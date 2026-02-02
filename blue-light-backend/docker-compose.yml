@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  db:
+    image: mysql:8.0
+    container_name: blue-light-db
+    ports:
+      - "3307:3306"  # 기존 프로젝트가 3306을 쓸 수 있으니 3307로 매핑
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bluelight
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - ./db_data:/var/lib/mysql # 데이터가 날아가지 않게 로컬에 저장
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
