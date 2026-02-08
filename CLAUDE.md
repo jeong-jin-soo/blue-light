@@ -133,6 +133,10 @@ DB_USERNAME=user
 DB_PASSWORD=password
 JWT_SECRET=bluelight-jwt-secret-key-for-development-minimum-256-bits-required
 FILE_UPLOAD_DIR=./uploads
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174  # 쉼표 구분
+LOG_LEVEL_APP=DEBUG    # 개발용 (프로덕션 기본값: INFO)
+LOG_LEVEL_SQL=DEBUG    # 개발용 (프로덕션 기본값: WARN)
+LOG_LEVEL_BIND=TRACE   # 개발용 (프로덕션 기본값: WARN)
 
 # Frontend (.env)
 VITE_API_BASE_URL=http://localhost:8090/api

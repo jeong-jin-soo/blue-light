@@ -26,8 +26,16 @@ public class JwtTokenProvider {
 
     private SecretKey secretKey;
 
+    private static final String DEV_SECRET_PREFIX = "bluelight-jwt-secret-key";
+
     @PostConstruct
     protected void init() {
+        if (secretKeyString.startsWith(DEV_SECRET_PREFIX)) {
+            log.warn("========================================");
+            log.warn("WARNING: Using default JWT secret key!");
+            log.warn("Set JWT_SECRET environment variable for production.");
+            log.warn("========================================");
+        }
         this.secretKey = Keys.hmacShaKeyFor(secretKeyString.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -88,13 +96,13 @@ public class JwtTokenProvider {
                     .parseSignedClaims(token);
             return true;
         } catch (SecurityException | MalformedJwtException e) {
-            log.error("Invalid JWT signature: {}", e.getMessage());
+            log.debug("Invalid JWT signature: {}", e.getMessage());
         } catch (ExpiredJwtException e) {
-            log.error("Expired JWT token: {}", e.getMessage());
+            log.debug("Expired JWT token: {}", e.getMessage());
         } catch (UnsupportedJwtException e) {
-            log.error("Unsupported JWT token: {}", e.getMessage());
+            log.debug("Unsupported JWT token: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty: {}", e.getMessage());
+            log.debug("JWT claims string is empty: {}", e.getMessage());
         }
         return false;
     }

@@ -3,6 +3,9 @@ package com.bluelight.backend.api.auth;
 import com.bluelight.backend.api.auth.dto.LoginRequest;
 import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
+import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.security.LoginRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final LoginRateLimiter loginRateLimiter;
 
     /**
      * 회원가입
@@ -36,13 +40,34 @@ public class AuthController {
     }
 
     /**
-     * 로그인
+     * 로그인 (Rate Limiting 적용: IP당 15분 내 최대 5회)
      * POST /api/auth/login
      */
     @PostMapping("/login")
-    public ResponseEntity<TokenResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<TokenResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+
+        String clientIp = httpRequest.getRemoteAddr();
+
+        if (loginRateLimiter.isBlocked(clientIp)) {
+            log.warn("Rate limit exceeded for IP: {}", clientIp);
+            throw new BusinessException(
+                    "Too many login attempts. Please try again later.",
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "RATE_LIMIT_EXCEEDED"
+            );
+        }
+
         log.info("로그인 요청: email={}", request.getEmail());
-        TokenResponse response = authService.login(request);
-        return ResponseEntity.ok(response);
+
+        try {
+            TokenResponse response = authService.login(request);
+            loginRateLimiter.clearAttempts(clientIp);
+            return ResponseEntity.ok(response);
+        } catch (BusinessException e) {
+            loginRateLimiter.recordFailedAttempt(clientIp);
+            throw e;
+        }
     }
 }

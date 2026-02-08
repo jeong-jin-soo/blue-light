@@ -2,6 +2,7 @@ package com.bluelight.backend.config;
 
 import com.bluelight.backend.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -17,6 +18,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -30,6 +32,9 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @Value("${cors.allowed-origins}")
+    private String allowedOriginsRaw;
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -38,6 +43,11 @@ public class SecurityConfig {
 
                 // CORS 설정
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // Security Response Headers
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.deny())
+                )
 
                 // 세션 비활성화 (Stateless)
                 .sessionManagement(session ->
@@ -66,19 +76,15 @@ public class SecurityConfig {
 
     /**
      * CORS 설정
-     * - 프론트엔드(5173 포트) 허용
+     * - 환경변수 CORS_ALLOWED_ORIGINS로 허용 Origin 관리
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 허용할 Origin (프론트엔드 개발 서버)
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "http://localhost:5174",
-                "http://127.0.0.1:5173",
-                "http://127.0.0.1:5174"
-        ));
+        // 환경변수에서 허용 Origin 목록 로드
+        List<String> origins = Arrays.asList(allowedOriginsRaw.split(","));
+        configuration.setAllowedOrigins(origins);
 
         // 허용할 HTTP 메서드
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

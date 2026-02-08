@@ -162,8 +162,12 @@ PENDING_PAYMENT  -->  PAID  -->  IN_PROGRESS  -->  COMPLETED
 |----------|---------|-------------|
 | `DB_USERNAME` | `user` | MySQL username |
 | `DB_PASSWORD` | `password` | MySQL password |
-| `JWT_SECRET` | dev default | JWT signing key (change in production) |
+| `JWT_SECRET` | dev default | JWT signing key (min 256-bit, **must change in production**) |
 | `FILE_UPLOAD_DIR` | `./uploads` | File storage directory |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,...` | Comma-separated allowed origins |
+| `LOG_LEVEL_APP` | `INFO` | Application log level |
+| `LOG_LEVEL_SQL` | `WARN` | Hibernate SQL log level |
+| `LOG_LEVEL_BIND` | `WARN` | Hibernate bind parameter log level |
 
 ## Security
 
@@ -173,7 +177,11 @@ PENDING_PAYMENT  -->  PAID  -->  IN_PROGRESS  -->  COMPLETED
 - Ownership verification on all file operations (IDOR-protected)
 - Ownership verification on application access
 - BCrypt password hashing
-- CORS restricted to frontend origins
+- CORS configurable via environment variable (`CORS_ALLOWED_ORIGINS`)
+- Login rate limiting (5 attempts per 15 minutes per IP, HTTP 429)
+- Security response headers (X-Frame-Options: DENY)
+- JWT default secret key startup warning for production awareness
+- Soft delete pattern prevents permanent data loss
 
 ## Design System
 
