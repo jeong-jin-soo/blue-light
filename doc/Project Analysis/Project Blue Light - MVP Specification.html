@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Project Blue Light - MVP Specification</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-size: 9px;
+      color: #888;
+    }
+  }
+  body {
+    font-family: -apple-system, 'Helvetica Neue', 'Apple SD Gothic Neo', sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.7;
+    color: #222;
+    max-width: 210mm;
+    margin: 0 auto;
+  }
+  .cover {
+    page-break-after: always;
+    text-align: center;
+    padding-top: 100px;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    color: #1a3a5c;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .cover .subtitle {
+    font-size: 16pt;
+    color: #4a7ab5;
+    margin-bottom: 40px;
+  }
+  .cover .meta {
+    font-size: 11pt;
+    color: #666;
+    line-height: 2;
+  }
+  .cover .meta strong { color: #333; }
+  .cover .divider {
+    width: 80px;
+    height: 3px;
+    background: #1a3a5c;
+    margin: 40px auto;
+  }
+  .cover .strategy-box {
+    background: #f0f5fa;
+    border: 2px solid #1a3a5c;
+    border-radius: 8px;
+    padding: 20px 28px;
+    margin: 40px auto;
+    max-width: 480px;
+    text-align: left;
+    font-size: 10.5pt;
+    line-height: 1.8;
+  }
+  .cover .strategy-box .label {
+    font-weight: bold;
+    color: #1a3a5c;
+    font-size: 11pt;
+    margin-bottom: 6px;
+  }
+
+  .toc {
+    page-break-after: always;
+  }
+  .toc h2 {
+    font-size: 18pt;
+    color: #1a3a5c;
+    border-bottom: 2px solid #1a3a5c;
+    padding-bottom: 8px;
+  }
+  .toc ul {
+    list-style: none;
+    padding-left: 0;
+  }
+  .toc ul li {
+    padding: 6px 0;
+    border-bottom: 1px dotted #ccc;
+    font-size: 11pt;
+  }
+  .toc ul li .num {
+    display: inline-block;
+    width: 30px;
+    font-weight: bold;
+    color: #1a3a5c;
+  }
+
+  h2 {
+    font-size: 16pt;
+    color: #1a3a5c;
+    border-bottom: 2px solid #1a3a5c;
+    padding-bottom: 6px;
+    margin-top: 36px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 13pt;
+    color: #2a5a8c;
+    margin-top: 24px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 11pt;
+    color: #3a6a9c;
+    margin-top: 16px;
+    page-break-after: avoid;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px 0;
+    font-size: 9.5pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background-color: #1a3a5c;
+    color: white;
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #ddd;
+    vertical-align: top;
+  }
+  tr:nth-child(even) { background-color: #f7f9fc; }
+
+  .in-badge {
+    display: inline-block;
+    background: #28a745;
+    color: white;
+    font-size: 8pt;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+  .out-badge {
+    display: inline-block;
+    background: #999;
+    color: white;
+    font-size: 8pt;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 3px;
+  }
+
+  .process-box {
+    background: #f5f8fc;
+    border-left: 4px solid #1a3a5c;
+    padding: 14px 18px;
+    margin: 12px 0;
+    font-size: 10pt;
+    line-height: 1.8;
+    page-break-inside: avoid;
+  }
+  .process-box .step { margin: 4px 0; }
+  .process-box .step-num {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: #1a3a5c;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-size: 9pt;
+    font-weight: bold;
+    margin-right: 8px;
+  }
+  .process-box .sub {
+    margin-left: 36px;
+    color: #555;
+    font-size: 9.5pt;
+  }
+
+  .info-box {
+    background: #fff8e1;
+    border: 1px solid #f0d060;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  .info-box .label {
+    font-weight: bold;
+    color: #b8860b;
+  }
+
+  .risk-high { color: #dc3545; font-weight: bold; }
+  .risk-mid { color: #fd7e14; font-weight: bold; }
+  .risk-low { color: #28a745; font-weight: bold; }
+
+  .week-header {
+    background: #1a3a5c;
+    color: white;
+    padding: 8px 14px;
+    font-size: 11pt;
+    font-weight: bold;
+    border-radius: 4px 4px 0 0;
+    margin-top: 16px;
+    margin-bottom: 0;
+  }
+  .week-body {
+    border: 1px solid #1a3a5c;
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+    margin-bottom: 16px;
+  }
+  .week-body table {
+    margin: 0;
+  }
+
+  ul, ol { padding-left: 24px; }
+  li { margin-bottom: 3px; }
+  strong { color: #1a3a5c; }
+  code {
+    background: #f0f0f0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+  }
+  .section-break { page-break-before: always; }
+
+  .us-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-left: 4px solid #1a3a5c;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 8px 0;
+    page-break-inside: avoid;
+  }
+  .us-card .us-title {
+    font-weight: bold;
+    color: #1a3a5c;
+    font-size: 10.5pt;
+  }
+  .us-card .us-ref {
+    font-size: 8.5pt;
+    color: #888;
+    margin-left: 8px;
+  }
+  .us-card ul {
+    margin: 4px 0;
+    font-size: 9.5pt;
+  }
+
+  .priority-label {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 9pt;
+    font-weight: bold;
+    color: white;
+    margin-right: 8px;
+  }
+  .p1 { background: #dc3545; }
+  .p2 { background: #fd7e14; }
+  .p3 { background: #6c757d; }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="cover">
+  <h1>Project Blue Light</h1>
+  <div class="subtitle">MVP Specification</div>
+  <div class="divider"></div>
+  <div class="subtitle" style="font-size:13pt; color:#666;">
+    Minimum Viable Product Definition<br>
+    1 Mid-Level Developer &middot; 4 Weeks (22 Working Days)
+  </div>
+
+  <div class="strategy-box">
+    <div class="label">Target: VER 1 &mdash; Without LEW Participant</div>
+    <ul style="margin:6px 0; padding-left:20px;">
+      <li>LEW/Drafter marketplace, bidding system not required</li>
+      <li>Company's own LEW handles EMA submission offline</li>
+      <li>Applicant self-service journey validated first</li>
+      <li>Immediately monetizable via kVA-based pricing</li>
+    </ul>
+  </div>
+
+  <div style="margin-top:50px;" class="meta">
+    <strong>Document Version:</strong> 1.0<br>
+    <strong>Date:</strong> 2026-02-06<br>
+    <strong>Classification:</strong> Internal Planning Document<br>
+    <strong>Tech Stack:</strong> React 19 + Spring Boot 4.0.2 + MySQL 8.0<br>
+  </div>
+</div>
+
+<!-- ==================== TOC ==================== -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><span class="num">A.</span> MVP Scope (IN vs OUT)</li>
+    <li><span class="num">B.</span> User Stories</li>
+    <li style="padding-left:30px;">Priority 1: Critical Path</li>
+    <li style="padding-left:30px;">Priority 2: Admin Operations</li>
+    <li style="padding-left:30px;">Priority 3: Enhancements</li>
+    <li><span class="num">C.</span> Architecture</li>
+    <li style="padding-left:30px;">C-1. Frontend Routes</li>
+    <li style="padding-left:30px;">C-2. Frontend Directory Structure</li>
+    <li style="padding-left:30px;">C-3. Backend API Endpoints</li>
+    <li style="padding-left:30px;">C-4. Database</li>
+    <li><span class="num">D.</span> Sprint Plan (4 Weeks)</li>
+    <li><span class="num">E.</span> Expansion Strategy</li>
+    <li><span class="num">F.</span> Risk Assessment</li>
+  </ul>
+</div>
+
+<!-- ==================== A. SCOPE ==================== -->
+<div class="section-break">
+<h2>A. MVP Scope (IN vs OUT)</h2>
+
+<h3>IN &mdash; 12 Features</h3>
+
+<table>
+  <tr><th style="width:8%">ID</th><th style="width:22%">Feature</th><th style="width:6%">MVP</th><th>Scope</th></tr>
+  <tr><td>A-1</td><td>Sign Up / Login</td><td><span class="in-badge">IN</span></td><td>Backend complete. <strong>Build UI pages only</strong></td></tr>
+  <tr><td>A-2</td><td>New Licence Application</td><td><span class="in-badge">IN</span></td><td>Core flow: address &rarr; kVA selection &rarr; auto pricing &rarr; SLD upload &rarr; status tracking. Actual EMA submission handled offline by company LEW</td></tr>
+  <tr><td>A-4</td><td>Service Type Selection</td><td><span class="in-badge">IN</span></td><td>Single service type in MVP ("New Licence"). Dropdown structure preserved for future types (Renewal, Supply)</td></tr>
+  <tr><td>A-5</td><td>kVA-Based Auto Pricing</td><td><span class="in-badge">IN</span></td><td>MasterPrice entity ready. Key differentiator &mdash; instant transparent pricing</td></tr>
+  <tr><td>A-10</td><td>My Profile</td><td><span class="in-badge">IN</span></td><td>Edit name, phone. Change password</td></tr>
+  <tr><td>A-12</td><td>My Applications</td><td><span class="in-badge">IN</span></td><td>Application list + status tracking with colour-coded badges</td></tr>
+  <tr><td>A-14</td><td>Dashboard</td><td><span class="in-badge">IN</span></td><td>Summary cards (Total / Pending / In-Progress / Completed) + recent list</td></tr>
+  <tr><td>A-16</td><td>Document Upload/Download</td><td><span class="in-badge">IN</span></td><td>SLD upload, completed docs download. Local disk storage (S3-ready interface)</td></tr>
+  <tr><td>A-17</td><td>Payment (simplified)</td><td><span class="in-badge">IN</span></td><td>Offline payment (PayNow/bank transfer) + admin manual confirmation. Real PG deferred</td></tr>
+  <tr><td>A-18</td><td>Payment History</td><td><span class="in-badge">IN</span></td><td>Per-application payment record list</td></tr>
+  <tr><td>C-1</td><td>User Management</td><td><span class="in-badge">IN</span></td><td>Admin: user list with search</td></tr>
+  <tr><td>C-3</td><td>Application Monitoring</td><td><span class="in-badge">IN</span></td><td>Admin: all applications list / status change / payment confirm / licence issuance</td></tr>
+</table>
+
+<h3>OUT &mdash; 23 Features (Deferred)</h3>
+
+<table>
+  <tr><th style="width:8%">ID</th><th style="width:22%">Feature</th><th style="width:6%">MVP</th><th>Reason for Deferral</th></tr>
+  <tr><td>A-3</td><td>Licence Renewal</td><td><span class="out-badge">OUT</span></td><td>Nearly identical to A-2. Add <code>applicationType</code> enum later (2-3 days)</td></tr>
+  <tr><td>A-6</td><td>SLD Service Request</td><td><span class="out-badge">OUT</span></td><td>Requires Drafter marketplace &rarr; VER 2</td></tr>
+  <tr><td>A-7</td><td>Find &amp; Engage LEW</td><td><span class="out-badge">OUT</span></td><td>Requires LEW marketplace &rarr; VER 2</td></tr>
+  <tr><td>A-8</td><td>Find SLD/Layout Drafter</td><td><span class="out-badge">OUT</span></td><td>Requires Drafter marketplace &rarr; VER 2</td></tr>
+  <tr><td>A-9</td><td>SLD Verification</td><td><span class="out-badge">OUT</span></td><td>Advanced feature &rarr; VER 2+</td></tr>
+  <tr><td>A-11</td><td>My Licenses</td><td><span class="out-badge">OUT</span></td><td>Manual licence registration is nice-to-have</td></tr>
+  <tr><td>A-13</td><td>My Engagement</td><td><span class="out-badge">OUT</span></td><td>No LEW/Drafter engagement in VER 1</td></tr>
+  <tr><td>A-15</td><td>Chat</td><td><span class="out-badge">OUT</span></td><td>WebSocket real-time feature &rarr; VER 2</td></tr>
+  <tr><td>B-1~B-8</td><td>LEW/Drafter Portal (all)</td><td><span class="out-badge">OUT</span></td><td>Entire portal deferred to VER 2</td></tr>
+  <tr><td>C-2</td><td>Professional Verification</td><td><span class="out-badge">OUT</span></td><td>No LEW/Drafter in VER 1</td></tr>
+  <tr><td>C-4</td><td>Support Handling</td><td><span class="out-badge">OUT</span></td><td>Use email for MVP support</td></tr>
+  <tr><td>D-1~D-5</td><td>System/Notifications (all)</td><td><span class="out-badge">OUT</span></td><td>AI chatbot, email alerts, reminders &rarr; post-MVP</td></tr>
+</table>
+</div>
+
+<!-- ==================== B. USER STORIES ==================== -->
+<div class="section-break">
+<h2>B. User Stories</h2>
+
+<h3><span class="priority-label p1">P1</span>Priority 1 &mdash; Critical Path (Must Ship)</h3>
+
+<div class="us-card">
+  <div><span class="us-title">US-1: Applicant Registration &amp; Login</span><span class="us-ref">A-1</span></div>
+  <ul>
+    <li>Sign up with email / password / name / phone &rarr; JWT-based login</li>
+    <li>Protected routes redirect unauthenticated users to login</li>
+    <li>Role-based route guards (APPLICANT vs ADMIN)</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-2: Create New Licence Application</span><span class="us-ref">A-2, A-4, A-5</span></div>
+  <ul>
+    <li>Multi-step form: Step 1 (Address + Building Type) &rarr; Step 2 (kVA Selection + Auto Price) &rarr; Step 3 (Review + Confirm)</li>
+    <li>kVA dropdown fetches active MasterPrice entries; price auto-calculated on selection</li>
+    <li>On submit: Application created with <code>PENDING_PAYMENT</code> status; payment instructions displayed</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-3: Upload SLD Document</span><span class="us-ref">A-16</span></div>
+  <ul>
+    <li>Accept PDF / JPG / PNG (max 10MB); store on local disk</li>
+    <li>Create FileEntity with <code>DRAWING_SLD</code> type; allow file replacement</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-4: View My Applications List</span><span class="us-ref">A-12</span></div>
+  <ul>
+    <li>Display: address, kVA, amount, status, created date</li>
+    <li>Colour-coded status badges: PENDING_PAYMENT=yellow, PAID=blue, IN_PROGRESS=orange, COMPLETED=green</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-5: View Application Detail</span><span class="us-ref">A-12, A-16, A-18</span></div>
+  <ul>
+    <li>Full fields + uploaded files (download links) + payment history</li>
+    <li>Step tracker progress indicator; licence info when COMPLETED</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-6: Applicant Dashboard</span><span class="us-ref">A-14</span></div>
+  <ul>
+    <li>Summary cards: Total / Pending Payment / In Progress / Completed counts</li>
+    <li>Recent 5 applications list + "New Application" CTA button</li>
+  </ul>
+</div>
+
+<h3><span class="priority-label p2">P2</span>Priority 2 &mdash; Admin Operations (Must Ship)</h3>
+
+<div class="us-card">
+  <div><span class="us-title">US-7: Admin Application Monitoring</span><span class="us-ref">C-3</span></div>
+  <ul>
+    <li>Paginated list of all applications + filter by status / search</li>
+    <li>Status transitions: PENDING_PAYMENT &rarr; PAID &rarr; IN_PROGRESS &rarr; COMPLETED</li>
+    <li>On COMPLETED: enter licence number + expiry date</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-8: Admin Payment Confirmation</span><span class="us-ref">A-17 (admin)</span></div>
+  <ul>
+    <li>"Confirm Payment" on PENDING_PAYMENT application</li>
+    <li>Creates Payment record (SUCCESS) + Application status &rarr; PAID</li>
+  </ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-9: Admin User Management</span><span class="us-ref">C-1</span></div>
+  <ul>
+    <li>User list: email, name, role, registration date + search</li>
+  </ul>
+</div>
+
+<h3><span class="priority-label p3">P3</span>Priority 3 &mdash; Enhancements (Should Ship)</h3>
+
+<div class="us-card">
+  <div><span class="us-title">US-10: Profile Management</span><span class="us-ref">A-10</span></div>
+  <ul><li>Edit name / phone; change password (requires current password)</li></ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-11: Download Completed Documents</span><span class="us-ref">A-16</span></div>
+  <ul><li>Applicant downloads licence PDF uploaded by admin for COMPLETED applications</li></ul>
+</div>
+
+<div class="us-card">
+  <div><span class="us-title">US-12: Admin File Upload</span><span class="us-ref">A-16 (admin)</span></div>
+  <ul><li>Admin uploads LICENSE_PDF / REPORT_PDF for completed applications</li></ul>
+</div>
+</div>
+
+<!-- ==================== C. ARCHITECTURE ==================== -->
+<div class="section-break">
+<h2>C. Architecture</h2>
+
+<h3>C-1. Frontend Routes</h3>
+
+<table>
+  <tr><th style="width:35%">Route</th><th style="width:15%">Role</th><th>Page</th></tr>
+  <tr><td><code>/login</code></td><td>Public</td><td>LoginPage</td></tr>
+  <tr><td><code>/signup</code></td><td>Public</td><td>SignupPage</td></tr>
+  <tr><td><code>/dashboard</code></td><td>APPLICANT</td><td>Applicant Dashboard</td></tr>
+  <tr><td><code>/applications</code></td><td>APPLICANT</td><td>Application List</td></tr>
+  <tr><td><code>/applications/new</code></td><td>APPLICANT</td><td>New Application (multi-step form)</td></tr>
+  <tr><td><code>/applications/:id</code></td><td>APPLICANT</td><td>Application Detail</td></tr>
+  <tr><td><code>/profile</code></td><td>APPLICANT</td><td>Profile Management</td></tr>
+  <tr><td><code>/admin/dashboard</code></td><td>ADMIN</td><td>Admin Dashboard</td></tr>
+  <tr><td><code>/admin/applications</code></td><td>ADMIN</td><td>Admin Application List</td></tr>
+  <tr><td><code>/admin/applications/:id</code></td><td>ADMIN</td><td>Admin Application Detail + Status Mgmt</td></tr>
+  <tr><td><code>/admin/users</code></td><td>ADMIN</td><td>Admin User List</td></tr>
+</table>
+
+<h3>C-2. Frontend Directory Structure</h3>
+
+<div class="process-box" style="font-size:9pt; line-height:1.6;">
+<pre style="margin:0; font-family: 'SF Mono', Menlo, monospace;">src/
+  api/
+    axiosClient.ts          (existing)
+    authApi.ts              (existing)
+    applicationApi.ts       (new)
+    priceApi.ts             (new)
+    fileApi.ts              (new)
+    paymentApi.ts           (new)
+    userApi.ts              (new)
+  stores/
+    authStore.ts            (existing)
+  types/
+    index.ts                (existing - all interfaces defined)
+  components/
+    common/    Layout, ProtectedRoute, StatusBadge,
+               FileUpload, StepTracker, DataTable,
+               LoadingSpinner, EmptyState
+    applicant/ DashboardCards, ApplicationCard,
+               ApplicationForm/ (Step1, Step2, Step3)
+    admin/     ApplicationStatusManager,
+               PaymentConfirmation, UserTable
+  pages/
+    auth/      LoginPage, SignupPage
+    applicant/ DashboardPage, ApplicationListPage,
+               NewApplicationPage, ApplicationDetailPage,
+               ProfilePage
+    admin/     AdminDashboardPage, AdminApplicationListPage,
+               AdminApplicationDetailPage, AdminUserListPage
+  router/      index.tsx, routes.tsx</pre>
+</div>
+
+<h3>C-3. Backend API Endpoints</h3>
+
+<table>
+  <tr><th style="width:10%">Method</th><th style="width:42%">Endpoint</th><th style="width:12%">Auth</th><th>Description</th></tr>
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Auth (existing)</strong></td></tr>
+  <tr><td>POST</td><td><code>/api/auth/signup</code></td><td>Public</td><td>User registration</td></tr>
+  <tr><td>POST</td><td><code>/api/auth/login</code></td><td>Public</td><td>User login</td></tr>
+
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Prices (new)</strong></td></tr>
+  <tr><td>GET</td><td><code>/api/prices</code></td><td>Public</td><td>List active kVA price tiers</td></tr>
+  <tr><td>GET</td><td><code>/api/prices/calculate?kva=</code></td><td>Public</td><td>Calculate price for given kVA</td></tr>
+
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Applications - Applicant (new)</strong></td></tr>
+  <tr><td>POST</td><td><code>/api/applications</code></td><td>APPLICANT</td><td>Create new application</td></tr>
+  <tr><td>GET</td><td><code>/api/applications</code></td><td>APPLICANT</td><td>List my applications</td></tr>
+  <tr><td>GET</td><td><code>/api/applications/:id</code></td><td>APPLICANT</td><td>Application detail (+ files, payments)</td></tr>
+  <tr><td>GET</td><td><code>/api/applications/summary</code></td><td>APPLICANT</td><td>Dashboard summary counts</td></tr>
+
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Applications - Admin (new)</strong></td></tr>
+  <tr><td>GET</td><td><code>/api/admin/applications</code></td><td>ADMIN</td><td>List all applications (paginated)</td></tr>
+  <tr><td>GET</td><td><code>/api/admin/applications/:id</code></td><td>ADMIN</td><td>Any application detail</td></tr>
+  <tr><td>PATCH</td><td><code>/api/admin/applications/:id/status</code></td><td>ADMIN</td><td>Update application status</td></tr>
+  <tr><td>POST</td><td><code>/api/admin/applications/:id/complete</code></td><td>ADMIN</td><td>Mark complete with licence info</td></tr>
+
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Files (new)</strong></td></tr>
+  <tr><td>POST</td><td><code>/api/applications/:id/files</code></td><td>Authenticated</td><td>Upload file</td></tr>
+  <tr><td>GET</td><td><code>/api/applications/:id/files</code></td><td>Authenticated</td><td>List files</td></tr>
+  <tr><td>GET</td><td><code>/api/files/:fileId/download</code></td><td>Authenticated</td><td>Download file</td></tr>
+  <tr><td>DELETE</td><td><code>/api/files/:fileId</code></td><td>Authenticated</td><td>Delete file (soft)</td></tr>
+
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Payments (new)</strong></td></tr>
+  <tr><td>GET</td><td><code>/api/applications/:id/payments</code></td><td>Authenticated</td><td>List payments for application</td></tr>
+  <tr><td>POST</td><td><code>/api/admin/applications/:id/payments/confirm</code></td><td>ADMIN</td><td>Confirm offline payment</td></tr>
+
+  <tr style="background:#e8f5e9"><td colspan="4"><strong>Users (new)</strong></td></tr>
+  <tr><td>GET</td><td><code>/api/users/me</code></td><td>Authenticated</td><td>Current user profile</td></tr>
+  <tr><td>PUT</td><td><code>/api/users/me</code></td><td>Authenticated</td><td>Update profile</td></tr>
+  <tr><td>PUT</td><td><code>/api/users/me/password</code></td><td>Authenticated</td><td>Change password</td></tr>
+  <tr><td>GET</td><td><code>/api/admin/users</code></td><td>ADMIN</td><td>List all users</td></tr>
+</table>
+
+<h3>C-4. Database</h3>
+
+<div class="info-box">
+  <span class="label">No schema changes required.</span> All 6 existing entities (User, Application, Payment, Inspection, FileEntity, MasterPrice) are sufficient for MVP. Inspection entity is dormant until VER 2.
+</div>
+
+<p><strong>Required setup:</strong></p>
+<ul>
+  <li><code>schema.sql</code> &mdash; CREATE TABLE scripts matching all JPA entities (JPA validate mode)</li>
+  <li><code>data.sql</code> &mdash; MasterPrice seed data (kVA pricing tiers) + Admin user account</li>
+</ul>
+</div>
+
+<!-- ==================== D. SPRINT PLAN ==================== -->
+<div class="section-break">
+<h2>D. Sprint Plan (4 Weeks, 22 Working Days)</h2>
+
+<div class="week-header">Week 1: Foundation + Auth UI + Backend APIs (Day 1-5)</div>
+<div class="week-body">
+<table>
+  <tr><th style="width:10%">Day</th><th>Task</th><th style="width:30%">Deliverable</th></tr>
+  <tr><td>1</td><td>DB initialisation (schema.sql + data.sql), frontend router/layout shell setup</td><td>MySQL tables created, seed data loaded, React Router + Layout working</td></tr>
+  <tr><td>2</td><td>Auth UI: LoginPage, SignupPage, ProtectedRoute component</td><td>Full auth flow working E2E</td></tr>
+  <tr><td>3</td><td>Backend: PriceController + ApplicationService/Controller (create, list, detail)</td><td>Application CRUD APIs tested via Postman</td></tr>
+  <tr><td>4</td><td>Backend: Admin APIs (all applications, status update, payment confirmation)</td><td>Admin workflow APIs complete</td></tr>
+  <tr><td>5</td><td>Backend: FileStorageService + FileController (upload/download)</td><td>File upload/download working</td></tr>
+</table>
+</div>
+
+<div class="week-header">Week 2: Applicant Frontend (Day 6-10)</div>
+<div class="week-body">
+<table>
+  <tr><th style="width:10%">Day</th><th>Task</th><th style="width:30%">Deliverable</th></tr>
+  <tr><td>6</td><td>Frontend API layer (applicationApi, priceApi, fileApi, paymentApi) + common components</td><td>API modules + StatusBadge, DataTable, etc.</td></tr>
+  <tr><td>7</td><td>Applicant Dashboard (summary cards + recent applications)</td><td>Dashboard page functional</td></tr>
+  <tr><td>8</td><td>New Application multi-step form (Address &rarr; kVA/Price &rarr; Review)</td><td>Application creation E2E</td></tr>
+  <tr><td>9</td><td>Application List + Detail pages</td><td>List with filters + Detail with step tracker</td></tr>
+  <tr><td>10</td><td>File upload/download integration + Applicant E2E testing</td><td>Complete applicant journey tested</td></tr>
+</table>
+</div>
+
+<div class="week-header">Week 3: Admin Frontend + Profile + Integration (Day 11-15)</div>
+<div class="week-body">
+<table>
+  <tr><th style="width:10%">Day</th><th>Task</th><th style="width:30%">Deliverable</th></tr>
+  <tr><td>11</td><td>Admin Dashboard</td><td>Admin overview page</td></tr>
+  <tr><td>12</td><td>Admin Application Management (list / filter / detail)</td><td>Admin can browse all applications</td></tr>
+  <tr><td>13</td><td>Admin: Payment confirmation + licence completion + file upload</td><td>Full admin workflow functional</td></tr>
+  <tr><td>14</td><td>Admin User Management + Applicant Profile page</td><td>User list + Profile edit working</td></tr>
+  <tr><td>15</td><td>E2E integration testing (create &rarr; pay &rarr; status &rarr; complete &rarr; download)</td><td>All flows validated end-to-end</td></tr>
+</table>
+</div>
+
+<div class="week-header">Week 4: Polish + Stabilisation (Day 16-22)</div>
+<div class="week-body">
+<table>
+  <tr><th style="width:10%">Day</th><th>Task</th><th style="width:30%">Deliverable</th></tr>
+  <tr><td>16-17</td><td>Responsive design (mobile optimisation, sidebar toggle)</td><td>Mobile-friendly UI</td></tr>
+  <tr><td>18</td><td>Error handling + empty states + session expiry</td><td>Robust error UX</td></tr>
+  <tr><td>19</td><td>Loading states + toast notifications + UX improvements</td><td>Polished interactions</td></tr>
+  <tr><td>20</td><td>Security review (role verification, data access scope, CORS)</td><td>Security-hardened</td></tr>
+  <tr><td>21</td><td>Documentation (README, API list, env variable guide)</td><td>Developer documentation</td></tr>
+  <tr><td>22</td><td>Final testing + buffer</td><td>Production-ready MVP</td></tr>
+</table>
+</div>
+
+<div class="info-box">
+  <span class="label">Critical Path:</span> Backend Application API (Day 3) &rarr; Frontend Application Form (Day 8) &rarr; Admin Application Management (Day 12) &rarr; E2E Testing (Day 15)
+</div>
+</div>
+
+<!-- ==================== E. EXPANSION ==================== -->
+<div class="section-break">
+<h2>E. Expansion Strategy (Deferred Features)</h2>
+
+<table>
+  <tr><th style="width:25%">Feature</th><th style="width:40%">How to Expand</th><th>Estimated Effort</th></tr>
+  <tr><td><strong>Licence Renewal</strong> (A-3)</td><td>Add <code>applicationType</code> enum (NEW / RENEWAL) to Application entity</td><td>2-3 days</td></tr>
+  <tr><td><strong>LEW/Drafter Portal</strong> (B-all)</td><td>Add LEW / DRAFTER to UserRole enum. New Engagement entity. /lew/* and /drafter/* routes</td><td>3-4 weeks</td></tr>
+  <tr><td><strong>Real Payment Gateway</strong> (A-17)</td><td>Stripe / PayNow webhook handler replaces admin manual confirmation</td><td>1 week</td></tr>
+  <tr><td><strong>Inspection / PDF Report</strong> (B-3, B-4)</td><td>Existing Inspection entity + iText/Jasper PDF generation</td><td>1-2 weeks</td></tr>
+  <tr><td><strong>Chat</strong> (A-15)</td><td>Message entity + WebSocket (STOMP)</td><td>2-3 weeks</td></tr>
+  <tr><td><strong>Email Notifications</strong> (D-3, D-4)</td><td>Spring Mail + event listeners + email templates</td><td>3-5 days</td></tr>
+  <tr><td><strong>S3 File Storage</strong></td><td>FileStorageService interface &rarr; swap LocalStorage for S3 implementation</td><td>1 day</td></tr>
+  <tr><td><strong>AI Chatbot</strong> (D-1)</td><td>/api/chat endpoint + AI API integration</td><td>1-2 weeks</td></tr>
+</table>
+
+<div class="info-box">
+  <span class="label">Key Design Principles for Extensibility:</span>
+  <ul style="margin:4px 0;">
+    <li><strong>FileStorageService</strong> designed as interface (Local &rarr; S3 swappable)</li>
+    <li><strong>UserRole</strong> as enum (LEW / DRAFTER easily addable)</li>
+    <li><strong>Application</strong> entity's flexible status machine is the foundation for all expansions</li>
+  </ul>
+</div>
+</div>
+
+<!-- ==================== F. RISK ==================== -->
+<h2>F. Risk Assessment</h2>
+
+<table>
+  <tr><th style="width:25%">Risk</th><th style="width:10%">Likelihood</th><th style="width:10%">Impact</th><th>Mitigation</th></tr>
+  <tr>
+    <td>Spring Boot 4.0.2 compatibility</td>
+    <td class="risk-mid">Medium</td>
+    <td class="risk-high">High</td>
+    <td>4.x is very new (Jakarta EE migration). If blockers arise, downgrade to 3.4.x</td>
+  </tr>
+  <tr>
+    <td>JPA validate + tables missing</td>
+    <td class="risk-high">High</td>
+    <td class="risk-mid">Medium</td>
+    <td><strong>Create schema.sql immediately on Day 1</strong></td>
+  </tr>
+  <tr>
+    <td>Frontend workload underestimated</td>
+    <td class="risk-mid">Medium</td>
+    <td class="risk-high">High</td>
+    <td>10+ pages in 2 weeks. Leverage Tailwind component library aggressively</td>
+  </tr>
+  <tr>
+    <td>Scope creep</td>
+    <td class="risk-high">High</td>
+    <td class="risk-high">High</td>
+    <td>This document is the agreed scope. All additions go to deferred backlog</td>
+  </tr>
+  <tr>
+    <td>kVA pricing data unavailable</td>
+    <td class="risk-low">Low</td>
+    <td class="risk-mid">Medium</td>
+    <td>Use placeholder values; make configurable via admin</td>
+  </tr>
+  <tr>
+    <td>No automated tests</td>
+    <td class="risk-high">High</td>
+    <td class="risk-mid">Medium</td>
+    <td>Write integration tests for 3 critical endpoints: create application, confirm payment, update status</td>
+  </tr>
+</table>
+
+<div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #1a3a5c; text-align: center; color: #888; font-size: 9pt;">
+  Project Blue Light &mdash; MVP Specification v1.0 | 2026-02-06
+</div>
+
+</body>
+</html>

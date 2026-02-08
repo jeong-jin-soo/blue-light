@@ -29,11 +29,10 @@ public class AuditorAwareImpl implements AuditorAware<Long> {
             return Optional.empty();
         }
 
-        // TODO: JWT 기반 인증 구현 후 실제 사용자 ID 추출 로직으로 교체
-        // 현재는 Principal이 사용자 ID(Long)를 직접 담고 있다고 가정
+        // JwtAuthenticationFilter에서 Principal로 userSeq(Long)를 설정함
         Object principal = authentication.getPrincipal();
-        if (principal instanceof Long) {
-            return Optional.of((Long) principal);
+        if (principal instanceof Long userSeq) {
+            return Optional.of(userSeq);
         }
 
         return Optional.empty();

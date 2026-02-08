@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Project Blue Light - Project Analysis</title>
+<style>
+  @page {
+    size: A4;
+    margin: 20mm 18mm 20mm 18mm;
+    @bottom-center {
+      content: counter(page) " / " counter(pages);
+      font-size: 9px;
+      color: #888;
+    }
+  }
+  body {
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10.5pt;
+    line-height: 1.7;
+    color: #222;
+    max-width: 210mm;
+    margin: 0 auto;
+  }
+
+  /* Cover Page */
+  .cover {
+    page-break-after: always;
+    text-align: center;
+    padding-top: 120px;
+  }
+  .cover h1 {
+    font-size: 32pt;
+    color: #1a3a5c;
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .cover .subtitle {
+    font-size: 16pt;
+    color: #4a7ab5;
+    margin-bottom: 60px;
+  }
+  .cover .meta {
+    font-size: 11pt;
+    color: #666;
+    line-height: 2;
+  }
+  .cover .meta strong {
+    color: #333;
+  }
+  .cover .divider {
+    width: 80px;
+    height: 3px;
+    background: #1a3a5c;
+    margin: 40px auto;
+  }
+
+  /* TOC */
+  .toc {
+    page-break-after: always;
+  }
+  .toc h2 {
+    font-size: 18pt;
+    color: #1a3a5c;
+    border-bottom: 2px solid #1a3a5c;
+    padding-bottom: 8px;
+  }
+  .toc ul {
+    list-style: none;
+    padding-left: 0;
+  }
+  .toc ul li {
+    padding: 6px 0;
+    border-bottom: 1px dotted #ccc;
+    font-size: 11pt;
+  }
+  .toc ul li a {
+    text-decoration: none;
+    color: #333;
+  }
+  .toc ul li .num {
+    display: inline-block;
+    width: 30px;
+    font-weight: bold;
+    color: #1a3a5c;
+  }
+
+  /* Section Headers */
+  h2 {
+    font-size: 16pt;
+    color: #1a3a5c;
+    border-bottom: 2px solid #1a3a5c;
+    padding-bottom: 6px;
+    margin-top: 36px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 13pt;
+    color: #2a5a8c;
+    margin-top: 24px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 11pt;
+    color: #3a6a9c;
+    margin-top: 16px;
+    page-break-after: avoid;
+  }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background-color: #1a3a5c;
+    color: white;
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #ddd;
+    vertical-align: top;
+  }
+  tr:nth-child(even) {
+    background-color: #f7f9fc;
+  }
+  tr:hover {
+    background-color: #eef3f9;
+  }
+
+  /* Process Flow */
+  .process-box {
+    background: #f5f8fc;
+    border-left: 4px solid #1a3a5c;
+    padding: 14px 18px;
+    margin: 12px 0;
+    font-size: 10pt;
+    line-height: 1.8;
+    page-break-inside: avoid;
+  }
+  .process-box .step {
+    margin: 4px 0;
+  }
+  .process-box .step-num {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    background: #1a3a5c;
+    color: white;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    font-size: 9pt;
+    font-weight: bold;
+    margin-right: 8px;
+  }
+  .process-box .sub {
+    margin-left: 36px;
+    color: #555;
+    font-size: 9.5pt;
+  }
+
+  /* Info Boxes */
+  .info-box {
+    background: #fff8e1;
+    border: 1px solid #f0d060;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  .info-box .label {
+    font-weight: bold;
+    color: #b8860b;
+  }
+
+  /* Lists */
+  ul, ol {
+    padding-left: 24px;
+  }
+  li {
+    margin-bottom: 3px;
+  }
+
+  /* Misc */
+  strong { color: #1a3a5c; }
+  code {
+    background: #f0f0f0;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 9.5pt;
+  }
+  .section-break {
+    page-break-before: always;
+  }
+</style>
+</head>
+<body>
+
+<!-- ==================== COVER PAGE ==================== -->
+<div class="cover">
+  <h1>Project Blue Light</h1>
+  <div class="subtitle">Project Analysis Document</div>
+  <div class="divider"></div>
+  <div class="subtitle" style="font-size:13pt; color:#666;">
+    Singapore EMA Electrical Installation Licence<br>
+    Application &amp; Renewal Automation Platform
+  </div>
+  <div style="margin-top:80px;" class="meta">
+    <strong>Document Version:</strong> 1.0<br>
+    <strong>Date:</strong> 6 February 2026<br>
+    <strong>Classification:</strong> Internal Planning Document<br>
+  </div>
+</div>
+
+<!-- ==================== TABLE OF CONTENTS ==================== -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><span class="num">1.</span> Project Purpose &amp; Background</li>
+    <li><span class="num">2.</span> User Types</li>
+    <li><span class="num">3.</span> Core Business Processes</li>
+    <li style="padding-left:30px;">3-1. New Licence Application</li>
+    <li style="padding-left:30px;">3-2. Licence Renewal</li>
+    <li style="padding-left:30px;">3-3. Temporary Supply Installation</li>
+    <li style="padding-left:30px;">3-4. Inspection &amp; Rectification</li>
+    <li><span class="num">4.</span> Detailed Feature Specification</li>
+    <li style="padding-left:30px;">A. Applicant Portal</li>
+    <li style="padding-left:30px;">B. LEW / Drafter Service Provider Portal</li>
+    <li style="padding-left:30px;">C. Admin Dashboard</li>
+    <li style="padding-left:30px;">D. System &amp; Notifications</li>
+    <li><span class="num">5.</span> LEW Participation Models (3 Versions)</li>
+    <li><span class="num">6.</span> Domain Glossary</li>
+    <li><span class="num">7.</span> Letter of Appointment (3 Types)</li>
+    <li><span class="num">8.</span> Key Deliverables</li>
+  </ul>
+</div>
+
+<!-- ==================== 1. PROJECT PURPOSE ==================== -->
+<div class="section-break">
+<h2>1. Project Purpose &amp; Background</h2>
+
+<h3>1-1. Project Purpose</h3>
+<p>To build a one-stop digital platform (App/Web) that automates the <strong>new application and renewal process for Electrical Installation Licences (EIL)</strong> for commercial and industrial premises in Singapore.</p>
+
+<h3>1-2. Current Pain Points (As-Is)</h3>
+<ul>
+  <li>In Singapore, it is <strong>legally mandatory</strong> to hold an Electrical Installation Licence from the <strong>Energy Market Authority (EMA)</strong> to operate an electrical board exceeding <strong>45kVA</strong></li>
+  <li>The current process is <strong>entirely manual</strong> &mdash; upon receiving a renewal notice, licensees must find and engage a Licensed Electrical Worker (LEW) on their own</li>
+  <li>Delays can result in <strong>termination of electrical supply by SP Group (Singapore Power)</strong></li>
+  <li>The <strong>high turnover rate of Singapore&rsquo;s commercial spaces</strong> (due to high rental costs) creates continuous demand for new applications and renewals</li>
+</ul>
+
+<h3>1-3. Key Value Proposition</h3>
+<ul>
+  <li>Tenants and building owners can <strong>complete the entire process via self-service</strong>: discover website &rarr; read guidelines &rarr; sign up &rarr; make payment</li>
+  <li>LEWs receive <strong>guaranteed job assignments in exchange for an annual subscription fee</strong> (first year free), with access to the inspection system</li>
+  <li>Post-inspection <strong>rectification quotations</strong> create additional revenue streams</li>
+</ul>
+</div>
+
+<!-- ==================== 2. USERS ==================== -->
+<h2>2. User Types</h2>
+
+<table>
+  <tr><th style="width:25%">User</th><th>Role</th></tr>
+  <tr><td><strong>Applicant</strong></td><td>Tenants, building owners, contractors &mdash; apply for / renew licences, make payments</td></tr>
+  <tr><td><strong>LEW (Licensed Electrical Worker)</strong></td><td>Licensed electrician &mdash; conducts on-site inspections, prepares documents, submits to EMA</td></tr>
+  <tr><td><strong>SLD / Layout Drafter</strong></td><td>Single Line Diagram designer (in-house or freelance)</td></tr>
+  <tr><td><strong>Service Providers &amp; Administrators</strong></td><td>Platform administrators &mdash; manage users, professionals, and applications</td></tr>
+</table>
+
+<!-- ==================== 3. BUSINESS PROCESS ==================== -->
+<div class="section-break">
+<h2>3. Core Business Processes</h2>
+
+<h3>3-1. New Licence Application</h3>
+
+<div class="process-box">
+  <div class="step"><span class="step-num">1</span><strong>Open SP Group Utilities Account</strong></div>
+  <div class="sub">Applicant applies directly via the Gov Link provided by the platform &rarr; obtains SP Account Number + Provisional Account<br>
+  System captures the kVA capacity for the address (e.g., 45kVA &rarr; 45kVA; 45.01kVA &rarr; rounded up to 46kVA)</div>
+
+  <div class="step"><span class="step-num">2</span><strong>Complete Acknowledgement Form</strong></div>
+  <div class="sub">SP Group form &mdash; enter applicant details (company name, UEN, address) + LEW details (name, licence number, contact)</div>
+
+  <div class="step"><span class="step-num">3</span><strong>Submit Letter of Appointment for Electrical Installation</strong></div>
+  <div class="sub">LEW appointment letter &mdash; includes LEW name, licence number, installation address, company name (UEN), contact details, licence period (3 months $50 / 12 months $100)</div>
+
+  <div class="step"><span class="step-num">4</span><strong>Submit Latest SLD (Single Line Diagram)</strong></div>
+  <div class="sub">Prepared by a Drafter or upload existing drawing. Must comply with EMA regulations</div>
+
+  <div class="step"><span class="step-num">5</span><strong>Pay $100 to EMA</strong></div>
+  <div class="sub">Payment via ELISE system (elise.ema.gov.sg) using eNETS CreditCard</div>
+
+  <div class="step"><span class="step-num">6</span><strong>EMA Review &amp; Licence Issuance</strong></div>
+  <div class="sub">Result notification within approximately 10 days &rarr; upon approval: Licence Letter + Electrical Installation Licence issued<br>
+  Licence valid for 1 year (e.g., 22/01/2026 to 21/01/2027). Must be displayed at the Main Switch Board (MSB)</div>
+</div>
+
+<h3>3-2. Licence Renewal</h3>
+
+<div class="process-box">
+  <div class="step"><span class="step-num">1</span><strong>Receive EMA Renewal Notification Email</strong></div>
+  <div class="sub">User details auto-populated; Renewal Reference Number assigned</div>
+
+  <div class="step"><span class="step-num">2</span><strong>Submit Letter of Appointment for Renewal</strong></div>
+  <div class="sub">Includes LEW name, existing licence number, expiry date, renewal period (12 months $100 / 3 months $50)</div>
+
+  <div class="step"><span class="step-num">3</span><strong>Submit Latest SLD</strong></div>
+
+  <div class="step"><span class="step-num">4</span><strong>Pay $100 to EMA</strong></div>
+
+  <div class="step"><span class="step-num">5</span><strong>EMA Approval &amp; Renewed Licence Issuance</strong></div>
+</div>
+
+<h3>3-3. Temporary Supply Installation</h3>
+
+<div class="process-box">
+  <div class="step"><span class="step-num">1</span><strong>Submit Letter of Appointment for Supply Installation</strong></div>
+  <div class="sub">Under the Electricity Act (Cap. 89A). Choose 3 months ($50) or 12 months ($150)</div>
+</div>
+
+<h3>3-4. Inspection &amp; Rectification</h3>
+
+<div class="process-box">
+  <div class="step"><span class="step-num">1</span><strong>Conduct On-Site Inspection</strong></div>
+  <div class="sub">After electricity supply turn-on, LEW performs on-site inspection using mobile checklist + photo capture</div>
+
+  <div class="step"><span class="step-num">2</span><strong>Auto-Generate PDF Report</strong></div>
+  <div class="sub">Documents Issue / Risk / Action items per category, with on-site photos. Compliant with SS 638:2018 standards</div>
+
+  <div class="step"><span class="step-num">3</span><strong>Deliver Report to Client</strong></div>
+  <div class="sub">Via email or platform download</div>
+
+  <div class="step"><span class="step-num">4</span><strong>Link to Rectification Services</strong></div>
+  <div class="sub">If client opts in, a rectification quotation is provided &rarr; generates additional revenue</div>
+</div>
+</div>
+
+<!-- ==================== 4. FEATURE SPECIFICATION ==================== -->
+<div class="section-break">
+<h2>4. Detailed Feature Specification</h2>
+
+<h3>A. Applicant Portal (PC / Mobile Web)</h3>
+
+<table>
+  <tr><th style="width:7%">#</th><th style="width:28%">Feature</th><th>Description</th></tr>
+  <tr><td>A-1</td><td><strong>Sign Up / Login</strong></td><td>Email/password-based registration, email verification, password recovery</td></tr>
+  <tr><td>A-2</td><td><strong>New Licence Application</strong></td><td>Enter SP Account info &rarr; Acknowledgement Form &rarr; Letter of Appointment &rarr; Upload SLD &rarr; Payment</td></tr>
+  <tr><td>A-3</td><td><strong>Licence Renewal</strong></td><td>Based on EMA renewal notification &rarr; Letter of Appointment (Renewal) &rarr; SLD &rarr; Payment</td></tr>
+  <tr><td>A-4</td><td><strong>Service Type Selection</strong></td><td>Drop-down menu for different service types; AI guides selection of Apparent Power (kVA)</td></tr>
+  <tr><td>A-5</td><td><strong>kVA-Based Auto Pricing</strong></td><td>Fixed pricing auto-calculated based on kVA captured during SP Account application<br>(45kVA &rarr; 45kVA; 45.01kVA &rarr; rounded up to 46kVA)</td></tr>
+  <tr><td>A-6</td><td><strong>SLD Service Request</strong></td><td>Commission a Drafter for SLD preparation<br>(EMA-compliant, 3&ndash;5 day turnaround, unlimited revisions, digital + printed copies)</td></tr>
+  <tr><td>A-7</td><td><strong>Find &amp; Engage LEW</strong></td><td>Search LEW via Find LEW &rarr; review ratings &rarr; select &rarr; enter details &rarr; fixed pricing by DB size &rarr; payment</td></tr>
+  <tr><td>A-8</td><td><strong>Find SLD/Layout Drafter</strong></td><td>Search and engage a drafter via Find SLD/Layout Drafter</td></tr>
+  <tr><td>A-9</td><td><strong>SLD Verification</strong></td><td>Compliance verification service for SLD and layout drawings</td></tr>
+  <tr><td>A-10</td><td><strong>My Profile</strong></td><td>Manage business profile (company name, UEN, contact details), change password</td></tr>
+  <tr><td>A-11</td><td><strong>My Licenses</strong></td><td>Manually register and manage existing licences; track status (Active / Expired / Pending)</td></tr>
+  <tr><td>A-12</td><td><strong>My Application</strong></td><td>Track the status of in-progress applications</td></tr>
+  <tr><td>A-13</td><td><strong>My Engagement</strong></td><td>Manage list of engaged LEWs and Drafters</td></tr>
+  <tr><td>A-14</td><td><strong>Dashboard</strong></td><td>Overview of all applications and engagements at a glance</td></tr>
+  <tr><td>A-15</td><td><strong>Chat</strong></td><td>Communicate with engaged LEW/Drafter via Chat List feature</td></tr>
+  <tr><td>A-16</td><td><strong>Document Delivery</strong></td><td>Receive endorsed licences/drawings via email; download from platform</td></tr>
+  <tr><td>A-17</td><td><strong>Payment</strong></td><td>QR Code, PayNow (UEN), Credit Card (Mastercard / Visa), NETS</td></tr>
+  <tr><td>A-18</td><td><strong>Payment History</strong></td><td>Track payment records via dashboard</td></tr>
+</table>
+
+<h3>B. LEW / Drafter Service Provider Portal</h3>
+
+<table>
+  <tr><th style="width:7%">#</th><th style="width:28%">Feature</th><th>Description</th></tr>
+  <tr><td>B-1</td><td><strong>Profile Management</strong></td><td>Set up business profile; upload credentials and licences for verification</td></tr>
+  <tr><td>B-2</td><td><strong>Job Dashboard</strong></td><td>Manage incoming jobs, ongoing jobs, and upload reports</td></tr>
+  <tr><td>B-3</td><td><strong>Mobile Inspection Form</strong></td><td>Complete checklists on-site + attach photos via smartphone camera + electronic signature</td></tr>
+  <tr><td>B-4</td><td><strong>Auto PDF Report Generation</strong></td><td>Generate standardised inspection report PDF from form data (per SS 638:2018 standards)</td></tr>
+  <tr><td>B-5</td><td><strong>Drawing (SLD) Management</strong></td><td>Upload client drawings and link to relevant projects</td></tr>
+  <tr><td>B-6</td><td><strong>Client Chat</strong></td><td>Communicate directly with engaged applicants</td></tr>
+  <tr><td>B-7</td><td><strong>Payment Tracking</strong></td><td>View and track payment records</td></tr>
+  <tr><td>B-8</td><td><strong>Subscription-Based Access</strong></td><td>Annual subscription fee (first year free) for system access and guaranteed job assignments</td></tr>
+</table>
+
+<h3>C. Admin Dashboard</h3>
+
+<table>
+  <tr><th style="width:7%">#</th><th style="width:28%">Feature</th><th>Description</th></tr>
+  <tr><td>C-1</td><td><strong>User Management</strong></td><td>View and manage all registered users</td></tr>
+  <tr><td>C-2</td><td><strong>Professional Verification</strong></td><td>Review and approve LEW/Drafter credentials before granting access</td></tr>
+  <tr><td>C-3</td><td><strong>Application Monitoring</strong></td><td>Track the status of all applications across the platform</td></tr>
+  <tr><td>C-4</td><td><strong>Support Handling</strong></td><td>Respond to customer enquiries and support tickets</td></tr>
+</table>
+
+<h3>D. System &amp; Notifications</h3>
+
+<table>
+  <tr><th style="width:7%">#</th><th style="width:28%">Feature</th><th>Description</th></tr>
+  <tr><td>D-1</td><td><strong>AI Chatbot</strong></td><td>Automated FAQ responses; LEW concurrently serves as chatbot operator while building AI training data</td></tr>
+  <tr><td>D-2</td><td><strong>Email Helpdesk</strong></td><td>Email channel for additional enquiries</td></tr>
+  <tr><td>D-3</td><td><strong>Payment / Completion Alerts</strong></td><td>Automated email notifications upon payment completion and job completion</td></tr>
+  <tr><td>D-4</td><td><strong>Renewal Reminder</strong></td><td>Automated alerts when licence expiry is approaching</td></tr>
+  <tr><td>D-5</td><td><strong>New User Promotion</strong></td><td>Conditional promotional offers for new users</td></tr>
+</table>
+</div>
+
+<!-- ==================== 5. LEW VERSIONS ==================== -->
+<div class="section-break">
+<h2>5. LEW Participation Models (3 Versions)</h2>
+
+<p>The storyboard (Drawing1) defines three operational versions for LEW participation:</p>
+
+<table>
+  <tr><th style="width:15%">Version</th><th style="width:38%">Model</th><th>Description</th></tr>
+  <tr><td><strong>VER 1</strong></td><td>Without LEW Participant</td><td>Document processing only, without LEW involvement</td></tr>
+  <tr><td><strong>VER 2</strong></td><td>Allow LEW to come in &amp; bid job</td><td>External LEWs can join the platform and bid for jobs</td></tr>
+  <tr><td><strong>VER 3</strong></td><td>Allow LEW to rectify site defect</td><td>LEW performs on-site rectification of identified defects</td></tr>
+</table>
+
+<div class="info-box">
+  <span class="label">Note:</span> As the model progresses from VER 1 to VER 3, LEW involvement in the platform deepens, expanding both service scope and revenue opportunities.
+</div>
+</div>
+
+<!-- ==================== 6. DOMAIN GLOSSARY ==================== -->
+<h2>6. Domain Glossary</h2>
+
+<h3>6-1. Key Terms</h3>
+
+<table>
+  <tr><th style="width:22%">Term</th><th>Definition</th></tr>
+  <tr><td><strong>EMA</strong></td><td>Energy Market Authority &mdash; Singapore&rsquo;s energy regulatory body</td></tr>
+  <tr><td><strong>ELISE</strong></td><td>EMA&rsquo;s online licence application system (elise.ema.gov.sg)</td></tr>
+  <tr><td><strong>EIL</strong></td><td>Electrical Installation Licence &mdash; required for installations exceeding 45kVA</td></tr>
+  <tr><td><strong>LEW</strong></td><td>Licensed Electrical Worker &mdash; licensed electrician authorised to perform electrical work</td></tr>
+  <tr><td><strong>SLD</strong></td><td>Single Line Diagram &mdash; a simplified electrical circuit diagram</td></tr>
+  <tr><td><strong>SP Group</strong></td><td>Singapore Power Group &mdash; electricity and gas utilities provider</td></tr>
+  <tr><td><strong>kVA</strong></td><td>Kilovolt-ampere (apparent power) &mdash; pricing is determined by DB size (distribution board capacity)</td></tr>
+  <tr><td><strong>DB</strong></td><td>Distribution Board &mdash; an electrical panel that distributes power to circuits</td></tr>
+  <tr><td><strong>MSB</strong></td><td>Main Switch Board &mdash; the primary electrical panel; licence must be displayed here</td></tr>
+  <tr><td><strong>UEN</strong></td><td>Unique Entity Number &mdash; Singapore&rsquo;s standard business identification number</td></tr>
+  <tr><td><strong>SS 638:2018</strong></td><td>Singapore Standard &ldquo;Code of Practice for Electrical Installations&rdquo; (incorporating A1:2022)</td></tr>
+</table>
+
+<h3>6-2. LEW Licence Grade System</h3>
+
+<table>
+  <tr><th style="width:12%">Grade</th><th style="width:38%">Title</th><th>Scope of Authority</th></tr>
+  <tr><td><strong>Grade 7</strong></td><td>Licenced Electricians</td><td>&le;1,000V / Approved load &le;<strong>45kVA</strong></td></tr>
+  <tr><td><strong>Grade 8</strong></td><td>Licenced Electrical Technicians</td><td>&le;1,000V / Approved load &le;<strong>500kVA</strong><br>Drawing design &amp; submission: &le;150kVA</td></tr>
+  <tr><td><strong>Grade 9</strong></td><td>Licenced Electrical Engineers (PE)</td><td>Operational voltage: 1kV to 400kV<br>May be restricted to particular types of installation</td></tr>
+</table>
+
+<!-- ==================== 7. LETTER OF APPOINTMENT ==================== -->
+<div class="section-break">
+<h2>7. Letter of Appointment (3 Types)</h2>
+
+<table>
+  <tr><th style="width:30%">Type</th><th style="width:22%">Purpose</th><th style="width:25%">Licence Fee</th><th>Remarks</th></tr>
+  <tr>
+    <td><strong>for Electrical Installation</strong></td>
+    <td>New licence application</td>
+    <td>3 months: $50<br>12 months: $100</td>
+    <td>Under Electricity Act (Cap. 89A)</td>
+  </tr>
+  <tr>
+    <td><strong>for Renewal</strong></td>
+    <td>Existing licence renewal</td>
+    <td>3 months: $50<br>12 months: $100</td>
+    <td>EMA sends renewal notification email;<br>Renewal Ref number assigned</td>
+  </tr>
+  <tr>
+    <td><strong>for Supply Installation</strong></td>
+    <td>Temporary supply installation</td>
+    <td>3 months: $50<br>12 months: $150</td>
+    <td>For temporary electrical supply</td>
+  </tr>
+</table>
+
+<div class="info-box">
+  <span class="label">Common Required Fields:</span> LEW full name, LEW licence number, installation address, company name, UEN, contact details (phone / email / SMS), authorised person&rsquo;s signature, date
+</div>
+</div>
+
+<!-- ==================== 8. DELIVERABLES ==================== -->
+<h2>8. Key Deliverables (Documents Generated / Managed by the Platform)</h2>
+
+<table>
+  <tr><th style="width:32%">Document</th><th>Description</th></tr>
+  <tr><td><strong>EMA Licence Letter</strong></td><td>Licence approval notification (signed by EMA Authorised Officer, includes licence number)</td></tr>
+  <tr><td><strong>Electrical Installation Licence</strong></td><td>Official licence certificate (Serial No., validity period, Licence Fee $100, must be displayed at MSB)</td></tr>
+  <tr><td><strong>Inspection Report (PDF)</strong></td><td>On-site electrical safety inspection report (Issue / Risk / Action items per category, with on-site photos, compliant with SS 638:2018)</td></tr>
+  <tr><td><strong>SLD (Single Line Diagram)</strong></td><td>Electrical single line diagram (EMA-compliant, prepared by Drafter)</td></tr>
+  <tr><td><strong>Acknowledgement</strong></td><td>ELISE system application receipt confirmation (includes Application Reference Number, outcome within 10 days)</td></tr>
+  <tr><td><strong>Credit Transaction Receipt</strong></td><td>EMA $100 payment receipt (eNETS CreditCard, includes Transaction ID / Ref)</td></tr>
+</table>
+
+<div style="margin-top: 60px; padding-top: 20px; border-top: 2px solid #1a3a5c; text-align: center; color: #888; font-size: 9pt;">
+  Project Blue Light &mdash; Project Analysis Document v1.0 | 6 February 2026
+</div>
+
+</body>
+</html>

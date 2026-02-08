@@ -1,3 +1,61 @@
 spring:
   application:
-    name: backend
+    name: bluelight-backend
+
+  # DataSource 설정
+  datasource:
+    url: jdbc:mysql://localhost:3307/bluelight?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Singapore&characterEncoding=UTF-8
+    username: ${DB_USERNAME:user}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 30000
+      connection-timeout: 20000
+
+  # SQL 초기화 설정
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+
+  # JPA 설정
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+        show_sql: false
+        default_batch_fetch_size: 100
+    open-in-view: false
+    defer-datasource-initialization: true
+
+  # 파일 업로드 설정
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# 로깅 설정
+logging:
+  level:
+    com.bluelight.backend: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+# 서버 설정
+server:
+  port: 8090
+
+# JWT 설정
+jwt:
+  secret: ${JWT_SECRET:bluelight-jwt-secret-key-for-development-minimum-256-bits-required}
+  expiration: 86400000  # 24시간 (밀리초)
+
+# 파일 저장 설정
+file:
+  upload-dir: ${FILE_UPLOAD_DIR:./uploads}

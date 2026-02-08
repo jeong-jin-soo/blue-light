@@ -1,0 +1,25 @@
+1. Capacity- based pricing  
+
+For table 5- Does not applies to our project/ henceforth profit. For architectural purposes, it can be calculated according to KVA or DB sizing. 
+
+Furthering this, a new user applied for SP account ( Singapore power account ) for specific address/ unit. Our system captured this as eg, 45kva. 
+
+In processes, applying EMA electrical licenses and even for power turn- on, the system will auto tabulate, as 45 kva was applied. ( for this particular address ) aid in costing 
+
+2. Emphasis of the necessity of a LEW. License Electrical Worker 
+LEW assistance, is definitely needed. I can be the one in the chat bot at the same time use this opportunity to train Ai ( if it is incorporated). 
+
+The conclusion / summary parts for project BL was well written and phrased. 
+Not sure why there was a significant jump, in Singapore Power Group - SOP probably. 
+
+Next , 
+User more than 45kva definitely fall in as our customer 
+
+Eg, 45.00kva  , system will capture 45 kva
+
+45.01 kva system will capture as 46kva 
+
+Hopes this can aid in the script writing. 🙏🏻
+
+Hence, looking ahead , I will/ must do up a KVA - table 
+Commonly used amperage for commercial unit.
