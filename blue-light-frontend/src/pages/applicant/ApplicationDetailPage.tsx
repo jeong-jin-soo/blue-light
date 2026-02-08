@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { FileUpload } from '../../components/domain/FileUpload';
@@ -39,6 +40,7 @@ export default function ApplicationDetailPage() {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteFileId, setDeleteFileId] = useState<string | number | null>(null);
 
   const applicationId = Number(id);
 
@@ -81,13 +83,19 @@ export default function ApplicationDetailPage() {
   };
 
   const handleFileDelete = async (fileId: string | number) => {
-    if (!window.confirm('Are you sure you want to delete this file?')) return;
+    setDeleteFileId(fileId);
+  };
+
+  const confirmFileDelete = async () => {
+    if (deleteFileId === null) return;
     try {
-      await fileApi.deleteFile(Number(fileId));
+      await fileApi.deleteFile(Number(deleteFileId));
       toast.success('File deleted');
-      setFiles((prev) => prev.filter((f) => f.fileSeq !== Number(fileId)));
+      setFiles((prev) => prev.filter((f) => f.fileSeq !== Number(deleteFileId)));
     } catch {
       toast.error('Failed to delete file');
+    } finally {
+      setDeleteFileId(null);
     }
   };
 
@@ -106,7 +114,7 @@ export default function ApplicationDetailPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/applications')}
@@ -117,7 +125,7 @@ export default function ApplicationDetailPage() {
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
               Application #{application.applicationSeq}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
@@ -389,6 +397,16 @@ export default function ApplicationDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteFileId !== null}
+        onClose={() => setDeleteFileId(null)}
+        onConfirm={confirmFileDelete}
+        title="Delete File"
+        message="Are you sure you want to delete this file? This action cannot be undone."
+        confirmLabel="Delete"
+        variant="danger"
+      />
     </div>
   );
 }

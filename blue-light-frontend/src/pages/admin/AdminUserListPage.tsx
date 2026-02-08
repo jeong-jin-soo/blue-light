@@ -90,7 +90,7 @@ export default function AdminUserListPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">User Management</h1>
         <p className="text-sm text-gray-500 mt-1">View and manage registered users</p>
       </div>
 

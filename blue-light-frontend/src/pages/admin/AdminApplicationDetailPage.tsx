@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { FileUpload } from '../../components/domain/FileUpload';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
@@ -52,6 +53,7 @@ export default function AdminApplicationDetailPage() {
   // Modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [showProcessingConfirm, setShowProcessingConfirm] = useState(false);
   const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow' });
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
@@ -100,9 +102,7 @@ export default function AdminApplicationDetailPage() {
   };
 
   const handleStartProcessing = async () => {
-    if (!window.confirm('Start processing this application? Status will change to IN_PROGRESS.')) {
-      return;
-    }
+    setShowProcessingConfirm(false);
     setActionLoading(true);
     try {
       await adminApi.updateStatus(applicationId, { status: 'IN_PROGRESS' });
@@ -161,7 +161,7 @@ export default function AdminApplicationDetailPage() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/admin/applications')}
@@ -172,7 +172,7 @@ export default function AdminApplicationDetailPage() {
             </svg>
           </button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
               Application #{application.applicationSeq}
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
@@ -384,7 +384,7 @@ export default function AdminApplicationDetailPage() {
                   variant="outline"
                   fullWidth
                   size="sm"
-                  onClick={handleStartProcessing}
+                  onClick={() => setShowProcessingConfirm(true)}
                   loading={actionLoading}
                 >
                   🔄 Start Processing
@@ -555,6 +555,16 @@ export default function AdminApplicationDetailPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* ── Start Processing Confirm ────────────────── */}
+      <ConfirmDialog
+        isOpen={showProcessingConfirm}
+        onClose={() => setShowProcessingConfirm(false)}
+        onConfirm={handleStartProcessing}
+        title="Start Processing"
+        message="Start processing this application? Status will change to IN_PROGRESS."
+        confirmLabel="Start Processing"
+      />
     </div>
   );
 }

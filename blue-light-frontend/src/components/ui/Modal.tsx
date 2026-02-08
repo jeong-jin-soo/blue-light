@@ -63,7 +63,7 @@ export function Modal({
 
       {/* Modal content */}
       <div
-        className={`relative bg-surface rounded-xl shadow-modal w-full ${sizeClasses[size]} animate-in`}
+        className={`relative bg-surface rounded-xl shadow-modal w-full ${sizeClasses[size]} animate-in max-h-[90vh] overflow-y-auto`}
         role="dialog"
         aria-modal="true"
       >
@@ -84,7 +84,7 @@ export function ModalHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+    <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200">
       {title ? (
         <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
       ) : (
@@ -106,7 +106,7 @@ export function ModalHeader({
 
 export function ModalBody({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`px-6 py-4 ${className}`}>
+    <div className={`px-4 py-3 sm:px-6 sm:py-4 ${className}`}>
       {children}
     </div>
   );
@@ -114,7 +114,7 @@ export function ModalBody({ children, className = '' }: { children: ReactNode; c
 
 export function ModalFooter({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 ${className}`}>
+    <div className={`flex items-center justify-end gap-3 px-4 py-3 sm:px-6 sm:py-4 border-t border-gray-200 ${className}`}>
       {children}
     </div>
   );

@@ -23,6 +23,8 @@ interface DataTableProps<T> {
   onRowClick?: (item: T) => void;
   keyExtractor: (item: T) => string | number;
   className?: string;
+  /** Optional mobile card renderer. When provided, cards are shown on mobile (<640px) instead of the table. */
+  mobileCardRender?: (item: T) => ReactNode;
 }
 
 export function DataTable<T>({
@@ -36,6 +38,7 @@ export function DataTable<T>({
   onRowClick,
   keyExtractor,
   className = '',
+  mobileCardRender,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -68,7 +71,32 @@ export function DataTable<T>({
 
   return (
     <div className={`bg-surface rounded-xl shadow-card overflow-hidden ${className}`}>
-      <div className="overflow-x-auto">
+      {/* Mobile card view */}
+      {mobileCardRender && (
+        <div className="sm:hidden">
+          {loading
+            ? Array.from({ length: 3 }).map((_, i) => (
+                <div key={`m-skeleton-${i}`} className="p-4 border-b border-gray-100">
+                  <div className="space-y-2">
+                    <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-3 w-1/2 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-3 w-1/3 bg-gray-200 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))
+            : sortedData.map((item) => (
+                <div
+                  key={keyExtractor(item)}
+                  className={onRowClick ? 'cursor-pointer active:bg-gray-50' : ''}
+                  onClick={() => onRowClick?.(item)}
+                >
+                  {mobileCardRender(item)}
+                </div>
+              ))}
+        </div>
+      )}
+      {/* Desktop table view */}
+      <div className={`overflow-x-auto ${mobileCardRender ? 'hidden sm:block' : ''}`}>
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-surface-secondary">

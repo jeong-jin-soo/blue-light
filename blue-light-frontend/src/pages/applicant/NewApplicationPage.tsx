@@ -4,6 +4,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
@@ -43,6 +44,7 @@ export default function NewApplicationPage() {
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
@@ -114,7 +116,7 @@ export default function NewApplicationPage() {
 
   const handleSubmit = async () => {
     if (!formData.selectedKva) return;
-    if (!window.confirm('Submit this application? You will need to make payment after submission.')) return;
+    setShowSubmitConfirm(false);
     setSubmitting(true);
     try {
       const result = await applicationApi.createApplication({
@@ -145,7 +147,7 @@ export default function NewApplicationPage() {
           </svg>
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">New Licence Application</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New Licence Application</h1>
           <p className="text-sm text-gray-500 mt-0.5">Apply for a new electrical installation licence</p>
         </div>
       </div>
@@ -234,7 +236,7 @@ export default function NewApplicationPage() {
               {/* Price reference table */}
               <div>
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Price Reference Table</h3>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50">
@@ -328,10 +330,19 @@ export default function NewApplicationPage() {
           {currentStep < 2 ? (
             <Button onClick={handleNext}>Continue</Button>
           ) : (
-            <Button onClick={handleSubmit} loading={submitting}>Submit Application</Button>
+            <Button onClick={() => setShowSubmitConfirm(true)} loading={submitting}>Submit Application</Button>
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        isOpen={showSubmitConfirm}
+        onClose={() => setShowSubmitConfirm(false)}
+        onConfirm={handleSubmit}
+        title="Submit Application"
+        message="Submit this application? You will need to make payment after submission."
+        confirmLabel="Submit"
+      />
     </div>
   );
 }

@@ -35,7 +35,7 @@ export default function AdminApplicationListPage() {
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Debounce search input (300ms)
   const handleSearchChange = useCallback((value: string) => {
@@ -153,7 +153,7 @@ export default function AdminApplicationListPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">All Applications</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">All Applications</h1>
         <p className="text-sm text-gray-500 mt-1">Monitor and manage all licence applications</p>
       </div>
 
@@ -191,6 +191,25 @@ export default function AdminApplicationListPage() {
             ? 'No applications match your search criteria.'
             : 'Applications will appear here once users start submitting them.'
         }
+        mobileCardRender={(app) => (
+          <div className="p-4 border-b border-gray-100">
+            <div className="flex items-start justify-between mb-2">
+              <div className="min-w-0 flex-1 mr-3">
+                <p className="font-medium text-gray-800">{app.userName}</p>
+                <p className="text-xs text-gray-400">{app.userEmail}</p>
+              </div>
+              <StatusBadge status={app.status} />
+            </div>
+            <p className="text-sm text-gray-700 truncate mb-1">{app.address}</p>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-3 text-gray-500">
+                <span>{app.selectedKva} kVA</span>
+                <span className="font-medium text-gray-800">${app.quoteAmount.toLocaleString()}</span>
+              </div>
+              <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
+            </div>
+          </div>
+        )}
       />
 
       {/* Pagination */}
