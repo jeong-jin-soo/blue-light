@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.time.LocalDateTime;
+
 /**
  * 사용자 정보 Entity
  * - 건물주(APPLICANT)와 관리자(ADMIN)를 포함
@@ -57,13 +59,20 @@ public class User extends BaseEntity {
     @Column(name = "role", nullable = false)
     private UserRole role = UserRole.APPLICANT;
 
+    /**
+     * PDPA 동의 일시
+     */
+    @Column(name = "pdpa_consent_at")
+    private LocalDateTime pdpaConsentAt;
+
     @Builder
-    public User(String email, String password, String name, String phone, UserRole role) {
+    public User(String email, String password, String name, String phone, UserRole role, LocalDateTime pdpaConsentAt) {
         this.email = email;
         this.password = password;
         this.name = name;
         this.phone = phone;
         this.role = role != null ? role : UserRole.APPLICANT;
+        this.pdpaConsentAt = pdpaConsentAt;
     }
 
     /**

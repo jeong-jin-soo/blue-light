@@ -15,6 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 /**
  * 인증 서비스
  * - 회원가입, 로그인 처리
@@ -37,6 +39,15 @@ public class AuthService {
      */
     @Transactional
     public TokenResponse signup(SignupRequest request) {
+        // PDPA 동의 검증
+        if (request.getPdpaConsent() == null || !request.getPdpaConsent()) {
+            throw new BusinessException(
+                    "You must agree to the Privacy Policy to continue",
+                    HttpStatus.BAD_REQUEST,
+                    "PDPA_CONSENT_REQUIRED"
+            );
+        }
+
         // 이메일 중복 검사
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email is already in use", HttpStatus.CONFLICT, "DUPLICATE_EMAIL");
@@ -52,6 +63,7 @@ public class AuthService {
                 .name(request.getName())
                 .phone(request.getPhone())
                 .role(UserRole.APPLICANT)  // 기본 역할: 신청자
+                .pdpaConsentAt(LocalDateTime.now())
                 .build();
 
         User savedUser = userRepository.save(user);

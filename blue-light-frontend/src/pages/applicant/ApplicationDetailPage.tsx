@@ -11,7 +11,13 @@ import { FileUpload } from '../../components/domain/FileUpload';
 import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
-import type { Application, FileInfo, Payment } from '../../types';
+import { Select } from '../../components/ui/Select';
+import type { Application, FileInfo, FileType, Payment } from '../../types';
+
+const APPLICANT_FILE_TYPE_OPTIONS = [
+  { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
+  { value: 'OWNER_AUTH_LETTER', label: "Owner's Authorisation Letter" },
+];
 
 const STATUS_STEPS = [
   { label: 'Submitted', description: 'Application created' },
@@ -41,6 +47,7 @@ export default function ApplicationDetailPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteFileId, setDeleteFileId] = useState<string | number | null>(null);
+  const [uploadFileType, setUploadFileType] = useState<FileType>('DRAWING_SLD');
 
   const applicationId = Number(id);
 
@@ -67,7 +74,7 @@ export default function ApplicationDetailPage() {
   }, [fetchData]);
 
   const handleFileUpload = async (file: File) => {
-    await fileApi.uploadFile(applicationId, file, 'DRAWING_SLD');
+    await fileApi.uploadFile(applicationId, file, uploadFileType);
     toast.success('File uploaded successfully');
     // Refresh files list
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
@@ -222,18 +229,25 @@ export default function ApplicationDetailPage() {
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Documents</h2>
 
             {canUpload && (
-              <FileUpload
-                onUpload={handleFileUpload}
-                onRemove={handleFileDelete}
-                files={files.map((f) => ({
-                  id: f.fileSeq,
-                  name: f.originalFilename || `File #${f.fileSeq}`,
-                  size: 0, // Backend doesn't return size
-                }))}
-                label="Single Line Diagram (SLD)"
-                hint="PDF, JPG, PNG up to 10MB"
-                className="mb-4"
-              />
+              <div className="space-y-3 mb-4">
+                <Select
+                  label="Document Type"
+                  value={uploadFileType}
+                  onChange={(e) => setUploadFileType(e.target.value as FileType)}
+                  options={APPLICANT_FILE_TYPE_OPTIONS}
+                />
+                <FileUpload
+                  onUpload={handleFileUpload}
+                  onRemove={handleFileDelete}
+                  files={files.map((f) => ({
+                    id: f.fileSeq,
+                    name: f.originalFilename || `File #${f.fileSeq}`,
+                    size: 0,
+                  }))}
+                  label={APPLICANT_FILE_TYPE_OPTIONS.find((o) => o.value === uploadFileType)?.label || 'Document'}
+                  hint="PDF, JPG, PNG up to 10MB"
+                />
+              </div>
             )}
 
             {!canUpload && files.length === 0 && (
@@ -424,6 +438,7 @@ function InfoField({ label, value }: { label: string; value: string }) {
 function formatFileType(type: string): string {
   switch (type) {
     case 'DRAWING_SLD': return 'SLD';
+    case 'OWNER_AUTH_LETTER': return 'Auth Letter';
     case 'SITE_PHOTO': return 'Photo';
     case 'REPORT_PDF': return 'Report';
     case 'LICENSE_PDF': return 'Licence';
@@ -434,6 +449,7 @@ function formatFileType(type: string): string {
 function getFileTypeBadge(type: string): 'primary' | 'info' | 'success' | 'gray' {
   switch (type) {
     case 'DRAWING_SLD': return 'primary';
+    case 'OWNER_AUTH_LETTER': return 'info';
     case 'SITE_PHOTO': return 'info';
     case 'REPORT_PDF': return 'gray';
     case 'LICENSE_PDF': return 'success';

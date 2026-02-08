@@ -14,6 +14,7 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [pdpaConsent, setPdpaConsent] = useState(false);
   const [localError, setLocalError] = useState('');
 
   useEffect(() => {
@@ -38,8 +39,13 @@ export default function SignupPage() {
       return;
     }
 
+    if (!pdpaConsent) {
+      setLocalError('You must agree to the Privacy Policy to continue');
+      return;
+    }
+
     try {
-      await signup({ email, password, name, phone: phone || undefined });
+      await signup({ email, password, name, phone: phone || undefined, pdpaConsent });
     } catch {
       // error is managed by store
     }
@@ -106,6 +112,29 @@ export default function SignupPage() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           placeholder="Re-enter your password"
         />
+
+        {/* PDPA Consent */}
+        <div className="flex items-start gap-2.5 pt-1">
+          <input
+            type="checkbox"
+            id="pdpaConsent"
+            checked={pdpaConsent}
+            onChange={(e) => setPdpaConsent(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+          />
+          <label htmlFor="pdpaConsent" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+            I agree to the{' '}
+            <a href="/privacy" target="_blank" className="text-primary font-medium hover:underline">
+              Privacy Policy
+            </a>{' '}
+            and{' '}
+            <a href="/disclaimer" target="_blank" className="text-primary font-medium hover:underline">
+              Disclaimer
+            </a>
+            . I consent to the collection and use of my personal data as described.
+            <span className="text-error-500"> *</span>
+          </label>
+        </div>
 
         <Button type="submit" fullWidth loading={isLoading} className="mt-2">
           Create Account

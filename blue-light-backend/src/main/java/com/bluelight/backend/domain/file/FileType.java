@@ -10,6 +10,11 @@ public enum FileType {
     DRAWING_SLD,
 
     /**
+     * Owner's Authorisation Letter
+     */
+    OWNER_AUTH_LETTER,
+
+    /**
      * 현장 사진
      */
     SITE_PHOTO,

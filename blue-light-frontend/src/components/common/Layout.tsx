@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import Footer from './Footer';
 
 /**
  * 공통 레이아웃: 사이드바 + 헤더 + 메인 콘텐츠
@@ -119,6 +120,9 @@ export default function Layout() {
         <main className="flex-1 p-4 lg:p-6">
           <Outlet />
         </main>
+
+        {/* Footer */}
+        <Footer />
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ import type { AdminApplication, FileInfo, FileType, Payment } from '../../types'
 const FILE_TYPE_OPTIONS = [
   { value: 'LICENSE_PDF', label: 'Licence PDF' },
   { value: 'REPORT_PDF', label: 'Report PDF' },
+  { value: 'OWNER_AUTH_LETTER', label: "Owner's Auth Letter" },
 ];
 
 const STATUS_STEPS = [
@@ -581,6 +582,7 @@ function InfoField({ label, value }: { label: string; value: string }) {
 function formatFileType(type: string): string {
   switch (type) {
     case 'DRAWING_SLD': return 'SLD';
+    case 'OWNER_AUTH_LETTER': return 'Auth Letter';
     case 'SITE_PHOTO': return 'Photo';
     case 'REPORT_PDF': return 'Report';
     case 'LICENSE_PDF': return 'Licence';
@@ -591,6 +593,7 @@ function formatFileType(type: string): string {
 function getFileTypeBadge(type: string): 'primary' | 'info' | 'success' | 'gray' {
   switch (type) {
     case 'DRAWING_SLD': return 'primary';
+    case 'OWNER_AUTH_LETTER': return 'info';
     case 'SITE_PHOTO': return 'info';
     case 'REPORT_PDF': return 'gray';
     case 'LICENSE_PDF': return 'success';

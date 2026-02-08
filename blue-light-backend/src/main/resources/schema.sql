@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     name           VARCHAR(50)  NOT NULL,
     phone          VARCHAR(20),
     role           VARCHAR(20)  NOT NULL DEFAULT 'APPLICANT',
+    pdpa_consent_at DATETIME(6),
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
     created_by     BIGINT,

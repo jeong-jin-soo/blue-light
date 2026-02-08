@@ -7,6 +7,10 @@ import NotFoundPage from '../pages/NotFoundPage';
 import LoginPage from '../pages/auth/LoginPage';
 import SignupPage from '../pages/auth/SignupPage';
 
+// Legal pages
+import DisclaimerPage from '../pages/legal/DisclaimerPage';
+import PrivacyPolicyPage from '../pages/legal/PrivacyPolicyPage';
+
 // Applicant pages
 import DashboardPage from '../pages/applicant/DashboardPage';
 import ApplicationListPage from '../pages/applicant/ApplicationListPage';
@@ -32,6 +36,14 @@ const router = createBrowserRouter([
   {
     path: '/signup',
     element: <SignupPage />,
+  },
+  {
+    path: '/disclaimer',
+    element: <DisclaimerPage />,
+  },
+  {
+    path: '/privacy',
+    element: <PrivacyPolicyPage />,
   },
 
   // Applicant routes (APPLICANT role)
