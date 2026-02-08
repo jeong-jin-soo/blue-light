@@ -26,7 +26,7 @@ export interface ApiError {
 /**
  * 사용자 역할
  */
-export type UserRole = 'APPLICANT' | 'ADMIN';
+export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN';
 
 /**
  * 사용자 정보
@@ -49,6 +49,8 @@ export interface User {
  * 신청 상태
  */
 export type ApplicationStatus =
+  | 'PENDING_REVIEW'
+  | 'REVISION_REQUESTED'
   | 'PENDING_PAYMENT'
   | 'PAID'
   | 'IN_PROGRESS'
@@ -68,6 +70,7 @@ export interface Application {
   quoteAmount: number;
   status: ApplicationStatus;
   licenseNumber?: string;
+  reviewComment?: string;
   licenseExpiryDate?: string;
   createdAt: string;
   updatedAt: string;
@@ -181,6 +184,7 @@ export interface SignupRequest {
   password: string;
   name: string;
   phone?: string;
+  role?: string;
   pdpaConsent: boolean;
 }
 
@@ -212,6 +216,30 @@ export interface CreateApplicationRequest {
 }
 
 /**
+ * 신청서 수정 요청 (보완 후 재제출)
+ */
+export interface UpdateApplicationRequest {
+  address: string;
+  postalCode: string;
+  buildingType?: string;
+  selectedKva: number;
+}
+
+/**
+ * 보완 요청 DTO
+ */
+export interface RevisionRequest {
+  comment: string;
+}
+
+/**
+ * 역할 변경 요청 (Admin)
+ */
+export interface ChangeRoleRequest {
+  role: string;
+}
+
+/**
  * 신청서 응답 (상세)
  */
 export interface ApplicationDetail extends Application {
@@ -230,6 +258,7 @@ export interface ApplicationDetail extends Application {
  */
 export interface ApplicationSummary {
   total: number;
+  pendingReview: number;
   pendingPayment: number;
   inProgress: number;
   completed: number;
@@ -252,6 +281,7 @@ export interface AdminApplication extends Application {
   userName: string;
   userEmail: string;
   userPhone?: string;
+  reviewComment?: string;
 }
 
 /**
@@ -259,6 +289,8 @@ export interface AdminApplication extends Application {
  */
 export interface AdminDashboard {
   totalApplications: number;
+  pendingReview: number;
+  revisionRequested: number;
   pendingPayment: number;
   paid: number;
   inProgress: number;

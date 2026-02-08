@@ -11,6 +11,7 @@ import lombok.Getter;
 public class ApplicationSummaryResponse {
 
     private long total;
+    private long pendingReview;
     private long pendingPayment;
     private long inProgress;
     private long completed;

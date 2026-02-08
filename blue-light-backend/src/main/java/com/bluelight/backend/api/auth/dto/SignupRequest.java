@@ -31,4 +31,9 @@ public class SignupRequest {
 
     @NotNull(message = "PDPA consent is required")
     private Boolean pdpaConsent;
+
+    /**
+     * 역할 선택 (APPLICANT / LEW, nullable — 미입력 시 APPLICANT)
+     */
+    private String role;
 }

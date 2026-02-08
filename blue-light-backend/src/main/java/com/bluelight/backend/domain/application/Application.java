@@ -71,7 +71,7 @@ public class Application extends BaseEntity {
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private ApplicationStatus status = ApplicationStatus.PENDING_PAYMENT;
+    private ApplicationStatus status = ApplicationStatus.PENDING_REVIEW;
 
     /**
      * 라이선스 번호 (발급 후 설정)
@@ -85,6 +85,12 @@ public class Application extends BaseEntity {
     @Column(name = "license_expiry_date")
     private LocalDate licenseExpiryDate;
 
+    /**
+     * LEW 리뷰 코멘트 (보완 요청 사유)
+     */
+    @Column(name = "review_comment", columnDefinition = "TEXT")
+    private String reviewComment;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount) {
@@ -94,7 +100,7 @@ public class Application extends BaseEntity {
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
-        this.status = ApplicationStatus.PENDING_PAYMENT;
+        this.status = ApplicationStatus.PENDING_REVIEW;
     }
 
     /**
@@ -102,6 +108,41 @@ public class Application extends BaseEntity {
      */
     public void changeStatus(ApplicationStatus status) {
         this.status = status;
+    }
+
+    /**
+     * LEW 보완 요청
+     */
+    public void requestRevision(String comment) {
+        this.reviewComment = comment;
+        this.status = ApplicationStatus.REVISION_REQUESTED;
+    }
+
+    /**
+     * 신청자 보완 후 재제출
+     */
+    public void resubmit() {
+        this.status = ApplicationStatus.PENDING_REVIEW;
+    }
+
+    /**
+     * LEW 검토 승인 → 결제 요청
+     */
+    public void approveForPayment() {
+        this.reviewComment = null;
+        this.status = ApplicationStatus.PENDING_PAYMENT;
+    }
+
+    /**
+     * 신청 내용 수정 (보완 시)
+     */
+    public void updateDetails(String address, String postalCode, String buildingType,
+                              Integer selectedKva, BigDecimal quoteAmount) {
+        this.address = address;
+        this.postalCode = postalCode;
+        this.buildingType = buildingType;
+        this.selectedKva = selectedKva;
+        this.quoteAmount = quoteAmount;
     }
 
     /**

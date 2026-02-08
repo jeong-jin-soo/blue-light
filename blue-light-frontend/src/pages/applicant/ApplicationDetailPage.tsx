@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
+import { Input } from '../../components/ui/Input';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { StatusBadge } from '../../components/domain/StatusBadge';
@@ -11,8 +12,9 @@ import { FileUpload } from '../../components/domain/FileUpload';
 import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
+import priceApi from '../../api/priceApi';
 import { Select } from '../../components/ui/Select';
-import type { Application, FileInfo, FileType, Payment } from '../../types';
+import type { Application, FileInfo, FileType, MasterPrice, Payment } from '../../types';
 
 const APPLICANT_FILE_TYPE_OPTIONS = [
   { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
@@ -20,7 +22,8 @@ const APPLICANT_FILE_TYPE_OPTIONS = [
 ];
 
 const STATUS_STEPS = [
-  { label: 'Submitted', description: 'Application created' },
+  { label: 'Submitted', description: 'Application submitted for review' },
+  { label: 'Reviewed', description: 'LEW review completed' },
   { label: 'Paid', description: 'Payment confirmed' },
   { label: 'In Progress', description: 'Under processing' },
   { label: 'Completed', description: 'Licence issued' },
@@ -28,10 +31,12 @@ const STATUS_STEPS = [
 
 function getStatusStep(status: string): number {
   switch (status) {
-    case 'PENDING_PAYMENT': return 0;
-    case 'PAID': return 1;
-    case 'IN_PROGRESS': return 2;
-    case 'COMPLETED': return 4; // All steps completed
+    case 'PENDING_REVIEW': return 0;
+    case 'REVISION_REQUESTED': return 0;
+    case 'PENDING_PAYMENT': return 1;
+    case 'PAID': return 2;
+    case 'IN_PROGRESS': return 3;
+    case 'COMPLETED': return 5;
     case 'EXPIRED': return -1;
     default: return 0;
   }
@@ -48,6 +53,17 @@ export default function ApplicationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleteFileId, setDeleteFileId] = useState<string | number | null>(null);
   const [uploadFileType, setUploadFileType] = useState<FileType>('DRAWING_SLD');
+
+  // Edit mode state
+  const [editMode, setEditMode] = useState(false);
+  const [editAddress, setEditAddress] = useState('');
+  const [editPostalCode, setEditPostalCode] = useState('');
+  const [editBuildingType, setEditBuildingType] = useState('');
+  const [editKva, setEditKva] = useState<number>(0);
+  const [editPrice, setEditPrice] = useState<number | null>(null);
+  const [prices, setPrices] = useState<MasterPrice[]>([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
 
   const applicationId = Number(id);
 
@@ -73,10 +89,62 @@ export default function ApplicationDetailPage() {
     fetchData();
   }, [fetchData]);
 
+  // Load prices when entering edit mode
+  const enterEditMode = async () => {
+    if (!application) return;
+    try {
+      const priceData = await priceApi.getPrices();
+      setPrices(priceData);
+      setEditAddress(application.address);
+      setEditPostalCode(application.postalCode);
+      setEditBuildingType(application.buildingType || '');
+      setEditKva(application.selectedKva);
+      setEditPrice(application.quoteAmount);
+      setEditMode(true);
+    } catch {
+      toast.error('Failed to load price information');
+    }
+  };
+
+  // Recalculate price when kVA changes
+  const handleKvaChange = async (kva: number) => {
+    setEditKva(kva);
+    if (kva > 0) {
+      try {
+        const result = await priceApi.calculatePrice(kva);
+        setEditPrice(result.price);
+      } catch {
+        setEditPrice(null);
+      }
+    }
+  };
+
+  const handleResubmit = async () => {
+    if (!application) return;
+    setSubmitting(true);
+    try {
+      const updated = await applicationApi.updateApplication(applicationId, {
+        address: editAddress,
+        postalCode: editPostalCode,
+        buildingType: editBuildingType || undefined,
+        selectedKva: editKva,
+      });
+      setApplication(updated);
+      setEditMode(false);
+      toast.success('Application resubmitted successfully');
+      fetchData();
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to resubmit application';
+      toast.error(message);
+    } finally {
+      setSubmitting(false);
+      setShowResubmitConfirm(false);
+    }
+  };
+
   const handleFileUpload = async (file: File) => {
     await fileApi.uploadFile(applicationId, file, uploadFileType);
     toast.success('File uploaded successfully');
-    // Refresh files list
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
     setFiles(updatedFiles);
   };
@@ -116,7 +184,8 @@ export default function ApplicationDetailPage() {
 
   if (!application) return null;
 
-  const canUpload = application.status === 'PENDING_PAYMENT' || application.status === 'PAID';
+  const canUpload = ['PENDING_REVIEW', 'REVISION_REQUESTED', 'PENDING_PAYMENT', 'PAID']
+    .includes(application.status);
 
   return (
     <div className="space-y-6">
@@ -143,18 +212,121 @@ export default function ApplicationDetailPage() {
         <StatusBadge status={application.status} />
       </div>
 
+      {/* PENDING_REVIEW Banner */}
+      {application.status === 'PENDING_REVIEW' && (
+        <div className="bg-info-50 border border-info-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">🔍</span>
+            <div>
+              <p className="text-sm font-medium text-info-800">Under Review</p>
+              <p className="text-xs text-info-700 mt-1">
+                Your application is being reviewed by the Licensed Electrical Worker (LEW). You will be notified once the review is complete.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REVISION_REQUESTED Banner */}
+      {application.status === 'REVISION_REQUESTED' && (
+        <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">📝</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-warning-800">Revision Requested</p>
+              <p className="text-xs text-warning-700 mt-1">
+                The LEW has requested changes to your application. Please review the comment below, make the necessary updates, and resubmit.
+              </p>
+              {application.reviewComment && (
+                <div className="mt-3 bg-white rounded-lg p-3 border border-warning-200">
+                  <p className="text-xs font-medium text-gray-500 mb-1">LEW Comment:</p>
+                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{application.reviewComment}</p>
+                </div>
+              )}
+              {!editMode && (
+                <Button
+                  size="sm"
+                  className="mt-3"
+                  onClick={enterEditMode}
+                >
+                  Edit & Resubmit
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Property Details */}
           <Card>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Property Details</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InfoField label="Installation Address" value={application.address} />
-              <InfoField label="Postal Code" value={application.postalCode} />
-              <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-              <InfoField label="DB Size (kVA)" value={`${application.selectedKva} kVA`} />
-            </div>
+
+            {editMode ? (
+              <div className="space-y-4">
+                <Input
+                  label="Installation Address"
+                  required
+                  maxLength={255}
+                  value={editAddress}
+                  onChange={(e) => setEditAddress(e.target.value)}
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label="Postal Code"
+                    required
+                    maxLength={10}
+                    value={editPostalCode}
+                    onChange={(e) => setEditPostalCode(e.target.value)}
+                  />
+                  <Input
+                    label="Building Type"
+                    maxLength={50}
+                    value={editBuildingType}
+                    onChange={(e) => setEditBuildingType(e.target.value)}
+                  />
+                </div>
+                <Select
+                  label="DB Size (kVA)"
+                  required
+                  value={String(editKva)}
+                  onChange={(e) => handleKvaChange(Number(e.target.value))}
+                  options={prices.map((p) => ({
+                    value: String(p.kvaMin),
+                    label: `${p.kvaMin} kVA — SGD $${p.price.toLocaleString()}`,
+                  }))}
+                  placeholder="Select kVA"
+                />
+                {editPrice !== null && (
+                  <div className="bg-primary-50 rounded-lg p-3 border border-primary-100">
+                    <p className="text-sm text-primary-700">
+                      Updated Quote: <span className="font-bold">SGD ${editPrice.toLocaleString()}</span>
+                    </p>
+                  </div>
+                )}
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    onClick={() => setShowResubmitConfirm(true)}
+                    loading={submitting}
+                    disabled={!editAddress || !editPostalCode || !editKva}
+                  >
+                    Resubmit Application
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditMode(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoField label="Installation Address" value={application.address} />
+                <InfoField label="Postal Code" value={application.postalCode} />
+                <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+                <InfoField label="DB Size (kVA)" value={`${application.selectedKva} kVA`} />
+              </div>
+            )}
           </Card>
 
           {/* Pricing */}
@@ -420,6 +592,16 @@ export default function ApplicationDetailPage() {
         message="Are you sure you want to delete this file? This action cannot be undone."
         confirmLabel="Delete"
         variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={showResubmitConfirm}
+        onClose={() => setShowResubmitConfirm(false)}
+        onConfirm={handleResubmit}
+        title="Resubmit Application"
+        message="Are you sure you want to resubmit this application? It will be sent back to the LEW for review."
+        confirmLabel="Resubmit"
+        loading={submitting}
       />
     </div>
   );

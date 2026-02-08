@@ -25,6 +25,7 @@ public class ApplicationResponse {
     private ApplicationStatus status;
     private String licenseNumber;
     private LocalDate licenseExpiryDate;
+    private String reviewComment;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -39,6 +40,7 @@ public class ApplicationResponse {
                 .status(application.getStatus())
                 .licenseNumber(application.getLicenseNumber())
                 .licenseExpiryDate(application.getLicenseExpiryDate())
+                .reviewComment(application.getReviewComment())
                 .createdAt(application.getCreatedAt())
                 .updatedAt(application.getUpdatedAt())
                 .build();

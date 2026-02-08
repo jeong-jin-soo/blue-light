@@ -38,6 +38,8 @@ public class AdminApplicationService {
      */
     public AdminDashboardResponse getDashboardSummary() {
         long totalApplications = applicationRepository.count();
+        long pendingReview = applicationRepository.countByStatus(ApplicationStatus.PENDING_REVIEW);
+        long revisionRequested = applicationRepository.countByStatus(ApplicationStatus.REVISION_REQUESTED);
         long pendingPayment = applicationRepository.countByStatus(ApplicationStatus.PENDING_PAYMENT);
         long paid = applicationRepository.countByStatus(ApplicationStatus.PAID);
         long inProgress = applicationRepository.countByStatus(ApplicationStatus.IN_PROGRESS);
@@ -46,6 +48,8 @@ public class AdminApplicationService {
 
         return AdminDashboardResponse.builder()
                 .totalApplications(totalApplications)
+                .pendingReview(pendingReview)
+                .revisionRequested(revisionRequested)
                 .pendingPayment(pendingPayment)
                 .paid(paid)
                 .inProgress(inProgress)
@@ -173,6 +177,44 @@ public class AdminApplicationService {
                 .toList();
     }
 
+    /**
+     * LEW 보완 요청
+     */
+    @Transactional
+    public AdminApplicationResponse requestRevision(Long applicationSeq, RevisionRequestDto request) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        if (application.getStatus() != ApplicationStatus.PENDING_REVIEW) {
+            throw new BusinessException(
+                    "Revision can only be requested for applications in PENDING_REVIEW status",
+                    HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_REVISION");
+        }
+
+        application.requestRevision(request.getComment());
+        log.info("Revision requested: applicationSeq={}", applicationSeq);
+
+        return AdminApplicationResponse.from(application);
+    }
+
+    /**
+     * LEW 검토 승인 → 결제 요청
+     */
+    @Transactional
+    public AdminApplicationResponse approveForPayment(Long applicationSeq) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        if (application.getStatus() != ApplicationStatus.PENDING_REVIEW) {
+            throw new BusinessException(
+                    "Only applications in PENDING_REVIEW status can be approved for payment",
+                    HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_APPROVAL");
+        }
+
+        application.approveForPayment();
+        log.info("Application approved for payment: applicationSeq={}", applicationSeq);
+
+        return AdminApplicationResponse.from(application);
+    }
+
     // --- Private helpers ---
 
     private Application findApplicationOrThrow(Long applicationSeq) {
@@ -186,11 +228,13 @@ public class AdminApplicationService {
 
     private void validateStatusTransition(ApplicationStatus current, ApplicationStatus target) {
         boolean valid = switch (target) {
+            case PENDING_REVIEW -> current == ApplicationStatus.REVISION_REQUESTED;
+            case REVISION_REQUESTED -> current == ApplicationStatus.PENDING_REVIEW;
+            case PENDING_PAYMENT -> current == ApplicationStatus.PENDING_REVIEW;
             case PAID -> current == ApplicationStatus.PENDING_PAYMENT;
             case IN_PROGRESS -> current == ApplicationStatus.PAID;
             case COMPLETED -> current == ApplicationStatus.IN_PROGRESS;
             case EXPIRED -> true; // can expire from any state
-            case PENDING_PAYMENT -> false; // cannot revert to pending
         };
 
         if (!valid) {

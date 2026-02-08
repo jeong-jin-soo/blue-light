@@ -5,6 +5,16 @@ package com.bluelight.backend.domain.application;
  */
 public enum ApplicationStatus {
     /**
+     * LEW 검토 대기
+     */
+    PENDING_REVIEW,
+
+    /**
+     * 보완 요청됨
+     */
+    REVISION_REQUESTED,
+
+    /**
      * 결제 대기 중
      */
     PENDING_PAYMENT,

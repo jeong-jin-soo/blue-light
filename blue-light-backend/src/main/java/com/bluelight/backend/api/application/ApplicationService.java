@@ -4,6 +4,7 @@ import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
+import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -75,6 +76,49 @@ public class ApplicationService {
     }
 
     /**
+     * Update and resubmit application (after revision request)
+     */
+    @Transactional
+    public ApplicationResponse updateApplication(Long userSeq, Long applicationSeq,
+                                                  UpdateApplicationRequest request) {
+        Application application = applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+        // Verify ownership
+        if (!application.getUser().getUserSeq().equals(userSeq)) {
+            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        }
+
+        // Only allow editing in REVISION_REQUESTED status
+        if (application.getStatus() != ApplicationStatus.REVISION_REQUESTED) {
+            throw new BusinessException(
+                    "Application can only be edited when revision is requested",
+                    HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_EDIT");
+        }
+
+        // Recalculate price if kVA changed
+        MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
+                .orElseThrow(() -> new BusinessException(
+                        "No price tier found for " + request.getSelectedKva() + " kVA",
+                        HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
+
+        application.updateDetails(
+                request.getAddress(), request.getPostalCode(),
+                request.getBuildingType(), request.getSelectedKva(),
+                masterPrice.getPrice()
+        );
+
+        // Auto-transition status back to PENDING_REVIEW
+        application.resubmit();
+
+        log.info("Application updated and resubmitted: applicationSeq={}, userSeq={}",
+                applicationSeq, userSeq);
+
+        return ApplicationResponse.from(application);
+    }
+
+    /**
      * Get all applications for the authenticated user
      *
      * @param userSeq authenticated user ID
@@ -120,6 +164,10 @@ public class ApplicationService {
         List<Application> applications = applicationRepository.findByUserUserSeq(userSeq);
 
         long total = applications.size();
+        long pendingReview = applications.stream()
+                .filter(a -> a.getStatus() == ApplicationStatus.PENDING_REVIEW
+                        || a.getStatus() == ApplicationStatus.REVISION_REQUESTED)
+                .count();
         long pendingPayment = applications.stream()
                 .filter(a -> a.getStatus() == ApplicationStatus.PENDING_PAYMENT)
                 .count();
@@ -132,6 +180,7 @@ public class ApplicationService {
 
         return ApplicationSummaryResponse.builder()
                 .total(total)
+                .pendingReview(pendingReview)
                 .pendingPayment(pendingPayment)
                 .inProgress(inProgress)
                 .completed(completed)

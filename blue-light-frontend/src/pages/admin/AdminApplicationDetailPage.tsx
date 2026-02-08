@@ -23,7 +23,8 @@ const FILE_TYPE_OPTIONS = [
 ];
 
 const STATUS_STEPS = [
-  { label: 'Submitted', description: 'Application created' },
+  { label: 'Submitted', description: 'Application submitted for review' },
+  { label: 'Reviewed', description: 'LEW review completed' },
   { label: 'Paid', description: 'Payment confirmed' },
   { label: 'In Progress', description: 'Under processing' },
   { label: 'Completed', description: 'Licence issued' },
@@ -31,10 +32,12 @@ const STATUS_STEPS = [
 
 function getStatusStep(status: string): number {
   switch (status) {
-    case 'PENDING_PAYMENT': return 0;
-    case 'PAID': return 1;
-    case 'IN_PROGRESS': return 2;
-    case 'COMPLETED': return 4;
+    case 'PENDING_REVIEW': return 0;
+    case 'REVISION_REQUESTED': return 0;
+    case 'PENDING_PAYMENT': return 1;
+    case 'PAID': return 2;
+    case 'IN_PROGRESS': return 3;
+    case 'COMPLETED': return 5;
     case 'EXPIRED': return -1;
     default: return 0;
   }
@@ -55,6 +58,9 @@ export default function AdminApplicationDetailPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showProcessingConfirm, setShowProcessingConfirm] = useState(false);
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
+  const [revisionComment, setRevisionComment] = useState('');
   const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow' });
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
@@ -84,6 +90,39 @@ export default function AdminApplicationDetailPage() {
   }, [fetchData]);
 
   // ── Admin Actions ──────────────────────────────────
+
+  const handleRequestRevision = async () => {
+    if (!revisionComment.trim()) {
+      toast.error('Please enter a review comment');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await adminApi.requestRevision(applicationId, { comment: revisionComment });
+      toast.success('Revision requested successfully');
+      setShowRevisionModal(false);
+      setRevisionComment('');
+      fetchData();
+    } catch {
+      toast.error('Failed to request revision');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleApproveForPayment = async () => {
+    setShowApproveConfirm(false);
+    setActionLoading(true);
+    try {
+      await adminApi.approveForPayment(applicationId);
+      toast.success('Application approved. Payment requested from applicant.');
+      fetchData();
+    } catch {
+      toast.error('Failed to approve application');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const handleConfirmPayment = async () => {
     setActionLoading(true);
@@ -183,6 +222,34 @@ export default function AdminApplicationDetailPage() {
         </div>
         <StatusBadge status={application.status} />
       </div>
+
+      {/* Review Comment Display */}
+      {application.reviewComment && (
+        <Card>
+          <div className="flex items-start gap-3">
+            <span className="text-lg">📝</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-800">Review Comment</p>
+              <p className="text-sm text-gray-600 mt-1 whitespace-pre-wrap">{application.reviewComment}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* REVISION_REQUESTED Info Banner */}
+      {application.status === 'REVISION_REQUESTED' && (
+        <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-lg">⏳</span>
+            <div>
+              <p className="text-sm font-medium text-warning-800">Awaiting Applicant Revision</p>
+              <p className="text-xs text-warning-700 mt-1">
+                The applicant has been notified to revise and resubmit their application.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
@@ -368,6 +435,38 @@ export default function AdminApplicationDetailPage() {
           <Card>
             <h3 className="text-sm font-semibold text-gray-800 mb-4">Admin Actions</h3>
             <div className="space-y-2">
+              {application.status === 'PENDING_REVIEW' && (
+                <>
+                  <Button
+                    variant="outline"
+                    fullWidth
+                    size="sm"
+                    onClick={() => setShowRevisionModal(true)}
+                    loading={actionLoading}
+                  >
+                    📝 Request Revision
+                  </Button>
+                  <Button
+                    variant="primary"
+                    fullWidth
+                    size="sm"
+                    onClick={() => setShowApproveConfirm(true)}
+                    loading={actionLoading}
+                  >
+                    ✅ Approve & Request Payment
+                  </Button>
+                </>
+              )}
+
+              {application.status === 'REVISION_REQUESTED' && (
+                <div className="bg-warning-50 rounded-lg p-3 border border-warning-200 text-center">
+                  <span className="text-lg">⏳</span>
+                  <p className="text-xs text-warning-700 mt-1">
+                    Waiting for applicant to revise and resubmit.
+                  </p>
+                </div>
+              )}
+
               {application.status === 'PENDING_PAYMENT' && (
                 <Button
                   variant="outline"
@@ -556,6 +655,58 @@ export default function AdminApplicationDetailPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* ── Revision Request Modal ────────────────── */}
+      <Modal isOpen={showRevisionModal} onClose={() => setShowRevisionModal(false)} size="sm">
+        <ModalHeader title="Request Revision" onClose={() => setShowRevisionModal(false)} />
+        <ModalBody>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Enter a comment describing what the applicant needs to revise.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Review Comment<span className="text-error-500 ml-0.5">*</span>
+              </label>
+              <textarea
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                rows={4}
+                maxLength={2000}
+                value={revisionComment}
+                onChange={(e) => setRevisionComment(e.target.value)}
+                placeholder="e.g., Please provide the correct postal code and update the building type."
+              />
+              <p className="mt-1 text-xs text-gray-500 text-right">
+                {revisionComment.length}/2000
+              </p>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" size="sm" onClick={() => setShowRevisionModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleRequestRevision}
+            loading={actionLoading}
+            disabled={!revisionComment.trim()}
+          >
+            Request Revision
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* ── Approve for Payment Confirm ────────────────── */}
+      <ConfirmDialog
+        isOpen={showApproveConfirm}
+        onClose={() => setShowApproveConfirm(false)}
+        onConfirm={handleApproveForPayment}
+        title="Approve Application"
+        message="Approve this application and request payment from the applicant? The status will change to PENDING_PAYMENT."
+        confirmLabel="Approve"
+        loading={actionLoading}
+      />
 
       {/* ── Start Processing Confirm ────────────────── */}
       <ConfirmDialog

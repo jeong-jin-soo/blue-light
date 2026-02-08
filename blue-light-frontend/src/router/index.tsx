@@ -63,9 +63,9 @@ const router = createBrowserRouter([
     ],
   },
 
-  // Admin routes (ADMIN role)
+  // Admin + LEW routes (shared)
   {
-    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+    element: <ProtectedRoute allowedRoles={['ADMIN', 'LEW']} />,
     children: [
       {
         element: <Layout />,
@@ -73,6 +73,18 @@ const router = createBrowserRouter([
           { path: '/admin/dashboard', element: <AdminDashboardPage /> },
           { path: '/admin/applications', element: <AdminApplicationListPage /> },
           { path: '/admin/applications/:id', element: <AdminApplicationDetailPage /> },
+        ],
+      },
+    ],
+  },
+
+  // Admin-only routes (user management)
+  {
+    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
           { path: '/admin/users', element: <AdminUserListPage /> },
         ],
       },

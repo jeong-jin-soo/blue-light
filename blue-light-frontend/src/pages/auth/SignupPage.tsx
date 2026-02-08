@@ -14,12 +14,13 @@ export default function SignupPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState('APPLICANT');
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [localError, setLocalError] = useState('');
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const dest = user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+      const dest = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
@@ -45,7 +46,7 @@ export default function SignupPage() {
     }
 
     try {
-      await signup({ email, password, name, phone: phone || undefined, pdpaConsent });
+      await signup({ email, password, name, phone: phone || undefined, role, pdpaConsent });
     } catch {
       // error is managed by store
     }
@@ -92,6 +93,41 @@ export default function SignupPage() {
           placeholder="+65-XXXX-XXXX"
           hint="Optional"
         />
+
+        {/* Role selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Account Type<span className="text-error-500 ml-0.5">*</span>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setRole('APPLICANT')}
+              className={`p-3 border-2 rounded-lg text-center transition-all ${
+                role === 'APPLICANT'
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <div className="text-lg mb-1">🏢</div>
+              <div className="text-sm font-medium">Building Owner</div>
+              <div className="text-xs text-gray-500 mt-0.5">Applicant</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setRole('LEW')}
+              className={`p-3 border-2 rounded-lg text-center transition-all ${
+                role === 'LEW'
+                  ? 'border-primary bg-primary/5 text-primary'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              <div className="text-lg mb-1">⚡</div>
+              <div className="text-sm font-medium">LEW</div>
+              <div className="text-xs text-gray-500 mt-0.5">Licensed Electrical Worker</div>
+            </button>
+          </div>
+        </div>
 
         <Input
           label="Password"

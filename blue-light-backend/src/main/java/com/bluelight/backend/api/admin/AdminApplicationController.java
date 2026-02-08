@@ -16,13 +16,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 /**
- * Admin Application API controller (ADMIN role only)
+ * Admin/LEW Application API controller
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'LEW')")
 public class AdminApplicationController {
 
     private final AdminApplicationService adminApplicationService;
@@ -103,6 +103,30 @@ public class AdminApplicationController {
             @Valid @RequestBody CompleteApplicationRequest request) {
         log.info("Admin complete application: applicationSeq={}, licenseNumber={}", id, request.getLicenseNumber());
         AdminApplicationResponse response = adminApplicationService.completeApplication(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Request revision from applicant
+     * POST /api/admin/applications/:id/revision
+     */
+    @PostMapping("/applications/{id}/revision")
+    public ResponseEntity<AdminApplicationResponse> requestRevision(
+            @PathVariable Long id,
+            @Valid @RequestBody RevisionRequestDto request) {
+        log.info("Admin request revision: applicationSeq={}", id);
+        AdminApplicationResponse response = adminApplicationService.requestRevision(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Approve application and request payment
+     * POST /api/admin/applications/:id/approve
+     */
+    @PostMapping("/applications/{id}/approve")
+    public ResponseEntity<AdminApplicationResponse> approveForPayment(@PathVariable Long id) {
+        log.info("Admin approve for payment: applicationSeq={}", id);
+        AdminApplicationResponse response = adminApplicationService.approveForPayment(id);
         return ResponseEntity.ok(response);
     }
 

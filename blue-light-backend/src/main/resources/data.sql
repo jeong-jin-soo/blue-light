@@ -12,6 +12,15 @@ SELECT 'admin@bluelight.sg',
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@bluelight.sg');
 
+-- LEW 계정 (password: admin1234 / BCrypt encoded)
+INSERT INTO users (email, password, name, phone, role, created_at, updated_at)
+SELECT 'lew@bluelight.sg',
+       '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
+       'LEW Officer', '+65-0000-0001', 'LEW',
+       NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'lew@bluelight.sg');
+
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입
 INSERT INTO master_prices (description, kva_min, kva_max, price, is_active, created_at, updated_at)

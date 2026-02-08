@@ -12,6 +12,8 @@ import type { AdminApplication, ApplicationStatus } from '../../types';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
+  { value: 'PENDING_REVIEW', label: 'Pending Review' },
+  { value: 'REVISION_REQUESTED', label: 'Revision Requested' },
   { value: 'PENDING_PAYMENT', label: 'Pending Payment' },
   { value: 'PAID', label: 'Paid' },
   { value: 'IN_PROGRESS', label: 'In Progress' },

@@ -15,7 +15,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const dest = user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+      const dest = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);

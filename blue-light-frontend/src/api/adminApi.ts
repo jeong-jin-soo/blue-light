@@ -3,12 +3,14 @@ import type {
   AdminApplication,
   AdminDashboard,
   ApplicationStatus,
+  ChangeRoleRequest,
   CompleteApplicationRequest,
   FileInfo,
   FileType,
   Page,
   Payment,
   PaymentConfirmRequest,
+  RevisionRequest,
   UpdateStatusRequest,
   User,
 } from '../types';
@@ -50,6 +52,24 @@ export const updateStatus = async (
   const response = await axiosClient.patch<AdminApplication>(
     `/admin/applications/${id}/status`,
     data
+  );
+  return response.data;
+};
+
+export const requestRevision = async (
+  id: number,
+  data: RevisionRequest
+): Promise<AdminApplication> => {
+  const response = await axiosClient.post<AdminApplication>(
+    `/admin/applications/${id}/revision`,
+    data
+  );
+  return response.data;
+};
+
+export const approveForPayment = async (id: number): Promise<AdminApplication> => {
+  const response = await axiosClient.post<AdminApplication>(
+    `/admin/applications/${id}/approve`
   );
   return response.data;
 };
@@ -117,15 +137,23 @@ export const getUsers = async (): Promise<User[]> => {
   return response.data;
 };
 
+export const changeUserRole = async (id: number, data: ChangeRoleRequest): Promise<User> => {
+  const response = await axiosClient.patch<User>(`/admin/users/${id}/role`, data);
+  return response.data;
+};
+
 export const adminApi = {
   getDashboard,
   getApplications,
   getApplication,
   updateStatus,
+  requestRevision,
+  approveForPayment,
   completeApplication,
   confirmPayment,
   getPayments,
   uploadFile,
   getUsers,
+  changeUserRole,
 };
 export default adminApi;

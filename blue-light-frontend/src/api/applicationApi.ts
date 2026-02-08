@@ -4,6 +4,7 @@ import type {
   ApplicationSummary,
   CreateApplicationRequest,
   Payment,
+  UpdateApplicationRequest,
 } from '../types';
 
 /**
@@ -31,6 +32,14 @@ export const getApplication = async (id: number): Promise<Application> => {
 };
 
 /**
+ * Update and resubmit application (after revision request)
+ */
+export const updateApplication = async (id: number, data: UpdateApplicationRequest): Promise<Application> => {
+  const response = await axiosClient.put<Application>(`/applications/${id}`, data);
+  return response.data;
+};
+
+/**
  * Get application summary for dashboard
  */
 export const getApplicationSummary = async (): Promise<ApplicationSummary> => {
@@ -48,6 +57,7 @@ export const getApplicationPayments = async (applicationId: number): Promise<Pay
 
 export const applicationApi = {
   createApplication,
+  updateApplication,
   getMyApplications,
   getApplication,
   getApplicationSummary,

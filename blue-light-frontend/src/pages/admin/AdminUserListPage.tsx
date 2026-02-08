@@ -3,17 +3,21 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/data/DataTable';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
-import type { User } from '../../types';
+import type { User, UserRole } from '../../types';
 
 export default function AdminUserListPage() {
   const toast = useToastStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: User; newRole: UserRole } | null>(null);
+  const [changingRole, setChangingRole] = useState(false);
 
-  useEffect(() => {
+  const loadUsers = () => {
+    setLoading(true);
     adminApi
       .getUsers()
       .then(setUsers)
@@ -21,7 +25,27 @@ export default function AdminUserListPage() {
         toast.error(err.message || 'Failed to load users');
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadUsers();
   }, []);
+
+  const handleRoleChange = async () => {
+    if (!roleChangeTarget) return;
+    setChangingRole(true);
+    try {
+      await adminApi.changeUserRole(roleChangeTarget.user.userSeq, { role: roleChangeTarget.newRole });
+      toast.success(`${roleChangeTarget.user.name}'s role changed to ${roleChangeTarget.newRole}`);
+      loadUsers();
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to change role';
+      toast.error(message);
+    } finally {
+      setChangingRole(false);
+      setRoleChangeTarget(null);
+    }
+  };
 
   // Client-side search
   const filteredUsers = searchTerm
@@ -32,6 +56,14 @@ export default function AdminUserListPage() {
           user.role.toLowerCase().includes(searchTerm.toLowerCase())
       )
     : users;
+
+  const getRoleBadgeVariant = (role: string) => {
+    switch (role) {
+      case 'ADMIN': return 'primary' as const;
+      case 'LEW': return 'info' as const;
+      default: return 'gray' as const;
+    }
+  };
 
   const columns: Column<User>[] = [
     {
@@ -69,9 +101,23 @@ export default function AdminUserListPage() {
       key: 'role',
       header: 'Role',
       render: (user) => (
-        <Badge variant={user.role === 'ADMIN' ? 'primary' : 'gray'}>
-          {user.role}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={getRoleBadgeVariant(user.role)}>
+            {user.role}
+          </Badge>
+          {user.role !== 'ADMIN' && (
+            <button
+              onClick={() => {
+                const newRole: UserRole = user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT';
+                setRoleChangeTarget({ user, newRole });
+              }}
+              className="text-xs text-primary hover:text-primary/80 hover:underline"
+              title={`Change to ${user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT'}`}
+            >
+              Change
+            </button>
+          )}
+        </div>
       ),
     },
     {
@@ -129,11 +175,29 @@ export default function AdminUserListPage() {
               Applicants: {users.filter((u) => u.role === 'APPLICANT').length}
             </span>
             <span>
+              LEWs: {users.filter((u) => u.role === 'LEW').length}
+            </span>
+            <span>
               Admins: {users.filter((u) => u.role === 'ADMIN').length}
             </span>
           </div>
         </div>
       )}
+
+      {/* Role change confirmation */}
+      <ConfirmDialog
+        isOpen={!!roleChangeTarget}
+        title="Change User Role"
+        message={
+          roleChangeTarget
+            ? `Are you sure you want to change ${roleChangeTarget.user.name}'s role from ${roleChangeTarget.user.role} to ${roleChangeTarget.newRole}?`
+            : ''
+        }
+        confirmLabel="Change Role"
+        loading={changingRole}
+        onConfirm={handleRoleChange}
+        onClose={() => setRoleChangeTarget(null)}
+      />
     </div>
   );
 }

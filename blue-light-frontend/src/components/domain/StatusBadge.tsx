@@ -7,11 +7,13 @@ interface StatusConfig {
 }
 
 const STATUS_CONFIG: Record<ApplicationStatus, StatusConfig> = {
-  PENDING_PAYMENT: { label: 'Pending Payment', variant: 'warning' },
-  PAID:            { label: 'Paid',            variant: 'info' },
-  IN_PROGRESS:     { label: 'In Progress',     variant: 'primary' },
-  COMPLETED:       { label: 'Completed',       variant: 'success' },
-  EXPIRED:         { label: 'Expired',         variant: 'gray' },
+  PENDING_REVIEW:     { label: 'Pending Review',     variant: 'info' },
+  REVISION_REQUESTED: { label: 'Revision Requested', variant: 'warning' },
+  PENDING_PAYMENT:    { label: 'Pending Payment',    variant: 'warning' },
+  PAID:               { label: 'Paid',               variant: 'info' },
+  IN_PROGRESS:        { label: 'In Progress',        variant: 'primary' },
+  COMPLETED:          { label: 'Completed',           variant: 'success' },
+  EXPIRED:            { label: 'Expired',             variant: 'gray' },
 };
 
 interface StatusBadgeProps {

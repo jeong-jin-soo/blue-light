@@ -62,11 +62,16 @@ export default function DashboardPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <DashboardCard
           label="Total Applications"
           value={summary?.total ?? 0}
           icon="📋"
+        />
+        <DashboardCard
+          label="Pending Review"
+          value={summary?.pendingReview ?? 0}
+          icon="🔍"
         />
         <DashboardCard
           label="Pending Payment"

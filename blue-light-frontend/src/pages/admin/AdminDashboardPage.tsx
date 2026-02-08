@@ -53,11 +53,23 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
         <DashboardCard
           label="Total Applications"
           value={dashboard?.totalApplications ?? 0}
           icon="📋"
+        />
+        <DashboardCard
+          label="Pending Review"
+          value={dashboard?.pendingReview ?? 0}
+          icon="🔍"
+          onClick={() => navigate('/admin/applications?status=PENDING_REVIEW')}
+        />
+        <DashboardCard
+          label="Revision Requested"
+          value={dashboard?.revisionRequested ?? 0}
+          icon="📝"
+          onClick={() => navigate('/admin/applications?status=REVISION_REQUESTED')}
         />
         <DashboardCard
           label="Pending Payment"

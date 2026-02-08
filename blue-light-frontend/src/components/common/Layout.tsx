@@ -13,6 +13,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN';
+  const isLew = user?.role === 'LEW';
 
   const handleLogout = () => {
     logout();
@@ -33,7 +34,12 @@ export default function Layout() {
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
 
-  const menuItems = isAdmin ? adminMenu : applicantMenu;
+  const lewMenu = [
+    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/admin/applications', label: 'Applications', icon: '📋' },
+  ];
+
+  const menuItems = isAdmin ? adminMenu : isLew ? lewMenu : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -54,7 +60,7 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <Link to={isAdmin ? '/admin/dashboard' : '/dashboard'} className="flex items-center gap-2">
+          <Link to={isAdmin || isLew ? '/admin/dashboard' : '/dashboard'} className="flex items-center gap-2">
             <span className="text-xl">💡</span>
             <span className="text-lg font-bold tracking-tight">Blue Light</span>
           </Link>
@@ -83,7 +89,7 @@ export default function Layout() {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
           <div className="text-sm text-white/60 truncate">{user?.email}</div>
           <div className="text-xs text-white/40 mt-0.5">
-            {isAdmin ? 'Administrator' : 'Applicant'}
+            {isAdmin ? 'Administrator' : isLew ? 'LEW' : 'Applicant'}
           </div>
         </div>
       </aside>

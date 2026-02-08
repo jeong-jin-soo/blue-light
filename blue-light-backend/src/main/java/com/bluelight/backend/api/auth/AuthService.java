@@ -56,13 +56,17 @@ public class AuthService {
         // 비밀번호 암호화
         String encodedPassword = passwordEncoder.encode(request.getPassword());
 
+        // 역할 결정 (LEW 선택 시 LEW, 그 외 APPLICANT — ADMIN 가입 불가)
+        UserRole selectedRole = "LEW".equalsIgnoreCase(request.getRole())
+                ? UserRole.LEW : UserRole.APPLICANT;
+
         // 사용자 생성
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword)
                 .name(request.getName())
                 .phone(request.getPhone())
-                .role(UserRole.APPLICANT)  // 기본 역할: 신청자
+                .role(selectedRole)
                 .pdpaConsentAt(LocalDateTime.now())
                 .build();
 

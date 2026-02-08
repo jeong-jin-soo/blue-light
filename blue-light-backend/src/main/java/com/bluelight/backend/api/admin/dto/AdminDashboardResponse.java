@@ -11,6 +11,8 @@ import lombok.Getter;
 public class AdminDashboardResponse {
 
     private long totalApplications;
+    private long pendingReview;
+    private long revisionRequested;
     private long pendingPayment;
     private long paid;
     private long inProgress;

@@ -4,6 +4,7 @@ import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
+import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,21 @@ public class ApplicationController {
         Long userSeq = (Long) authentication.getPrincipal();
         log.info("Get application detail: userSeq={}, applicationSeq={}", userSeq, id);
         ApplicationResponse response = applicationService.getMyApplication(userSeq, id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update and resubmit application (after revision request)
+     * PUT /api/applications/:id
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<ApplicationResponse> updateApplication(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateApplicationRequest request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Update application request: userSeq={}, applicationSeq={}", userSeq, id);
+        ApplicationResponse response = applicationService.updateApplication(userSeq, id, request);
         return ResponseEntity.ok(response);
     }
 

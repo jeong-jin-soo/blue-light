@@ -9,6 +9,24 @@ import { authApi } from '../api/authApi';
 import { tokenUtils } from '../api/axiosClient';
 
 /**
+ * JWT 토큰의 만료 여부를 확인
+ * - 토큰이 없거나 디코딩 실패 시 false 반환
+ * - exp 클레임 기준 만료 여부 판단 (60초 버퍼)
+ */
+function isTokenValid(): boolean {
+  const token = tokenUtils.getToken();
+  if (!token) return false;
+
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const now = Math.floor(Date.now() / 1000);
+    return payload.exp > now + 60; // 60초 버퍼
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 인증 사용자 정보
  */
 interface AuthUser {
@@ -42,9 +60,9 @@ interface AuthState {
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      // 초기 상태
+      // 초기 상태 — 토큰 존재 + 만료되지 않은 경우만 인증 상태 유지
       user: null,
-      isAuthenticated: tokenUtils.hasToken(),
+      isAuthenticated: isTokenValid(),
       isLoading: false,
       error: null,
 
@@ -143,6 +161,14 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // localStorage에서 복원된 후 토큰 만료 여부 재검증
+        if (state && state.isAuthenticated && !isTokenValid()) {
+          state.user = null;
+          state.isAuthenticated = false;
+          tokenUtils.removeToken();
+        }
+      },
     }
   )
 );

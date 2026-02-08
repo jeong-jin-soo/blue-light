@@ -62,8 +62,8 @@ public class SecurityConfig {
                         // Swagger, Health Check 등
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        // Admin 전용 경로 (URL-level defense-in-depth)
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Admin/LEW 경로 (URL-level defense-in-depth)
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW")
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
