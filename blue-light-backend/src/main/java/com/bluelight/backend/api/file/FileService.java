@@ -148,12 +148,12 @@ public class FileService {
      * Delete a file
      */
     @Transactional
-    public void deleteFile(Long userSeq, Long fileSeq) {
+    public void deleteFile(Long userSeq, String role, Long fileSeq) {
         FileEntity fileEntity = fileRepository.findById(fileSeq)
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
-        // Verify ownership
-        if (!fileEntity.getApplication().getUser().getUserSeq().equals(userSeq)) {
+        // Admins can delete any file; applicants can only delete their own
+        if (!"ROLE_ADMIN".equals(role) && !fileEntity.getApplication().getUser().getUserSeq().equals(userSeq)) {
             throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         }
 

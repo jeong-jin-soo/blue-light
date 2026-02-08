@@ -15,6 +15,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 /**
@@ -88,10 +90,12 @@ public class FileController {
         FileEntity fileEntity = fileService.getFileEntity(userSeq, role, fileId);
         Resource resource = fileService.downloadFile(userSeq, role, fileId);
 
+        String encodedFilename = URLEncoder.encode(fileEntity.getOriginalFilename(), StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + fileEntity.getOriginalFilename() + "\"")
+                        "attachment; filename=\"" + fileEntity.getOriginalFilename() + "\"; filename*=UTF-8''" + encodedFilename)
                 .body(resource);
     }
 
@@ -104,8 +108,9 @@ public class FileController {
             Authentication authentication,
             @PathVariable Long fileId) {
         Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
         log.info("File delete: userSeq={}, fileSeq={}", userSeq, fileId);
-        fileService.deleteFile(userSeq, fileId);
+        fileService.deleteFile(userSeq, role, fileId);
         return ResponseEntity.noContent().build();
     }
 }

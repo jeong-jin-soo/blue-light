@@ -3,10 +3,12 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/data/DataTable';
+import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User } from '../../types';
 
 export default function AdminUserListPage() {
+  const toast = useToastStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,8 +17,8 @@ export default function AdminUserListPage() {
     adminApi
       .getUsers()
       .then(setUsers)
-      .catch(() => {
-        // Handled by axios interceptor
+      .catch((err: { message?: string }) => {
+        toast.error(err.message || 'Failed to load users');
       })
       .finally(() => setLoading(false));
   }, []);

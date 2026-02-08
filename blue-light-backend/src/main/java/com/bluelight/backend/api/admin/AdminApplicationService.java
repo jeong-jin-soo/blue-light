@@ -113,10 +113,14 @@ public class AdminApplicationService {
             );
         }
 
+        // Normalize blank fields
+        String transactionId = request.getTransactionId();
+        if (transactionId != null && transactionId.isBlank()) transactionId = null;
+
         // Create payment record
         Payment payment = Payment.builder()
                 .application(application)
-                .transactionId(request.getTransactionId())
+                .transactionId(transactionId)
                 .amount(application.getQuoteAmount())
                 .paymentMethod(request.getPaymentMethod() != null ? request.getPaymentMethod() : "BANK_TRANSFER")
                 .status(PaymentStatus.SUCCESS)

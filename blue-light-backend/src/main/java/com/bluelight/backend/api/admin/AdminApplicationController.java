@@ -48,8 +48,10 @@ public class AdminApplicationController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        log.info("Admin get all applications: status={}, search={}, page={}, size={}", status, search, page, size);
-        Pageable pageable = PageRequest.of(page, size);
+        int validPage = Math.max(0, page);
+        int validSize = Math.min(Math.max(1, size), 100);
+        log.info("Admin get all applications: status={}, search={}, page={}, size={}", status, search, validPage, validSize);
+        Pageable pageable = PageRequest.of(validPage, validSize);
         Page<AdminApplicationResponse> applications = adminApplicationService.getAllApplications(status, search, pageable);
         return ResponseEntity.ok(applications);
     }
@@ -85,7 +87,7 @@ public class AdminApplicationController {
     @PostMapping("/applications/{id}/payments/confirm")
     public ResponseEntity<PaymentResponse> confirmPayment(
             @PathVariable Long id,
-            @RequestBody PaymentConfirmRequest request) {
+            @Valid @RequestBody PaymentConfirmRequest request) {
         log.info("Admin confirm payment: applicationSeq={}", id);
         PaymentResponse response = adminApplicationService.confirmPayment(id, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

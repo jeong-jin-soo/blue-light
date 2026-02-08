@@ -55,18 +55,24 @@ axiosClient.interceptors.response.use(
     if (response) {
       // 401 Unauthorized: 토큰 만료 또는 무효
       if (response.status === 401) {
-        // 토큰 제거
+        // 토큰 및 Zustand 인증 상태 제거
         localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem('bluelight-auth');
 
-        // 로그인 페이지로 리다이렉트 (auth 관련 요청 제외)
+        // 로그인/회원가입 페이지가 아닌 경우에만 리다이렉트 (무한 루프 방지)
         const isAuthRequest = response.config.url?.includes('/auth/');
-        if (!isAuthRequest) {
+        const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
+        if (!isAuthRequest && !isAuthPage) {
+          sessionStorage.setItem('bluelight_logout_reason', 'session_expired');
           window.location.href = '/login';
         }
       }
 
-      // 에러 메시지 추출
-      const errorMessage = response.data?.message || 'An error occurred while processing the request';
+      // 에러 메시지 추출 (필드별 검증 에러가 있으면 조합)
+      const details = response.data?.details as Record<string, string> | undefined;
+      const errorMessage = details
+        ? Object.values(details).join('. ')
+        : response.data?.message || 'An error occurred while processing the request';
 
       return Promise.reject({
         ...error,

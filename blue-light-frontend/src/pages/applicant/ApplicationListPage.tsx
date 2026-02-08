@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import type { Application } from '../../types';
 
@@ -18,6 +19,7 @@ const STATUS_FILTER_OPTIONS = [
 
 export default function ApplicationListPage() {
   const navigate = useNavigate();
+  const toast = useToastStore();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -26,8 +28,8 @@ export default function ApplicationListPage() {
     applicationApi
       .getMyApplications()
       .then(setApplications)
-      .catch(() => {
-        // Handled by axios interceptor
+      .catch((err: { message?: string }) => {
+        toast.error(err.message || 'Failed to load applications');
       })
       .finally(() => setLoading(false));
   }, []);

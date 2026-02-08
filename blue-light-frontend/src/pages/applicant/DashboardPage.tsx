@@ -7,12 +7,14 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useAuthStore } from '../../stores/authStore';
+import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import type { Application, ApplicationSummary } from '../../types';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
+  const toast = useToastStore();
   const [summary, setSummary] = useState<ApplicationSummary | null>(null);
   const [recentApps, setRecentApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,8 +28,9 @@ export default function DashboardPage() {
         ]);
         setSummary(summaryData);
         setRecentApps(appsData.slice(0, 5));
-      } catch {
-        // Error handled by axios interceptor
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        toast.error(error.message || 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }

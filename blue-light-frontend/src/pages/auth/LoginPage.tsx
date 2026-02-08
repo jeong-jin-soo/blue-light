@@ -11,6 +11,7 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [sessionExpiredMsg, setSessionExpiredMsg] = useState('');
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -18,6 +19,15 @@ export default function LoginPage() {
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
+
+  // 세션 만료로 인한 리다이렉트 감지
+  useEffect(() => {
+    const reason = sessionStorage.getItem('bluelight_logout_reason');
+    if (reason === 'session_expired') {
+      sessionStorage.removeItem('bluelight_logout_reason');
+      setSessionExpiredMsg('Your session has expired. Please sign in again.');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,6 +43,12 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <h2 className="text-xl font-semibold text-gray-800 mb-6">Sign in to your account</h2>
+
+      {sessionExpiredMsg && (
+        <div className="mb-4 p-3 bg-warning-50 border border-warning-200 rounded-lg text-sm text-warning-700">
+          {sessionExpiredMsg}
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg text-sm text-error-600">

@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminApplication, ApplicationStatus } from '../../types';
 
@@ -22,6 +23,7 @@ const PAGE_SIZE = 15;
 
 export default function AdminApplicationListPage() {
   const navigate = useNavigate();
+  const toast = useToastStore();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialStatus = searchParams.get('status') || '';
@@ -58,8 +60,8 @@ export default function AdminApplicationListPage() {
         setApplications(data.content);
         setTotalPages(data.totalPages);
       })
-      .catch(() => {
-        // Handled by axios interceptor
+      .catch((err: { message?: string }) => {
+        toast.error(err.message || 'Failed to load applications');
       })
       .finally(() => setLoading(false));
   }, [page, statusFilter, debouncedSearch]);

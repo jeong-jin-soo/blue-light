@@ -6,11 +6,13 @@ import { DashboardCard } from '../../components/domain/DashboardCard';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminApplication, AdminDashboard } from '../../types';
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
+  const toast = useToastStore();
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [recentApps, setRecentApps] = useState<AdminApplication[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,8 +26,9 @@ export default function AdminDashboardPage() {
         ]);
         setDashboard(dashboardData);
         setRecentApps(appsData.content);
-      } catch {
-        // Handled by axios interceptor
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        toast.error(error.message || 'Failed to load dashboard data');
       } finally {
         setLoading(false);
       }

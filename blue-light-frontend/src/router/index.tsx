@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Layout from '../components/common/Layout';
 import ProtectedRoute from '../components/common/ProtectedRoute';
+import NotFoundPage from '../pages/NotFoundPage';
 
 // Auth pages
 import LoginPage from '../pages/auth/LoginPage';
@@ -75,7 +76,7 @@ const router = createBrowserRouter([
   // 404 catch-all
   {
     path: '*',
-    element: <Navigate to="/login" replace />,
+    element: <NotFoundPage />,
   },
 ]);
 
