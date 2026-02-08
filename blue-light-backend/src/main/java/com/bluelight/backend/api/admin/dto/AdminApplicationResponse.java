@@ -35,6 +35,11 @@ public class AdminApplicationResponse {
     private String userEmail;
     private String userPhone;
 
+    // Assigned LEW info
+    private Long assignedLewSeq;
+    private String assignedLewName;
+    private String assignedLewEmail;
+
     public static AdminApplicationResponse from(Application application) {
         return AdminApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -53,6 +58,12 @@ public class AdminApplicationResponse {
                 .userName(application.getUser().getName())
                 .userEmail(application.getUser().getEmail())
                 .userPhone(application.getUser().getPhone())
+                .assignedLewSeq(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getUserSeq() : null)
+                .assignedLewName(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getName() : null)
+                .assignedLewEmail(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getEmail() : null)
                 .build();
     }
 }

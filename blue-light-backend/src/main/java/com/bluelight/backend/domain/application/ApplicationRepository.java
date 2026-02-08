@@ -72,4 +72,25 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
      * 상태별 건수 (Admin dashboard)
      */
     long countByStatus(ApplicationStatus status);
+
+    /**
+     * 미할당 신청 건수
+     */
+    long countByAssignedLewIsNull();
+
+    /**
+     * 특정 LEW에게 할당된 신청 건수
+     */
+    long countByAssignedLewUserSeq(Long lewSeq);
+
+    /**
+     * 특정 LEW에게 할당된 신청 목록 (최신순, 페이지네이션)
+     */
+    Page<Application> findByAssignedLewUserSeqOrderByCreatedAtDesc(Long lewSeq, Pageable pageable);
+
+    /**
+     * 특정 LEW에게 할당된 + 특정 상태의 신청 목록
+     */
+    Page<Application> findByAssignedLewUserSeqAndStatusOrderByCreatedAtDesc(
+            Long lewSeq, ApplicationStatus status, Pageable pageable);
 }

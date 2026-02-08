@@ -7,25 +7,42 @@ import { StatusBadge } from '../../components/domain/StatusBadge';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
 import type { AdminApplication, AdminDashboard } from '../../types';
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const toast = useToastStore();
+  const { user: currentUser } = useAuthStore();
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [recentApps, setRecentApps] = useState<AdminApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lewRegistrationOpen, setLewRegistrationOpen] = useState(true);
+  const [settingsLoading, setSettingsLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashboardData, appsData] = await Promise.all([
+        const promises: Promise<unknown>[] = [
           adminApi.getDashboard(),
           adminApi.getApplications(0, 5),
-        ]);
-        setDashboard(dashboardData);
-        setRecentApps(appsData.content);
+        ];
+        // ADMIN만 설정 조회
+        if (isAdmin) {
+          promises.push(adminApi.getSettings());
+        }
+
+        const results = await Promise.all(promises);
+        setDashboard(results[0] as AdminDashboard);
+        setRecentApps((results[1] as { content: AdminApplication[] }).content);
+
+        if (isAdmin && results[2]) {
+          const settings = results[2] as Record<string, string>;
+          setLewRegistrationOpen(settings['lew_registration_open'] === 'true');
+        }
       } catch (err: unknown) {
         const error = err as { message?: string };
         toast.error(error.message || 'Failed to load dashboard data');
@@ -35,6 +52,20 @@ export default function AdminDashboardPage() {
     };
     fetchData();
   }, []);
+
+  const handleToggleLewRegistration = async () => {
+    const newValue = !lewRegistrationOpen;
+    setSettingsLoading(true);
+    try {
+      await adminApi.updateSettings({ lew_registration_open: String(newValue) });
+      setLewRegistrationOpen(newValue);
+      toast.success(newValue ? 'LEW registration opened' : 'LEW registration closed');
+    } catch {
+      toast.error('Failed to update setting');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -101,7 +132,44 @@ export default function AdminDashboardPage() {
           icon="👥"
           onClick={() => navigate('/admin/users')}
         />
+        {isAdmin && (
+          <DashboardCard
+            label="Unassigned"
+            value={dashboard?.unassigned ?? 0}
+            icon="⚡"
+          />
+        )}
       </div>
+
+      {/* ADMIN-only: LEW Registration Setting */}
+      {isAdmin && (
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800">LEW Registration</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {lewRegistrationOpen
+                  ? 'New LEW sign-ups are currently allowed.'
+                  : 'New LEW sign-ups are currently blocked.'}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={settingsLoading}
+              onClick={handleToggleLewRegistration}
+              className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 ${
+                lewRegistrationOpen ? 'bg-primary' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  lewRegistrationOpen ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* Recent applications */}
       <Card>

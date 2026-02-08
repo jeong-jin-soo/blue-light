@@ -4,6 +4,8 @@ import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { authApi } from '../../api/authApi';
 
 export default function SignupPage() {
   const navigate = useNavigate();
@@ -17,6 +19,27 @@ export default function SignupPage() {
   const [role, setRole] = useState('APPLICANT');
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [localError, setLocalError] = useState('');
+
+  // 가입 가능한 역할 목록 (동적 로드)
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+
+  // 가입 옵션 로드
+  useEffect(() => {
+    authApi.getSignupOptions()
+      .then((options) => {
+        setAvailableRoles(options.availableRoles);
+        // 역할이 1개뿐이면 자동 선택
+        if (options.availableRoles.length === 1) {
+          setRole(options.availableRoles[0]);
+        }
+      })
+      .catch(() => {
+        // 실패 시 기본값 (APPLICANT만)
+        setAvailableRoles(['APPLICANT']);
+      })
+      .finally(() => setOptionsLoading(false));
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -59,6 +82,16 @@ export default function SignupPage() {
 
   const displayError = localError || error;
 
+  if (optionsLoading) {
+    return (
+      <AuthLayout>
+        <div className="flex items-center justify-center py-12">
+          <LoadingSpinner size="md" label="Loading..." />
+        </div>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout>
       <h2 className="text-xl font-semibold text-gray-800 mb-6">Create your account</h2>
@@ -99,45 +132,49 @@ export default function SignupPage() {
           hint="Optional"
         />
 
-        {/* Role selection */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Account Type<span className="text-error-500 ml-0.5">*</span>
-          </label>
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setRole('APPLICANT')}
-              className={`p-3 border-2 rounded-lg text-center transition-all ${
-                role === 'APPLICANT'
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              <div className="text-lg mb-1">🏢</div>
-              <div className="text-sm font-medium">Building Owner</div>
-              <div className="text-xs text-gray-500 mt-0.5">Applicant</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('LEW')}
-              className={`p-3 border-2 rounded-lg text-center transition-all ${
-                role === 'LEW'
-                  ? 'border-primary bg-primary/5 text-primary'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-              }`}
-            >
-              <div className="text-lg mb-1">⚡</div>
-              <div className="text-sm font-medium">LEW</div>
-              <div className="text-xs text-gray-500 mt-0.5">Licensed Electrical Worker</div>
-            </button>
+        {/* Role selection — 역할이 2개 이상일 때만 표시 */}
+        {availableRoles.length > 1 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Account Type<span className="text-error-500 ml-0.5">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setRole('APPLICANT')}
+                className={`p-3 border-2 rounded-lg text-center transition-all ${
+                  role === 'APPLICANT'
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                <div className="text-lg mb-1">🏢</div>
+                <div className="text-sm font-medium">Building Owner</div>
+                <div className="text-xs text-gray-500 mt-0.5">Applicant</div>
+              </button>
+              {availableRoles.includes('LEW') && (
+                <button
+                  type="button"
+                  onClick={() => setRole('LEW')}
+                  className={`p-3 border-2 rounded-lg text-center transition-all ${
+                    role === 'LEW'
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-lg mb-1">⚡</div>
+                  <div className="text-sm font-medium">LEW</div>
+                  <div className="text-xs text-gray-500 mt-0.5">Licensed Electrical Worker</div>
+                </button>
+              )}
+            </div>
+            {role === 'LEW' && (
+              <p className="text-xs text-warning-600 mt-1.5">
+                ⚠ LEW accounts require administrator approval before access.
+              </p>
+            )}
           </div>
-          {role === 'LEW' && (
-            <p className="text-xs text-warning-600 mt-1.5">
-              ⚠ LEW accounts require administrator approval before access.
-            </p>
-          )}
-        </div>
+        )}
 
         <Input
           label="Password"

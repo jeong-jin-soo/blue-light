@@ -14,7 +14,8 @@ import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
 import { Select } from '../../components/ui/Select';
-import type { AdminApplication, FileInfo, FileType, Payment } from '../../types';
+import { useAuthStore } from '../../stores/authStore';
+import type { AdminApplication, FileInfo, FileType, Payment, LewSummary } from '../../types';
 
 const FILE_TYPE_OPTIONS = [
   { value: 'LICENSE_PDF', label: 'Licence PDF' },
@@ -64,6 +65,16 @@ export default function AdminApplicationDetailPage() {
   const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow' });
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
+
+  // LEW assignment states
+  const [showAssignLewModal, setShowAssignLewModal] = useState(false);
+  const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
+  const [availableLews, setAvailableLews] = useState<LewSummary[]>([]);
+  const [selectedLewSeq, setSelectedLewSeq] = useState<number | null>(null);
+  const [lewsLoading, setLewsLoading] = useState(false);
+
+  const { user: currentUser } = useAuthStore();
+  const isAdmin = currentUser?.role === 'ADMIN';
 
   const applicationId = Number(id);
 
@@ -178,6 +189,61 @@ export default function AdminApplicationDetailPage() {
     toast.success('File uploaded successfully');
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
     setFiles(updatedFiles);
+  };
+
+  // ── LEW Assignment Handlers ──────────────────────
+  const openAssignLewModal = async () => {
+    setLewsLoading(true);
+    setShowAssignLewModal(true);
+    try {
+      const lews = await adminApi.getAvailableLews();
+      setAvailableLews(lews);
+      // 현재 할당된 LEW가 있으면 미리 선택
+      if (application?.assignedLewSeq) {
+        setSelectedLewSeq(application.assignedLewSeq);
+      } else if (lews.length === 1) {
+        setSelectedLewSeq(lews[0].userSeq);
+      } else {
+        setSelectedLewSeq(null);
+      }
+    } catch {
+      toast.error('Failed to load LEW list');
+      setShowAssignLewModal(false);
+    } finally {
+      setLewsLoading(false);
+    }
+  };
+
+  const handleAssignLew = async () => {
+    if (!selectedLewSeq) {
+      toast.error('Please select a LEW');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await adminApi.assignLew(applicationId, { lewUserSeq: selectedLewSeq });
+      toast.success('LEW assigned successfully');
+      setShowAssignLewModal(false);
+      fetchData();
+    } catch {
+      toast.error('Failed to assign LEW');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUnassignLew = async () => {
+    setShowUnassignConfirm(false);
+    setActionLoading(true);
+    try {
+      await adminApi.unassignLew(applicationId);
+      toast.success('LEW unassigned successfully');
+      fetchData();
+    } catch {
+      toast.error('Failed to unassign LEW');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleFileDownload = async (fileInfo: FileInfo) => {
@@ -522,6 +588,56 @@ export default function AdminApplicationDetailPage() {
             </div>
           </Card>
 
+          {/* Assigned LEW (ADMIN only) */}
+          {isAdmin && (
+            <Card>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Assigned LEW</h3>
+              {application.assignedLewSeq ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg border border-primary-100">
+                    <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                      <span className="text-sm">⚡</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800">{application.assignedLewName}</p>
+                      <p className="text-xs text-gray-500 truncate">{application.assignedLewEmail}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      fullWidth
+                      onClick={openAssignLewModal}
+                    >
+                      Change
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      fullWidth
+                      onClick={() => setShowUnassignConfirm(true)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-2">
+                  <p className="text-sm text-gray-500 mb-3">No LEW assigned</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    fullWidth
+                    onClick={openAssignLewModal}
+                  >
+                    ⚡ Assign LEW
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* Licence Info (when completed) */}
           {application.status === 'COMPLETED' && application.licenseNumber && (
             <Card>
@@ -716,6 +832,75 @@ export default function AdminApplicationDetailPage() {
         title="Start Processing"
         message="Start processing this application? Status will change to IN_PROGRESS."
         confirmLabel="Start Processing"
+      />
+
+      {/* ── Assign LEW Modal ────────────────── */}
+      <Modal isOpen={showAssignLewModal} onClose={() => setShowAssignLewModal(false)} size="sm">
+        <ModalHeader title="Assign LEW" onClose={() => setShowAssignLewModal(false)} />
+        <ModalBody>
+          {lewsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner size="md" label="Loading LEWs..." />
+            </div>
+          ) : availableLews.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-sm text-gray-500">No approved LEWs available for assignment.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-sm text-gray-600 mb-3">
+                Select a LEW to assign to this application:
+              </p>
+              {availableLews.map((lew) => (
+                <button
+                  key={lew.userSeq}
+                  type="button"
+                  onClick={() => setSelectedLewSeq(lew.userSeq)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
+                    selectedLewSeq === lew.userSeq
+                      ? 'border-primary bg-primary/5'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm">⚡</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-800">{lew.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{lew.email}</p>
+                  </div>
+                  {selectedLewSeq === lew.userSeq && (
+                    <span className="text-primary text-lg flex-shrink-0">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" size="sm" onClick={() => setShowAssignLewModal(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleAssignLew}
+            loading={actionLoading}
+            disabled={!selectedLewSeq || lewsLoading}
+          >
+            Assign
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* ── Unassign LEW Confirm ────────────────── */}
+      <ConfirmDialog
+        isOpen={showUnassignConfirm}
+        onClose={() => setShowUnassignConfirm(false)}
+        onConfirm={handleUnassignLew}
+        title="Remove LEW Assignment"
+        message="Remove the assigned LEW from this application? The application will become unassigned."
+        confirmLabel="Remove"
+        loading={actionLoading}
       />
     </div>
   );

@@ -91,6 +91,13 @@ public class Application extends BaseEntity {
     @Column(name = "review_comment", columnDefinition = "TEXT")
     private String reviewComment;
 
+    /**
+     * 담당 LEW (할당된 경우, nullable)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_lew_seq")
+    private User assignedLew;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount) {
@@ -173,5 +180,19 @@ public class Application extends BaseEntity {
      */
     public void markAsExpired() {
         this.status = ApplicationStatus.EXPIRED;
+    }
+
+    /**
+     * LEW 할당
+     */
+    public void assignLew(User lew) {
+        this.assignedLew = lew;
+    }
+
+    /**
+     * LEW 할당 해제
+     */
+    public void unassignLew() {
+        this.assignedLew = null;
     }
 }

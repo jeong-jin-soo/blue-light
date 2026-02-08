@@ -290,6 +290,10 @@ export interface AdminApplication extends Application {
   userEmail: string;
   userPhone?: string;
   reviewComment?: string;
+  // Assigned LEW info
+  assignedLewSeq?: number;
+  assignedLewName?: string;
+  assignedLewEmail?: string;
 }
 
 /**
@@ -304,6 +308,7 @@ export interface AdminDashboard {
   inProgress: number;
   completed: number;
   totalUsers: number;
+  unassigned: number;
 }
 
 /**
@@ -357,4 +362,32 @@ export interface CompleteApplicationRequest {
 export interface PaymentConfirmRequest {
   transactionId?: string;
   paymentMethod?: string;
+}
+
+// ============================================
+// LEW Assignment Types
+// ============================================
+
+/**
+ * LEW 할당 요청
+ */
+export interface AssignLewRequest {
+  lewUserSeq: number;
+}
+
+/**
+ * LEW 요약 정보 (할당 드롭다운용)
+ */
+export interface LewSummary {
+  userSeq: number;
+  name: string;
+  email: string;
+}
+
+/**
+ * 회원가입 옵션 (가입 가능한 역할 목록)
+ */
+export interface SignupOptions {
+  availableRoles: string[];
+  lewRegistrationOpen: boolean;
 }

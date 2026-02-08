@@ -21,6 +21,12 @@ SELECT 'lew@bluelight.sg',
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'lew@bluelight.sg');
 
+-- 시스템 설정 초기값
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'lew_registration_open', 'true', 'LEW 가입 허용 여부', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'lew_registration_open');
+
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입
 INSERT INTO master_prices (description, kva_min, kva_max, price, is_active, created_at, updated_at)

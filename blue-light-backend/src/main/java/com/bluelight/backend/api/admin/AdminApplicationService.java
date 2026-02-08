@@ -8,7 +8,12 @@ import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.payment.Payment;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.payment.PaymentStatus;
+import com.bluelight.backend.domain.setting.SystemSetting;
+import com.bluelight.backend.domain.setting.SystemSettingRepository;
+import com.bluelight.backend.domain.user.ApprovalStatus;
+import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import com.bluelight.backend.domain.user.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -32,6 +37,7 @@ public class AdminApplicationService {
     private final ApplicationRepository applicationRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final SystemSettingRepository systemSettingRepository;
 
     /**
      * Get admin dashboard summary
@@ -46,6 +52,8 @@ public class AdminApplicationService {
         long completed = applicationRepository.countByStatus(ApplicationStatus.COMPLETED);
         long totalUsers = userRepository.count();
 
+        long unassigned = applicationRepository.countByAssignedLewIsNull();
+
         return AdminDashboardResponse.builder()
                 .totalApplications(totalApplications)
                 .pendingReview(pendingReview)
@@ -55,6 +63,7 @@ public class AdminApplicationService {
                 .inProgress(inProgress)
                 .completed(completed)
                 .totalUsers(totalUsers)
+                .unassigned(unassigned)
                 .build();
     }
 
@@ -213,6 +222,82 @@ public class AdminApplicationService {
         log.info("Application approved for payment: applicationSeq={}", applicationSeq);
 
         return AdminApplicationResponse.from(application);
+    }
+
+    // --- LEW Assignment ---
+
+    /**
+     * 신청에 LEW 할당
+     */
+    @Transactional
+    public AdminApplicationResponse assignLew(Long applicationSeq, AssignLewRequest request) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        User lew = userRepository.findById(request.getLewUserSeq())
+                .orElseThrow(() -> new BusinessException(
+                        "LEW user not found", HttpStatus.NOT_FOUND, "LEW_NOT_FOUND"));
+
+        if (lew.getRole() != UserRole.LEW) {
+            throw new BusinessException(
+                    "User is not a LEW", HttpStatus.BAD_REQUEST, "NOT_LEW_USER");
+        }
+        if (!lew.isApproved()) {
+            throw new BusinessException(
+                    "LEW is not approved", HttpStatus.BAD_REQUEST, "LEW_NOT_APPROVED");
+        }
+
+        application.assignLew(lew);
+        log.info("LEW assigned: applicationSeq={}, lewSeq={}", applicationSeq, lew.getUserSeq());
+
+        return AdminApplicationResponse.from(application);
+    }
+
+    /**
+     * 신청에서 LEW 할당 해제
+     */
+    @Transactional
+    public AdminApplicationResponse unassignLew(Long applicationSeq) {
+        Application application = findApplicationOrThrow(applicationSeq);
+        application.unassignLew();
+        log.info("LEW unassigned: applicationSeq={}", applicationSeq);
+        return AdminApplicationResponse.from(application);
+    }
+
+    /**
+     * 할당 가능한 LEW 목록 조회 (APPROVED 상태)
+     */
+    public List<LewSummaryResponse> getAvailableLews() {
+        return userRepository.findByRoleAndApprovedStatus(UserRole.LEW, ApprovalStatus.APPROVED)
+                .stream()
+                .map(LewSummaryResponse::from)
+                .toList();
+    }
+
+    // --- System Settings ---
+
+    /**
+     * 시스템 설정 조회
+     */
+    public java.util.Map<String, String> getSettings() {
+        java.util.Map<String, String> settings = new java.util.HashMap<>();
+        systemSettingRepository.findAll().forEach(s ->
+                settings.put(s.getSettingKey(), s.getSettingValue()));
+        return settings;
+    }
+
+    /**
+     * 시스템 설정 변경
+     */
+    @Transactional
+    public java.util.Map<String, String> updateSettings(java.util.Map<String, String> updates, Long updatedBy) {
+        updates.forEach((key, value) -> {
+            SystemSetting setting = systemSettingRepository.findById(key)
+                    .orElseThrow(() -> new BusinessException(
+                            "Setting not found: " + key, HttpStatus.NOT_FOUND, "SETTING_NOT_FOUND"));
+            setting.updateValue(value, updatedBy);
+            log.info("Setting updated: key={}, value={}, by={}", key, value, updatedBy);
+        });
+        return getSettings();
     }
 
     // --- Private helpers ---

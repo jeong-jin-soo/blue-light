@@ -18,4 +18,5 @@ public class AdminDashboardResponse {
     private long inProgress;
     private long completed;
     private long totalUsers;
+    private long unassigned;
 }

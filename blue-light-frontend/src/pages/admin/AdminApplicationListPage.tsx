@@ -128,6 +128,15 @@ export default function AdminApplicationListPage() {
       ),
     },
     {
+      key: 'assignedLewName',
+      header: 'Assigned LEW',
+      render: (app) => (
+        <span className={app.assignedLewName ? 'text-gray-700' : 'text-gray-400 italic'}>
+          {app.assignedLewName || 'Unassigned'}
+        </span>
+      ),
+    },
+    {
       key: 'status',
       header: 'Status',
       render: (app) => <StatusBadge status={app.status} />,
@@ -210,6 +219,13 @@ export default function AdminApplicationListPage() {
               </div>
               <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
             </div>
+            {app.assignedLewName && (
+              <div className="mt-1.5 text-xs text-gray-500">
+                <span className="inline-flex items-center gap-1">
+                  ⚡ {app.assignedLewName}
+                </span>
+              </div>
+            )}
           </div>
         )}
       />

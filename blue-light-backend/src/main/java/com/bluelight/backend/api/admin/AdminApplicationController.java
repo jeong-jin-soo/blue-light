@@ -13,7 +13,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.Authentication;
+
 import java.util.List;
+import java.util.Map;
 
 /**
  * Admin/LEW Application API controller
@@ -139,5 +142,74 @@ public class AdminApplicationController {
         log.info("Admin get payments: applicationSeq={}", id);
         List<PaymentResponse> payments = adminApplicationService.getPayments(id);
         return ResponseEntity.ok(payments);
+    }
+
+    // ── LEW Assignment (ADMIN only) ──────────────────
+
+    /**
+     * Assign LEW to application
+     * POST /api/admin/applications/:id/assign-lew
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PostMapping("/applications/{id}/assign-lew")
+    public ResponseEntity<AdminApplicationResponse> assignLew(
+            @PathVariable Long id,
+            @Valid @RequestBody AssignLewRequest request) {
+        log.info("Admin assign LEW: applicationSeq={}, lewSeq={}", id, request.getLewUserSeq());
+        AdminApplicationResponse response = adminApplicationService.assignLew(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Unassign LEW from application
+     * DELETE /api/admin/applications/:id/assign-lew
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @DeleteMapping("/applications/{id}/assign-lew")
+    public ResponseEntity<AdminApplicationResponse> unassignLew(@PathVariable Long id) {
+        log.info("Admin unassign LEW: applicationSeq={}", id);
+        AdminApplicationResponse response = adminApplicationService.unassignLew(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get available LEWs for assignment
+     * GET /api/admin/lews
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/lews")
+    public ResponseEntity<List<LewSummaryResponse>> getAvailableLews() {
+        log.info("Get available LEWs for assignment");
+        List<LewSummaryResponse> lews = adminApplicationService.getAvailableLews();
+        return ResponseEntity.ok(lews);
+    }
+
+    // ── System Settings (ADMIN only) ──────────────────
+
+    /**
+     * Get system settings
+     * GET /api/admin/settings
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/settings")
+    public ResponseEntity<Map<String, String>> getSettings() {
+        log.info("Admin get settings");
+        Map<String, String> settings = adminApplicationService.getSettings();
+        return ResponseEntity.ok(settings);
+    }
+
+    /**
+     * Update system settings
+     * PATCH /api/admin/settings
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/settings")
+    public ResponseEntity<Map<String, String>> updateSettings(
+            @RequestBody Map<String, String> updates,
+            Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Admin update settings: keys={}", updates.keySet());
+        Map<String, String> settings = adminApplicationService.updateSettings(updates, userSeq);
+        return ResponseEntity.ok(settings);
     }
 }

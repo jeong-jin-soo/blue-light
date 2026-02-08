@@ -12,8 +12,10 @@ import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
+import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import com.bluelight.backend.domain.user.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -67,6 +69,14 @@ public class ApplicationService {
                 .selectedKva(request.getSelectedKva())
                 .quoteAmount(masterPrice.getPrice())
                 .build();
+
+        // 승인된 LEW가 1명이면 자동 할당
+        List<User> approvedLews = userRepository.findByRoleAndApprovedStatus(
+                UserRole.LEW, ApprovalStatus.APPROVED);
+        if (approvedLews.size() == 1) {
+            application.assignLew(approvedLews.get(0));
+            log.info("LEW auto-assigned: lewSeq={}", approvedLews.get(0).getUserSeq());
+        }
 
         Application saved = applicationRepository.save(application);
         log.info("Application created: applicationSeq={}, userSeq={}, kva={}, amount={}",

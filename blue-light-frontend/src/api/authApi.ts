@@ -3,7 +3,7 @@
  */
 
 import axiosClient, { tokenUtils } from './axiosClient';
-import type { LoginRequest, SignupRequest, TokenResponse } from '../types';
+import type { LoginRequest, SignupOptions, SignupRequest, TokenResponse } from '../types';
 
 /**
  * 회원가입
@@ -48,11 +48,20 @@ export const isAuthenticated = (): boolean => {
   return tokenUtils.hasToken();
 };
 
+/**
+ * 가입 가능한 역할 옵션 조회 (Public)
+ */
+export const getSignupOptions = async (): Promise<SignupOptions> => {
+  const response = await axiosClient.get<SignupOptions>('/auth/signup-options');
+  return response.data;
+};
+
 export const authApi = {
   signup,
   login,
   logout,
   isAuthenticated,
+  getSignupOptions,
 };
 
 export default authApi;

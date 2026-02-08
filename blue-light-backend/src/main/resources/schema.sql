@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS applications (
     license_number     VARCHAR(50),
     license_expiry_date DATE,
     review_comment     TEXT,
+    assigned_lew_seq   BIGINT,
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -43,7 +44,9 @@ CREATE TABLE IF NOT EXISTS applications (
     PRIMARY KEY (application_seq),
     KEY idx_applications_user_seq (user_seq),
     KEY idx_applications_status (status),
-    CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+    KEY idx_applications_assigned_lew (assigned_lew_seq),
+    CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_applications_assigned_lew FOREIGN KEY (assigned_lew_seq) REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. 결제 로그
@@ -100,7 +103,17 @@ CREATE TABLE IF NOT EXISTS files (
     CONSTRAINT fk_files_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 6. 용량별 단가표
+-- 6. 시스템 설정 (key-value)
+CREATE TABLE IF NOT EXISTS system_settings (
+    setting_key   VARCHAR(100)  NOT NULL,
+    setting_value VARCHAR(500)  NOT NULL,
+    description   VARCHAR(255),
+    updated_at    DATETIME(6),
+    updated_by    BIGINT,
+    PRIMARY KEY (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 7. 용량별 단가표
 CREATE TABLE IF NOT EXISTS master_prices (
     master_price_seq BIGINT        NOT NULL AUTO_INCREMENT,
     description      VARCHAR(50),

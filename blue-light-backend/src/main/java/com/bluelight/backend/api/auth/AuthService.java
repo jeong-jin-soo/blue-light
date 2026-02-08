@@ -4,6 +4,7 @@ import com.bluelight.backend.api.auth.dto.LoginRequest;
 import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -17,6 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 인증 서비스
@@ -31,6 +35,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final SystemSettingRepository systemSettingRepository;
 
     /**
      * 회원가입
@@ -60,6 +65,15 @@ public class AuthService {
         // 역할 결정 (LEW 선택 시 LEW, 그 외 APPLICANT — ADMIN 가입 불가)
         UserRole selectedRole = "LEW".equalsIgnoreCase(request.getRole())
                 ? UserRole.LEW : UserRole.APPLICANT;
+
+        // LEW 가입이 닫혀 있으면 LEW 가입 차단
+        if (selectedRole == UserRole.LEW && !isLewRegistrationOpen()) {
+            throw new BusinessException(
+                    "LEW registration is currently closed",
+                    HttpStatus.BAD_REQUEST,
+                    "LEW_REGISTRATION_CLOSED"
+            );
+        }
 
         // 사용자 생성 (LEW는 승인 대기 상태로 시작)
         User user = User.builder()
@@ -107,6 +121,33 @@ public class AuthService {
 
         // JWT 토큰 생성 및 반환
         return createTokenResponse(user);
+    }
+
+    /**
+     * 가입 가능한 역할 목록 조회
+     * - APPLICANT는 항상 포함
+     * - LEW는 lew_registration_open 설정에 따라 포함/제외
+     */
+    public Map<String, Object> getSignupOptions() {
+        boolean lewOpen = isLewRegistrationOpen();
+        List<String> availableRoles = new ArrayList<>();
+        availableRoles.add("APPLICANT");
+        if (lewOpen) {
+            availableRoles.add("LEW");
+        }
+        return Map.of(
+                "availableRoles", availableRoles,
+                "lewRegistrationOpen", lewOpen
+        );
+    }
+
+    /**
+     * LEW 가입 허용 여부 확인
+     */
+    private boolean isLewRegistrationOpen() {
+        return systemSettingRepository.findById("lew_registration_open")
+                .map(s -> s.toBooleanValue())
+                .orElse(true); // 설정값이 없으면 기본 허용
     }
 
     /**

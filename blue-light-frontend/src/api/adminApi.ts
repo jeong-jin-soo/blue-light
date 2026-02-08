@@ -3,10 +3,12 @@ import type {
   AdminApplication,
   AdminDashboard,
   ApplicationStatus,
+  AssignLewRequest,
   ChangeRoleRequest,
   CompleteApplicationRequest,
   FileInfo,
   FileType,
+  LewSummary,
   Page,
   Payment,
   PaymentConfirmRequest,
@@ -129,6 +131,49 @@ export const uploadFile = async (
 };
 
 // ============================================
+// LEW Assignment
+// ============================================
+
+export const getAvailableLews = async (): Promise<LewSummary[]> => {
+  const response = await axiosClient.get<LewSummary[]>('/admin/lews');
+  return response.data;
+};
+
+export const assignLew = async (
+  applicationId: number,
+  data: AssignLewRequest
+): Promise<AdminApplication> => {
+  const response = await axiosClient.post<AdminApplication>(
+    `/admin/applications/${applicationId}/assign-lew`,
+    data
+  );
+  return response.data;
+};
+
+export const unassignLew = async (applicationId: number): Promise<AdminApplication> => {
+  const response = await axiosClient.delete<AdminApplication>(
+    `/admin/applications/${applicationId}/assign-lew`
+  );
+  return response.data;
+};
+
+// ============================================
+// System Settings
+// ============================================
+
+export const getSettings = async (): Promise<Record<string, string>> => {
+  const response = await axiosClient.get<Record<string, string>>('/admin/settings');
+  return response.data;
+};
+
+export const updateSettings = async (
+  data: Record<string, string>
+): Promise<Record<string, string>> => {
+  const response = await axiosClient.patch<Record<string, string>>('/admin/settings', data);
+  return response.data;
+};
+
+// ============================================
 // Users
 // ============================================
 
@@ -163,6 +208,11 @@ export const adminApi = {
   confirmPayment,
   getPayments,
   uploadFile,
+  getAvailableLews,
+  assignLew,
+  unassignLew,
+  getSettings,
+  updateSettings,
   getUsers,
   changeUserRole,
   approveLew,
