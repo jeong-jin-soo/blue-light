@@ -12,11 +12,11 @@ SELECT 'admin@bluelight.sg',
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@bluelight.sg');
 
--- LEW 계정 (password: admin1234 / BCrypt encoded)
-INSERT INTO users (email, password, name, phone, role, created_at, updated_at)
+-- LEW 계정 (password: admin1234 / BCrypt encoded, 사전 승인됨)
+INSERT INTO users (email, password, name, phone, role, approved_status, created_at, updated_at)
 SELECT 'lew@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'LEW Officer', '+65-0000-0001', 'LEW',
+       'LEW Officer', '+65-0000-0001', 'LEW', 'APPROVED',
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'lew@bluelight.sg');

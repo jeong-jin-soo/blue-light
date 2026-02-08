@@ -19,6 +19,7 @@ public class AdminUserResponse {
     private String name;
     private String phone;
     private UserRole role;
+    private String approvedStatus;
     private LocalDateTime createdAt;
 
     public static AdminUserResponse from(User user) {
@@ -28,6 +29,8 @@ public class AdminUserResponse {
                 .name(user.getName())
                 .phone(user.getPhone())
                 .role(user.getRole())
+                .approvedStatus(user.getApprovedStatus() != null
+                        ? user.getApprovedStatus().name() : null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }

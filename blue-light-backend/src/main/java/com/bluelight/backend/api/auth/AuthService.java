@@ -4,6 +4,7 @@ import com.bluelight.backend.api.auth.dto.LoginRequest;
 import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
@@ -60,13 +61,14 @@ public class AuthService {
         UserRole selectedRole = "LEW".equalsIgnoreCase(request.getRole())
                 ? UserRole.LEW : UserRole.APPLICANT;
 
-        // 사용자 생성
+        // 사용자 생성 (LEW는 승인 대기 상태로 시작)
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword)
                 .name(request.getName())
                 .phone(request.getPhone())
                 .role(selectedRole)
+                .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
                 .pdpaConsentAt(LocalDateTime.now())
                 .build();
 
@@ -111,10 +113,12 @@ public class AuthService {
      * TokenResponse 생성
      */
     private TokenResponse createTokenResponse(User user) {
+        boolean approved = user.isApproved();
         String accessToken = jwtTokenProvider.createToken(
                 user.getUserSeq(),
                 user.getEmail(),
-                user.getRole().name()
+                user.getRole().name(),
+                approved
         );
 
         return TokenResponse.of(
@@ -123,7 +127,8 @@ public class AuthService {
                 user.getUserSeq(),
                 user.getEmail(),
                 user.getName(),
-                user.getRole().name()
+                user.getRole().name(),
+                approved
         );
     }
 }

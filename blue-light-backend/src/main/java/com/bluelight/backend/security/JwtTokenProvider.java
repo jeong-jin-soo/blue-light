@@ -42,12 +42,13 @@ public class JwtTokenProvider {
     /**
      * Access Token 생성
      *
-     * @param userSeq 사용자 PK
-     * @param email   사용자 이메일
-     * @param role    사용자 역할
+     * @param userSeq  사용자 PK
+     * @param email    사용자 이메일
+     * @param role     사용자 역할
+     * @param approved 승인 여부 (LEW만 관련)
      * @return JWT 토큰
      */
-    public String createToken(Long userSeq, String email, String role) {
+    public String createToken(Long userSeq, String email, String role, boolean approved) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
@@ -55,6 +56,7 @@ public class JwtTokenProvider {
                 .subject(String.valueOf(userSeq))
                 .claim("email", email)
                 .claim("role", role)
+                .claim("approved", approved)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)
@@ -83,6 +85,14 @@ public class JwtTokenProvider {
     public String getRole(String token) {
         Claims claims = parseClaims(token);
         return claims.get("role", String.class);
+    }
+
+    /**
+     * 토큰에서 승인 여부 추출
+     */
+    public Boolean getApproved(String token) {
+        Claims claims = parseClaims(token);
+        return claims.get("approved", Boolean.class);
     }
 
     /**

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 
 /**
  * 사용자 정보 Entity
- * - 건물주(APPLICANT)와 관리자(ADMIN)를 포함
+ * - 건물주(APPLICANT), LEW, 관리자(ADMIN)를 포함
  */
 @Entity
 @Table(name = "users")
@@ -53,11 +53,18 @@ public class User extends BaseEntity {
     private String phone;
 
     /**
-     * 역할 구분 (APPLICANT, ADMIN)
+     * 역할 구분 (APPLICANT, LEW, ADMIN)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private UserRole role = UserRole.APPLICANT;
+
+    /**
+     * LEW 승인 상태 (LEW만 사용, APPLICANT/ADMIN은 null)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approved_status", length = 20)
+    private ApprovalStatus approvedStatus;
 
     /**
      * PDPA 동의 일시
@@ -66,13 +73,45 @@ public class User extends BaseEntity {
     private LocalDateTime pdpaConsentAt;
 
     @Builder
-    public User(String email, String password, String name, String phone, UserRole role, LocalDateTime pdpaConsentAt) {
+    public User(String email, String password, String name, String phone,
+                UserRole role, ApprovalStatus approvedStatus, LocalDateTime pdpaConsentAt) {
         this.email = email;
         this.password = password;
         this.name = name;
         this.phone = phone;
         this.role = role != null ? role : UserRole.APPLICANT;
+        this.approvedStatus = approvedStatus;
         this.pdpaConsentAt = pdpaConsentAt;
+    }
+
+    /**
+     * LEW 승인 여부 확인
+     * - LEW가 아닌 역할은 항상 true
+     * - LEW는 APPROVED 상태일 때만 true
+     */
+    public boolean isApproved() {
+        if (this.role != UserRole.LEW) return true;
+        return this.approvedStatus == ApprovalStatus.APPROVED;
+    }
+
+    /**
+     * LEW 승인 처리
+     */
+    public void approve() {
+        if (this.role != UserRole.LEW) {
+            throw new IllegalStateException("Only LEW users can be approved");
+        }
+        this.approvedStatus = ApprovalStatus.APPROVED;
+    }
+
+    /**
+     * LEW 거절 처리
+     */
+    public void reject() {
+        if (this.role != UserRole.LEW) {
+            throw new IllegalStateException("Only LEW users can be rejected");
+        }
+        this.approvedStatus = ApprovalStatus.REJECTED;
     }
 
     /**
@@ -91,9 +130,14 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 역할 변경
+     * 역할 변경 (approvedStatus 연동)
      */
     public void changeRole(UserRole role) {
         this.role = role;
+        if (role == UserRole.LEW) {
+            this.approvedStatus = ApprovalStatus.PENDING;
+        } else {
+            this.approvedStatus = null;
+        }
     }
 }

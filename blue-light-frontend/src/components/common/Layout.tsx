@@ -13,7 +13,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN';
-  const isLew = user?.role === 'LEW';
+  const isLew = user?.role === 'LEW' && user?.approved;
 
   const handleLogout = () => {
     logout();

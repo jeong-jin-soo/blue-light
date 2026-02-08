@@ -6,7 +6,7 @@ import { DataTable, type Column } from '../../components/data/DataTable';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
-import type { User, UserRole } from '../../types';
+import type { User, UserRole, ApprovalStatus } from '../../types';
 
 export default function AdminUserListPage() {
   const toast = useToastStore();
@@ -15,6 +15,8 @@ export default function AdminUserListPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: User; newRole: UserRole } | null>(null);
   const [changingRole, setChangingRole] = useState(false);
+  const [approvalTarget, setApprovalTarget] = useState<{ user: User; action: 'approve' | 'reject' } | null>(null);
+  const [processingApproval, setProcessingApproval] = useState(false);
 
   const loadUsers = () => {
     setLoading(true);
@@ -57,10 +59,40 @@ export default function AdminUserListPage() {
       )
     : users;
 
+  const handleApproval = async () => {
+    if (!approvalTarget) return;
+    setProcessingApproval(true);
+    try {
+      if (approvalTarget.action === 'approve') {
+        await adminApi.approveLew(approvalTarget.user.userSeq);
+        toast.success(`${approvalTarget.user.name} has been approved as LEW`);
+      } else {
+        await adminApi.rejectLew(approvalTarget.user.userSeq);
+        toast.success(`${approvalTarget.user.name}'s LEW registration has been rejected`);
+      }
+      loadUsers();
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to process approval';
+      toast.error(message);
+    } finally {
+      setProcessingApproval(false);
+      setApprovalTarget(null);
+    }
+  };
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'ADMIN': return 'primary' as const;
       case 'LEW': return 'info' as const;
+      default: return 'gray' as const;
+    }
+  };
+
+  const getApprovalBadgeVariant = (status?: ApprovalStatus) => {
+    switch (status) {
+      case 'APPROVED': return 'success' as const;
+      case 'REJECTED': return 'error' as const;
+      case 'PENDING': return 'warning' as const;
       default: return 'gray' as const;
     }
   };
@@ -121,6 +153,36 @@ export default function AdminUserListPage() {
       ),
     },
     {
+      key: 'approvedStatus' as keyof User,
+      header: 'Approval',
+      render: (user) => {
+        if (user.role !== 'LEW') return <span className="text-gray-400">-</span>;
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant={getApprovalBadgeVariant(user.approvedStatus)}>
+              {user.approvedStatus || 'N/A'}
+            </Badge>
+            {user.approvedStatus !== 'APPROVED' && (
+              <button
+                onClick={() => setApprovalTarget({ user, action: 'approve' })}
+                className="text-xs text-success-600 hover:text-success-700 hover:underline"
+              >
+                Approve
+              </button>
+            )}
+            {user.approvedStatus === 'PENDING' && (
+              <button
+                onClick={() => setApprovalTarget({ user, action: 'reject' })}
+                className="text-xs text-error-600 hover:text-error-700 hover:underline"
+              >
+                Reject
+              </button>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: 'createdAt',
       header: 'Registered',
       sortable: true,
@@ -170,13 +232,18 @@ export default function AdminUserListPage() {
           <span>
             Showing {filteredUsers.length} of {users.length} users
           </span>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             <span>
               Applicants: {users.filter((u) => u.role === 'APPLICANT').length}
             </span>
             <span>
               LEWs: {users.filter((u) => u.role === 'LEW').length}
             </span>
+            {users.filter((u) => u.role === 'LEW' && u.approvedStatus === 'PENDING').length > 0 && (
+              <span className="text-warning-600 font-medium">
+                Pending LEW: {users.filter((u) => u.role === 'LEW' && u.approvedStatus === 'PENDING').length}
+              </span>
+            )}
             <span>
               Admins: {users.filter((u) => u.role === 'ADMIN').length}
             </span>
@@ -197,6 +264,24 @@ export default function AdminUserListPage() {
         loading={changingRole}
         onConfirm={handleRoleChange}
         onClose={() => setRoleChangeTarget(null)}
+      />
+
+      {/* LEW approval confirmation */}
+      <ConfirmDialog
+        isOpen={!!approvalTarget}
+        title={approvalTarget?.action === 'approve' ? 'Approve LEW' : 'Reject LEW'}
+        message={
+          approvalTarget
+            ? approvalTarget.action === 'approve'
+              ? `Are you sure you want to approve ${approvalTarget.user.name} as LEW? They will be able to manage applications after re-login.`
+              : `Are you sure you want to reject ${approvalTarget.user.name}'s LEW registration? They will not be able to access the system.`
+            : ''
+        }
+        confirmLabel={approvalTarget?.action === 'approve' ? 'Approve' : 'Reject'}
+        variant={approvalTarget?.action === 'reject' ? 'danger' : 'primary'}
+        loading={processingApproval}
+        onConfirm={handleApproval}
+        onClose={() => setApprovalTarget(null)}
       />
     </div>
   );

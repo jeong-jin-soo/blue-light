@@ -20,6 +20,11 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      // 미승인 LEW는 대기 페이지로
+      if (user.role === 'LEW' && !user.approved) {
+        navigate('/lew-pending', { replace: true });
+        return;
+      }
       const dest = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
@@ -127,6 +132,11 @@ export default function SignupPage() {
               <div className="text-xs text-gray-500 mt-0.5">Licensed Electrical Worker</div>
             </button>
           </div>
+          {role === 'LEW' && (
+            <p className="text-xs text-warning-600 mt-1.5">
+              ⚠ LEW accounts require administrator approval before access.
+            </p>
+          )}
         </div>
 
         <Input

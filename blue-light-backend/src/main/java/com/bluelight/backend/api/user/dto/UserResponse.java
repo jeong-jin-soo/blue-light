@@ -19,6 +19,7 @@ public class UserResponse {
     private String name;
     private String phone;
     private UserRole role;
+    private boolean approved;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -28,6 +29,7 @@ public class UserResponse {
                 .name(user.getName())
                 .phone(user.getPhone())
                 .role(user.getRole())
+                .approved(user.isApproved())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

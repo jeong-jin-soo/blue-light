@@ -15,6 +15,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      // 미승인 LEW는 대기 페이지로
+      if (user.role === 'LEW' && !user.approved) {
+        navigate('/lew-pending', { replace: true });
+        return;
+      }
       const dest = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }

@@ -41,10 +41,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token) && jwtTokenProvider.validateToken(token)) {
             Long userSeq = jwtTokenProvider.getUserSeq(token);
             String role = jwtTokenProvider.getRole(token);
+            Boolean approved = jwtTokenProvider.getApproved(token);
 
-            // 권한 설정 (ROLE_ 접두사 추가)
+            // 미승인 LEW는 ROLE_LEW_PENDING 권한 부여 → /api/admin/** 접근 차단
+            String authority;
+            if ("LEW".equals(role) && (approved == null || !approved)) {
+                authority = "ROLE_LEW_PENDING";
+            } else {
+                authority = "ROLE_" + role;
+            }
+
+            // 권한 설정
             List<SimpleGrantedAuthority> authorities = List.of(
-                    new SimpleGrantedAuthority("ROLE_" + role)
+                    new SimpleGrantedAuthority(authority)
             );
 
             // 인증 객체 생성 및 SecurityContext에 설정
@@ -53,7 +62,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            log.debug("Security Context에 인증 정보 설정 완료: userSeq={}, role={}", userSeq, role);
+            log.debug("Security Context에 인증 정보 설정 완료: userSeq={}, role={}, authority={}", userSeq, role, authority);
         }
 
         filterChain.doFilter(request, response);

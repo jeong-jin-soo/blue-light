@@ -34,6 +34,7 @@ interface AuthUser {
   email: string;
   name: string;
   role: UserRole;
+  approved: boolean;
 }
 
 /**
@@ -79,6 +80,7 @@ export const useAuthStore = create<AuthState>()(
               email: response.email,
               name: response.name,
               role: response.role,
+              approved: response.approved,
             },
             isAuthenticated: true,
             isLoading: false,
@@ -109,6 +111,7 @@ export const useAuthStore = create<AuthState>()(
               email: response.email,
               name: response.name,
               role: response.role,
+              approved: response.approved,
             },
             isAuthenticated: true,
             isLoading: false,
@@ -150,6 +153,7 @@ export const useAuthStore = create<AuthState>()(
             email: tokenResponse.email,
             name: tokenResponse.name,
             role: tokenResponse.role,
+            approved: tokenResponse.approved,
           },
           isAuthenticated: true,
         });

@@ -18,6 +18,11 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
+  // 미승인 LEW는 대기 페이지로 리다이렉트
+  if (user.role === 'LEW' && !user.approved) {
+    return <Navigate to="/lew-pending" replace />;
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // 역할 불일치 시 역할별 기본 페이지로 리다이렉트
     const redirectPath = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';

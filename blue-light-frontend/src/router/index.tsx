@@ -6,6 +6,7 @@ import NotFoundPage from '../pages/NotFoundPage';
 // Auth pages
 import LoginPage from '../pages/auth/LoginPage';
 import SignupPage from '../pages/auth/SignupPage';
+import LewPendingPage from '../pages/auth/LewPendingPage';
 
 // Legal pages
 import DisclaimerPage from '../pages/legal/DisclaimerPage';
@@ -44,6 +45,10 @@ const router = createBrowserRouter([
   {
     path: '/privacy',
     element: <PrivacyPolicyPage />,
+  },
+  {
+    path: '/lew-pending',
+    element: <LewPendingPage />,
   },
 
   // Applicant routes (APPLICANT role)

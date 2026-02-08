@@ -17,9 +17,10 @@ public class TokenResponse {
     private String email;
     private String name;
     private String role;
+    private Boolean approved;
 
     public static TokenResponse of(String accessToken, Long expiresIn, Long userSeq,
-                                   String email, String name, String role) {
+                                   String email, String name, String role, boolean approved) {
         return TokenResponse.builder()
                 .accessToken(accessToken)
                 .tokenType("Bearer")
@@ -28,6 +29,7 @@ public class TokenResponse {
                 .email(email)
                 .name(name)
                 .role(role)
+                .approved(approved)
                 .build();
     }
 }

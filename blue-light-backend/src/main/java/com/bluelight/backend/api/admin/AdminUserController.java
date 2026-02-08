@@ -80,8 +80,55 @@ public class AdminUserController {
                     HttpStatus.BAD_REQUEST, "CANNOT_ASSIGN_ADMIN");
         }
 
+        // changeRole이 approvedStatus도 자동 연동 (LEW → PENDING, APPLICANT → null)
         user.changeRole(targetRole);
         log.info("User role changed: userSeq={}, newRole={}", id, targetRole);
+
+        return ResponseEntity.ok(AdminUserResponse.from(user));
+    }
+
+    /**
+     * Approve LEW user
+     * POST /api/admin/users/:id/approve
+     */
+    @PostMapping("/{id}/approve")
+    @Transactional
+    public ResponseEntity<AdminUserResponse> approveLew(@PathVariable Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(
+                        "User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+
+        if (user.getRole() != UserRole.LEW) {
+            throw new BusinessException(
+                    "Only LEW users can be approved",
+                    HttpStatus.BAD_REQUEST, "NOT_LEW_USER");
+        }
+
+        user.approve();
+        log.info("LEW approved: userSeq={}, email={}", id, user.getEmail());
+
+        return ResponseEntity.ok(AdminUserResponse.from(user));
+    }
+
+    /**
+     * Reject LEW user
+     * POST /api/admin/users/:id/reject
+     */
+    @PostMapping("/{id}/reject")
+    @Transactional
+    public ResponseEntity<AdminUserResponse> rejectLew(@PathVariable Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(
+                        "User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+
+        if (user.getRole() != UserRole.LEW) {
+            throw new BusinessException(
+                    "Only LEW users can be rejected",
+                    HttpStatus.BAD_REQUEST, "NOT_LEW_USER");
+        }
+
+        user.reject();
+        log.info("LEW rejected: userSeq={}, email={}", id, user.getEmail());
 
         return ResponseEntity.ok(AdminUserResponse.from(user));
     }

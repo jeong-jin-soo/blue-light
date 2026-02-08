@@ -29,6 +29,11 @@ export interface ApiError {
 export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN';
 
 /**
+ * LEW 승인 상태
+ */
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/**
  * 사용자 정보
  */
 export interface User {
@@ -37,6 +42,8 @@ export interface User {
   name: string;
   phone?: string;
   role: UserRole;
+  approved?: boolean;
+  approvedStatus?: ApprovalStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -199,6 +206,7 @@ export interface TokenResponse {
   email: string;
   name: string;
   role: UserRole;
+  approved: boolean;
 }
 
 // ============================================

@@ -142,6 +142,16 @@ export const changeUserRole = async (id: number, data: ChangeRoleRequest): Promi
   return response.data;
 };
 
+export const approveLew = async (id: number): Promise<User> => {
+  const response = await axiosClient.post<User>(`/admin/users/${id}/approve`);
+  return response.data;
+};
+
+export const rejectLew = async (id: number): Promise<User> => {
+  const response = await axiosClient.post<User>(`/admin/users/${id}/reject`);
+  return response.data;
+};
+
 export const adminApi = {
   getDashboard,
   getApplications,
@@ -155,5 +165,7 @@ export const adminApi = {
   uploadFile,
   getUsers,
   changeUserRole,
+  approveLew,
+  rejectLew,
 };
 export default adminApi;
