@@ -74,18 +74,27 @@ public class ApplicationService {
         Integer renewalPeriodMonths = null;
         BigDecimal emaFee = null;
 
-        if ("RENEWAL".equals(request.getApplicationType())) {
-            appType = ApplicationType.RENEWAL;
-
-            // Validate renewal period
+        // Licence period (applicable to both NEW and RENEWAL)
+        if (request.getRenewalPeriodMonths() != null) {
             renewalPeriodMonths = request.getRenewalPeriodMonths();
-            if (renewalPeriodMonths == null || (renewalPeriodMonths != 3 && renewalPeriodMonths != 12)) {
+            if (renewalPeriodMonths != 3 && renewalPeriodMonths != 12) {
                 throw new BusinessException(
-                        "Renewal period must be 3 or 12 months",
+                        "Licence period must be 3 or 12 months",
                         HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
             }
             emaFee = renewalPeriodMonths == 3
                     ? new BigDecimal("50.00") : new BigDecimal("100.00");
+        }
+
+        if ("RENEWAL".equals(request.getApplicationType())) {
+            appType = ApplicationType.RENEWAL;
+
+            // Renewal must have a licence period
+            if (renewalPeriodMonths == null) {
+                throw new BusinessException(
+                        "Licence period is required for renewal",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
 
             // Link to original application if provided
             if (request.getOriginalApplicationSeq() != null) {
@@ -182,13 +191,12 @@ public class ApplicationService {
                 quoteAmount, serviceFee
         );
 
-        // 갱신 신청이면 갱신 기간 변경 처리
-        if (application.getApplicationType() == ApplicationType.RENEWAL
-                && request.getRenewalPeriodMonths() != null) {
+        // Licence period 변경 처리 (NEW, RENEWAL 모두)
+        if (request.getRenewalPeriodMonths() != null) {
             int months = request.getRenewalPeriodMonths();
             if (months != 3 && months != 12) {
                 throw new BusinessException(
-                        "Renewal period must be 3 or 12 months",
+                        "Licence period must be 3 or 12 months",
                         HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
             }
             BigDecimal newEmaFee = months == 3

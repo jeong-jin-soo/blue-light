@@ -148,10 +148,11 @@ export default function NewApplicationPage() {
   // Validation per step
   const validateStep0 = (): boolean => {
     const newErrors: Record<string, string> = {};
+    // Licence period is required for both NEW and RENEWAL
+    if (!formData.renewalPeriodMonths) {
+      newErrors.renewalPeriodMonths = 'Please select a licence period';
+    }
     if (formData.applicationType === 'RENEWAL') {
-      if (!formData.renewalPeriodMonths) {
-        newErrors.renewalPeriodMonths = 'Please select a renewal period';
-      }
       if (formData.manualEntry) {
         if (!formData.existingLicenceNo.trim()) {
           newErrors.existingLicenceNo = 'Existing licence number is required';
@@ -207,9 +208,9 @@ export default function NewApplicationPage() {
         buildingType: formData.buildingType || undefined,
         selectedKva: formData.selectedKva,
         applicationType: formData.applicationType,
+        renewalPeriodMonths: formData.renewalPeriodMonths,
       };
       if (formData.applicationType === 'RENEWAL') {
-        payload.renewalPeriodMonths = formData.renewalPeriodMonths;
         if (formData.renewalReferenceNo.trim()) {
           payload.renewalReferenceNo = formData.renewalReferenceNo.trim();
         }
@@ -342,6 +343,45 @@ export default function NewApplicationPage() {
               </button>
             </div>
 
+            {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}
+            <div className="space-y-2 border-t border-gray-100 pt-5">
+              <label className="block text-sm font-medium text-gray-700">
+                Licence Period <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Select the duration for your electrical installation licence
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => updateField('renewalPeriodMonths', 12)}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    formData.renewalPeriodMonths === 12
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="font-semibold text-gray-800">12 Months</p>
+                  <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $100</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('renewalPeriodMonths', 3)}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    formData.renewalPeriodMonths === 3
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <p className="font-semibold text-gray-800">3 Months</p>
+                  <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $50</p>
+                </button>
+              </div>
+              {errors.renewalPeriodMonths && (
+                <p className="text-sm text-red-600">{errors.renewalPeriodMonths}</p>
+              )}
+            </div>
+
             {/* Renewal-specific fields */}
             {formData.applicationType === 'RENEWAL' && (
               <div className="space-y-5 border-t border-gray-100 pt-5">
@@ -460,42 +500,6 @@ export default function NewApplicationPage() {
                   </>
                 )}
 
-                {/* Renewal Period Selection */}
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Renewal Period <span className="text-red-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => updateField('renewalPeriodMonths', 12)}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        formData.renewalPeriodMonths === 12
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <p className="font-semibold text-gray-800">12 Months</p>
-                      <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $100</p>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateField('renewalPeriodMonths', 3)}
-                      className={`p-4 rounded-lg border-2 text-left transition-all ${
-                        formData.renewalPeriodMonths === 3
-                          ? 'border-primary-500 bg-primary-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <p className="font-semibold text-gray-800">3 Months</p>
-                      <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $50</p>
-                    </button>
-                  </div>
-                  {errors.renewalPeriodMonths && (
-                    <p className="text-sm text-red-600">{errors.renewalPeriodMonths}</p>
-                  )}
-                </div>
-
                 {/* Renewal Reference No (optional) */}
                 <Input
                   label="Renewal Reference No."
@@ -598,14 +602,14 @@ export default function NewApplicationPage() {
                       </span>
                     </div>
                   </div>
-                  {/* EMA Fee info for renewals */}
-                  {formData.applicationType === 'RENEWAL' && formData.renewalPeriodMonths && (
+                  {/* EMA Fee info */}
+                  {formData.renewalPeriodMonths && (
                     <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mt-2">
                       <div className="flex items-start gap-2">
                         <span className="text-amber-600 mt-0.5">ℹ️</span>
                         <div>
                           <p className="text-sm font-medium text-amber-800">
-                            EMA Fee: {getEmaFeeLabel(formData.renewalPeriodMonths)}
+                            EMA Fee: {getEmaFeeLabel(formData.renewalPeriodMonths)} ({formData.renewalPeriodMonths}-month licence)
                           </p>
                           <p className="text-xs text-amber-600 mt-0.5">
                             Paid directly to EMA (Energy Market Authority). Not included in the total above.
@@ -669,6 +673,28 @@ export default function NewApplicationPage() {
               </span>
             </div>
 
+            {/* Licence Period (both NEW and RENEWAL) */}
+            {formData.renewalPeriodMonths && (
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Licence Period</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <dt className="text-xs text-gray-500">Duration</dt>
+                    <dd className="text-sm font-medium text-gray-800 mt-0.5">
+                      {formData.renewalPeriodMonths} months
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-gray-500">EMA Fee</dt>
+                    <dd className="text-sm font-medium text-gray-800 mt-0.5">
+                      {getEmaFeeLabel(formData.renewalPeriodMonths)}
+                      <span className="text-xs text-gray-500 ml-1">(Paid to EMA)</span>
+                    </dd>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Renewal Details (if RENEWAL) */}
             {formData.applicationType === 'RENEWAL' && (
               <div className="bg-orange-50 rounded-lg p-4 space-y-3 border border-orange-100">
@@ -684,19 +710,6 @@ export default function NewApplicationPage() {
                     <dt className="text-xs text-orange-600">Existing Expiry Date</dt>
                     <dd className="text-sm font-medium text-orange-800 mt-0.5">
                       {formData.existingExpiryDate || '—'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-orange-600">Renewal Period</dt>
-                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
-                      {formData.renewalPeriodMonths} months
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-orange-600">EMA Fee</dt>
-                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
-                      {getEmaFeeLabel(formData.renewalPeriodMonths)}
-                      <span className="text-xs text-orange-500 ml-1">(Paid to EMA)</span>
                     </dd>
                   </div>
                   {formData.renewalReferenceNo && (
@@ -769,9 +782,9 @@ export default function NewApplicationPage() {
               <p className="text-xs text-primary-600 mt-2">
                 Payment via PayNow or bank transfer. Details will be provided after submission.
               </p>
-              {formData.applicationType === 'RENEWAL' && formData.renewalPeriodMonths && (
+              {formData.renewalPeriodMonths && (
                 <p className="text-xs text-amber-600 mt-1">
-                  * EMA fee of {getEmaFeeLabel(formData.renewalPeriodMonths)} is payable directly to EMA and is not included in the above total.
+                  * EMA fee of {getEmaFeeLabel(formData.renewalPeriodMonths)} ({formData.renewalPeriodMonths}-month licence) is payable directly to EMA and is not included in the above total.
                 </p>
               )}
             </div>

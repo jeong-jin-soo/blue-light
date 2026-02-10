@@ -362,6 +362,20 @@ export default function AdminApplicationDetailPage() {
             </div>
           </Card>
 
+          {/* Licence Period (both NEW and RENEWAL) */}
+          {application.renewalPeriodMonths && (
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Licence Period</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoField label="Duration" value={`${application.renewalPeriodMonths} months`} />
+                <InfoField
+                  label="EMA Fee"
+                  value={application.emaFee ? `SGD $${application.emaFee.toLocaleString()} (Paid to EMA)` : '—'}
+                />
+              </div>
+            </Card>
+          )}
+
           {/* Renewal Details (RENEWAL only) */}
           {application.applicationType === 'RENEWAL' && (
             <Card>
@@ -370,11 +384,6 @@ export default function AdminApplicationDetailPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <InfoField label="Existing Licence No." value={application.existingLicenceNo || '—'} />
                   <InfoField label="Existing Expiry Date" value={application.existingExpiryDate || '—'} />
-                  <InfoField label="Renewal Period" value={application.renewalPeriodMonths ? `${application.renewalPeriodMonths} months` : '—'} />
-                  <InfoField
-                    label="EMA Fee"
-                    value={application.emaFee ? `SGD $${application.emaFee.toLocaleString()} (Paid to EMA)` : '—'}
-                  />
                   {application.renewalReferenceNo && (
                     <InfoField label="Renewal Reference No." value={application.renewalReferenceNo} />
                   )}
@@ -428,9 +437,9 @@ export default function AdminApplicationDetailPage() {
                   SGD ${application.quoteAmount.toLocaleString()}
                 </p>
               </div>
-              {application.applicationType === 'RENEWAL' && application.emaFee && (
+              {application.emaFee && (
                 <p className="text-xs text-amber-600 mt-3">
-                  * EMA fee of SGD ${application.emaFee.toLocaleString()} is payable directly to EMA and is not included in the above total.
+                  * EMA fee of SGD ${application.emaFee.toLocaleString()} ({application.renewalPeriodMonths}-month licence) is payable directly to EMA and is not included in the above total.
                 </p>
               )}
             </div>
