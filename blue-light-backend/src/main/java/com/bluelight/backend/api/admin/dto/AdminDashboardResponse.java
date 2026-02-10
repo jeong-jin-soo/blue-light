@@ -17,6 +17,7 @@ public class AdminDashboardResponse {
     private long paid;
     private long inProgress;
     private long completed;
+    private long expired;
     private long totalUsers;
     private long unassigned;
 }

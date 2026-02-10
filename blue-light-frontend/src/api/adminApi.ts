@@ -196,8 +196,15 @@ export const updateSettings = async (
 // Users
 // ============================================
 
-export const getUsers = async (): Promise<User[]> => {
-  const response = await axiosClient.get<User[]>('/admin/users');
+export const getUsers = async (
+  page = 0,
+  size = 20,
+  role?: string,
+  search?: string
+): Promise<Page<User>> => {
+  const response = await axiosClient.get<Page<User>>('/admin/users', {
+    params: { page, size, ...(role && { role }), ...(search && { search }) },
+  });
   return response.data;
 };
 

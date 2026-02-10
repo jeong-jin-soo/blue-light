@@ -1,37 +1,83 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/data/DataTable';
+import { Pagination } from '../../components/data/Pagination';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User, UserRole, ApprovalStatus } from '../../types';
 
+const ROLE_OPTIONS = [
+  { value: '', label: 'All Roles' },
+  { value: 'APPLICANT', label: 'Applicant' },
+  { value: 'LEW', label: 'LEW' },
+  { value: 'ADMIN', label: 'Admin' },
+];
+
+const PAGE_SIZE = 20;
+
 export default function AdminUserListPage() {
   const toast = useToastStore();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: User; newRole: UserRole } | null>(null);
   const [changingRole, setChangingRole] = useState(false);
   const [approvalTarget, setApprovalTarget] = useState<{ user: User; action: 'approve' | 'reject' } | null>(null);
   const [processingApproval, setProcessingApproval] = useState(false);
 
-  const loadUsers = () => {
+  const loadUsers = useCallback((currentPage: number, role: string, search: string) => {
     setLoading(true);
     adminApi
-      .getUsers()
-      .then(setUsers)
+      .getUsers(currentPage, PAGE_SIZE, role || undefined, search || undefined)
+      .then((data) => {
+        setUsers(data.content);
+        setTotalPages(data.totalPages);
+        setTotalElements(data.totalElements);
+      })
       .catch((err: { message?: string }) => {
         toast.error(err.message || 'Failed to load users');
       })
       .finally(() => setLoading(false));
-  };
+  }, [toast]);
 
   useEffect(() => {
-    loadUsers();
-  }, []);
+    loadUsers(page, roleFilter, searchTerm);
+  }, [page, roleFilter, searchTerm]);
+
+  // 검색 debounce: Enter 또는 버튼 클릭 시 적용
+  const handleSearch = () => {
+    setPage(0);
+    setSearchTerm(searchInput);
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchInput('');
+    setPage(0);
+    setSearchTerm('');
+  };
+
+  const handleRoleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setRoleFilter(e.target.value);
+    setPage(0);
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+  };
 
   const handleRoleChange = async () => {
     if (!roleChangeTarget) return;
@@ -39,7 +85,7 @@ export default function AdminUserListPage() {
     try {
       await adminApi.changeUserRole(roleChangeTarget.user.userSeq, { role: roleChangeTarget.newRole });
       toast.success(`${roleChangeTarget.user.name}'s role changed to ${roleChangeTarget.newRole}`);
-      loadUsers();
+      loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to change role';
       toast.error(message);
@@ -48,18 +94,6 @@ export default function AdminUserListPage() {
       setRoleChangeTarget(null);
     }
   };
-
-  // Client-side search
-  const filteredUsers = searchTerm
-    ? users.filter(
-        (user) =>
-          user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (user.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (user.uen || '').toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : users;
 
   const handleApproval = async () => {
     if (!approvalTarget) return;
@@ -72,7 +106,7 @@ export default function AdminUserListPage() {
         await adminApi.rejectLew(approvalTarget.user.userSeq);
         toast.success(`${approvalTarget.user.name}'s LEW registration has been rejected`);
       }
-      loadUsers();
+      loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to process approval';
       toast.error(message);
@@ -218,52 +252,70 @@ export default function AdminUserListPage() {
         <p className="text-sm text-gray-500 mt-1">View and manage registered users</p>
       </div>
 
-      {/* Search */}
+      {/* Search & Filter */}
       <Card>
-        <Input
-          placeholder="Search by name, email, or role..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 flex gap-2">
+            <Input
+              placeholder="Search by name, email, company, or UEN..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+            />
+            <button
+              onClick={handleSearch}
+              className="px-4 py-2 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors whitespace-nowrap"
+            >
+              Search
+            </button>
+            {searchTerm && (
+              <button
+                onClick={handleClearSearch}
+                className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors whitespace-nowrap"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+          <select
+            value={roleFilter}
+            onChange={handleRoleFilterChange}
+            className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary sm:w-40"
+          >
+            {ROLE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </Card>
 
       {/* User table */}
       <DataTable
         columns={columns}
-        data={filteredUsers}
+        data={users}
         loading={loading}
         keyExtractor={(user) => user.userSeq}
         emptyIcon="👥"
         emptyTitle="No users found"
         emptyDescription={
-          searchTerm
-            ? `No users matching "${searchTerm}".`
+          searchTerm || roleFilter
+            ? 'No users matching the current filters.'
             : 'Registered users will be listed here.'
         }
       />
 
+      {/* Pagination */}
+      <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
+
       {/* Summary */}
-      {!loading && users.length > 0 && (
+      {!loading && totalElements > 0 && (
         <div className="flex items-center justify-between text-sm text-gray-500 px-1">
           <span>
-            Showing {filteredUsers.length} of {users.length} users
+            Showing {users.length} of {totalElements} users
+            {(searchTerm || roleFilter) && ' (filtered)'}
           </span>
-          <div className="flex gap-4 flex-wrap">
-            <span>
-              Applicants: {users.filter((u) => u.role === 'APPLICANT').length}
-            </span>
-            <span>
-              LEWs: {users.filter((u) => u.role === 'LEW').length}
-            </span>
-            {users.filter((u) => u.role === 'LEW' && u.approvedStatus === 'PENDING').length > 0 && (
-              <span className="text-warning-600 font-medium">
-                Pending LEW: {users.filter((u) => u.role === 'LEW' && u.approvedStatus === 'PENDING').length}
-              </span>
-            )}
-            <span>
-              Admins: {users.filter((u) => u.role === 'ADMIN').length}
-            </span>
-          </div>
         </div>
       )}
 

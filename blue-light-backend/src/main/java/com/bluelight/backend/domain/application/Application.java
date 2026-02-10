@@ -12,6 +12,7 @@ import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * 라이선스 신청 내역 Entity
@@ -150,6 +151,12 @@ public class Application extends BaseEntity {
     @Column(name = "ema_fee", precision = 10, scale = 2)
     private BigDecimal emaFee;
 
+    /**
+     * 만료 알림 발송 시각 (중복 알림 방지)
+     */
+    @Column(name = "expiry_notified_at")
+    private LocalDateTime expiryNotifiedAt;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal serviceFee,
@@ -253,6 +260,13 @@ public class Application extends BaseEntity {
      */
     public void markAsExpired() {
         this.status = ApplicationStatus.EXPIRED;
+    }
+
+    /**
+     * 만료 알림 발송 기록
+     */
+    public void markExpiryNotified() {
+        this.expiryNotifiedAt = LocalDateTime.now();
     }
 
     /**

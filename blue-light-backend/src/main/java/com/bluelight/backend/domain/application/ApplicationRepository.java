@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -98,4 +99,16 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
      */
     Page<Application> findByAssignedLewUserSeqAndStatusOrderByCreatedAtDesc(
             Long lewSeq, ApplicationStatus status, Pageable pageable);
+
+    /**
+     * 만료 대상: COMPLETED + 만료일 경과
+     */
+    List<Application> findByStatusAndLicenseExpiryDateBefore(
+            ApplicationStatus status, LocalDate date);
+
+    /**
+     * 만료 알림 대상: COMPLETED + 만료일 임박 + 미알림
+     */
+    List<Application> findByStatusAndLicenseExpiryDateLessThanEqualAndExpiryNotifiedAtIsNull(
+            ApplicationStatus status, LocalDate date);
 }

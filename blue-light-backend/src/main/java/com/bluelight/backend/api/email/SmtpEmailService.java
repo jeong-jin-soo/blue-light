@@ -12,6 +12,9 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 /**
  * SMTP 기반 이메일 발송 서비스
  * - spring.mail.host 설정이 있을 때만 활성화
@@ -54,6 +57,29 @@ public class SmtpEmailService implements EmailService {
         }
     }
 
+    @Override
+    @Async
+    public void sendLicenseExpiryWarningEmail(String to, String userName,
+                                               String licenseNumber, String address,
+                                               LocalDate expiryDate, int daysRemaining) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("Licence Expiry Notice - Blue Light");
+
+            String htmlContent = buildLicenseExpiryHtml(userName, licenseNumber, address, expiryDate, daysRemaining);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("License expiry warning email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send license expiry warning email to: {}", to, e);
+        }
+    }
+
     private String buildPasswordResetHtml(String userName, String resetLink) {
         return """
                 <!DOCTYPE html>
@@ -90,5 +116,59 @@ public class SmtpEmailService implements EmailService {
                 </body>
                 </html>
                 """.formatted(userName, resetLink, resetLink, resetLink);
+    }
+
+    private String buildLicenseExpiryHtml(String userName, String licenseNumber,
+                                           String address, LocalDate expiryDate, int daysRemaining) {
+        String formattedDate = expiryDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
+        String urgencyColor = daysRemaining <= 7 ? "#dc2626" : daysRemaining <= 14 ? "#f59e0b" : "#1a3a5c";
+        String daysText = daysRemaining <= 0
+                ? "Your licence has expired."
+                : "Your licence will expire in <strong>" + daysRemaining + " day" + (daysRemaining == 1 ? "" : "s") + "</strong>.";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Blue Light</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">Licence Expiry Notice</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: %s; line-height: 1.6; font-size: 16px;">
+                        %s
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Licence No.</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Address</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Expiry Date</td>
+                            <td style="padding: 6px 0; color: %s; font-weight: bold;">%s</td>
+                          </tr>
+                        </table>
+                      </div>
+                      <p style="color: #555555; line-height: 1.6;">
+                        To continue operating your electrical installation, please submit a renewal application
+                        before the expiry date. You can start the renewal process by logging into your Blue Light account.
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px;">
+                        This is an automated notification from Blue Light. If you have already renewed your licence, please disregard this email.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(userName, urgencyColor, daysText, licenseNumber, address, urgencyColor, formattedDate);
     }
 }

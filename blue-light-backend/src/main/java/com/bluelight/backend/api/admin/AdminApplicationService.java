@@ -53,6 +53,7 @@ public class AdminApplicationService {
         long paid = applicationRepository.countByStatus(ApplicationStatus.PAID);
         long inProgress = applicationRepository.countByStatus(ApplicationStatus.IN_PROGRESS);
         long completed = applicationRepository.countByStatus(ApplicationStatus.COMPLETED);
+        long expired = applicationRepository.countByStatus(ApplicationStatus.EXPIRED);
         long totalUsers = userRepository.count();
 
         long unassigned = applicationRepository.countByAssignedLewIsNull();
@@ -65,6 +66,7 @@ public class AdminApplicationService {
                 .paid(paid)
                 .inProgress(inProgress)
                 .completed(completed)
+                .expired(expired)
                 .totalUsers(totalUsers)
                 .unassigned(unassigned)
                 .build();

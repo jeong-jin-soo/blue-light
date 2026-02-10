@@ -85,3 +85,8 @@ file:
 password-reset:
   token-expiry-minutes: ${PASSWORD_RESET_TOKEN_EXPIRY:60}
   base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:5174}
+
+# 면허 만료 스케줄러 설정
+license-expiry:
+  schedule-cron: ${LICENSE_EXPIRY_CRON:0 0 2 * * ?}
+  warning-days-before: ${LICENSE_EXPIRY_WARNING_DAYS:30}

@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-4">
         <DashboardCard
           label="Total Applications"
           value={dashboard?.totalApplications ?? 0}
@@ -125,6 +125,12 @@ export default function AdminDashboardPage() {
           value={dashboard?.completed ?? 0}
           icon="🏁"
           onClick={() => navigate('/admin/applications?status=COMPLETED')}
+        />
+        <DashboardCard
+          label="Expired"
+          value={dashboard?.expired ?? 0}
+          icon="⏰"
+          onClick={() => navigate('/admin/applications?status=EXPIRED')}
         />
         <DashboardCard
           label="Total Users"

@@ -348,6 +348,7 @@ export interface AdminDashboard {
   paid: number;
   inProgress: number;
   completed: number;
+  expired: number;
   totalUsers: number;
   unassigned: number;
 }

@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS applications (
     existing_expiry_date     DATE,
     renewal_period_months    INT,
     ema_fee                  DECIMAL(10,2),
+    expiry_notified_at       DATETIME(6),
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
