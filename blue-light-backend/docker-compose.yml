@@ -12,4 +12,6 @@ services:
       MYSQL_PASSWORD: password
     volumes:
       - ./db_data:/var/lib/mysql # 데이터가 날아가지 않게 로컬에 저장
+      - ./src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./src/main/resources/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
