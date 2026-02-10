@@ -8,6 +8,8 @@ import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.payment.Payment;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.payment.PaymentStatus;
+import com.bluelight.backend.domain.price.MasterPrice;
+import com.bluelight.backend.domain.price.MasterPriceRepository;
 import com.bluelight.backend.domain.setting.SystemSetting;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.ApprovalStatus;
@@ -38,6 +40,7 @@ public class AdminApplicationService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final SystemSettingRepository systemSettingRepository;
+    private final MasterPriceRepository masterPriceRepository;
 
     /**
      * Get admin dashboard summary
@@ -271,6 +274,67 @@ public class AdminApplicationService {
                 .stream()
                 .map(LewSummaryResponse::from)
                 .toList();
+    }
+
+    // --- Price Management ---
+
+    /**
+     * 모든 가격 티어 조회 (kVA 최소값 오름차순)
+     */
+    public List<AdminPriceResponse> getAllPrices() {
+        return masterPriceRepository.findAll().stream()
+                .sorted((a, b) -> a.getKvaMin().compareTo(b.getKvaMin()))
+                .map(AdminPriceResponse::from)
+                .toList();
+    }
+
+    /**
+     * 가격 티어 수정
+     */
+    @Transactional
+    public AdminPriceResponse updatePrice(Long priceSeq, UpdatePriceRequest request) {
+        MasterPrice masterPrice = masterPriceRepository.findById(priceSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Price tier not found",
+                        HttpStatus.NOT_FOUND,
+                        "PRICE_TIER_NOT_FOUND"
+                ));
+
+        // 가격 수정
+        masterPrice.updatePrice(request.getPrice());
+
+        // kVA 범위 및 설명 수정
+        if (request.getKvaMin() != null && request.getKvaMax() != null) {
+            if (request.getKvaMin() > request.getKvaMax()) {
+                throw new BusinessException(
+                        "kVA min cannot be greater than kVA max",
+                        HttpStatus.BAD_REQUEST,
+                        "INVALID_KVA_RANGE"
+                );
+            }
+            masterPrice.updateKvaRange(
+                    request.getKvaMin(),
+                    request.getKvaMax(),
+                    request.getDescription()
+            );
+        } else if (request.getDescription() != null) {
+            masterPrice.updateKvaRange(
+                    masterPrice.getKvaMin(),
+                    masterPrice.getKvaMax(),
+                    request.getDescription()
+            );
+        }
+
+        // 활성화 상태 수정
+        if (request.getIsActive() != null) {
+            masterPrice.setActive(request.getIsActive());
+        }
+
+        log.info("Price tier updated: priceSeq={}, price={}, kvaMin={}, kvaMax={}, isActive={}",
+                priceSeq, request.getPrice(), masterPrice.getKvaMin(),
+                masterPrice.getKvaMax(), masterPrice.getIsActive());
+
+        return AdminPriceResponse.from(masterPrice);
     }
 
     // --- System Settings ---

@@ -2,6 +2,7 @@ import axiosClient from './axiosClient';
 import type {
   AdminApplication,
   AdminDashboard,
+  AdminPriceResponse,
   ApplicationStatus,
   AssignLewRequest,
   ChangeRoleRequest,
@@ -13,6 +14,7 @@ import type {
   Payment,
   PaymentConfirmRequest,
   RevisionRequest,
+  UpdatePriceRequest,
   UpdateStatusRequest,
   User,
 } from '../types';
@@ -158,6 +160,23 @@ export const unassignLew = async (applicationId: number): Promise<AdminApplicati
 };
 
 // ============================================
+// Price Management
+// ============================================
+
+export const getPrices = async (): Promise<AdminPriceResponse[]> => {
+  const response = await axiosClient.get<AdminPriceResponse[]>('/admin/prices');
+  return response.data;
+};
+
+export const updatePrice = async (
+  id: number,
+  data: UpdatePriceRequest
+): Promise<AdminPriceResponse> => {
+  const response = await axiosClient.put<AdminPriceResponse>(`/admin/prices/${id}`, data);
+  return response.data;
+};
+
+// ============================================
 // System Settings
 // ============================================
 
@@ -211,6 +230,8 @@ export const adminApi = {
   getAvailableLews,
   assignLew,
   unassignLew,
+  getPrices,
+  updatePrice,
   getSettings,
   updateSettings,
   getUsers,

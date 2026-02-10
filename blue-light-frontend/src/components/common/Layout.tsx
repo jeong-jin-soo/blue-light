@@ -31,6 +31,7 @@ export default function Layout() {
   const adminMenu = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/admin/applications', label: 'Applications', icon: '📋' },
+    { path: '/admin/prices', label: 'Prices', icon: '💰' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
 

@@ -26,6 +26,7 @@ import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
 import AdminApplicationListPage from '../pages/admin/AdminApplicationListPage';
 import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPage';
 import AdminUserListPage from '../pages/admin/AdminUserListPage';
+import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 
 /**
  * 애플리케이션 라우터 설정
@@ -93,7 +94,7 @@ const router = createBrowserRouter([
     ],
   },
 
-  // Admin-only routes (user management)
+  // Admin-only routes (user management, price management)
   {
     element: <ProtectedRoute allowedRoles={['ADMIN']} />,
     children: [
@@ -101,6 +102,7 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/users', element: <AdminUserListPage /> },
+          { path: '/admin/prices', element: <AdminPriceManagementPage /> },
         ],
       },
     ],

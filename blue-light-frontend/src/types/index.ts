@@ -461,3 +461,31 @@ export interface ResetPasswordRequest {
 export interface MessageResponse {
   message: string;
 }
+
+// ============================================
+// Admin Price Management Types
+// ============================================
+
+/**
+ * Admin 가격 티어 응답 (isActive, updatedAt 포함)
+ */
+export interface AdminPriceResponse {
+  masterPriceSeq: number;
+  description?: string;
+  kvaMin: number;
+  kvaMax: number;
+  price: number;
+  isActive: boolean;
+  updatedAt: string;
+}
+
+/**
+ * 가격 티어 수정 요청
+ */
+export interface UpdatePriceRequest {
+  price: number;
+  description?: string;
+  kvaMin?: number;
+  kvaMax?: number;
+  isActive?: boolean;
+}

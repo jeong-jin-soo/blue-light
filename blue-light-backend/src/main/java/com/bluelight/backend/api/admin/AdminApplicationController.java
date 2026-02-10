@@ -184,6 +184,34 @@ public class AdminApplicationController {
         return ResponseEntity.ok(lews);
     }
 
+    // ── Price Management (ADMIN only) ──────────────────
+
+    /**
+     * Get all price tiers
+     * GET /api/admin/prices
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/prices")
+    public ResponseEntity<List<AdminPriceResponse>> getAllPrices() {
+        log.info("Admin get all prices");
+        List<AdminPriceResponse> prices = adminApplicationService.getAllPrices();
+        return ResponseEntity.ok(prices);
+    }
+
+    /**
+     * Update price tier
+     * PUT /api/admin/prices/:id
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping("/prices/{id}")
+    public ResponseEntity<AdminPriceResponse> updatePrice(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdatePriceRequest request) {
+        log.info("Admin update price: priceSeq={}, price={}", id, request.getPrice());
+        AdminPriceResponse response = adminApplicationService.updatePrice(id, request);
+        return ResponseEntity.ok(response);
+    }
+
     // ── System Settings (ADMIN only) ──────────────────
 
     /**
