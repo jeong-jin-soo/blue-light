@@ -306,16 +306,15 @@ export default function AdminUserListPage() {
         }
       />
 
-      {/* Pagination */}
-      <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
-
-      {/* Summary */}
+      {/* Pagination + Summary */}
       {!loading && totalElements > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-500 px-1">
-          <span>
-            Showing {users.length} of {totalElements} users
+        <div className="flex flex-col items-center gap-2">
+          <Pagination page={page} totalPages={totalPages} onPageChange={handlePageChange} />
+          <div className="text-sm text-gray-500">
+            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, totalElements)} of {totalElements} users
             {(searchTerm || roleFilter) && ' (filtered)'}
-          </span>
+            {totalPages > 1 && ` · Page ${page + 1} of ${totalPages}`}
+          </div>
         </div>
       )}
 

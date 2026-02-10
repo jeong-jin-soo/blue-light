@@ -14,6 +14,8 @@ interface FileUploadProps {
   files?: UploadedFile[];
   accept?: string;           // e.g., ".pdf,.jpg,.png"
   maxSizeMb?: number;
+  warnSizeMb?: number;       // soft warning threshold (e.g., 2MB for ELISE)
+  warnSizeMessage?: string;  // custom warning message
   label?: string;
   hint?: string;
   className?: string;
@@ -23,8 +25,10 @@ export function FileUpload({
   onUpload,
   onRemove,
   files = [],
-  accept = '.pdf,.jpg,.jpeg,.png',
+  accept = '.pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip',
   maxSizeMb = 10,
+  warnSizeMb,
+  warnSizeMessage,
   label = 'Upload File',
   hint,
   className = '',
@@ -32,16 +36,23 @@ export function FileUpload({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validateAndUpload = useCallback(
     async (file: File) => {
       setError('');
+      setWarning('');
 
-      // Size check
+      // Size check (hard limit)
       if (file.size > maxSizeMb * 1024 * 1024) {
         setError(`File size must be less than ${maxSizeMb}MB`);
         return;
+      }
+
+      // Soft warning (e.g., ELISE 2MB limit)
+      if (warnSizeMb && file.size > warnSizeMb * 1024 * 1024) {
+        setWarning(warnSizeMessage || `File exceeds ${warnSizeMb}MB. It may need to be resized for ELISE submission.`);
       }
 
       // Extension check
@@ -63,7 +74,7 @@ export function FileUpload({
         setIsUploading(false);
       }
     },
-    [onUpload, maxSizeMb, accept]
+    [onUpload, maxSizeMb, accept, warnSizeMb, warnSizeMessage]
   );
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -140,6 +151,11 @@ export function FileUpload({
       {/* Error */}
       {error && (
         <p className="mt-1.5 text-xs text-error-600">{error}</p>
+      )}
+
+      {/* Warning (soft limit) */}
+      {warning && !error && (
+        <p className="mt-1.5 text-xs text-amber-600">⚠️ {warning}</p>
       )}
 
       {/* File list */}

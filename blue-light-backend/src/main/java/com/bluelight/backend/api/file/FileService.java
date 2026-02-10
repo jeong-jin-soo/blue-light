@@ -32,7 +32,10 @@ public class FileService {
     private final FileStorageService fileStorageService;
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            ".pdf", ".jpg", ".jpeg", ".png"
+            ".pdf", ".jpg", ".jpeg", ".png",
+            ".dwg", ".dxf", ".dgn",           // CAD drawing formats (ELISE SLD)
+            ".tif", ".tiff", ".gif",           // Image formats (ELISE SLD)
+            ".zip"                             // Archive (ELISE SLD bundle)
     );
 
     /**
@@ -172,7 +175,7 @@ public class FileService {
         String extension = filename.substring(filename.lastIndexOf(".")).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new BusinessException(
-                    "File type not allowed. Accepted: PDF, JPG, JPEG, PNG",
+                    "File type not allowed. Accepted: PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP",
                     HttpStatus.BAD_REQUEST,
                     "INVALID_FILE_TYPE"
             );

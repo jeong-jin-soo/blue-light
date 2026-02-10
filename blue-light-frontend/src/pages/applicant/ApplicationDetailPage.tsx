@@ -205,8 +205,8 @@ export default function ApplicationDetailPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
                 Application #{application.applicationSeq}
               </h1>
-              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
-                {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : application.applicationType === 'SUPPLY_INSTALLATION' ? 'warning' : 'info'}>
+                {application.applicationType === 'RENEWAL' ? 'Renewal' : application.applicationType === 'SUPPLY_INSTALLATION' ? 'Supply' : 'New'}
               </Badge>
             </div>
             <p className="text-sm text-gray-500 mt-0.5">
@@ -477,7 +477,9 @@ export default function ApplicationDetailPage() {
                     size: 0,
                   }))}
                   label={APPLICANT_FILE_TYPE_OPTIONS.find((o) => o.value === uploadFileType)?.label || 'Document'}
-                  hint="PDF, JPG, PNG up to 10MB"
+                  hint="PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP up to 10MB. Files for ELISE submission should be under 2MB."
+                  warnSizeMb={2}
+                  warnSizeMessage="This file exceeds 2MB and may need to be resized before ELISE submission to EMA."
                 />
               </div>
             )}

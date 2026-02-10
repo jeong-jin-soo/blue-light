@@ -32,7 +32,7 @@ public class CreateApplicationRequest {
     // ── Phase 18: 갱신 관련 필드 ──
 
     /**
-     * 신청 유형: "NEW" (기본) or "RENEWAL"
+     * 신청 유형: "NEW" (기본) / "RENEWAL" / "SUPPLY_INSTALLATION"
      */
     private String applicationType;
 

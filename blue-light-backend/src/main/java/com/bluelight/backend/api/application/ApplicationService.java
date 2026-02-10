@@ -67,6 +67,12 @@ public class ApplicationService {
 
         // Determine application type
         ApplicationType appType = ApplicationType.NEW;
+        if ("RENEWAL".equals(request.getApplicationType())) {
+            appType = ApplicationType.RENEWAL;
+        } else if ("SUPPLY_INSTALLATION".equals(request.getApplicationType())) {
+            appType = ApplicationType.SUPPLY_INSTALLATION;
+        }
+
         Application originalApp = null;
         String existingLicenceNo = null;
         String renewalReferenceNo = request.getRenewalReferenceNo();
@@ -74,7 +80,7 @@ public class ApplicationService {
         Integer renewalPeriodMonths = null;
         BigDecimal emaFee = null;
 
-        // Licence period (applicable to both NEW and RENEWAL)
+        // Licence period (applicable to all types)
         if (request.getRenewalPeriodMonths() != null) {
             renewalPeriodMonths = request.getRenewalPeriodMonths();
             if (renewalPeriodMonths != 3 && renewalPeriodMonths != 12) {
@@ -82,13 +88,10 @@ public class ApplicationService {
                         "Licence period must be 3 or 12 months",
                         HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
             }
-            emaFee = renewalPeriodMonths == 3
-                    ? new BigDecimal("50.00") : new BigDecimal("100.00");
+            emaFee = calculateEmaFee(appType, renewalPeriodMonths);
         }
 
-        if ("RENEWAL".equals(request.getApplicationType())) {
-            appType = ApplicationType.RENEWAL;
-
+        if (appType == ApplicationType.RENEWAL) {
             // Renewal must have a licence period
             if (renewalPeriodMonths == null) {
                 throw new BusinessException(
@@ -191,7 +194,7 @@ public class ApplicationService {
                 quoteAmount, serviceFee
         );
 
-        // Licence period 변경 처리 (NEW, RENEWAL 모두)
+        // Licence period 변경 처리 (모든 타입)
         if (request.getRenewalPeriodMonths() != null) {
             int months = request.getRenewalPeriodMonths();
             if (months != 3 && months != 12) {
@@ -199,8 +202,7 @@ public class ApplicationService {
                         "Licence period must be 3 or 12 months",
                         HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
             }
-            BigDecimal newEmaFee = months == 3
-                    ? new BigDecimal("50.00") : new BigDecimal("100.00");
+            BigDecimal newEmaFee = calculateEmaFee(application.getApplicationType(), months);
             application.updateRenewalPeriod(months, newEmaFee);
         }
 
@@ -312,5 +314,21 @@ public class ApplicationService {
         return systemSettingRepository.findById("service_fee")
                 .map(s -> new BigDecimal(s.getSettingValue()))
                 .orElse(BigDecimal.ZERO);
+    }
+
+    /**
+     * EMA 수수료 계산 (신청 유형별 차등)
+     * - NEW / RENEWAL: 3개월=$50, 12개월=$100
+     * - SUPPLY_INSTALLATION: 3개월=$50, 12개월=$150
+     */
+    private BigDecimal calculateEmaFee(ApplicationType type, int months) {
+        if (months == 3) {
+            return new BigDecimal("50.00");
+        }
+        // 12개월
+        if (type == ApplicationType.SUPPLY_INSTALLATION) {
+            return new BigDecimal("150.00");
+        }
+        return new BigDecimal("100.00");
     }
 }

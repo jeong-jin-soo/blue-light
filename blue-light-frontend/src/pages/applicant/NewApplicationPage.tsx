@@ -250,10 +250,12 @@ export default function NewApplicationPage() {
     setPriceResult(null);
   };
 
-  // Compute EMA fee label
+  // Compute EMA fee label (Supply Installation: 12mo=$150, others: 12mo=$100; 3mo always $50)
   const getEmaFeeLabel = (months: number | null) => {
     if (months === 3) return 'SGD $50';
-    if (months === 12) return 'SGD $100';
+    if (months === 12) {
+      return formData.applicationType === 'SUPPLY_INSTALLATION' ? 'SGD $150' : 'SGD $100';
+    }
     return '—';
   };
 
@@ -287,60 +289,42 @@ export default function NewApplicationPage() {
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Application Type</h2>
-              <p className="text-sm text-gray-500 mt-1">Choose whether this is a new licence or a renewal</p>
+              <p className="text-sm text-gray-500 mt-1">Choose the type of licence application</p>
             </div>
 
             {/* Type selection cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => handleTypeChange('NEW')}
-                className={`relative p-5 rounded-xl border-2 text-left transition-all ${
-                  formData.applicationType === 'NEW'
-                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">🏢</span>
-                  <div>
-                    <p className="font-semibold text-gray-800">New Licence</p>
-                    <p className="text-sm text-gray-500 mt-1">Apply for a brand new electrical installation licence</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {([
+                { type: 'NEW' as ApplicationType, icon: '🏢', title: 'New Licence', desc: 'Apply for a brand new electrical installation licence' },
+                { type: 'RENEWAL' as ApplicationType, icon: '🔄', title: 'Licence Renewal', desc: 'Renew an existing electrical installation licence' },
+                { type: 'SUPPLY_INSTALLATION' as ApplicationType, icon: '⚡', title: 'Supply Installation', desc: 'Apply for a temporary electricity supply licence' },
+              ]).map(({ type, icon, title, desc }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => handleTypeChange(type)}
+                  className={`relative p-5 rounded-xl border-2 text-left transition-all ${
+                    formData.applicationType === type
+                      ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{icon}</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">{title}</p>
+                      <p className="text-sm text-gray-500 mt-1">{desc}</p>
+                    </div>
                   </div>
-                </div>
-                {formData.applicationType === 'NEW' && (
-                  <div className="absolute top-3 right-3">
-                    <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleTypeChange('RENEWAL')}
-                className={`relative p-5 rounded-xl border-2 text-left transition-all ${
-                  formData.applicationType === 'RENEWAL'
-                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">🔄</span>
-                  <div>
-                    <p className="font-semibold text-gray-800">Licence Renewal</p>
-                    <p className="text-sm text-gray-500 mt-1">Renew an existing electrical installation licence</p>
-                  </div>
-                </div>
-                {formData.applicationType === 'RENEWAL' && (
-                  <div className="absolute top-3 right-3">
-                    <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
-              </button>
+                  {formData.applicationType === type && (
+                    <div className="absolute top-3 right-3">
+                      <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  )}
+                </button>
+              ))}
             </div>
 
             {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}
@@ -362,7 +346,9 @@ export default function NewApplicationPage() {
                   }`}
                 >
                   <p className="font-semibold text-gray-800">12 Months</p>
-                  <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $100</p>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    EMA Fee: {formData.applicationType === 'SUPPLY_INSTALLATION' ? 'SGD $150' : 'SGD $100'}
+                  </p>
                 </button>
                 <button
                   type="button"
@@ -665,11 +651,15 @@ export default function NewApplicationPage() {
             {/* Application Type Badge */}
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                formData.applicationType === 'NEW'
-                  ? 'bg-blue-100 text-blue-800'
-                  : 'bg-orange-100 text-orange-800'
+                formData.applicationType === 'RENEWAL'
+                  ? 'bg-orange-100 text-orange-800'
+                  : formData.applicationType === 'SUPPLY_INSTALLATION'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-blue-100 text-blue-800'
               }`}>
-                {formData.applicationType === 'NEW' ? '🏢 New Licence' : '🔄 Licence Renewal'}
+                {formData.applicationType === 'RENEWAL' ? '🔄 Licence Renewal'
+                  : formData.applicationType === 'SUPPLY_INSTALLATION' ? '⚡ Supply Installation'
+                  : '🏢 New Licence'}
               </span>
             </div>
 
@@ -812,7 +802,11 @@ export default function NewApplicationPage() {
         onClose={() => setShowSubmitConfirm(false)}
         onConfirm={handleSubmit}
         title="Submit Application"
-        message={`Submit this ${formData.applicationType === 'RENEWAL' ? 'renewal' : ''} application? You will need to make payment after submission.`}
+        message={`Submit this ${
+          formData.applicationType === 'RENEWAL' ? 'renewal'
+            : formData.applicationType === 'SUPPLY_INSTALLATION' ? 'supply installation'
+            : ''
+        } application? You will need to make payment after submission.`}
         confirmLabel="Submit"
       />
     </div>

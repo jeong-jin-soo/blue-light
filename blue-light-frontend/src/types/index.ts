@@ -73,7 +73,7 @@ export type ApplicationStatus =
 /**
  * 신청 유형
  */
-export type ApplicationType = 'NEW' | 'RENEWAL';
+export type ApplicationType = 'NEW' | 'RENEWAL' | 'SUPPLY_INSTALLATION';
 
 /**
  * 라이선스 신청 내역
