@@ -28,4 +28,9 @@ public class UpdateApplicationRequest {
     @NotNull(message = "Selected kVA is required")
     @Positive(message = "Selected kVA must be a positive number")
     private Integer selectedKva;
+
+    /**
+     * 갱신 기간 수정 (Admin/LEW, 3 or 12)
+     */
+    private Integer renewalPeriodMonths;
 }

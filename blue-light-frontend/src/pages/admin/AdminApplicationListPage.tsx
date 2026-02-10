@@ -6,6 +6,7 @@ import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { Badge } from '../../components/ui/Badge';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminApplication, ApplicationStatus } from '../../types';
@@ -85,6 +86,16 @@ export default function AdminApplicationListPage() {
       width: '60px',
       render: (app) => (
         <span className="font-mono text-xs text-gray-500">#{app.applicationSeq}</span>
+      ),
+    },
+    {
+      key: 'applicationType',
+      header: 'Type',
+      width: '80px',
+      render: (app) => (
+        <Badge variant={app.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
+          {app.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+        </Badge>
       ),
     },
     {
@@ -206,6 +217,11 @@ export default function AdminApplicationListPage() {
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 flex-1 mr-3">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Badge variant={app.applicationType === 'RENEWAL' ? 'warning' : 'info'} className="text-[10px]">
+                    {app.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+                  </Badge>
+                </div>
                 <p className="font-medium text-gray-800">{app.userName}</p>
                 <p className="text-xs text-gray-400">{app.userEmail}</p>
               </div>

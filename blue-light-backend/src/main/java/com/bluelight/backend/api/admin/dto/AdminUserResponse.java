@@ -20,6 +20,12 @@ public class AdminUserResponse {
     private String phone;
     private UserRole role;
     private String approvedStatus;
+    private String lewLicenceNo;
+    private String companyName;
+    private String uen;
+    private String designation;
+    private String correspondenceAddress;
+    private String correspondencePostalCode;
     private LocalDateTime createdAt;
 
     public static AdminUserResponse from(User user) {
@@ -31,6 +37,12 @@ public class AdminUserResponse {
                 .role(user.getRole())
                 .approvedStatus(user.getApprovedStatus() != null
                         ? user.getApprovedStatus().name() : null)
+                .lewLicenceNo(user.getLewLicenceNo())
+                .companyName(user.getCompanyName())
+                .uen(user.getUen())
+                .designation(user.getDesignation())
+                .correspondenceAddress(user.getCorrespondenceAddress())
+                .correspondencePostalCode(user.getCorrespondencePostalCode())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

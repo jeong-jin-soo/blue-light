@@ -55,6 +55,14 @@ export const getApplicationPayments = async (applicationId: number): Promise<Pay
   return response.data;
 };
 
+/**
+ * Get completed applications (갱신 시 원본 선택용)
+ */
+export const getCompletedApplications = async (): Promise<Application[]> => {
+  const response = await axiosClient.get<Application[]>('/applications/completed');
+  return response.data;
+};
+
 export const applicationApi = {
   createApplication,
   updateApplication,
@@ -62,5 +70,6 @@ export const applicationApi = {
   getApplication,
   getApplicationSummary,
   getApplicationPayments,
+  getCompletedApplications,
 };
 export default applicationApi;

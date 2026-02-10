@@ -29,6 +29,20 @@ public class ApplicationResponse {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
+    // ── Phase 19: Assigned LEW info (신청자용 — 이름+면허번호만 노출) ──
+    private String assignedLewName;
+    private String assignedLewLicenceNo;
+
+    // ── Phase 18: 갱신 + 견적 개선 필드 ──
+    private String applicationType;
+    private BigDecimal serviceFee;
+    private Long originalApplicationSeq;
+    private String existingLicenceNo;
+    private String renewalReferenceNo;
+    private LocalDate existingExpiryDate;
+    private Integer renewalPeriodMonths;
+    private BigDecimal emaFee;
+
     public static ApplicationResponse from(Application application) {
         return ApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -43,6 +57,21 @@ public class ApplicationResponse {
                 .reviewComment(application.getReviewComment())
                 .createdAt(application.getCreatedAt())
                 .updatedAt(application.getUpdatedAt())
+                // Phase 19: Assigned LEW info
+                .assignedLewName(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getName() : null)
+                .assignedLewLicenceNo(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getLewLicenceNo() : null)
+                // Phase 18 fields
+                .applicationType(application.getApplicationType().name())
+                .serviceFee(application.getServiceFee())
+                .originalApplicationSeq(application.getOriginalApplication() != null
+                        ? application.getOriginalApplication().getApplicationSeq() : null)
+                .existingLicenceNo(application.getExistingLicenceNo())
+                .renewalReferenceNo(application.getRenewalReferenceNo())
+                .existingExpiryDate(application.getExistingExpiryDate())
+                .renewalPeriodMonths(application.getRenewalPeriodMonths())
+                .emaFee(application.getEmaFee())
                 .build();
     }
 }

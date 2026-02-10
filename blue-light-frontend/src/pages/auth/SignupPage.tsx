@@ -17,6 +17,10 @@ export default function SignupPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('APPLICANT');
+  const [lewLicenceNo, setLewLicenceNo] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [uen, setUen] = useState('');
+  const [designation, setDesignation] = useState('');
   const [pdpaConsent, setPdpaConsent] = useState(false);
   const [localError, setLocalError] = useState('');
 
@@ -68,13 +72,27 @@ export default function SignupPage() {
       return;
     }
 
+    if (role === 'LEW' && !lewLicenceNo.trim()) {
+      setLocalError('LEW licence number is required');
+      return;
+    }
+
     if (!pdpaConsent) {
       setLocalError('You must agree to the Privacy Policy to continue');
       return;
     }
 
     try {
-      await signup({ email, password, name, phone: phone || undefined, role, pdpaConsent });
+      await signup({
+        email, password, name,
+        phone: phone || undefined,
+        role,
+        lewLicenceNo: role === 'LEW' ? lewLicenceNo.trim() : undefined,
+        companyName: role === 'APPLICANT' && companyName.trim() ? companyName.trim() : undefined,
+        uen: role === 'APPLICANT' && uen.trim() ? uen.trim() : undefined,
+        designation: role === 'APPLICANT' && designation.trim() ? designation.trim() : undefined,
+        pdpaConsent,
+      });
     } catch {
       // error is managed by store
     }
@@ -132,6 +150,40 @@ export default function SignupPage() {
           hint="Optional"
         />
 
+        {/* Business Information — APPLICANT 회원가입 시 (선택적) */}
+        {role === 'APPLICANT' && (
+          <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-xs font-medium text-gray-600">
+              Business Information <span className="text-gray-400">(Optional — can be added later in Profile)</span>
+            </p>
+            <Input
+              label="Company Name"
+              maxLength={100}
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="e.g., BLUE LIGHT PTE LTD"
+              hint="Will be printed on your installation licence"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                label="UEN"
+                maxLength={20}
+                value={uen}
+                onChange={(e) => setUen(e.target.value)}
+                placeholder="e.g., 202407291M"
+                hint="Business registration number"
+              />
+              <Input
+                label="Designation"
+                maxLength={50}
+                value={designation}
+                onChange={(e) => setDesignation(e.target.value)}
+                placeholder="e.g., Director"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Role selection — 역할이 2개 이상일 때만 표시 */}
         {availableRoles.length > 1 && (
           <div>
@@ -169,9 +221,22 @@ export default function SignupPage() {
               )}
             </div>
             {role === 'LEW' && (
-              <p className="text-xs text-warning-600 mt-1.5">
-                ⚠ LEW accounts require administrator approval before access.
-              </p>
+              <>
+                <p className="text-xs text-warning-600 mt-1.5">
+                  ⚠ LEW accounts require administrator approval before access.
+                </p>
+                <div className="mt-3">
+                  <Input
+                    label="LEW Licence Number"
+                    required
+                    maxLength={50}
+                    value={lewLicenceNo}
+                    onChange={(e) => setLewLicenceNo(e.target.value)}
+                    placeholder="e.g., LEW-2026-XXXXX"
+                    hint="Your EMA-issued LEW licence number"
+                  />
+                </div>
+              </>
             )}
           </div>
         )}

@@ -9,9 +9,11 @@ import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.ApplicationType;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
+import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -22,11 +24,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
  * Application service for applicants
- * - Create, list, detail, summary, payment history
+ * - Create (new/renewal), list, detail, summary, payment history
  */
 @Slf4j
 @Service
@@ -38,13 +42,10 @@ public class ApplicationService {
     private final MasterPriceRepository masterPriceRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final SystemSettingRepository systemSettingRepository;
 
     /**
-     * Create a new licence application
-     *
-     * @param userSeq authenticated user ID
-     * @param request application details
-     * @return created application
+     * Create a new licence application (NEW or RENEWAL)
      */
     @Transactional
     public ApplicationResponse createApplication(Long userSeq, CreateApplicationRequest request) {
@@ -60,6 +61,56 @@ public class ApplicationService {
                         "PRICE_TIER_NOT_FOUND"
                 ));
 
+        // Service fee from settings
+        BigDecimal serviceFee = getServiceFee();
+        BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
+
+        // Determine application type
+        ApplicationType appType = ApplicationType.NEW;
+        Application originalApp = null;
+        String existingLicenceNo = null;
+        String renewalReferenceNo = request.getRenewalReferenceNo();
+        LocalDate existingExpiryDate = null;
+        Integer renewalPeriodMonths = null;
+        BigDecimal emaFee = null;
+
+        if ("RENEWAL".equals(request.getApplicationType())) {
+            appType = ApplicationType.RENEWAL;
+
+            // Validate renewal period
+            renewalPeriodMonths = request.getRenewalPeriodMonths();
+            if (renewalPeriodMonths == null || (renewalPeriodMonths != 3 && renewalPeriodMonths != 12)) {
+                throw new BusinessException(
+                        "Renewal period must be 3 or 12 months",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            emaFee = renewalPeriodMonths == 3
+                    ? new BigDecimal("50.00") : new BigDecimal("100.00");
+
+            // Link to original application if provided
+            if (request.getOriginalApplicationSeq() != null) {
+                originalApp = applicationRepository.findById(request.getOriginalApplicationSeq())
+                        .orElseThrow(() -> new BusinessException(
+                                "Original application not found",
+                                HttpStatus.NOT_FOUND, "ORIGINAL_APP_NOT_FOUND"));
+
+                // Verify ownership
+                if (!originalApp.getUser().getUserSeq().equals(userSeq)) {
+                    throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+                }
+
+                // Auto-fill from original
+                existingLicenceNo = originalApp.getLicenseNumber();
+                existingExpiryDate = originalApp.getLicenseExpiryDate();
+            } else {
+                // Manual entry
+                existingLicenceNo = request.getExistingLicenceNo();
+                if (request.getExistingExpiryDate() != null && !request.getExistingExpiryDate().isBlank()) {
+                    existingExpiryDate = LocalDate.parse(request.getExistingExpiryDate());
+                }
+            }
+        }
+
         // Create application
         Application application = Application.builder()
                 .user(user)
@@ -67,7 +118,15 @@ public class ApplicationService {
                 .postalCode(request.getPostalCode())
                 .buildingType(request.getBuildingType())
                 .selectedKva(request.getSelectedKva())
-                .quoteAmount(masterPrice.getPrice())
+                .quoteAmount(quoteAmount)
+                .serviceFee(serviceFee)
+                .applicationType(appType)
+                .originalApplication(originalApp)
+                .existingLicenceNo(existingLicenceNo)
+                .renewalReferenceNo(renewalReferenceNo)
+                .existingExpiryDate(existingExpiryDate)
+                .renewalPeriodMonths(renewalPeriodMonths)
+                .emaFee(emaFee)
                 .build();
 
         // 승인된 LEW가 1명이면 자동 할당
@@ -79,8 +138,9 @@ public class ApplicationService {
         }
 
         Application saved = applicationRepository.save(application);
-        log.info("Application created: applicationSeq={}, userSeq={}, kva={}, amount={}",
-                saved.getApplicationSeq(), userSeq, request.getSelectedKva(), masterPrice.getPrice());
+        log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, serviceFee={}",
+                saved.getApplicationSeq(), appType, userSeq,
+                request.getSelectedKva(), quoteAmount, serviceFee);
 
         return ApplicationResponse.from(saved);
     }
@@ -107,17 +167,34 @@ public class ApplicationService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_EDIT");
         }
 
-        // Recalculate price if kVA changed
+        // Recalculate price if kVA changed (+ service fee)
         MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
                 .orElseThrow(() -> new BusinessException(
                         "No price tier found for " + request.getSelectedKva() + " kVA",
                         HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
 
+        BigDecimal serviceFee = getServiceFee();
+        BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
+
         application.updateDetails(
                 request.getAddress(), request.getPostalCode(),
                 request.getBuildingType(), request.getSelectedKva(),
-                masterPrice.getPrice()
+                quoteAmount, serviceFee
         );
+
+        // 갱신 신청이면 갱신 기간 변경 처리
+        if (application.getApplicationType() == ApplicationType.RENEWAL
+                && request.getRenewalPeriodMonths() != null) {
+            int months = request.getRenewalPeriodMonths();
+            if (months != 3 && months != 12) {
+                throw new BusinessException(
+                        "Renewal period must be 3 or 12 months",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            BigDecimal newEmaFee = months == 3
+                    ? new BigDecimal("50.00") : new BigDecimal("100.00");
+            application.updateRenewalPeriod(months, newEmaFee);
+        }
 
         // Auto-transition status back to PENDING_REVIEW
         application.resubmit();
@@ -130,9 +207,6 @@ public class ApplicationService {
 
     /**
      * Get all applications for the authenticated user
-     *
-     * @param userSeq authenticated user ID
-     * @return list of applications
      */
     public List<ApplicationResponse> getMyApplications(Long userSeq) {
         return applicationRepository.findByUserUserSeqOrderByCreatedAtDesc(userSeq)
@@ -143,10 +217,6 @@ public class ApplicationService {
 
     /**
      * Get a single application detail
-     *
-     * @param userSeq authenticated user ID
-     * @param applicationSeq application ID
-     * @return application detail
      */
     public ApplicationResponse getMyApplication(Long userSeq, Long applicationSeq) {
         Application application = applicationRepository.findById(applicationSeq)
@@ -166,9 +236,6 @@ public class ApplicationService {
 
     /**
      * Get application summary for dashboard
-     *
-     * @param userSeq authenticated user ID
-     * @return summary with counts by status
      */
     public ApplicationSummaryResponse getMyApplicationSummary(Long userSeq) {
         List<Application> applications = applicationRepository.findByUserUserSeq(userSeq);
@@ -199,10 +266,6 @@ public class ApplicationService {
 
     /**
      * Get payment history for an application (verifies ownership)
-     *
-     * @param userSeq authenticated user ID
-     * @param applicationSeq application ID
-     * @return list of payments
      */
     public List<PaymentResponse> getApplicationPayments(Long userSeq, Long applicationSeq) {
         Application application = applicationRepository.findById(applicationSeq)
@@ -221,5 +284,25 @@ public class ApplicationService {
                 .stream()
                 .map(PaymentResponse::from)
                 .toList();
+    }
+
+    /**
+     * Get completed applications for the user (갱신 시 원본 선택용)
+     */
+    public List<ApplicationResponse> getCompletedApplications(Long userSeq) {
+        return applicationRepository.findByUserUserSeqAndStatusOrderByCreatedAtDesc(
+                        userSeq, ApplicationStatus.COMPLETED)
+                .stream()
+                .map(ApplicationResponse::from)
+                .toList();
+    }
+
+    /**
+     * system_settings에서 서비스 수수료 조회
+     */
+    private BigDecimal getServiceFee() {
+        return systemSettingRepository.findById("service_fee")
+                .map(s -> new BigDecimal(s.getSettingValue()))
+                .orElse(BigDecimal.ZERO);
     }
 }

@@ -13,10 +13,10 @@ FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@bluelight.sg');
 
 -- LEW 계정 (password: admin1234 / BCrypt encoded, 사전 승인됨)
-INSERT INTO users (email, password, name, phone, role, approved_status, created_at, updated_at)
+INSERT INTO users (email, password, name, phone, role, approved_status, lew_licence_no, created_at, updated_at)
 SELECT 'lew@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'LEW Officer', '+65-0000-0001', 'LEW', 'APPROVED',
+       'LEW Officer', '+65-0000-0001', 'LEW', 'APPROVED', 'LEW-2026-00001',
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'lew@bluelight.sg');
@@ -26,6 +26,12 @@ INSERT INTO system_settings (setting_key, setting_value, description, updated_at
 SELECT 'lew_registration_open', 'true', 'LEW 가입 허용 여부', NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'lew_registration_open');
+
+-- 플랫폼 서비스 수수료 초기값
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'service_fee', '50.00', 'Platform service fee (SGD)', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'service_fee');
 
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입

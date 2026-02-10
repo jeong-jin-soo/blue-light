@@ -44,6 +44,12 @@ export interface User {
   role: UserRole;
   approved?: boolean;
   approvedStatus?: ApprovalStatus;
+  lewLicenceNo?: string;
+  companyName?: string;
+  uen?: string;
+  designation?: string;
+  correspondenceAddress?: string;
+  correspondencePostalCode?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +71,11 @@ export type ApplicationStatus =
   | 'EXPIRED';
 
 /**
+ * 신청 유형
+ */
+export type ApplicationType = 'NEW' | 'RENEWAL';
+
+/**
  * 라이선스 신청 내역
  */
 export interface Application {
@@ -81,6 +92,18 @@ export interface Application {
   licenseExpiryDate?: string;
   createdAt: string;
   updatedAt: string;
+  // Phase 19: Assigned LEW info
+  assignedLewName?: string;
+  assignedLewLicenceNo?: string;
+  // Phase 18: 갱신 + 견적 개선
+  applicationType: ApplicationType;
+  serviceFee?: number;
+  originalApplicationSeq?: number;
+  existingLicenceNo?: string;
+  renewalReferenceNo?: string;
+  existingExpiryDate?: string;
+  renewalPeriodMonths?: number;
+  emaFee?: number;
 }
 
 // ============================================
@@ -192,6 +215,10 @@ export interface SignupRequest {
   name: string;
   phone?: string;
   role?: string;
+  lewLicenceNo?: string;
+  companyName?: string;
+  uen?: string;
+  designation?: string;
   pdpaConsent: boolean;
 }
 
@@ -221,6 +248,13 @@ export interface CreateApplicationRequest {
   postalCode: string;
   buildingType?: string;
   selectedKva: number;
+  // Phase 18: 갱신 관련
+  applicationType?: string;
+  originalApplicationSeq?: number;
+  existingLicenceNo?: string;
+  existingExpiryDate?: string;
+  renewalPeriodMonths?: number;
+  renewalReferenceNo?: string;
 }
 
 /**
@@ -231,6 +265,7 @@ export interface UpdateApplicationRequest {
   postalCode: string;
   buildingType?: string;
   selectedKva: number;
+  renewalPeriodMonths?: number;
 }
 
 /**
@@ -279,6 +314,8 @@ export interface PriceCalculation {
   kva: number;
   tierDescription: string;
   price: number;
+  serviceFee: number;
+  totalAmount: number;
 }
 
 /**
@@ -289,11 +326,15 @@ export interface AdminApplication extends Application {
   userName: string;
   userEmail: string;
   userPhone?: string;
+  userCompanyName?: string;
+  userUen?: string;
+  userDesignation?: string;
   reviewComment?: string;
   // Assigned LEW info
   assignedLewSeq?: number;
   assignedLewName?: string;
   assignedLewEmail?: string;
+  assignedLewLicenceNo?: string;
 }
 
 /**
@@ -331,6 +372,12 @@ export interface Page<T> {
 export interface UpdateProfileRequest {
   name: string;
   phone?: string;
+  lewLicenceNo?: string;
+  companyName?: string;
+  uen?: string;
+  designation?: string;
+  correspondenceAddress?: string;
+  correspondencePostalCode?: string;
 }
 
 /**
@@ -382,6 +429,7 @@ export interface LewSummary {
   userSeq: number;
   name: string;
   email: string;
+  lewLicenceNo?: string;
 }
 
 /**

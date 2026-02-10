@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS users (
     phone          VARCHAR(20),
     role           VARCHAR(20)  NOT NULL DEFAULT 'APPLICANT',
     approved_status VARCHAR(20),
+    lew_licence_no  VARCHAR(50),
+    company_name    VARCHAR(100),
+    uen             VARCHAR(20),
+    designation     VARCHAR(50),
+    correspondence_address     VARCHAR(255),
+    correspondence_postal_code VARCHAR(10),
     pdpa_consent_at DATETIME(6),
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
@@ -36,6 +42,14 @@ CREATE TABLE IF NOT EXISTS applications (
     license_expiry_date DATE,
     review_comment     TEXT,
     assigned_lew_seq   BIGINT,
+    application_type         VARCHAR(10)   NOT NULL DEFAULT 'NEW',
+    service_fee              DECIMAL(10,2),
+    original_application_seq BIGINT,
+    existing_licence_no      VARCHAR(50),
+    renewal_reference_no     VARCHAR(50),
+    existing_expiry_date     DATE,
+    renewal_period_months    INT,
+    ema_fee                  DECIMAL(10,2),
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -45,8 +59,10 @@ CREATE TABLE IF NOT EXISTS applications (
     KEY idx_applications_user_seq (user_seq),
     KEY idx_applications_status (status),
     KEY idx_applications_assigned_lew (assigned_lew_seq),
+    KEY idx_applications_type (application_type),
     CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
-    CONSTRAINT fk_applications_assigned_lew FOREIGN KEY (assigned_lew_seq) REFERENCES users (user_seq)
+    CONSTRAINT fk_applications_assigned_lew FOREIGN KEY (assigned_lew_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_applications_original FOREIGN KEY (original_application_seq) REFERENCES applications (application_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. 결제 로그

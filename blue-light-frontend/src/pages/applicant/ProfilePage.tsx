@@ -19,6 +19,12 @@ export default function ProfilePage() {
   // Profile form
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [lewLicenceNo, setLewLicenceNo] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [uen, setUen] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [correspondenceAddress, setCorrespondenceAddress] = useState('');
+  const [correspondencePostalCode, setCorrespondencePostalCode] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
 
@@ -36,6 +42,12 @@ export default function ProfilePage() {
         setProfile(data);
         setName(data.name);
         setPhone(data.phone || '');
+        setLewLicenceNo(data.lewLicenceNo || '');
+        setCompanyName(data.companyName || '');
+        setUen(data.uen || '');
+        setDesignation(data.designation || '');
+        setCorrespondenceAddress(data.correspondenceAddress || '');
+        setCorrespondencePostalCode(data.correspondencePostalCode || '');
       })
       .catch(() => {
         toast.error('Failed to load profile');
@@ -54,6 +66,12 @@ export default function ProfilePage() {
       const updated = await userApi.updateProfile({
         name: name.trim(),
         phone: phone.trim() || undefined,
+        lewLicenceNo: lewLicenceNo.trim() || undefined,
+        companyName: companyName.trim() || undefined,
+        uen: uen.trim() || undefined,
+        designation: designation.trim() || undefined,
+        correspondenceAddress: correspondenceAddress.trim() || undefined,
+        correspondencePostalCode: correspondencePostalCode.trim() || undefined,
       });
       setProfile(updated);
       toast.success('Profile updated successfully');
@@ -150,6 +168,67 @@ export default function ProfilePage() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="e.g., +65 9123 4567"
+          />
+          {(profile?.role === 'LEW' || authUser?.role === 'LEW') && (
+            <Input
+              label="LEW Licence Number"
+              value={lewLicenceNo}
+              onChange={(e) => setLewLicenceNo(e.target.value)}
+              maxLength={50}
+              placeholder="e.g., LEW-2026-XXXXX"
+              hint="Your EMA-issued LEW licence number"
+            />
+          )}
+        </div>
+      </Card>
+
+      {/* Business Information — EMA Letter of Appointment 필수 필드 */}
+      <Card>
+        <CardHeader
+          title="Business Information"
+          description="Company details required for EMA licence application (Letter of Appointment)"
+        />
+        <div className="space-y-4">
+          <Input
+            label="Company Name"
+            value={companyName}
+            onChange={(e) => setCompanyName(e.target.value)}
+            maxLength={100}
+            placeholder="e.g., BLUE LIGHT PTE LTD"
+            hint="This name will be printed on your installation licence"
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="UEN (Unique Entity Number)"
+              value={uen}
+              onChange={(e) => setUen(e.target.value)}
+              maxLength={20}
+              placeholder="e.g., 202407291M"
+              hint="Singapore business registration number"
+            />
+            <Input
+              label="Designation"
+              value={designation}
+              onChange={(e) => setDesignation(e.target.value)}
+              maxLength={50}
+              placeholder="e.g., Director, Manager"
+              hint="Your position / title"
+            />
+          </div>
+          <Input
+            label="Correspondence Address"
+            value={correspondenceAddress}
+            onChange={(e) => setCorrespondenceAddress(e.target.value)}
+            maxLength={255}
+            placeholder="e.g., 105 Sims Ave, #07-08, Chancerlodge Complex"
+            hint="EMA will send notifications to this address"
+          />
+          <Input
+            label="Correspondence Postal Code"
+            value={correspondencePostalCode}
+            onChange={(e) => setCorrespondencePostalCode(e.target.value)}
+            maxLength={10}
+            placeholder="e.g., 387429"
           />
           <div className="pt-2">
             <Button onClick={handleProfileSave} loading={profileSaving}>

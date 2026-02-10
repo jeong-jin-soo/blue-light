@@ -82,6 +82,18 @@ public class ApplicationController {
     }
 
     /**
+     * Get completed applications (갱신 시 원본 선택용)
+     * GET /api/applications/completed
+     */
+    @GetMapping("/completed")
+    public ResponseEntity<List<ApplicationResponse>> getCompletedApplications(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Get completed applications: userSeq={}", userSeq);
+        List<ApplicationResponse> applications = applicationService.getCompletedApplications(userSeq);
+        return ResponseEntity.ok(applications);
+    }
+
+    /**
      * Get application summary for dashboard
      * GET /api/applications/summary
      */

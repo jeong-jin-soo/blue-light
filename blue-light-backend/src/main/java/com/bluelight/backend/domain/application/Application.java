@@ -98,15 +98,79 @@ public class Application extends BaseEntity {
     @JoinColumn(name = "assigned_lew_seq")
     private User assignedLew;
 
+    // ── Phase 18: 갱신 + 견적 개선 필드 ──
+
+    /**
+     * 신청 유형 (NEW / RENEWAL)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "application_type", nullable = false)
+    private ApplicationType applicationType = ApplicationType.NEW;
+
+    /**
+     * 플랫폼 서비스 수수료 (생성 시점 스냅샷)
+     */
+    @Column(name = "service_fee", precision = 10, scale = 2)
+    private BigDecimal serviceFee;
+
+    /**
+     * 원본 신청 (갱신 시 참조, nullable)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "original_application_seq")
+    private Application originalApplication;
+
+    /**
+     * 기존 면허 번호 (갱신 시)
+     */
+    @Column(name = "existing_licence_no", length = 50)
+    private String existingLicenceNo;
+
+    /**
+     * 갱신 참조 번호
+     */
+    @Column(name = "renewal_reference_no", length = 50)
+    private String renewalReferenceNo;
+
+    /**
+     * 기존 면허 만료일 (갱신 시)
+     */
+    @Column(name = "existing_expiry_date")
+    private LocalDate existingExpiryDate;
+
+    /**
+     * 갱신 기간 (3 or 12 개월)
+     */
+    @Column(name = "renewal_period_months")
+    private Integer renewalPeriodMonths;
+
+    /**
+     * EMA 수수료 (안내용, 3개월=$50, 12개월=$100)
+     */
+    @Column(name = "ema_fee", precision = 10, scale = 2)
+    private BigDecimal emaFee;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
-                       Integer selectedKva, BigDecimal quoteAmount) {
+                       Integer selectedKva, BigDecimal quoteAmount, BigDecimal serviceFee,
+                       ApplicationType applicationType, Application originalApplication,
+                       String existingLicenceNo, String renewalReferenceNo,
+                       LocalDate existingExpiryDate, Integer renewalPeriodMonths,
+                       BigDecimal emaFee) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
+        this.serviceFee = serviceFee;
+        this.applicationType = applicationType != null ? applicationType : ApplicationType.NEW;
+        this.originalApplication = originalApplication;
+        this.existingLicenceNo = existingLicenceNo;
+        this.renewalReferenceNo = renewalReferenceNo;
+        this.existingExpiryDate = existingExpiryDate;
+        this.renewalPeriodMonths = renewalPeriodMonths;
+        this.emaFee = emaFee;
         this.status = ApplicationStatus.PENDING_REVIEW;
     }
 
@@ -144,12 +208,21 @@ public class Application extends BaseEntity {
      * 신청 내용 수정 (보완 시)
      */
     public void updateDetails(String address, String postalCode, String buildingType,
-                              Integer selectedKva, BigDecimal quoteAmount) {
+                              Integer selectedKva, BigDecimal quoteAmount, BigDecimal serviceFee) {
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
+        this.serviceFee = serviceFee;
+    }
+
+    /**
+     * 갱신 기간 수정 (Admin/LEW)
+     */
+    public void updateRenewalPeriod(Integer renewalPeriodMonths, BigDecimal emaFee) {
+        this.renewalPeriodMonths = renewalPeriodMonths;
+        this.emaFee = emaFee;
     }
 
     /**

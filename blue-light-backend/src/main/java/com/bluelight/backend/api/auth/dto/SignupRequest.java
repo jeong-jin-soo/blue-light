@@ -36,4 +36,28 @@ public class SignupRequest {
      * 역할 선택 (APPLICANT / LEW, nullable — 미입력 시 APPLICANT)
      */
     private String role;
+
+    /**
+     * LEW 면허번호 (LEW 역할 선택 시 필수)
+     */
+    @Size(max = 50, message = "Licence number must be 50 characters or less")
+    private String lewLicenceNo;
+
+    /**
+     * 회사명 (APPLICANT 선택 시 입력 가능)
+     */
+    @Size(max = 100, message = "Company name must be 100 characters or less")
+    private String companyName;
+
+    /**
+     * UEN (싱가포르 사업자등록번호, 선택)
+     */
+    @Size(max = 20, message = "UEN must be 20 characters or less")
+    private String uen;
+
+    /**
+     * 직위 (Director, Manager 등, 선택)
+     */
+    @Size(max = 50, message = "Designation must be 50 characters or less")
+    private String designation;
 }

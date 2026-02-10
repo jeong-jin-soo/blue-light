@@ -15,4 +15,8 @@ public class PriceCalculationResponse {
     private Integer kva;
     private String tierDescription;
     private BigDecimal price;
+
+    // ── Phase 18: 서비스 수수료 분리 ──
+    private BigDecimal serviceFee;
+    private BigDecimal totalAmount;
 }

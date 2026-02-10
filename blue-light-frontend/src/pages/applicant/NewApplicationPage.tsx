@@ -10,9 +10,10 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
-import type { MasterPrice, PriceCalculation } from '../../types';
+import type { MasterPrice, PriceCalculation, Application, ApplicationType } from '../../types';
 
 const STEPS = [
+  { label: 'Type', description: 'Application type' },
   { label: 'Address', description: 'Property details' },
   { label: 'kVA & Price', description: 'Select capacity' },
   { label: 'Review', description: 'Confirm & submit' },
@@ -32,10 +33,18 @@ const BUILDING_TYPES = [
 ];
 
 interface FormData {
+  applicationType: ApplicationType;
   address: string;
   postalCode: string;
   buildingType: string;
   selectedKva: number | null;
+  // Renewal fields
+  originalApplicationSeq: number | null;
+  existingLicenceNo: string;
+  existingExpiryDate: string;
+  renewalPeriodMonths: number | null;
+  renewalReferenceNo: string;
+  manualEntry: boolean;
 }
 
 export default function NewApplicationPage() {
@@ -48,10 +57,17 @@ export default function NewApplicationPage() {
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
+    applicationType: 'NEW',
     address: '',
     postalCode: '',
     buildingType: '',
     selectedKva: null,
+    originalApplicationSeq: null,
+    existingLicenceNo: '',
+    existingExpiryDate: '',
+    renewalPeriodMonths: null,
+    renewalReferenceNo: '',
+    manualEntry: false,
   });
 
   // Price data
@@ -59,9 +75,30 @@ export default function NewApplicationPage() {
   const [priceResult, setPriceResult] = useState<PriceCalculation | null>(null);
   const [loadingPrices, setLoadingPrices] = useState(false);
 
-  // Load price tiers when entering step 2
+  // Completed applications for renewal
+  const [completedApps, setCompletedApps] = useState<Application[]>([]);
+  const [loadingCompleted, setLoadingCompleted] = useState(false);
+
+  // Load completed applications when selecting RENEWAL
   useEffect(() => {
-    if (currentStep === 1 && priceTiers.length === 0) {
+    if (formData.applicationType === 'RENEWAL' && completedApps.length === 0) {
+      setLoadingCompleted(true);
+      applicationApi.getCompletedApplications()
+        .then((apps) => {
+          setCompletedApps(apps);
+          // If no completed apps, auto-enable manual entry
+          if (apps.length === 0) {
+            setFormData((prev) => ({ ...prev, manualEntry: true }));
+          }
+        })
+        .catch(() => toast.error('Failed to load completed applications'))
+        .finally(() => setLoadingCompleted(false));
+    }
+  }, [formData.applicationType]);
+
+  // Load price tiers when entering kVA step
+  useEffect(() => {
+    if (currentStep === 2 && priceTiers.length === 0) {
       setLoadingPrices(true);
       priceApi.getPrices()
         .then(setPriceTiers)
@@ -86,6 +123,50 @@ export default function NewApplicationPage() {
     setErrors((prev) => ({ ...prev, [field]: '' }));
   };
 
+  // Handle selecting an existing completed application
+  const handleSelectOriginalApp = (appSeq: number | null) => {
+    if (!appSeq) {
+      updateField('originalApplicationSeq', null);
+      return;
+    }
+    const app = completedApps.find((a) => a.applicationSeq === appSeq);
+    if (app) {
+      setFormData((prev) => ({
+        ...prev,
+        originalApplicationSeq: app.applicationSeq,
+        existingLicenceNo: app.licenseNumber || '',
+        existingExpiryDate: app.licenseExpiryDate || '',
+        address: app.address,
+        postalCode: app.postalCode,
+        buildingType: app.buildingType || '',
+        selectedKva: app.selectedKva,
+      }));
+      setErrors({});
+    }
+  };
+
+  // Validation per step
+  const validateStep0 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (formData.applicationType === 'RENEWAL') {
+      if (!formData.renewalPeriodMonths) {
+        newErrors.renewalPeriodMonths = 'Please select a renewal period';
+      }
+      if (formData.manualEntry) {
+        if (!formData.existingLicenceNo.trim()) {
+          newErrors.existingLicenceNo = 'Existing licence number is required';
+        }
+        if (!formData.existingExpiryDate.trim()) {
+          newErrors.existingExpiryDate = 'Existing expiry date is required';
+        }
+      } else if (!formData.originalApplicationSeq) {
+        newErrors.originalApplicationSeq = 'Please select an existing application';
+      }
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const validateStep1 = (): boolean => {
     const newErrors: Record<string, string> = {};
     if (!formData.address.trim()) newErrors.address = 'Address is required';
@@ -105,9 +186,10 @@ export default function NewApplicationPage() {
   };
 
   const handleNext = () => {
-    if (currentStep === 0 && !validateStep1()) return;
-    if (currentStep === 1 && !validateStep2()) return;
-    setCurrentStep((prev) => Math.min(prev + 1, 2));
+    if (currentStep === 0 && !validateStep0()) return;
+    if (currentStep === 1 && !validateStep1()) return;
+    if (currentStep === 2 && !validateStep2()) return;
+    setCurrentStep((prev) => Math.min(prev + 1, 3));
   };
 
   const handleBack = () => {
@@ -119,12 +201,26 @@ export default function NewApplicationPage() {
     setShowSubmitConfirm(false);
     setSubmitting(true);
     try {
-      const result = await applicationApi.createApplication({
+      const payload: Record<string, unknown> = {
         address: formData.address.trim(),
         postalCode: formData.postalCode.trim(),
         buildingType: formData.buildingType || undefined,
         selectedKva: formData.selectedKva,
-      });
+        applicationType: formData.applicationType,
+      };
+      if (formData.applicationType === 'RENEWAL') {
+        payload.renewalPeriodMonths = formData.renewalPeriodMonths;
+        if (formData.renewalReferenceNo.trim()) {
+          payload.renewalReferenceNo = formData.renewalReferenceNo.trim();
+        }
+        if (formData.originalApplicationSeq && !formData.manualEntry) {
+          payload.originalApplicationSeq = formData.originalApplicationSeq;
+        } else {
+          payload.existingLicenceNo = formData.existingLicenceNo.trim();
+          payload.existingExpiryDate = formData.existingExpiryDate;
+        }
+      }
+      const result = await applicationApi.createApplication(payload as any);
       toast.success('Application submitted successfully!');
       navigate(`/applications/${result.applicationSeq}`);
     } catch {
@@ -132,6 +228,32 @@ export default function NewApplicationPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Helper: reset renewal fields when switching type
+  const handleTypeChange = (type: ApplicationType) => {
+    setFormData({
+      applicationType: type,
+      address: '',
+      postalCode: '',
+      buildingType: '',
+      selectedKva: null,
+      originalApplicationSeq: null,
+      existingLicenceNo: '',
+      existingExpiryDate: '',
+      renewalPeriodMonths: null,
+      renewalReferenceNo: '',
+      manualEntry: false,
+    });
+    setErrors({});
+    setPriceResult(null);
+  };
+
+  // Compute EMA fee label
+  const getEmaFeeLabel = (months: number | null) => {
+    if (months === 3) return 'SGD $50';
+    if (months === 12) return 'SGD $100';
+    return '—';
   };
 
   return (
@@ -148,7 +270,7 @@ export default function NewApplicationPage() {
         </button>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New Licence Application</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Apply for a new electrical installation licence</p>
+          <p className="text-sm text-gray-500 mt-0.5">Apply for a new or renewal electrical installation licence</p>
         </div>
       </div>
 
@@ -159,11 +281,243 @@ export default function NewApplicationPage() {
 
       {/* Step content */}
       <Card>
+        {/* ───── Step 0: Application Type ───── */}
         {currentStep === 0 && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Application Type</h2>
+              <p className="text-sm text-gray-500 mt-1">Choose whether this is a new licence or a renewal</p>
+            </div>
+
+            {/* Type selection cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => handleTypeChange('NEW')}
+                className={`relative p-5 rounded-xl border-2 text-left transition-all ${
+                  formData.applicationType === 'NEW'
+                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🏢</span>
+                  <div>
+                    <p className="font-semibold text-gray-800">New Licence</p>
+                    <p className="text-sm text-gray-500 mt-1">Apply for a brand new electrical installation licence</p>
+                  </div>
+                </div>
+                {formData.applicationType === 'NEW' && (
+                  <div className="absolute top-3 right-3">
+                    <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleTypeChange('RENEWAL')}
+                className={`relative p-5 rounded-xl border-2 text-left transition-all ${
+                  formData.applicationType === 'RENEWAL'
+                    ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200'
+                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🔄</span>
+                  <div>
+                    <p className="font-semibold text-gray-800">Licence Renewal</p>
+                    <p className="text-sm text-gray-500 mt-1">Renew an existing electrical installation licence</p>
+                  </div>
+                </div>
+                {formData.applicationType === 'RENEWAL' && (
+                  <div className="absolute top-3 right-3">
+                    <svg className="w-5 h-5 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Renewal-specific fields */}
+            {formData.applicationType === 'RENEWAL' && (
+              <div className="space-y-5 border-t border-gray-100 pt-5">
+                {/* Select existing completed application */}
+                {loadingCompleted ? (
+                  <div className="flex items-center justify-center py-8">
+                    <LoadingSpinner size="md" label="Loading completed applications..." />
+                  </div>
+                ) : (
+                  <>
+                    {completedApps.length > 0 && !formData.manualEntry && (
+                      <div className="space-y-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Select Existing Licence <span className="text-red-500">*</span>
+                        </label>
+                        <div className="space-y-2">
+                          {completedApps.map((app) => (
+                            <button
+                              key={app.applicationSeq}
+                              type="button"
+                              onClick={() => handleSelectOriginalApp(app.applicationSeq)}
+                              className={`w-full text-left p-3 rounded-lg border transition-all ${
+                                formData.originalApplicationSeq === app.applicationSeq
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-800">
+                                    {app.licenseNumber || `Application #${app.applicationSeq}`}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    {app.address} • {app.selectedKva} kVA
+                                    {app.licenseExpiryDate && ` • Expires: ${app.licenseExpiryDate}`}
+                                  </p>
+                                </div>
+                                {formData.originalApplicationSeq === app.applicationSeq && (
+                                  <svg className="w-5 h-5 text-primary-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        {errors.originalApplicationSeq && (
+                          <p className="text-sm text-red-600">{errors.originalApplicationSeq}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              manualEntry: true,
+                              originalApplicationSeq: null,
+                              existingLicenceNo: '',
+                              existingExpiryDate: '',
+                              address: '',
+                              postalCode: '',
+                              buildingType: '',
+                              selectedKva: null,
+                            }));
+                            setPriceResult(null);
+                          }}
+                          className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                        >
+                          Or enter details manually →
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Manual entry mode */}
+                    {(formData.manualEntry || completedApps.length === 0) && (
+                      <div className="space-y-4">
+                        {completedApps.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                manualEntry: false,
+                                originalApplicationSeq: null,
+                                existingLicenceNo: '',
+                                existingExpiryDate: '',
+                                address: '',
+                                postalCode: '',
+                                buildingType: '',
+                                selectedKva: null,
+                              }));
+                              setPriceResult(null);
+                            }}
+                            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                          >
+                            ← Select from existing applications
+                          </button>
+                        )}
+                        <Input
+                          label="Existing Licence Number"
+                          placeholder="e.g., EI-2025-001"
+                          value={formData.existingLicenceNo}
+                          onChange={(e) => updateField('existingLicenceNo', e.target.value)}
+                          error={errors.existingLicenceNo}
+                          required
+                        />
+                        <Input
+                          label="Existing Licence Expiry Date"
+                          type="date"
+                          value={formData.existingExpiryDate}
+                          onChange={(e) => updateField('existingExpiryDate', e.target.value)}
+                          error={errors.existingExpiryDate}
+                          required
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Renewal Period Selection */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Renewal Period <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateField('renewalPeriodMonths', 12)}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        formData.renewalPeriodMonths === 12
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-gray-800">12 Months</p>
+                      <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $100</p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateField('renewalPeriodMonths', 3)}
+                      className={`p-4 rounded-lg border-2 text-left transition-all ${
+                        formData.renewalPeriodMonths === 3
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <p className="font-semibold text-gray-800">3 Months</p>
+                      <p className="text-sm text-gray-500 mt-0.5">EMA Fee: SGD $50</p>
+                    </button>
+                  </div>
+                  {errors.renewalPeriodMonths && (
+                    <p className="text-sm text-red-600">{errors.renewalPeriodMonths}</p>
+                  )}
+                </div>
+
+                {/* Renewal Reference No (optional) */}
+                <Input
+                  label="Renewal Reference No."
+                  placeholder="e.g., RN-2025-001 (optional)"
+                  value={formData.renewalReferenceNo}
+                  onChange={(e) => updateField('renewalReferenceNo', e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ───── Step 1: Address ───── */}
+        {currentStep === 1 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Property Details</h2>
-              <p className="text-sm text-gray-500 mt-1">Enter the address of the electrical installation</p>
+              <p className="text-sm text-gray-500 mt-1">
+                {formData.applicationType === 'RENEWAL' && formData.originalApplicationSeq
+                  ? 'Auto-filled from your previous application. You may modify if needed.'
+                  : 'Enter the address of the electrical installation'}
+              </p>
             </div>
             <Input
               label="Installation Address"
@@ -192,7 +546,8 @@ export default function NewApplicationPage() {
           </div>
         )}
 
-        {currentStep === 1 && (
+        {/* ───── Step 2: kVA & Price ───── */}
+        {currentStep === 2 && (
           loadingPrices ? (
             <div className="flex items-center justify-center h-48">
               <LoadingSpinner size="lg" label="Loading price tiers..." />
@@ -217,22 +572,51 @@ export default function NewApplicationPage() {
                 error={errors.selectedKva}
                 required
               />
+
+              {/* Price breakdown */}
               {priceResult && (
-                <div className="bg-primary-50 rounded-xl p-5 border border-primary-100">
+                <div className="bg-primary-50 rounded-xl p-5 border border-primary-100 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-primary-700">Selected Tier</p>
                       <p className="text-lg font-semibold text-primary-800 mt-1">{priceResult.tierDescription}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-primary-700">Estimated Price</p>
-                      <p className="text-2xl font-bold text-primary-800 mt-1">
-                        SGD ${priceResult.price.toLocaleString()}
-                      </p>
+                  </div>
+                  <div className="border-t border-primary-200 pt-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-primary-700">kVA Tier Price</span>
+                      <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-primary-700">Service Fee</span>
+                      <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
+                    </div>
+                    <div className="border-t border-primary-200 pt-2 flex justify-between">
+                      <span className="text-sm font-semibold text-primary-700">Total Amount</span>
+                      <span className="text-xl font-bold text-primary-800">
+                        SGD ${priceResult.totalAmount.toLocaleString()}
+                      </span>
                     </div>
                   </div>
+                  {/* EMA Fee info for renewals */}
+                  {formData.applicationType === 'RENEWAL' && formData.renewalPeriodMonths && (
+                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mt-2">
+                      <div className="flex items-start gap-2">
+                        <span className="text-amber-600 mt-0.5">ℹ️</span>
+                        <div>
+                          <p className="text-sm font-medium text-amber-800">
+                            EMA Fee: {getEmaFeeLabel(formData.renewalPeriodMonths)}
+                          </p>
+                          <p className="text-xs text-amber-600 mt-0.5">
+                            Paid directly to EMA (Energy Market Authority). Not included in the total above.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
               {/* Price reference table */}
               <div>
                 <h3 className="text-sm font-medium text-gray-600 mb-2">Price Reference Table</h3>
@@ -266,12 +650,67 @@ export default function NewApplicationPage() {
           )
         )}
 
-        {currentStep === 2 && (
+        {/* ───── Step 3: Review ───── */}
+        {currentStep === 3 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Review & Confirm</h2>
               <p className="text-sm text-gray-500 mt-1">Please review your application details before submitting</p>
             </div>
+
+            {/* Application Type Badge */}
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                formData.applicationType === 'NEW'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-orange-100 text-orange-800'
+              }`}>
+                {formData.applicationType === 'NEW' ? '🏢 New Licence' : '🔄 Licence Renewal'}
+              </span>
+            </div>
+
+            {/* Renewal Details (if RENEWAL) */}
+            {formData.applicationType === 'RENEWAL' && (
+              <div className="bg-orange-50 rounded-lg p-4 space-y-3 border border-orange-100">
+                <h3 className="text-sm font-semibold text-orange-700 uppercase tracking-wider">Renewal Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <dt className="text-xs text-orange-600">Existing Licence No.</dt>
+                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
+                      {formData.existingLicenceNo || '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-orange-600">Existing Expiry Date</dt>
+                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
+                      {formData.existingExpiryDate || '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-orange-600">Renewal Period</dt>
+                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
+                      {formData.renewalPeriodMonths} months
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-orange-600">EMA Fee</dt>
+                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
+                      {getEmaFeeLabel(formData.renewalPeriodMonths)}
+                      <span className="text-xs text-orange-500 ml-1">(Paid to EMA)</span>
+                    </dd>
+                  </div>
+                  {formData.renewalReferenceNo && (
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs text-orange-600">Renewal Reference No.</dt>
+                      <dd className="text-sm font-medium text-orange-800 mt-0.5">
+                        {formData.renewalReferenceNo}
+                      </dd>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Property Details */}
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Property Details</h3>
@@ -290,6 +729,7 @@ export default function NewApplicationPage() {
                 </div>
               </div>
             </div>
+
             {/* Capacity & Price */}
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
               <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Capacity & Pricing</h3>
@@ -304,17 +744,36 @@ export default function NewApplicationPage() {
                 </div>
               </div>
             </div>
-            {/* Total */}
+
+            {/* Total with breakdown */}
             <div className="bg-primary-50 rounded-xl p-5 border border-primary-100">
+              {priceResult && (
+                <div className="space-y-2 mb-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-primary-700">kVA Tier Price</span>
+                    <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-primary-700">Service Fee</span>
+                    <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-primary-200 pt-2"></div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-primary-700">Total Amount Due</span>
                 <span className="text-2xl font-bold text-primary-800">
-                  SGD ${priceResult?.price.toLocaleString() || '—'}
+                  SGD ${priceResult?.totalAmount.toLocaleString() || '—'}
                 </span>
               </div>
               <p className="text-xs text-primary-600 mt-2">
                 Payment via PayNow or bank transfer. Details will be provided after submission.
               </p>
+              {formData.applicationType === 'RENEWAL' && formData.renewalPeriodMonths && (
+                <p className="text-xs text-amber-600 mt-1">
+                  * EMA fee of {getEmaFeeLabel(formData.renewalPeriodMonths)} is payable directly to EMA and is not included in the above total.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -327,7 +786,7 @@ export default function NewApplicationPage() {
           >
             {currentStep === 0 ? 'Cancel' : 'Back'}
           </Button>
-          {currentStep < 2 ? (
+          {currentStep < 3 ? (
             <Button onClick={handleNext}>Continue</Button>
           ) : (
             <Button onClick={() => setShowSubmitConfirm(true)} loading={submitting}>Submit Application</Button>
@@ -340,7 +799,7 @@ export default function NewApplicationPage() {
         onClose={() => setShowSubmitConfirm(false)}
         onConfirm={handleSubmit}
         title="Submit Application"
-        message="Submit this application? You will need to make payment after submission."
+        message={`Submit this ${formData.applicationType === 'RENEWAL' ? 'renewal' : ''} application? You will need to make payment after submission.`}
         confirmLabel="Submit"
       />
     </div>

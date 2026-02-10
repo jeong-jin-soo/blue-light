@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Select } from '../../components/ui/Select';
 import { DataTable, type Column } from '../../components/data/DataTable';
@@ -42,6 +43,16 @@ export default function ApplicationListPage() {
   }, [applications, statusFilter]);
 
   const columns: Column<Application>[] = [
+    {
+      key: 'applicationType',
+      header: 'Type',
+      width: '80px',
+      render: (app) => (
+        <Badge variant={app.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
+          {app.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+        </Badge>
+      ),
+    },
     {
       key: 'address',
       header: 'Address',
@@ -164,6 +175,11 @@ export default function ApplicationListPage() {
           <div className="p-4 border-b border-gray-100">
             <div className="flex items-start justify-between mb-2">
               <div className="min-w-0 flex-1 mr-3">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <Badge variant={app.applicationType === 'RENEWAL' ? 'warning' : 'info'} className="text-[10px]">
+                    {app.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+                  </Badge>
+                </div>
                 <p className="font-medium text-gray-800 truncate">{app.address}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
               </div>

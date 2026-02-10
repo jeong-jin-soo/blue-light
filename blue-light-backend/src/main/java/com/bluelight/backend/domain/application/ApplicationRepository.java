@@ -36,6 +36,11 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     List<Application> findByUserUserSeqAndStatus(Long userSeq, ApplicationStatus status);
 
     /**
+     * 특정 사용자의 특정 상태 신청 목록 (최신순) — 갱신 시 완료 신청 조회용
+     */
+    List<Application> findByUserUserSeqAndStatusOrderByCreatedAtDesc(Long userSeq, ApplicationStatus status);
+
+    /**
      * 전체 신청 목록 페이지네이션 (Admin)
      */
     Page<Application> findAllByOrderByCreatedAtDesc(Pageable pageable);

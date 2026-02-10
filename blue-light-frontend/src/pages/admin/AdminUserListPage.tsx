@@ -55,7 +55,9 @@ export default function AdminUserListPage() {
         (user) =>
           user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.role.toLowerCase().includes(searchTerm.toLowerCase())
+          user.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (user.companyName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (user.uen || '').toLowerCase().includes(searchTerm.toLowerCase())
       )
     : users;
 
@@ -111,7 +113,12 @@ export default function AdminUserListPage() {
       header: 'Name',
       sortable: true,
       render: (user) => (
-        <span className="font-medium text-gray-800">{user.name}</span>
+        <div>
+          <span className="font-medium text-gray-800">{user.name}</span>
+          {user.companyName && (
+            <div className="text-xs text-gray-500 mt-0.5">{user.companyName}{user.uen ? ` (${user.uen})` : ''}</div>
+          )}
+        </div>
       ),
     },
     {
@@ -181,6 +188,15 @@ export default function AdminUserListPage() {
           </div>
         );
       },
+    },
+    {
+      key: 'lewLicenceNo' as keyof User,
+      header: 'Licence No.',
+      render: (user) => (
+        <span className={user.lewLicenceNo ? 'text-gray-700 font-mono text-xs' : 'text-gray-400'}>
+          {user.lewLicenceNo || '-'}
+        </span>
+      ),
     },
     {
       key: 'createdAt',

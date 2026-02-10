@@ -67,6 +67,43 @@ public class User extends BaseEntity {
     private ApprovalStatus approvedStatus;
 
     /**
+     * LEW 면허번호 (LEW만 사용)
+     */
+    @Column(name = "lew_licence_no", length = 50)
+    private String lewLicenceNo;
+
+    /**
+     * 회사명 (EMA 라이선스에 인쇄됨)
+     */
+    @Column(name = "company_name", length = 100)
+    private String companyName;
+
+    /**
+     * UEN (Unique Entity Number, 싱가포르 사업자등록번호)
+     * - 사업체 신청 시 필수, 개인 신청 시 null
+     */
+    @Column(name = "uen", length = 20)
+    private String uen;
+
+    /**
+     * 직위 (Director, Manager 등)
+     */
+    @Column(name = "designation", length = 50)
+    private String designation;
+
+    /**
+     * 통신 주소 (EMA 통지서 수신 주소, 설치 현장 주소와 별개)
+     */
+    @Column(name = "correspondence_address", length = 255)
+    private String correspondenceAddress;
+
+    /**
+     * 통신 주소 우편번호
+     */
+    @Column(name = "correspondence_postal_code", length = 10)
+    private String correspondencePostalCode;
+
+    /**
      * PDPA 동의 일시
      */
     @Column(name = "pdpa_consent_at")
@@ -74,13 +111,22 @@ public class User extends BaseEntity {
 
     @Builder
     public User(String email, String password, String name, String phone,
-                UserRole role, ApprovalStatus approvedStatus, LocalDateTime pdpaConsentAt) {
+                UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
+                String companyName, String uen, String designation,
+                String correspondenceAddress, String correspondencePostalCode,
+                LocalDateTime pdpaConsentAt) {
         this.email = email;
         this.password = password;
         this.name = name;
         this.phone = phone;
         this.role = role != null ? role : UserRole.APPLICANT;
         this.approvedStatus = approvedStatus;
+        this.lewLicenceNo = lewLicenceNo;
+        this.companyName = companyName;
+        this.uen = uen;
+        this.designation = designation;
+        this.correspondenceAddress = correspondenceAddress;
+        this.correspondencePostalCode = correspondencePostalCode;
         this.pdpaConsentAt = pdpaConsentAt;
     }
 
@@ -127,6 +173,31 @@ public class User extends BaseEntity {
     public void updateProfile(String name, String phone) {
         this.name = name;
         this.phone = phone;
+    }
+
+    /**
+     * 프로필 정보 수정 (LEW 면허번호 포함)
+     */
+    public void updateProfile(String name, String phone, String lewLicenceNo) {
+        this.name = name;
+        this.phone = phone;
+        this.lewLicenceNo = lewLicenceNo;
+    }
+
+    /**
+     * 프로필 정보 수정 (회사 정보 포함)
+     */
+    public void updateProfile(String name, String phone, String lewLicenceNo,
+                              String companyName, String uen, String designation,
+                              String correspondenceAddress, String correspondencePostalCode) {
+        this.name = name;
+        this.phone = phone;
+        this.lewLicenceNo = lewLicenceNo;
+        this.companyName = companyName;
+        this.uen = uen;
+        this.designation = designation;
+        this.correspondenceAddress = correspondenceAddress;
+        this.correspondencePostalCode = correspondencePostalCode;
     }
 
     /**

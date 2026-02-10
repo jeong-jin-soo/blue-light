@@ -20,6 +20,12 @@ public class UserResponse {
     private String phone;
     private UserRole role;
     private boolean approved;
+    private String lewLicenceNo;
+    private String companyName;
+    private String uen;
+    private String designation;
+    private String correspondenceAddress;
+    private String correspondencePostalCode;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -30,6 +36,12 @@ public class UserResponse {
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .approved(user.isApproved())
+                .lewLicenceNo(user.getLewLicenceNo())
+                .companyName(user.getCompanyName())
+                .uen(user.getUen())
+                .designation(user.getDesignation())
+                .correspondenceAddress(user.getCorrespondenceAddress())
+                .correspondencePostalCode(user.getCorrespondencePostalCode())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

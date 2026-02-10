@@ -34,12 +34,21 @@ public class UserService {
     }
 
     /**
-     * Update profile (name, phone)
+     * Update profile (name, phone, company info)
      */
     @Transactional
     public UserResponse updateProfile(Long userSeq, UpdateProfileRequest request) {
         User user = findUserOrThrow(userSeq);
-        user.updateProfile(request.getName(), request.getPhone());
+        user.updateProfile(
+                request.getName(),
+                request.getPhone(),
+                request.getLewLicenceNo(),
+                request.getCompanyName(),
+                request.getUen(),
+                request.getDesignation(),
+                request.getCorrespondenceAddress(),
+                request.getCorrespondencePostalCode()
+        );
         log.info("Profile updated: userSeq={}", userSeq);
         return UserResponse.from(user);
     }

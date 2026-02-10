@@ -34,11 +34,25 @@ public class AdminApplicationResponse {
     private String userName;
     private String userEmail;
     private String userPhone;
+    private String userCompanyName;
+    private String userUen;
+    private String userDesignation;
 
     // Assigned LEW info
     private Long assignedLewSeq;
     private String assignedLewName;
     private String assignedLewEmail;
+    private String assignedLewLicenceNo;
+
+    // ── Phase 18: 갱신 + 견적 개선 필드 ──
+    private String applicationType;
+    private BigDecimal serviceFee;
+    private Long originalApplicationSeq;
+    private String existingLicenceNo;
+    private String renewalReferenceNo;
+    private LocalDate existingExpiryDate;
+    private Integer renewalPeriodMonths;
+    private BigDecimal emaFee;
 
     public static AdminApplicationResponse from(Application application) {
         return AdminApplicationResponse.builder()
@@ -58,12 +72,27 @@ public class AdminApplicationResponse {
                 .userName(application.getUser().getName())
                 .userEmail(application.getUser().getEmail())
                 .userPhone(application.getUser().getPhone())
+                .userCompanyName(application.getUser().getCompanyName())
+                .userUen(application.getUser().getUen())
+                .userDesignation(application.getUser().getDesignation())
                 .assignedLewSeq(application.getAssignedLew() != null
                         ? application.getAssignedLew().getUserSeq() : null)
                 .assignedLewName(application.getAssignedLew() != null
                         ? application.getAssignedLew().getName() : null)
                 .assignedLewEmail(application.getAssignedLew() != null
                         ? application.getAssignedLew().getEmail() : null)
+                .assignedLewLicenceNo(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getLewLicenceNo() : null)
+                // Phase 18 fields
+                .applicationType(application.getApplicationType().name())
+                .serviceFee(application.getServiceFee())
+                .originalApplicationSeq(application.getOriginalApplication() != null
+                        ? application.getOriginalApplication().getApplicationSeq() : null)
+                .existingLicenceNo(application.getExistingLicenceNo())
+                .renewalReferenceNo(application.getRenewalReferenceNo())
+                .existingExpiryDate(application.getExistingExpiryDate())
+                .renewalPeriodMonths(application.getRenewalPeriodMonths())
+                .emaFee(application.getEmaFee())
                 .build();
     }
 }

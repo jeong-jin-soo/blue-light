@@ -28,4 +28,38 @@ public class CreateApplicationRequest {
     @NotNull(message = "Selected kVA is required")
     @Positive(message = "Selected kVA must be a positive number")
     private Integer selectedKva;
+
+    // ── Phase 18: 갱신 관련 필드 ──
+
+    /**
+     * 신청 유형: "NEW" (기본) or "RENEWAL"
+     */
+    private String applicationType;
+
+    /**
+     * 원본 신청 ID (기존 완료 신청 선택 시)
+     */
+    private Long originalApplicationSeq;
+
+    /**
+     * 기존 면허 번호 (직접 입력 시)
+     */
+    @Size(max = 50, message = "Licence number must be 50 characters or less")
+    private String existingLicenceNo;
+
+    /**
+     * 기존 면허 만료일 (직접 입력, "yyyy-MM-dd")
+     */
+    private String existingExpiryDate;
+
+    /**
+     * 갱신 기간 (3 or 12 개월, 갱신 시 필수)
+     */
+    private Integer renewalPeriodMonths;
+
+    /**
+     * 갱신 참조 번호
+     */
+    @Size(max = 50, message = "Renewal reference number must be 50 characters or less")
+    private String renewalReferenceNo;
 }

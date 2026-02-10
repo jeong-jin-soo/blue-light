@@ -75,6 +75,17 @@ public class AuthService {
             );
         }
 
+        // LEW 역할 선택 시 면허번호 필수 검증
+        if (selectedRole == UserRole.LEW) {
+            if (request.getLewLicenceNo() == null || request.getLewLicenceNo().isBlank()) {
+                throw new BusinessException(
+                        "LEW licence number is required for LEW registration",
+                        HttpStatus.BAD_REQUEST,
+                        "LEW_LICENCE_NO_REQUIRED"
+                );
+            }
+        }
+
         // 사용자 생성 (LEW는 승인 대기 상태로 시작)
         User user = User.builder()
                 .email(request.getEmail())
@@ -83,6 +94,10 @@ public class AuthService {
                 .phone(request.getPhone())
                 .role(selectedRole)
                 .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
+                .lewLicenceNo(selectedRole == UserRole.LEW ? request.getLewLicenceNo() : null)
+                .companyName(request.getCompanyName())
+                .uen(request.getUen())
+                .designation(request.getDesignation())
                 .pdpaConsentAt(LocalDateTime.now())
                 .build();
 
