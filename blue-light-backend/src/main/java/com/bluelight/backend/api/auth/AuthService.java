@@ -1,17 +1,18 @@
 package com.bluelight.backend.api.auth;
 
+import com.bluelight.backend.api.auth.dto.ForgotPasswordRequest;
 import com.bluelight.backend.api.auth.dto.LoginRequest;
+import com.bluelight.backend.api.auth.dto.ResetPasswordRequest;
 import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
+import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
-import com.bluelight.backend.domain.user.ApprovalStatus;
-import com.bluelight.backend.domain.user.User;
-import com.bluelight.backend.domain.user.UserRepository;
-import com.bluelight.backend.domain.user.UserRole;
+import com.bluelight.backend.domain.user.*;
 import com.bluelight.backend.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,10 +22,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * 인증 서비스
- * - 회원가입, 로그인 처리
+ * - 회원가입, 로그인, 비밀번호 재설정 처리
  */
 @Slf4j
 @Service
@@ -36,6 +38,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final SystemSettingRepository systemSettingRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailService emailService;
+
+    @Value("${password-reset.token-expiry-minutes:60}")
+    private int tokenExpiryMinutes;
+
+    @Value("${password-reset.base-url:http://localhost:5174}")
+    private String resetBaseUrl;
 
     /**
      * 회원가입
@@ -136,6 +146,77 @@ public class AuthService {
 
         // JWT 토큰 생성 및 반환
         return createTokenResponse(user);
+    }
+
+    /**
+     * 비밀번호 재설정 요청 (이메일 발송)
+     * - 보안: 이메일 존재 여부와 관계없이 동일한 응답 반환
+     * - Rate limiting: 동일 사용자에게 5분 내 재발송 방지
+     */
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
+            // Rate limiting: 마지막 토큰이 5분 이내면 차단
+            boolean rateLimited = passwordResetTokenRepository.findTopByUserOrderByCreatedAtDesc(user)
+                    .map(lastToken -> lastToken.getCreatedAt() != null
+                            && lastToken.getCreatedAt().plusMinutes(5).isAfter(LocalDateTime.now()))
+                    .orElse(false);
+
+            if (rateLimited) {
+                log.warn("Password reset rate limited for: {}", request.getEmail());
+                return; // 조용히 무시 (보안)
+            }
+
+            // UUID 기반 토큰 생성
+            String token = UUID.randomUUID().toString();
+            PasswordResetToken resetToken = PasswordResetToken.builder()
+                    .user(user)
+                    .token(token)
+                    .expiresAt(LocalDateTime.now().plusMinutes(tokenExpiryMinutes))
+                    .build();
+
+            passwordResetTokenRepository.save(resetToken);
+
+            // 비밀번호 재설정 링크 생성 및 이메일 발송
+            String resetLink = resetBaseUrl + "/reset-password?token=" + token;
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetLink);
+
+            log.info("Password reset token created for: {}", request.getEmail());
+        });
+
+        // 이메일이 없더라도 동일한 응답 (보안)
+    }
+
+    /**
+     * 비밀번호 재설정 실행
+     * - 토큰 유효성 검증 후 비밀번호 변경
+     */
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new BusinessException(
+                        "Invalid or expired reset link",
+                        HttpStatus.BAD_REQUEST,
+                        "INVALID_RESET_TOKEN"
+                ));
+
+        // 토큰 유효성 확인
+        if (!resetToken.isValid()) {
+            throw new BusinessException(
+                    "This reset link has expired or already been used",
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_RESET_TOKEN"
+            );
+        }
+
+        // 비밀번호 변경
+        User user = resetToken.getUser();
+        user.changePassword(passwordEncoder.encode(request.getNewPassword()));
+
+        // 토큰 사용 처리
+        resetToken.markAsUsed();
+
+        log.info("Password reset completed for: userSeq={}", user.getUserSeq());
     }
 
     /**

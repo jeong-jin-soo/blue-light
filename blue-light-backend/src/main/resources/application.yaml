@@ -34,6 +34,23 @@ spring:
     open-in-view: false
     defer-datasource-initialization: true
 
+  # 이메일 설정 (AWS SES SMTP or 기타 SMTP)
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enabled: true
+            required: true
+    sender:
+      from: ${MAIL_FROM:noreply@bluelight.sg}
+      name: ${MAIL_FROM_NAME:Blue Light}
+
   # 파일 업로드 설정
   servlet:
     multipart:
@@ -63,3 +80,8 @@ cors:
 # 파일 저장 설정
 file:
   upload-dir: ${FILE_UPLOAD_DIR:./uploads}
+
+# 비밀번호 재설정 설정
+password-reset:
+  token-expiry-minutes: ${PASSWORD_RESET_TOKEN_EXPIRY:60}
+  base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:5174}

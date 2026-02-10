@@ -3,7 +3,15 @@
  */
 
 import axiosClient, { tokenUtils } from './axiosClient';
-import type { LoginRequest, SignupOptions, SignupRequest, TokenResponse } from '../types';
+import type {
+  ForgotPasswordRequest,
+  LoginRequest,
+  MessageResponse,
+  ResetPasswordRequest,
+  SignupOptions,
+  SignupRequest,
+  TokenResponse,
+} from '../types';
 
 /**
  * 회원가입
@@ -56,12 +64,30 @@ export const getSignupOptions = async (): Promise<SignupOptions> => {
   return response.data;
 };
 
+/**
+ * 비밀번호 재설정 요청 (이메일 발송)
+ */
+export const forgotPassword = async (data: ForgotPasswordRequest): Promise<MessageResponse> => {
+  const response = await axiosClient.post<MessageResponse>('/auth/forgot-password', data);
+  return response.data;
+};
+
+/**
+ * 비밀번호 재설정 실행 (토큰 + 새 비밀번호)
+ */
+export const resetPassword = async (data: ResetPasswordRequest): Promise<MessageResponse> => {
+  const response = await axiosClient.post<MessageResponse>('/auth/reset-password', data);
+  return response.data;
+};
+
 export const authApi = {
   signup,
   login,
   logout,
   isAuthenticated,
   getSignupOptions,
+  forgotPassword,
+  resetPassword,
 };
 
 export default authApi;

@@ -439,3 +439,25 @@ export interface SignupOptions {
   availableRoles: string[];
   lewRegistrationOpen: boolean;
 }
+
+/**
+ * 비밀번호 재설정 요청 (이메일)
+ */
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+/**
+ * 비밀번호 재설정 실행 (토큰 + 새 비밀번호)
+ */
+export interface ResetPasswordRequest {
+  token: string;
+  newPassword: string;
+}
+
+/**
+ * 메시지 응답 (forgot/reset password)
+ */
+export interface MessageResponse {
+  message: string;
+}

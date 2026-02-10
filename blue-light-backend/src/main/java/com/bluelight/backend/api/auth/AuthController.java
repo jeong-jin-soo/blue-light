@@ -1,6 +1,8 @@
 package com.bluelight.backend.api.auth;
 
+import com.bluelight.backend.api.auth.dto.ForgotPasswordRequest;
 import com.bluelight.backend.api.auth.dto.LoginRequest;
+import com.bluelight.backend.api.auth.dto.ResetPasswordRequest;
 import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -79,5 +81,34 @@ public class AuthController {
             loginRateLimiter.recordFailedAttempt(clientIp);
             throw e;
         }
+    }
+
+    /**
+     * 비밀번호 재설정 요청 (이메일 발송)
+     * POST /api/auth/forgot-password
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, String>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("비밀번호 재설정 요청: email={}", request.getEmail());
+        authService.forgotPassword(request);
+        // 보안: 이메일 존재 여부와 관계없이 동일한 응답
+        return ResponseEntity.ok(Map.of(
+                "message", "If an account with that email exists, a password reset link has been sent."
+        ));
+    }
+
+    /**
+     * 비밀번호 재설정 실행
+     * POST /api/auth/reset-password
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, String>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request) {
+        log.info("비밀번호 재설정 실행");
+        authService.resetPassword(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Your password has been reset successfully."
+        ));
     }
 }

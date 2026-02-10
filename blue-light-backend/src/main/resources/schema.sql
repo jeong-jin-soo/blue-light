@@ -129,7 +129,21 @@ CREATE TABLE IF NOT EXISTS system_settings (
     PRIMARY KEY (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 7. 용량별 단가표
+-- 7. 비밀번호 재설정 토큰
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    token_seq      BIGINT       NOT NULL AUTO_INCREMENT,
+    user_seq       BIGINT       NOT NULL,
+    token          VARCHAR(255) NOT NULL,
+    expires_at     DATETIME(6)  NOT NULL,
+    used_at        DATETIME(6),
+    created_at     DATETIME(6),
+    PRIMARY KEY (token_seq),
+    UNIQUE KEY uk_password_reset_token (token),
+    KEY idx_password_reset_user (user_seq),
+    CONSTRAINT fk_password_reset_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 8. 용량별 단가표
 CREATE TABLE IF NOT EXISTS master_prices (
     master_price_seq BIGINT        NOT NULL AUTO_INCREMENT,
     description      VARCHAR(50),
