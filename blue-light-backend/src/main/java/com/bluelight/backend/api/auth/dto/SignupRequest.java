@@ -44,6 +44,12 @@ public class SignupRequest {
     private String lewLicenceNo;
 
     /**
+     * LEW 등급 (LEW 역할 선택 시 필수: GRADE_7, GRADE_8, GRADE_9)
+     */
+    @Size(max = 20, message = "LEW grade must be 20 characters or less")
+    private String lewGrade;
+
+    /**
      * 회사명 (APPLICANT 선택 시 입력 가능)
      */
     @Size(max = 100, message = "Company name must be 100 characters or less")

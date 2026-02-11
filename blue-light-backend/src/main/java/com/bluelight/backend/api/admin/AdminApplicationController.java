@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
+import com.bluelight.backend.api.application.dto.SldRequestResponse;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -178,10 +179,48 @@ public class AdminApplicationController {
      */
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/lews")
-    public ResponseEntity<List<LewSummaryResponse>> getAvailableLews() {
-        log.info("Get available LEWs for assignment");
-        List<LewSummaryResponse> lews = adminApplicationService.getAvailableLews();
+    public ResponseEntity<List<LewSummaryResponse>> getAvailableLews(
+            @RequestParam(required = false) Integer kva) {
+        log.info("Get available LEWs for assignment: kva={}", kva);
+        List<LewSummaryResponse> lews = adminApplicationService.getAvailableLews(kva);
         return ResponseEntity.ok(lews);
+    }
+
+    // ── SLD Request Management ──────────────────
+
+    /**
+     * Get SLD request for an application
+     * GET /api/admin/applications/:id/sld-request
+     */
+    @GetMapping("/applications/{id}/sld-request")
+    public ResponseEntity<SldRequestResponse> getAdminSldRequest(@PathVariable Long id) {
+        log.info("Admin get SLD request: applicationSeq={}", id);
+        SldRequestResponse response = adminApplicationService.getAdminSldRequest(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Mark SLD as uploaded by LEW
+     * POST /api/admin/applications/:id/sld-uploaded
+     */
+    @PostMapping("/applications/{id}/sld-uploaded")
+    public ResponseEntity<SldRequestResponse> uploadSld(
+            @PathVariable Long id,
+            @Valid @RequestBody SldUploadedDto request) {
+        log.info("Admin/LEW SLD uploaded: applicationSeq={}, fileSeq={}", id, request.getFileSeq());
+        SldRequestResponse response = adminApplicationService.uploadSld(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Confirm SLD
+     * POST /api/admin/applications/:id/sld-confirm
+     */
+    @PostMapping("/applications/{id}/sld-confirm")
+    public ResponseEntity<SldRequestResponse> confirmSld(@PathVariable Long id) {
+        log.info("Admin/LEW SLD confirmed: applicationSeq={}", id);
+        SldRequestResponse response = adminApplicationService.confirmSld(id);
+        return ResponseEntity.ok(response);
     }
 
     // ── Price Management (ADMIN only) ──────────────────

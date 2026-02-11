@@ -34,6 +34,11 @@ export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN';
 export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 /**
+ * LEW 등급 (Grade 7/8/9)
+ */
+export type LewGrade = 'GRADE_7' | 'GRADE_8' | 'GRADE_9';
+
+/**
  * 사용자 정보
  */
 export interface User {
@@ -45,6 +50,7 @@ export interface User {
   approved?: boolean;
   approvedStatus?: ApprovalStatus;
   lewLicenceNo?: string;
+  lewGrade?: LewGrade;
   companyName?: string;
   uen?: string;
   designation?: string;
@@ -76,6 +82,30 @@ export type ApplicationStatus =
 export type ApplicationType = 'NEW' | 'RENEWAL' | 'SUPPLY_INSTALLATION';
 
 /**
+ * SLD 제출 방식
+ */
+export type SldOption = 'SELF_UPLOAD' | 'REQUEST_LEW';
+
+/**
+ * SLD 요청 상태
+ */
+export type SldRequestStatus = 'REQUESTED' | 'UPLOADED' | 'CONFIRMED';
+
+/**
+ * SLD 요청 정보
+ */
+export interface SldRequest {
+  sldRequestSeq: number;
+  applicationSeq: number;
+  status: SldRequestStatus;
+  applicantNote?: string;
+  lewNote?: string;
+  uploadedFileSeq?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * 라이선스 신청 내역
  */
 export interface Application {
@@ -95,6 +125,8 @@ export interface Application {
   // Phase 19: Assigned LEW info
   assignedLewName?: string;
   assignedLewLicenceNo?: string;
+  // SP Group 계정 번호
+  spAccountNo?: string;
   // Phase 18: 갱신 + 견적 개선
   applicationType: ApplicationType;
   serviceFee?: number;
@@ -104,6 +136,8 @@ export interface Application {
   existingExpiryDate?: string;
   renewalPeriodMonths?: number;
   emaFee?: number;
+  // SLD 제출 방식
+  sldOption?: SldOption;
 }
 
 // ============================================
@@ -124,6 +158,7 @@ export interface FileInfo {
   fileType: FileType;
   fileUrl: string;
   originalFilename?: string;
+  fileSize?: number;
   uploadedAt: string;
 }
 
@@ -216,6 +251,7 @@ export interface SignupRequest {
   phone?: string;
   role?: string;
   lewLicenceNo?: string;
+  lewGrade?: string;
   companyName?: string;
   uen?: string;
   designation?: string;
@@ -234,6 +270,7 @@ export interface TokenResponse {
   name: string;
   role: UserRole;
   approved: boolean;
+  emailVerified: boolean;
 }
 
 // ============================================
@@ -248,6 +285,7 @@ export interface CreateApplicationRequest {
   postalCode: string;
   buildingType?: string;
   selectedKva: number;
+  spAccountNo?: string;
   // Phase 18: 갱신 관련
   applicationType?: string;
   originalApplicationSeq?: number;
@@ -255,6 +293,8 @@ export interface CreateApplicationRequest {
   existingExpiryDate?: string;
   renewalPeriodMonths?: number;
   renewalReferenceNo?: string;
+  // SLD 제출 방식
+  sldOption?: string;
 }
 
 /**
@@ -265,6 +305,7 @@ export interface UpdateApplicationRequest {
   postalCode: string;
   buildingType?: string;
   selectedKva: number;
+  spAccountNo?: string;
   renewalPeriodMonths?: number;
 }
 
@@ -329,12 +370,17 @@ export interface AdminApplication extends Application {
   userCompanyName?: string;
   userUen?: string;
   userDesignation?: string;
+  userCorrespondenceAddress?: string;
+  userCorrespondencePostalCode?: string;
   reviewComment?: string;
+  spAccountNo?: string;
   // Assigned LEW info
   assignedLewSeq?: number;
   assignedLewName?: string;
   assignedLewEmail?: string;
   assignedLewLicenceNo?: string;
+  assignedLewGrade?: LewGrade;
+  assignedLewMaxKva?: number;
 }
 
 /**
@@ -374,6 +420,7 @@ export interface UpdateProfileRequest {
   name: string;
   phone?: string;
   lewLicenceNo?: string;
+  lewGrade?: string;
   companyName?: string;
   uen?: string;
   designation?: string;
@@ -431,6 +478,8 @@ export interface LewSummary {
   name: string;
   email: string;
   lewLicenceNo?: string;
+  lewGrade?: LewGrade;
+  maxKva?: number;
 }
 
 /**

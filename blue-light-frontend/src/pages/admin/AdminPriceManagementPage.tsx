@@ -30,6 +30,20 @@ export default function AdminPriceManagementPage() {
   const [originalServiceFee, setOriginalServiceFee] = useState('');
   const [savingFee, setSavingFee] = useState(false);
 
+  // Email verification toggle state
+  const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(false);
+  const [originalEmailVerification, setOriginalEmailVerification] = useState(false);
+  const [savingEmailVerification, setSavingEmailVerification] = useState(false);
+
+  // Payment info state
+  const [paymentPaynowUen, setPaymentPaynowUen] = useState('');
+  const [paymentPaynowName, setPaymentPaynowName] = useState('');
+  const [paymentBankName, setPaymentBankName] = useState('');
+  const [paymentBankAccount, setPaymentBankAccount] = useState('');
+  const [paymentBankAccountName, setPaymentBankAccountName] = useState('');
+  const [originalPaymentInfo, setOriginalPaymentInfo] = useState<Record<string, string>>({});
+  const [savingPayment, setSavingPayment] = useState(false);
+
   const loadPrices = () => {
     setLoading(true);
     adminApi
@@ -48,6 +62,26 @@ export default function AdminPriceManagementPage() {
         const fee = settings['service_fee'] || '0';
         setServiceFee(fee);
         setOriginalServiceFee(fee);
+
+        // Email verification
+        const emailVerif = settings['email_verification_enabled'] === 'true';
+        setEmailVerificationEnabled(emailVerif);
+        setOriginalEmailVerification(emailVerif);
+
+        // Payment info
+        const pInfo: Record<string, string> = {
+          payment_paynow_uen: settings['payment_paynow_uen'] || '',
+          payment_paynow_name: settings['payment_paynow_name'] || '',
+          payment_bank_name: settings['payment_bank_name'] || '',
+          payment_bank_account: settings['payment_bank_account'] || '',
+          payment_bank_account_name: settings['payment_bank_account_name'] || '',
+        };
+        setPaymentPaynowUen(pInfo.payment_paynow_uen);
+        setPaymentPaynowName(pInfo.payment_paynow_name);
+        setPaymentBankName(pInfo.payment_bank_name);
+        setPaymentBankAccount(pInfo.payment_bank_account);
+        setPaymentBankAccountName(pInfo.payment_bank_account_name);
+        setOriginalPaymentInfo(pInfo);
       })
       .catch((err: { message?: string }) => {
         toast.error(err.message || 'Failed to load settings');
@@ -114,6 +148,56 @@ export default function AdminPriceManagementPage() {
       toast.error(message);
     } finally {
       setSavingFee(false);
+    }
+  };
+
+  const handleSaveEmailVerification = async () => {
+    setSavingEmailVerification(true);
+    try {
+      await adminApi.updateSettings({
+        email_verification_enabled: emailVerificationEnabled ? 'true' : 'false',
+      });
+      setOriginalEmailVerification(emailVerificationEnabled);
+      toast.success(
+        emailVerificationEnabled
+          ? 'Email verification enabled. New users must verify their email.'
+          : 'Email verification disabled. New users are auto-verified.'
+      );
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to update email verification setting';
+      toast.error(message);
+    } finally {
+      setSavingEmailVerification(false);
+    }
+  };
+
+  const emailVerificationChanged = emailVerificationEnabled !== originalEmailVerification;
+
+  const paymentInfoChanged =
+    paymentPaynowUen !== originalPaymentInfo.payment_paynow_uen ||
+    paymentPaynowName !== originalPaymentInfo.payment_paynow_name ||
+    paymentBankName !== originalPaymentInfo.payment_bank_name ||
+    paymentBankAccount !== originalPaymentInfo.payment_bank_account ||
+    paymentBankAccountName !== originalPaymentInfo.payment_bank_account_name;
+
+  const handleSavePaymentInfo = async () => {
+    setSavingPayment(true);
+    try {
+      const data: Record<string, string> = {
+        payment_paynow_uen: paymentPaynowUen,
+        payment_paynow_name: paymentPaynowName,
+        payment_bank_name: paymentBankName,
+        payment_bank_account: paymentBankAccount,
+        payment_bank_account_name: paymentBankAccountName,
+      };
+      await adminApi.updateSettings(data);
+      setOriginalPaymentInfo(data);
+      toast.success('Payment information updated successfully');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to update payment info';
+      toast.error(message);
+    } finally {
+      setSavingPayment(false);
     }
   };
 
@@ -194,9 +278,54 @@ export default function AdminPriceManagementPage() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Price Management</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage kVA price tiers and service fee
+          Manage system settings, kVA price tiers, service fee, and payment information
         </p>
       </div>
+
+      {/* Email Verification Toggle Card */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">Email Verification</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          When enabled, new users must verify their email address before accessing the platform.
+          Disable this for local development or testing.
+        </p>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={emailVerificationEnabled}
+                onChange={(e) => setEmailVerificationEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+            </label>
+            <span className="text-sm text-gray-700">
+              {emailVerificationEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleSaveEmailVerification}
+              loading={savingEmailVerification}
+              disabled={!emailVerificationChanged}
+              size="sm"
+            >
+              Save
+            </Button>
+            {emailVerificationChanged && (
+              <span className="text-xs text-warning-600">Unsaved changes</span>
+            )}
+          </div>
+        </div>
+
+        {!emailVerificationEnabled && (
+          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">
+            Email verification is currently disabled. New users can sign up without verifying their email.
+          </p>
+        )}
+      </Card>
 
       {/* Service Fee Card */}
       <Card>
@@ -229,6 +358,80 @@ export default function AdminPriceManagementPage() {
         <p className="text-xs text-gray-500 mt-2">
           This fee is added to the kVA tier price for every application quote.
         </p>
+      </Card>
+
+      {/* Payment Information Card */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">Payment Information</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          These details are displayed to applicants when making payment. Update to reflect your actual receiving accounts.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* PayNow Section */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">P</span>
+              PayNow
+            </h3>
+            <div className="space-y-3">
+              <Input
+                label="UEN Number"
+                value={paymentPaynowUen}
+                onChange={(e) => setPaymentPaynowUen(e.target.value)}
+                placeholder="e.g., 202401234A"
+              />
+              <Input
+                label="Recipient Name"
+                value={paymentPaynowName}
+                onChange={(e) => setPaymentPaynowName(e.target.value)}
+                placeholder="e.g., Blue Light Pte Ltd"
+              />
+            </div>
+          </div>
+
+          {/* Bank Transfer Section */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">B</span>
+              Bank Transfer
+            </h3>
+            <div className="space-y-3">
+              <Input
+                label="Bank Name"
+                value={paymentBankName}
+                onChange={(e) => setPaymentBankName(e.target.value)}
+                placeholder="e.g., DBS Bank"
+              />
+              <Input
+                label="Account Number"
+                value={paymentBankAccount}
+                onChange={(e) => setPaymentBankAccount(e.target.value)}
+                placeholder="e.g., 012-345678-9"
+              />
+              <Input
+                label="Account Holder Name"
+                value={paymentBankAccountName}
+                onChange={(e) => setPaymentBankAccountName(e.target.value)}
+                placeholder="e.g., Blue Light Pte Ltd"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100">
+          <Button
+            onClick={handleSavePaymentInfo}
+            loading={savingPayment}
+            disabled={!paymentInfoChanged}
+            size="sm"
+          >
+            Save Payment Info
+          </Button>
+          {paymentInfoChanged && (
+            <span className="text-xs text-warning-600">Unsaved changes</span>
+          )}
+        </div>
       </Card>
 
       {/* Price Tiers Table */}

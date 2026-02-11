@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [lewLicenceNo, setLewLicenceNo] = useState('');
+  const [lewGrade, setLewGrade] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [uen, setUen] = useState('');
   const [designation, setDesignation] = useState('');
@@ -43,6 +44,7 @@ export default function ProfilePage() {
         setName(data.name);
         setPhone(data.phone || '');
         setLewLicenceNo(data.lewLicenceNo || '');
+        setLewGrade(data.lewGrade || '');
         setCompanyName(data.companyName || '');
         setUen(data.uen || '');
         setDesignation(data.designation || '');
@@ -67,6 +69,7 @@ export default function ProfilePage() {
         name: name.trim(),
         phone: phone.trim() || undefined,
         lewLicenceNo: lewLicenceNo.trim() || undefined,
+        lewGrade: lewGrade || undefined,
         companyName: companyName.trim() || undefined,
         uen: uen.trim() || undefined,
         designation: designation.trim() || undefined,
@@ -170,14 +173,30 @@ export default function ProfilePage() {
             placeholder="e.g., +65 9123 4567"
           />
           {(profile?.role === 'LEW' || authUser?.role === 'LEW') && (
-            <Input
-              label="LEW Licence Number"
-              value={lewLicenceNo}
-              onChange={(e) => setLewLicenceNo(e.target.value)}
-              maxLength={50}
-              placeholder="e.g., LEW-2026-XXXXX"
-              hint="Your EMA-issued LEW licence number"
-            />
+            <>
+              <Input
+                label="LEW Licence Number"
+                value={lewLicenceNo}
+                onChange={(e) => setLewLicenceNo(e.target.value)}
+                maxLength={50}
+                placeholder="e.g., LEW-2026-XXXXX"
+                hint="Your EMA-issued LEW licence number"
+              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">LEW Grade</label>
+                <select
+                  value={lewGrade}
+                  onChange={(e) => setLewGrade(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="">Select grade</option>
+                  <option value="GRADE_7">Grade 7 (≤ 45 kVA)</option>
+                  <option value="GRADE_8">Grade 8 (≤ 500 kVA)</option>
+                  <option value="GRADE_9">Grade 9 (≤ 400 kV)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">Grade on your EMA LEW licence</p>
+              </div>
+            </>
           )}
         </div>
       </Card>

@@ -29,6 +29,12 @@ public class CreateApplicationRequest {
     @Positive(message = "Selected kVA must be a positive number")
     private Integer selectedKva;
 
+    /**
+     * SP Group 계정 번호 (선택)
+     */
+    @Size(max = 30, message = "SP Account No must be 30 characters or less")
+    private String spAccountNo;
+
     // ── Phase 18: 갱신 관련 필드 ──
 
     /**
@@ -62,4 +68,9 @@ public class CreateApplicationRequest {
      */
     @Size(max = 50, message = "Renewal reference number must be 50 characters or less")
     private String renewalReferenceNo;
+
+    /**
+     * SLD 제출 방식: "SELF_UPLOAD" (기본) / "REQUEST_LEW"
+     */
+    private String sldOption;
 }

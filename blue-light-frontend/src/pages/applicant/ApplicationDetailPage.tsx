@@ -14,7 +14,7 @@ import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
 import priceApi from '../../api/priceApi';
 import { Select } from '../../components/ui/Select';
-import type { Application, FileInfo, FileType, MasterPrice, Payment } from '../../types';
+import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest } from '../../types';
 
 const APPLICANT_FILE_TYPE_OPTIONS = [
   { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
@@ -53,6 +53,8 @@ export default function ApplicationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [deleteFileId, setDeleteFileId] = useState<string | number | null>(null);
   const [uploadFileType, setUploadFileType] = useState<FileType>('DRAWING_SLD');
+  const [paymentInfo, setPaymentInfo] = useState<Record<string, string>>({});
+  const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -77,6 +79,26 @@ export default function ApplicationDetailPage() {
       setApplication(appData);
       setFiles(filesData);
       setPayments(paymentsData);
+
+      // Fetch SLD request if sldOption is REQUEST_LEW
+      if (appData.sldOption === 'REQUEST_LEW') {
+        try {
+          const sldData = await applicationApi.getSldRequest(applicationId);
+          setSldRequest(sldData);
+        } catch {
+          // SLD request might not exist yet
+        }
+      }
+
+      // Fetch payment info when status is PENDING_PAYMENT
+      if (appData.status === 'PENDING_PAYMENT') {
+        try {
+          const info = await priceApi.getPaymentInfo();
+          setPaymentInfo(info);
+        } catch {
+          // Payment info is non-critical, continue without it
+        }
+      }
     } catch {
       toast.error('Failed to load application details');
       navigate('/applications');
@@ -330,6 +352,9 @@ export default function ApplicationDetailPage() {
                 <InfoField label="Postal Code" value={application.postalCode} />
                 <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
                 <InfoField label="DB Size (kVA)" value={`${application.selectedKva} kVA`} />
+                {application.spAccountNo && (
+                  <InfoField label="SP Account No." value={application.spAccountNo} />
+                )}
               </div>
             )}
           </Card>
@@ -423,30 +448,45 @@ export default function ApplicationDetailPage() {
                   <p className="text-sm font-semibold text-gray-800 mb-3">Payment Methods</p>
 
                   {/* PayNow */}
-                  <div className="flex items-start gap-3 mb-3 pb-3 border-b border-gray-100">
-                    <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-bold text-primary-700">P</span>
+                  {(paymentInfo.payment_paynow_uen || paymentInfo.payment_paynow_name) && (
+                    <div className="flex items-start gap-3 mb-3 pb-3 border-b border-gray-100">
+                      <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-bold text-primary-700">P</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">PayNow</p>
+                        {paymentInfo.payment_paynow_uen && (
+                          <p className="text-xs text-gray-600 mt-0.5">UEN: <span className="font-mono font-medium">{paymentInfo.payment_paynow_uen}</span></p>
+                        )}
+                        {paymentInfo.payment_paynow_name && (
+                          <p className="text-xs text-gray-600 mt-0.5">Name: <span className="font-medium">{paymentInfo.payment_paynow_name}</span></p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-0.5">Reference: <span className="font-mono font-medium">BL-{application.applicationSeq}</span></p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">PayNow</p>
-                      <p className="text-xs text-gray-600 mt-0.5">UEN: <span className="font-mono font-medium">202401234A</span></p>
-                      <p className="text-xs text-gray-500 mt-0.5">Reference: <span className="font-mono font-medium">BL-{application.applicationSeq}</span></p>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Bank Transfer */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-bold text-primary-700">B</span>
+                  {(paymentInfo.payment_bank_name || paymentInfo.payment_bank_account) && (
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-bold text-primary-700">B</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">Bank Transfer</p>
+                        {paymentInfo.payment_bank_name && (
+                          <p className="text-xs text-gray-600 mt-0.5">Bank: <span className="font-medium">{paymentInfo.payment_bank_name}</span></p>
+                        )}
+                        {paymentInfo.payment_bank_account && (
+                          <p className="text-xs text-gray-600 mt-0.5">Account: <span className="font-mono font-medium">{paymentInfo.payment_bank_account}</span></p>
+                        )}
+                        {paymentInfo.payment_bank_account_name && (
+                          <p className="text-xs text-gray-600 mt-0.5">Account Name: <span className="font-medium">{paymentInfo.payment_bank_account_name}</span></p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-0.5">Reference: <span className="font-mono font-medium">BL-{application.applicationSeq}</span></p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">Bank Transfer</p>
-                      <p className="text-xs text-gray-600 mt-0.5">Bank: <span className="font-medium">DBS Bank</span></p>
-                      <p className="text-xs text-gray-600 mt-0.5">Account: <span className="font-mono font-medium">012-345678-9</span></p>
-                      <p className="text-xs text-gray-600 mt-0.5">Account Name: <span className="font-medium">Blue Light Pte Ltd</span></p>
-                      <p className="text-xs text-gray-500 mt-0.5">Reference: <span className="font-mono font-medium">BL-{application.applicationSeq}</span></p>
-                    </div>
-                  </div>
+                  )}
 
                   <p className="text-xs text-gray-400 mt-3 pt-3 border-t border-gray-100">
                     Please include the reference number in your payment. Processing takes 1-2 business days after payment is received.
@@ -455,6 +495,81 @@ export default function ApplicationDetailPage() {
               </div>
             )}
           </Card>
+
+          {/* SLD Request Status */}
+          {application.sldOption === 'REQUEST_LEW' && sldRequest && (
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">SLD Drawing Request</h2>
+              {sldRequest.status === 'REQUESTED' && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">🔧</span>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">SLD Drawing Request Sent</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Your SLD drawing request has been sent to the assigned LEW. You will be notified once the SLD is prepared.
+                      </p>
+                      {sldRequest.applicantNote && (
+                        <div className="mt-2 bg-white rounded p-2 border border-blue-100">
+                          <p className="text-xs text-gray-500">Your note:</p>
+                          <p className="text-sm text-gray-700">{sldRequest.applicantNote}</p>
+                        </div>
+                      )}
+                      <p className="text-xs text-blue-500 mt-2">
+                        Requested on {new Date(sldRequest.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sldRequest.status === 'UPLOADED' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">✅</span>
+                    <div>
+                      <p className="text-sm font-medium text-green-800">SLD Has Been Uploaded</p>
+                      <p className="text-xs text-green-700 mt-1">
+                        The LEW has uploaded the SLD drawing. It is pending confirmation.
+                      </p>
+                      {sldRequest.lewNote && (
+                        <div className="mt-2 bg-white rounded p-2 border border-green-100">
+                          <p className="text-xs text-gray-500">LEW note:</p>
+                          <p className="text-sm text-gray-700">{sldRequest.lewNote}</p>
+                        </div>
+                      )}
+                      {sldRequest.uploadedFileSeq && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => {
+                            if (sldRequest.uploadedFileSeq) {
+                              fileApi.downloadFile(sldRequest.uploadedFileSeq, 'SLD_Drawing');
+                            }
+                          }}
+                        >
+                          Download SLD
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {sldRequest.status === 'CONFIRMED' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">📋</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">SLD Confirmed</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        The SLD drawing has been confirmed and is included in your application.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
 
           {/* Documents */}
           <Card>
@@ -474,7 +589,7 @@ export default function ApplicationDetailPage() {
                   files={files.map((f) => ({
                     id: f.fileSeq,
                     name: f.originalFilename || `File #${f.fileSeq}`,
-                    size: 0,
+                    size: f.fileSize || 0,
                   }))}
                   label={APPLICANT_FILE_TYPE_OPTIONS.find((o) => o.value === uploadFileType)?.label || 'Document'}
                   hint="PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP up to 10MB. Files for ELISE submission should be under 2MB."
@@ -501,12 +616,15 @@ export default function ApplicationDetailPage() {
                         <p className="text-sm font-medium text-gray-700 truncate">
                           {f.originalFilename || `File #${f.fileSeq}`}
                         </p>
-                        <p className="text-xs text-gray-400">
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
                           <Badge variant={getFileTypeBadge(f.fileType)} className="text-[10px]">
                             {formatFileType(f.fileType)}
                           </Badge>
-                          <span className="ml-2">{new Date(f.uploadedAt).toLocaleDateString()}</span>
-                        </p>
+                          {f.fileSize != null && f.fileSize > 0 && (
+                            <span>{formatFileSize(f.fileSize)}</span>
+                          )}
+                          <span>{new Date(f.uploadedAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
                     </div>
                     <Button
@@ -695,6 +813,12 @@ function InfoField({ label, value }: { label: string; value: string }) {
       <dd className="text-sm font-medium text-gray-800 mt-0.5">{value}</dd>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatFileType(type: string): string {

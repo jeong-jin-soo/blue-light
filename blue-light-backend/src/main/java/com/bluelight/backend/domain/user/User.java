@@ -73,6 +73,13 @@ public class User extends BaseEntity {
     private String lewLicenceNo;
 
     /**
+     * LEW 등급 (GRADE_7, GRADE_8, GRADE_9 — LEW만 사용)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lew_grade", length = 20)
+    private LewGrade lewGrade;
+
+    /**
      * 회사명 (EMA 라이선스에 인쇄됨)
      */
     @Column(name = "company_name", length = 100)
@@ -104,6 +111,18 @@ public class User extends BaseEntity {
     private String correspondencePostalCode;
 
     /**
+     * 이메일 인증 여부
+     */
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+
+    /**
+     * 이메일 인증 토큰
+     */
+    @Column(name = "email_verification_token", length = 255)
+    private String emailVerificationToken;
+
+    /**
      * PDPA 동의 일시
      */
     @Column(name = "pdpa_consent_at")
@@ -112,8 +131,10 @@ public class User extends BaseEntity {
     @Builder
     public User(String email, String password, String name, String phone,
                 UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
+                LewGrade lewGrade,
                 String companyName, String uen, String designation,
                 String correspondenceAddress, String correspondencePostalCode,
+                Boolean emailVerified, String emailVerificationToken,
                 LocalDateTime pdpaConsentAt) {
         this.email = email;
         this.password = password;
@@ -122,11 +143,14 @@ public class User extends BaseEntity {
         this.role = role != null ? role : UserRole.APPLICANT;
         this.approvedStatus = approvedStatus;
         this.lewLicenceNo = lewLicenceNo;
+        this.lewGrade = lewGrade;
         this.companyName = companyName;
         this.uen = uen;
         this.designation = designation;
         this.correspondenceAddress = correspondenceAddress;
         this.correspondencePostalCode = correspondencePostalCode;
+        this.emailVerified = emailVerified != null ? emailVerified : false;
+        this.emailVerificationToken = emailVerificationToken;
         this.pdpaConsentAt = pdpaConsentAt;
     }
 
@@ -185,14 +209,16 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 프로필 정보 수정 (회사 정보 포함)
+     * 프로필 정보 수정 (회사 정보 + LEW 등급 포함)
      */
     public void updateProfile(String name, String phone, String lewLicenceNo,
+                              LewGrade lewGrade,
                               String companyName, String uen, String designation,
                               String correspondenceAddress, String correspondencePostalCode) {
         this.name = name;
         this.phone = phone;
         this.lewLicenceNo = lewLicenceNo;
+        this.lewGrade = lewGrade;
         this.companyName = companyName;
         this.uen = uen;
         this.designation = designation;
@@ -201,7 +227,7 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 역할 변경 (approvedStatus 연동)
+     * 역할 변경 (approvedStatus, lewGrade 연동)
      */
     public void changeRole(UserRole role) {
         this.role = role;
@@ -209,6 +235,39 @@ public class User extends BaseEntity {
             this.approvedStatus = ApprovalStatus.PENDING;
         } else {
             this.approvedStatus = null;
+            this.lewGrade = null;
         }
+    }
+
+    /**
+     * 해당 LEW가 주어진 kVA를 처리할 수 있는지 확인
+     */
+    public boolean canHandleKva(int kva) {
+        if (this.role != UserRole.LEW) return false;
+        if (this.lewGrade == null) return false;
+        return this.lewGrade.canHandle(kva);
+    }
+
+    /**
+     * 이메일 인증 여부 확인
+     */
+    public boolean isEmailVerified() {
+        return Boolean.TRUE.equals(this.emailVerified);
+    }
+
+    /**
+     * 이메일 인증 완료 처리
+     */
+    public void verifyEmail() {
+        this.emailVerified = true;
+        this.emailVerificationToken = null;
+    }
+
+    /**
+     * 이메일 인증 토큰 설정
+     */
+    public void setEmailVerificationToken(String token) {
+        this.emailVerificationToken = token;
+        this.emailVerified = false;
     }
 }

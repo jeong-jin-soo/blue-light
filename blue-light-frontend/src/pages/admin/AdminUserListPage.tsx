@@ -224,6 +224,20 @@ export default function AdminUserListPage() {
       },
     },
     {
+      key: 'lewGrade' as keyof User,
+      header: 'Grade',
+      render: (user) => {
+        if (user.role !== 'LEW' || !user.lewGrade) return <span className="text-gray-400">-</span>;
+        const gradeNum = user.lewGrade.replace('GRADE_', '');
+        const maxKva = user.lewGrade === 'GRADE_7' ? 45 : user.lewGrade === 'GRADE_8' ? 500 : 9999;
+        return (
+          <Badge variant="info" className="text-[10px]">
+            G{gradeNum} (≤{maxKva === 9999 ? '400kV' : `${maxKva}kVA`})
+          </Badge>
+        );
+      },
+    },
+    {
       key: 'lewLicenceNo' as keyof User,
       header: 'Licence No.',
       render: (user) => (

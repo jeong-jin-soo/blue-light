@@ -15,7 +15,7 @@ import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
 import { Select } from '../../components/ui/Select';
 import { useAuthStore } from '../../stores/authStore';
-import type { AdminApplication, FileInfo, FileType, Payment, LewSummary } from '../../types';
+import type { AdminApplication, FileInfo, FileType, Payment, LewSummary, SldRequest } from '../../types';
 
 const FILE_TYPE_OPTIONS = [
   { value: 'LICENSE_PDF', label: 'Licence PDF' },
@@ -66,6 +66,11 @@ export default function AdminApplicationDetailPage() {
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
 
+  // SLD request states
+  const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
+  const [sldLewNote, setSldLewNote] = useState('');
+  const [showSldConfirm, setShowSldConfirm] = useState(false);
+
   // LEW assignment states
   const [showAssignLewModal, setShowAssignLewModal] = useState(false);
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
@@ -88,6 +93,16 @@ export default function AdminApplicationDetailPage() {
       setApplication(appData);
       setFiles(filesData);
       setPayments(paymentsData);
+
+      // Fetch SLD request if sldOption is REQUEST_LEW
+      if (appData.sldOption === 'REQUEST_LEW') {
+        try {
+          const sldData = await adminApi.getAdminSldRequest(applicationId);
+          setSldRequest(sldData);
+        } catch {
+          // SLD request might not exist
+        }
+      }
     } catch {
       toast.error('Failed to load application details');
       navigate('/admin/applications');
@@ -196,7 +211,7 @@ export default function AdminApplicationDetailPage() {
     setLewsLoading(true);
     setShowAssignLewModal(true);
     try {
-      const lews = await adminApi.getAvailableLews();
+      const lews = await adminApi.getAvailableLews(application?.selectedKva);
       setAvailableLews(lews);
       // 현재 할당된 LEW가 있으면 미리 선택
       if (application?.assignedLewSeq) {
@@ -241,6 +256,31 @@ export default function AdminApplicationDetailPage() {
       fetchData();
     } catch {
       toast.error('Failed to unassign LEW');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ── SLD Request Handlers ──────────────────────
+  const handleSldUpload = async (file: File) => {
+    // Upload file first (as DRAWING_SLD type)
+    const uploadedFile = await adminApi.uploadFile(applicationId, file, 'DRAWING_SLD');
+    // Mark SLD as uploaded
+    await adminApi.uploadSldComplete(applicationId, uploadedFile.fileSeq, sldLewNote || undefined);
+    toast.success('SLD uploaded and marked as complete');
+    setSldLewNote('');
+    fetchData();
+  };
+
+  const handleSldConfirm = async () => {
+    setShowSldConfirm(false);
+    setActionLoading(true);
+    try {
+      await adminApi.confirmSld(applicationId);
+      toast.success('SLD confirmed');
+      fetchData();
+    } catch {
+      toast.error('Failed to confirm SLD');
     } finally {
       setActionLoading(false);
     }
@@ -332,20 +372,51 @@ export default function AdminApplicationDetailPage() {
               <InfoField label="Name" value={application.userName} />
               <InfoField label="Email" value={application.userEmail} />
               <InfoField label="Phone" value={application.userPhone || 'Not provided'} />
-              {application.userDesignation && (
-                <InfoField label="Designation" value={application.userDesignation} />
-              )}
+              <InfoField label="Designation" value={application.userDesignation || '—'} />
             </div>
-            {(application.userCompanyName || application.userUen) && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <h3 className="text-sm font-medium text-gray-600 mb-3">Business Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {application.userCompanyName && (
-                    <InfoField label="Company Name" value={application.userCompanyName} />
-                  )}
-                  {application.userUen && (
-                    <InfoField label="UEN" value={application.userUen} />
-                  )}
+
+            {/* Business Details (Letter of Appointment 필수 항목) */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <h3 className="text-sm font-medium text-gray-600 mb-3">
+                Business Details
+                <span className="text-xs text-gray-400 ml-1.5">(Required for Letter of Appointment)</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoField label="Company Name" value={application.userCompanyName || '—'} />
+                <InfoField label="UEN" value={application.userUen || '—'} />
+              </div>
+            </div>
+
+            {/* Correspondence Address */}
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <h3 className="text-sm font-medium text-gray-600 mb-3">
+                Correspondence Address
+                <span className="text-xs text-gray-400 ml-1.5">(EMA notification delivery)</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoField label="Address" value={application.userCorrespondenceAddress || '—'} />
+                <InfoField label="Postal Code" value={application.userCorrespondencePostalCode || '—'} />
+              </div>
+            </div>
+
+            {/* Missing info warning */}
+            {(!application.userCompanyName || !application.userUen || !application.userDesignation || !application.userCorrespondenceAddress) && (
+              <div className="mt-4 bg-warning-50 border border-warning-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-sm">⚠️</span>
+                  <div>
+                    <p className="text-xs font-medium text-warning-800">Incomplete Applicant Profile</p>
+                    <p className="text-xs text-warning-700 mt-0.5">
+                      The following are required for Letter of Appointment:{' '}
+                      {[
+                        !application.userCompanyName && 'Company Name',
+                        !application.userUen && 'UEN',
+                        !application.userDesignation && 'Designation',
+                        !application.userCorrespondenceAddress && 'Correspondence Address',
+                      ].filter(Boolean).join(', ')}.
+                      Please ask the applicant to update their profile.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
@@ -359,6 +430,9 @@ export default function AdminApplicationDetailPage() {
               <InfoField label="Postal Code" value={application.postalCode} />
               <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
               <InfoField label="DB Size (kVA)" value={`${application.selectedKva} kVA`} />
+              {application.spAccountNo && (
+                <InfoField label="SP Account No." value={application.spAccountNo} />
+              )}
             </div>
           </Card>
 
@@ -445,6 +519,134 @@ export default function AdminApplicationDetailPage() {
             </div>
           </Card>
 
+          {/* SLD Request Management */}
+          {application.sldOption === 'REQUEST_LEW' && sldRequest && (
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">SLD Drawing Request</h2>
+
+              {sldRequest.status === 'REQUESTED' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">🔧</span>
+                      <div>
+                        <p className="text-sm font-medium text-blue-800">SLD Drawing Requested by Applicant</p>
+                        <p className="text-xs text-blue-700 mt-1">
+                          The applicant has requested a LEW to prepare the SLD drawing.
+                        </p>
+                        {sldRequest.applicantNote && (
+                          <div className="mt-2 bg-white rounded p-2 border border-blue-100">
+                            <p className="text-xs text-gray-500">Applicant note:</p>
+                            <p className="text-sm text-gray-700">{sldRequest.applicantNote}</p>
+                          </div>
+                        )}
+                        <p className="text-xs text-blue-500 mt-2">
+                          Requested on {new Date(sldRequest.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* LEW SLD Upload Area */}
+                  <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Upload SLD Drawing</p>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        LEW Note (Optional)
+                      </label>
+                      <textarea
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                        rows={2}
+                        maxLength={2000}
+                        value={sldLewNote}
+                        onChange={(e) => setSldLewNote(e.target.value)}
+                        placeholder="Optional note about the SLD drawing"
+                      />
+                    </div>
+                    <FileUpload
+                      onUpload={handleSldUpload}
+                      files={[]}
+                      label="Upload SLD Drawing"
+                      hint="PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP up to 10MB"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {sldRequest.status === 'UPLOADED' && (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">✅</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-green-800">SLD Uploaded</p>
+                        <p className="text-xs text-green-700 mt-1">
+                          The SLD drawing has been uploaded. Click "Confirm SLD" to finalize.
+                        </p>
+                        {sldRequest.lewNote && (
+                          <div className="mt-2 bg-white rounded p-2 border border-green-100">
+                            <p className="text-xs text-gray-500">LEW note:</p>
+                            <p className="text-sm text-gray-700">{sldRequest.lewNote}</p>
+                          </div>
+                        )}
+                        {sldRequest.uploadedFileSeq && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => {
+                              if (sldRequest.uploadedFileSeq) {
+                                fileApi.downloadFile(sldRequest.uploadedFileSeq, 'SLD_Drawing');
+                              }
+                            }}
+                          >
+                            Download SLD
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setShowSldConfirm(true)}
+                    loading={actionLoading}
+                  >
+                    Confirm SLD
+                  </Button>
+                </div>
+              )}
+
+              {sldRequest.status === 'CONFIRMED' && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">📋</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">SLD Confirmed</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        The SLD drawing has been confirmed and is included in this application.
+                      </p>
+                      {sldRequest.uploadedFileSeq && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => {
+                            if (sldRequest.uploadedFileSeq) {
+                              fileApi.downloadFile(sldRequest.uploadedFileSeq, 'SLD_Drawing');
+                            }
+                          }}
+                        >
+                          Download SLD
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
           {/* Documents */}
           <Card>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Documents</h2>
@@ -491,6 +693,9 @@ export default function AdminApplicationDetailPage() {
                           >
                             {formatFileType(f.fileType)}
                           </Badge>
+                          {f.fileSize != null && f.fileSize > 0 && (
+                            <span>{formatFileSize(f.fileSize)}</span>
+                          )}
                           <span>{new Date(f.uploadedAt).toLocaleDateString()}</span>
                         </div>
                       </div>
@@ -689,6 +894,11 @@ export default function AdminApplicationDetailPage() {
                       <p className="text-xs text-gray-500 truncate">{application.assignedLewEmail}</p>
                       {application.assignedLewLicenceNo && (
                         <p className="text-xs text-primary-600 font-mono mt-0.5">{application.assignedLewLicenceNo}</p>
+                      )}
+                      {application.assignedLewGrade && (
+                        <Badge variant="info" className="mt-1 text-[10px]">
+                          {application.assignedLewGrade.replace('GRADE_', 'G')} (≤{application.assignedLewMaxKva === 9999 ? '400kV' : `${application.assignedLewMaxKva}kVA`})
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -933,10 +1143,20 @@ export default function AdminApplicationDetailPage() {
             </div>
           ) : availableLews.length === 0 ? (
             <div className="text-center py-6">
-              <p className="text-sm text-gray-500">No approved LEWs available for assignment.</p>
+              <p className="text-sm text-gray-500">
+                No eligible LEWs available for this application ({application?.selectedKva} kVA).
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                All approved LEWs either lack a grade or have insufficient capacity.
+              </p>
             </div>
           ) : (
             <div className="space-y-2">
+              <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100 mb-3">
+                <p className="text-xs text-blue-700">
+                  Showing LEWs eligible for <span className="font-semibold">{application?.selectedKva} kVA</span> capacity.
+                </p>
+              </div>
               <p className="text-sm text-gray-600 mb-3">
                 Select a LEW to assign to this application:
               </p>
@@ -957,9 +1177,16 @@ export default function AdminApplicationDetailPage() {
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-gray-800">{lew.name}</p>
                     <p className="text-xs text-gray-500 truncate">{lew.email}</p>
-                    {lew.lewLicenceNo && (
-                      <p className="text-xs text-primary-600 font-mono mt-0.5">{lew.lewLicenceNo}</p>
-                    )}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {lew.lewLicenceNo && (
+                        <span className="text-xs text-primary-600 font-mono">{lew.lewLicenceNo}</span>
+                      )}
+                      {lew.lewGrade && (
+                        <Badge variant="info" className="text-[10px]">
+                          {lew.lewGrade.replace('GRADE_', 'G')} (≤{lew.maxKva === 9999 ? '400kV' : `${lew.maxKva}kVA`})
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   {selectedLewSeq === lew.userSeq && (
                     <span className="text-primary text-lg flex-shrink-0">✓</span>
@@ -994,6 +1221,17 @@ export default function AdminApplicationDetailPage() {
         confirmLabel="Remove"
         loading={actionLoading}
       />
+
+      {/* ── SLD Confirm ────────────────── */}
+      <ConfirmDialog
+        isOpen={showSldConfirm}
+        onClose={() => setShowSldConfirm(false)}
+        onConfirm={handleSldConfirm}
+        title="Confirm SLD"
+        message="Confirm that the uploaded SLD drawing is complete and acceptable? This action cannot be undone."
+        confirmLabel="Confirm"
+        loading={actionLoading}
+      />
     </div>
   );
 }
@@ -1005,6 +1243,12 @@ function InfoField({ label, value }: { label: string; value: string }) {
       <dd className="text-sm font-medium text-gray-800 mt-0.5">{value}</dd>
     </div>
   );
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function formatFileType(type: string): string {

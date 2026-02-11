@@ -13,11 +13,14 @@ CREATE TABLE IF NOT EXISTS users (
     role           VARCHAR(20)  NOT NULL DEFAULT 'APPLICANT',
     approved_status VARCHAR(20),
     lew_licence_no  VARCHAR(50),
+    lew_grade       VARCHAR(20),
     company_name    VARCHAR(100),
     uen             VARCHAR(20),
     designation     VARCHAR(50),
     correspondence_address     VARCHAR(255),
     correspondence_postal_code VARCHAR(10),
+    email_verified          BOOLEAN DEFAULT FALSE,
+    email_verification_token VARCHAR(255),
     pdpa_consent_at DATETIME(6),
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
@@ -42,6 +45,7 @@ CREATE TABLE IF NOT EXISTS applications (
     license_expiry_date DATE,
     review_comment     TEXT,
     assigned_lew_seq   BIGINT,
+    sp_account_no            VARCHAR(30),
     application_type         VARCHAR(10)   NOT NULL DEFAULT 'NEW',
     service_fee              DECIMAL(10,2),
     original_application_seq BIGINT,
@@ -50,6 +54,7 @@ CREATE TABLE IF NOT EXISTS applications (
     existing_expiry_date     DATE,
     renewal_period_months    INT,
     ema_fee                  DECIMAL(10,2),
+    sld_option               VARCHAR(20)   DEFAULT 'SELF_UPLOAD',
     expiry_notified_at       DATETIME(6),
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
@@ -110,6 +115,7 @@ CREATE TABLE IF NOT EXISTS files (
     file_type       VARCHAR(30)  NOT NULL,
     file_url        VARCHAR(500) NOT NULL,
     original_filename VARCHAR(255),
+    file_size       BIGINT,
     uploaded_at     DATETIME(6),
     updated_at      DATETIME(6),
     created_by      BIGINT,
@@ -144,7 +150,26 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     CONSTRAINT fk_password_reset_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 8. 용량별 단가표
+-- 8. SLD 요청
+CREATE TABLE IF NOT EXISTS sld_requests (
+    sld_request_seq  BIGINT      NOT NULL AUTO_INCREMENT,
+    application_seq  BIGINT      NOT NULL,
+    status           VARCHAR(20) NOT NULL DEFAULT 'REQUESTED',
+    applicant_note   TEXT,
+    lew_note         TEXT,
+    uploaded_file_seq BIGINT,
+    created_at       DATETIME(6),
+    updated_at       DATETIME(6),
+    created_by       BIGINT,
+    updated_by       BIGINT,
+    deleted_at       DATETIME(6),
+    PRIMARY KEY (sld_request_seq),
+    KEY idx_sld_requests_application (application_seq),
+    CONSTRAINT fk_sld_requests_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
+    CONSTRAINT fk_sld_requests_file FOREIGN KEY (uploaded_file_seq) REFERENCES files (file_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 9. 용량별 단가표
 CREATE TABLE IF NOT EXISTS master_prices (
     master_price_seq BIGINT        NOT NULL AUTO_INCREMENT,
     description      VARCHAR(50),

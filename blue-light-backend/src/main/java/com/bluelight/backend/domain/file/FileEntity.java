@@ -60,6 +60,12 @@ public class FileEntity {
     private String originalFilename;
 
     /**
+     * 파일 크기 (bytes)
+     */
+    @Column(name = "file_size")
+    private Long fileSize;
+
+    /**
      * 업로드 일시
      */
     @Column(name = "uploaded_at")
@@ -92,20 +98,22 @@ public class FileEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public FileEntity(Application application, FileType fileType, String fileUrl, String originalFilename) {
+    public FileEntity(Application application, FileType fileType, String fileUrl, String originalFilename, Long fileSize) {
         this.application = application;
         this.fileType = fileType;
         this.fileUrl = fileUrl;
         this.originalFilename = originalFilename;
+        this.fileSize = fileSize;
         this.uploadedAt = LocalDateTime.now();
     }
 
     /**
      * 파일 URL 변경 (재업로드 시)
      */
-    public void updateFileUrl(String fileUrl, String originalFilename) {
+    public void updateFileUrl(String fileUrl, String originalFilename, Long fileSize) {
         this.fileUrl = fileUrl;
         this.originalFilename = originalFilename;
+        this.fileSize = fileSize;
         this.uploadedAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }

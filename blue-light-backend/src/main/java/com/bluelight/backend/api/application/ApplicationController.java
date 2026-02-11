@@ -1,10 +1,7 @@
 package com.bluelight.backend.api.application;
 
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
-import com.bluelight.backend.api.application.dto.ApplicationResponse;
-import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
-import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
-import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
+import com.bluelight.backend.api.application.dto.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -117,5 +114,36 @@ public class ApplicationController {
         log.info("Get application payments: userSeq={}, applicationSeq={}", userSeq, id);
         List<PaymentResponse> payments = applicationService.getApplicationPayments(userSeq, id);
         return ResponseEntity.ok(payments);
+    }
+
+    // ── SLD Request ────────────────────
+
+    /**
+     * Create SLD request (신청자 → LEW)
+     * POST /api/applications/:id/sld-request
+     */
+    @PostMapping("/{id}/sld-request")
+    public ResponseEntity<SldRequestResponse> createSldRequest(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody CreateSldRequestDto request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Create SLD request: userSeq={}, applicationSeq={}", userSeq, id);
+        SldRequestResponse response = applicationService.createSldRequest(userSeq, id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Get SLD request for my application
+     * GET /api/applications/:id/sld-request
+     */
+    @GetMapping("/{id}/sld-request")
+    public ResponseEntity<SldRequestResponse> getSldRequest(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Get SLD request: userSeq={}, applicationSeq={}", userSeq, id);
+        SldRequestResponse response = applicationService.getSldRequest(userSeq, id);
+        return ResponseEntity.ok(response);
     }
 }

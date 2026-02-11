@@ -30,6 +30,12 @@ public class UpdateApplicationRequest {
     private Integer selectedKva;
 
     /**
+     * SP Group 계정 번호 (선택)
+     */
+    @Size(max = 30, message = "SP Account No must be 30 characters or less")
+    private String spAccountNo;
+
+    /**
      * 갱신 기간 수정 (Admin/LEW, 3 or 12)
      */
     private Integer renewalPeriodMonths;

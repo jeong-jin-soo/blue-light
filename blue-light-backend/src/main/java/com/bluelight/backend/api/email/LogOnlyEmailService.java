@@ -25,6 +25,16 @@ public class LogOnlyEmailService implements EmailService {
     }
 
     @Override
+    public void sendEmailVerificationEmail(String to, String userName, String verificationLink) {
+        log.info("==================================================");
+        log.info("[DEV] Email Verification Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Verification Link: {}", verificationLink);
+        log.info("==================================================");
+    }
+
+    @Override
     public void sendLicenseExpiryWarningEmail(String to, String userName,
                                                String licenseNumber, String address,
                                                LocalDate expiryDate, int daysRemaining) {

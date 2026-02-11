@@ -27,6 +27,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
 
     /**
+     * 이메일 인증 토큰으로 사용자 조회
+     */
+    Optional<User> findByEmailVerificationToken(String emailVerificationToken);
+
+    /**
      * 역할 + 승인 상태로 사용자 목록 조회 (예: 승인된 LEW 목록)
      */
     List<User> findByRoleAndApprovedStatus(UserRole role, ApprovalStatus approvedStatus);

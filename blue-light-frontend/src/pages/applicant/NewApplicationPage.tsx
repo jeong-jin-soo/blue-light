@@ -34,6 +34,7 @@ const BUILDING_TYPES = [
 
 interface FormData {
   applicationType: ApplicationType;
+  spAccountNo: string;
   address: string;
   postalCode: string;
   buildingType: string;
@@ -45,11 +46,14 @@ interface FormData {
   renewalPeriodMonths: number | null;
   renewalReferenceNo: string;
   manualEntry: boolean;
+  // SLD option
+  sldOption: 'SELF_UPLOAD' | 'REQUEST_LEW';
 }
 
 export default function NewApplicationPage() {
   const navigate = useNavigate();
   const toast = useToastStore();
+  const [showGuide, setShowGuide] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -58,6 +62,7 @@ export default function NewApplicationPage() {
   // Form data
   const [formData, setFormData] = useState<FormData>({
     applicationType: 'NEW',
+    spAccountNo: '',
     address: '',
     postalCode: '',
     buildingType: '',
@@ -68,6 +73,7 @@ export default function NewApplicationPage() {
     renewalPeriodMonths: null,
     renewalReferenceNo: '',
     manualEntry: false,
+    sldOption: 'SELF_UPLOAD',
   });
 
   // Price data
@@ -209,6 +215,8 @@ export default function NewApplicationPage() {
         selectedKva: formData.selectedKva,
         applicationType: formData.applicationType,
         renewalPeriodMonths: formData.renewalPeriodMonths,
+        spAccountNo: formData.spAccountNo.trim() || undefined,
+        sldOption: formData.sldOption,
       };
       if (formData.applicationType === 'RENEWAL') {
         if (formData.renewalReferenceNo.trim()) {
@@ -235,6 +243,7 @@ export default function NewApplicationPage() {
   const handleTypeChange = (type: ApplicationType) => {
     setFormData({
       applicationType: type,
+      spAccountNo: '',
       address: '',
       postalCode: '',
       buildingType: '',
@@ -245,6 +254,7 @@ export default function NewApplicationPage() {
       renewalPeriodMonths: null,
       renewalReferenceNo: '',
       manualEntry: false,
+      sldOption: 'SELF_UPLOAD',
     });
     setErrors({});
     setPriceResult(null);
@@ -277,16 +287,161 @@ export default function NewApplicationPage() {
         </div>
       </div>
 
+      {/* ───── Before You Begin Guide ───── */}
+      {showGuide && (
+        <Card>
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-800">Before You Begin</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Please review the following checklist to ensure a smooth application process.
+              </p>
+            </div>
+
+            {/* Process Overview */}
+            <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Application Process</h3>
+              <div className="space-y-3">
+                {[
+                  { step: '1', title: 'Submit Application', desc: 'Fill in property details, select kVA capacity, and review pricing.' },
+                  { step: '2', title: 'Upload Documents', desc: 'Upload required documents including SLD (Single Line Diagram) and authorisation letter.' },
+                  { step: '3', title: 'LEW Review', desc: 'A Licensed Electrical Worker will review your application. You may be asked to revise.' },
+                  { step: '4', title: 'Make Payment', desc: 'Once approved, complete payment via PayNow or bank transfer.' },
+                  { step: '5', title: 'Licence Issued', desc: 'After verification, your electrical installation licence will be issued.' },
+                ].map(({ step, title, desc }) => (
+                  <div key={step} className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">
+                      {step}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">{title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Required Documents Checklist */}
+            <div className="bg-amber-50 rounded-xl p-5 border border-amber-200">
+              <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wider mb-3">Required Documents</h3>
+              <p className="text-xs text-amber-700 mb-3">Prepare these documents before starting your application. You can upload them after submission.</p>
+              <ul className="space-y-2">
+                {[
+                  { label: 'Single Line Diagram (SLD)', desc: 'Accepted formats: PDF, JPG, DWG, DXF, DGN, TIF, GIF, ZIP' },
+                  { label: "Owner's Authorisation Letter", desc: 'Signed letter authorising the electrical installation work' },
+                ].map(({ label, desc }) => (
+                  <li key={label} className="flex items-start gap-2.5">
+                    <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-amber-900">{label}</p>
+                      <p className="text-xs text-amber-700">{desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Key Information */}
+            <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+              <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Key Information</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">💰</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Pricing</p>
+                    <p className="text-xs text-blue-700">Based on your DB Size (kVA). Service fee and EMA fee apply.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">⏱️</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Licence Period</p>
+                    <p className="text-xs text-blue-700">Choose between 3-month or 12-month licence validity.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">🔌</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">SP Group Account</p>
+                    <p className="text-xs text-blue-700">You need an SP Group utilities account before applying.</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-blue-600 mt-0.5">📋</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">EMA Submission</p>
+                    <p className="text-xs text-blue-700">Files for ELISE submission must be under 2MB each.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Start Application Button */}
+            <div className="flex justify-between items-center pt-2">
+              <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                Cancel
+              </Button>
+              <Button onClick={() => setShowGuide(false)}>
+                Start Application
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Step tracker */}
-      <Card>
-        <StepTracker steps={STEPS} currentStep={currentStep} />
-      </Card>
+      {!showGuide && (
+        <Card>
+          <StepTracker steps={STEPS} currentStep={currentStep} />
+        </Card>
+      )}
 
       {/* Step content */}
-      <Card>
+      {!showGuide && <Card>
         {/* ───── Step 0: Application Type ───── */}
         {currentStep === 0 && (
           <div className="space-y-6">
+            {/* SP Group Account Notice */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-800">SP Group Account Required</h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Before applying for an electrical installation licence, you need an SP Group utilities account.
+                    If you don't have one yet, please open an account first.
+                  </p>
+                  <a
+                    href="https://openaccount.spgroup.com.sg"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2"
+                  >
+                    Open SP Group Account
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+              <div className="mt-4 pt-3 border-t border-blue-200">
+                <Input
+                  label="SP Account Number"
+                  placeholder="e.g., 1234567890"
+                  value={formData.spAccountNo}
+                  onChange={(e) => updateField('spAccountNo', e.target.value)}
+                  hint="Optional. Enter your SP Group account number if available."
+                />
+              </div>
+            </div>
+
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Application Type</h2>
               <p className="text-sm text-gray-500 mt-1">Choose the type of licence application</p>
@@ -366,6 +521,59 @@ export default function NewApplicationPage() {
               {errors.renewalPeriodMonths && (
                 <p className="text-sm text-red-600">{errors.renewalPeriodMonths}</p>
               )}
+            </div>
+
+            {/* SLD Option Selection */}
+            <div className="space-y-2 border-t border-gray-100 pt-5">
+              <label className="block text-sm font-medium text-gray-700">
+                Single Line Diagram (SLD) <span className="text-red-500">*</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                An SLD is required for your application. Choose how you'd like to provide it.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => updateField('sldOption', 'SELF_UPLOAD')}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    formData.sldOption === 'SELF_UPLOAD'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0 mt-0.5">📄</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Upload Myself</p>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        I have an SLD ready and will upload it after submission
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('sldOption', 'REQUEST_LEW')}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    formData.sldOption === 'REQUEST_LEW'
+                      ? 'border-emerald-500 bg-emerald-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0 mt-0.5">🔧</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Request LEW to Prepare</p>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        A Licensed Electrical Worker will prepare the SLD for you
+                      </p>
+                      <p className="text-xs text-emerald-600 font-medium mt-1">
+                        Additional fee may apply (to be determined)
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
 
             {/* Renewal-specific fields */}
@@ -663,6 +871,17 @@ export default function NewApplicationPage() {
               </span>
             </div>
 
+            {/* SP Account Number (if provided) */}
+            {formData.spAccountNo.trim() && (
+              <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
+                <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">SP Group Account</h3>
+                <div>
+                  <dt className="text-xs text-blue-600">Account Number</dt>
+                  <dd className="text-sm font-medium text-blue-800 mt-0.5">{formData.spAccountNo}</dd>
+                </div>
+              </div>
+            )}
+
             {/* Licence Period (both NEW and RENEWAL) */}
             {formData.renewalPeriodMonths && (
               <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -713,6 +932,33 @@ export default function NewApplicationPage() {
                 </div>
               </div>
             )}
+
+            {/* SLD Option */}
+            <div className={`rounded-lg p-4 space-y-2 border ${
+              formData.sldOption === 'REQUEST_LEW'
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-gray-50 border-gray-100'
+            }`}>
+              <h3 className={`text-sm font-semibold uppercase tracking-wider ${
+                formData.sldOption === 'REQUEST_LEW' ? 'text-emerald-700' : 'text-gray-700'
+              }`}>SLD (Single Line Diagram)</h3>
+              <div className="flex items-center gap-2">
+                <span>{formData.sldOption === 'REQUEST_LEW' ? '🔧' : '📄'}</span>
+                <span className={`text-sm font-medium ${
+                  formData.sldOption === 'REQUEST_LEW' ? 'text-emerald-800' : 'text-gray-800'
+                }`}>
+                  {formData.sldOption === 'REQUEST_LEW'
+                    ? 'LEW will prepare the SLD for you'
+                    : 'You will upload the SLD yourself'}
+                </span>
+              </div>
+              {formData.sldOption === 'REQUEST_LEW' && (
+                <p className="text-xs text-emerald-600">
+                  An SLD drawing request will be automatically sent to the assigned LEW after submission.
+                  Additional fee may apply.
+                </p>
+              )}
+            </div>
 
             {/* Property Details */}
             <div className="bg-gray-50 rounded-lg p-4 space-y-3">
@@ -785,9 +1031,9 @@ export default function NewApplicationPage() {
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
           <Button
             variant="outline"
-            onClick={currentStep === 0 ? () => navigate('/dashboard') : handleBack}
+            onClick={currentStep === 0 ? () => setShowGuide(true) : handleBack}
           >
-            {currentStep === 0 ? 'Cancel' : 'Back'}
+            {currentStep === 0 ? 'Back to Guide' : 'Back'}
           </Button>
           {currentStep < 3 ? (
             <Button onClick={handleNext}>Continue</Button>
@@ -795,7 +1041,7 @@ export default function NewApplicationPage() {
             <Button onClick={() => setShowSubmitConfirm(true)} loading={submitting}>Submit Application</Button>
           )}
         </div>
-      </Card>
+      </Card>}
 
       <ConfirmDialog
         isOpen={showSubmitConfirm}

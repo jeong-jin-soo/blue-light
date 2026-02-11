@@ -15,6 +15,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import java.util.Map;
 
 /**
@@ -109,6 +112,37 @@ public class AuthController {
         authService.resetPassword(request);
         return ResponseEntity.ok(Map.of(
                 "message", "Your password has been reset successfully."
+        ));
+    }
+
+    /**
+     * 이메일 인증 처리 (Public - 토큰 기반)
+     * GET /api/auth/verify-email?token=xxx
+     */
+    @GetMapping("/verify-email")
+    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
+        log.info("이메일 인증 요청: token={}", token.substring(0, Math.min(8, token.length())) + "...");
+        authService.verifyEmail(token);
+        return ResponseEntity.ok(Map.of(
+                "message", "Your email has been verified successfully."
+        ));
+    }
+
+    /**
+     * 인증 이메일 재발송 (인증된 사용자만)
+     * POST /api/auth/resend-verification
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, String>> resendVerification() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getPrincipal() == null || !(auth.getPrincipal() instanceof Long)) {
+            throw new BusinessException("Authentication required", HttpStatus.UNAUTHORIZED, "UNAUTHORIZED");
+        }
+        Long userSeq = (Long) auth.getPrincipal();
+        log.info("인증 이메일 재발송 요청: userSeq={}", userSeq);
+        authService.resendVerificationEmail(userSeq);
+        return ResponseEntity.ok(Map.of(
+                "message", "Verification email has been sent."
         ));
     }
 }

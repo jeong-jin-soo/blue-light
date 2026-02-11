@@ -99,10 +99,16 @@ public class Application extends BaseEntity {
     @JoinColumn(name = "assigned_lew_seq")
     private User assignedLew;
 
+    /**
+     * SP Group 계정 번호
+     */
+    @Column(name = "sp_account_no", length = 30)
+    private String spAccountNo;
+
     // ── Phase 18: 갱신 + 견적 개선 필드 ──
 
     /**
-     * 신청 유형 (NEW / RENEWAL)
+     * 신청 유형 (NEW / RENEWAL / SUPPLY_INSTALLATION)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "application_type", nullable = false)
@@ -152,6 +158,13 @@ public class Application extends BaseEntity {
     private BigDecimal emaFee;
 
     /**
+     * SLD 제출 방식 (SELF_UPLOAD / REQUEST_LEW)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sld_option")
+    private SldOption sldOption = SldOption.SELF_UPLOAD;
+
+    /**
      * 만료 알림 발송 시각 (중복 알림 방지)
      */
     @Column(name = "expiry_notified_at")
@@ -160,6 +173,7 @@ public class Application extends BaseEntity {
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal serviceFee,
+                       String spAccountNo, SldOption sldOption,
                        ApplicationType applicationType, Application originalApplication,
                        String existingLicenceNo, String renewalReferenceNo,
                        LocalDate existingExpiryDate, Integer renewalPeriodMonths,
@@ -171,6 +185,8 @@ public class Application extends BaseEntity {
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.serviceFee = serviceFee;
+        this.spAccountNo = spAccountNo;
+        this.sldOption = sldOption != null ? sldOption : SldOption.SELF_UPLOAD;
         this.applicationType = applicationType != null ? applicationType : ApplicationType.NEW;
         this.originalApplication = originalApplication;
         this.existingLicenceNo = existingLicenceNo;
@@ -222,6 +238,13 @@ public class Application extends BaseEntity {
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.serviceFee = serviceFee;
+    }
+
+    /**
+     * SP 계정 번호 수정
+     */
+    public void updateSpAccountNo(String spAccountNo) {
+        this.spAccountNo = spAccountNo;
     }
 
     /**

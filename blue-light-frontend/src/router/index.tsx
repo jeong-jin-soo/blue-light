@@ -9,6 +9,8 @@ import SignupPage from '../pages/auth/SignupPage';
 import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import LewPendingPage from '../pages/auth/LewPendingPage';
+import EmailVerificationPendingPage from '../pages/auth/EmailVerificationPendingPage';
+import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
 
 // Legal pages
 import DisclaimerPage from '../pages/legal/DisclaimerPage';
@@ -60,6 +62,14 @@ const router = createBrowserRouter([
   {
     path: '/lew-pending',
     element: <LewPendingPage />,
+  },
+  {
+    path: '/email-verification-pending',
+    element: <EmailVerificationPendingPage />,
+  },
+  {
+    path: '/verify-email',
+    element: <VerifyEmailPage />,
   },
 
   // Applicant routes (APPLICANT role)

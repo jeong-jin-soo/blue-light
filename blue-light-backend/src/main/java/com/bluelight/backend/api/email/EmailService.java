@@ -18,6 +18,15 @@ public interface EmailService {
     void sendPasswordResetEmail(String to, String userName, String resetLink);
 
     /**
+     * 이메일 인증 이메일 발송
+     *
+     * @param to               수신자 이메일
+     * @param userName         수신자 이름
+     * @param verificationLink 이메일 인증 링크
+     */
+    void sendEmailVerificationEmail(String to, String userName, String verificationLink);
+
+    /**
      * 면허 만료 알림 이메일 발송
      *
      * @param to            수신자 이메일

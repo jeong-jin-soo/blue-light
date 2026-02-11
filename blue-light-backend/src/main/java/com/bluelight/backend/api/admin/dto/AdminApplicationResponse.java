@@ -37,12 +37,19 @@ public class AdminApplicationResponse {
     private String userCompanyName;
     private String userUen;
     private String userDesignation;
+    private String userCorrespondenceAddress;
+    private String userCorrespondencePostalCode;
 
     // Assigned LEW info
     private Long assignedLewSeq;
     private String assignedLewName;
     private String assignedLewEmail;
     private String assignedLewLicenceNo;
+    private String assignedLewGrade;
+    private Integer assignedLewMaxKva;
+
+    // SP Group 계정 번호
+    private String spAccountNo;
 
     // ── Phase 18: 갱신 + 견적 개선 필드 ──
     private String applicationType;
@@ -53,6 +60,9 @@ public class AdminApplicationResponse {
     private LocalDate existingExpiryDate;
     private Integer renewalPeriodMonths;
     private BigDecimal emaFee;
+
+    // SLD 제출 방식
+    private String sldOption;
 
     public static AdminApplicationResponse from(Application application) {
         return AdminApplicationResponse.builder()
@@ -75,6 +85,8 @@ public class AdminApplicationResponse {
                 .userCompanyName(application.getUser().getCompanyName())
                 .userUen(application.getUser().getUen())
                 .userDesignation(application.getUser().getDesignation())
+                .userCorrespondenceAddress(application.getUser().getCorrespondenceAddress())
+                .userCorrespondencePostalCode(application.getUser().getCorrespondencePostalCode())
                 .assignedLewSeq(application.getAssignedLew() != null
                         ? application.getAssignedLew().getUserSeq() : null)
                 .assignedLewName(application.getAssignedLew() != null
@@ -83,6 +95,12 @@ public class AdminApplicationResponse {
                         ? application.getAssignedLew().getEmail() : null)
                 .assignedLewLicenceNo(application.getAssignedLew() != null
                         ? application.getAssignedLew().getLewLicenceNo() : null)
+                .assignedLewGrade(application.getAssignedLew() != null && application.getAssignedLew().getLewGrade() != null
+                        ? application.getAssignedLew().getLewGrade().name() : null)
+                .assignedLewMaxKva(application.getAssignedLew() != null && application.getAssignedLew().getLewGrade() != null
+                        ? application.getAssignedLew().getLewGrade().getMaxKva() : null)
+                // SP Account
+                .spAccountNo(application.getSpAccountNo())
                 // Phase 18 fields
                 .applicationType(application.getApplicationType().name())
                 .serviceFee(application.getServiceFee())
@@ -93,6 +111,7 @@ public class AdminApplicationResponse {
                 .existingExpiryDate(application.getExistingExpiryDate())
                 .renewalPeriodMonths(application.getRenewalPeriodMonths())
                 .emaFee(application.getEmaFee())
+                .sldOption(application.getSldOption() != null ? application.getSldOption().name() : null)
                 .build();
     }
 }

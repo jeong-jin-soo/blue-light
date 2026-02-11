@@ -22,6 +22,9 @@ public class UpdateProfileRequest {
     @Size(max = 50, message = "Licence number must be 50 characters or less")
     private String lewLicenceNo;
 
+    @Size(max = 20, message = "LEW grade must be 20 characters or less")
+    private String lewGrade;
+
     @Size(max = 100, message = "Company name must be 100 characters or less")
     private String companyName;
 

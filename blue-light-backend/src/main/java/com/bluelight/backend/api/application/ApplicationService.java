@@ -6,10 +6,9 @@ import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
 import com.bluelight.backend.common.exception.BusinessException;
-import com.bluelight.backend.domain.application.Application;
-import com.bluelight.backend.domain.application.ApplicationRepository;
-import com.bluelight.backend.domain.application.ApplicationStatus;
-import com.bluelight.backend.domain.application.ApplicationType;
+import com.bluelight.backend.api.application.dto.CreateSldRequestDto;
+import com.bluelight.backend.api.application.dto.SldRequestResponse;
+import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
@@ -39,6 +38,7 @@ import java.util.List;
 public class ApplicationService {
 
     private final ApplicationRepository applicationRepository;
+    private final SldRequestRepository sldRequestRepository;
     private final MasterPriceRepository masterPriceRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
@@ -123,6 +123,12 @@ public class ApplicationService {
             }
         }
 
+        // Parse SLD option
+        SldOption sldOption = SldOption.SELF_UPLOAD;
+        if ("REQUEST_LEW".equals(request.getSldOption())) {
+            sldOption = SldOption.REQUEST_LEW;
+        }
+
         // Create application
         Application application = Application.builder()
                 .user(user)
@@ -132,6 +138,8 @@ public class ApplicationService {
                 .selectedKva(request.getSelectedKva())
                 .quoteAmount(quoteAmount)
                 .serviceFee(serviceFee)
+                .spAccountNo(request.getSpAccountNo())
+                .sldOption(sldOption)
                 .applicationType(appType)
                 .originalApplication(originalApp)
                 .existingLicenceNo(existingLicenceNo)
@@ -150,9 +158,19 @@ public class ApplicationService {
         }
 
         Application saved = applicationRepository.save(application);
-        log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, serviceFee={}",
+        log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, serviceFee={}, sldOption={}",
                 saved.getApplicationSeq(), appType, userSeq,
-                request.getSelectedKva(), quoteAmount, serviceFee);
+                request.getSelectedKva(), quoteAmount, serviceFee, sldOption);
+
+        // SLD 요청 시 자동으로 SldRequest 생성
+        if (sldOption == SldOption.REQUEST_LEW) {
+            SldRequest sldRequest = SldRequest.builder()
+                    .application(saved)
+                    .applicantNote(null)
+                    .build();
+            sldRequestRepository.save(sldRequest);
+            log.info("SLD request auto-created: applicationSeq={}", saved.getApplicationSeq());
+        }
 
         return ApplicationResponse.from(saved);
     }
@@ -193,6 +211,11 @@ public class ApplicationService {
                 request.getBuildingType(), request.getSelectedKva(),
                 quoteAmount, serviceFee
         );
+
+        // SP Account No 수정
+        if (request.getSpAccountNo() != null) {
+            application.updateSpAccountNo(request.getSpAccountNo());
+        }
 
         // Licence period 변경 처리 (모든 타입)
         if (request.getRenewalPeriodMonths() != null) {
@@ -305,6 +328,55 @@ public class ApplicationService {
                 .stream()
                 .map(ApplicationResponse::from)
                 .toList();
+    }
+
+    // ── SLD Request (신청자용) ────────────────────
+
+    /**
+     * SLD 요청 생성 (신청서 상세 페이지에서 후속 요청 시)
+     */
+    @Transactional
+    public SldRequestResponse createSldRequest(Long userSeq, Long applicationSeq, CreateSldRequestDto dto) {
+        Application application = applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+        if (!application.getUser().getUserSeq().equals(userSeq)) {
+            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        }
+
+        // 중복 체크
+        if (sldRequestRepository.findByApplicationApplicationSeq(applicationSeq).isPresent()) {
+            throw new BusinessException(
+                    "SLD request already exists for this application",
+                    HttpStatus.CONFLICT, "SLD_REQUEST_ALREADY_EXISTS");
+        }
+
+        SldRequest sldRequest = SldRequest.builder()
+                .application(application)
+                .applicantNote(dto.getNote())
+                .build();
+        sldRequestRepository.save(sldRequest);
+
+        log.info("SLD request created: applicationSeq={}, userSeq={}", applicationSeq, userSeq);
+        return SldRequestResponse.from(sldRequest);
+    }
+
+    /**
+     * SLD 요청 조회 (신청자용)
+     */
+    public SldRequestResponse getSldRequest(Long userSeq, Long applicationSeq) {
+        Application application = applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+        if (!application.getUser().getUserSeq().equals(userSeq)) {
+            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        }
+
+        return sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .map(SldRequestResponse::from)
+                .orElse(null);
     }
 
     /**

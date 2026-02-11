@@ -33,6 +33,9 @@ public class ApplicationResponse {
     private String assignedLewName;
     private String assignedLewLicenceNo;
 
+    // SP Group 계정 번호
+    private String spAccountNo;
+
     // ── Phase 18: 갱신 + 견적 개선 필드 ──
     private String applicationType;
     private BigDecimal serviceFee;
@@ -42,6 +45,9 @@ public class ApplicationResponse {
     private LocalDate existingExpiryDate;
     private Integer renewalPeriodMonths;
     private BigDecimal emaFee;
+
+    // SLD 제출 방식
+    private String sldOption;
 
     public static ApplicationResponse from(Application application) {
         return ApplicationResponse.builder()
@@ -62,6 +68,8 @@ public class ApplicationResponse {
                         ? application.getAssignedLew().getName() : null)
                 .assignedLewLicenceNo(application.getAssignedLew() != null
                         ? application.getAssignedLew().getLewLicenceNo() : null)
+                // SP Account
+                .spAccountNo(application.getSpAccountNo())
                 // Phase 18 fields
                 .applicationType(application.getApplicationType().name())
                 .serviceFee(application.getServiceFee())
@@ -72,6 +80,7 @@ public class ApplicationResponse {
                 .existingExpiryDate(application.getExistingExpiryDate())
                 .renewalPeriodMonths(application.getRenewalPeriodMonths())
                 .emaFee(application.getEmaFee())
+                .sldOption(application.getSldOption() != null ? application.getSldOption().name() : null)
                 .build();
     }
 }

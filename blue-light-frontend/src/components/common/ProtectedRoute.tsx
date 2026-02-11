@@ -18,6 +18,11 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
+  // 이메일 미인증 사용자는 인증 대기 페이지로 리다이렉트
+  if (!user.emailVerified) {
+    return <Navigate to="/email-verification-pending" replace />;
+  }
+
   // 미승인 LEW는 대기 페이지로 리다이렉트
   if (user.role === 'LEW' && !user.approved) {
     return <Navigate to="/lew-pending" replace />;

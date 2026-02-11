@@ -85,7 +85,7 @@ public class AuthService {
             );
         }
 
-        // LEW 역할 선택 시 면허번호 필수 검증
+        // LEW 역할 선택 시 면허번호 + 등급 필수 검증
         if (selectedRole == UserRole.LEW) {
             if (request.getLewLicenceNo() == null || request.getLewLicenceNo().isBlank()) {
                 throw new BusinessException(
@@ -94,7 +94,34 @@ public class AuthService {
                         "LEW_LICENCE_NO_REQUIRED"
                 );
             }
+            if (request.getLewGrade() == null || request.getLewGrade().isBlank()) {
+                throw new BusinessException(
+                        "LEW grade is required for LEW registration",
+                        HttpStatus.BAD_REQUEST,
+                        "LEW_GRADE_REQUIRED"
+                );
+            }
         }
+
+        // LEW 등급 파싱
+        LewGrade lewGrade = null;
+        if (selectedRole == UserRole.LEW && request.getLewGrade() != null) {
+            try {
+                lewGrade = LewGrade.valueOf(request.getLewGrade().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException(
+                        "Invalid LEW grade: " + request.getLewGrade(),
+                        HttpStatus.BAD_REQUEST,
+                        "INVALID_LEW_GRADE"
+                );
+            }
+        }
+
+        // 이메일 인증 활성화 여부 확인
+        boolean emailVerificationEnabled = isEmailVerificationEnabled();
+
+        // 이메일 인증 토큰 생성 (인증 활성화 시)
+        String emailVerificationToken = emailVerificationEnabled ? UUID.randomUUID().toString() : null;
 
         // 사용자 생성 (LEW는 승인 대기 상태로 시작)
         User user = User.builder()
@@ -105,14 +132,24 @@ public class AuthService {
                 .role(selectedRole)
                 .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
                 .lewLicenceNo(selectedRole == UserRole.LEW ? request.getLewLicenceNo() : null)
+                .lewGrade(lewGrade)
                 .companyName(request.getCompanyName())
                 .uen(request.getUen())
                 .designation(request.getDesignation())
+                .emailVerified(!emailVerificationEnabled)
+                .emailVerificationToken(emailVerificationToken)
                 .pdpaConsentAt(LocalDateTime.now())
                 .build();
 
         User savedUser = userRepository.save(user);
-        log.info("회원가입 완료: userSeq={}, email={}", savedUser.getUserSeq(), savedUser.getEmail());
+        log.info("회원가입 완료: userSeq={}, email={}, emailVerified={}",
+                savedUser.getUserSeq(), savedUser.getEmail(), savedUser.isEmailVerified());
+
+        // 이메일 인증 메일 발송
+        if (emailVerificationEnabled) {
+            String verificationLink = resetBaseUrl + "/verify-email?token=" + emailVerificationToken;
+            emailService.sendEmailVerificationEmail(savedUser.getEmail(), savedUser.getName(), verificationLink);
+        }
 
         // JWT 토큰 생성 및 반환
         return createTokenResponse(savedUser);
@@ -124,6 +161,7 @@ public class AuthService {
      * @param request 로그인 요청 정보
      * @return 토큰 응답
      */
+    @Transactional
     public TokenResponse login(LoginRequest request) {
         // 이메일로 사용자 조회
         User user = userRepository.findByEmail(request.getEmail())
@@ -143,6 +181,12 @@ public class AuthService {
         }
 
         log.info("로그인 성공: userSeq={}, email={}", user.getUserSeq(), user.getEmail());
+
+        // 이메일 인증 비활성화 상태이면서 미인증 사용자 → 자동 인증 처리
+        if (!user.isEmailVerified() && !isEmailVerificationEnabled()) {
+            user.verifyEmail();
+            log.info("이메일 인증 비활성화 상태 → 기존 사용자 자동 인증: userSeq={}", user.getUserSeq());
+        }
 
         // JWT 토큰 생성 및 반환
         return createTokenResponse(user);
@@ -238,6 +282,79 @@ public class AuthService {
     }
 
     /**
+     * 이메일 인증 처리
+     * - 토큰이 유효하면 emailVerified = true로 변경
+     */
+    @Transactional
+    public void verifyEmail(String token) {
+        User user = userRepository.findByEmailVerificationToken(token)
+                .orElseThrow(() -> new BusinessException(
+                        "Invalid or expired verification link",
+                        HttpStatus.BAD_REQUEST,
+                        "INVALID_VERIFICATION_TOKEN"
+                ));
+
+        if (user.isEmailVerified()) {
+            throw new BusinessException(
+                    "Email is already verified",
+                    HttpStatus.BAD_REQUEST,
+                    "ALREADY_VERIFIED"
+            );
+        }
+
+        user.verifyEmail();
+        log.info("Email verified: userSeq={}, email={}", user.getUserSeq(), user.getEmail());
+    }
+
+    /**
+     * 인증 이메일 재발송
+     * - 이미 인증된 경우 에러
+     * - 인증 활성화 설정이 꺼져있으면 자동 인증 처리
+     */
+    @Transactional
+    public void resendVerificationEmail(Long userSeq) {
+        User user = userRepository.findById(userSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "User not found",
+                        HttpStatus.NOT_FOUND,
+                        "USER_NOT_FOUND"
+                ));
+
+        if (user.isEmailVerified()) {
+            throw new BusinessException(
+                    "Email is already verified",
+                    HttpStatus.BAD_REQUEST,
+                    "ALREADY_VERIFIED"
+            );
+        }
+
+        // 인증 비활성화 상태면 자동 인증
+        if (!isEmailVerificationEnabled()) {
+            user.verifyEmail();
+            log.info("Email auto-verified (verification disabled): userSeq={}", userSeq);
+            return;
+        }
+
+        // 새 토큰 생성 및 이메일 발송
+        String newToken = UUID.randomUUID().toString();
+        user.setEmailVerificationToken(newToken);
+
+        String verificationLink = resetBaseUrl + "/verify-email?token=" + newToken;
+        emailService.sendEmailVerificationEmail(user.getEmail(), user.getName(), verificationLink);
+
+        log.info("Verification email resent: userSeq={}, email={}", userSeq, user.getEmail());
+    }
+
+    /**
+     * 이메일 인증 기능 활성화 여부 확인
+     */
+    private boolean isEmailVerificationEnabled() {
+        return systemSettingRepository.findById("email_verification_enabled")
+                .map(s -> s.toBooleanValue())
+                .orElse(false); // 설정값이 없으면 기본 비활성화
+    }
+
+    /**
      * LEW 가입 허용 여부 확인
      */
     private boolean isLewRegistrationOpen() {
@@ -251,11 +368,13 @@ public class AuthService {
      */
     private TokenResponse createTokenResponse(User user) {
         boolean approved = user.isApproved();
+        boolean emailVerified = user.isEmailVerified();
         String accessToken = jwtTokenProvider.createToken(
                 user.getUserSeq(),
                 user.getEmail(),
                 user.getRole().name(),
-                approved
+                approved,
+                emailVerified
         );
 
         return TokenResponse.of(
@@ -265,7 +384,8 @@ public class AuthService {
                 user.getEmail(),
                 user.getName(),
                 user.getRole().name(),
-                approved
+                approved,
+                emailVerified
         );
     }
 }

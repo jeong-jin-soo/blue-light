@@ -80,6 +80,24 @@ export const resetPassword = async (data: ResetPasswordRequest): Promise<Message
   return response.data;
 };
 
+/**
+ * 이메일 인증 처리 (토큰 기반)
+ */
+export const verifyEmail = async (token: string): Promise<MessageResponse> => {
+  const response = await axiosClient.get<MessageResponse>('/auth/verify-email', {
+    params: { token },
+  });
+  return response.data;
+};
+
+/**
+ * 인증 이메일 재발송
+ */
+export const resendVerificationEmail = async (): Promise<MessageResponse> => {
+  const response = await axiosClient.post<MessageResponse>('/auth/resend-verification');
+  return response.data;
+};
+
 export const authApi = {
   signup,
   login,
@@ -88,6 +106,8 @@ export const authApi = {
   getSignupOptions,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerificationEmail,
 };
 
 export default authApi;

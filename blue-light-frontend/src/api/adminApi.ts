@@ -14,6 +14,7 @@ import type {
   Payment,
   PaymentConfirmRequest,
   RevisionRequest,
+  SldRequest,
   UpdatePriceRequest,
   UpdateStatusRequest,
   User,
@@ -133,11 +134,43 @@ export const uploadFile = async (
 };
 
 // ============================================
+// SLD Request Management
+// ============================================
+
+export const getAdminSldRequest = async (applicationId: number): Promise<SldRequest | null> => {
+  const response = await axiosClient.get<SldRequest>(
+    `/admin/applications/${applicationId}/sld-request`
+  );
+  return response.data;
+};
+
+export const uploadSldComplete = async (
+  applicationId: number,
+  fileSeq: number,
+  lewNote?: string
+): Promise<SldRequest> => {
+  const response = await axiosClient.post<SldRequest>(
+    `/admin/applications/${applicationId}/sld-uploaded`,
+    { fileSeq, lewNote }
+  );
+  return response.data;
+};
+
+export const confirmSld = async (applicationId: number): Promise<SldRequest> => {
+  const response = await axiosClient.post<SldRequest>(
+    `/admin/applications/${applicationId}/sld-confirm`
+  );
+  return response.data;
+};
+
+// ============================================
 // LEW Assignment
 // ============================================
 
-export const getAvailableLews = async (): Promise<LewSummary[]> => {
-  const response = await axiosClient.get<LewSummary[]>('/admin/lews');
+export const getAvailableLews = async (kva?: number): Promise<LewSummary[]> => {
+  const response = await axiosClient.get<LewSummary[]>('/admin/lews', {
+    params: kva ? { kva } : undefined,
+  });
   return response.data;
 };
 
@@ -234,6 +267,9 @@ export const adminApi = {
   confirmPayment,
   getPayments,
   uploadFile,
+  getAdminSldRequest,
+  uploadSldComplete,
+  confirmSld,
   getAvailableLews,
   assignLew,
   unassignLew,

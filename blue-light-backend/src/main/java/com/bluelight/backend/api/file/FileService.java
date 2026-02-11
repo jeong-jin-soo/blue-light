@@ -64,11 +64,12 @@ public class FileService {
                 .fileType(fileType)
                 .fileUrl(storedPath)
                 .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
                 .build();
 
         FileEntity saved = fileRepository.save(fileEntity);
-        log.info("File uploaded: fileSeq={}, applicationSeq={}, type={}, name={}",
-                saved.getFileSeq(), applicationSeq, fileType, file.getOriginalFilename());
+        log.info("File uploaded: fileSeq={}, applicationSeq={}, type={}, name={}, size={}",
+                saved.getFileSeq(), applicationSeq, fileType, file.getOriginalFilename(), file.getSize());
 
         return FileResponse.from(saved);
     }
@@ -91,10 +92,11 @@ public class FileService {
                 .fileType(fileType)
                 .fileUrl(storedPath)
                 .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
                 .build();
 
         FileEntity saved = fileRepository.save(fileEntity);
-        log.info("File uploaded by admin: fileSeq={}, applicationSeq={}, type={}", saved.getFileSeq(), applicationSeq, fileType);
+        log.info("File uploaded by admin: fileSeq={}, applicationSeq={}, type={}, size={}", saved.getFileSeq(), applicationSeq, fileType, file.getSize());
 
         return FileResponse.from(saved);
     }

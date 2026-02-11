@@ -59,6 +59,27 @@ public class SmtpEmailService implements EmailService {
 
     @Override
     @Async
+    public void sendEmailVerificationEmail(String to, String userName, String verificationLink) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("Verify Your Email - Blue Light");
+
+            String htmlContent = buildEmailVerificationHtml(userName, verificationLink);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Email verification email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send email verification email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
     public void sendLicenseExpiryWarningEmail(String to, String userName,
                                                String licenseNumber, String address,
                                                LocalDate expiryDate, int daysRemaining) {
@@ -170,5 +191,41 @@ public class SmtpEmailService implements EmailService {
                 </body>
                 </html>
                 """.formatted(userName, urgencyColor, daysText, licenseNumber, address, urgencyColor, formattedDate);
+    }
+
+    private String buildEmailVerificationHtml(String userName, String verificationLink) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Blue Light</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">Verify Your Email</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        Thank you for signing up with Blue Light. Please verify your email address by clicking the button below.
+                      </p>
+                      <div style="text-align: center; margin: 32px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                          Verify Email
+                        </a>
+                      </div>
+                      <p style="color: #888888; font-size: 13px; line-height: 1.5;">
+                        If you didn't create an account with Blue Light, you can safely ignore this email.
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px;">
+                        If the button doesn't work, copy and paste this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(userName, verificationLink, verificationLink, verificationLink);
     }
 }

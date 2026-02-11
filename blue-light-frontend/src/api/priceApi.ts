@@ -19,5 +19,13 @@ export const calculatePrice = async (kva: number): Promise<PriceCalculation> => 
   return response.data;
 };
 
-export const priceApi = { getPrices, calculatePrice };
+/**
+ * Get payment receiving info (public, no auth)
+ */
+export const getPaymentInfo = async (): Promise<Record<string, string>> => {
+  const response = await axiosClient.get<Record<string, string>>('/public/payment-info');
+  return response.data;
+};
+
+export const priceApi = { getPrices, calculatePrice, getPaymentInfo };
 export default priceApi;

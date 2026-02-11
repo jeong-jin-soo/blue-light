@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { StatusBadge } from '../../components/domain/StatusBadge';
@@ -26,6 +27,7 @@ export default function ApplicationListPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   useEffect(() => {
     applicationApi
@@ -38,9 +40,29 @@ export default function ApplicationListPage() {
   }, []);
 
   const filteredApplications = useMemo(() => {
-    if (!statusFilter) return applications;
-    return applications.filter((app) => app.status === statusFilter);
-  }, [applications, statusFilter]);
+    let result = applications;
+
+    // Status filter
+    if (statusFilter) {
+      result = result.filter((app) => app.status === statusFilter);
+    }
+
+    // Keyword search (address, postal code, building type, licence number, SP account)
+    if (searchKeyword.trim()) {
+      const keyword = searchKeyword.trim().toLowerCase();
+      result = result.filter((app) =>
+        app.address.toLowerCase().includes(keyword) ||
+        app.postalCode.toLowerCase().includes(keyword) ||
+        (app.buildingType && app.buildingType.toLowerCase().includes(keyword)) ||
+        (app.licenseNumber && app.licenseNumber.toLowerCase().includes(keyword)) ||
+        (app.spAccountNo && app.spAccountNo.toLowerCase().includes(keyword)) ||
+        String(app.applicationSeq).includes(keyword) ||
+        String(app.selectedKva).includes(keyword)
+      );
+    }
+
+    return result;
+  }, [applications, statusFilter, searchKeyword]);
 
   const columns: Column<Application>[] = [
     {
@@ -135,14 +157,23 @@ export default function ApplicationListPage() {
         </Button>
       </div>
 
-      {/* Status filter */}
+      {/* Search & filter */}
       {applications.length > 0 && (
-        <div className="w-48">
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            options={STATUS_FILTER_OPTIONS}
-          />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 max-w-sm">
+            <Input
+              placeholder="Search by address, postal code, kVA..."
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+            />
+          </div>
+          <div className="w-48">
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={STATUS_FILTER_OPTIONS}
+            />
+          </div>
         </div>
       )}
 
@@ -156,12 +187,12 @@ export default function ApplicationListPage() {
         emptyIcon="📋"
         emptyTitle="No applications found"
         emptyDescription={
-          statusFilter
-            ? `No applications with status "${STATUS_FILTER_OPTIONS.find((s) => s.value === statusFilter)?.label}".`
+          searchKeyword || statusFilter
+            ? `No applications found${statusFilter ? ` with status "${STATUS_FILTER_OPTIONS.find((s) => s.value === statusFilter)?.label}"` : ''}${searchKeyword ? ` matching "${searchKeyword}"` : ''}.`
             : "You haven't submitted any licence applications yet."
         }
         emptyAction={
-          !statusFilter ? (
+          !statusFilter && !searchKeyword ? (
             <Button
               variant="outline"
               size="sm"

@@ -18,6 +18,7 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('APPLICANT');
   const [lewLicenceNo, setLewLicenceNo] = useState('');
+  const [lewGrade, setLewGrade] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [uen, setUen] = useState('');
   const [designation, setDesignation] = useState('');
@@ -77,6 +78,11 @@ export default function SignupPage() {
       return;
     }
 
+    if (role === 'LEW' && !lewGrade) {
+      setLocalError('LEW grade is required');
+      return;
+    }
+
     if (!pdpaConsent) {
       setLocalError('You must agree to the Privacy Policy to continue');
       return;
@@ -88,6 +94,7 @@ export default function SignupPage() {
         phone: phone || undefined,
         role,
         lewLicenceNo: role === 'LEW' ? lewLicenceNo.trim() : undefined,
+        lewGrade: role === 'LEW' ? lewGrade : undefined,
         companyName: role === 'APPLICANT' && companyName.trim() ? companyName.trim() : undefined,
         uen: role === 'APPLICANT' && uen.trim() ? uen.trim() : undefined,
         designation: role === 'APPLICANT' && designation.trim() ? designation.trim() : undefined,
@@ -235,6 +242,33 @@ export default function SignupPage() {
                     placeholder="e.g., LEW-2026-XXXXX"
                     hint="Your EMA-issued LEW licence number"
                   />
+                </div>
+                <div className="mt-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    LEW Grade<span className="text-error-500 ml-0.5">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
+                      { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
+                      { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
+                    ].map((g) => (
+                      <button
+                        key={g.value}
+                        type="button"
+                        onClick={() => setLewGrade(g.value)}
+                        className={`p-2.5 border-2 rounded-lg text-center transition-all ${
+                          lewGrade === g.value
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="text-sm font-medium">{g.label}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">{g.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Select the grade on your EMA licence</p>
                 </div>
               </>
             )}

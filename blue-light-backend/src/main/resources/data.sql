@@ -3,20 +3,20 @@
 -- 중복 방지: 데이터가 없을 때만 삽입
 -- ============================================
 
--- Admin 계정 (password: admin1234 / BCrypt encoded)
-INSERT INTO users (email, password, name, phone, role, created_at, updated_at)
+-- Admin 계정 (password: admin1234 / BCrypt encoded, 이메일 인증 완료)
+INSERT INTO users (email, password, name, phone, role, email_verified, created_at, updated_at)
 SELECT 'admin@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'System Admin', '+65-0000-0000', 'ADMIN',
+       'System Admin', '+65-0000-0000', 'ADMIN', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@bluelight.sg');
 
--- LEW 계정 (password: admin1234 / BCrypt encoded, 사전 승인됨)
-INSERT INTO users (email, password, name, phone, role, approved_status, lew_licence_no, created_at, updated_at)
+-- LEW 계정 (password: admin1234 / BCrypt encoded, 사전 승인됨, Grade 9, 이메일 인증 완료)
+INSERT INTO users (email, password, name, phone, role, approved_status, lew_licence_no, lew_grade, email_verified, created_at, updated_at)
 SELECT 'lew@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'LEW Officer', '+65-0000-0001', 'LEW', 'APPROVED', 'LEW-2026-00001',
+       'LEW Officer', '+65-0000-0001', 'LEW', 'APPROVED', 'LEW-2026-00001', 'GRADE_9', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'lew@bluelight.sg');
@@ -32,6 +32,45 @@ INSERT INTO system_settings (setting_key, setting_value, description, updated_at
 SELECT 'service_fee', '50.00', 'Platform service fee (SGD)', NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'service_fee');
+
+-- 결제 수취 정보 (PayNow)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'payment_paynow_uen', '202401234A', 'PayNow UEN number', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_paynow_uen');
+
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'payment_paynow_name', 'Blue Light Pte Ltd', 'PayNow recipient name', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_paynow_name');
+
+-- 결제 수취 정보 (Bank Transfer)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'payment_bank_name', 'DBS Bank', 'Bank name for transfer', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_bank_name');
+
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'payment_bank_account', '012-345678-9', 'Bank account number', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_bank_account');
+
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'payment_bank_account_name', 'Blue Light Pte Ltd', 'Bank account holder name', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_bank_account_name');
+
+-- 이메일 인증 기능 활성화 여부 (기본: 비활성화 — 로컬 개발 환경 대응)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'email_verification_enabled', 'false', 'Enable email verification on signup', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'email_verification_enabled');
+
+-- SLD 작성 수수료 (LEW 대행 시, 미정 상태 — 추후 결정)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'sld_drawing_fee', '0', 'SLD drawing fee when LEW prepares (SGD). Set to 0 while pricing TBD.', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'sld_drawing_fee');
 
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입

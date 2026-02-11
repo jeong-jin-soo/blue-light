@@ -21,6 +21,7 @@ public class UserResponse {
     private UserRole role;
     private boolean approved;
     private String lewLicenceNo;
+    private String lewGrade;
     private String companyName;
     private String uen;
     private String designation;
@@ -37,6 +38,7 @@ public class UserResponse {
                 .role(user.getRole())
                 .approved(user.isApproved())
                 .lewLicenceNo(user.getLewLicenceNo())
+                .lewGrade(user.getLewGrade() != null ? user.getLewGrade().name() : null)
                 .companyName(user.getCompanyName())
                 .uen(user.getUen())
                 .designation(user.getDesignation())

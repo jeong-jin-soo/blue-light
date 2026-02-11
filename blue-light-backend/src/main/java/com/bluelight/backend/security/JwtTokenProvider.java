@@ -42,13 +42,14 @@ public class JwtTokenProvider {
     /**
      * Access Token 생성
      *
-     * @param userSeq  사용자 PK
-     * @param email    사용자 이메일
-     * @param role     사용자 역할
-     * @param approved 승인 여부 (LEW만 관련)
+     * @param userSeq       사용자 PK
+     * @param email         사용자 이메일
+     * @param role          사용자 역할
+     * @param approved      승인 여부 (LEW만 관련)
+     * @param emailVerified 이메일 인증 여부
      * @return JWT 토큰
      */
-    public String createToken(Long userSeq, String email, String role, boolean approved) {
+    public String createToken(Long userSeq, String email, String role, boolean approved, boolean emailVerified) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
@@ -57,6 +58,7 @@ public class JwtTokenProvider {
                 .claim("email", email)
                 .claim("role", role)
                 .claim("approved", approved)
+                .claim("emailVerified", emailVerified)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)
@@ -93,6 +95,14 @@ public class JwtTokenProvider {
     public Boolean getApproved(String token) {
         Claims claims = parseClaims(token);
         return claims.get("approved", Boolean.class);
+    }
+
+    /**
+     * 토큰에서 이메일 인증 여부 추출
+     */
+    public Boolean getEmailVerified(String token) {
+        Claims claims = parseClaims(token);
+        return claims.get("emailVerified", Boolean.class);
     }
 
     /**

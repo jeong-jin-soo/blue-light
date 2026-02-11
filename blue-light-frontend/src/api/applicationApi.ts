@@ -4,6 +4,7 @@ import type {
   ApplicationSummary,
   CreateApplicationRequest,
   Payment,
+  SldRequest,
   UpdateApplicationRequest,
 } from '../types';
 
@@ -63,6 +64,34 @@ export const getCompletedApplications = async (): Promise<Application[]> => {
   return response.data;
 };
 
+// ============================================
+// SLD Request
+// ============================================
+
+/**
+ * Create SLD request (request LEW to prepare SLD)
+ */
+export const createSldRequest = async (
+  applicationId: number,
+  note?: string
+): Promise<SldRequest> => {
+  const response = await axiosClient.post<SldRequest>(
+    `/applications/${applicationId}/sld-request`,
+    { note }
+  );
+  return response.data;
+};
+
+/**
+ * Get SLD request for an application
+ */
+export const getSldRequest = async (applicationId: number): Promise<SldRequest | null> => {
+  const response = await axiosClient.get<SldRequest>(
+    `/applications/${applicationId}/sld-request`
+  );
+  return response.data;
+};
+
 export const applicationApi = {
   createApplication,
   updateApplication,
@@ -71,5 +100,7 @@ export const applicationApi = {
   getApplicationSummary,
   getApplicationPayments,
   getCompletedApplications,
+  createSldRequest,
+  getSldRequest,
 };
 export default applicationApi;

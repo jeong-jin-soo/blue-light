@@ -2,9 +2,8 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
 import com.bluelight.backend.common.exception.BusinessException;
-import com.bluelight.backend.domain.application.Application;
-import com.bluelight.backend.domain.application.ApplicationRepository;
-import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.api.application.dto.SldRequestResponse;
+import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.payment.Payment;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.payment.PaymentStatus;
@@ -37,6 +36,7 @@ import java.util.List;
 public class AdminApplicationService {
 
     private final ApplicationRepository applicationRepository;
+    private final SldRequestRepository sldRequestRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final SystemSettingRepository systemSettingRepository;
@@ -251,6 +251,19 @@ public class AdminApplicationService {
                     "LEW is not approved", HttpStatus.BAD_REQUEST, "LEW_NOT_APPROVED");
         }
 
+        // LEW 등급별 kVA 용량 검증
+        if (lew.getLewGrade() == null) {
+            throw new BusinessException(
+                    "LEW grade is not set. Please update the LEW's grade before assignment.",
+                    HttpStatus.BAD_REQUEST, "LEW_GRADE_NOT_SET");
+        }
+        if (!lew.canHandleKva(application.getSelectedKva())) {
+            throw new BusinessException(
+                    String.format("LEW grade %s (max %d kVA) cannot handle this application's %d kVA",
+                            lew.getLewGrade().name(), lew.getLewGrade().getMaxKva(), application.getSelectedKva()),
+                    HttpStatus.BAD_REQUEST, "LEW_GRADE_INSUFFICIENT");
+        }
+
         application.assignLew(lew);
         log.info("LEW assigned: applicationSeq={}, lewSeq={}", applicationSeq, lew.getUserSeq());
 
@@ -269,11 +282,12 @@ public class AdminApplicationService {
     }
 
     /**
-     * 할당 가능한 LEW 목록 조회 (APPROVED 상태)
+     * 할당 가능한 LEW 목록 조회 (APPROVED 상태, kVA 필터 선택)
      */
-    public List<LewSummaryResponse> getAvailableLews() {
+    public List<LewSummaryResponse> getAvailableLews(Integer kva) {
         return userRepository.findByRoleAndApprovedStatus(UserRole.LEW, ApprovalStatus.APPROVED)
                 .stream()
+                .filter(lew -> kva == null || lew.canHandleKva(kva))
                 .map(LewSummaryResponse::from)
                 .toList();
     }
@@ -364,6 +378,62 @@ public class AdminApplicationService {
             log.info("Setting updated: key={}, value={}, by={}", key, value, updatedBy);
         });
         return getSettings();
+    }
+
+    // --- SLD Request Management ---
+
+    /**
+     * SLD 요청 조회 (Admin/LEW)
+     */
+    public SldRequestResponse getAdminSldRequest(Long applicationSeq) {
+        findApplicationOrThrow(applicationSeq);
+        return sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .map(SldRequestResponse::from)
+                .orElse(null);
+    }
+
+    /**
+     * SLD 업로드 완료 마킹 (LEW)
+     */
+    @Transactional
+    public SldRequestResponse uploadSld(Long applicationSeq, SldUploadedDto dto) {
+        findApplicationOrThrow(applicationSeq);
+        SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
+
+        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED) {
+            throw new BusinessException(
+                    "SLD can only be uploaded when status is REQUESTED",
+                    HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
+        }
+
+        sldRequest.markUploaded(dto.getFileSeq(), dto.getLewNote());
+        log.info("SLD marked as uploaded: applicationSeq={}, fileSeq={}", applicationSeq, dto.getFileSeq());
+
+        return SldRequestResponse.from(sldRequest);
+    }
+
+    /**
+     * SLD 확인 (Admin/LEW)
+     */
+    @Transactional
+    public SldRequestResponse confirmSld(Long applicationSeq) {
+        findApplicationOrThrow(applicationSeq);
+        SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
+
+        if (sldRequest.getStatus() != SldRequestStatus.UPLOADED) {
+            throw new BusinessException(
+                    "SLD can only be confirmed when status is UPLOADED",
+                    HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
+        }
+
+        sldRequest.confirm();
+        log.info("SLD confirmed: applicationSeq={}", applicationSeq);
+
+        return SldRequestResponse.from(sldRequest);
     }
 
     // --- Private helpers ---
