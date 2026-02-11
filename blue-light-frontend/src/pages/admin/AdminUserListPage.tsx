@@ -187,6 +187,7 @@ export default function AdminUserListPage() {
               }}
               className="text-xs text-primary hover:text-primary/80 hover:underline"
               title={`Change to ${user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT'}`}
+              aria-label={`Change ${user.name}'s role to ${user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT'}`}
             >
               Change
             </button>
@@ -208,6 +209,7 @@ export default function AdminUserListPage() {
               <button
                 onClick={() => setApprovalTarget({ user, action: 'approve' })}
                 className="text-xs text-success-600 hover:text-success-700 hover:underline"
+                aria-label={`Approve ${user.name} as LEW`}
               >
                 Approve
               </button>
@@ -216,6 +218,7 @@ export default function AdminUserListPage() {
               <button
                 onClick={() => setApprovalTarget({ user, action: 'reject' })}
                 className="text-xs text-error-600 hover:text-error-700 hover:underline"
+                aria-label={`Reject ${user.name}'s LEW registration`}
               >
                 Reject
               </button>
