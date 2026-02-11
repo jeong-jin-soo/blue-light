@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-10 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <DashboardCard
           label="Total Applications"
           value={dashboard?.totalApplications ?? 0}
@@ -202,7 +202,10 @@ export default function AdminDashboardPage() {
                 <div
                   key={app.applicationSeq}
                   className="py-3 cursor-pointer active:bg-gray-50"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => navigate(`/admin/applications/${app.applicationSeq}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/admin/applications/${app.applicationSeq}`); } }}
                 >
                   <div className="flex items-start justify-between mb-1.5">
                     <div className="min-w-0 flex-1 mr-3">
@@ -240,8 +243,10 @@ export default function AdminDashboardPage() {
                   {recentApps.map((app) => (
                     <tr
                       key={app.applicationSeq}
-                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary/20"
+                      tabIndex={0}
                       onClick={() => navigate(`/admin/applications/${app.applicationSeq}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/admin/applications/${app.applicationSeq}`); } }}
                     >
                       <td className="py-3 px-2">
                         <div className="font-medium text-gray-800">{app.userName}</div>

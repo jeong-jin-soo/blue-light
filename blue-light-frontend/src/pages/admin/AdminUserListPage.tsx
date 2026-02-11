@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
@@ -291,17 +292,13 @@ export default function AdminUserListPage() {
               </button>
             )}
           </div>
-          <select
-            value={roleFilter}
-            onChange={handleRoleFilterChange}
-            className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary sm:w-40"
-          >
-            {ROLE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          <div className="sm:w-40">
+            <Select
+              value={roleFilter}
+              onChange={handleRoleFilterChange}
+              options={ROLE_OPTIONS}
+            />
+          </div>
         </div>
       </Card>
 

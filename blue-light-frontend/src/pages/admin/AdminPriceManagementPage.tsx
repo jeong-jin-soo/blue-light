@@ -276,9 +276,9 @@ export default function AdminPriceManagementPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Price Management</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">System Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage system settings, kVA price tiers, service fee, and payment information
+          Manage email verification, pricing, service fees, and payment information
         </p>
       </div>
 
@@ -546,7 +546,7 @@ export default function AdminPriceManagementPage() {
           <Button variant="outline" onClick={() => setEditingPrice(null)}>
             Cancel
           </Button>
-          <Button onClick={handleSavePrice} loading={saving}>
+          <Button size="sm" onClick={handleSavePrice} loading={saving}>
             Save Changes
           </Button>
         </ModalFooter>

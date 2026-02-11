@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 type ModalSize = 'sm' | 'md' | 'lg';
@@ -18,6 +18,9 @@ const sizeClasses: Record<ModalSize, string> = {
   lg: 'max-w-2xl',
 };
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 export function Modal({
   isOpen,
   onClose,
@@ -27,16 +30,71 @@ export function Modal({
   closeOnEscape = true,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<Element | null>(null);
 
-  // Escape key handler
+  // Focus trap: Tab / Shift+Tab cycles within modal
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && closeOnEscape) {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    },
+    [onClose, closeOnEscape]
+  );
+
+  // Save trigger element & move focus into modal on open
   useEffect(() => {
-    if (!isOpen || !closeOnEscape) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    if (isOpen) {
+      triggerRef.current = document.activeElement;
+      // Delay to ensure modal content is rendered
+      requestAnimationFrame(() => {
+        if (!dialogRef.current) return;
+        const first = dialogRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (first) {
+          first.focus();
+        } else {
+          dialogRef.current.focus();
+        }
+      });
+    }
+  }, [isOpen]);
+
+  // Restore focus to trigger element on close
+  useEffect(() => {
+    return () => {
+      if (triggerRef.current && triggerRef.current instanceof HTMLElement) {
+        triggerRef.current.focus();
+      }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [isOpen, onClose, closeOnEscape]);
+  }, [isOpen]);
+
+  // Keyboard handler
+  useEffect(() => {
+    if (!isOpen) return;
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleKeyDown]);
 
   // Scroll lock
   useEffect(() => {
@@ -63,9 +121,11 @@ export function Modal({
 
       {/* Modal content */}
       <div
+        ref={dialogRef}
         className={`relative bg-surface rounded-xl shadow-modal w-full ${sizeClasses[size]} animate-in max-h-[90vh] overflow-y-auto`}
         role="dialog"
         aria-modal="true"
+        tabIndex={-1}
       >
         {children}
       </div>
@@ -94,6 +154,7 @@ export function ModalHeader({
         <button
           onClick={onClose}
           className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          aria-label="Close dialog"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

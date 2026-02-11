@@ -1,16 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
 import { Button } from '../../components/ui/Button';
+import { useToastStore } from '../../stores/toastStore';
 
 /**
  * 미승인 LEW 대기 페이지
  * - LEW로 가입했지만 아직 ADMIN 승인을 받지 못한 사용자에게 표시
+ * - "Check Status" 버튼으로 승인 여부 재확인 가능
  */
 export default function LewPendingPage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user, isAuthenticated, logout, refreshUser } = useAuthStore();
+  const toast = useToastStore();
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
     // 비로그인 상태면 로그인 페이지로
@@ -31,6 +35,19 @@ export default function LewPendingPage() {
       navigate(dest, { replace: true });
     }
   }, [user, isAuthenticated, navigate]);
+
+  const handleCheckStatus = useCallback(async () => {
+    setChecking(true);
+    try {
+      await refreshUser();
+      // If approved, the useEffect above will redirect
+      toast.info('Status checked — still pending approval.');
+    } catch {
+      toast.error('Failed to check status. Please try again.');
+    } finally {
+      setChecking(false);
+    }
+  }, [refreshUser, toast]);
 
   const handleLogout = () => {
     logout();
@@ -60,13 +77,16 @@ export default function LewPendingPage() {
           <ul className="text-left space-y-1 text-xs">
             <li>1. An administrator will review your registration.</li>
             <li>2. Once approved, you&apos;ll have full access to the system.</li>
-            <li>3. Please sign in again after approval to activate your account.</li>
+            <li>3. Click &quot;Check Status&quot; below to refresh, or sign in again later.</li>
           </ul>
         </div>
 
-        <div className="flex gap-3 justify-center pt-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-center pt-2">
           <Button variant="outline" onClick={handleLogout}>
             Logout
+          </Button>
+          <Button variant="outline" onClick={handleCheckStatus} loading={checking}>
+            🔄 Check Status
           </Button>
           <Button onClick={handleSignInAgain}>
             Sign in again

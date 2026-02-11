@@ -69,11 +69,38 @@ export function DataTable<T>({
     return 'text-left';
   };
 
+  const sortableColumns = columns.filter((col) => col.sortable);
+
   return (
     <div className={`bg-surface rounded-xl shadow-card overflow-hidden ${className}`}>
       {/* Mobile card view */}
       {mobileCardRender && (
         <div className="sm:hidden">
+          {/* Mobile sort dropdown */}
+          {sortableColumns.length > 0 && !loading && data.length > 1 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-surface-secondary">
+              <label htmlFor="mobile-sort" className="text-xs text-gray-500 flex-shrink-0">Sort by</label>
+              <select
+                id="mobile-sort"
+                value={sortKey ? `${sortKey}:${sortDir}` : ''}
+                onChange={(e) => {
+                  if (!e.target.value) { setSortKey(null); return; }
+                  const [key, dir] = e.target.value.split(':');
+                  setSortKey(key);
+                  setSortDir(dir as 'asc' | 'desc');
+                }}
+                className="flex-1 text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-primary/20"
+              >
+                <option value="">Default</option>
+                {sortableColumns.map((col) => (
+                  <optgroup key={col.key} label={col.header}>
+                    <option value={`${col.key}:asc`}>{col.header} ↑</option>
+                    <option value={`${col.key}:desc`}>{col.header} ↓</option>
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+          )}
           {loading
             ? Array.from({ length: 3 }).map((_, i) => (
                 <div key={`m-skeleton-${i}`} className="p-4 border-b border-gray-100">
@@ -88,7 +115,10 @@ export function DataTable<T>({
                 <div
                   key={keyExtractor(item)}
                   className={onRowClick ? 'cursor-pointer active:bg-gray-50' : ''}
+                  role={onRowClick ? 'button' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
                   onClick={() => onRowClick?.(item)}
+                  onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(item); } } : undefined}
                 >
                   {mobileCardRender(item)}
                 </div>
@@ -104,15 +134,22 @@ export function DataTable<T>({
                 <th
                   key={col.key}
                   className={`px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider ${alignClass(col.align)} ${
-                    col.sortable ? 'cursor-pointer select-none hover:text-gray-700' : ''
+                    col.sortable ? 'cursor-pointer select-none hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary/20' : ''
                   } ${col.className || ''}`}
                   style={col.width ? { width: col.width } : undefined}
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
+                  aria-sort={
+                    col.sortable && sortKey === col.key
+                      ? sortDir === 'asc' ? 'ascending' : 'descending'
+                      : col.sortable ? 'none' : undefined
+                  }
+                  tabIndex={col.sortable ? 0 : undefined}
+                  onKeyDown={col.sortable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSort(col.key); } } : undefined}
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.header}
                     {col.sortable && sortKey === col.key && (
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path
                           strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                           d={sortDir === 'asc' ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}
@@ -140,10 +177,12 @@ export function DataTable<T>({
                     key={keyExtractor(item)}
                     className={`transition-colors ${
                       onRowClick
-                        ? 'cursor-pointer hover:bg-gray-50'
+                        ? 'cursor-pointer hover:bg-gray-50 focus-within:ring-2 focus-within:ring-primary/20'
                         : ''
                     }`}
+                    tabIndex={onRowClick ? 0 : undefined}
                     onClick={() => onRowClick?.(item)}
+                    onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(item); } } : undefined}
                   >
                     {columns.map((col) => (
                       <td

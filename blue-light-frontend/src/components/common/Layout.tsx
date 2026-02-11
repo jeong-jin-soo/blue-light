@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { ErrorBoundary } from './ErrorBoundary';
 import Footer from './Footer';
 
 /**
@@ -31,7 +32,7 @@ export default function Layout() {
   const adminMenu = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/admin/applications', label: 'Applications', icon: '📋' },
-    { path: '/admin/prices', label: 'Prices', icon: '💰' },
+    { path: '/admin/prices', label: 'Settings', icon: '⚙️' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
 
@@ -103,6 +104,7 @@ export default function Layout() {
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100"
+            aria-label="Open menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -125,7 +127,9 @@ export default function Layout() {
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-6">
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
 
         {/* Footer */}

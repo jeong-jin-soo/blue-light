@@ -3,18 +3,22 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { Input } from '../../components/ui/Input';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { FileUpload } from '../../components/domain/FileUpload';
-import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
-import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { Textarea } from '../../components/ui/Textarea';
+import { Select } from '../../components/ui/Select';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
-import { Select } from '../../components/ui/Select';
+import { InfoField } from '../../components/common/InfoField';
+import { STATUS_STEPS, getStatusStep, formatFileSize, formatFileType, getFileTypeBadge } from '../../utils/applicationUtils';
 import { useAuthStore } from '../../stores/authStore';
+import {
+  PaymentModal, CompleteModal, RevisionModal, AssignLewModal,
+  ApproveConfirmDialog, ProcessingConfirmDialog, UnassignLewConfirmDialog, SldConfirmDialog,
+} from './sections/AdminModals';
 import type { AdminApplication, FileInfo, FileType, Payment, LewSummary, SldRequest } from '../../types';
 
 const FILE_TYPE_OPTIONS = [
@@ -22,27 +26,6 @@ const FILE_TYPE_OPTIONS = [
   { value: 'REPORT_PDF', label: 'Report PDF' },
   { value: 'OWNER_AUTH_LETTER', label: "Owner's Auth Letter" },
 ];
-
-const STATUS_STEPS = [
-  { label: 'Submitted', description: 'Application submitted for review' },
-  { label: 'Reviewed', description: 'LEW review completed' },
-  { label: 'Paid', description: 'Payment confirmed' },
-  { label: 'In Progress', description: 'Under processing' },
-  { label: 'Completed', description: 'Licence issued' },
-];
-
-function getStatusStep(status: string): number {
-  switch (status) {
-    case 'PENDING_REVIEW': return 0;
-    case 'REVISION_REQUESTED': return 0;
-    case 'PENDING_PAYMENT': return 1;
-    case 'PAID': return 2;
-    case 'IN_PROGRESS': return 3;
-    case 'COMPLETED': return 5;
-    case 'EXPIRED': return -1;
-    default: return 0;
-  }
-}
 
 export default function AdminApplicationDetailPage() {
   const { id } = useParams();
@@ -311,11 +294,13 @@ export default function AdminApplicationDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/admin/applications')}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+            aria-label="Back to applications list"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
+            <span>Back</span>
           </button>
           <div>
             <div className="flex items-center gap-2">
@@ -361,6 +346,21 @@ export default function AdminApplicationDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Mobile Progress Summary */}
+      <div className="lg:hidden">
+        <Card>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
+            <StatusBadge status={application.status} />
+          </div>
+          {application.status !== 'EXPIRED' && (
+            <div className="mt-3">
+              <StepTracker steps={STATUS_STEPS} currentStep={getStatusStep(application.status)} variant="horizontal" />
+            </div>
+          )}
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
@@ -550,19 +550,15 @@ export default function AdminApplicationDetailPage() {
                   {/* LEW SLD Upload Area */}
                   <div className="border border-gray-200 rounded-lg p-4 space-y-3">
                     <p className="text-sm font-medium text-gray-700">Upload SLD Drawing</p>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                        LEW Note (Optional)
-                      </label>
-                      <textarea
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                        rows={2}
-                        maxLength={2000}
-                        value={sldLewNote}
-                        onChange={(e) => setSldLewNote(e.target.value)}
-                        placeholder="Optional note about the SLD drawing"
-                      />
-                    </div>
+                    <Textarea
+                      label="LEW Note (Optional)"
+                      rows={2}
+                      maxLength={2000}
+                      value={sldLewNote}
+                      onChange={(e) => setSldLewNote(e.target.value)}
+                      placeholder="Optional note about the SLD drawing"
+                      className="resize-none"
+                    />
                     <FileUpload
                       onUpload={handleSldUpload}
                       files={[]}
@@ -770,23 +766,25 @@ export default function AdminApplicationDetailPage() {
         </div>
 
         {/* Sidebar (right 1/3) */}
-        <div className="space-y-6">
-          {/* Status Tracker */}
-          <Card>
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
-            {application.status === 'EXPIRED' ? (
-              <div className="text-center py-4">
-                <span className="text-3xl">⏰</span>
-                <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
-              </div>
-            ) : (
-              <StepTracker
-                steps={STATUS_STEPS}
-                currentStep={getStatusStep(application.status)}
-                variant="vertical"
-              />
-            )}
-          </Card>
+        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          {/* Status Tracker (desktop only — mobile version shown above grid) */}
+          <div className="hidden lg:block">
+            <Card>
+              <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
+              {application.status === 'EXPIRED' ? (
+                <div className="text-center py-4">
+                  <span className="text-3xl">⏰</span>
+                  <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
+                </div>
+              ) : (
+                <StepTracker
+                  steps={STATUS_STEPS}
+                  currentStep={getStatusStep(application.status)}
+                  variant="vertical"
+                />
+              )}
+            </Card>
+          </div>
 
           {/* Admin Actions */}
           <Card>
@@ -986,289 +984,67 @@ export default function AdminApplicationDetailPage() {
         </div>
       </div>
 
-      {/* ── Payment Confirmation Modal ────────────────── */}
-      <Modal isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)} size="sm">
-        <ModalHeader title="Confirm Payment" onClose={() => setShowPaymentModal(false)} />
-        <ModalBody>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Confirm that payment of{' '}
-              <span className="font-semibold">
-                SGD ${application.quoteAmount.toLocaleString()}
-              </span>{' '}
-              has been received for this application.
-            </p>
-            <Input
-              label="Transaction ID"
-              placeholder="e.g., TXN-20250101-001"
-              value={paymentForm.transactionId}
-              onChange={(e) =>
-                setPaymentForm((prev) => ({ ...prev, transactionId: e.target.value }))
-              }
-              hint="Optional - enter if available"
-            />
-            <Input
-              label="Payment Method"
-              placeholder="e.g., PayNow, Bank Transfer"
-              value={paymentForm.paymentMethod}
-              onChange={(e) =>
-                setPaymentForm((prev) => ({ ...prev, paymentMethod: e.target.value }))
-              }
-            />
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => setShowPaymentModal(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleConfirmPayment} loading={actionLoading}>
-            Confirm Payment
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* ── Complete Application Modal ────────────────── */}
-      <Modal isOpen={showCompleteModal} onClose={() => setShowCompleteModal(false)} size="sm">
-        <ModalHeader
-          title="Complete & Issue Licence"
-          onClose={() => setShowCompleteModal(false)}
-        />
-        <ModalBody>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Issue the electrical installation licence for this application.
-            </p>
-            <Input
-              label="Licence Number"
-              placeholder="e.g., EIL-2025-00001"
-              value={completeForm.licenseNumber}
-              onChange={(e) =>
-                setCompleteForm((prev) => ({ ...prev, licenseNumber: e.target.value }))
-              }
-              required
-            />
-            <Input
-              label="Expiry Date"
-              type="date"
-              value={completeForm.licenseExpiryDate}
-              onChange={(e) =>
-                setCompleteForm((prev) => ({
-                  ...prev,
-                  licenseExpiryDate: e.target.value,
-                }))
-              }
-              required
-            />
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => setShowCompleteModal(false)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleComplete} loading={actionLoading}>
-            Issue Licence
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* ── Revision Request Modal ────────────────── */}
-      <Modal isOpen={showRevisionModal} onClose={() => setShowRevisionModal(false)} size="sm">
-        <ModalHeader title="Request Revision" onClose={() => setShowRevisionModal(false)} />
-        <ModalBody>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Enter a comment describing what the applicant needs to revise.
-            </p>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Review Comment<span className="text-error-500 ml-0.5">*</span>
-              </label>
-              <textarea
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
-                rows={4}
-                maxLength={2000}
-                value={revisionComment}
-                onChange={(e) => setRevisionComment(e.target.value)}
-                placeholder="e.g., Please provide the correct postal code and update the building type."
-              />
-              <p className="mt-1 text-xs text-gray-500 text-right">
-                {revisionComment.length}/2000
-              </p>
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => setShowRevisionModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleRequestRevision}
-            loading={actionLoading}
-            disabled={!revisionComment.trim()}
-          >
-            Request Revision
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* ── Approve for Payment Confirm ────────────────── */}
-      <ConfirmDialog
+      {/* ── Modals ────────────────── */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        onConfirm={handleConfirmPayment}
+        quoteAmount={application.quoteAmount}
+        paymentForm={paymentForm}
+        setPaymentForm={setPaymentForm}
+        loading={actionLoading}
+      />
+      <CompleteModal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        onConfirm={handleComplete}
+        completeForm={completeForm}
+        setCompleteForm={setCompleteForm}
+        loading={actionLoading}
+      />
+      <RevisionModal
+        isOpen={showRevisionModal}
+        onClose={() => setShowRevisionModal(false)}
+        onConfirm={handleRequestRevision}
+        revisionComment={revisionComment}
+        setRevisionComment={setRevisionComment}
+        loading={actionLoading}
+      />
+      <ApproveConfirmDialog
         isOpen={showApproveConfirm}
         onClose={() => setShowApproveConfirm(false)}
         onConfirm={handleApproveForPayment}
-        title="Approve Application"
-        message="Approve this application and request payment from the applicant? The status will change to PENDING_PAYMENT."
-        confirmLabel="Approve"
         loading={actionLoading}
       />
-
-      {/* ── Start Processing Confirm ────────────────── */}
-      <ConfirmDialog
+      <ProcessingConfirmDialog
         isOpen={showProcessingConfirm}
         onClose={() => setShowProcessingConfirm(false)}
         onConfirm={handleStartProcessing}
-        title="Start Processing"
-        message="Start processing this application? Status will change to IN_PROGRESS."
-        confirmLabel="Start Processing"
       />
-
-      {/* ── Assign LEW Modal ────────────────── */}
-      <Modal isOpen={showAssignLewModal} onClose={() => setShowAssignLewModal(false)} size="sm">
-        <ModalHeader title="Assign LEW" onClose={() => setShowAssignLewModal(false)} />
-        <ModalBody>
-          {lewsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <LoadingSpinner size="md" label="Loading LEWs..." />
-            </div>
-          ) : availableLews.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-sm text-gray-500">
-                No eligible LEWs available for this application ({application?.selectedKva} kVA).
-              </p>
-              <p className="text-xs text-gray-400 mt-1">
-                All approved LEWs either lack a grade or have insufficient capacity.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <div className="bg-blue-50 rounded-lg p-2.5 border border-blue-100 mb-3">
-                <p className="text-xs text-blue-700">
-                  Showing LEWs eligible for <span className="font-semibold">{application?.selectedKva} kVA</span> capacity.
-                </p>
-              </div>
-              <p className="text-sm text-gray-600 mb-3">
-                Select a LEW to assign to this application:
-              </p>
-              {availableLews.map((lew) => (
-                <button
-                  key={lew.userSeq}
-                  type="button"
-                  onClick={() => setSelectedLewSeq(lew.userSeq)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left ${
-                    selectedLewSeq === lew.userSeq
-                      ? 'border-primary bg-primary/5'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm">⚡</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-800">{lew.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{lew.email}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {lew.lewLicenceNo && (
-                        <span className="text-xs text-primary-600 font-mono">{lew.lewLicenceNo}</span>
-                      )}
-                      {lew.lewGrade && (
-                        <Badge variant="info" className="text-[10px]">
-                          {lew.lewGrade.replace('GRADE_', 'G')} (≤{lew.maxKva === 9999 ? '400kV' : `${lew.maxKva}kVA`})
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  {selectedLewSeq === lew.userSeq && (
-                    <span className="text-primary text-lg flex-shrink-0">✓</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" size="sm" onClick={() => setShowAssignLewModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleAssignLew}
-            loading={actionLoading}
-            disabled={!selectedLewSeq || lewsLoading}
-          >
-            Assign
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* ── Unassign LEW Confirm ────────────────── */}
-      <ConfirmDialog
+      <AssignLewModal
+        isOpen={showAssignLewModal}
+        onClose={() => setShowAssignLewModal(false)}
+        onConfirm={handleAssignLew}
+        lewsLoading={lewsLoading}
+        availableLews={availableLews}
+        selectedLewSeq={selectedLewSeq}
+        setSelectedLewSeq={setSelectedLewSeq}
+        applicationKva={application?.selectedKva}
+        loading={actionLoading}
+      />
+      <UnassignLewConfirmDialog
         isOpen={showUnassignConfirm}
         onClose={() => setShowUnassignConfirm(false)}
         onConfirm={handleUnassignLew}
-        title="Remove LEW Assignment"
-        message="Remove the assigned LEW from this application? The application will become unassigned."
-        confirmLabel="Remove"
         loading={actionLoading}
       />
-
-      {/* ── SLD Confirm ────────────────── */}
-      <ConfirmDialog
+      <SldConfirmDialog
         isOpen={showSldConfirm}
         onClose={() => setShowSldConfirm(false)}
         onConfirm={handleSldConfirm}
-        title="Confirm SLD"
-        message="Confirm that the uploaded SLD drawing is complete and acceptable? This action cannot be undone."
-        confirmLabel="Confirm"
         loading={actionLoading}
       />
     </div>
   );
 }
 
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="text-sm font-medium text-gray-800 mt-0.5">{value}</dd>
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatFileType(type: string): string {
-  switch (type) {
-    case 'DRAWING_SLD': return 'SLD';
-    case 'OWNER_AUTH_LETTER': return 'Auth Letter';
-    case 'SITE_PHOTO': return 'Photo';
-    case 'REPORT_PDF': return 'Report';
-    case 'LICENSE_PDF': return 'Licence';
-    default: return type;
-  }
-}
-
-function getFileTypeBadge(type: string): 'primary' | 'info' | 'success' | 'gray' {
-  switch (type) {
-    case 'DRAWING_SLD': return 'primary';
-    case 'OWNER_AUTH_LETTER': return 'info';
-    case 'SITE_PHOTO': return 'info';
-    case 'REPORT_PDF': return 'gray';
-    case 'LICENSE_PDF': return 'success';
-    default: return 'gray';
-  }
-}

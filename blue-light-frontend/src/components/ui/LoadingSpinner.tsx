@@ -19,11 +19,12 @@ const sizeClasses: Record<SpinnerSize, string> = {
  */
 export function LoadingSpinner({ size = 'md', label, className = '' }: LoadingSpinnerProps) {
   return (
-    <div className={`inline-flex items-center gap-2 ${className}`}>
+    <div className={`inline-flex items-center gap-2 ${className}`} role="status" aria-live="polite">
       <svg
         className={`animate-spin text-primary ${sizeClasses[size]}`}
         viewBox="0 0 24 24"
         fill="none"
+        aria-hidden="true"
       >
         <circle
           className="opacity-25"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
@@ -7,27 +7,50 @@ import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { authApi } from '../../api/authApi';
 
+interface SignupForm {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  name: string;
+  phone: string;
+  role: string;
+  lewLicenceNo: string;
+  lewGrade: string;
+  companyName: string;
+  uen: string;
+  designation: string;
+  pdpaConsent: boolean;
+}
+
+const INITIAL_FORM: SignupForm = {
+  email: '',
+  password: '',
+  confirmPassword: '',
+  name: '',
+  phone: '',
+  role: 'APPLICANT',
+  lewLicenceNo: '',
+  lewGrade: '',
+  companyName: '',
+  uen: '',
+  designation: '',
+  pdpaConsent: false,
+};
+
 export default function SignupPage() {
   const navigate = useNavigate();
   const { signup, isLoading, error, clearError, isAuthenticated, user } = useAuthStore();
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [role, setRole] = useState('APPLICANT');
-  const [lewLicenceNo, setLewLicenceNo] = useState('');
-  const [lewGrade, setLewGrade] = useState('');
-  const [companyName, setCompanyName] = useState('');
-  const [uen, setUen] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [pdpaConsent, setPdpaConsent] = useState(false);
+  const [form, setForm] = useState<SignupForm>(INITIAL_FORM);
   const [localError, setLocalError] = useState('');
 
   // 가입 가능한 역할 목록 (동적 로드)
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
+
+  const updateField = useCallback(<K extends keyof SignupForm>(field: K, value: SignupForm[K]) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }, []);
 
   // 가입 옵션 로드
   useEffect(() => {
@@ -36,7 +59,7 @@ export default function SignupPage() {
         setAvailableRoles(options.availableRoles);
         // 역할이 1개뿐이면 자동 선택
         if (options.availableRoles.length === 1) {
-          setRole(options.availableRoles[0]);
+          updateField('role', options.availableRoles[0]);
         }
       })
       .catch(() => {
@@ -44,7 +67,7 @@ export default function SignupPage() {
         setAvailableRoles(['APPLICANT']);
       })
       .finally(() => setOptionsLoading(false));
-  }, []);
+  }, [updateField]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -63,42 +86,44 @@ export default function SignupPage() {
     clearError();
     setLocalError('');
 
-    if (password !== confirmPassword) {
+    if (form.password !== form.confirmPassword) {
       setLocalError('Passwords do not match');
       return;
     }
 
-    if (password.length < 8) {
+    if (form.password.length < 8) {
       setLocalError('Password must be at least 8 characters');
       return;
     }
 
-    if (role === 'LEW' && !lewLicenceNo.trim()) {
+    if (form.role === 'LEW' && !form.lewLicenceNo.trim()) {
       setLocalError('LEW licence number is required');
       return;
     }
 
-    if (role === 'LEW' && !lewGrade) {
+    if (form.role === 'LEW' && !form.lewGrade) {
       setLocalError('LEW grade is required');
       return;
     }
 
-    if (!pdpaConsent) {
+    if (!form.pdpaConsent) {
       setLocalError('You must agree to the Privacy Policy to continue');
       return;
     }
 
     try {
       await signup({
-        email, password, name,
-        phone: phone || undefined,
-        role,
-        lewLicenceNo: role === 'LEW' ? lewLicenceNo.trim() : undefined,
-        lewGrade: role === 'LEW' ? lewGrade : undefined,
-        companyName: role === 'APPLICANT' && companyName.trim() ? companyName.trim() : undefined,
-        uen: role === 'APPLICANT' && uen.trim() ? uen.trim() : undefined,
-        designation: role === 'APPLICANT' && designation.trim() ? designation.trim() : undefined,
-        pdpaConsent,
+        email: form.email,
+        password: form.password,
+        name: form.name,
+        phone: form.phone || undefined,
+        role: form.role,
+        lewLicenceNo: form.role === 'LEW' ? form.lewLicenceNo.trim() : undefined,
+        lewGrade: form.role === 'LEW' ? form.lewGrade : undefined,
+        companyName: form.role === 'APPLICANT' && form.companyName.trim() ? form.companyName.trim() : undefined,
+        uen: form.role === 'APPLICANT' && form.uen.trim() ? form.uen.trim() : undefined,
+        designation: form.role === 'APPLICANT' && form.designation.trim() ? form.designation.trim() : undefined,
+        pdpaConsent: form.pdpaConsent,
       });
     } catch {
       // error is managed by store
@@ -133,8 +158,8 @@ export default function SignupPage() {
           type="text"
           required
           maxLength={50}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={form.name}
+          onChange={(e) => updateField('name', e.target.value)}
           placeholder="John Doe"
         />
 
@@ -142,8 +167,8 @@ export default function SignupPage() {
           label="Email"
           type="email"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          value={form.email}
+          onChange={(e) => updateField('email', e.target.value)}
           placeholder="you@example.com"
         />
 
@@ -151,14 +176,14 @@ export default function SignupPage() {
           label="Phone"
           type="tel"
           maxLength={20}
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          value={form.phone}
+          onChange={(e) => updateField('phone', e.target.value)}
           placeholder="+65-XXXX-XXXX"
           hint="Optional"
         />
 
         {/* Business Information — APPLICANT 회원가입 시 (선택적) */}
-        {role === 'APPLICANT' && (
+        {form.role === 'APPLICANT' && (
           <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
             <p className="text-xs font-medium text-gray-600">
               Business Information <span className="text-gray-400">(Optional — can be added later in Profile)</span>
@@ -166,8 +191,8 @@ export default function SignupPage() {
             <Input
               label="Company Name"
               maxLength={100}
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
+              value={form.companyName}
+              onChange={(e) => updateField('companyName', e.target.value)}
               placeholder="e.g., BLUE LIGHT PTE LTD"
               hint="Will be printed on your installation licence"
             />
@@ -175,16 +200,16 @@ export default function SignupPage() {
               <Input
                 label="UEN"
                 maxLength={20}
-                value={uen}
-                onChange={(e) => setUen(e.target.value)}
+                value={form.uen}
+                onChange={(e) => updateField('uen', e.target.value)}
                 placeholder="e.g., 202407291M"
                 hint="Business registration number"
               />
               <Input
                 label="Designation"
                 maxLength={50}
-                value={designation}
-                onChange={(e) => setDesignation(e.target.value)}
+                value={form.designation}
+                onChange={(e) => updateField('designation', e.target.value)}
                 placeholder="e.g., Director"
               />
             </div>
@@ -200,9 +225,9 @@ export default function SignupPage() {
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setRole('APPLICANT')}
+                onClick={() => updateField('role', 'APPLICANT')}
                 className={`p-3 border-2 rounded-lg text-center transition-all ${
-                  role === 'APPLICANT'
+                  form.role === 'APPLICANT'
                     ? 'border-primary bg-primary/5 text-primary'
                     : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                 }`}
@@ -214,9 +239,9 @@ export default function SignupPage() {
               {availableRoles.includes('LEW') && (
                 <button
                   type="button"
-                  onClick={() => setRole('LEW')}
+                  onClick={() => updateField('role', 'LEW')}
                   className={`p-3 border-2 rounded-lg text-center transition-all ${
-                    role === 'LEW'
+                    form.role === 'LEW'
                       ? 'border-primary bg-primary/5 text-primary'
                       : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                   }`}
@@ -227,7 +252,7 @@ export default function SignupPage() {
                 </button>
               )}
             </div>
-            {role === 'LEW' && (
+            {form.role === 'LEW' && (
               <>
                 <p className="text-xs text-warning-600 mt-1.5">
                   ⚠ LEW accounts require administrator approval before access.
@@ -237,8 +262,8 @@ export default function SignupPage() {
                     label="LEW Licence Number"
                     required
                     maxLength={50}
-                    value={lewLicenceNo}
-                    onChange={(e) => setLewLicenceNo(e.target.value)}
+                    value={form.lewLicenceNo}
+                    onChange={(e) => updateField('lewLicenceNo', e.target.value)}
                     placeholder="e.g., LEW-2026-XXXXX"
                     hint="Your EMA-issued LEW licence number"
                   />
@@ -256,9 +281,9 @@ export default function SignupPage() {
                       <button
                         key={g.value}
                         type="button"
-                        onClick={() => setLewGrade(g.value)}
+                        onClick={() => updateField('lewGrade', g.value)}
                         className={`p-2.5 border-2 rounded-lg text-center transition-all ${
-                          lewGrade === g.value
+                          form.lewGrade === g.value
                             ? 'border-primary bg-primary/5 text-primary'
                             : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                         }`}
@@ -281,8 +306,8 @@ export default function SignupPage() {
           required
           minLength={8}
           maxLength={20}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          value={form.password}
+          onChange={(e) => updateField('password', e.target.value)}
           placeholder="8-20 characters"
         />
 
@@ -290,8 +315,8 @@ export default function SignupPage() {
           label="Confirm Password"
           type="password"
           required
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          value={form.confirmPassword}
+          onChange={(e) => updateField('confirmPassword', e.target.value)}
           placeholder="Re-enter your password"
         />
 
@@ -300,8 +325,8 @@ export default function SignupPage() {
           <input
             type="checkbox"
             id="pdpaConsent"
-            checked={pdpaConsent}
-            onChange={(e) => setPdpaConsent(e.target.checked)}
+            checked={form.pdpaConsent}
+            onChange={(e) => updateField('pdpaConsent', e.target.checked)}
             className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
           />
           <label htmlFor="pdpaConsent" className="text-xs text-gray-600 leading-relaxed cursor-pointer">

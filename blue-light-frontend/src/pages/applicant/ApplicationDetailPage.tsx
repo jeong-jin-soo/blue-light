@@ -14,33 +14,14 @@ import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
 import priceApi from '../../api/priceApi';
 import { Select } from '../../components/ui/Select';
+import { InfoField } from '../../components/common/InfoField';
+import { STATUS_STEPS, getStatusStep, formatFileSize, formatFileType, getFileTypeBadge } from '../../utils/applicationUtils';
 import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest } from '../../types';
 
 const APPLICANT_FILE_TYPE_OPTIONS = [
   { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
   { value: 'OWNER_AUTH_LETTER', label: "Owner's Authorisation Letter" },
 ];
-
-const STATUS_STEPS = [
-  { label: 'Submitted', description: 'Application submitted for review' },
-  { label: 'Reviewed', description: 'LEW review completed' },
-  { label: 'Paid', description: 'Payment confirmed' },
-  { label: 'In Progress', description: 'Under processing' },
-  { label: 'Completed', description: 'Licence issued' },
-];
-
-function getStatusStep(status: string): number {
-  switch (status) {
-    case 'PENDING_REVIEW': return 0;
-    case 'REVISION_REQUESTED': return 0;
-    case 'PENDING_PAYMENT': return 1;
-    case 'PAID': return 2;
-    case 'IN_PROGRESS': return 3;
-    case 'COMPLETED': return 5;
-    case 'EXPIRED': return -1;
-    default: return 0;
-  }
-}
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
@@ -216,11 +197,13 @@ export default function ApplicationDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/applications')}
-            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+            aria-label="Back to applications list"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
+            <span>Back</span>
           </button>
           <div>
             <div className="flex items-center gap-2">
@@ -283,6 +266,25 @@ export default function ApplicationDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Mobile Progress Summary */}
+      <div className="lg:hidden">
+        <Card>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
+            <StatusBadge status={application.status} />
+          </div>
+          {application.status !== 'EXPIRED' && (
+            <div className="mt-3">
+              <StepTracker
+                steps={STATUS_STEPS}
+                currentStep={getStatusStep(application.status)}
+                variant="horizontal"
+              />
+            </div>
+          )}
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
@@ -690,26 +692,28 @@ export default function ApplicationDetailPage() {
         </div>
 
         {/* Sidebar (right 1/3) */}
-        <div className="space-y-6">
-          {/* Status Tracker */}
-          <Card>
-            <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
-            {application.status === 'EXPIRED' ? (
-              <div className="text-center py-4">
-                <span className="text-3xl">⏰</span>
-                <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  This application has expired due to non-payment.
-                </p>
-              </div>
-            ) : (
-              <StepTracker
-                steps={STATUS_STEPS}
-                currentStep={getStatusStep(application.status)}
-                variant="vertical"
-              />
-            )}
-          </Card>
+        <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
+          {/* Status Tracker (desktop only - mobile version above grid) */}
+          <div className="hidden lg:block">
+            <Card>
+              <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
+              {application.status === 'EXPIRED' ? (
+                <div className="text-center py-4">
+                  <span className="text-3xl">⏰</span>
+                  <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    This application has expired due to non-payment.
+                  </p>
+                </div>
+              ) : (
+                <StepTracker
+                  steps={STATUS_STEPS}
+                  currentStep={getStatusStep(application.status)}
+                  variant="vertical"
+                />
+              )}
+            </Card>
+          </div>
 
           {/* Assigned LEW */}
           {application.assignedLewName && (
@@ -805,40 +809,3 @@ export default function ApplicationDetailPage() {
   );
 }
 
-/** Small helper component for label-value pairs */
-function InfoField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-gray-500">{label}</dt>
-      <dd className="text-sm font-medium text-gray-800 mt-0.5">{value}</dd>
-    </div>
-  );
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function formatFileType(type: string): string {
-  switch (type) {
-    case 'DRAWING_SLD': return 'SLD';
-    case 'OWNER_AUTH_LETTER': return 'Auth Letter';
-    case 'SITE_PHOTO': return 'Photo';
-    case 'REPORT_PDF': return 'Report';
-    case 'LICENSE_PDF': return 'Licence';
-    default: return type;
-  }
-}
-
-function getFileTypeBadge(type: string): 'primary' | 'info' | 'success' | 'gray' {
-  switch (type) {
-    case 'DRAWING_SLD': return 'primary';
-    case 'OWNER_AUTH_LETTER': return 'info';
-    case 'SITE_PHOTO': return 'info';
-    case 'REPORT_PDF': return 'gray';
-    case 'LICENSE_PDF': return 'success';
-    default: return 'gray';
-  }
-}

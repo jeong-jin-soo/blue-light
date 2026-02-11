@@ -120,7 +120,10 @@ export default function DashboardPage() {
                 <div
                   key={app.applicationSeq}
                   className="py-3 cursor-pointer active:bg-gray-50"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => navigate(`/applications/${app.applicationSeq}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/applications/${app.applicationSeq}`); } }}
                 >
                   <div className="flex items-start justify-between mb-1.5">
                     <div className="min-w-0 flex-1 mr-3">
@@ -156,8 +159,10 @@ export default function DashboardPage() {
                   {recentApps.map((app) => (
                     <tr
                       key={app.applicationSeq}
-                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary/20"
+                      tabIndex={0}
                       onClick={() => navigate(`/applications/${app.applicationSeq}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/applications/${app.applicationSeq}`); } }}
                     >
                       <td className="py-3 px-2">
                         <div className="font-medium text-gray-800 truncate max-w-[200px]">

@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
+import { useFormGuard } from '../../hooks/useFormGuard';
 import userApi from '../../api/userApi';
 import type { User } from '../../types';
 
@@ -56,6 +58,21 @@ export default function ProfilePage() {
       })
       .finally(() => setLoading(false));
   }, []);
+
+  // Form leave guard — warn when navigating away with unsaved changes
+  const isProfileDirty = useMemo(() => {
+    if (!profile) return false;
+    return (
+      name !== profile.name ||
+      phone !== (profile.phone || '') ||
+      companyName !== (profile.companyName || '') ||
+      uen !== (profile.uen || '') ||
+      designation !== (profile.designation || '') ||
+      correspondenceAddress !== (profile.correspondenceAddress || '') ||
+      correspondencePostalCode !== (profile.correspondencePostalCode || '')
+    );
+  }, [profile, name, phone, companyName, uen, designation, correspondenceAddress, correspondencePostalCode]);
+  useFormGuard(isProfileDirty);
 
   const handleProfileSave = async () => {
     const errors: Record<string, string> = {};
@@ -144,10 +161,11 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      {/* Personal information */}
+      {/* Personal & Business Information */}
       <Card>
-        <CardHeader title="Personal Information" description="Update your name and contact details" />
+        <CardHeader title="Profile Information" description="Update your personal and business details" />
         <div className="space-y-4">
+          {/* Personal Information */}
           <Input
             label="Full Name"
             value={name}
@@ -182,32 +200,26 @@ export default function ProfilePage() {
                 placeholder="e.g., LEW-2026-XXXXX"
                 hint="Your EMA-issued LEW licence number"
               />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">LEW Grade</label>
-                <select
-                  value={lewGrade}
-                  onChange={(e) => setLewGrade(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                >
-                  <option value="">Select grade</option>
-                  <option value="GRADE_7">Grade 7 (≤ 45 kVA)</option>
-                  <option value="GRADE_8">Grade 8 (≤ 500 kVA)</option>
-                  <option value="GRADE_9">Grade 9 (≤ 400 kV)</option>
-                </select>
-                <p className="mt-1 text-xs text-gray-500">Grade on your EMA LEW licence</p>
-              </div>
+              <Select
+                label="LEW Grade"
+                value={lewGrade}
+                onChange={(e) => setLewGrade(e.target.value)}
+                options={[
+                  { value: '', label: 'Select grade' },
+                  { value: 'GRADE_7', label: 'Grade 7 (≤ 45 kVA)' },
+                  { value: 'GRADE_8', label: 'Grade 8 (≤ 500 kVA)' },
+                  { value: 'GRADE_9', label: 'Grade 9 (≤ 400 kV)' },
+                ]}
+                hint="Grade on your EMA LEW licence"
+              />
             </>
           )}
-        </div>
-      </Card>
 
-      {/* Business Information — EMA Letter of Appointment 필수 필드 */}
-      <Card>
-        <CardHeader
-          title="Business Information"
-          description="Company details required for EMA licence application (Letter of Appointment)"
-        />
-        <div className="space-y-4">
+          {/* Business Information */}
+          <div className="border-t border-gray-100 pt-4 mt-2">
+            <h3 className="text-sm font-semibold text-gray-700 mb-1">Business Information</h3>
+            <p className="text-xs text-gray-500 mb-4">Company details required for EMA licence application (Letter of Appointment)</p>
+          </div>
           <Input
             label="Company Name"
             value={companyName}

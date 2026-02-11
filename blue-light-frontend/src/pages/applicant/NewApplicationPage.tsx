@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -8,6 +8,9 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
+import { useFormGuard } from '../../hooks/useFormGuard';
+import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
+import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
 import type { MasterPrice, PriceCalculation, Application, ApplicationType } from '../../types';
@@ -84,6 +87,13 @@ export default function NewApplicationPage() {
   // Completed applications for renewal
   const [completedApps, setCompletedApps] = useState<Application[]>([]);
   const [loadingCompleted, setLoadingCompleted] = useState(false);
+
+  // Form leave guard — warn when navigating away with unsaved data
+  const isFormDirty = useMemo(() => {
+    if (showGuide || submitting) return false;
+    return !!(formData.address || formData.postalCode || formData.spAccountNo || formData.selectedKva);
+  }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva]);
+  useFormGuard(isFormDirty);
 
   // Load completed applications when selecting RENEWAL
   useEffect(() => {
@@ -197,10 +207,12 @@ export default function NewApplicationPage() {
     if (currentStep === 1 && !validateStep1()) return;
     if (currentStep === 2 && !validateStep2()) return;
     setCurrentStep((prev) => Math.min(prev + 1, 3));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleBack = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSubmit = async () => {
@@ -275,11 +287,13 @@ export default function NewApplicationPage() {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate('/dashboard')}
-          className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+          aria-label="Back to dashboard"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
+          <span>Back</span>
         </button>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New Licence Application</h1>
@@ -289,107 +303,10 @@ export default function NewApplicationPage() {
 
       {/* ───── Before You Begin Guide ───── */}
       {showGuide && (
-        <Card>
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">Before You Begin</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                Please review the following checklist to ensure a smooth application process.
-              </p>
-            </div>
-
-            {/* Process Overview */}
-            <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Application Process</h3>
-              <div className="space-y-3">
-                {[
-                  { step: '1', title: 'Submit Application', desc: 'Fill in property details, select kVA capacity, and review pricing.' },
-                  { step: '2', title: 'Upload Documents', desc: 'Upload required documents including SLD (Single Line Diagram) and authorisation letter.' },
-                  { step: '3', title: 'LEW Review', desc: 'A Licensed Electrical Worker will review your application. You may be asked to revise.' },
-                  { step: '4', title: 'Make Payment', desc: 'Once approved, complete payment via PayNow or bank transfer.' },
-                  { step: '5', title: 'Licence Issued', desc: 'After verification, your electrical installation licence will be issued.' },
-                ].map(({ step, title, desc }) => (
-                  <div key={step} className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-7 h-7 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-sm font-bold">
-                      {step}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-800">{title}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Required Documents Checklist */}
-            <div className="bg-amber-50 rounded-xl p-5 border border-amber-200">
-              <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wider mb-3">Required Documents</h3>
-              <p className="text-xs text-amber-700 mb-3">Prepare these documents before starting your application. You can upload them after submission.</p>
-              <ul className="space-y-2">
-                {[
-                  { label: 'Single Line Diagram (SLD)', desc: 'Accepted formats: PDF, JPG, DWG, DXF, DGN, TIF, GIF, ZIP' },
-                  { label: "Owner's Authorisation Letter", desc: 'Signed letter authorising the electrical installation work' },
-                ].map(({ label, desc }) => (
-                  <li key={label} className="flex items-start gap-2.5">
-                    <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-medium text-amber-900">{label}</p>
-                      <p className="text-xs text-amber-700">{desc}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Key Information */}
-            <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
-              <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Key Information</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">💰</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">Pricing</p>
-                    <p className="text-xs text-blue-700">Based on your DB Size (kVA). Service fee and EMA fee apply.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">⏱️</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">Licence Period</p>
-                    <p className="text-xs text-blue-700">Choose between 3-month or 12-month licence validity.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">🔌</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">SP Group Account</p>
-                    <p className="text-xs text-blue-700">You need an SP Group utilities account before applying.</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-0.5">📋</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-900">EMA Submission</p>
-                    <p className="text-xs text-blue-700">Files for ELISE submission must be under 2MB each.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Start Application Button */}
-            <div className="flex justify-between items-center pt-2">
-              <Button variant="outline" onClick={() => navigate('/dashboard')}>
-                Cancel
-              </Button>
-              <Button onClick={() => setShowGuide(false)}>
-                Start Application
-              </Button>
-            </div>
-          </div>
-        </Card>
+        <BeforeYouBeginGuide
+          onStart={() => { setShowGuide(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          onCancel={() => navigate('/dashboard')}
+        />
       )}
 
       {/* Step tracker */}
@@ -850,188 +767,14 @@ export default function NewApplicationPage() {
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-800">Review & Confirm</h2>
-              <p className="text-sm text-gray-500 mt-1">Please review your application details before submitting</p>
-            </div>
-
-            {/* Application Type Badge */}
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                formData.applicationType === 'RENEWAL'
-                  ? 'bg-orange-100 text-orange-800'
-                  : formData.applicationType === 'SUPPLY_INSTALLATION'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-blue-100 text-blue-800'
-              }`}>
-                {formData.applicationType === 'RENEWAL' ? '🔄 Licence Renewal'
-                  : formData.applicationType === 'SUPPLY_INSTALLATION' ? '⚡ Supply Installation'
-                  : '🏢 New Licence'}
-              </span>
-            </div>
-
-            {/* SP Account Number (if provided) */}
-            {formData.spAccountNo.trim() && (
-              <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
-                <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">SP Group Account</h3>
-                <div>
-                  <dt className="text-xs text-blue-600">Account Number</dt>
-                  <dd className="text-sm font-medium text-blue-800 mt-0.5">{formData.spAccountNo}</dd>
-                </div>
-              </div>
-            )}
-
-            {/* Licence Period (both NEW and RENEWAL) */}
-            {formData.renewalPeriodMonths && (
-              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Licence Period</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <dt className="text-xs text-gray-500">Duration</dt>
-                    <dd className="text-sm font-medium text-gray-800 mt-0.5">
-                      {formData.renewalPeriodMonths} months
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-gray-500">EMA Fee</dt>
-                    <dd className="text-sm font-medium text-gray-800 mt-0.5">
-                      {getEmaFeeLabel(formData.renewalPeriodMonths)}
-                      <span className="text-xs text-gray-500 ml-1">(Paid to EMA)</span>
-                    </dd>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Renewal Details (if RENEWAL) */}
-            {formData.applicationType === 'RENEWAL' && (
-              <div className="bg-orange-50 rounded-lg p-4 space-y-3 border border-orange-100">
-                <h3 className="text-sm font-semibold text-orange-700 uppercase tracking-wider">Renewal Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <dt className="text-xs text-orange-600">Existing Licence No.</dt>
-                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
-                      {formData.existingLicenceNo || '—'}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-orange-600">Existing Expiry Date</dt>
-                    <dd className="text-sm font-medium text-orange-800 mt-0.5">
-                      {formData.existingExpiryDate || '—'}
-                    </dd>
-                  </div>
-                  {formData.renewalReferenceNo && (
-                    <div className="sm:col-span-2">
-                      <dt className="text-xs text-orange-600">Renewal Reference No.</dt>
-                      <dd className="text-sm font-medium text-orange-800 mt-0.5">
-                        {formData.renewalReferenceNo}
-                      </dd>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* SLD Option */}
-            <div className={`rounded-lg p-4 space-y-2 border ${
-              formData.sldOption === 'REQUEST_LEW'
-                ? 'bg-emerald-50 border-emerald-200'
-                : 'bg-gray-50 border-gray-100'
-            }`}>
-              <h3 className={`text-sm font-semibold uppercase tracking-wider ${
-                formData.sldOption === 'REQUEST_LEW' ? 'text-emerald-700' : 'text-gray-700'
-              }`}>SLD (Single Line Diagram)</h3>
-              <div className="flex items-center gap-2">
-                <span>{formData.sldOption === 'REQUEST_LEW' ? '🔧' : '📄'}</span>
-                <span className={`text-sm font-medium ${
-                  formData.sldOption === 'REQUEST_LEW' ? 'text-emerald-800' : 'text-gray-800'
-                }`}>
-                  {formData.sldOption === 'REQUEST_LEW'
-                    ? 'LEW will prepare the SLD for you'
-                    : 'You will upload the SLD yourself'}
-                </span>
-              </div>
-              {formData.sldOption === 'REQUEST_LEW' && (
-                <p className="text-xs text-emerald-600">
-                  An SLD drawing request will be automatically sent to the assigned LEW after submission.
-                  Additional fee may apply.
-                </p>
-              )}
-            </div>
-
-            {/* Property Details */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Property Details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <dt className="text-xs text-gray-500">Address</dt>
-                  <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.address}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-gray-500">Postal Code</dt>
-                  <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.postalCode}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-gray-500">Building Type</dt>
-                  <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.buildingType || 'Not specified'}</dd>
-                </div>
-              </div>
-            </div>
-
-            {/* Capacity & Price */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Capacity & Pricing</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <dt className="text-xs text-gray-500">Selected kVA</dt>
-                  <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.selectedKva} kVA</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-gray-500">Tier</dt>
-                  <dd className="text-sm font-medium text-gray-800 mt-0.5">{priceResult?.tierDescription || '-'}</dd>
-                </div>
-              </div>
-            </div>
-
-            {/* Total with breakdown */}
-            <div className="bg-primary-50 rounded-xl p-5 border border-primary-100">
-              {priceResult && (
-                <div className="space-y-2 mb-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-primary-700">kVA Tier Price</span>
-                    <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-primary-700">Service Fee</span>
-                    <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
-                  </div>
-                  <div className="border-t border-primary-200 pt-2"></div>
-                </div>
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-primary-700">Total Amount Due</span>
-                <span className="text-2xl font-bold text-primary-800">
-                  SGD ${priceResult?.totalAmount.toLocaleString() || '—'}
-                </span>
-              </div>
-              <p className="text-xs text-primary-600 mt-2">
-                Payment via PayNow or bank transfer. Details will be provided after submission.
-              </p>
-              {formData.renewalPeriodMonths && (
-                <p className="text-xs text-amber-600 mt-1">
-                  * EMA fee of {getEmaFeeLabel(formData.renewalPeriodMonths)} ({formData.renewalPeriodMonths}-month licence) is payable directly to EMA and is not included in the above total.
-                </p>
-              )}
-            </div>
-          </div>
+          <StepReview formData={formData} priceResult={priceResult} getEmaFeeLabel={getEmaFeeLabel} />
         )}
 
         {/* Navigation buttons */}
         <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
           <Button
             variant="outline"
-            onClick={currentStep === 0 ? () => setShowGuide(true) : handleBack}
+            onClick={currentStep === 0 ? () => { setShowGuide(true); window.scrollTo({ top: 0, behavior: 'smooth' }); } : handleBack}
           >
             {currentStep === 0 ? 'Back to Guide' : 'Back'}
           </Button>

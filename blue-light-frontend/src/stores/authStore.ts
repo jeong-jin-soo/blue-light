@@ -7,6 +7,7 @@ import { persist } from 'zustand/middleware';
 import type { UserRole, LoginRequest, SignupRequest, TokenResponse } from '../types';
 import { authApi } from '../api/authApi';
 import { tokenUtils } from '../api/axiosClient';
+import { userApi } from '../api/userApi';
 
 /**
  * JWT 토큰의 만료 여부를 확인
@@ -54,6 +55,7 @@ interface AuthState {
   logout: () => void;
   clearError: () => void;
   setUserFromToken: (tokenResponse: TokenResponse) => void;
+  refreshUser: () => Promise<void>;
 }
 
 /**
@@ -61,7 +63,7 @@ interface AuthState {
  */
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // 초기 상태 — 토큰 존재 + 만료되지 않은 경우만 인증 상태 유지
       user: null,
       isAuthenticated: isTokenValid(),
@@ -161,6 +163,29 @@ export const useAuthStore = create<AuthState>()(
           },
           isAuthenticated: true,
         });
+      },
+
+      // 서버에서 최신 사용자 정보 갱신 (LEW 승인 확인 등)
+      refreshUser: async () => {
+        try {
+          const profile = await userApi.getMyProfile();
+          const currentUser = get().user;
+          set({
+            user: {
+              userSeq: profile.userSeq,
+              email: profile.email,
+              name: profile.name,
+              role: profile.role as UserRole,
+              approved: profile.approved ?? false,
+              emailVerified: currentUser?.emailVerified ?? false,
+            },
+          });
+        } catch {
+          // 토큰 만료 등의 경우 로그아웃 처리
+          authApi.logout();
+          set({ user: null, isAuthenticated: false });
+          throw new Error('Session expired');
+        }
       },
     }),
     {

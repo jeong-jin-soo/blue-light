@@ -28,10 +28,13 @@ const iconBg: Record<ToastType, string> = {
 export function ToastProvider() {
   const { toasts, remove } = useToastStore();
 
-  if (toasts.length === 0) return null;
-
   return (
-    <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm">
+    <div
+      className="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm"
+      aria-live="assertive"
+      aria-atomic="false"
+      role="status"
+    >
       {toasts.map((toast) => {
         const config = typeConfig[toast.type];
         return (
