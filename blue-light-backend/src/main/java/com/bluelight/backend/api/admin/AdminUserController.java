@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminUserResponse;
 import com.bluelight.backend.api.admin.dto.ChangeRoleRequest;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.EnumParser;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
@@ -49,16 +50,7 @@ public class AdminUserController {
         Pageable pageable = PageRequest.of(page, size);
 
         // 역할 파싱
-        UserRole roleFilter = null;
-        if (role != null && !role.isBlank()) {
-            try {
-                roleFilter = UserRole.valueOf(role.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException(
-                        "Invalid role: " + role,
-                        HttpStatus.BAD_REQUEST, "INVALID_ROLE");
-            }
-        }
+        UserRole roleFilter = EnumParser.parseNullable(UserRole.class, role, "INVALID_ROLE");
 
         boolean hasSearch = search != null && !search.trim().isEmpty();
         Page<User> userPage;
@@ -99,14 +91,7 @@ public class AdminUserController {
         }
 
         // ADMIN 역할로 변경 불가
-        UserRole targetRole;
-        try {
-            targetRole = UserRole.valueOf(request.getRole().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(
-                    "Invalid role: " + request.getRole(),
-                    HttpStatus.BAD_REQUEST, "INVALID_ROLE");
-        }
+        UserRole targetRole = EnumParser.parse(UserRole.class, request.getRole(), "INVALID_ROLE");
 
         if (targetRole == UserRole.ADMIN) {
             throw new BusinessException(

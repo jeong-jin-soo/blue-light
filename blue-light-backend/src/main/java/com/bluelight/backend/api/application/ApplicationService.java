@@ -6,13 +6,14 @@ import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.api.application.dto.CreateSldRequestDto;
 import com.bluelight.backend.api.application.dto.SldRequestResponse;
+import com.bluelight.backend.api.price.PriceService;
 import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
-import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -42,7 +43,7 @@ public class ApplicationService {
     private final MasterPriceRepository masterPriceRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
-    private final SystemSettingRepository systemSettingRepository;
+    private final PriceService priceService;
 
     /**
      * Create a new licence application (NEW or RENEWAL)
@@ -62,7 +63,7 @@ public class ApplicationService {
                 ));
 
         // Service fee from settings
-        BigDecimal serviceFee = getServiceFee();
+        BigDecimal serviceFee = priceService.getServiceFee();
         BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
 
         // Determine application type
@@ -107,9 +108,7 @@ public class ApplicationService {
                                 HttpStatus.NOT_FOUND, "ORIGINAL_APP_NOT_FOUND"));
 
                 // Verify ownership
-                if (!originalApp.getUser().getUserSeq().equals(userSeq)) {
-                    throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-                }
+                OwnershipValidator.validateOwner(originalApp.getUser().getUserSeq(), userSeq);
 
                 // Auto-fill from original
                 existingLicenceNo = originalApp.getLicenseNumber();
@@ -186,9 +185,7 @@ public class ApplicationService {
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
         // Verify ownership
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
         // Only allow editing in REVISION_REQUESTED status
         if (application.getStatus() != ApplicationStatus.REVISION_REQUESTED) {
@@ -203,7 +200,7 @@ public class ApplicationService {
                         "No price tier found for " + request.getSelectedKva() + " kVA",
                         HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
 
-        BigDecimal serviceFee = getServiceFee();
+        BigDecimal serviceFee = priceService.getServiceFee();
         BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
 
         application.updateDetails(
@@ -260,9 +257,7 @@ public class ApplicationService {
                 ));
 
         // Verify ownership
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
         return ApplicationResponse.from(application);
     }
@@ -309,9 +304,7 @@ public class ApplicationService {
                 ));
 
         // Verify ownership
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
         return paymentRepository.findByApplicationApplicationSeq(applicationSeq)
                 .stream()
@@ -341,9 +334,7 @@ public class ApplicationService {
                 .orElseThrow(() -> new BusinessException(
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
         // 중복 체크
         if (sldRequestRepository.findByApplicationApplicationSeq(applicationSeq).isPresent()) {
@@ -370,22 +361,11 @@ public class ApplicationService {
                 .orElseThrow(() -> new BusinessException(
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
         return sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .map(SldRequestResponse::from)
                 .orElse(null);
-    }
-
-    /**
-     * system_settings에서 서비스 수수료 조회
-     */
-    private BigDecimal getServiceFee() {
-        return systemSettingRepository.findById("service_fee")
-                .map(s -> new BigDecimal(s.getSettingValue()))
-                .orElse(BigDecimal.ZERO);
     }
 
     /**

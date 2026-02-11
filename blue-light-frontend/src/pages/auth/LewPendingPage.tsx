@@ -23,9 +23,9 @@ export default function LewPendingPage() {
       return;
     }
 
-    // 승인된 LEW면 admin 대시보드로
+    // 승인된 LEW면 LEW 대시보드로
     if (user.role === 'LEW' && user.approved) {
-      navigate('/admin/dashboard', { replace: true });
+      navigate('/lew/dashboard', { replace: true });
       return;
     }
 

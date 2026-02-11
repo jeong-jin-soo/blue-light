@@ -4,6 +4,7 @@ import com.bluelight.backend.api.user.dto.ChangePasswordRequest;
 import com.bluelight.backend.api.user.dto.UpdateProfileRequest;
 import com.bluelight.backend.api.user.dto.UserResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.EnumParser;
 import com.bluelight.backend.domain.user.LewGrade;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -42,18 +43,7 @@ public class UserService {
         User user = findUserOrThrow(userSeq);
 
         // LEW 등급 파싱
-        LewGrade lewGrade = null;
-        if (request.getLewGrade() != null && !request.getLewGrade().isBlank()) {
-            try {
-                lewGrade = LewGrade.valueOf(request.getLewGrade().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException(
-                        "Invalid LEW grade: " + request.getLewGrade(),
-                        HttpStatus.BAD_REQUEST,
-                        "INVALID_LEW_GRADE"
-                );
-            }
-        }
+        LewGrade lewGrade = EnumParser.parseNullable(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
 
         user.updateProfile(
                 request.getName(),

@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
+import { getBasePath } from '../../utils/routeUtils';
 import type { AdminApplication, AdminDashboard } from '../../types';
 
 export default function AdminDashboardPage() {
@@ -16,6 +17,7 @@ export default function AdminDashboardPage() {
   const toast = useToastStore();
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.role === 'ADMIN';
+  const basePath = getBasePath(currentUser?.role);
 
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);
   const [recentApps, setRecentApps] = useState<AdminApplication[]>([]);
@@ -79,7 +81,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{isAdmin ? 'Admin Dashboard' : 'LEW Dashboard'}</h1>
         <p className="text-sm text-gray-500 mt-1">Platform overview and key metrics</p>
       </div>
 
@@ -94,50 +96,52 @@ export default function AdminDashboardPage() {
           label="Pending Review"
           value={dashboard?.pendingReview ?? 0}
           icon="🔍"
-          onClick={() => navigate('/admin/applications?status=PENDING_REVIEW')}
+          onClick={() => navigate(`${basePath}/applications?status=PENDING_REVIEW`)}
         />
         <DashboardCard
           label="Revision Requested"
           value={dashboard?.revisionRequested ?? 0}
           icon="📝"
-          onClick={() => navigate('/admin/applications?status=REVISION_REQUESTED')}
+          onClick={() => navigate(`${basePath}/applications?status=REVISION_REQUESTED`)}
         />
         <DashboardCard
           label="Pending Payment"
           value={dashboard?.pendingPayment ?? 0}
           icon="💳"
-          onClick={() => navigate('/admin/applications?status=PENDING_PAYMENT')}
+          onClick={() => navigate(`${basePath}/applications?status=PENDING_PAYMENT`)}
         />
         <DashboardCard
           label="Paid"
           value={dashboard?.paid ?? 0}
           icon="✅"
-          onClick={() => navigate('/admin/applications?status=PAID')}
+          onClick={() => navigate(`${basePath}/applications?status=PAID`)}
         />
         <DashboardCard
           label="In Progress"
           value={dashboard?.inProgress ?? 0}
           icon="🔄"
-          onClick={() => navigate('/admin/applications?status=IN_PROGRESS')}
+          onClick={() => navigate(`${basePath}/applications?status=IN_PROGRESS`)}
         />
         <DashboardCard
           label="Completed"
           value={dashboard?.completed ?? 0}
           icon="🏁"
-          onClick={() => navigate('/admin/applications?status=COMPLETED')}
+          onClick={() => navigate(`${basePath}/applications?status=COMPLETED`)}
         />
         <DashboardCard
           label="Expired"
           value={dashboard?.expired ?? 0}
           icon="⏰"
-          onClick={() => navigate('/admin/applications?status=EXPIRED')}
+          onClick={() => navigate(`${basePath}/applications?status=EXPIRED`)}
         />
-        <DashboardCard
-          label="Total Users"
-          value={dashboard?.totalUsers ?? 0}
-          icon="👥"
-          onClick={() => navigate('/admin/users')}
-        />
+        {isAdmin && (
+          <DashboardCard
+            label="Total Users"
+            value={dashboard?.totalUsers ?? 0}
+            icon="👥"
+            onClick={() => navigate('/admin/users')}
+          />
+        )}
         {isAdmin && (
           <DashboardCard
             label="Unassigned"
@@ -182,7 +186,7 @@ export default function AdminDashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800">Recent Applications</h2>
           {recentApps.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/applications')}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(`${basePath}/applications`)}>
               View All
             </Button>
           )}
@@ -204,8 +208,8 @@ export default function AdminDashboardPage() {
                   className="py-3 cursor-pointer active:bg-gray-50"
                   role="button"
                   tabIndex={0}
-                  onClick={() => navigate(`/admin/applications/${app.applicationSeq}`)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/admin/applications/${app.applicationSeq}`); } }}
+                  onClick={() => navigate(`${basePath}/applications/${app.applicationSeq}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`${basePath}/applications/${app.applicationSeq}`); } }}
                 >
                   <div className="flex items-start justify-between mb-1.5">
                     <div className="min-w-0 flex-1 mr-3">
@@ -245,8 +249,8 @@ export default function AdminDashboardPage() {
                       key={app.applicationSeq}
                       className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary/20"
                       tabIndex={0}
-                      onClick={() => navigate(`/admin/applications/${app.applicationSeq}`)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/admin/applications/${app.applicationSeq}`); } }}
+                      onClick={() => navigate(`${basePath}/applications/${app.applicationSeq}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`${basePath}/applications/${app.applicationSeq}`); } }}
                     >
                       <td className="py-3 px-2">
                         <div className="font-medium text-gray-800">{app.userName}</div>

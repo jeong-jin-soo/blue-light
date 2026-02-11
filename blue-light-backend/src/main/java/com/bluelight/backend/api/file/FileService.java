@@ -2,6 +2,7 @@ package com.bluelight.backend.api.file;
 
 import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.file.FileEntity;
@@ -46,10 +47,8 @@ public class FileService {
         Application application = applicationRepository.findById(applicationSeq)
                 .orElseThrow(() -> new BusinessException("Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
-        // Verify ownership (applicant) or allow admin
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        // Verify ownership (applicant)
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
         // Validate file extension
         validateFileExtension(file.getOriginalFilename());
@@ -109,9 +108,7 @@ public class FileService {
                 .orElseThrow(() -> new BusinessException("Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
         // Admins can view any application's files; applicants can only view their own
-        if (!"ROLE_ADMIN".equals(role) && !application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwnerOrAdmin(application.getUser().getUserSeq(), userSeq, role);
 
         return fileRepository.findByApplicationApplicationSeq(applicationSeq)
                 .stream()
@@ -127,9 +124,7 @@ public class FileService {
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
         // Admins can download any file; applicants can only download their own
-        if (!"ROLE_ADMIN".equals(role) && !fileEntity.getApplication().getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwnerOrAdmin(fileEntity.getApplication().getUser().getUserSeq(), userSeq, role);
 
         return fileStorageService.loadAsResource(fileEntity.getFileUrl());
     }
@@ -142,9 +137,7 @@ public class FileService {
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
         // Admins can access any file; applicants can only access their own
-        if (!"ROLE_ADMIN".equals(role) && !fileEntity.getApplication().getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwnerOrAdmin(fileEntity.getApplication().getUser().getUserSeq(), userSeq, role);
 
         return fileEntity;
     }
@@ -158,9 +151,7 @@ public class FileService {
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
         // Admins can delete any file; applicants can only delete their own
-        if (!"ROLE_ADMIN".equals(role) && !fileEntity.getApplication().getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        OwnershipValidator.validateOwnerOrAdmin(fileEntity.getApplication().getUser().getUserSeq(), userSeq, role);
 
         // Delete from disk
         fileStorageService.delete(fileEntity.getFileUrl());

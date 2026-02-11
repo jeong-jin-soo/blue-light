@@ -37,8 +37,8 @@ export default function Layout() {
   ];
 
   const lewMenu = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/admin/applications', label: 'Applications', icon: '📋' },
+    { path: '/lew/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/lew/applications', label: 'Applications', icon: '📋' },
   ];
 
   const menuItems = isAdmin ? adminMenu : isLew ? lewMenu : applicantMenu;
@@ -66,7 +66,7 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <Link to={isAdmin || isLew ? '/admin/dashboard' : '/dashboard'} className="flex items-center gap-2">
+          <Link to={isAdmin ? '/admin/dashboard' : isLew ? '/lew/dashboard' : '/dashboard'} className="flex items-center gap-2">
             <span className="text-xl">💡</span>
             <span className="text-lg font-bold tracking-tight">Blue Light</span>
           </Link>

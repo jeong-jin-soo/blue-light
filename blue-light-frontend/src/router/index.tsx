@@ -89,9 +89,9 @@ const router = createBrowserRouter([
     ],
   },
 
-  // Admin + LEW routes (shared)
+  // Admin routes (ADMIN only)
   {
-    element: <ProtectedRoute allowedRoles={['ADMIN', 'LEW']} />,
+    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
     children: [
       {
         element: <Layout />,
@@ -99,20 +99,23 @@ const router = createBrowserRouter([
           { path: '/admin/dashboard', element: <AdminDashboardPage /> },
           { path: '/admin/applications', element: <AdminApplicationListPage /> },
           { path: '/admin/applications/:id', element: <AdminApplicationDetailPage /> },
+          { path: '/admin/users', element: <AdminUserListPage /> },
+          { path: '/admin/prices', element: <AdminPriceManagementPage /> },
         ],
       },
     ],
   },
 
-  // Admin-only routes (user management, price management)
+  // LEW routes (LEW only)
   {
-    element: <ProtectedRoute allowedRoles={['ADMIN']} />,
+    element: <ProtectedRoute allowedRoles={['LEW']} />,
     children: [
       {
         element: <Layout />,
         children: [
-          { path: '/admin/users', element: <AdminUserListPage /> },
-          { path: '/admin/prices', element: <AdminPriceManagementPage /> },
+          { path: '/lew/dashboard', element: <AdminDashboardPage /> },
+          { path: '/lew/applications', element: <AdminApplicationListPage /> },
+          { path: '/lew/applications/:id', element: <AdminApplicationDetailPage /> },
         ],
       },
     ],

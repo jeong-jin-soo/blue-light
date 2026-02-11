@@ -25,7 +25,7 @@ export default function EmailVerificationPendingPage() {
 
     // 이미 인증된 경우 역할별 기본 페이지로
     if (user.emailVerified) {
-      const dest = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';
+      const dest = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
   }, [user, isAuthenticated, navigate]);

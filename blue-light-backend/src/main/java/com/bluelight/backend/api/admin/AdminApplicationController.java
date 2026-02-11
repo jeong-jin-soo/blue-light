@@ -1,7 +1,6 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
-import com.bluelight.backend.api.application.dto.SldRequestResponse;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,13 +13,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.core.Authentication;
-
 import java.util.List;
-import java.util.Map;
 
 /**
- * Admin/LEW Application API controller
+ * Admin/LEW 신청 관리 핵심 API 컨트롤러
+ * - 대시보드, 신청 목록/상세, 상태 변경, 보완 요청, 승인, 완료, 결제
  */
 @Slf4j
 @RestController
@@ -30,6 +27,7 @@ import java.util.Map;
 public class AdminApplicationController {
 
     private final AdminApplicationService adminApplicationService;
+    private final AdminPaymentService adminPaymentService;
 
     /**
      * Get admin dashboard summary
@@ -93,7 +91,7 @@ public class AdminApplicationController {
             @PathVariable Long id,
             @Valid @RequestBody PaymentConfirmRequest request) {
         log.info("Admin confirm payment: applicationSeq={}", id);
-        PaymentResponse response = adminApplicationService.confirmPayment(id, request);
+        PaymentResponse response = adminPaymentService.confirmPayment(id, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -141,142 +139,7 @@ public class AdminApplicationController {
     @GetMapping("/applications/{id}/payments")
     public ResponseEntity<List<PaymentResponse>> getPayments(@PathVariable Long id) {
         log.info("Admin get payments: applicationSeq={}", id);
-        List<PaymentResponse> payments = adminApplicationService.getPayments(id);
+        List<PaymentResponse> payments = adminPaymentService.getPayments(id);
         return ResponseEntity.ok(payments);
-    }
-
-    // ── LEW Assignment (ADMIN only) ──────────────────
-
-    /**
-     * Assign LEW to application
-     * POST /api/admin/applications/:id/assign-lew
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @PostMapping("/applications/{id}/assign-lew")
-    public ResponseEntity<AdminApplicationResponse> assignLew(
-            @PathVariable Long id,
-            @Valid @RequestBody AssignLewRequest request) {
-        log.info("Admin assign LEW: applicationSeq={}, lewSeq={}", id, request.getLewUserSeq());
-        AdminApplicationResponse response = adminApplicationService.assignLew(id, request);
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Unassign LEW from application
-     * DELETE /api/admin/applications/:id/assign-lew
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @DeleteMapping("/applications/{id}/assign-lew")
-    public ResponseEntity<AdminApplicationResponse> unassignLew(@PathVariable Long id) {
-        log.info("Admin unassign LEW: applicationSeq={}", id);
-        AdminApplicationResponse response = adminApplicationService.unassignLew(id);
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Get available LEWs for assignment
-     * GET /api/admin/lews
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/lews")
-    public ResponseEntity<List<LewSummaryResponse>> getAvailableLews(
-            @RequestParam(required = false) Integer kva) {
-        log.info("Get available LEWs for assignment: kva={}", kva);
-        List<LewSummaryResponse> lews = adminApplicationService.getAvailableLews(kva);
-        return ResponseEntity.ok(lews);
-    }
-
-    // ── SLD Request Management ──────────────────
-
-    /**
-     * Get SLD request for an application
-     * GET /api/admin/applications/:id/sld-request
-     */
-    @GetMapping("/applications/{id}/sld-request")
-    public ResponseEntity<SldRequestResponse> getAdminSldRequest(@PathVariable Long id) {
-        log.info("Admin get SLD request: applicationSeq={}", id);
-        SldRequestResponse response = adminApplicationService.getAdminSldRequest(id);
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Mark SLD as uploaded by LEW
-     * POST /api/admin/applications/:id/sld-uploaded
-     */
-    @PostMapping("/applications/{id}/sld-uploaded")
-    public ResponseEntity<SldRequestResponse> uploadSld(
-            @PathVariable Long id,
-            @Valid @RequestBody SldUploadedDto request) {
-        log.info("Admin/LEW SLD uploaded: applicationSeq={}, fileSeq={}", id, request.getFileSeq());
-        SldRequestResponse response = adminApplicationService.uploadSld(id, request);
-        return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Confirm SLD
-     * POST /api/admin/applications/:id/sld-confirm
-     */
-    @PostMapping("/applications/{id}/sld-confirm")
-    public ResponseEntity<SldRequestResponse> confirmSld(@PathVariable Long id) {
-        log.info("Admin/LEW SLD confirmed: applicationSeq={}", id);
-        SldRequestResponse response = adminApplicationService.confirmSld(id);
-        return ResponseEntity.ok(response);
-    }
-
-    // ── Price Management (ADMIN only) ──────────────────
-
-    /**
-     * Get all price tiers
-     * GET /api/admin/prices
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/prices")
-    public ResponseEntity<List<AdminPriceResponse>> getAllPrices() {
-        log.info("Admin get all prices");
-        List<AdminPriceResponse> prices = adminApplicationService.getAllPrices();
-        return ResponseEntity.ok(prices);
-    }
-
-    /**
-     * Update price tier
-     * PUT /api/admin/prices/:id
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/prices/{id}")
-    public ResponseEntity<AdminPriceResponse> updatePrice(
-            @PathVariable Long id,
-            @Valid @RequestBody UpdatePriceRequest request) {
-        log.info("Admin update price: priceSeq={}, price={}", id, request.getPrice());
-        AdminPriceResponse response = adminApplicationService.updatePrice(id, request);
-        return ResponseEntity.ok(response);
-    }
-
-    // ── System Settings (ADMIN only) ──────────────────
-
-    /**
-     * Get system settings
-     * GET /api/admin/settings
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/settings")
-    public ResponseEntity<Map<String, String>> getSettings() {
-        log.info("Admin get settings");
-        Map<String, String> settings = adminApplicationService.getSettings();
-        return ResponseEntity.ok(settings);
-    }
-
-    /**
-     * Update system settings
-     * PATCH /api/admin/settings
-     */
-    @PreAuthorize("hasRole('ADMIN')")
-    @PatchMapping("/settings")
-    public ResponseEntity<Map<String, String>> updateSettings(
-            @RequestBody Map<String, String> updates,
-            Authentication authentication) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        log.info("Admin update settings: keys={}", updates.keySet());
-        Map<String, String> settings = adminApplicationService.updateSettings(updates, userSeq);
-        return ResponseEntity.ok(settings);
     }
 }

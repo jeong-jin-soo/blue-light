@@ -7,6 +7,7 @@ import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.EnumParser;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.*;
 import com.bluelight.backend.security.JwtTokenProvider;
@@ -106,15 +107,7 @@ public class AuthService {
         // LEW 등급 파싱
         LewGrade lewGrade = null;
         if (selectedRole == UserRole.LEW && request.getLewGrade() != null) {
-            try {
-                lewGrade = LewGrade.valueOf(request.getLewGrade().toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new BusinessException(
-                        "Invalid LEW grade: " + request.getLewGrade(),
-                        HttpStatus.BAD_REQUEST,
-                        "INVALID_LEW_GRADE"
-                );
-            }
+            lewGrade = EnumParser.parse(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
         }
 
         // 이메일 인증 활성화 여부 확인

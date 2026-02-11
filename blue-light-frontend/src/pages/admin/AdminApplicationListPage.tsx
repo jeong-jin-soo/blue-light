@@ -8,7 +8,9 @@ import { Pagination } from '../../components/data/Pagination';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { Badge } from '../../components/ui/Badge';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
+import { getBasePath } from '../../utils/routeUtils';
 import type { AdminApplication, ApplicationStatus } from '../../types';
 
 const STATUS_OPTIONS = [
@@ -27,6 +29,8 @@ const PAGE_SIZE = 15;
 export default function AdminApplicationListPage() {
   const navigate = useNavigate();
   const toast = useToastStore();
+  const { user: currentUser } = useAuthStore();
+  const basePath = getBasePath(currentUser?.role);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialStatus = searchParams.get('status') || '';
@@ -205,7 +209,7 @@ export default function AdminApplicationListPage() {
         data={applications}
         loading={loading}
         keyExtractor={(app) => app.applicationSeq}
-        onRowClick={(app) => navigate(`/admin/applications/${app.applicationSeq}`)}
+        onRowClick={(app) => navigate(`${basePath}/applications/${app.applicationSeq}`)}
         emptyIcon="📋"
         emptyTitle="No applications found"
         emptyDescription={

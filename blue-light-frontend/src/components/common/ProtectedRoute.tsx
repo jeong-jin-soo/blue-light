@@ -30,7 +30,9 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // 역할 불일치 시 역할별 기본 페이지로 리다이렉트
-    const redirectPath = user.role === 'ADMIN' || user.role === 'LEW' ? '/admin/dashboard' : '/dashboard';
+    const redirectPath = user.role === 'ADMIN' ? '/admin/dashboard'
+      : user.role === 'LEW' ? '/lew/dashboard'
+      : '/dashboard';
     return <Navigate to={redirectPath} replace />;
   }
 
