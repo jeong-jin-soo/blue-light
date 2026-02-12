@@ -138,6 +138,9 @@ export interface Application {
   emaFee?: number;
   // SLD 제출 방식
   sldOption?: SldOption;
+  // LOA 서명 정보
+  loaSignatureUrl?: string;
+  loaSignedAt?: string;
 }
 
 // ============================================
@@ -538,4 +541,39 @@ export interface UpdatePriceRequest {
   kvaMin?: number;
   kvaMax?: number;
   isActive?: boolean;
+}
+
+/**
+ * 배치 가격 티어 항목 (생성/수정 겸용)
+ */
+export interface BatchPriceTierItem {
+  masterPriceSeq: number | null;
+  description: string;
+  kvaMin: number;
+  kvaMax: number;
+  price: number;
+  isActive: boolean;
+}
+
+/**
+ * 배치 가격 수정 요청
+ */
+export interface BatchUpdatePricesRequest {
+  tiers: BatchPriceTierItem[];
+}
+
+// ============================================
+// LOA Types
+// ============================================
+
+/**
+ * LOA 상태 응답
+ */
+export interface LoaStatus {
+  applicationSeq: number;
+  loaGenerated: boolean;
+  loaSigned: boolean;
+  loaSignedAt?: string;
+  loaFileSeq?: number;
+  applicationType: ApplicationType;
 }

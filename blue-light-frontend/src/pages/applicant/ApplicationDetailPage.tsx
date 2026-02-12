@@ -12,11 +12,13 @@ import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
 import priceApi from '../../api/priceApi';
+import loaApi from '../../api/loaApi';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import { ApplicationInfo } from './sections/ApplicationInfo';
 import { ApplicationPayment } from './sections/ApplicationPayment';
+import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
-import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest } from '../../types';
+import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus } from '../../types';
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
@@ -31,6 +33,7 @@ export default function ApplicationDetailPage() {
   const [uploadFileType, setUploadFileType] = useState<FileType>('DRAWING_SLD');
   const [paymentInfo, setPaymentInfo] = useState<Record<string, string>>({});
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
+  const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -55,6 +58,12 @@ export default function ApplicationDetailPage() {
       setApplication(appData);
       setFiles(filesData);
       setPayments(paymentsData);
+
+      // LOA status
+      try {
+        const loaData = await loaApi.getLoaStatus(applicationId);
+        setLoaStatus(loaData);
+      } catch { /* LOA status might not be available */ }
 
       if (appData.sldOption === 'REQUEST_LEW') {
         try {
@@ -313,6 +322,12 @@ export default function ApplicationDetailPage() {
             application={application}
             payments={payments}
             paymentInfo={paymentInfo}
+          />
+
+          <ApplicationLoaSection
+            application={application}
+            loaStatus={loaStatus}
+            onStatusUpdate={fetchData}
           />
 
           <ApplicationDocuments

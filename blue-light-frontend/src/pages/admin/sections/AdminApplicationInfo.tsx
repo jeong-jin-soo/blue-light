@@ -78,7 +78,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
           <InfoField label="Installation Address" value={application.address} />
           <InfoField label="Postal Code" value={application.postalCode} />
           <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-          <InfoField label="DB Size (kVA)" value={`${application.selectedKva} kVA`} />
+          <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
           {application.spAccountNo && (
             <InfoField label="SP Account No." value={application.spAccountNo} />
           )}

@@ -49,6 +49,10 @@ public class ApplicationResponse {
     // SLD 제출 방식
     private String sldOption;
 
+    // LOA 서명 정보
+    private String loaSignatureUrl;
+    private LocalDateTime loaSignedAt;
+
     public static ApplicationResponse from(Application application) {
         return ApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -81,6 +85,8 @@ public class ApplicationResponse {
                 .renewalPeriodMonths(application.getRenewalPeriodMonths())
                 .emaFee(application.getEmaFee())
                 .sldOption(application.getSldOption() != null ? application.getSldOption().name() : null)
+                .loaSignatureUrl(application.getLoaSignatureUrl())
+                .loaSignedAt(application.getLoaSignedAt())
                 .build();
     }
 }

@@ -165,6 +165,18 @@ public class Application extends BaseEntity {
     private SldOption sldOption = SldOption.SELF_UPLOAD;
 
     /**
+     * LOA 서명 이미지 경로 (전자서명 PNG)
+     */
+    @Column(name = "loa_signature_url", length = 255)
+    private String loaSignatureUrl;
+
+    /**
+     * LOA 서명 일시
+     */
+    @Column(name = "loa_signed_at")
+    private LocalDateTime loaSignedAt;
+
+    /**
      * 만료 알림 발송 시각 (중복 알림 방지)
      */
     @Column(name = "expiry_notified_at")
@@ -304,5 +316,13 @@ public class Application extends BaseEntity {
      */
     public void unassignLew() {
         this.assignedLew = null;
+    }
+
+    /**
+     * LOA 전자서명 등록
+     */
+    public void registerLoaSignature(String signatureUrl) {
+        this.loaSignatureUrl = signatureUrl;
+        this.loaSignedAt = LocalDateTime.now();
     }
 }

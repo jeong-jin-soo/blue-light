@@ -67,7 +67,7 @@ export function ApplicationInfo({
               />
             </div>
             <Select
-              label="DB Size (kVA)"
+              label="Electric Box (kVA)"
               required
               value={String(editState.kva)}
               onChange={(e) => onKvaChange(Number(e.target.value))}
@@ -102,7 +102,7 @@ export function ApplicationInfo({
             <InfoField label="Installation Address" value={application.address} />
             <InfoField label="Postal Code" value={application.postalCode} />
             <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-            <InfoField label="DB Size (kVA)" value={`${application.selectedKva} kVA`} />
+            <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
             {application.spAccountNo && (
               <InfoField label="SP Account No." value={application.spAccountNo} />
             )}

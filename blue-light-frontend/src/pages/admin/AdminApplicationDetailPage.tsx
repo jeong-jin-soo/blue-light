@@ -9,11 +9,13 @@ import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
+import loaApi from '../../api/loaApi';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import { getBasePath } from '../../utils/routeUtils';
 
 // Section components
 import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
+import { AdminLoaSection } from './sections/AdminLoaSection';
 import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
 import { AdminPaymentSection } from './sections/AdminPaymentSection';
@@ -25,7 +27,7 @@ import {
   ApproveConfirmDialog, ProcessingConfirmDialog, UnassignLewConfirmDialog, SldConfirmDialog,
 } from './sections/AdminModals';
 
-import type { AdminApplication, FileInfo, FileType, Payment, LewSummary, SldRequest } from '../../types';
+import type { AdminApplication, FileInfo, FileType, Payment, LewSummary, SldRequest, LoaStatus } from '../../types';
 
 export default function AdminApplicationDetailPage() {
   const { id } = useParams();
@@ -48,6 +50,10 @@ export default function AdminApplicationDetailPage() {
   const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow' });
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
+
+  // LOA states
+  const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
+  const [loaGenerating, setLoaGenerating] = useState(false);
 
   // SLD states
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
@@ -78,6 +84,12 @@ export default function AdminApplicationDetailPage() {
       setApplication(appData);
       setFiles(filesData);
       setPayments(paymentsData);
+
+      // LOA status
+      try {
+        const loaData = await loaApi.getLoaStatus(applicationId);
+        setLoaStatus(loaData);
+      } catch { /* LOA status might not be available */ }
 
       if (appData.sldOption === 'REQUEST_LEW') {
         try {
@@ -209,6 +221,26 @@ export default function AdminApplicationDetailPage() {
     finally { setActionLoading(false); }
   };
 
+  // LOA
+  const handleGenerateLoa = async () => {
+    setLoaGenerating(true);
+    try {
+      await loaApi.generateLoa(applicationId);
+      toast.success('LOA generated successfully');
+      const loaData = await loaApi.getLoaStatus(applicationId);
+      setLoaStatus(loaData);
+    } catch {
+      toast.error('Failed to generate LOA');
+    } finally {
+      setLoaGenerating(false);
+    }
+  };
+
+  const handleLoaDownload = async (fileSeq: number, filename: string) => {
+    try { await fileApi.downloadFile(fileSeq, filename); }
+    catch { toast.error('Failed to download LOA'); }
+  };
+
   // SLD
   const handleSldUpload = async (file: File) => {
     const uploadedFile = await adminApi.uploadFile(applicationId, file, 'DRAWING_SLD');
@@ -318,6 +350,14 @@ export default function AdminApplicationDetailPage() {
           <AdminApplicationInfo
             application={application}
             onNavigateToOriginal={(seq) => navigate(`${basePath}/applications/${seq}`)}
+          />
+
+          <AdminLoaSection
+            application={application}
+            loaStatus={loaStatus}
+            onGenerate={handleGenerateLoa}
+            onDownload={handleLoaDownload}
+            generating={loaGenerating}
           />
 
           {application.sldOption === 'REQUEST_LEW' && sldRequest && (

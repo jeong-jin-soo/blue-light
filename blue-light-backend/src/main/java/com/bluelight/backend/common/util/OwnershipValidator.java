@@ -36,8 +36,8 @@ public final class OwnershipValidator {
      * @param role      요청자 역할 (ROLE_ADMIN이면 우회)
      */
     public static void validateOwnerOrAdmin(Long ownerSeq, Long requestorSeq, String role) {
-        if ("ROLE_ADMIN".equals(role)) {
-            return; // 관리자는 모든 리소스 접근 가능
+        if ("ROLE_ADMIN".equals(role) || "ROLE_LEW".equals(role)) {
+            return; // 관리자/LEW는 모든 리소스 접근 가능
         }
         validateOwner(ownerSeq, requestorSeq);
     }
