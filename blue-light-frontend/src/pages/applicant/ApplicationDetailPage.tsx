@@ -212,8 +212,8 @@ export default function ApplicationDetailPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
                 Application #{application.applicationSeq}
               </h1>
-              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : application.applicationType === 'SUPPLY_INSTALLATION' ? 'warning' : 'info'}>
-                {application.applicationType === 'RENEWAL' ? 'Renewal' : application.applicationType === 'SUPPLY_INSTALLATION' ? 'Supply' : 'New'}
+              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
+                {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
               </Badge>
             </div>
             <p className="text-sm text-gray-500 mt-0.5">

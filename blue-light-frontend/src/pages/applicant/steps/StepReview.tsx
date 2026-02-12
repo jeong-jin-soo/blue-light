@@ -34,13 +34,9 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile }: S
         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
           formData.applicationType === 'RENEWAL'
             ? 'bg-orange-100 text-orange-800'
-            : formData.applicationType === 'SUPPLY_INSTALLATION'
-              ? 'bg-yellow-100 text-yellow-800'
-              : 'bg-blue-100 text-blue-800'
+            : 'bg-blue-100 text-blue-800'
         }`}>
-          {formData.applicationType === 'RENEWAL' ? '🔄 Licence Renewal'
-            : formData.applicationType === 'SUPPLY_INSTALLATION' ? '⚡ Supply Installation'
-            : '🏢 New Licence'}
+          {formData.applicationType === 'RENEWAL' ? '🔄 Licence Renewal' : '🏢 New Licence'}
         </span>
       </div>
 

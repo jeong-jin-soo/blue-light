@@ -290,12 +290,10 @@ export default function NewApplicationPage() {
     setSldFile(null);
   };
 
-  // Compute EMA fee label (Supply Installation: 12mo=$150, others: 12mo=$100; 3mo always $50)
+  // Compute EMA fee label (12mo=$100, 3mo=$50)
   const getEmaFeeLabel = (months: number | null) => {
     if (months === 3) return 'SGD $50';
-    if (months === 12) {
-      return formData.applicationType === 'SUPPLY_INSTALLATION' ? 'SGD $150' : 'SGD $100';
-    }
+    if (months === 12) return 'SGD $100';
     return '—';
   };
 
@@ -383,11 +381,10 @@ export default function NewApplicationPage() {
             </div>
 
             {/* Type selection cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
                 { type: 'NEW' as ApplicationType, icon: '🏢', title: 'New Licence', desc: 'Apply for a brand new electrical installation licence' },
                 { type: 'RENEWAL' as ApplicationType, icon: '🔄', title: 'Licence Renewal', desc: 'Renew an existing electrical installation licence' },
-                { type: 'SUPPLY_INSTALLATION' as ApplicationType, icon: '⚡', title: 'Supply Installation', desc: 'Apply for a temporary electricity supply licence' },
               ]).map(({ type, icon, title, desc }) => (
                 <button
                   key={type}
@@ -437,7 +434,7 @@ export default function NewApplicationPage() {
                 >
                   <p className="font-semibold text-gray-800">12 Months</p>
                   <p className="text-sm text-gray-500 mt-0.5">
-                    EMA Fee: {formData.applicationType === 'SUPPLY_INSTALLATION' ? 'SGD $150' : 'SGD $100'}
+                    EMA Fee: SGD $100
                   </p>
                 </button>
                 <button
@@ -874,10 +871,8 @@ export default function NewApplicationPage() {
         onConfirm={handleSubmit}
         title="Submit Application"
         message={`Submit this ${
-          formData.applicationType === 'RENEWAL' ? 'renewal'
-            : formData.applicationType === 'SUPPLY_INSTALLATION' ? 'supply installation'
-            : ''
-        } application? You will need to make payment after submission.`}
+          formData.applicationType === 'RENEWAL' ? 'renewal ' : ''
+        }application? You will need to make payment after submission.`}
         confirmLabel="Submit"
       />
     </div>

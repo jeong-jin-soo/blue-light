@@ -108,7 +108,7 @@ public class Application extends BaseEntity {
     // ── Phase 18: 갱신 + 견적 개선 필드 ──
 
     /**
-     * 신청 유형 (NEW / RENEWAL / SUPPLY_INSTALLATION)
+     * 신청 유형 (NEW / RENEWAL)
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "application_type", nullable = false)

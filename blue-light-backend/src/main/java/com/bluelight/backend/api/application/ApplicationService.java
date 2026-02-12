@@ -70,8 +70,6 @@ public class ApplicationService {
         ApplicationType appType = ApplicationType.NEW;
         if ("RENEWAL".equals(request.getApplicationType())) {
             appType = ApplicationType.RENEWAL;
-        } else if ("SUPPLY_INSTALLATION".equals(request.getApplicationType())) {
-            appType = ApplicationType.SUPPLY_INSTALLATION;
         }
 
         Application originalApp = null;
@@ -369,17 +367,12 @@ public class ApplicationService {
     }
 
     /**
-     * EMA 수수료 계산 (신청 유형별 차등)
-     * - NEW / RENEWAL: 3개월=$50, 12개월=$100
-     * - SUPPLY_INSTALLATION: 3개월=$50, 12개월=$150
+     * EMA 수수료 계산
+     * - 3개월=$50, 12개월=$100
      */
     private BigDecimal calculateEmaFee(ApplicationType type, int months) {
         if (months == 3) {
             return new BigDecimal("50.00");
-        }
-        // 12개월
-        if (type == ApplicationType.SUPPLY_INSTALLATION) {
-            return new BigDecimal("150.00");
         }
         return new BigDecimal("100.00");
     }

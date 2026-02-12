@@ -79,7 +79,7 @@ export type ApplicationStatus =
 /**
  * 신청 유형
  */
-export type ApplicationType = 'NEW' | 'RENEWAL' | 'SUPPLY_INSTALLATION';
+export type ApplicationType = 'NEW' | 'RENEWAL';
 
 /**
  * SLD 제출 방식
