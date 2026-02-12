@@ -63,6 +63,16 @@ public class AdminPriceSettingsService {
                         "INVALID_KVA_RANGE"
                 );
             }
+            // 다른 티어와 kVA 범위 겹침 검증
+            var overlapping = masterPriceRepository.findOverlappingTiers(
+                    priceSeq, request.getKvaMin(), request.getKvaMax());
+            if (!overlapping.isEmpty()) {
+                throw new BusinessException(
+                        "kVA range overlaps with existing tier: " + overlapping.get(0).getDescription(),
+                        HttpStatus.BAD_REQUEST,
+                        "KVA_RANGE_OVERLAP"
+                );
+            }
             masterPrice.updateKvaRange(
                     request.getKvaMin(),
                     request.getKvaMax(),
