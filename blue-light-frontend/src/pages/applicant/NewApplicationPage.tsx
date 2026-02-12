@@ -13,6 +13,7 @@ import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
 import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
+import fileApi from '../../api/fileApi';
 import type { MasterPrice, PriceCalculation, Application, ApplicationType } from '../../types';
 
 const STEPS = [
@@ -61,6 +62,9 @@ export default function NewApplicationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
+  // SLD file (held client-side until application is created)
+  const [sldFile, setSldFile] = useState<File | null>(null);
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
@@ -242,6 +246,19 @@ export default function NewApplicationPage() {
         }
       }
       const result = await applicationApi.createApplication(payload as any);
+
+      // Upload SLD file if attached
+      if (sldFile && formData.sldOption === 'SELF_UPLOAD') {
+        try {
+          await fileApi.uploadFile(result.applicationSeq, sldFile, 'DRAWING_SLD');
+        } catch {
+          // Application created successfully, but SLD upload failed — user can retry from detail page
+          toast.warning('Application submitted, but SLD upload failed. You can upload it from the application detail page.');
+          navigate(`/applications/${result.applicationSeq}`);
+          return;
+        }
+      }
+
       toast.success('Application submitted successfully!');
       navigate(`/applications/${result.applicationSeq}`);
     } catch {
@@ -270,6 +287,7 @@ export default function NewApplicationPage() {
     });
     setErrors({});
     setPriceResult(null);
+    setSldFile(null);
   };
 
   // Compute EMA fee label (Supply Installation: 12mo=$150, others: 12mo=$100; 3mo always $50)
@@ -463,14 +481,14 @@ export default function NewApplicationPage() {
                     <div>
                       <p className="font-semibold text-gray-800">Upload Myself</p>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        I have an SLD ready and will upload it after submission
+                        I have an SLD ready and will attach it now or upload later
                       </p>
                     </div>
                   </div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => updateField('sldOption', 'REQUEST_LEW')}
+                  onClick={() => { updateField('sldOption', 'REQUEST_LEW'); setSldFile(null); }}
                   className={`p-4 rounded-lg border-2 text-left transition-all ${
                     formData.sldOption === 'REQUEST_LEW'
                       ? 'border-emerald-500 bg-emerald-50'
@@ -491,6 +509,70 @@ export default function NewApplicationPage() {
                   </div>
                 </button>
               </div>
+
+              {/* SLD File Attachment (shown when SELF_UPLOAD is selected) */}
+              {formData.sldOption === 'SELF_UPLOAD' && (
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-start gap-2 mb-3">
+                    <span className="text-sm">📎</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Attach SLD File (Optional)</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        You can attach your SLD now, or upload it later from the application detail page.
+                      </p>
+                    </div>
+                  </div>
+
+                  {sldFile ? (
+                    <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-lg">📄</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-700 truncate">{sldFile.name}</p>
+                          <p className="text-xs text-gray-400">
+                            {sldFile.size < 1024 * 1024
+                              ? `${(sldFile.size / 1024).toFixed(1)} KB`
+                              : `${(sldFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSldFile(null)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                        aria-label="Remove SLD file"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      <span className="text-sm text-gray-600">Choose SLD file</span>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            if (file.size > 10 * 1024 * 1024) {
+                              toast.error('File size must be less than 10MB');
+                              return;
+                            }
+                            setSldFile(file);
+                          }
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Renewal-specific fields */}
@@ -767,7 +849,7 @@ export default function NewApplicationPage() {
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <StepReview formData={formData} priceResult={priceResult} getEmaFeeLabel={getEmaFeeLabel} />
+          <StepReview formData={formData} priceResult={priceResult} getEmaFeeLabel={getEmaFeeLabel} sldFile={sldFile} />
         )}
 
         {/* Navigation buttons */}

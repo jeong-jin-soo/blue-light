@@ -18,9 +18,10 @@ interface StepReviewProps {
   formData: FormData;
   priceResult: PriceCalculation | null;
   getEmaFeeLabel: (months: number | null) => string;
+  sldFile?: File | null;
 }
 
-export function StepReview({ formData, priceResult, getEmaFeeLabel }: StepReviewProps) {
+export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile }: StepReviewProps) {
   return (
     <div className="space-y-5">
       <div>
@@ -128,6 +129,25 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel }: StepReview
           <p className="text-xs text-emerald-600">
             An SLD drawing request will be automatically sent to the assigned LEW after submission.
             Additional fee may apply.
+          </p>
+        )}
+        {formData.sldOption === 'SELF_UPLOAD' && sldFile && (
+          <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <span className="text-lg">📄</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-700 truncate">{sldFile.name}</p>
+              <p className="text-xs text-gray-400">
+                {sldFile.size < 1024 * 1024
+                  ? `${(sldFile.size / 1024).toFixed(1)} KB`
+                  : `${(sldFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                {' — Will be uploaded on submission'}
+              </p>
+            </div>
+          </div>
+        )}
+        {formData.sldOption === 'SELF_UPLOAD' && !sldFile && (
+          <p className="text-xs text-gray-500 mt-1">
+            No SLD file attached. You can upload it later from the application detail page.
           </p>
         )}
       </div>
