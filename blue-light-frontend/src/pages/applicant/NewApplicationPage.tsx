@@ -65,6 +65,10 @@ export default function NewApplicationPage() {
 
   // SLD file (held client-side until application is created)
   const [sldFile, setSldFile] = useState<File | null>(null);
+  // LOA email screenshot (held client-side until application is created)
+  const [loaEmailFile, setLoaEmailFile] = useState<File | null>(null);
+  // Main breaker box photo (held client-side until application is created)
+  const [breakerBoxPhoto, setBreakerBoxPhoto] = useState<File | null>(null);
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
@@ -259,6 +263,28 @@ export default function NewApplicationPage() {
         }
       }
 
+      // Upload LOA email screenshot if attached
+      if (loaEmailFile) {
+        try {
+          await fileApi.uploadFile(result.applicationSeq, loaEmailFile, 'OWNER_AUTH_LETTER');
+        } catch {
+          toast.warning('Application submitted, but LOA email screenshot upload failed. You can upload it from the application detail page.');
+          navigate(`/applications/${result.applicationSeq}`);
+          return;
+        }
+      }
+
+      // Upload main breaker box photo if attached
+      if (breakerBoxPhoto) {
+        try {
+          await fileApi.uploadFile(result.applicationSeq, breakerBoxPhoto, 'SITE_PHOTO');
+        } catch {
+          toast.warning('Application submitted, but breaker box photo upload failed. You can upload it from the application detail page.');
+          navigate(`/applications/${result.applicationSeq}`);
+          return;
+        }
+      }
+
       toast.success('Application submitted successfully!');
       navigate(`/applications/${result.applicationSeq}`);
     } catch {
@@ -348,7 +374,8 @@ export default function NewApplicationPage() {
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-blue-800">SP Group Account Required</h3>
                   <p className="text-sm text-blue-700 mt-1">
-                    Before applying for an electrical installation licence, you need an SP Group utilities account.
+                    For <strong>New Licence</strong> applications, an SP Group utilities account is mandatory.
+                    You must have an active SP account before submitting your application.
                     If you don't have one yet, please open an account first.
                   </p>
                   <a
@@ -373,6 +400,68 @@ export default function NewApplicationPage() {
                   hint="Optional. Enter your SP Group account number if available."
                 />
               </div>
+
+              {/* LOA Email Screenshot Upload */}
+              <div className="mt-4 pt-3 border-t border-blue-200">
+                <div className="flex items-start gap-2 mb-2">
+                  <span className="text-sm">📧</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Letter of Appointment Email Screenshot</p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      Upload a screenshot of the LOA email received from EMA. You can also upload it later from the application detail page.
+                    </p>
+                  </div>
+                </div>
+
+                {loaEmailFile ? (
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">🖼️</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
+                        <p className="text-xs text-gray-400">
+                          {loaEmailFile.size < 1024 * 1024
+                            ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
+                            : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLoaEmailFile(null)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      aria-label="Remove LOA email screenshot"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="text-sm text-blue-600">Choose screenshot file</span>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 10 * 1024 * 1024) {
+                            toast.error('File size must be less than 10MB');
+                            return;
+                          }
+                          setLoaEmailFile(file);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
 
             <div>
@@ -383,7 +472,7 @@ export default function NewApplicationPage() {
             {/* Type selection cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {([
-                { type: 'NEW' as ApplicationType, icon: '🏢', title: 'New Licence', desc: 'Apply for a brand new electrical installation licence' },
+                { type: 'NEW' as ApplicationType, icon: '🏢', title: 'New Licence', desc: 'Apply for a brand new electrical installation licence. An SP Group account is required.' },
                 { type: 'RENEWAL' as ApplicationType, icon: '🔄', title: 'Licence Renewal', desc: 'Renew an existing electrical installation licence' },
               ]).map(({ type, icon, title, desc }) => (
                 <button
@@ -453,6 +542,67 @@ export default function NewApplicationPage() {
               {errors.renewalPeriodMonths && (
                 <p className="text-sm text-red-600">{errors.renewalPeriodMonths}</p>
               )}
+            </div>
+
+            {/* Main Breaker Box Photo */}
+            <div className="space-y-2 border-t border-gray-100 pt-5">
+              <label className="block text-sm font-medium text-gray-700">
+                Main Breaker Box Photo
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                Upload a photo of the main breaker box at the installation site. This helps verify the electrical capacity (kVA). You can also upload it later.
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                {breakerBoxPhoto ? (
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">📷</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">{breakerBoxPhoto.name}</p>
+                        <p className="text-xs text-gray-400">
+                          {breakerBoxPhoto.size < 1024 * 1024
+                            ? `${(breakerBoxPhoto.size / 1024).toFixed(1)} KB`
+                            : `${(breakerBoxPhoto.size / (1024 * 1024)).toFixed(1)} MB`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBreakerBoxPhoto(null)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      aria-label="Remove breaker box photo"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span className="text-sm text-gray-600">Choose photo file</span>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.heic,.heif"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          if (file.size > 10 * 1024 * 1024) {
+                            toast.error('File size must be less than 10MB');
+                            return;
+                          }
+                          setBreakerBoxPhoto(file);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
 
             {/* SLD Option Selection */}
@@ -753,7 +903,7 @@ export default function NewApplicationPage() {
                 <p className="text-sm text-gray-500 mt-1">Select the electrical capacity for your installation</p>
               </div>
               <Select
-                label="DB Size (kVA)"
+                label="Electric Box (kVA)"
                 value={formData.selectedKva ? String(formData.selectedKva) : ''}
                 onChange={(e) => updateField('selectedKva', e.target.value ? Number(e.target.value) : null)}
                 options={[
@@ -846,7 +996,7 @@ export default function NewApplicationPage() {
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <StepReview formData={formData} priceResult={priceResult} getEmaFeeLabel={getEmaFeeLabel} sldFile={sldFile} />
+          <StepReview formData={formData} priceResult={priceResult} getEmaFeeLabel={getEmaFeeLabel} sldFile={sldFile} loaEmailFile={loaEmailFile} breakerBoxPhoto={breakerBoxPhoto} />
         )}
 
         {/* Navigation buttons */}

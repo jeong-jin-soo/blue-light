@@ -19,9 +19,11 @@ interface StepReviewProps {
   priceResult: PriceCalculation | null;
   getEmaFeeLabel: (months: number | null) => string;
   sldFile?: File | null;
+  loaEmailFile?: File | null;
+  breakerBoxPhoto?: File | null;
 }
 
-export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile }: StepReviewProps) {
+export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loaEmailFile, breakerBoxPhoto }: StepReviewProps) {
   return (
     <div className="space-y-5">
       <div>
@@ -47,6 +49,44 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile }: S
           <div>
             <dt className="text-xs text-blue-600">Account Number</dt>
             <dd className="text-sm font-medium text-blue-800 mt-0.5">{formData.spAccountNo}</dd>
+          </div>
+        </div>
+      )}
+
+      {/* LOA Email Screenshot (if attached) */}
+      {loaEmailFile && (
+        <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
+          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">LOA Email Screenshot</h3>
+          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+            <span className="text-lg">🖼️</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
+              <p className="text-xs text-gray-400">
+                {loaEmailFile.size < 1024 * 1024
+                  ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
+                  : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                {' — Will be uploaded on submission'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Breaker Box Photo (if attached) */}
+      {breakerBoxPhoto && (
+        <div className="bg-gray-50 rounded-lg p-4 space-y-2 border border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Main Breaker Box Photo</h3>
+          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
+            <span className="text-lg">📷</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-700 truncate">{breakerBoxPhoto.name}</p>
+              <p className="text-xs text-gray-400">
+                {breakerBoxPhoto.size < 1024 * 1024
+                  ? `${(breakerBoxPhoto.size / 1024).toFixed(1)} KB`
+                  : `${(breakerBoxPhoto.size / (1024 * 1024)).toFixed(1)} MB`}
+                {' — Will be uploaded on submission'}
+              </p>
+            </div>
           </div>
         </div>
       )}
