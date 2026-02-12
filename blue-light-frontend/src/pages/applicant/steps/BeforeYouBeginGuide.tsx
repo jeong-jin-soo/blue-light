@@ -28,7 +28,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           <div className="space-y-3">
             {[
               { step: '1', title: 'Submit Application', desc: 'Fill in property details, select kVA capacity, and review pricing.' },
-              { step: '2', title: 'Upload Documents', desc: 'Upload required documents including SLD (Single Line Diagram) and authorisation letter.' },
+              { step: '2', title: 'Upload Documents', desc: 'Upload required documents including SLD (Single Line Diagram) and Letter of Appointment.' },
               { step: '3', title: 'LEW Review', desc: 'A Licensed Electrical Worker will review your application. You may be asked to revise.' },
               { step: '4', title: 'Make Payment', desc: 'Once approved, complete payment via PayNow or bank transfer.' },
               { step: '5', title: 'Licence Issued', desc: 'After verification, your electrical installation licence will be issued.' },
@@ -53,7 +53,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           <ul className="space-y-2">
             {[
               { label: 'Single Line Diagram (SLD)', desc: 'Accepted formats: PDF, JPG, DWG, DXF, DGN, TIF, GIF, ZIP' },
-              { label: "Owner's Authorisation Letter", desc: 'Signed letter authorising the electrical installation work' },
+              { label: 'Letter of Appointment', desc: 'Signed letter appointing the Licensed Electrical Worker' },
             ].map(({ label, desc }) => (
               <li key={label} className="flex items-start gap-2.5">
                 <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -10,7 +10,7 @@ public enum FileType {
     DRAWING_SLD,
 
     /**
-     * Owner's Authorisation Letter
+     * Letter of Appointment
      */
     OWNER_AUTH_LETTER,
 

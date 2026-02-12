@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
             <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
               <li><strong>Account Information:</strong> Full name, email address, phone number</li>
               <li><strong>Application Information:</strong> Installation address, postal code, building type</li>
-              <li><strong>Documents:</strong> Single Line Diagrams (SLD), Owner's Authorisation Letters, and other uploaded documents</li>
+              <li><strong>Documents:</strong> Single Line Diagrams (SLD), Letters of Appointment, and other uploaded documents</li>
               <li><strong>Usage Data:</strong> Login timestamps, application activity logs</li>
             </ul>
           </section>

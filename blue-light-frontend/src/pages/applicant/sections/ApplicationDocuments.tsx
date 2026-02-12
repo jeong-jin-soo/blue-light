@@ -9,7 +9,7 @@ import type { Application, FileInfo, FileType, SldRequest } from '../../../types
 
 const APPLICANT_FILE_TYPE_OPTIONS = [
   { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
-  { value: 'OWNER_AUTH_LETTER', label: "Owner's Authorisation Letter" },
+  { value: 'OWNER_AUTH_LETTER', label: 'Letter of Appointment' },
 ];
 
 interface ApplicationDocumentsProps {

@@ -37,7 +37,7 @@ export function formatFileSize(bytes: number): string {
 export function formatFileType(type: string): string {
   switch (type) {
     case 'DRAWING_SLD': return 'SLD';
-    case 'OWNER_AUTH_LETTER': return 'Auth Letter';
+    case 'OWNER_AUTH_LETTER': return 'Appointment';
     case 'SITE_PHOTO': return 'Photo';
     case 'REPORT_PDF': return 'Report';
     case 'LICENSE_PDF': return 'Licence';

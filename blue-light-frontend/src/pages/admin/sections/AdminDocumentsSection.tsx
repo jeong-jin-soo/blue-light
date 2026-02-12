@@ -9,7 +9,7 @@ import type { FileInfo, FileType } from '../../../types';
 const FILE_TYPE_OPTIONS = [
   { value: 'LICENSE_PDF', label: 'Licence PDF' },
   { value: 'REPORT_PDF', label: 'Report PDF' },
-  { value: 'OWNER_AUTH_LETTER', label: "Owner's Auth Letter" },
+  { value: 'OWNER_AUTH_LETTER', label: 'Letter of Appointment' },
 ];
 
 interface Props {
