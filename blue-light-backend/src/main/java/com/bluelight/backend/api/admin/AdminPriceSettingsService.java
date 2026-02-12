@@ -1,6 +1,8 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.AdminPriceResponse;
+import com.bluelight.backend.api.admin.dto.BatchPriceTierItem;
+import com.bluelight.backend.api.admin.dto.BatchUpdatePricesRequest;
 import com.bluelight.backend.api.admin.dto.UpdatePriceRequest;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.price.MasterPrice;
@@ -13,9 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Admin 가격 및 시스템 설정 관리 서비스
@@ -96,6 +97,112 @@ public class AdminPriceSettingsService {
                 masterPrice.getKvaMax(), masterPrice.getIsActive());
 
         return AdminPriceResponse.from(masterPrice);
+    }
+
+    /**
+     * 가격 티어 일괄 수정 (생성/수정/삭제를 한번에 처리)
+     */
+    @Transactional
+    public List<AdminPriceResponse> batchUpdatePrices(BatchUpdatePricesRequest request) {
+        List<BatchPriceTierItem> tiers = request.getTiers();
+
+        // 1. kvaMin 오름차순 정렬
+        List<BatchPriceTierItem> sorted = tiers.stream()
+                .sorted(Comparator.comparingInt(BatchPriceTierItem::getKvaMin))
+                .toList();
+
+        // 2. 개별 검증: kvaMin <= kvaMax
+        for (BatchPriceTierItem tier : sorted) {
+            if (tier.getKvaMin() > tier.getKvaMax()) {
+                throw new BusinessException(
+                        "kVA min cannot be greater than kVA max for tier: " +
+                                (tier.getDescription() != null ? tier.getDescription() : tier.getKvaMin() + "-" + tier.getKvaMax()),
+                        HttpStatus.BAD_REQUEST,
+                        "INVALID_KVA_RANGE"
+                );
+            }
+        }
+
+        // 3. 교차 검증: 중복 및 빈 구간
+        for (int i = 0; i < sorted.size() - 1; i++) {
+            BatchPriceTierItem curr = sorted.get(i);
+            BatchPriceTierItem next = sorted.get(i + 1);
+
+            String currDesc = curr.getDescription() != null ? curr.getDescription() : curr.getKvaMin() + "-" + curr.getKvaMax();
+            String nextDesc = next.getDescription() != null ? next.getDescription() : next.getKvaMin() + "-" + next.getKvaMax();
+
+            // 중복 체크
+            if (curr.getKvaMax() >= next.getKvaMin()) {
+                throw new BusinessException(
+                        "kVA range overlap detected between tiers: " + currDesc + " and " + nextDesc,
+                        HttpStatus.BAD_REQUEST,
+                        "KVA_RANGE_OVERLAP"
+                );
+            }
+
+            // 빈 구간 체크
+            if (curr.getKvaMax() + 1 != next.getKvaMin()) {
+                throw new BusinessException(
+                        "Gap detected between tiers: " + currDesc + " (max: " + curr.getKvaMax() + ") and " + nextDesc + " (min: " + next.getKvaMin() + ")",
+                        HttpStatus.BAD_REQUEST,
+                        "KVA_RANGE_GAP"
+                );
+            }
+        }
+
+        // 4. 요청에 포함된 기존 ID 수집
+        Set<Long> requestedIds = tiers.stream()
+                .filter(t -> t.getMasterPriceSeq() != null)
+                .map(BatchPriceTierItem::getMasterPriceSeq)
+                .collect(Collectors.toSet());
+
+        // 5. DB의 모든 기존 엔티티 조회
+        List<MasterPrice> existingPrices = masterPriceRepository.findAll();
+        Map<Long, MasterPrice> existingMap = existingPrices.stream()
+                .collect(Collectors.toMap(MasterPrice::getMasterPriceSeq, p -> p));
+
+        // 6. 요청에 없는 기존 티어 → 소프트 삭제
+        for (MasterPrice existing : existingPrices) {
+            if (!requestedIds.contains(existing.getMasterPriceSeq())) {
+                masterPriceRepository.deleteById(existing.getMasterPriceSeq());
+                log.info("Price tier soft-deleted: priceSeq={}", existing.getMasterPriceSeq());
+            }
+        }
+
+        // 7. 수정 및 생성 처리
+        for (BatchPriceTierItem tier : tiers) {
+            if (tier.getMasterPriceSeq() != null) {
+                // 기존 티어 수정
+                MasterPrice mp = existingMap.get(tier.getMasterPriceSeq());
+                if (mp == null) {
+                    throw new BusinessException(
+                            "Price tier not found: id=" + tier.getMasterPriceSeq(),
+                            HttpStatus.NOT_FOUND,
+                            "PRICE_TIER_NOT_FOUND"
+                    );
+                }
+                mp.updatePrice(tier.getPrice());
+                mp.updateKvaRange(tier.getKvaMin(), tier.getKvaMax(), tier.getDescription());
+                mp.setActive(tier.getIsActive());
+                log.info("Price tier updated: priceSeq={}, kvaMin={}, kvaMax={}, price={}",
+                        mp.getMasterPriceSeq(), tier.getKvaMin(), tier.getKvaMax(), tier.getPrice());
+            } else {
+                // 신규 생성
+                MasterPrice newPrice = MasterPrice.builder()
+                        .description(tier.getDescription())
+                        .kvaMin(tier.getKvaMin())
+                        .kvaMax(tier.getKvaMax())
+                        .price(tier.getPrice())
+                        .isActive(tier.getIsActive())
+                        .build();
+                masterPriceRepository.save(newPrice);
+                log.info("Price tier created: kvaMin={}, kvaMax={}, price={}",
+                        tier.getKvaMin(), tier.getKvaMax(), tier.getPrice());
+            }
+        }
+
+        log.info("Batch price update completed: {} tiers processed", tiers.size());
+        return getAllPrices();
     }
 
     /**

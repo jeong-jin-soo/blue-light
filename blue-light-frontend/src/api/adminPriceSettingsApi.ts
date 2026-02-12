@@ -1,5 +1,5 @@
 import axiosClient from './axiosClient';
-import type { AdminPriceResponse, UpdatePriceRequest } from '../types';
+import type { AdminPriceResponse, UpdatePriceRequest, BatchUpdatePricesRequest } from '../types';
 
 // ── Price Management ──────────────────────────────
 
@@ -13,6 +13,13 @@ export const updatePrice = async (
   data: UpdatePriceRequest
 ): Promise<AdminPriceResponse> => {
   const response = await axiosClient.put<AdminPriceResponse>(`/admin/prices/${id}`, data);
+  return response.data;
+};
+
+export const batchUpdatePrices = async (
+  data: BatchUpdatePricesRequest
+): Promise<AdminPriceResponse[]> => {
+  const response = await axiosClient.put<AdminPriceResponse[]>('/admin/prices/batch', data);
   return response.data;
 };
 

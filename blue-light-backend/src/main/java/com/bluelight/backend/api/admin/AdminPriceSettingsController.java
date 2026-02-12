@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.AdminPriceResponse;
+import com.bluelight.backend.api.admin.dto.BatchUpdatePricesRequest;
 import com.bluelight.backend.api.admin.dto.UpdatePriceRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,18 @@ public class AdminPriceSettingsController {
             @Valid @RequestBody UpdatePriceRequest request) {
         log.info("Admin update price: priceSeq={}, price={}", id, request.getPrice());
         AdminPriceResponse response = adminPriceSettingsService.updatePrice(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Batch update price tiers (create, update, delete in one request)
+     * PUT /api/admin/prices/batch
+     */
+    @PutMapping("/prices/batch")
+    public ResponseEntity<List<AdminPriceResponse>> batchUpdatePrices(
+            @Valid @RequestBody BatchUpdatePricesRequest request) {
+        log.info("Admin batch update prices: {} tiers", request.getTiers().size());
+        List<AdminPriceResponse> response = adminPriceSettingsService.batchUpdatePrices(request);
         return ResponseEntity.ok(response);
     }
 

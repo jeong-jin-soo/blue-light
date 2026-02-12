@@ -27,6 +27,7 @@ export {
 export {
   getPrices,
   updatePrice,
+  batchUpdatePrices,
   getSettings,
   updateSettings,
 } from './adminPriceSettingsApi';

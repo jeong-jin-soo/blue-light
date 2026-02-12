@@ -1,29 +1,70 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { DataTable, type Column } from '../../components/data/DataTable';
-import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
-import type { AdminPriceResponse, UpdatePriceRequest } from '../../types';
+import type { AdminPriceResponse, BatchUpdatePricesRequest } from '../../types';
+
+// ── Editable Tier 타입 ──────────────────────────────
+
+interface TierErrors {
+  description?: string;
+  kvaMin?: string;
+  kvaMax?: string;
+  price?: string;
+}
+
+interface EditableTier {
+  tempId: string;
+  masterPriceSeq: number | null;
+  description: string;
+  kvaMin: string;
+  kvaMax: string;
+  price: string;
+  isActive: boolean;
+  errors: TierErrors;
+}
+
+function toEditableTier(price: AdminPriceResponse): EditableTier {
+  return {
+    tempId: crypto.randomUUID(),
+    masterPriceSeq: price.masterPriceSeq,
+    description: price.description || '',
+    kvaMin: String(price.kvaMin),
+    kvaMax: String(price.kvaMax),
+    price: String(price.price),
+    isActive: price.isActive,
+    errors: {},
+  };
+}
+
+function createEmptyTier(): EditableTier {
+  return {
+    tempId: crypto.randomUUID(),
+    masterPriceSeq: null,
+    description: '',
+    kvaMin: '',
+    kvaMax: '',
+    price: '',
+    isActive: true,
+    errors: {},
+  };
+}
+
+// ── 메인 컴포넌트 ──────────────────────────────
 
 export default function AdminPriceManagementPage() {
   const toast = useToastStore();
-  const [prices, setPrices] = useState<AdminPriceResponse[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Edit modal state
-  const [editingPrice, setEditingPrice] = useState<AdminPriceResponse | null>(null);
-  const [editForm, setEditForm] = useState<UpdatePriceRequest>({
-    price: 0,
-    description: '',
-    kvaMin: 0,
-    kvaMax: 0,
-    isActive: true,
-  });
-  const [saving, setSaving] = useState(false);
+  // 가격 티어 상태
+  const [editableTiers, setEditableTiers] = useState<EditableTier[]>([]);
+  const [originalPrices, setOriginalPrices] = useState<AdminPriceResponse[]>([]);
+  const [batchSaving, setBatchSaving] = useState(false);
+  const [crossTierErrors, setCrossTierErrors] = useState<string[]>([]);
+  const [deleteConfirmTier, setDeleteConfirmTier] = useState<EditableTier | null>(null);
 
   // Service fee state
   const [serviceFee, setServiceFee] = useState('');
@@ -44,18 +85,28 @@ export default function AdminPriceManagementPage() {
   const [originalPaymentInfo, setOriginalPaymentInfo] = useState<Record<string, string>>({});
   const [savingPayment, setSavingPayment] = useState(false);
 
-  const loadPrices = () => {
+  // ── 데이터 로드 ──────────────────────────────
+
+  const initializeTiers = useCallback((prices: AdminPriceResponse[]) => {
+    setOriginalPrices(prices);
+    setEditableTiers(prices.map(toEditableTier));
+    setCrossTierErrors([]);
+  }, []);
+
+  const loadPrices = useCallback(() => {
     setLoading(true);
     adminApi
       .getPrices()
-      .then(setPrices)
+      .then((prices) => {
+        initializeTiers(prices);
+      })
       .catch((err: { message?: string }) => {
         toast.error(err.message || 'Failed to load prices');
       })
       .finally(() => setLoading(false));
-  };
+  }, [initializeTiers, toast]);
 
-  const loadSettings = () => {
+  const loadSettings = useCallback(() => {
     adminApi
       .getSettings()
       .then((settings) => {
@@ -63,12 +114,10 @@ export default function AdminPriceManagementPage() {
         setServiceFee(fee);
         setOriginalServiceFee(fee);
 
-        // Email verification
         const emailVerif = settings['email_verification_enabled'] === 'true';
         setEmailVerificationEnabled(emailVerif);
         setOriginalEmailVerification(emailVerif);
 
-        // Payment info
         const pInfo: Record<string, string> = {
           payment_paynow_uen: settings['payment_paynow_uen'] || '',
           payment_paynow_name: settings['payment_paynow_name'] || '',
@@ -86,50 +135,156 @@ export default function AdminPriceManagementPage() {
       .catch((err: { message?: string }) => {
         toast.error(err.message || 'Failed to load settings');
       });
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadPrices();
     loadSettings();
   }, []);
 
-  const openEditModal = (price: AdminPriceResponse) => {
-    setEditingPrice(price);
-    setEditForm({
-      price: price.price,
-      description: price.description || '',
-      kvaMin: price.kvaMin,
-      kvaMax: price.kvaMax,
-      isActive: price.isActive,
-    });
+  // ── 가격 티어 인라인 편집 핸들러 ──────────────────────────────
+
+  const updateTier = (tempId: string, field: keyof EditableTier, value: string | boolean) => {
+    setEditableTiers((prev) =>
+      prev.map((t) =>
+        t.tempId === tempId ? { ...t, [field]: value, errors: { ...t.errors, [field]: undefined } } : t
+      )
+    );
   };
 
-  const handleSavePrice = async () => {
-    if (!editingPrice) return;
+  const handleAddTier = () => {
+    setEditableTiers((prev) => [...prev, createEmptyTier()]);
+  };
 
-    // Validation
-    if (editForm.price < 0) {
-      toast.error('Price must be non-negative');
-      return;
+  const handleDeleteTier = (tier: EditableTier) => {
+    if (tier.masterPriceSeq !== null) {
+      // 기존 티어: 확인 다이얼로그
+      setDeleteConfirmTier(tier);
+    } else {
+      // 신규 티어: 즉시 제거
+      setEditableTiers((prev) => prev.filter((t) => t.tempId !== tier.tempId));
     }
-    if (editForm.kvaMin && editForm.kvaMax && editForm.kvaMin > editForm.kvaMax) {
-      toast.error('kVA min cannot be greater than kVA max');
-      return;
+  };
+
+  const confirmDeleteTier = () => {
+    if (!deleteConfirmTier) return;
+    setEditableTiers((prev) => prev.filter((t) => t.tempId !== deleteConfirmTier.tempId));
+    setDeleteConfirmTier(null);
+  };
+
+  const handleDiscardChanges = () => {
+    initializeTiers(originalPrices);
+  };
+
+  // ── 변경 감지 ──────────────────────────────
+
+  const hasUnsavedPriceChanges = (() => {
+    if (editableTiers.length !== originalPrices.length) return true;
+    return editableTiers.some((tier, idx) => {
+      const orig = originalPrices[idx];
+      if (!orig) return true;
+      return (
+        tier.masterPriceSeq !== orig.masterPriceSeq ||
+        tier.description !== (orig.description || '') ||
+        tier.kvaMin !== String(orig.kvaMin) ||
+        tier.kvaMax !== String(orig.kvaMax) ||
+        tier.price !== String(orig.price) ||
+        tier.isActive !== orig.isActive
+      );
+    });
+  })();
+
+  // ── 클라이언트 사이드 검증 ──────────────────────────────
+
+  const validateTiers = (): boolean => {
+    let isValid = true;
+    const newTiers = editableTiers.map((t) => ({ ...t, errors: {} as TierErrors }));
+    const newCrossErrors: string[] = [];
+
+    // 개별 검증
+    newTiers.forEach((tier) => {
+      const kvaMin = parseInt(tier.kvaMin);
+      const kvaMax = parseInt(tier.kvaMax);
+      const price = parseFloat(tier.price);
+
+      if (!tier.kvaMin || isNaN(kvaMin) || kvaMin < 1) {
+        tier.errors.kvaMin = 'Required (min: 1)';
+        isValid = false;
+      }
+      if (!tier.kvaMax || isNaN(kvaMax) || kvaMax < 1) {
+        tier.errors.kvaMax = 'Required (min: 1)';
+        isValid = false;
+      }
+      if (!isNaN(kvaMin) && !isNaN(kvaMax) && kvaMin > kvaMax) {
+        tier.errors.kvaMax = 'Must be >= kVA Min';
+        isValid = false;
+      }
+      if (tier.price === '' || isNaN(price) || price < 0) {
+        tier.errors.price = 'Required (min: 0)';
+        isValid = false;
+      }
+    });
+
+    // 교차 검증 (kvaMin 정렬)
+    const validTiers = newTiers
+      .filter((t) => !isNaN(parseInt(t.kvaMin)) && !isNaN(parseInt(t.kvaMax)))
+      .sort((a, b) => parseInt(a.kvaMin) - parseInt(b.kvaMin));
+
+    for (let i = 0; i < validTiers.length - 1; i++) {
+      const curr = validTiers[i];
+      const next = validTiers[i + 1];
+      const currMax = parseInt(curr.kvaMax);
+      const nextMin = parseInt(next.kvaMin);
+      const currDesc = curr.description || `${curr.kvaMin}-${curr.kvaMax} kVA`;
+      const nextDesc = next.description || `${next.kvaMin}-${next.kvaMax} kVA`;
+
+      if (currMax >= nextMin) {
+        newCrossErrors.push(
+          `Overlap: "${currDesc}" (max: ${currMax}) overlaps with "${nextDesc}" (min: ${nextMin})`
+        );
+        isValid = false;
+      } else if (currMax + 1 !== nextMin) {
+        newCrossErrors.push(
+          `Gap: "${currDesc}" (max: ${currMax}) and "${nextDesc}" (min: ${nextMin}) — expected min to be ${currMax + 1}`
+        );
+        isValid = false;
+      }
     }
 
-    setSaving(true);
+    setEditableTiers(newTiers);
+    setCrossTierErrors(newCrossErrors);
+    return isValid;
+  };
+
+  // ── 일괄 저장 ──────────────────────────────
+
+  const handleBatchSave = async () => {
+    if (!validateTiers()) return;
+
+    setBatchSaving(true);
     try {
-      await adminApi.updatePrice(editingPrice.masterPriceSeq, editForm);
-      toast.success('Price tier updated successfully');
-      setEditingPrice(null);
-      loadPrices();
+      const request: BatchUpdatePricesRequest = {
+        tiers: editableTiers.map((t) => ({
+          masterPriceSeq: t.masterPriceSeq,
+          description: t.description,
+          kvaMin: parseInt(t.kvaMin),
+          kvaMax: parseInt(t.kvaMax),
+          price: parseFloat(t.price),
+          isActive: t.isActive,
+        })),
+      };
+      const updated = await adminApi.batchUpdatePrices(request);
+      initializeTiers(updated);
+      toast.success('Price tiers saved successfully');
     } catch (err: unknown) {
-      const message = (err as { message?: string })?.message || 'Failed to update price';
+      const message = (err as { message?: string })?.message || 'Failed to save price tiers';
       toast.error(message);
     } finally {
-      setSaving(false);
+      setBatchSaving(false);
     }
   };
+
+  // ── Settings 핸들러 ──────────────────────────────
 
   const handleSaveServiceFee = async () => {
     const feeValue = parseFloat(serviceFee);
@@ -164,7 +319,8 @@ export default function AdminPriceManagementPage() {
           : 'Email verification disabled. New users are auto-verified.'
       );
     } catch (err: unknown) {
-      const message = (err as { message?: string })?.message || 'Failed to update email verification setting';
+      const message =
+        (err as { message?: string })?.message || 'Failed to update email verification setting';
       toast.error(message);
     } finally {
       setSavingEmailVerification(false);
@@ -201,76 +357,9 @@ export default function AdminPriceManagementPage() {
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-SG', {
-      style: 'currency',
-      currency: 'SGD',
-    }).format(amount);
-  };
-
-  const columns: Column<AdminPriceResponse>[] = [
-    {
-      key: 'masterPriceSeq',
-      header: '#',
-      width: '50px',
-      render: (price) => (
-        <span className="font-mono text-xs text-gray-500">#{price.masterPriceSeq}</span>
-      ),
-    },
-    {
-      key: 'description',
-      header: 'Description',
-      render: (price) => (
-        <span className="text-gray-800 font-medium">{price.description || '-'}</span>
-      ),
-    },
-    {
-      key: 'kvaMin',
-      header: 'kVA Range',
-      render: (price) => (
-        <span className="font-mono text-sm text-gray-700">
-          {price.kvaMin.toLocaleString()} – {price.kvaMax.toLocaleString()} kVA
-        </span>
-      ),
-    },
-    {
-      key: 'price',
-      header: 'Price (SGD)',
-      render: (price) => (
-        <span className="font-semibold text-gray-800">{formatCurrency(price.price)}</span>
-      ),
-    },
-    {
-      key: 'isActive' as keyof AdminPriceResponse,
-      header: 'Status',
-      render: (price) => (
-        <Badge variant={price.isActive ? 'success' : 'gray'}>
-          {price.isActive ? 'Active' : 'Inactive'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'updatedAt',
-      header: 'Updated',
-      render: (price) => (
-        <span className="text-gray-500 text-xs">
-          {price.updatedAt ? new Date(price.updatedAt).toLocaleDateString() : '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'actions' as keyof AdminPriceResponse,
-      header: '',
-      width: '80px',
-      render: (price) => (
-        <Button variant="outline" size="sm" onClick={() => openEditModal(price)}>
-          Edit
-        </Button>
-      ),
-    },
-  ];
-
   const serviceFeeChanged = serviceFee !== originalServiceFee;
+
+  // ── 렌더링 ──────────────────────────────
 
   return (
     <div className="space-y-6">
@@ -322,7 +411,8 @@ export default function AdminPriceManagementPage() {
 
         {!emailVerificationEnabled && (
           <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">
-            Email verification is currently disabled. New users can sign up without verifying their email.
+            Email verification is currently disabled. New users can sign up without verifying their
+            email.
           </p>
         )}
       </Card>
@@ -364,14 +454,17 @@ export default function AdminPriceManagementPage() {
       <Card>
         <h2 className="text-lg font-semibold text-gray-800 mb-1">Payment Information</h2>
         <p className="text-xs text-gray-500 mb-4">
-          These details are displayed to applicants when making payment. Update to reflect your actual receiving accounts.
+          These details are displayed to applicants when making payment. Update to reflect your
+          actual receiving accounts.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* PayNow Section */}
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">P</span>
+              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">
+                P
+              </span>
               PayNow
             </h3>
             <div className="space-y-3">
@@ -393,7 +486,9 @@ export default function AdminPriceManagementPage() {
           {/* Bank Transfer Section */}
           <div>
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">B</span>
+              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">
+                B
+              </span>
               Bank Transfer
             </h3>
             <div className="space-y-3">
@@ -434,123 +529,247 @@ export default function AdminPriceManagementPage() {
         </div>
       </Card>
 
-      {/* Price Tiers Table */}
-      <DataTable
-        columns={columns}
-        data={prices}
-        loading={loading}
-        keyExtractor={(price) => price.masterPriceSeq}
-        emptyIcon="💰"
-        emptyTitle="No price tiers found"
-        emptyDescription="Price tiers will be listed here."
-        mobileCardRender={(price) => (
-          <div className="p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-gray-800">{price.description || `Tier #${price.masterPriceSeq}`}</span>
-              <Badge variant={price.isActive ? 'success' : 'gray'}>
-                {price.isActive ? 'Active' : 'Inactive'}
-              </Badge>
-            </div>
-            <div className="text-sm text-gray-600">
-              <span className="font-mono">{price.kvaMin.toLocaleString()} – {price.kvaMax.toLocaleString()} kVA</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-lg text-gray-800">{formatCurrency(price.price)}</span>
-              <Button variant="outline" size="sm" onClick={() => openEditModal(price)}>
-                Edit
-              </Button>
-            </div>
+      {/* ── Price Tiers (인라인 편집) ────────────────────── */}
+      <Card>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">Price Tiers</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Manage kVA capacity-based pricing. Add, edit, or remove tiers and save all changes at once.
+            </p>
           </div>
-        )}
-      />
-
-      {/* Summary */}
-      {!loading && prices.length > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-500 px-1">
-          <span>{prices.length} price tiers</span>
-          <div className="flex gap-4">
-            <span>Active: {prices.filter((p) => p.isActive).length}</span>
-            <span>Inactive: {prices.filter((p) => !p.isActive).length}</span>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {hasUnsavedPriceChanges && (
+              <span className="text-xs text-warning-600 mr-1">Unsaved changes</span>
+            )}
+            {hasUnsavedPriceChanges && (
+              <Button variant="outline" size="sm" onClick={handleDiscardChanges}>
+                Discard
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={handleBatchSave}
+              loading={batchSaving}
+              disabled={!hasUnsavedPriceChanges}
+            >
+              Save All
+            </Button>
           </div>
         </div>
-      )}
 
-      {/* Edit Price Modal */}
-      <Modal isOpen={!!editingPrice} onClose={() => setEditingPrice(null)} size="md">
-        <ModalHeader title="Edit Price Tier" onClose={() => setEditingPrice(null)} />
-        <ModalBody>
-          <div className="space-y-4">
-            <Input
-              label="Description"
-              value={editForm.description || ''}
-              onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-              placeholder="e.g., Up to 45 kVA"
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="kVA Min"
-                type="number"
-                min="1"
-                value={editForm.kvaMin?.toString() || ''}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, kvaMin: parseInt(e.target.value) || 0 })
-                }
-              />
-              <Input
-                label="kVA Max"
-                type="number"
-                min="1"
-                value={editForm.kvaMax?.toString() || ''}
-                onChange={(e) =>
-                  setEditForm({ ...editForm, kvaMax: parseInt(e.target.value) || 0 })
-                }
-              />
-            </div>
-
-            <Input
-              label="Price (SGD)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={editForm.price?.toString() || ''}
-              onChange={(e) =>
-                setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })
-              }
-              required
-            />
-
-            <div className="flex items-center gap-3">
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={editForm.isActive ?? true}
-                  onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-              </label>
-              <span className="text-sm text-gray-700">
-                {editForm.isActive ? 'Active' : 'Inactive'}
-              </span>
-            </div>
-
-            {!editForm.isActive && (
-              <p className="text-xs text-warning-600 bg-warning-50 p-2 rounded">
-                Inactive price tiers will not appear in the applicant's kVA selection.
-              </p>
-            )}
+        {/* 교차 검증 에러 배너 */}
+        {crossTierErrors.length > 0 && (
+          <div className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg">
+            <p className="text-sm font-medium text-error-700 mb-1">Validation Errors</p>
+            <ul className="text-xs text-error-600 space-y-0.5">
+              {crossTierErrors.map((err, i) => (
+                <li key={i}>• {err}</li>
+              ))}
+            </ul>
           </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" onClick={() => setEditingPrice(null)}>
-            Cancel
-          </Button>
-          <Button size="sm" onClick={handleSavePrice} loading={saving}>
-            Save Changes
-          </Button>
-        </ModalFooter>
-      </Modal>
+        )}
+
+        {/* 로딩 스켈레톤 */}
+        {loading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* 데스크톱 테이블 헤더 */}
+            <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_70px_44px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+              <span>Description</span>
+              <span>kVA Min</span>
+              <span>kVA Max</span>
+              <span>Price (SGD)</span>
+              <span>Active</span>
+              <span />
+            </div>
+
+            {/* 가격 티어 행들 */}
+            {editableTiers.length === 0 ? (
+              <div className="py-12 text-center text-gray-400">
+                <p className="text-3xl mb-2">💰</p>
+                <p className="text-sm font-medium">No price tiers</p>
+                <p className="text-xs">Click "Add Tier" to create a new price tier.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {editableTiers.map((tier, index) => (
+                  <div key={tier.tempId}>
+                    {/* 데스크톱 레이아웃 */}
+                    <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_70px_44px] gap-2 px-3 py-2.5 items-start">
+                      <Input
+                        value={tier.description}
+                        onChange={(e) => updateTier(tier.tempId, 'description', e.target.value)}
+                        placeholder={`Tier ${index + 1}`}
+                        error={tier.errors.description}
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        value={tier.kvaMin}
+                        onChange={(e) => updateTier(tier.tempId, 'kvaMin', e.target.value)}
+                        placeholder="Min"
+                        error={tier.errors.kvaMin}
+                      />
+                      <Input
+                        type="number"
+                        min="1"
+                        value={tier.kvaMax}
+                        onChange={(e) => updateTier(tier.tempId, 'kvaMax', e.target.value)}
+                        placeholder="Max"
+                        error={tier.errors.kvaMax}
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tier.price}
+                        onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
+                        placeholder="0.00"
+                        error={tier.errors.price}
+                      />
+                      <div className="flex items-center justify-center pt-2.5">
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={tier.isActive}
+                            onChange={(e) => updateTier(tier.tempId, 'isActive', e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
+                        </label>
+                      </div>
+                      <div className="flex items-center justify-center pt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTier(tier)}
+                          className="p-1.5 text-gray-400 hover:text-error-500 hover:bg-error-50 rounded-md transition-colors"
+                          title="Remove tier"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 모바일 레이아웃 */}
+                    <div className="md:hidden p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-500">
+                          Tier {index + 1}
+                          {tier.masterPriceSeq === null && (
+                            <span className="ml-1.5 text-primary-600">(New)</span>
+                          )}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={tier.isActive}
+                              onChange={(e) => updateTier(tier.tempId, 'isActive', e.target.checked)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary" />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTier(tier)}
+                            className="p-1.5 text-gray-400 hover:text-error-500 hover:bg-error-50 rounded-md transition-colors"
+                            title="Remove tier"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <Input
+                        label="Description"
+                        value={tier.description}
+                        onChange={(e) => updateTier(tier.tempId, 'description', e.target.value)}
+                        placeholder={`Tier ${index + 1}`}
+                        error={tier.errors.description}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="kVA Min"
+                          type="number"
+                          min="1"
+                          value={tier.kvaMin}
+                          onChange={(e) => updateTier(tier.tempId, 'kvaMin', e.target.value)}
+                          placeholder="Min"
+                          error={tier.errors.kvaMin}
+                        />
+                        <Input
+                          label="kVA Max"
+                          type="number"
+                          min="1"
+                          value={tier.kvaMax}
+                          onChange={(e) => updateTier(tier.tempId, 'kvaMax', e.target.value)}
+                          placeholder="Max"
+                          error={tier.errors.kvaMax}
+                        />
+                      </div>
+                      <Input
+                        label="Price (SGD)"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tier.price}
+                        onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
+                        placeholder="0.00"
+                        error={tier.errors.price}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Tier 버튼 */}
+            <div className="px-3 py-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={handleAddTier}
+                className="flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Tier
+              </button>
+            </div>
+
+            {/* 요약 */}
+            {editableTiers.length > 0 && (
+              <div className="flex items-center justify-between text-xs text-gray-400 px-3 pt-2 pb-1">
+                <span>{editableTiers.length} tier{editableTiers.length !== 1 ? 's' : ''}</span>
+                <span>
+                  Active: {editableTiers.filter((t) => t.isActive).length} / Inactive:{' '}
+                  {editableTiers.filter((t) => !t.isActive).length}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <ConfirmDialog
+        isOpen={!!deleteConfirmTier}
+        onClose={() => setDeleteConfirmTier(null)}
+        onConfirm={confirmDeleteTier}
+        title="Remove Price Tier"
+        message={`Are you sure you want to remove "${deleteConfirmTier?.description || `Tier (${deleteConfirmTier?.kvaMin}-${deleteConfirmTier?.kvaMax} kVA)`}"? This change will take effect when you click "Save All".`}
+        confirmLabel="Remove"
+        variant="danger"
+      />
     </div>
   );
 }
