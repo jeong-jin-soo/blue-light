@@ -150,7 +150,7 @@ export interface Application {
 /**
  * 파일 종류
  */
-export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF';
+export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT';
 
 /**
  * 첨부 파일

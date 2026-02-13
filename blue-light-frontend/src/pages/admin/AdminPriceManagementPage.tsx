@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
@@ -76,14 +76,17 @@ export default function AdminPriceManagementPage() {
   const [originalEmailVerification, setOriginalEmailVerification] = useState(false);
   const [savingEmailVerification, setSavingEmailVerification] = useState(false);
 
-  // Payment info state
+  // Payment info state (PayNow only)
   const [paymentPaynowUen, setPaymentPaynowUen] = useState('');
   const [paymentPaynowName, setPaymentPaynowName] = useState('');
-  const [paymentBankName, setPaymentBankName] = useState('');
-  const [paymentBankAccount, setPaymentBankAccount] = useState('');
-  const [paymentBankAccountName, setPaymentBankAccountName] = useState('');
   const [originalPaymentInfo, setOriginalPaymentInfo] = useState<Record<string, string>>({});
   const [savingPayment, setSavingPayment] = useState(false);
+
+  // QR image state
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
+  const [uploadingQr, setUploadingQr] = useState(false);
+  const [deletingQr, setDeletingQr] = useState(false);
+  const qrFileInputRef = useRef<HTMLInputElement>(null);
 
   // ── 데이터 로드 ──────────────────────────────
 
@@ -121,16 +124,19 @@ export default function AdminPriceManagementPage() {
         const pInfo: Record<string, string> = {
           payment_paynow_uen: settings['payment_paynow_uen'] || '',
           payment_paynow_name: settings['payment_paynow_name'] || '',
-          payment_bank_name: settings['payment_bank_name'] || '',
-          payment_bank_account: settings['payment_bank_account'] || '',
-          payment_bank_account_name: settings['payment_bank_account_name'] || '',
         };
         setPaymentPaynowUen(pInfo.payment_paynow_uen);
         setPaymentPaynowName(pInfo.payment_paynow_name);
-        setPaymentBankName(pInfo.payment_bank_name);
-        setPaymentBankAccount(pInfo.payment_bank_account);
-        setPaymentBankAccountName(pInfo.payment_bank_account_name);
         setOriginalPaymentInfo(pInfo);
+
+        // QR 이미지 존재 여부 확인
+        const qrPath = settings['payment_paynow_qr'] || '';
+        if (qrPath) {
+          const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
+          setQrImageUrl(`${apiBase}/public/payment-qr?t=${Date.now()}`);
+        } else {
+          setQrImageUrl(null);
+        }
       })
       .catch((err: { message?: string }) => {
         toast.error(err.message || 'Failed to load settings');
@@ -331,10 +337,7 @@ export default function AdminPriceManagementPage() {
 
   const paymentInfoChanged =
     paymentPaynowUen !== originalPaymentInfo.payment_paynow_uen ||
-    paymentPaynowName !== originalPaymentInfo.payment_paynow_name ||
-    paymentBankName !== originalPaymentInfo.payment_bank_name ||
-    paymentBankAccount !== originalPaymentInfo.payment_bank_account ||
-    paymentBankAccountName !== originalPaymentInfo.payment_bank_account_name;
+    paymentPaynowName !== originalPaymentInfo.payment_paynow_name;
 
   const handleSavePaymentInfo = async () => {
     setSavingPayment(true);
@@ -342,9 +345,6 @@ export default function AdminPriceManagementPage() {
       const data: Record<string, string> = {
         payment_paynow_uen: paymentPaynowUen,
         payment_paynow_name: paymentPaynowName,
-        payment_bank_name: paymentBankName,
-        payment_bank_account: paymentBankAccount,
-        payment_bank_account_name: paymentBankAccountName,
       };
       await adminApi.updateSettings(data);
       setOriginalPaymentInfo(data);
@@ -354,6 +354,52 @@ export default function AdminPriceManagementPage() {
       toast.error(message);
     } finally {
       setSavingPayment(false);
+    }
+  };
+
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 이미지 파일 검증
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file (PNG, JPG, etc.)');
+      return;
+    }
+
+    // 5MB 제한
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image file must be less than 5MB');
+      return;
+    }
+
+    setUploadingQr(true);
+    try {
+      const result = await adminApi.uploadPaymentQr(file);
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
+      setQrImageUrl(`${apiBase}${result.url}?t=${Date.now()}`);
+      toast.success('QR image uploaded successfully');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to upload QR image';
+      toast.error(message);
+    } finally {
+      setUploadingQr(false);
+      // input 리셋
+      if (qrFileInputRef.current) qrFileInputRef.current.value = '';
+    }
+  };
+
+  const handleQrDelete = async () => {
+    setDeletingQr(true);
+    try {
+      await adminApi.deletePaymentQr();
+      setQrImageUrl(null);
+      toast.success('QR image removed');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to remove QR image';
+      toast.error(message);
+    } finally {
+      setDeletingQr(false);
     }
   };
 
@@ -458,59 +504,79 @@ export default function AdminPriceManagementPage() {
           actual receiving accounts.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* PayNow Section */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">
-                P
-              </span>
-              PayNow
-            </h3>
-            <div className="space-y-3">
-              <Input
-                label="UEN Number"
-                value={paymentPaynowUen}
-                onChange={(e) => setPaymentPaynowUen(e.target.value)}
-                placeholder="e.g., 202401234A"
-              />
-              <Input
-                label="Recipient Name"
-                value={paymentPaynowName}
-                onChange={(e) => setPaymentPaynowName(e.target.value)}
-                placeholder="e.g., Blue Light Pte Ltd"
-              />
-            </div>
+        <div className="max-w-md">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">
+              P
+            </span>
+            PayNow
+          </h3>
+          <div className="space-y-3">
+            <Input
+              label="UEN Number"
+              value={paymentPaynowUen}
+              onChange={(e) => setPaymentPaynowUen(e.target.value)}
+              placeholder="e.g., 202401234A"
+            />
+            <Input
+              label="Recipient Name"
+              value={paymentPaynowName}
+              onChange={(e) => setPaymentPaynowName(e.target.value)}
+              placeholder="e.g., LicenseKaki Pte Ltd"
+            />
           </div>
 
-          {/* Bank Transfer Section */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <span className="w-6 h-6 bg-primary-100 rounded flex items-center justify-center text-xs font-bold text-primary-700">
-                B
-              </span>
-              Bank Transfer
-            </h3>
-            <div className="space-y-3">
-              <Input
-                label="Bank Name"
-                value={paymentBankName}
-                onChange={(e) => setPaymentBankName(e.target.value)}
-                placeholder="e.g., DBS Bank"
-              />
-              <Input
-                label="Account Number"
-                value={paymentBankAccount}
-                onChange={(e) => setPaymentBankAccount(e.target.value)}
-                placeholder="e.g., 012-345678-9"
-              />
-              <Input
-                label="Account Holder Name"
-                value={paymentBankAccountName}
-                onChange={(e) => setPaymentBankAccountName(e.target.value)}
-                placeholder="e.g., Blue Light Pte Ltd"
-              />
-            </div>
+          {/* QR Image Upload */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+            <label className="block text-sm font-medium text-gray-700 mb-2">PayNow QR Code Image</label>
+            {qrImageUrl ? (
+              <div className="space-y-3">
+                <div className="relative inline-block">
+                  <img
+                    src={qrImageUrl}
+                    alt="PayNow QR Code"
+                    className="w-48 h-48 object-contain border border-gray-200 rounded-lg bg-white p-2"
+                    onError={() => setQrImageUrl(null)}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => qrFileInputRef.current?.click()}
+                    loading={uploadingQr}
+                  >
+                    Replace Image
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleQrDelete}
+                    loading={deletingQr}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
+                onClick={() => qrFileInputRef.current?.click()}
+              >
+                <div className="text-3xl mb-2">📱</div>
+                <p className="text-sm text-gray-600 font-medium">
+                  {uploadingQr ? 'Uploading...' : 'Click to upload QR code image'}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</p>
+              </div>
+            )}
+            <input
+              ref={qrFileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleQrUpload}
+            />
           </div>
         </div>
 

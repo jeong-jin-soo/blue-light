@@ -30,6 +30,8 @@ export {
   batchUpdatePrices,
   getSettings,
   updateSettings,
+  uploadPaymentQr,
+  deletePaymentQr,
 } from './adminPriceSettingsApi';
 
 export {

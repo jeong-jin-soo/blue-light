@@ -4,6 +4,7 @@ import { Badge } from '../../../components/ui/Badge';
 import { StepTracker } from '../../../components/domain/StepTracker';
 import { InfoField } from '../../../components/common/InfoField';
 import { STATUS_STEPS, getStatusStep } from '../../../utils/applicationUtils';
+import fileApi from '../../../api/fileApi';
 import type { AdminApplication, FileInfo, Payment } from '../../../types';
 
 interface Props {
@@ -173,6 +174,29 @@ export function AdminSidebar({
               />
             )}
           </div>
+          {/* Licence PDF quick access */}
+          {(() => {
+            const licencePdf = files.find((f) => f.fileType === 'LICENSE_PDF');
+            if (licencePdf) {
+              return (
+                <div className="mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    fullWidth
+                    onClick={() => fileApi.downloadFile(licencePdf.fileSeq, licencePdf.originalFilename || 'licence.pdf')}
+                  >
+                    📄 Download Licence PDF
+                  </Button>
+                </div>
+              );
+            }
+            return (
+              <p className="text-xs text-gray-400 mt-3">
+                No licence PDF uploaded yet. Upload via Documents section.
+              </p>
+            );
+          })()}
         </Card>
       )}
 

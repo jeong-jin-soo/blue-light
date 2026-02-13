@@ -8,7 +8,7 @@ export default function PrivacyPolicyPage() {
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
             <span className="text-2xl">💡</span>
-            <span className="text-xl font-bold">Blue Light</span>
+            <span className="text-xl font-bold">LicenseKaki</span>
           </Link>
         </div>
 
@@ -18,7 +18,7 @@ export default function PrivacyPolicyPage() {
           <p className="text-sm text-gray-500">Last updated: February 2026</p>
 
           <p className="text-sm text-gray-600 leading-relaxed">
-            Blue Light ("we", "our", "us") is committed to protecting your personal data in
+            LicenseKaki ("we", "our", "us") is committed to protecting your personal data in
             compliance with the <strong>Singapore Personal Data Protection Act 2012 (PDPA)</strong>.
             This Privacy Policy explains how we collect, use, disclose, and protect your personal data.
           </p>
@@ -131,8 +131,8 @@ export default function PrivacyPolicyPage() {
               rights, please contact our Data Protection Officer:
             </p>
             <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-              <p><strong>Blue Light Pte Ltd</strong></p>
-              <p>Email: <a href="mailto:dpo@bluelight.sg" className="text-primary underline">dpo@bluelight.sg</a></p>
+              <p><strong>LicenseKaki Pte Ltd</strong></p>
+              <p>Email: <a href="mailto:dpo@licensekaki.sg" className="text-primary underline">dpo@licensekaki.sg</a></p>
             </div>
           </section>
         </div>

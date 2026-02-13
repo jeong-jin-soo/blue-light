@@ -1,15 +1,27 @@
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
-import type { Payment } from '../../../types';
+import { Button } from '../../../components/ui/Button';
+import fileApi from '../../../api/fileApi';
+import type { Payment, FileInfo } from '../../../types';
 
 interface Props {
   payments: Payment[];
+  files?: FileInfo[];
 }
 
 /**
  * 결제 이력 섹션
  */
-export function AdminPaymentSection({ payments }: Props) {
+export function AdminPaymentSection({ payments, files = [] }: Props) {
+  const receiptFiles = files.filter(f => f.fileType === 'PAYMENT_RECEIPT');
+
+  const handleDownloadReceipt = async (file: FileInfo) => {
+    try {
+      await fileApi.downloadFile(file.fileSeq, file.originalFilename || 'payment-receipt');
+    } catch {
+      // silently fail
+    }
+  };
   return (
     <Card>
       <h2 className="text-lg font-semibold text-gray-800 mb-4">Payment History</h2>
@@ -59,6 +71,35 @@ export function AdminPaymentSection({ payments }: Props) {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Receipt Files */}
+      {receiptFiles.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-gray-100">
+          <p className="text-sm font-medium text-gray-700 mb-2">Payment Receipt</p>
+          <div className="space-y-2">
+            {receiptFiles.map((file) => (
+              <div key={file.fileSeq} className="flex items-center gap-3 p-2.5 bg-green-50 border border-green-200 rounded-lg">
+                <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-green-800 truncate">{file.originalFilename || 'Payment Receipt'}</p>
+                  {file.fileSize && (
+                    <p className="text-xs text-green-600">{(file.fileSize / 1024).toFixed(0)} KB</p>
+                  )}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDownloadReceipt(file)}
+                >
+                  Download
+                </Button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </Card>

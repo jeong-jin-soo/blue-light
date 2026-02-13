@@ -47,13 +47,14 @@ export default function AdminApplicationDetailPage() {
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [revisionComment, setRevisionComment] = useState('');
-  const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow' });
+  const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow', receiptFile: null as File | null });
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
 
   // LOA states
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
   const [loaGenerating, setLoaGenerating] = useState(false);
+  const [loaUploading, setLoaUploading] = useState(false);
 
   // SLD states
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
@@ -140,8 +141,19 @@ export default function AdminApplicationDetailPage() {
         transactionId: paymentForm.transactionId || undefined,
         paymentMethod: paymentForm.paymentMethod || undefined,
       });
+
+      // 영수증 파일이 첨부된 경우 업로드
+      if (paymentForm.receiptFile) {
+        try {
+          await adminApi.uploadFile(applicationId, paymentForm.receiptFile, 'PAYMENT_RECEIPT');
+        } catch {
+          toast.error('Payment confirmed but failed to upload receipt');
+        }
+      }
+
       toast.success('Payment confirmed successfully');
       setShowPaymentModal(false);
+      setPaymentForm({ transactionId: '', paymentMethod: 'PayNow', receiptFile: null });
       fetchData();
     } catch { toast.error('Failed to confirm payment'); }
     finally { setActionLoading(false); }
@@ -239,6 +251,20 @@ export default function AdminApplicationDetailPage() {
   const handleLoaDownload = async (fileSeq: number, filename: string) => {
     try { await fileApi.downloadFile(fileSeq, filename); }
     catch { toast.error('Failed to download LOA'); }
+  };
+
+  const handleUploadLoa = async (file: File) => {
+    setLoaUploading(true);
+    try {
+      await adminApi.uploadFile(applicationId, file, 'OWNER_AUTH_LETTER');
+      toast.success('LOA uploaded successfully');
+      const loaData = await loaApi.getLoaStatus(applicationId);
+      setLoaStatus(loaData);
+    } catch {
+      toast.error('Failed to upload LOA');
+    } finally {
+      setLoaUploading(false);
+    }
   };
 
   // SLD
@@ -356,8 +382,10 @@ export default function AdminApplicationDetailPage() {
             application={application}
             loaStatus={loaStatus}
             onGenerate={handleGenerateLoa}
+            onUploadLoa={handleUploadLoa}
             onDownload={handleLoaDownload}
             generating={loaGenerating}
+            uploading={loaUploading}
           />
 
           {application.sldOption === 'REQUEST_LEW' && sldRequest && (
@@ -380,7 +408,7 @@ export default function AdminApplicationDetailPage() {
             onFileDownload={handleFileDownload}
           />
 
-          <AdminPaymentSection payments={payments} />
+          <AdminPaymentSection payments={payments} files={files} />
         </div>
 
         {/* Sidebar */}

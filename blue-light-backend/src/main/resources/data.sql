@@ -40,9 +40,15 @@ FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_paynow_uen');
 
 INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
-SELECT 'payment_paynow_name', 'Blue Light Pte Ltd', 'PayNow recipient name', NOW()
+SELECT 'payment_paynow_name', 'LicenseKaki Pte Ltd', 'PayNow recipient name', NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_paynow_name');
+
+-- PayNow QR 이미지 경로 (Admin이 업로드, 파일 경로 저장)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'payment_paynow_qr', '', 'PayNow QR code image file path', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_paynow_qr');
 
 -- 결제 수취 정보 (Bank Transfer)
 INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
@@ -56,7 +62,7 @@ FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_bank_account');
 
 INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
-SELECT 'payment_bank_account_name', 'Blue Light Pte Ltd', 'Bank account holder name', NOW()
+SELECT 'payment_bank_account_name', 'LicenseKaki Pte Ltd', 'Bank account holder name', NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'payment_bank_account_name');
 

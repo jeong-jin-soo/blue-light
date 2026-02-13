@@ -22,6 +22,34 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           </Button>
         </div>
 
+        {/* SP Group Account Notice */}
+        <div className="bg-green-50 rounded-xl p-5 border border-green-200">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🔌</span>
+            <div>
+              <h3 className="text-sm font-semibold text-green-800 uppercase tracking-wider mb-2">
+                SP Group Account (New Licence Only)
+              </h3>
+              <p className="text-sm text-green-700 leading-relaxed">
+                If you are applying for a <strong>New Licence</strong>, you must have an active SP Group electricity account for the installation address.
+                If you don't have one, please open a group account at{' '}
+                <a
+                  href="https://www.spgroup.com.sg"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium hover:text-green-900"
+                >
+                  www.spgroup.com.sg
+                </a>{' '}
+                before submitting your application.
+              </p>
+              <p className="text-xs text-green-600 mt-2">
+                * This is not required for Licence Renewal applications.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Process Overview */}
         <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Application Process</h3>
@@ -30,7 +58,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
               { step: '1', title: 'Submit Application', desc: 'Fill in property details, select kVA capacity, and review pricing. For New Licence applications, an SP Group account is required.' },
               { step: '2', title: 'Upload Documents', desc: 'Upload required documents including SLD (Single Line Diagram) and Letter of Appointment.' },
               { step: '3', title: 'LEW Review', desc: 'A Licensed Electrical Worker will review your application. You may be asked to revise.' },
-              { step: '4', title: 'Make Payment', desc: 'Once approved, complete payment via PayNow or bank transfer.' },
+              { step: '4', title: 'Make Payment', desc: 'Once approved, complete payment via PayNow.' },
               { step: '5', title: 'Licence Issued', desc: 'After verification, your electrical installation licence will be issued.' },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex items-start gap-3">
@@ -77,7 +105,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
               { icon: '💰', title: 'Pricing', desc: 'Based on your Electric Box (kVA). Service fee and EMA fee apply.' },
               { icon: '⏱️', title: 'Licence Period', desc: 'Choose between 3-month or 12-month licence validity.' },
               { icon: '🔌', title: 'SP Group Account', desc: 'An SP Group utilities account is required for New Licence applications.' },
-              { icon: '📋', title: 'EMA Submission', desc: 'Files for ELISE submission must be under 2MB each.' },
+              { icon: '📋', title: 'File Submission', desc: 'Files for licence submission must be under 2MB each.' },
             ].map(({ icon, title, desc }) => (
               <div key={title} className="flex items-start gap-2">
                 <span className="text-blue-600 mt-0.5">{icon}</span>

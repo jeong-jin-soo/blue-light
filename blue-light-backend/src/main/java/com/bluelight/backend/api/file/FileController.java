@@ -51,7 +51,7 @@ public class FileController {
      * POST /api/admin/applications/:id/files
      */
     @PostMapping("/api/admin/applications/{applicationId}/files")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'LEW')")
     public ResponseEntity<FileResponse> uploadFileAsAdmin(
             @PathVariable Long applicationId,
             @RequestParam("file") MultipartFile file,

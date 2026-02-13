@@ -268,7 +268,7 @@ export default function NewApplicationPage() {
         try {
           await fileApi.uploadFile(result.applicationSeq, loaEmailFile, 'OWNER_AUTH_LETTER');
         } catch {
-          toast.warning('Application submitted, but LOA email screenshot upload failed. You can upload it from the application detail page.');
+          toast.warning('Application submitted, but LOA upload failed. You can upload it from the application detail page.');
           navigate(`/applications/${result.applicationSeq}`);
           return;
         }
@@ -363,107 +363,6 @@ export default function NewApplicationPage() {
         {/* ───── Step 0: Application Type ───── */}
         {currentStep === 0 && (
           <div className="space-y-6">
-            {/* SP Group Account Notice */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-blue-800">SP Group Account Required</h3>
-                  <p className="text-sm text-blue-700 mt-1">
-                    For <strong>New Licence</strong> applications, an SP Group utilities account is mandatory.
-                    You must have an active SP account before submitting your application.
-                    If you don't have one yet, please open an account first.
-                  </p>
-                  <a
-                    href="https://openaccount.spgroup.com.sg"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-blue-700 hover:text-blue-900 underline underline-offset-2"
-                  >
-                    Open SP Group Account
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                  </a>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-blue-200">
-                <Input
-                  label="SP Account Number"
-                  placeholder="e.g., 1234567890"
-                  value={formData.spAccountNo}
-                  onChange={(e) => updateField('spAccountNo', e.target.value)}
-                  hint="Optional. Enter your SP Group account number if available."
-                />
-              </div>
-
-              {/* LOA Email Screenshot Upload */}
-              <div className="mt-4 pt-3 border-t border-blue-200">
-                <div className="flex items-start gap-2 mb-2">
-                  <span className="text-sm">📧</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">Letter of Appointment Email Screenshot</p>
-                    <p className="text-xs text-blue-600 mt-0.5">
-                      Upload a screenshot of the LOA email received from EMA. You can also upload it later from the application detail page.
-                    </p>
-                  </div>
-                </div>
-
-                {loaEmailFile ? (
-                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">🖼️</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {loaEmailFile.size < 1024 * 1024
-                            ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
-                            : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLoaEmailFile(null)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      aria-label="Remove LOA email screenshot"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors">
-                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="text-sm text-blue-600">Choose screenshot file</span>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.pdf"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 10 * 1024 * 1024) {
-                            toast.error('File size must be less than 10MB');
-                            return;
-                          }
-                          setLoaEmailFile(file);
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-
             <div>
               <h2 className="text-lg font-semibold text-gray-800">Application Type</h2>
               <p className="text-sm text-gray-500 mt-1">Choose the type of licence application</p>
@@ -501,6 +400,112 @@ export default function NewApplicationPage() {
                   )}
                 </button>
               ))}
+            </div>
+
+            {/* SP Account Notice + Input — NEW only */}
+            {formData.applicationType === 'NEW' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl mt-0.5">💡</span>
+                  <div>
+                    <p className="text-sm font-semibold text-blue-800">SP Group Account Required</p>
+                    <p className="text-sm text-blue-700 mt-1">
+                      New licence applications require an active SP Group electricity account. If you don't have one yet, please apply at{' '}
+                      <a
+                        href="https://www.spgroup.com.sg"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline font-medium hover:text-blue-900"
+                      >
+                        SP Group website
+                      </a>{' '}
+                      before proceeding.
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="spAccountNo" className="block text-sm font-medium text-blue-800 mb-1">
+                    SP Account Number
+                  </label>
+                  <input
+                    id="spAccountNo"
+                    type="text"
+                    placeholder="e.g. 1234567890"
+                    value={formData.spAccountNo}
+                    onChange={(e) => updateField('spAccountNo', e.target.value)}
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-400"
+                  />
+                  <p className="text-xs text-blue-600 mt-1">
+                    Enter your SP Group account number if available. You can also provide it later.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* LOA Upload — label varies by type */}
+            <div className="space-y-2 border-t border-gray-100 pt-5">
+              <label className="block text-sm font-medium text-gray-700">
+                {formData.applicationType === 'RENEWAL'
+                  ? '📄 Letter of Appointment (LOA) Document'
+                  : '📧 Letter of Appointment Email Screenshot'}
+              </label>
+              <p className="text-xs text-gray-500 mb-2">
+                {formData.applicationType === 'RENEWAL'
+                  ? 'Upload the LOA document received from the relevant authority. You can also upload it later.'
+                  : 'Upload a screenshot of the LOA email received from EMA. You can also upload it later.'}
+              </p>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                {loaEmailFile ? (
+                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">🖼️</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
+                        <p className="text-xs text-gray-400">
+                          {loaEmailFile.size < 1024 * 1024
+                            ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
+                            : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLoaEmailFile(null)}
+                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                      aria-label="Remove LOA file"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span className="text-sm text-gray-600">
+                      {formData.applicationType === 'RENEWAL' ? 'Choose LOA document' : 'Choose LOA email screenshot'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          if (f.size > 10 * 1024 * 1024) {
+                            toast.error('File size must be under 10 MB');
+                            return;
+                          }
+                          setLoaEmailFile(f);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
             </div>
 
             {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}

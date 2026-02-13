@@ -141,6 +141,7 @@ export function ApplicationDocuments({
           </div>
         )}
 
+        {/* File list (read-only view when upload is disabled) */}
         {!canUpload && files.length === 0 && (
           <p className="text-sm text-gray-500">No documents uploaded.</p>
         )}
@@ -180,6 +181,50 @@ export function ApplicationDocuments({
             ))}
           </div>
         )}
+
+        {/* Licence Documents (admin-uploaded, read-only) */}
+        {(() => {
+          const adminFiles = files.filter((f) => f.fileType === 'LICENSE_PDF' || f.fileType === 'REPORT_PDF');
+          if (!canUpload || adminFiles.length === 0) return null;
+          return (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Licence Documents</h3>
+              <div className="space-y-2">
+                {adminFiles.map((f) => (
+                  <div
+                    key={f.fileSeq}
+                    className="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-100"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-lg">📋</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-700 truncate">
+                          {f.originalFilename || `File #${f.fileSeq}`}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <Badge variant={getFileTypeBadge(f.fileType)} className="text-[10px]">
+                            {formatFileType(f.fileType)}
+                          </Badge>
+                          {f.fileSize != null && f.fileSize > 0 && (
+                            <span>{formatFileSize(f.fileSize)}</span>
+                          )}
+                          <span>{new Date(f.uploadedAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onFileDownload(f)}
+                    >
+                      Download
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </Card>
     </>
   );

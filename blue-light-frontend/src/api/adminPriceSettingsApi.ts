@@ -36,3 +36,22 @@ export const updateSettings = async (
   const response = await axiosClient.patch<Record<string, string>>('/admin/settings', data);
   return response.data;
 };
+
+// ── PayNow QR Image ──────────────────────────────
+
+export const uploadPaymentQr = async (
+  file: File
+): Promise<{ filePath: string; url: string }> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axiosClient.post<{ filePath: string; url: string }>(
+    '/admin/settings/payment-qr',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data;
+};
+
+export const deletePaymentQr = async (): Promise<void> => {
+  await axiosClient.delete('/admin/settings/payment-qr');
+};

@@ -1,6 +1,6 @@
-# Blue Light - Electrical Installation Licence Platform
+# LicenseKaki - Electrical Installation Licence Platform
 
-Singapore EMA 전기 설비 면허 신청/관리 플랫폼
+Singapore 전기 설비 면허 신청/관리 플랫폼
 
 ## Tech Stack
 - **Backend**: Spring Boot 4.0.2, Java 17, Gradle, JPA/Hibernate 7.2

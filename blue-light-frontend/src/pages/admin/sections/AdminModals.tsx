@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../../components/ui/Modal';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { Button } from '../../../components/ui/Button';
@@ -13,12 +14,24 @@ interface PaymentModalProps {
   onClose: () => void;
   onConfirm: () => void;
   quoteAmount: number;
-  paymentForm: { transactionId: string; paymentMethod: string };
-  setPaymentForm: React.Dispatch<React.SetStateAction<{ transactionId: string; paymentMethod: string }>>;
+  paymentForm: { transactionId: string; paymentMethod: string; receiptFile: File | null };
+  setPaymentForm: React.Dispatch<React.SetStateAction<{ transactionId: string; paymentMethod: string; receiptFile: File | null }>>;
   loading: boolean;
 }
 
 export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentForm, setPaymentForm, loading }: PaymentModalProps) {
+  const receiptInputRef = useRef<HTMLInputElement>(null);
+
+  const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setPaymentForm((prev) => ({ ...prev, receiptFile: file }));
+  };
+
+  const removeReceipt = () => {
+    setPaymentForm((prev) => ({ ...prev, receiptFile: null }));
+    if (receiptInputRef.current) receiptInputRef.current.value = '';
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <ModalHeader title="Confirm Payment" onClose={onClose} />
@@ -38,10 +51,48 @@ export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentF
           />
           <Input
             label="Payment Method"
-            placeholder="e.g., PayNow, Bank Transfer"
+            placeholder="e.g., PayNow"
             value={paymentForm.paymentMethod}
             onChange={(e) => setPaymentForm((prev) => ({ ...prev, paymentMethod: e.target.value }))}
           />
+
+          {/* Receipt Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Receipt</label>
+            {paymentForm.receiptFile ? (
+              <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-lg">
+                <svg className="w-4 h-4 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span className="text-xs text-green-800 truncate flex-1">{paymentForm.receiptFile.name}</span>
+                <button
+                  type="button"
+                  onClick={removeReceipt}
+                  className="text-green-600 hover:text-red-500 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => receiptInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-gray-300 rounded-lg p-3 text-center hover:border-primary-400 hover:bg-primary-50/50 transition-colors"
+              >
+                <p className="text-xs text-gray-500">Click to attach receipt (PDF, image)</p>
+              </button>
+            )}
+            <input
+              ref={receiptInputRef}
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              onChange={handleReceiptChange}
+            />
+            <p className="text-xs text-gray-400 mt-1">Optional — upload a receipt to share with the applicant</p>
+          </div>
         </div>
       </ModalBody>
       <ModalFooter>

@@ -56,7 +56,9 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
       {/* LOA Email Screenshot (if attached) */}
       {loaEmailFile && (
         <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
-          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">LOA Email Screenshot</h3>
+          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">
+            {formData.applicationType === 'RENEWAL' ? 'LOA Document' : 'LOA Email Screenshot'}
+          </h3>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
             <span className="text-lg">🖼️</span>
             <div className="min-w-0">
@@ -244,7 +246,7 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
           </span>
         </div>
         <p className="text-xs text-primary-600 mt-2">
-          Payment via PayNow or bank transfer. Details will be provided after submission.
+          Payment via PayNow. Details will be provided after submission.
         </p>
         {formData.renewalPeriodMonths && (
           <p className="text-xs text-amber-600 mt-1">

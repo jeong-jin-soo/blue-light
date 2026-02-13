@@ -3,6 +3,9 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminPriceResponse;
 import com.bluelight.backend.api.admin.dto.BatchUpdatePricesRequest;
 import com.bluelight.backend.api.admin.dto.UpdatePriceRequest;
+import com.bluelight.backend.api.file.FileStorageService;
+import com.bluelight.backend.domain.setting.SystemSetting;
+import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,8 @@ import java.util.Map;
 public class AdminPriceSettingsController {
 
     private final AdminPriceSettingsService adminPriceSettingsService;
+    private final FileStorageService fileStorageService;
+    private final SystemSettingRepository systemSettingRepository;
 
     /**
      * Get all price tiers
@@ -85,5 +91,74 @@ public class AdminPriceSettingsController {
         log.info("Admin update settings: keys={}", updates.keySet());
         Map<String, String> settings = adminPriceSettingsService.updateSettings(updates, userSeq);
         return ResponseEntity.ok(settings);
+    }
+
+    /**
+     * PayNow QR 이미지 업로드
+     * POST /api/admin/settings/payment-qr
+     */
+    @PostMapping("/settings/payment-qr")
+    public ResponseEntity<Map<String, String>> uploadPaymentQr(
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Admin upload PayNow QR image: filename={}, size={}", file.getOriginalFilename(), file.getSize());
+
+        // 이미지 파일 검증
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Only image files are allowed"));
+        }
+
+        // 기존 QR 파일 삭제
+        systemSettingRepository.findById("payment_paynow_qr").ifPresent(setting -> {
+            String oldPath = setting.getSettingValue();
+            if (oldPath != null && !oldPath.isBlank()) {
+                try {
+                    fileStorageService.delete(oldPath);
+                    log.info("Old QR image deleted: {}", oldPath);
+                } catch (Exception e) {
+                    log.warn("Failed to delete old QR image: {}", oldPath, e);
+                }
+            }
+        });
+
+        // 새 파일 저장
+        String filePath = fileStorageService.store(file, "settings");
+
+        // DB 설정 업데이트
+        SystemSetting setting = systemSettingRepository.findById("payment_paynow_qr")
+                .orElseGet(() -> new SystemSetting("payment_paynow_qr", "", "PayNow QR code image file path"));
+        setting.updateValue(filePath, userSeq);
+        systemSettingRepository.save(setting);
+
+        log.info("PayNow QR image uploaded: {}", filePath);
+        return ResponseEntity.ok(Map.of("filePath", filePath, "url", "/api/public/payment-qr"));
+    }
+
+    /**
+     * PayNow QR 이미지 삭제
+     * DELETE /api/admin/settings/payment-qr
+     */
+    @DeleteMapping("/settings/payment-qr")
+    public ResponseEntity<Void> deletePaymentQr(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Admin delete PayNow QR image");
+
+        systemSettingRepository.findById("payment_paynow_qr").ifPresent(setting -> {
+            String oldPath = setting.getSettingValue();
+            if (oldPath != null && !oldPath.isBlank()) {
+                try {
+                    fileStorageService.delete(oldPath);
+                    log.info("QR image deleted: {}", oldPath);
+                } catch (Exception e) {
+                    log.warn("Failed to delete QR image file: {}", oldPath, e);
+                }
+            }
+            setting.updateValue("", userSeq);
+            systemSettingRepository.save(setting);
+        });
+
+        return ResponseEntity.noContent().build();
     }
 }

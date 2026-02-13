@@ -27,5 +27,10 @@ public enum FileType {
     /**
      * 라이선스 PDF
      */
-    LICENSE_PDF
+    LICENSE_PDF,
+
+    /**
+     * 결제 영수증
+     */
+    PAYMENT_RECEIPT
 }

@@ -49,6 +49,13 @@ public class LoaService {
     public FileResponse generateLoa(Long applicationSeq) {
         Application application = findApplicationOrThrow(applicationSeq);
 
+        // RENEWAL 타입은 LOA 자동 생성 불가 — 신청자가 관계기관에서 받아 업로드
+        if (application.getApplicationType() == ApplicationType.RENEWAL) {
+            throw new BusinessException(
+                    "LOA cannot be auto-generated for renewal applications. Please upload the LOA document.",
+                    HttpStatus.BAD_REQUEST, "LOA_RENEWAL_UPLOAD_REQUIRED");
+        }
+
         // 이미 서명된 LOA가 있으면 재생성 불가
         if (application.getLoaSignatureUrl() != null) {
             throw new BusinessException("LOA has already been signed. Cannot regenerate.",

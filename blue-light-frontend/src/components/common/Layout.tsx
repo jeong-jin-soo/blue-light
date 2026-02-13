@@ -68,7 +68,7 @@ export default function Layout() {
         <div className="h-16 flex items-center px-6 border-b border-white/10">
           <Link to={isAdmin ? '/admin/dashboard' : isLew ? '/lew/dashboard' : '/dashboard'} className="flex items-center gap-2">
             <span className="text-xl">💡</span>
-            <span className="text-lg font-bold tracking-tight">Blue Light</span>
+            <span className="text-lg font-bold tracking-tight">LicenseKaki</span>
           </Link>
         </div>
 

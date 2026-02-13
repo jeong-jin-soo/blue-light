@@ -48,8 +48,8 @@ spring:
             enabled: true
             required: true
     sender:
-      from: ${MAIL_FROM:noreply@bluelight.sg}
-      name: ${MAIL_FROM_NAME:Blue Light}
+      from: ${MAIL_FROM:noreply@licensekaki.sg}
+      name: ${MAIL_FROM_NAME:LicenseKaki}
 
   # 파일 업로드 설정
   servlet:
