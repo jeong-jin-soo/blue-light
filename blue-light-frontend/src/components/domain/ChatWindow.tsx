@@ -43,7 +43,7 @@ export default function ChatWindow() {
 
   return (
     <div
-      className="fixed bottom-24 right-6 z-50 flex flex-col
+      className="fixed bottom-32 right-6 z-50 flex flex-col
                  w-[calc(100vw-2rem)] max-w-96 h-[520px]
                  md:w-96
                  bg-white rounded-2xl shadow-modal border border-gray-200

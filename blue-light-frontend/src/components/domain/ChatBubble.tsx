@@ -9,7 +9,7 @@ export default function ChatBubble() {
   return (
     <button
       onClick={toggleChat}
-      className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-primary text-white
+      className="fixed bottom-14 right-6 z-50 w-14 h-14 rounded-full bg-primary text-white
                  shadow-lg hover:bg-primary-hover transition-all duration-200
                  flex items-center justify-center cursor-pointer"
       aria-label={isOpen ? 'Close chat' : 'Open chat assistant'}
