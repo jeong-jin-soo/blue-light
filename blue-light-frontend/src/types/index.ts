@@ -56,6 +56,7 @@ export interface User {
   designation?: string;
   correspondenceAddress?: string;
   correspondencePostalCode?: string;
+  hasSignature?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -150,7 +151,7 @@ export interface Application {
 /**
  * 파일 종류
  */
-export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT';
+export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC';
 
 /**
  * 첨부 파일
@@ -360,6 +361,7 @@ export interface PriceCalculation {
   price: number;
   serviceFee: number;
   totalAmount: number;
+  emaFee?: number;
 }
 
 /**

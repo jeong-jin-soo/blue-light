@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.user;
 
+import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.api.user.dto.ChangePasswordRequest;
 import com.bluelight.backend.api.user.dto.UpdateProfileRequest;
 import com.bluelight.backend.api.user.dto.UserResponse;
@@ -10,10 +11,12 @@ import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * User profile service
@@ -26,6 +29,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final FileStorageService fileStorageService;
 
     /**
      * Get current user profile
@@ -76,6 +80,54 @@ public class UserService {
         String encodedNewPassword = passwordEncoder.encode(request.getNewPassword());
         user.changePassword(encodedNewPassword);
         log.info("Password changed: userSeq={}", userSeq);
+    }
+
+    /**
+     * Upload or replace profile signature
+     */
+    @Transactional
+    public UserResponse uploadSignature(Long userSeq, MultipartFile signatureImage) {
+        User user = findUserOrThrow(userSeq);
+
+        // 기존 서명 파일 삭제
+        if (user.getSignatureUrl() != null) {
+            fileStorageService.delete(user.getSignatureUrl());
+        }
+
+        // 새 서명 저장
+        String relativePath = fileStorageService.store(signatureImage, "users/" + userSeq);
+        user.updateSignatureUrl(relativePath);
+        log.info("Signature uploaded: userSeq={}, path={}", userSeq, relativePath);
+        return UserResponse.from(user);
+    }
+
+    /**
+     * Delete profile signature
+     */
+    @Transactional
+    public void deleteSignature(Long userSeq) {
+        User user = findUserOrThrow(userSeq);
+
+        if (user.getSignatureUrl() == null) {
+            throw new BusinessException("No signature to delete", HttpStatus.BAD_REQUEST, "NO_SIGNATURE");
+        }
+
+        fileStorageService.delete(user.getSignatureUrl());
+        user.removeSignatureUrl();
+        log.info("Signature deleted: userSeq={}", userSeq);
+    }
+
+    /**
+     * Get signature image as Resource
+     */
+    public Resource getSignatureResource(Long userSeq) {
+        User user = findUserOrThrow(userSeq);
+
+        if (user.getSignatureUrl() == null) {
+            throw new BusinessException("No signature found", HttpStatus.NOT_FOUND, "NO_SIGNATURE");
+        }
+
+        return fileStorageService.loadAsResource(user.getSignatureUrl());
     }
 
     private User findUserOrThrow(Long userSeq) {

@@ -41,6 +41,7 @@ export function formatFileType(type: string): string {
     case 'SITE_PHOTO': return 'Photo';
     case 'REPORT_PDF': return 'Report';
     case 'LICENSE_PDF': return 'Licence';
+    case 'SP_ACCOUNT_DOC': return 'SP Account';
     default: return type;
   }
 }
@@ -51,6 +52,7 @@ export function getFileTypeBadge(type: string): 'primary' | 'info' | 'success' |
     case 'DRAWING_SLD': return 'primary';
     case 'OWNER_AUTH_LETTER': return 'info';
     case 'SITE_PHOTO': return 'info';
+    case 'SP_ACCOUNT_DOC': return 'info';
     case 'REPORT_PDF': return 'gray';
     case 'LICENSE_PDF': return 'success';
     default: return 'gray';

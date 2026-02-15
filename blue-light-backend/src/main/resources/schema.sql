@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
     email_verified          BOOLEAN DEFAULT FALSE,
     email_verification_token VARCHAR(255),
     pdpa_consent_at DATETIME(6),
+    signature_url   VARCHAR(255),
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
     created_by     BIGINT,

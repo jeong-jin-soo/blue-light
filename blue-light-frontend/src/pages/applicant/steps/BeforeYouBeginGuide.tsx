@@ -80,8 +80,9 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           <p className="text-xs text-amber-700 mb-3">Prepare these documents before starting your application. You can upload them after submission.</p>
           <ul className="space-y-2">
             {[
+              { label: 'SP Account Email Screenshot (New Licence)', desc: 'Screenshot or PDF of SP Group account confirmation email (PDF, JPG)' },
               { label: 'Single Line Diagram (SLD)', desc: 'Accepted formats: PDF, JPG, DWG, DXF, DGN, TIF, GIF, ZIP' },
-              { label: 'Letter of Appointment', desc: 'Signed letter appointing the Licensed Electrical Worker' },
+              { label: 'Letter of Appointment', desc: 'Signed letter appointing the Licensed Electrical Worker (PDF, JPG)' },
               { label: 'Main Breaker Box Photo', desc: 'Photo of the main breaker box at the installation site (JPG, PNG)' },
             ].map(({ label, desc }) => (
               <li key={label} className="flex items-start gap-2.5">
@@ -102,7 +103,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Key Information</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { icon: '💰', title: 'Pricing', desc: 'Based on your Electric Box (kVA). Service fee and EMA fee apply.' },
+              { icon: '💰', title: 'Pricing', desc: 'Pricing includes kVA tier fee, service fee, and EMA fee (if applicable).' },
               { icon: '⏱️', title: 'Licence Period', desc: 'Choose between 3-month or 12-month licence validity.' },
               { icon: '🔌', title: 'SP Group Account', desc: 'An SP Group utilities account is required for New Licence applications.' },
               { icon: '📋', title: 'File Submission', desc: 'Files for licence submission must be under 2MB each.' },

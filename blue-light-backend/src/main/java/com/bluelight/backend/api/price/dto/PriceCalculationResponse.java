@@ -19,4 +19,7 @@ public class PriceCalculationResponse {
     // ── Phase 18: 서비스 수수료 분리 ──
     private BigDecimal serviceFee;
     private BigDecimal totalAmount;
+
+    // ── EMA 수수료 (총액에 포함) ──
+    private BigDecimal emaFee;
 }

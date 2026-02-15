@@ -17,13 +17,13 @@ interface FormData {
 interface StepReviewProps {
   formData: FormData;
   priceResult: PriceCalculation | null;
-  getEmaFeeLabel: (months: number | null) => string;
   sldFile?: File | null;
   loaEmailFile?: File | null;
   breakerBoxPhoto?: File | null;
+  spAccountFile?: File | null;
 }
 
-export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loaEmailFile, breakerBoxPhoto }: StepReviewProps) {
+export function StepReview({ formData, priceResult, sldFile, loaEmailFile, breakerBoxPhoto, spAccountFile }: StepReviewProps) {
   return (
     <div className="space-y-5">
       <div>
@@ -53,11 +53,30 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
         </div>
       )}
 
-      {/* LOA Email Screenshot (if attached) */}
-      {loaEmailFile && (
+      {/* SP Account Document (NEW only, if attached) */}
+      {spAccountFile && formData.applicationType === 'NEW' && (
+        <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
+          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">SP Account Document</h3>
+          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+            <span className="text-lg">📧</span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-700 truncate">{spAccountFile.name}</p>
+              <p className="text-xs text-gray-400">
+                {spAccountFile.size < 1024 * 1024
+                  ? `${(spAccountFile.size / 1024).toFixed(1)} KB`
+                  : `${(spAccountFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                {' — Will be uploaded on submission'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LOA Document (Renewal only, if attached) */}
+      {loaEmailFile && formData.applicationType === 'RENEWAL' && (
         <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
           <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">
-            {formData.applicationType === 'RENEWAL' ? 'LOA Document' : 'LOA Email Screenshot'}
+            LOA Document
           </h3>
           <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
             <span className="text-lg">🖼️</span>
@@ -107,8 +126,9 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
             <div>
               <dt className="text-xs text-gray-500">EMA Fee</dt>
               <dd className="text-sm font-medium text-gray-800 mt-0.5">
-                {getEmaFeeLabel(formData.renewalPeriodMonths)}
-                <span className="text-xs text-gray-500 ml-1">(Paid to EMA)</span>
+                {priceResult?.emaFee != null && priceResult.emaFee > 0
+                  ? `SGD $${priceResult.emaFee.toLocaleString()}`
+                  : '—'}
               </dd>
             </div>
           </div>
@@ -132,14 +152,12 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
                 {formData.existingExpiryDate || '—'}
               </dd>
             </div>
-            {formData.renewalReferenceNo && (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-orange-600">Renewal Reference No.</dt>
-                <dd className="text-sm font-medium text-orange-800 mt-0.5">
-                  {formData.renewalReferenceNo}
-                </dd>
-              </div>
-            )}
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-orange-600">Renewal Reference No.</dt>
+              <dd className="text-sm font-medium text-orange-800 mt-0.5">
+                {formData.renewalReferenceNo || '—'}
+              </dd>
+            </div>
           </div>
         </div>
       )}
@@ -236,6 +254,12 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
               <span className="text-primary-700">Service Fee</span>
               <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
             </div>
+            {priceResult.emaFee != null && priceResult.emaFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>
+                <span className="font-medium text-primary-800">SGD ${priceResult.emaFee.toLocaleString()}</span>
+              </div>
+            )}
             <div className="border-t border-primary-200 pt-2"></div>
           </div>
         )}
@@ -248,11 +272,6 @@ export function StepReview({ formData, priceResult, getEmaFeeLabel, sldFile, loa
         <p className="text-xs text-primary-600 mt-2">
           Payment via PayNow. Details will be provided after submission.
         </p>
-        {formData.renewalPeriodMonths && (
-          <p className="text-xs text-amber-600 mt-1">
-            * EMA fee of {getEmaFeeLabel(formData.renewalPeriodMonths)} ({formData.renewalPeriodMonths}-month licence) is payable directly to EMA and is not included in the above total.
-          </p>
-        )}
       </div>
     </div>
   );

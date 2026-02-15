@@ -11,6 +11,7 @@ const APPLICANT_FILE_TYPE_OPTIONS = [
   { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
   { value: 'OWNER_AUTH_LETTER', label: 'Letter of Appointment' },
   { value: 'SITE_PHOTO', label: 'Main Breaker Box Photo' },
+  { value: 'SP_ACCOUNT_DOC', label: 'SP Account Document' },
 ];
 
 interface ApplicationDocumentsProps {

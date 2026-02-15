@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import SignaturePad, { type SignaturePadHandle } from '../../../components/domain/SignaturePad';
 import loaApi from '../../../api/loaApi';
 import fileApi from '../../../api/fileApi';
+import userApi from '../../../api/userApi';
 import { useToastStore } from '../../../stores/toastStore';
 import type { Application, LoaStatus } from '../../../types';
 
@@ -16,6 +18,7 @@ interface Props {
 /**
  * Applicant LOA (Letter of Appointment) 섹션
  * - LOA 다운로드, 전자서명, 서명 완료 상태
+ * - 프로필 서명 저장 시 자동 로드 + 서명 후 프로필 저장 다이얼로그
  */
 export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }: Props) {
   const toast = useToastStore();
@@ -24,6 +27,35 @@ export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }
   const [hasSignature, setHasSignature] = useState(false);
 
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // 프로필 서명 관련 상태
+  const [savedSignatureDataUrl, setSavedSignatureDataUrl] = useState<string | null>(null);
+  const [hadSavedSignature, setHadSavedSignature] = useState(false);
+  const [showSaveToProfile, setShowSaveToProfile] = useState(false);
+  const [showReplaceSignature, setShowReplaceSignature] = useState(false);
+  const [savingToProfile, setSavingToProfile] = useState(false);
+  const pendingSignatureBlob = useRef<Blob | null>(null);
+
+  // 마운트 시 프로필 서명 로드
+  useEffect(() => {
+    if (!loaStatus?.loaGenerated || loaStatus.loaSigned) return;
+
+    const loadSavedSignature = async () => {
+      try {
+        const profile = await userApi.getMyProfile();
+        if (profile.hasSignature) {
+          setHadSavedSignature(true);
+          const dataUrl = await userApi.getSignatureDataUrl();
+          if (dataUrl) {
+            setSavedSignatureDataUrl(dataUrl);
+          }
+        }
+      } catch {
+        // 서명 로드 실패해도 LOA 서명은 계속 가능
+      }
+    };
+    loadSavedSignature();
+  }, [loaStatus?.loaGenerated, loaStatus?.loaSigned]);
 
   const handleSignLoa = () => {
     if (!signatureRef.current || signatureRef.current.isEmpty()) {
@@ -48,14 +80,53 @@ export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }
         return;
       }
 
+      // LOA 서명 API 호출
       await loaApi.signLoa(application.applicationSeq, blob);
       toast.success('LOA signed successfully!');
-      onStatusUpdate();
+
+      // 사용자가 직접 그렸는지 확인 → 프로필 저장 다이얼로그
+      const isModified = signatureRef.current.isModifiedByUser();
+      if (isModified) {
+        pendingSignatureBlob.current = blob;
+        if (hadSavedSignature) {
+          setShowReplaceSignature(true);
+        } else {
+          setShowSaveToProfile(true);
+        }
+      } else {
+        onStatusUpdate();
+      }
     } catch {
       toast.error('Failed to sign LOA');
     } finally {
       setSigning(false);
     }
+  };
+
+  // 프로필에 서명 저장
+  const handleSaveSignatureToProfile = async () => {
+    if (!pendingSignatureBlob.current) return;
+    setSavingToProfile(true);
+    try {
+      await userApi.uploadSignature(pendingSignatureBlob.current);
+      toast.success('Signature saved to profile');
+    } catch {
+      toast.error('Failed to save signature to profile');
+    } finally {
+      setSavingToProfile(false);
+      setShowSaveToProfile(false);
+      setShowReplaceSignature(false);
+      pendingSignatureBlob.current = null;
+      onStatusUpdate();
+    }
+  };
+
+  // 프로필 저장 건너뛰기
+  const handleSkipSaveToProfile = () => {
+    setShowSaveToProfile(false);
+    setShowReplaceSignature(false);
+    pendingSignatureBlob.current = null;
+    onStatusUpdate();
   };
 
   const handleDownloadLoa = async () => {
@@ -172,7 +243,13 @@ export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }
             ref={signatureRef}
             onSignatureChange={setHasSignature}
             disabled={signing}
+            initialDataUrl={savedSignatureDataUrl ?? undefined}
           />
+          {savedSignatureDataUrl && (
+            <p className="text-xs text-blue-600 mt-1">
+              ✓ Your saved signature has been loaded. You can use it as-is or draw a new one.
+            </p>
+          )}
         </div>
 
         {/* 서명 제출 버튼 */}
@@ -228,6 +305,30 @@ export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }
           </div>
         </div>
       )}
+
+      {/* 프로필에 서명 저장 다이얼로그 (기존 서명 없음) */}
+      <ConfirmDialog
+        isOpen={showSaveToProfile}
+        onClose={handleSkipSaveToProfile}
+        onConfirm={handleSaveSignatureToProfile}
+        title="Save Signature to Profile"
+        message="Would you like to save this signature to your profile? It will be automatically loaded next time you need to sign a document."
+        confirmLabel="Save to Profile"
+        cancelLabel="Skip"
+        loading={savingToProfile}
+      />
+
+      {/* 프로필 서명 대체 다이얼로그 (기존 서명 있음) */}
+      <ConfirmDialog
+        isOpen={showReplaceSignature}
+        onClose={handleSkipSaveToProfile}
+        onConfirm={handleSaveSignatureToProfile}
+        title="Update Saved Signature"
+        message="You drew a new signature. Would you like to replace your saved profile signature with this new one?"
+        confirmLabel="Replace Signature"
+        cancelLabel="Keep Previous"
+        loading={savingToProfile}
+      />
     </Card>
   );
 }

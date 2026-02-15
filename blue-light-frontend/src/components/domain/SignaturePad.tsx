@@ -8,6 +8,10 @@ export interface SignaturePadHandle {
   clear: () => void;
   /** 서명 여부 확인 */
   isEmpty: () => boolean;
+  /** 기존 서명 이미지를 캔버스에 로드 */
+  fromDataURL: (dataUrl: string) => void;
+  /** 사용자가 직접 그렸는지 여부 (pre-load와 구분) */
+  isModifiedByUser: () => boolean;
 }
 
 interface SignaturePadProps {
@@ -19,18 +23,21 @@ interface SignaturePadProps {
   disabled?: boolean;
   /** 추가 className */
   className?: string;
+  /** 저장된 서명 이미지를 캔버스에 미리 로드 */
+  initialDataUrl?: string;
 }
 
 /**
  * 전자서명 캔버스 컴포넌트
  * - react-signature-canvas 래퍼
- * - toBlob(), clear(), isEmpty() 메서드 노출
+ * - toBlob(), clear(), isEmpty(), fromDataURL(), isModifiedByUser() 메서드 노출
  */
 const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
-  ({ onSignatureChange, penColor = '#1e293b', disabled = false, className = '' }, ref) => {
+  ({ onSignatureChange, penColor = '#1e293b', disabled = false, className = '', initialDataUrl }, ref) => {
     const canvasRef = useRef<SignatureCanvas | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [hasSignature, setHasSignature] = useState(false);
+    const wasModifiedByUser = useRef(false);
 
     useImperativeHandle(ref, () => ({
       toBlob: async () => {
@@ -42,14 +49,27 @@ const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       clear: () => {
         canvasRef.current?.clear();
         setHasSignature(false);
+        wasModifiedByUser.current = false;
         onSignatureChange?.(false);
       },
       isEmpty: () => canvasRef.current?.isEmpty() ?? true,
+      fromDataURL: (dataUrl: string) => {
+        if (canvasRef.current && containerRef.current) {
+          canvasRef.current.fromDataURL(dataUrl, {
+            width: containerRef.current.offsetWidth,
+            height: containerRef.current.offsetHeight,
+          });
+          setHasSignature(true);
+          onSignatureChange?.(true);
+        }
+      },
+      isModifiedByUser: () => wasModifiedByUser.current,
     }));
 
     const handleEnd = useCallback(() => {
       const empty = canvasRef.current?.isEmpty() ?? true;
       setHasSignature(!empty);
+      wasModifiedByUser.current = true;
       onSignatureChange?.(!empty);
     }, [onSignatureChange]);
 
@@ -68,6 +88,24 @@ const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
       window.addEventListener('resize', resizeCanvas);
       return () => window.removeEventListener('resize', resizeCanvas);
     }, []);
+
+    // 저장된 서명 이미지 자동 로드
+    useEffect(() => {
+      if (initialDataUrl && canvasRef.current && containerRef.current) {
+        const timer = setTimeout(() => {
+          if (canvasRef.current && containerRef.current) {
+            canvasRef.current.fromDataURL(initialDataUrl, {
+              width: containerRef.current.offsetWidth,
+              height: containerRef.current.offsetHeight,
+            });
+            setHasSignature(true);
+            wasModifiedByUser.current = false;
+            onSignatureChange?.(true);
+          }
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }, [initialDataUrl]);
 
     return (
       <div className={`relative ${className}`}>
@@ -107,6 +145,7 @@ const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(
             onClick={() => {
               canvasRef.current?.clear();
               setHasSignature(false);
+              wasModifiedByUser.current = false;
               onSignatureChange?.(false);
             }}
             className="absolute top-2 right-2 text-xs text-gray-400 hover:text-gray-600 bg-white/80 px-2 py-1 rounded"

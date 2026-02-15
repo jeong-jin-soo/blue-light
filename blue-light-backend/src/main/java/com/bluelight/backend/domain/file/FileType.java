@@ -32,5 +32,10 @@ public enum FileType {
     /**
      * 결제 영수증
      */
-    PAYMENT_RECEIPT
+    PAYMENT_RECEIPT,
+
+    /**
+     * SP Group 계정 확인 문서
+     */
+    SP_ACCOUNT_DOC
 }

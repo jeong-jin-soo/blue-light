@@ -35,13 +35,15 @@ public class PriceController {
     }
 
     /**
-     * Calculate price for a given kVA
-     * GET /api/prices/calculate?kva=100
+     * Calculate price for a given kVA (with optional licence period for EMA fee)
+     * GET /api/prices/calculate?kva=100&months=12
      */
     @GetMapping("/calculate")
-    public ResponseEntity<PriceCalculationResponse> calculatePrice(@RequestParam Integer kva) {
-        log.info("Price calculation requested: kva={}", kva);
-        PriceCalculationResponse result = priceService.calculatePrice(kva);
+    public ResponseEntity<PriceCalculationResponse> calculatePrice(
+            @RequestParam Integer kva,
+            @RequestParam(required = false) Integer months) {
+        log.info("Price calculation requested: kva={}, months={}", kva, months);
+        PriceCalculationResponse result = priceService.calculatePrice(kva, months);
         return ResponseEntity.ok(result);
     }
 }

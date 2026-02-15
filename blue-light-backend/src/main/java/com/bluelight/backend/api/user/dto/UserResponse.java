@@ -27,6 +27,7 @@ public class UserResponse {
     private String designation;
     private String correspondenceAddress;
     private String correspondencePostalCode;
+    private boolean hasSignature;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -44,6 +45,7 @@ public class UserResponse {
                 .designation(user.getDesignation())
                 .correspondenceAddress(user.getCorrespondenceAddress())
                 .correspondencePostalCode(user.getCorrespondencePostalCode())
+                .hasSignature(user.getSignatureUrl() != null)
                 .createdAt(user.getCreatedAt())
                 .build();
     }

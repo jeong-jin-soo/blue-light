@@ -118,7 +118,7 @@ export function ApplicationInfo({
             <InfoField label="Duration" value={`${application.renewalPeriodMonths} months`} />
             <InfoField
               label="EMA Fee"
-              value={application.emaFee ? `SGD $${application.emaFee.toLocaleString()} (Paid to EMA)` : '—'}
+              value={application.emaFee ? `SGD $${application.emaFee.toLocaleString()}` : '—'}
             />
           </div>
         </Card>

@@ -46,6 +46,17 @@ public class PriceService {
      * @return calculation result with tier, price, service fee, and total
      */
     public PriceCalculationResponse calculatePrice(Integer kva) {
+        return calculatePrice(kva, null);
+    }
+
+    /**
+     * Calculate price for a given kVA value (includes service fee + optional EMA fee)
+     *
+     * @param kva    the kVA capacity
+     * @param months licence period in months (3 or 12), null if not applicable
+     * @return calculation result with tier, price, service fee, EMA fee, and total
+     */
+    public PriceCalculationResponse calculatePrice(Integer kva, Integer months) {
         if (kva == null || kva < 1) {
             throw new BusinessException("kVA must be a positive number", HttpStatus.BAD_REQUEST, "INVALID_KVA");
         }
@@ -58,18 +69,31 @@ public class PriceService {
                 ));
 
         BigDecimal serviceFee = getServiceFee();
-        BigDecimal totalAmount = masterPrice.getPrice().add(serviceFee);
+        BigDecimal emaFee = (months != null) ? calculateEmaFee(months) : BigDecimal.ZERO;
+        BigDecimal totalAmount = masterPrice.getPrice().add(serviceFee).add(emaFee);
 
-        log.info("Price calculated: kva={}, tier={}, price={}, serviceFee={}, total={}",
-                kva, masterPrice.getDescription(), masterPrice.getPrice(), serviceFee, totalAmount);
+        log.info("Price calculated: kva={}, tier={}, price={}, serviceFee={}, emaFee={}, total={}",
+                kva, masterPrice.getDescription(), masterPrice.getPrice(), serviceFee, emaFee, totalAmount);
 
         return PriceCalculationResponse.builder()
                 .kva(kva)
                 .tierDescription(masterPrice.getDescription())
                 .price(masterPrice.getPrice())
                 .serviceFee(serviceFee)
+                .emaFee(emaFee)
                 .totalAmount(totalAmount)
                 .build();
+    }
+
+    /**
+     * EMA 수수료 계산
+     * - 3개월=$50, 12개월=$100
+     */
+    public BigDecimal calculateEmaFee(int months) {
+        if (months == 3) {
+            return new BigDecimal("50.00");
+        }
+        return new BigDecimal("100.00");
     }
 
     /**

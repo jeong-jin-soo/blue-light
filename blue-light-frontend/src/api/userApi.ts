@@ -24,5 +24,45 @@ export const changePassword = async (data: ChangePasswordRequest): Promise<void>
   await axiosClient.put('/users/me/password', data);
 };
 
-export const userApi = { getMyProfile, updateProfile, changePassword };
+/**
+ * Upload or replace profile signature
+ */
+export const uploadSignature = async (signatureBlob: Blob): Promise<User> => {
+  const formData = new FormData();
+  formData.append('signature', signatureBlob, 'signature.png');
+  const response = await axiosClient.put<User>('/users/me/signature', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+};
+
+/**
+ * Delete profile signature
+ */
+export const deleteSignature = async (): Promise<void> => {
+  await axiosClient.delete('/users/me/signature');
+};
+
+/**
+ * Get signature image as data URL (for canvas pre-loading)
+ */
+export const getSignatureDataUrl = async (): Promise<string | null> => {
+  try {
+    const response = await axiosClient.get('/users/me/signature', {
+      responseType: 'blob',
+    });
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(new Blob([response.data]));
+    });
+  } catch {
+    return null;
+  }
+};
+
+export const userApi = {
+  getMyProfile, updateProfile, changePassword,
+  uploadSignature, deleteSignature, getSignatureDataUrl,
+};
 export default userApi;

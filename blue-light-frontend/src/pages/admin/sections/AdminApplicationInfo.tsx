@@ -93,7 +93,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
             <InfoField label="Duration" value={`${application.renewalPeriodMonths} months`} />
             <InfoField
               label="EMA Fee"
-              value={application.emaFee ? `SGD $${application.emaFee.toLocaleString()} (Paid to EMA)` : '—'}
+              value={application.emaFee ? `SGD $${application.emaFee.toLocaleString()}` : '—'}
             />
           </div>
         </Card>
@@ -137,7 +137,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
               <div className="flex justify-between text-sm">
                 <span className="text-primary-700">kVA Tier Price</span>
                 <span className="font-medium text-primary-800">
-                  SGD ${(application.quoteAmount - application.serviceFee).toLocaleString()}
+                  SGD ${(application.quoteAmount - (application.serviceFee || 0) - (application.emaFee || 0)).toLocaleString()}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
@@ -146,6 +146,14 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
                   SGD ${application.serviceFee.toLocaleString()}
                 </span>
               </div>
+              {application.emaFee != null && application.emaFee > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-primary-700">EMA Fee ({application.renewalPeriodMonths}-month)</span>
+                  <span className="font-medium text-primary-800">
+                    SGD ${application.emaFee.toLocaleString()}
+                  </span>
+                </div>
+              )}
               <div className="border-t border-primary-200 pt-2"></div>
             </div>
           )}
@@ -160,11 +168,6 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
               SGD ${application.quoteAmount.toLocaleString()}
             </p>
           </div>
-          {application.emaFee && (
-            <p className="text-xs text-amber-600 mt-3">
-              * EMA fee of SGD ${application.emaFee.toLocaleString()} ({application.renewalPeriodMonths}-month licence) is payable directly to EMA and is not included in the above total.
-            </p>
-          )}
         </div>
       </Card>
     </>

@@ -5,7 +5,9 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { StepTracker } from '../../components/domain/StepTracker';
+import { SpAccountEmailSample } from '../../components/domain/SpAccountEmailSample';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
@@ -69,6 +71,10 @@ export default function NewApplicationPage() {
   const [loaEmailFile, setLoaEmailFile] = useState<File | null>(null);
   // Main breaker box photo (held client-side until application is created)
   const [breakerBoxPhoto, setBreakerBoxPhoto] = useState<File | null>(null);
+  // SP Account document (held client-side until application is created)
+  const [spAccountFile, setSpAccountFile] = useState<File | null>(null);
+  // SP Account sample modal
+  const [showSpSample, setShowSpSample] = useState(false);
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
@@ -131,16 +137,16 @@ export default function NewApplicationPage() {
     }
   }, [currentStep]);
 
-  // Calculate price when kVA changes
+  // Calculate price when kVA or licence period changes
   useEffect(() => {
     if (formData.selectedKva) {
-      priceApi.calculatePrice(formData.selectedKva)
+      priceApi.calculatePrice(formData.selectedKva, formData.renewalPeriodMonths || undefined)
         .then(setPriceResult)
         .catch(() => setPriceResult(null));
     } else {
       setPriceResult(null);
     }
-  }, [formData.selectedKva]);
+  }, [formData.selectedKva, formData.renewalPeriodMonths]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -186,6 +192,9 @@ export default function NewApplicationPage() {
         }
       } else if (!formData.originalApplicationSeq) {
         newErrors.originalApplicationSeq = 'Please select an existing application';
+      }
+      if (!formData.renewalReferenceNo.trim()) {
+        newErrors.renewalReferenceNo = 'Renewal reference number is required';
       }
     }
     setErrors(newErrors);
@@ -263,8 +272,8 @@ export default function NewApplicationPage() {
         }
       }
 
-      // Upload LOA email screenshot if attached
-      if (loaEmailFile) {
+      // Upload LOA document if attached (Renewal only)
+      if (loaEmailFile && formData.applicationType === 'RENEWAL') {
         try {
           await fileApi.uploadFile(result.applicationSeq, loaEmailFile, 'OWNER_AUTH_LETTER');
         } catch {
@@ -280,6 +289,17 @@ export default function NewApplicationPage() {
           await fileApi.uploadFile(result.applicationSeq, breakerBoxPhoto, 'SITE_PHOTO');
         } catch {
           toast.warning('Application submitted, but breaker box photo upload failed. You can upload it from the application detail page.');
+          navigate(`/applications/${result.applicationSeq}`);
+          return;
+        }
+      }
+
+      // Upload SP Account document if attached (NEW only)
+      if (spAccountFile && formData.applicationType === 'NEW') {
+        try {
+          await fileApi.uploadFile(result.applicationSeq, spAccountFile, 'SP_ACCOUNT_DOC');
+        } catch {
+          toast.warning('Application submitted, but SP account document upload failed. You can upload it from the application detail page.');
           navigate(`/applications/${result.applicationSeq}`);
           return;
         }
@@ -314,13 +334,8 @@ export default function NewApplicationPage() {
     setErrors({});
     setPriceResult(null);
     setSldFile(null);
-  };
-
-  // Compute EMA fee label (12mo=$100, 3mo=$50)
-  const getEmaFeeLabel = (months: number | null) => {
-    if (months === 3) return 'SGD $50';
-    if (months === 12) return 'SGD $100';
-    return '—';
+    setLoaEmailFile(null);
+    setSpAccountFile(null);
   };
 
   return (
@@ -439,20 +454,88 @@ export default function NewApplicationPage() {
                     Enter your SP Group account number if available. You can also provide it later.
                   </p>
                 </div>
+
+                {/* SP Account Email Screenshot/PDF Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-blue-800 mb-1">
+                    SP Account Email Screenshot / PDF <span className="text-red-500">*</span>
+                  </label>
+                  <p className="text-xs text-blue-600 mb-2">
+                    Upload a screenshot or PDF of your SP Group account confirmation email. Accepted formats: PDF, JPG, JPEG. You can also upload it later.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowSpSample(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-900 mb-2 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    View sample email
+                  </button>
+                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
+                    {spAccountFile ? (
+                      <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-blue-200">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-lg">📧</span>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-700 truncate">{spAccountFile.name}</p>
+                            <p className="text-xs text-gray-400">
+                              {spAccountFile.size < 1024 * 1024
+                                ? `${(spAccountFile.size / 1024).toFixed(1)} KB`
+                                : `${(spAccountFile.size / (1024 * 1024)).toFixed(1)} MB`}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSpAccountFile(null)}
+                          className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                          aria-label="Remove SP account file"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors">
+                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span className="text-sm text-blue-600">Choose file</span>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) {
+                              if (f.size > 10 * 1024 * 1024) {
+                                toast.error('File size must be under 10 MB');
+                                return;
+                              }
+                              setSpAccountFile(f);
+                            }
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* LOA Upload — label varies by type */}
+            {/* LOA Upload — Renewal only */}
+            {formData.applicationType === 'RENEWAL' && (
             <div className="space-y-2 border-t border-gray-100 pt-5">
               <label className="block text-sm font-medium text-gray-700">
-                {formData.applicationType === 'RENEWAL'
-                  ? '📄 Letter of Appointment (LOA) Document'
-                  : '📧 Letter of Appointment Email Screenshot'}
+                📄 Letter of Appointment (LOA) Document
               </label>
               <p className="text-xs text-gray-500 mb-2">
-                {formData.applicationType === 'RENEWAL'
-                  ? 'Upload the LOA document received from the relevant authority. You can also upload it later.'
-                  : 'Upload a screenshot of the LOA email received from EMA. You can also upload it later.'}
+                Upload the LOA document received from the relevant authority. You can also upload it later.
               </p>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 {loaEmailFile ? (
@@ -484,12 +567,10 @@ export default function NewApplicationPage() {
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span className="text-sm text-gray-600">
-                      {formData.applicationType === 'RENEWAL' ? 'Choose LOA document' : 'Choose LOA email screenshot'}
-                    </span>
+                    <span className="text-sm text-gray-600">Choose LOA document</span>
                     <input
                       type="file"
-                      accept="image/*,.pdf"
+                      accept=".pdf,.jpg,.jpeg"
                       className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
@@ -507,6 +588,7 @@ export default function NewApplicationPage() {
                 )}
               </div>
             </div>
+            )}
 
             {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
@@ -845,12 +927,14 @@ export default function NewApplicationPage() {
                   </>
                 )}
 
-                {/* Renewal Reference No (optional) */}
+                {/* Renewal Reference No (required) */}
                 <Input
                   label="Renewal Reference No."
-                  placeholder="e.g., RN-2025-001 (optional)"
+                  placeholder="e.g., RN-2025-001"
                   value={formData.renewalReferenceNo}
                   onChange={(e) => updateField('renewalReferenceNo', e.target.value)}
+                  error={errors.renewalReferenceNo}
+                  required
                 />
               </div>
             )}
@@ -940,6 +1024,12 @@ export default function NewApplicationPage() {
                       <span className="text-primary-700">Service Fee</span>
                       <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
                     </div>
+                    {priceResult.emaFee != null && priceResult.emaFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>
+                        <span className="font-medium text-primary-800">SGD ${priceResult.emaFee.toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="border-t border-primary-200 pt-2 flex justify-between">
                       <span className="text-sm font-semibold text-primary-700">Total Amount</span>
                       <span className="text-xl font-bold text-primary-800">
@@ -947,22 +1037,6 @@ export default function NewApplicationPage() {
                       </span>
                     </div>
                   </div>
-                  {/* EMA Fee info */}
-                  {formData.renewalPeriodMonths && (
-                    <div className="bg-amber-50 rounded-lg p-3 border border-amber-200 mt-2">
-                      <div className="flex items-start gap-2">
-                        <span className="text-amber-600 mt-0.5">ℹ️</span>
-                        <div>
-                          <p className="text-sm font-medium text-amber-800">
-                            EMA Fee: {getEmaFeeLabel(formData.renewalPeriodMonths)} ({formData.renewalPeriodMonths}-month licence)
-                          </p>
-                          <p className="text-xs text-amber-600 mt-0.5">
-                            Paid directly to EMA (Energy Market Authority). Not included in the total above.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1001,7 +1075,7 @@ export default function NewApplicationPage() {
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <StepReview formData={formData} priceResult={priceResult} getEmaFeeLabel={getEmaFeeLabel} sldFile={sldFile} loaEmailFile={loaEmailFile} breakerBoxPhoto={breakerBoxPhoto} />
+          <StepReview formData={formData} priceResult={priceResult} sldFile={sldFile} loaEmailFile={loaEmailFile} breakerBoxPhoto={breakerBoxPhoto} spAccountFile={spAccountFile} />
         )}
 
         {/* Navigation buttons */}
@@ -1030,6 +1104,20 @@ export default function NewApplicationPage() {
         }application? You will need to make payment after submission.`}
         confirmLabel="Submit"
       />
+
+      {/* SP Account Email Sample Modal */}
+      <Modal isOpen={showSpSample} onClose={() => setShowSpSample(false)} size="lg">
+        <ModalHeader title="SP Account Email — Sample" onClose={() => setShowSpSample(false)} />
+        <ModalBody>
+          <p className="text-sm text-gray-600 mb-4">
+            Below are examples of the SP Services Ltd account confirmation emails. Please upload a screenshot or PDF of a similar email you received from SP Group.
+          </p>
+          <SpAccountEmailSample />
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => setShowSpSample(false)}>Close</Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

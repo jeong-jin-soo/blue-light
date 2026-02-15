@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -6,6 +6,8 @@ import { Select } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import SignaturePad, { type SignaturePadHandle } from '../../components/domain/SignaturePad';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
 import userApi from '../../api/userApi';
@@ -38,6 +40,14 @@ export default function ProfilePage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState<Record<string, string>>({});
 
+  // Signature management
+  const signatureRef = useRef<SignaturePadHandle>(null);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  const [signatureSaving, setSignatureSaving] = useState(false);
+  const [showSignaturePad, setShowSignaturePad] = useState(false);
+  const [hasNewSignature, setHasNewSignature] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   useEffect(() => {
     userApi
       .getMyProfile()
@@ -52,6 +62,10 @@ export default function ProfilePage() {
         setDesignation(data.designation || '');
         setCorrespondenceAddress(data.correspondenceAddress || '');
         setCorrespondencePostalCode(data.correspondencePostalCode || '');
+        // 서명 이미지 로드
+        if (data.hasSignature) {
+          userApi.getSignatureDataUrl().then(setSignatureDataUrl);
+        }
       })
       .catch(() => {
         toast.error('Failed to load profile');
@@ -126,6 +140,49 @@ export default function ProfilePage() {
       toast.error('Failed to change password. Please check your current password.');
     } finally {
       setPasswordSaving(false);
+    }
+  };
+
+  // ── Signature handlers ──
+
+  const handleSaveSignature = async () => {
+    if (!signatureRef.current || signatureRef.current.isEmpty()) {
+      toast.error('Please draw your signature first');
+      return;
+    }
+
+    setSignatureSaving(true);
+    try {
+      const blob = await signatureRef.current.toBlob();
+      if (!blob) {
+        toast.error('Failed to capture signature');
+        return;
+      }
+      const updated = await userApi.uploadSignature(blob);
+      setProfile(updated);
+      // 새 data URL 로드
+      const dataUrl = await userApi.getSignatureDataUrl();
+      setSignatureDataUrl(dataUrl);
+      setShowSignaturePad(false);
+      setHasNewSignature(false);
+      toast.success('Signature saved successfully');
+    } catch {
+      toast.error('Failed to save signature');
+    } finally {
+      setSignatureSaving(false);
+    }
+  };
+
+  const handleDeleteSignature = async () => {
+    setShowDeleteConfirm(false);
+    try {
+      await userApi.deleteSignature();
+      setProfile((prev) => prev ? { ...prev, hasSignature: false } : prev);
+      setSignatureDataUrl(null);
+      setShowSignaturePad(false);
+      toast.success('Signature deleted');
+    } catch {
+      toast.error('Failed to delete signature');
     }
   };
 
@@ -268,6 +325,85 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {/* ───── Signature Management ───── */}
+      <Card>
+        <CardHeader title="My Signature" description="Your saved signature will be pre-loaded when signing LOA documents" />
+        <div className="space-y-4">
+          {/* 서명이 있고, 편집 모드가 아닐 때 → 미리보기 */}
+          {profile?.hasSignature && signatureDataUrl && !showSignaturePad && (
+            <div className="space-y-3">
+              <div className="border-2 border-gray-200 rounded-lg overflow-hidden bg-white p-2" style={{ height: '150px' }}>
+                <img
+                  src={signatureDataUrl}
+                  alt="Saved signature"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => { setShowSignaturePad(true); setHasNewSignature(false); }}
+                >
+                  Update Signature
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 서명이 없거나, 편집 모드일 때 → SignaturePad */}
+          {(!profile?.hasSignature || showSignaturePad) && (
+            <div className="space-y-3">
+              {showSignaturePad && profile?.hasSignature && (
+                <p className="text-xs text-gray-500">
+                  Draw a new signature below to replace your current one.
+                </p>
+              )}
+              {!profile?.hasSignature && !showSignaturePad && (
+                <p className="text-xs text-gray-500">
+                  No signature saved yet. Draw your signature below to save it for future use.
+                </p>
+              )}
+              <SignaturePad
+                ref={signatureRef}
+                onSignatureChange={setHasNewSignature}
+                disabled={signatureSaving}
+              />
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleSaveSignature}
+                  loading={signatureSaving}
+                  disabled={!hasNewSignature}
+                >
+                  {profile?.hasSignature ? 'Replace Signature' : 'Save Signature'}
+                </Button>
+                {showSignaturePad && profile?.hasSignature && (
+                  <Button variant="outline" onClick={() => { setShowSignaturePad(false); setHasNewSignature(false); }}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteSignature}
+        title="Delete Signature"
+        message="Are you sure you want to delete your saved signature? You will need to draw a new one when signing LOA documents."
+        confirmLabel="Delete"
+        variant="danger"
+      />
 
       {/* Change password */}
       <Card>

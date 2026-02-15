@@ -64,7 +64,6 @@ public class ApplicationService {
 
         // Service fee from settings
         BigDecimal serviceFee = priceService.getServiceFee();
-        BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
 
         // Determine application type
         ApplicationType appType = ApplicationType.NEW;
@@ -90,12 +89,25 @@ public class ApplicationService {
             emaFee = calculateEmaFee(appType, renewalPeriodMonths);
         }
 
+        // Calculate total: kVA price + service fee + EMA fee (if applicable)
+        BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
+        if (emaFee != null) {
+            quoteAmount = quoteAmount.add(emaFee);
+        }
+
         if (appType == ApplicationType.RENEWAL) {
             // Renewal must have a licence period
             if (renewalPeriodMonths == null) {
                 throw new BusinessException(
                         "Licence period is required for renewal",
                         HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+
+            // Renewal reference number is required
+            if (renewalReferenceNo == null || renewalReferenceNo.isBlank()) {
+                throw new BusinessException(
+                        "Renewal reference number is required",
+                        HttpStatus.BAD_REQUEST, "RENEWAL_REF_REQUIRED");
             }
 
             // Link to original application if provided
@@ -192,14 +204,34 @@ public class ApplicationService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_EDIT");
         }
 
-        // Recalculate price if kVA changed (+ service fee)
+        // Recalculate price if kVA changed (+ service fee + EMA fee)
         MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
                 .orElseThrow(() -> new BusinessException(
                         "No price tier found for " + request.getSelectedKva() + " kVA",
                         HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
 
         BigDecimal serviceFee = priceService.getServiceFee();
+
+        // Determine current EMA fee (may be updated below)
+        BigDecimal currentEmaFee = application.getEmaFee();
+
+        // Licence period 변경 처리 (모든 타입)
+        if (request.getRenewalPeriodMonths() != null) {
+            int months = request.getRenewalPeriodMonths();
+            if (months != 3 && months != 12) {
+                throw new BusinessException(
+                        "Licence period must be 3 or 12 months",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            currentEmaFee = calculateEmaFee(application.getApplicationType(), months);
+            application.updateRenewalPeriod(months, currentEmaFee);
+        }
+
+        // Calculate total: kVA price + service fee + EMA fee (if applicable)
         BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
+        if (currentEmaFee != null) {
+            quoteAmount = quoteAmount.add(currentEmaFee);
+        }
 
         application.updateDetails(
                 request.getAddress(), request.getPostalCode(),
@@ -210,18 +242,6 @@ public class ApplicationService {
         // SP Account No 수정
         if (request.getSpAccountNo() != null) {
             application.updateSpAccountNo(request.getSpAccountNo());
-        }
-
-        // Licence period 변경 처리 (모든 타입)
-        if (request.getRenewalPeriodMonths() != null) {
-            int months = request.getRenewalPeriodMonths();
-            if (months != 3 && months != 12) {
-                throw new BusinessException(
-                        "Licence period must be 3 or 12 months",
-                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
-            }
-            BigDecimal newEmaFee = calculateEmaFee(application.getApplicationType(), months);
-            application.updateRenewalPeriod(months, newEmaFee);
         }
 
         // Auto-transition status back to PENDING_REVIEW

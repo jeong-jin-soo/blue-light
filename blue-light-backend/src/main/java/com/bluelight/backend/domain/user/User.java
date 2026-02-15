@@ -128,6 +128,12 @@ public class User extends BaseEntity {
     @Column(name = "pdpa_consent_at")
     private LocalDateTime pdpaConsentAt;
 
+    /**
+     * 프로필 서명 이미지 경로
+     */
+    @Column(name = "signature_url", length = 255)
+    private String signatureUrl;
+
     @Builder
     public User(String email, String password, String name, String phone,
                 UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
@@ -269,5 +275,19 @@ public class User extends BaseEntity {
     public void setEmailVerificationToken(String token) {
         this.emailVerificationToken = token;
         this.emailVerified = false;
+    }
+
+    /**
+     * 프로필 서명 등록/업데이트
+     */
+    public void updateSignatureUrl(String signatureUrl) {
+        this.signatureUrl = signatureUrl;
+    }
+
+    /**
+     * 프로필 서명 삭제
+     */
+    public void removeSignatureUrl() {
+        this.signatureUrl = null;
     }
 }
