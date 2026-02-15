@@ -579,3 +579,26 @@ export interface LoaStatus {
   loaFileSeq?: number;
   applicationType: ApplicationType;
 }
+
+// ============================================
+// Chat Types
+// ============================================
+
+export type ChatMessageRole = 'user' | 'assistant';
+
+export interface ChatMessage {
+  id: string;
+  role: ChatMessageRole;
+  content: string;
+  timestamp: Date;
+}
+
+export interface ChatRequest {
+  message: string;
+  history?: { role: string; content: string }[];
+}
+
+export interface ChatResponse {
+  message: string;
+  suggestedQuestions?: string[];
+}

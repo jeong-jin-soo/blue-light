@@ -90,3 +90,11 @@ password-reset:
 license-expiry:
   schedule-cron: ${LICENSE_EXPIRY_CRON:0 0 2 * * ?}
   warning-days-before: ${LICENSE_EXPIRY_WARNING_DAYS:30}
+
+# AI Chatbot (Gemini) 설정
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
+  base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+  max-tokens: ${GEMINI_MAX_TOKENS:1024}
+  temperature: ${GEMINI_TEMPERATURE:0.3}
