@@ -44,19 +44,6 @@ public class AdminPriceSettingsController {
     }
 
     /**
-     * Update price tier
-     * PUT /api/admin/prices/:id
-     */
-    @PutMapping("/prices/{id}")
-    public ResponseEntity<AdminPriceResponse> updatePrice(
-            @PathVariable Long id,
-            @Valid @RequestBody UpdatePriceRequest request) {
-        log.info("Admin update price: priceSeq={}, price={}", id, request.getPrice());
-        AdminPriceResponse response = adminPriceSettingsService.updatePrice(id, request);
-        return ResponseEntity.ok(response);
-    }
-
-    /**
      * Batch update price tiers (create, update, delete in one request)
      * PUT /api/admin/prices/batch
      */
@@ -65,6 +52,19 @@ public class AdminPriceSettingsController {
             @Valid @RequestBody BatchUpdatePricesRequest request) {
         log.info("Admin batch update prices: {} tiers", request.getTiers().size());
         List<AdminPriceResponse> response = adminPriceSettingsService.batchUpdatePrices(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update price tier
+     * PUT /api/admin/prices/:id
+     */
+    @PutMapping("/prices/{id:\\d+}")
+    public ResponseEntity<AdminPriceResponse> updatePrice(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdatePriceRequest request) {
+        log.info("Admin update price: priceSeq={}, price={}", id, request.getPrice());
+        AdminPriceResponse response = adminPriceSettingsService.updatePrice(id, request);
         return ResponseEntity.ok(response);
     }
 
