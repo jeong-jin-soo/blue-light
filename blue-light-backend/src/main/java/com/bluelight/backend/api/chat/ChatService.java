@@ -4,6 +4,10 @@ import com.bluelight.backend.api.chat.dto.ChatMessageDto;
 import com.bluelight.backend.api.chat.dto.ChatRequest;
 import com.bluelight.backend.api.chat.dto.ChatResponse;
 import com.bluelight.backend.config.GeminiConfig;
+import com.bluelight.backend.domain.chat.ChatMessage;
+import com.bluelight.backend.domain.chat.ChatMessageRepository;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +15,8 @@ import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.Disposable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +32,8 @@ public class ChatService {
 
     private final GeminiConfig geminiConfig;
     private final WebClient geminiWebClient;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ObjectMapper objectMapper;
 
     private String systemPrompt;
 
@@ -49,10 +57,134 @@ public class ChatService {
         Map<String, Object> body = buildGeminiRequest(request, userSeq);
         String responseText = callGeminiApi(body);
 
+        // 대화 기록 저장
+        saveMessages(request.getSessionId(), userSeq, request.getMessage(), responseText);
+
         return ChatResponse.builder()
                 .message(responseText)
                 .suggestedQuestions(generateSuggestedQuestions(request.getMessage()))
                 .build();
+    }
+
+    /**
+     * SSE 스트리밍 챗봇 응답
+     */
+    public void chatStream(ChatRequest request, Long userSeq, SseEmitter emitter) {
+        if (geminiConfig.getApiKey() == null || geminiConfig.getApiKey().isBlank()) {
+            sendSseEvent(emitter, "error", Map.of("type", "error",
+                    "content", "The AI assistant is currently unavailable."));
+            emitter.complete();
+            return;
+        }
+
+        Map<String, Object> body = buildGeminiRequest(request, userSeq);
+        String path = "/models/" + geminiConfig.getModel() + ":streamGenerateContent";
+
+        StringBuilder fullResponse = new StringBuilder();
+
+        Disposable subscription = geminiWebClient
+                .post()
+                .uri(uriBuilder -> uriBuilder
+                        .path(path)
+                        .queryParam("key", geminiConfig.getApiKey())
+                        .queryParam("alt", "sse")
+                        .build())
+                .bodyValue(body)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .subscribe(
+                        chunk -> {
+                            String text = extractTextFromChunk(chunk);
+                            if (text != null && !text.isEmpty()) {
+                                fullResponse.append(text);
+                                sendSseEvent(emitter, "token", Map.of(
+                                        "type", "token", "content", text));
+                            }
+                        },
+                        error -> {
+                            log.error("Gemini streaming error", error);
+                            sendSseEvent(emitter, "error", Map.of(
+                                    "type", "error",
+                                    "content", "Sorry, an error occurred. Please try again."));
+                            emitter.complete();
+                        },
+                        () -> {
+                            try {
+                                String complete = fullResponse.toString();
+                                List<String> suggestions = generateSuggestedQuestions(request.getMessage());
+                                sendSseEvent(emitter, "done", Map.of(
+                                        "type", "done",
+                                        "content", complete,
+                                        "suggestedQuestions", suggestions));
+                                emitter.complete();
+
+                                // DB 저장
+                                saveMessages(request.getSessionId(), userSeq,
+                                        request.getMessage(), complete);
+                            } catch (Exception e) {
+                                log.error("Error completing SSE stream", e);
+                                emitter.completeWithError(e);
+                            }
+                        }
+                );
+
+        // 클라이언트 연결 해제 시 구독 정리
+        emitter.onCompletion(subscription::dispose);
+        emitter.onTimeout(subscription::dispose);
+        emitter.onError(t -> subscription.dispose());
+    }
+
+    @SuppressWarnings("unchecked")
+    private String extractTextFromChunk(String jsonChunk) {
+        try {
+            Map<String, Object> parsed = objectMapper.readValue(
+                    jsonChunk, new TypeReference<Map<String, Object>>() {});
+            List<Map<String, Object>> candidates =
+                    (List<Map<String, Object>>) parsed.get("candidates");
+            if (candidates == null || candidates.isEmpty()) return null;
+            Map<String, Object> content =
+                    (Map<String, Object>) candidates.get(0).get("content");
+            if (content == null) return null;
+            List<Map<String, Object>> parts =
+                    (List<Map<String, Object>>) content.get("parts");
+            if (parts == null || parts.isEmpty()) return null;
+            return (String) parts.get(0).get("text");
+        } catch (Exception e) {
+            log.debug("Failed to parse Gemini chunk: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private void sendSseEvent(SseEmitter emitter, String eventName, Map<String, Object> data) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name(eventName)
+                    .data(objectMapper.writeValueAsString(data)));
+        } catch (Exception e) {
+            log.debug("Failed to send SSE event: {}", e.getMessage());
+        }
+    }
+
+    void saveMessages(String sessionId, Long userSeq, String userMessage, String assistantMessage) {
+        if (sessionId == null || sessionId.isBlank()) return;
+
+        try {
+            chatMessageRepository.save(ChatMessage.builder()
+                    .sessionId(sessionId)
+                    .userSeq(userSeq)
+                    .role("user")
+                    .content(userMessage)
+                    .build());
+
+            chatMessageRepository.save(ChatMessage.builder()
+                    .sessionId(sessionId)
+                    .userSeq(userSeq)
+                    .role("assistant")
+                    .content(assistantMessage)
+                    .build());
+        } catch (Exception e) {
+            log.warn("Failed to save chat messages: {}", e.getMessage());
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * AI 챗봇 API 컨트롤러 (Public — 로그인 불필요)
@@ -59,5 +61,41 @@ public class ChatController {
 
         ChatResponse response = chatService.chat(request, userSeq);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * SSE 스트리밍 챗봇 엔드포인트
+     */
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter chatStream(
+            @Valid @RequestBody ChatRequest request,
+            HttpServletRequest httpRequest) {
+
+        String ip = httpRequest.getRemoteAddr();
+
+        Long userSeq = null;
+        boolean authenticated = false;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getPrincipal() instanceof Long) {
+            userSeq = (Long) auth.getPrincipal();
+            authenticated = true;
+        }
+
+        if (chatRateLimiter.isBlocked(ip, authenticated)) {
+            throw new BusinessException(
+                    "Too many requests. Please try again later.",
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "RATE_LIMITED"
+            );
+        }
+        chatRateLimiter.recordAttempt(ip);
+
+        log.info("Chat stream request: ip={}, authenticated={}, message={}", ip, authenticated,
+                request.getMessage().substring(0, Math.min(request.getMessage().length(), 50)));
+
+        SseEmitter emitter = new SseEmitter(120_000L);
+        chatService.chatStream(request, userSeq, emitter);
+
+        return emitter;
     }
 }

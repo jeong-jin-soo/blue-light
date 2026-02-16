@@ -185,3 +185,16 @@ CREATE TABLE IF NOT EXISTS master_prices (
     deleted_at       DATETIME(6),
     PRIMARY KEY (master_price_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 10. 챗봇 대화 기록
+CREATE TABLE IF NOT EXISTS chat_messages (
+    chat_message_seq  BIGINT       NOT NULL AUTO_INCREMENT,
+    session_id        VARCHAR(36)  NOT NULL,
+    user_seq          BIGINT,
+    role              VARCHAR(10)  NOT NULL,
+    content           TEXT         NOT NULL,
+    created_at        DATETIME(6),
+    PRIMARY KEY (chat_message_seq),
+    KEY idx_chat_messages_session (session_id),
+    KEY idx_chat_messages_user (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

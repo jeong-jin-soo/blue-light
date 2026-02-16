@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useChatStore } from '../../stores/chatStore';
 import type { ChatMessage } from '../../types';
 
@@ -6,25 +8,27 @@ import type { ChatMessage } from '../../types';
  * 채팅 윈도우 — 메시지 목록, 입력, 추천 질문
  */
 export default function ChatWindow() {
-  const { messages, isLoading, suggestedQuestions, sendMessage, closeChat, clearMessages } =
+  const { messages, isLoading, isStreaming, suggestedQuestions, sendMessage, closeChat, clearMessages } =
     useChatStore();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // 새 메시지 시 자동 스크롤
+  // 새 메시지 / 스트리밍 시 자동 스크롤
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+  }, [messages, isLoading, isStreaming]);
 
   // 열릴 때 포커스
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
+  const isBusy = isLoading || isStreaming;
+
   const handleSend = () => {
     const trimmed = input.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isBusy) return;
     sendMessage(trimmed);
     setInput('');
   };
@@ -37,7 +41,7 @@ export default function ChatWindow() {
   };
 
   const handleSuggestionClick = (question: string) => {
-    if (isLoading) return;
+    if (isBusy) return;
     sendMessage(question);
   };
 
@@ -107,12 +111,18 @@ export default function ChatWindow() {
         )}
 
         {/* 대화 메시지 */}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+        {messages.map((msg, idx) => (
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            isStreamingCurrent={
+              isStreaming && msg.role === 'assistant' && idx === messages.length - 1
+            }
+          />
         ))}
 
-        {/* 타이핑 인디케이터 */}
-        {isLoading && (
+        {/* 타이핑 인디케이터 (스트리밍 시작 전에만 표시) */}
+        {isLoading && !isStreaming && (
           <div className="flex gap-2">
             <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
               <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -133,7 +143,7 @@ export default function ChatWindow() {
       </div>
 
       {/* 추천 질문 */}
-      {suggestedQuestions.length > 0 && !isLoading && (
+      {suggestedQuestions.length > 0 && !isBusy && (
         <div className="px-4 pb-2 flex flex-wrap gap-1.5">
           {suggestedQuestions.map((q) => (
             <button
@@ -161,11 +171,11 @@ export default function ChatWindow() {
             className="flex-1 resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm
                        focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
                        placeholder:text-gray-400 max-h-24"
-            disabled={isLoading}
+            disabled={isBusy}
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isBusy}
             className="p-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover
                        disabled:opacity-40 disabled:cursor-not-allowed transition-colors
                        flex-shrink-0 cursor-pointer"
@@ -182,7 +192,13 @@ export default function ChatWindow() {
 }
 
 /** 메시지 버블 컴포넌트 */
-function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubble({
+  message,
+  isStreamingCurrent = false,
+}: {
+  message: ChatMessage;
+  isStreamingCurrent?: boolean;
+}) {
   const isUser = message.role === 'user';
 
   return (
@@ -201,7 +217,27 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             : 'bg-gray-50 text-gray-700 rounded-tl-sm'
         }`}
       >
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        {isUser ? (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <div className="chat-markdown text-sm leading-relaxed">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children }) => (
+                  <a href={href} target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+            {isStreamingCurrent && (
+              <span className="inline-block w-1.5 h-4 bg-gray-400 ml-0.5 animate-pulse align-text-bottom" />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
