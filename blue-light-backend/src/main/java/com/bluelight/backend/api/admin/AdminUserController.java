@@ -20,13 +20,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * Admin User Management API controller (ADMIN role only)
+ * Admin User Management API controller (ADMIN + SYSTEM_ADMIN)
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/admin/users")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SYSTEM_ADMIN')")
 public class AdminUserController {
 
     private final UserRepository userRepository;
@@ -83,19 +83,19 @@ public class AdminUserController {
                 .orElseThrow(() -> new BusinessException(
                         "User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
-        // ADMIN 사용자의 역할은 변경 불가
-        if (user.getRole() == UserRole.ADMIN) {
+        // ADMIN / SYSTEM_ADMIN 사용자의 역할은 변경 불가
+        if (user.getRole() == UserRole.ADMIN || user.getRole() == UserRole.SYSTEM_ADMIN) {
             throw new BusinessException(
                     "Cannot change role of an admin user",
                     HttpStatus.BAD_REQUEST, "CANNOT_CHANGE_ADMIN_ROLE");
         }
 
-        // ADMIN 역할로 변경 불가
+        // ADMIN / SYSTEM_ADMIN 역할로 변경 불가
         UserRole targetRole = EnumParser.parse(UserRole.class, request.getRole(), "INVALID_ROLE");
 
-        if (targetRole == UserRole.ADMIN) {
+        if (targetRole == UserRole.ADMIN || targetRole == UserRole.SYSTEM_ADMIN) {
             throw new BusinessException(
-                    "Cannot assign ADMIN role through this endpoint",
+                    "Cannot assign ADMIN or SYSTEM_ADMIN role through this endpoint",
                     HttpStatus.BAD_REQUEST, "CANNOT_ASSIGN_ADMIN");
         }
 

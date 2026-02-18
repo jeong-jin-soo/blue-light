@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>LicenseKaki — User Manual</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 25mm 18mm; }
+  @page:first { margin-top: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1e293b; line-height: 1.65; font-size: 11pt; }
+
+  /* Cover */
+  .cover { page-break-after: always; text-align: center; padding-top: 180px; }
+  .cover h1 { font-size: 36pt; color: #1e3a5f; margin-bottom: 8px; }
+  .cover .subtitle { font-size: 16pt; color: #64748b; margin-bottom: 40px; }
+  .cover .meta { font-size: 11pt; color: #94a3b8; margin-top: 60px; line-height: 2; }
+
+  /* TOC */
+  .toc { page-break-after: always; }
+  .toc h2 { font-size: 20pt; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; }
+  .toc ul { list-style: none; padding: 0; }
+  .toc li { padding: 6px 0; border-bottom: 1px dotted #cbd5e1; font-size: 11pt; }
+  .toc li.l2 { padding-left: 24px; font-size: 10pt; color: #475569; }
+  .toc li.l3 { padding-left: 48px; font-size: 9.5pt; color: #64748b; }
+
+  /* Headings */
+  h1 { font-size: 22pt; color: #1e3a5f; border-bottom: 3px solid #1e3a5f; padding-bottom: 6px; margin-top: 30px; page-break-before: always; }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 { font-size: 16pt; color: #1e3a5f; margin-top: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  h3 { font-size: 13pt; color: #334155; margin-top: 18px; }
+  h4 { font-size: 11pt; color: #475569; margin-top: 14px; font-style: italic; }
+
+  /* Screenshots */
+  .screenshot { text-align: center; margin: 16px 0; page-break-inside: avoid; }
+  .screenshot img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .screenshot .caption { font-size: 9pt; color: #64748b; margin-top: 4px; font-style: italic; }
+
+  /* Info boxes */
+  .info, .warning, .tip { padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  .info { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .warning { background: #fef3c7; border-left: 4px solid #f59e0b; }
+  .tip { background: #f0fdf4; border-left: 4px solid #22c55e; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  th { background: #1e3a5f; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) { background: #f8fafc; }
+
+  /* Steps */
+  .step { display: flex; gap: 12px; margin: 10px 0; align-items: flex-start; page-break-inside: avoid; }
+  .step-num { background: #1e3a5f; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12pt; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; }
+
+  /* Status flow */
+  .flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 12px 0; font-size: 9pt; }
+  .flow .status { padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+  .flow .arrow { color: #94a3b8; font-size: 14pt; }
+  .s-pending { background: #dbeafe; color: #1e40af; }
+  .s-revision { background: #fef3c7; color: #92400e; }
+  .s-payment { background: #fce7f3; color: #9d174d; }
+  .s-paid { background: #d1fae5; color: #065f46; }
+  .s-progress { background: #e0e7ff; color: #3730a3; }
+  .s-completed { background: #dcfce7; color: #166534; }
+  .s-expired { background: #fee2e2; color: #991b1b; }
+
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  strong { color: #0f172a; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<!-- ===== COVER ===== -->
+<div class="cover">
+  <div style="font-size:60pt;">💡</div>
+  <h1>LicenseKaki</h1>
+  <div class="subtitle">Singapore Electrical Installation Licence Platform</div>
+  <div class="subtitle" style="font-size:14pt;">User Manual</div>
+  <div class="meta">
+    Version 3.0<br>
+    February 2026<br>
+    LicenseKaki Pte Ltd
+  </div>
+</div>
+
+<!-- ===== TABLE OF CONTENTS ===== -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ul>
+    <li><strong>1. Introduction</strong></li>
+    <li class="l2">1.1 About LicenseKaki</li>
+    <li class="l2">1.2 User Roles</li>
+    <li class="l2">1.3 Application Status Flow</li>
+
+    <li><strong>2. Getting Started</strong></li>
+    <li class="l2">2.1 Creating an Account</li>
+    <li class="l3">2.1.1 Applicant Registration</li>
+    <li class="l3">2.1.2 LEW Registration</li>
+    <li class="l2">2.2 Signing In</li>
+    <li class="l2">2.3 Forgot Password</li>
+    <li class="l2">2.4 Email Verification (If Enabled)</li>
+
+    <li><strong>3. Applicant Guide</strong></li>
+    <li class="l2">3.1 Dashboard</li>
+    <li class="l2">3.2 Creating a New Application</li>
+    <li class="l3">3.2.1 Before You Begin</li>
+    <li class="l3">3.2.2 Step 1: Application Type &amp; Options</li>
+    <li class="l3">3.2.3 Step 2: Installation Address</li>
+    <li class="l3">3.2.4 Step 3: kVA &amp; Pricing</li>
+    <li class="l3">3.2.5 Step 4: Review &amp; Submit</li>
+    <li class="l2">3.3 My Applications</li>
+    <li class="l2">3.4 Application Detail</li>
+    <li class="l3">3.4.1 Application Information</li>
+    <li class="l3">3.4.2 Letter of Appointment (LOA)</li>
+    <li class="l3">3.4.3 Documents &amp; SLD Requests</li>
+    <li class="l3">3.4.4 Payment Information</li>
+    <li class="l3">3.4.5 Licence Information &amp; Download</li>
+    <li class="l2">3.5 Responding to Revision Requests</li>
+    <li class="l2">3.6 Making Payment</li>
+    <li class="l2">3.7 My Profile</li>
+
+    <li><strong>4. LEW (Licensed Electrical Worker) Guide</strong></li>
+    <li class="l2">4.1 LEW Registration &amp; Approval</li>
+    <li class="l2">4.2 LEW Dashboard</li>
+    <li class="l2">4.3 Reviewing Applications</li>
+    <li class="l2">4.4 Managing SLD Requests</li>
+    <li class="l2">4.5 LOA Management</li>
+    <li class="l3">4.5.1 New Licence — LOA Auto-Generation</li>
+    <li class="l3">4.5.2 Licence Renewal — LOA Upload</li>
+
+    <li><strong>5. Administrator Guide</strong></li>
+    <li class="l2">5.1 Admin Dashboard</li>
+    <li class="l2">5.2 Application Management</li>
+    <li class="l2">5.3 Processing Applications (Step-by-Step)</li>
+    <li class="l3">5.3.1 Review &amp; Approve</li>
+    <li class="l3">5.3.2 Payment Confirmation</li>
+    <li class="l3">5.3.3 Processing &amp; Licence Issuance</li>
+    <li class="l2">5.4 LEW Assignment</li>
+    <li class="l2">5.5 LOA Management</li>
+    <li class="l2">5.6 SLD Request Management</li>
+    <li class="l2">5.7 User Management</li>
+    <li class="l2">5.8 System Settings</li>
+    <li class="l3">5.8.1 Email Verification</li>
+    <li class="l3">5.8.2 Service Fee</li>
+    <li class="l3">5.8.3 Payment Information</li>
+    <li class="l3">5.8.4 Price Tier Management</li>
+
+    <li><strong>6. AI Chat Assistant</strong></li>
+    <li class="l2">6.1 Overview</li>
+    <li class="l2">6.2 How to Use the Chatbot</li>
+    <li class="l2">6.3 Usage Limits</li>
+
+    <li><strong>Appendix</strong></li>
+    <li class="l2">A. kVA Price Tiers</li>
+    <li class="l2">B. Supported File Formats</li>
+    <li class="l2">C. Licence Fees</li>
+    <li class="l2">D. Additional Notes</li>
+  </ul>
+</div>
+
+<!-- ===== 1. INTRODUCTION ===== -->
+<h1>1. Introduction</h1>
+
+<h2>1.1 About LicenseKaki</h2>
+<p>
+  LicenseKaki is a web-based platform for applying and managing Electrical Installation Licences under Singapore's Energy Market Authority (EMA). It streamlines the entire licence lifecycle — from application submission, document management, and LEW review to LOA signing, payment processing, and licence issuance.
+</p>
+<p>Key capabilities include:</p>
+<ul>
+  <li><strong>Online Application</strong> — Step-by-step guided form for New Licence and Licence Renewal</li>
+  <li><strong>Document Management</strong> — Upload SLD, Letter of Appointment, Main Breaker Box Photos, and other required files</li>
+  <li><strong>LOA Generation &amp; Digital Signing</strong> — Automated LOA PDF generation with electronic signature</li>
+  <li><strong>SLD Request Workflow</strong> — Request LEW to prepare Single Line Diagrams on your behalf</li>
+  <li><strong>Real-time Status Tracking</strong> — Visual progress tracker from submission to licence issuance</li>
+  <li><strong>Configurable Pricing</strong> — Dynamic kVA-based price tiers with batch management</li>
+</ul>
+
+<h2>1.2 User Roles</h2>
+<table>
+  <tr><th>Role</th><th>Description</th><th>Access</th></tr>
+  <tr>
+    <td><strong>Applicant</strong><br>(Building Owner)</td>
+    <td>Property owners or representatives who apply for electrical installation licences. Can submit applications, upload documents, sign LOA, and track progress.</td>
+    <td>Dashboard, My Applications, New Application, My Profile</td>
+  </tr>
+  <tr>
+    <td><strong>LEW</strong><br>(Licensed Electrical Worker)</td>
+    <td>EMA-licensed electrical professionals who review applications, prepare SLD documents, and generate LOA. Requires admin approval after registration.</td>
+    <td>Admin Dashboard, Applications (view &amp; review), LOA generation, SLD upload</td>
+  </tr>
+  <tr>
+    <td><strong>Admin</strong><br>(Administrator)</td>
+    <td>Platform administrators who manage the entire application lifecycle, users, pricing, and system settings.</td>
+    <td>Full access: Dashboard, Applications, Users, System Settings</td>
+  </tr>
+</table>
+
+<h2>1.3 Application Status Flow</h2>
+<p>Every licence application progresses through the following statuses:</p>
+
+<div class="flow">
+  <span class="status s-pending">Pending Review</span>
+  <span class="arrow">→</span>
+  <span class="status s-revision">Revision Requested</span>
+  <span class="arrow">↔</span>
+  <span class="status s-pending">Pending Review</span>
+  <span class="arrow">→</span>
+  <span class="status s-payment">Pending Payment</span>
+  <span class="arrow">→</span>
+  <span class="status s-paid">Paid</span>
+  <span class="arrow">→</span>
+  <span class="status s-progress">In Progress</span>
+  <span class="arrow">→</span>
+  <span class="status s-completed">Completed</span>
+</div>
+
+<table>
+  <tr><th>Status</th><th>Description</th><th>Applicant Action</th><th>Admin / LEW Action</th></tr>
+  <tr><td><strong>Pending Review</strong></td><td>Application submitted, awaiting LEW review</td><td>Upload documents, Sign LOA</td><td>Assign LEW, Generate LOA, Review → Approve or Request Revision</td></tr>
+  <tr><td><strong>Revision Requested</strong></td><td>Revisions needed based on LEW review</td><td>Edit &amp; Resubmit</td><td>Wait for resubmission</td></tr>
+  <tr><td><strong>Pending Payment</strong></td><td>Application approved, payment required</td><td>View payment info &amp; make payment</td><td>Confirm Payment</td></tr>
+  <tr><td><strong>Paid</strong></td><td>Payment confirmed</td><td>Wait</td><td>Start Processing</td></tr>
+  <tr><td><strong>In Progress</strong></td><td>Licence being processed</td><td>Upload additional files if needed</td><td>Upload Licence PDF, Complete &amp; Issue Licence</td></tr>
+  <tr><td><strong>Completed</strong></td><td>Licence issued with licence number and expiry date</td><td>View &amp; download licence</td><td>—</td></tr>
+  <tr><td><strong>Expired</strong></td><td>Payment not received within deadline</td><td>—</td><td>—</td></tr>
+</table>
+
+
+<!-- ===== 2. GETTING STARTED ===== -->
+<h1>2. Getting Started</h1>
+
+<h2>2.1 Creating an Account</h2>
+
+<h3>2.1.1 Applicant (Building Owner) Registration</h3>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Click <strong>"Create account"</strong> on the login page, or navigate directly to the Sign Up page.</div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/02-signup-top.png" alt="Sign Up Page (Top)">
+  <div class="caption">Figure 2.1 — Sign Up Page (Applicant)</div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    Fill in the required fields:
+    <ul>
+      <li><strong>Full Name</strong> (required)</li>
+      <li><strong>Email</strong> (required — this will be your login ID)</li>
+      <li><strong>Phone</strong> (optional)</li>
+      <li><strong>Business Information</strong> (optional at registration — Company Name, UEN, Designation. Can be added later in Profile.)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    Select <strong>Account Type</strong> as <strong>"Building Owner (Applicant)"</strong>.
+  </div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/02-signup-bottom.png" alt="Sign Up Page (Bottom)">
+  <div class="caption">Figure 2.2 — Account Type Selection &amp; PDPA Consent</div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    Set your <strong>Password</strong> (8–20 characters), confirm it, agree to the <strong>Privacy Policy &amp; Disclaimer</strong>, and click <strong>"Create Account"</strong>.
+  </div>
+</div>
+
+<div class="warning">
+  <strong>⚠️ Business Information Required for LOA:</strong> Full Name, Company Name, UEN, Designation, and Correspondence Address are required for the Letter of Appointment (LOA). If these are not completed in your Profile, the LOA cannot be generated automatically. Please update them as early as possible to avoid delays.
+</div>
+
+<h3>2.1.2 LEW (Licensed Electrical Worker) Registration</h3>
+
+<div class="screenshot">
+  <img src="screenshots/03-signup-lew.png" alt="LEW Sign Up">
+  <div class="caption">Figure 2.3 — LEW Registration (additional fields)</div>
+</div>
+
+<p>When registering as a LEW, two additional fields are required:</p>
+<ul>
+  <li><strong>LEW Licence Number</strong> — Your EMA-issued licence number (e.g., LEW-2026-XXXXX)</li>
+  <li><strong>LEW Grade</strong> — Select your grade:
+    <ul>
+      <li><strong>Grade 7</strong>: ≤ 45 kVA</li>
+      <li><strong>Grade 8</strong>: ≤ 500 kVA</li>
+      <li><strong>Grade 9</strong>: ≤ 400 kV</li>
+    </ul>
+  </li>
+</ul>
+
+<div class="warning">
+  <strong>⚠️ LEW Approval Required:</strong> After registration, your account will be in "Pending" status. An Administrator must approve your account before you can access the platform. You will see a waiting page until approved. Once approved, <strong>log out and log in again</strong> to activate your access.
+</div>
+
+
+<h2>2.2 Signing In</h2>
+
+<div class="screenshot">
+  <img src="screenshots/01-login.png" alt="Login Page">
+  <div class="caption">Figure 2.4 — Login Page</div>
+</div>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Enter your registered <strong>Email</strong> and <strong>Password</strong>.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Click <strong>"Sign In"</strong>.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    You will be redirected to the appropriate dashboard based on your role:
+    <ul>
+      <li><strong>Applicant</strong> → Applicant Dashboard (<code>/dashboard</code>)</li>
+      <li><strong>LEW (Approved)</strong> → Admin Dashboard (<code>/admin/dashboard</code>)</li>
+      <li><strong>Admin</strong> → Admin Dashboard (<code>/admin/dashboard</code>)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ Login Attempt Limit:</strong> For security, the system limits login attempts to <strong>5 per 15 minutes</strong>. If exceeded, you will need to wait before trying again.
+</div>
+
+
+<h2>2.3 Forgot Password</h2>
+
+<div class="screenshot">
+  <img src="screenshots/04-forgot-password.png" alt="Forgot Password">
+  <div class="caption">Figure 2.5 — Forgot Password Page</div>
+</div>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Click <strong>"Forgot your password?"</strong> on the login page.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Enter your registered email address and click <strong>"Send Reset Link"</strong>.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Check your email for the reset link (valid for <strong>1 hour</strong>).</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">Click the link, set a new password (minimum 8 characters), and sign in.</div>
+</div>
+
+
+<h2>2.4 Email Verification (If Enabled)</h2>
+<p>When the administrator has enabled Email Verification in System Settings, new users must verify their email before accessing the platform:</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">After signing up, you will be redirected to the <strong>Email Verification Pending</strong> page.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Check your registered email inbox for the verification link.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Click the link in the email. You will see a <strong>"Email Verified!"</strong> confirmation page.</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">Click <strong>"Sign In"</strong> to proceed to the login page.</div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ Didn't receive the email?</strong> Click the <strong>"Resend Verification Email"</strong> button on the pending page. If the problem persists, contact the administrator.
+</div>
+
+<div class="tip">
+  <strong>💡 Note:</strong> Email Verification is controlled by the administrator and is disabled by default. If disabled, you can sign in immediately after registration without email verification.
+</div>
+
+
+<!-- ===== 3. APPLICANT GUIDE ===== -->
+<h1>3. Applicant Guide</h1>
+
+<h2>3.1 Dashboard</h2>
+
+<div class="screenshot">
+  <img src="screenshots/10-applicant-dashboard.png" alt="Applicant Dashboard">
+  <div class="caption">Figure 3.1 — Applicant Dashboard</div>
+</div>
+
+<p>The Dashboard provides an at-a-glance overview of your applications:</p>
+<ul>
+  <li><strong>Summary Cards</strong> — Total Applications, Pending Review, Pending Payment, In Progress, Completed</li>
+  <li><strong>Recent Applications</strong> — Your latest 5 applications with status, kVA, and amount</li>
+  <li><strong>"+ New Application"</strong> button to start a new licence application</li>
+</ul>
+
+<h2>3.2 Creating a New Application</h2>
+
+<p>The application form is a <strong>4-step wizard</strong> with a progress tracker at the top:</p>
+<table>
+  <tr><th>Step</th><th>Title</th><th>Description</th></tr>
+  <tr><td>1</td><td>Type</td><td>Application type, SP account, licence period, SLD option, file uploads</td></tr>
+  <tr><td>2</td><td>Address</td><td>Installation address, postal code, building type</td></tr>
+  <tr><td>3</td><td>kVA &amp; Price</td><td>Select capacity and review pricing</td></tr>
+  <tr><td>4</td><td>Review</td><td>Confirm all details and submit</td></tr>
+</table>
+
+<h3>3.2.1 Before You Begin</h3>
+
+<div class="screenshot">
+  <img src="screenshots/12-new-app-guide.png" alt="Before You Begin Guide">
+  <div class="caption">Figure 3.2 — Before You Begin Guide</div>
+</div>
+
+<p>Before starting the form, you will see a guide page with the following information sections:</p>
+
+<div class="tip">
+  <strong>🔌 SP Group Account (New Licence Only):</strong> If you are applying for a <strong>New Licence</strong>, you must have an active SP Group electricity account for the installation address. If you don't have one, please open a group account at <a href="https://www.spgroup.com.sg">www.spgroup.com.sg</a> before submitting your application. This is not required for Licence Renewal applications.
+</div>
+
+<h4>Application Process (5 Steps)</h4>
+<ol>
+  <li><strong>Submit Application</strong> — Fill in property details, select kVA capacity, and review pricing. For New Licence applications, an SP Group account is required.</li>
+  <li><strong>Upload Documents</strong> — Upload required documents including SLD and Letter of Appointment.</li>
+  <li><strong>LEW Review</strong> — A Licensed Electrical Worker will review your application. You may be asked to revise.</li>
+  <li><strong>Make Payment</strong> — Once approved, complete payment via PayNow.</li>
+  <li><strong>Licence Issued</strong> — After verification, your electrical installation licence will be issued.</li>
+</ol>
+
+<h4>Required Documents Checklist</h4>
+<table>
+  <tr><th>Document</th><th>Description</th></tr>
+  <tr><td><strong>Single Line Diagram (SLD)</strong></td><td>Accepted formats: PDF, JPG, DWG, DXF, DGN, TIF, GIF, ZIP</td></tr>
+  <tr><td><strong>Letter of Appointment</strong></td><td>Signed letter appointing the Licensed Electrical Worker</td></tr>
+  <tr><td><strong>Main Breaker Box Photo</strong></td><td>Photo of the main breaker box at the installation site (JPG, PNG)</td></tr>
+</table>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> All documents can be uploaded after submission from the Application Detail page. However, having them ready beforehand speeds up the process.
+</div>
+
+<h4>Key Information</h4>
+<ul>
+  <li><strong>Pricing</strong> — Includes kVA tier fee, service fee, and EMA fee (if applicable).</li>
+  <li><strong>Licence Period</strong> — Choose between 3-month or 12-month licence validity.</li>
+  <li><strong>SP Group Account</strong> — An SP Group utilities account is required for New Licence applications.</li>
+  <li><strong>EMA Submission</strong> — Files for ELISE submission must be under 2 MB each.</li>
+</ul>
+
+<p>Click <strong>"Start Application"</strong> to proceed to the form, or <strong>"Cancel"</strong> to return to the dashboard.</p>
+
+
+<h3>3.2.2 Step 1: Application Type &amp; Options</h3>
+
+<p>This step configures the core details of your application. It contains multiple sections:</p>
+
+<h4>A. Application Type</h4>
+
+<div class="screenshot">
+  <img src="screenshots/13-new-app-step1.png" alt="Step 1 - Type">
+  <div class="caption">Figure 3.3 — Application Type Selection</div>
+</div>
+
+<p>Select one of two application types:</p>
+<table>
+  <tr><th>Type</th><th>Description</th><th>Additional Fields</th></tr>
+  <tr>
+    <td><strong>New Licence</strong></td>
+    <td>Brand new electrical installation licence. An SP Group account is required.</td>
+    <td>SP Account Number</td>
+  </tr>
+  <tr>
+    <td><strong>Licence Renewal</strong></td>
+    <td>Renew an existing licence</td>
+    <td>Existing Licence No., Expiry Date, Renewal Reference No.</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ Renewal Auto-Fill:</strong> When selecting Licence Renewal, the system checks for your previously completed applications. If found, they are displayed as selectable cards showing licence number, address, kVA, and expiry date. Selecting one auto-fills all relevant fields (address, postal code, building type, kVA, licence number, and expiry date). Alternatively, click <strong>"Or enter details manually"</strong> to type in the information yourself.
+</div>
+
+<h4>B. SP Group Account (New Licence Only)</h4>
+<p>When "New Licence" is selected, a prominent blue notice box appears explaining that an active SP Group electricity account is required. This section includes:</p>
+<ul>
+  <li><strong>SP Account Number</strong> — Enter your SP Group account number (optional, can be provided later).</li>
+  <li><strong>SP Group website link</strong> — Direct link to <a href="https://www.spgroup.com.sg">www.spgroup.com.sg</a> if you need to open an account.</li>
+</ul>
+<div class="info">
+  <strong>ℹ️ Note:</strong> This section is <strong>not displayed</strong> for Licence Renewal applications.
+</div>
+
+<h4>C. LOA Upload (Renewal Only)</h4>
+<p>For <strong>Licence Renewal</strong> applications, the LOA upload field is displayed:</p>
+<table>
+  <tr><th>Type</th><th>Label</th><th>Description</th></tr>
+  <tr>
+    <td><strong>Licence Renewal</strong></td>
+    <td>📄 Letter of Appointment (LOA) Document</td>
+    <td>Upload the LOA document received from the relevant authority.</td>
+  </tr>
+</table>
+<p>Accepted formats: JPG, JPEG, PNG, PDF (max 10 MB). You can also upload this later from the Application Detail page.</p>
+
+<div class="info">
+  <strong>ℹ️ New Licence:</strong> For new licence applications, the LOA is not uploaded during application submission. Instead, the LOA will be auto-generated by the system once a LEW is assigned and your profile is complete.
+</div>
+
+<h4>D. Licence Period</h4>
+
+<div class="screenshot">
+  <img src="screenshots/13-new-app-step1-bottom.png" alt="Step 1 - Bottom">
+  <div class="caption">Figure 3.4 — Licence Period, Breaker Box Photo &amp; SLD Options</div>
+</div>
+
+<p>Select the licence validity period (required):</p>
+<table>
+  <tr><th>Duration</th><th>EMA Fee</th><th>Notes</th></tr>
+  <tr><td><strong>12 Months</strong></td><td>SGD $100</td><td>Standard licence period</td></tr>
+  <tr><td><strong>3 Months</strong></td><td>SGD $50</td><td>Short-term licence</td></tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ EMA Fee:</strong> The EMA fee is <strong>included</strong> in the total amount and shown as a separate line item in the pricing breakdown.
+</div>
+
+<h4>E. Main Breaker Box Photo (Optional)</h4>
+<p>Upload a photo of the main breaker box at the installation site. This helps verify the electrical capacity (kVA). Accepted formats: JPG, JPEG, PNG, HEIC, HEIF (max 10 MB). You can also upload this later.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Click <strong>"Choose photo file"</strong> in the upload area (camera icon).</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Select a photo from your device. The file name and size will be displayed.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">To remove the photo, click the <strong>✕</strong> button next to the file name.</div>
+</div>
+
+<h4>F. Single Line Diagram (SLD) Option</h4>
+<p>Choose how to provide the SLD (required selection):</p>
+<table>
+  <tr><th>Option</th><th>Description</th><th>What Happens</th></tr>
+  <tr>
+    <td><strong>Upload Myself</strong></td>
+    <td>You have an SLD ready or will prepare one</td>
+    <td>An optional file upload area appears to attach the SLD now. You can also upload later. Accepted formats: PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP (max 10 MB).</td>
+  </tr>
+  <tr>
+    <td><strong>Request LEW to Prepare</strong></td>
+    <td>A Licensed Electrical Worker will prepare the SLD for you</td>
+    <td>An SLD request will be automatically sent to the assigned LEW after submission. Additional fee may apply.</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> If you choose "Upload Myself" but don't have the SLD ready, you can skip the upload now and add it later from the Application Detail page.
+</div>
+
+
+<h3>3.2.3 Step 2: Installation Address</h3>
+<p>Enter the property details:</p>
+<ul>
+  <li><strong>Installation Address</strong> (required) — Full street address of the electrical installation</li>
+  <li><strong>Postal Code</strong> (required) — 6-digit Singapore postal code</li>
+  <li><strong>Building Type</strong> (optional) — Select from: Residential, Commercial, Industrial, Hotel, Healthcare, Education, Government, Mixed Use, or Other</li>
+</ul>
+
+<div class="info">
+  <strong>ℹ️ Renewal Auto-Fill:</strong> If you selected a previous application during Licence Renewal, these fields will be pre-filled. You can still edit them if needed.
+</div>
+
+
+<h3>3.2.4 Step 3: kVA &amp; Pricing</h3>
+<p>Select the Electric Box kVA capacity for your installation:</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Choose the <strong>kVA capacity</strong> from the dropdown list. Available options are based on the active price tiers configured by the administrator.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    The system automatically calculates and displays the pricing breakdown:
+    <ul>
+      <li><strong>kVA Tier Price</strong> — Based on the kVA range selected</li>
+      <li><strong>Service Fee</strong> — Fixed fee set by the administrator</li>
+      <li><strong>Total Amount Due</strong> — kVA Tier Price + Service Fee</li>
+    </ul>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">A reference price table is displayed below for transparency, showing all available tiers and their prices.</div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ Note:</strong> If a licence period is selected, the EMA fee (SGD $50 for 3 months or $100 for 12 months) is automatically included in the total amount and displayed as a separate line item in the pricing breakdown.
+</div>
+
+
+<h3>3.2.5 Step 4: Review &amp; Submit</h3>
+<p>The Review step displays a comprehensive summary of your application:</p>
+<ul>
+  <li><strong>Application Type Badge</strong> — "New Licence" (blue) or "Licence Renewal" (orange)</li>
+  <li><strong>SP Group Account</strong> — If provided</li>
+  <li><strong>LOA Document</strong> — For Renewal applications, if attached, shows file name and size.</li>
+  <li><strong>Main Breaker Box Photo</strong> — If attached, shows file name and size</li>
+  <li><strong>Licence Period</strong> — Duration and EMA fee (included in total)</li>
+  <li><strong>Renewal Details</strong> — Existing licence number, expiry date, renewal reference (for Renewal type)</li>
+  <li><strong>SLD Option</strong> — "Upload Myself" with attached file, or "LEW will prepare the SLD for you"</li>
+  <li><strong>Property Details</strong> — Address, Postal Code, Building Type</li>
+  <li><strong>Capacity &amp; Pricing</strong> — kVA, Tier, Price breakdown (kVA Price + Service Fee + EMA Fee), Total Amount</li>
+</ul>
+
+<p>Click <strong>"Submit Application"</strong> at the bottom. A confirmation dialog will appear:</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Confirm by clicking <strong>"Submit"</strong> in the dialog.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">The system creates the application and automatically uploads any attached files (SLD, LOA document for renewals, breaker box photo).</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">You will be redirected to the Application Detail page with a success message.</div>
+</div>
+
+<div class="tip">
+  <strong>💡 Navigation Warning:</strong> If you attempt to leave the form without submitting, a confirmation dialog appears to prevent accidental data loss.
+</div>
+
+<div class="warning">
+  <strong>⚠️ File Upload Failures:</strong> If the application is created successfully but a file upload fails, you will receive a warning notification and be redirected to the Application Detail page where you can retry the upload.
+</div>
+
+
+<h2>3.3 My Applications</h2>
+
+<div class="screenshot">
+  <img src="screenshots/11-application-list.png" alt="My Applications">
+  <div class="caption">Figure 3.5 — My Applications List</div>
+</div>
+
+<p>View and manage all your submitted applications:</p>
+<ul>
+  <li><strong>Search</strong> — Filter by address, postal code, building type, kVA, or licence number</li>
+  <li><strong>Status Filter</strong> — Dropdown to filter by status (All, Pending Review, Completed, etc.)</li>
+  <li><strong>Columns</strong> — Type (New/Renewal badge), Address, Building Type, kVA, Amount, Status, Date</li>
+  <li><strong>Pagination</strong> — Browse through multiple pages of applications</li>
+  <li>Click any row to view the application detail</li>
+</ul>
+
+
+<h2>3.4 Application Detail</h2>
+
+<div class="screenshot">
+  <img src="screenshots/15-app-detail-top.png" alt="Application Detail">
+  <div class="caption">Figure 3.6 — Application Detail Page (Top)</div>
+</div>
+
+<p>The detail page has a <strong>two-column layout</strong>:</p>
+<ul>
+  <li><strong>Main Content (left, 2/3 width)</strong> — Application info, LOA section, Documents, Payment</li>
+  <li><strong>Sidebar (right, 1/3 width)</strong> — Progress tracker, Assigned LEW, Licence Information, Quick Info</li>
+</ul>
+
+<h3>3.4.1 Application Information</h3>
+
+<div class="screenshot">
+  <img src="screenshots/15-app-detail-info.png" alt="Application Detail - Information">
+  <div class="caption">Figure 3.7 — Application Information Section</div>
+</div>
+
+<p>Displays all property details, pricing, and application-specific information:</p>
+<ul>
+  <li><strong>Status Banners</strong> — Context-specific banners (e.g., "Under Review" for Pending Review, revision comments for Revision Requested)</li>
+  <li><strong>Property Details</strong> — Address, Postal Code, Building Type, Electric Box (kVA), SP Account No.</li>
+  <li><strong>Licence Period</strong> — Duration and EMA fee</li>
+  <li><strong>Renewal Details</strong> — Existing licence number and expiry date (for Renewal type only)</li>
+  <li><strong>Pricing</strong> — kVA Tier Price, Service Fee, EMA Fee (if applicable), Total Amount</li>
+</ul>
+
+<h3>3.4.2 Letter of Appointment (LOA)</h3>
+
+<div class="screenshot">
+  <img src="screenshots/15-app-detail-loa.png" alt="Application Detail - LOA">
+  <div class="caption">Figure 3.8 — Letter of Appointment (LOA) Section</div>
+</div>
+
+<p>The LOA section manages the official Letter of Appointment document. The workflow differs by application type:</p>
+
+<div class="info">
+  <strong>ℹ️ NEW vs RENEWAL LOA Workflow:</strong>
+  <ul>
+    <li><strong>New Licence:</strong> The LOA is auto-generated by the Admin/LEW after a LEW is assigned and your profile is complete.</li>
+    <li><strong>Licence Renewal:</strong> You (or the Admin) upload the LOA document received from the relevant authority. LOA auto-generation is not available for renewals.</li>
+  </ul>
+</div>
+
+<table>
+  <tr><th>State</th><th>What You See</th><th>Your Action</th></tr>
+  <tr>
+    <td><strong>Not Available</strong></td>
+    <td>"Pending" badge.
+      <ul>
+        <li><strong>New:</strong> "The LOA will be generated once a LEW is assigned and your profile is complete."</li>
+        <li><strong>Renewal:</strong> "You can upload the LOA from the Documents section below. Once uploaded, you can sign it here."</li>
+      </ul>
+    </td>
+    <td>
+      <ul>
+        <li><strong>New:</strong> Ensure your Profile has Full Name, Company Name, UEN, Designation, and Correspondence Address filled in.</li>
+        <li><strong>Renewal:</strong> Upload the LOA document via the Documents section or during the application submission.</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Generated / Uploaded (Unsigned)</strong></td>
+    <td>"Signature Required" badge. Download button to review the LOA PDF. Signature pad (drawing canvas) displayed.</td>
+    <td>
+      <ol>
+        <li>Click <strong>"Review LOA Document"</strong> to download and review the PDF.</li>
+        <li>Draw your signature on the signature pad.</li>
+        <li>Click <strong>"Sign LOA"</strong>.</li>
+        <li>Confirm in the dialog (this action is <strong>irreversible</strong>).</li>
+      </ol>
+    </td>
+  </tr>
+  <tr>
+    <td><strong>Signed</strong></td>
+    <td>"Signed" badge with green success banner showing the signed date and time.</td>
+    <td>Click <strong>"Download Signed LOA"</strong> to get the final PDF with your embedded signature.</td>
+  </tr>
+</table>
+
+<div class="warning">
+  <strong>⚠️ Signature is Irreversible:</strong> Once you sign the LOA, it cannot be modified. Please review the LOA document carefully before signing.
+</div>
+
+<div class="tip">
+  <strong>💡 Renewal LOA Upload:</strong> For licence renewals, you can upload the LOA document at three points: (1) during the application submission in Step 1, (2) via the Documents section on the Application Detail page, or (3) the Admin/LEW can upload it on your behalf.
+</div>
+
+<h3>3.4.3 Documents &amp; SLD Requests</h3>
+
+<div class="screenshot">
+  <img src="screenshots/15-app-detail-docs.png" alt="Application Detail - Documents">
+  <div class="caption">Figure 3.9 — Documents &amp; SLD Requests Section</div>
+</div>
+
+<h4>SLD Drawing Request Status</h4>
+<p>If you selected <strong>"Request LEW to Prepare"</strong> for the SLD, a dedicated status card appears:</p>
+<table>
+  <tr><th>Status</th><th>Display</th><th>Description</th></tr>
+  <tr>
+    <td><strong>Requested</strong></td>
+    <td>Blue info card</td>
+    <td>"Your SLD drawing request has been sent to the assigned LEW." Shows your note (if any) and request date.</td>
+  </tr>
+  <tr>
+    <td><strong>Uploaded</strong></td>
+    <td>Green success card</td>
+    <td>"The LEW has uploaded the SLD drawing. It is pending confirmation." Shows LEW note and a <strong>"Download SLD"</strong> button.</td>
+  </tr>
+  <tr>
+    <td><strong>Confirmed</strong></td>
+    <td>Gray card</td>
+    <td>"The SLD drawing has been confirmed and is included in your application."</td>
+  </tr>
+</table>
+
+<h4>Document Upload &amp; Management</h4>
+<p>When the application status allows uploads, the Documents section shows:</p>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content"><strong>Document Type dropdown</strong> — Select the type of document:
+    <ul>
+      <li>Single Line Diagram (SLD)</li>
+      <li>Letter of Appointment</li>
+      <li>Main Breaker Box Photo</li>
+    </ul>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content"><strong>File Upload area</strong> — Drag &amp; drop or click to browse. Max 10 MB per file.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Uploaded files are listed with type badge, file name, size, upload date, and a <strong>Download</strong> button.</div>
+</div>
+
+<div class="warning">
+  <strong>⚠️ ELISE File Size Limit:</strong> Files for ELISE submission to EMA should be under <strong>2 MB</strong>. If a file exceeds 2 MB, a warning message will appear suggesting you resize it.
+</div>
+
+<h3>3.4.4 Payment Information</h3>
+
+<div class="screenshot">
+  <img src="screenshots/15-app-detail-payment.png" alt="Application Detail - Payment">
+  <div class="caption">Figure 3.10 — Payment Information Section</div>
+</div>
+
+<p>When the application reaches <strong>"Pending Payment"</strong> status, the Payment section displays:</p>
+<ul>
+  <li><strong>Amount Due</strong> — Total payment required (kVA price + service fee)</li>
+  <li><strong>PayNow Details</strong> — UEN number, recipient name, and payment reference</li>
+  <li><strong>PayNow QR Code</strong> — If the administrator has uploaded a PayNow QR code image, it is displayed here for convenient scanning via your banking app</li>
+  <li><strong>Payment History</strong> — Record of confirmed payments with date, method, and transaction ID</li>
+  <li><strong>Payment Receipt</strong> — If the administrator attached a receipt during payment confirmation, you can download it from below the Payment History</li>
+</ul>
+
+<div class="screenshot">
+  <img src="screenshots/15-app-detail-bottom.png" alt="Application Detail Bottom">
+  <div class="caption">Figure 3.11 — Application Detail Sidebar &amp; Bottom</div>
+</div>
+
+<h3>3.4.5 Licence Information &amp; Download</h3>
+<p>When your application reaches <strong>"Completed"</strong> status, the sidebar displays a <strong>Licence Information</strong> card with:</p>
+<ul>
+  <li><strong>Licence Number</strong> — Your issued electrical installation licence number</li>
+  <li><strong>Expiry Date</strong> — The licence validity end date</li>
+  <li><strong>Download Licence PDF</strong> button — Download the official licence document (if uploaded by the Admin/LEW)</li>
+</ul>
+
+<p>Additionally, any licence documents uploaded by the Admin/LEW (Licence PDF, Report PDF) will appear in the <strong>Documents</strong> section under a dedicated <strong>"Licence Documents"</strong> subsection, where you can download them individually.</p>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> If the "Download Licence PDF" button is not yet visible, the Admin/LEW may still be processing the final licence document. Check back later or contact your assigned LEW for status updates.
+</div>
+
+
+<h2>3.5 Responding to Revision Requests</h2>
+<p>When an Admin or LEW requests revisions:</p>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">The status changes to <strong>"Revision Requested"</strong>. A yellow banner displays the reviewer's comments explaining what needs to be changed.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Click <strong>"Edit &amp; Resubmit"</strong> to enter edit mode.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    In edit mode, you can modify:
+    <ul>
+      <li><strong>Installation Address</strong></li>
+      <li><strong>Postal Code</strong></li>
+      <li><strong>Building Type</strong></li>
+      <li><strong>kVA Capacity</strong> (with live price recalculation)</li>
+    </ul>
+    You can also upload new or updated documents.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">Click <strong>"Resubmit"</strong> to send the updated application. The status returns to <strong>"Pending Review"</strong>.</div>
+</div>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> Click <strong>"Cancel Edit"</strong> at any time to discard changes and return to view mode.
+</div>
+
+
+<h2>3.6 Making Payment</h2>
+<p>When your application is approved and set to <strong>"Pending Payment"</strong>:</p>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Open the application detail page. Scroll to the <strong>Payment Information</strong> section.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    Make payment via <strong>PayNow</strong> using the UEN number provided, or scan the <strong>PayNow QR code</strong> displayed on the page (if available) with your banking app. Include the application reference number (e.g., BL-123) in your transfer.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Wait for the Admin to confirm receipt. The status will change to <strong>"Paid"</strong>.</div>
+</div>
+
+<div class="warning">
+  <strong>⚠️ Payment Deadline:</strong> Applications that remain unpaid beyond the deadline will be automatically marked as <strong>"Expired"</strong>. Please make payment promptly.
+</div>
+
+<div class="info">
+  <strong>ℹ️ EMA Fee:</strong> If a licence period was selected, the EMA fee is already included in the total payment amount and shown in the pricing breakdown.
+</div>
+
+
+<h2>3.7 My Profile</h2>
+
+<div class="screenshot">
+  <img src="screenshots/16-profile-top.png" alt="My Profile">
+  <div class="caption">Figure 3.12 — My Profile Page</div>
+</div>
+
+<p>Manage your personal and business information:</p>
+
+<h3>Personal Information</h3>
+<ul>
+  <li><strong>Full Name</strong> — Your display name</li>
+  <li><strong>Email</strong> — Read-only (used for login)</li>
+  <li><strong>Phone</strong> — Contact number</li>
+</ul>
+
+<h3>Business Information</h3>
+<ul>
+  <li><strong>Company Name</strong> — Your registered company name</li>
+  <li><strong>UEN</strong> — Unique Entity Number (9-character Singapore business registration)</li>
+  <li><strong>Designation</strong> — Your role/title within the company</li>
+</ul>
+
+<h3>Correspondence Address</h3>
+<ul>
+  <li><strong>Address</strong> — Mailing address for EMA notifications</li>
+  <li><strong>Postal Code</strong> — 6-digit Singapore postal code</li>
+</ul>
+
+<h3>Change Password</h3>
+<ul>
+  <li>Enter your <strong>Current Password</strong>, then set a <strong>New Password</strong> (8–20 characters) and confirm it.</li>
+</ul>
+
+<div class="screenshot">
+  <img src="screenshots/16-profile-bottom.png" alt="My Profile Bottom">
+  <div class="caption">Figure 3.13 — Business Information &amp; Password Change</div>
+</div>
+
+<div class="warning">
+  <strong>⚠️ Required for LOA Generation:</strong> Full Name, Company Name, UEN, Designation, and Correspondence Address are all required for the automated Letter of Appointment (LOA) generation. If any of these fields are missing, the LEW/Admin will not be able to generate the LOA for your application. Please ensure these are completed early.
+</div>
+
+
+<!-- ===== 4. LEW GUIDE ===== -->
+<h1>4. LEW (Licensed Electrical Worker) Guide</h1>
+
+<h2>4.1 LEW Registration &amp; Approval</h2>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Register as a LEW on the Sign Up page (see Section 2.1.2) with your <strong>LEW Licence Number</strong> and <strong>Grade</strong>.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    After registration, you will see the <strong>LEW Pending Approval</strong> page. You must wait for an Administrator to approve your account.
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Use the <strong>"Check Status"</strong> button to verify if your account has been approved.</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">Once approved, <strong>log out and log in again</strong> to activate your LEW access.</div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ LEW Grade and kVA:</strong> Your LEW Grade determines which applications you can be assigned to:
+  <ul>
+    <li>Grade 7: Applications ≤ 45 kVA</li>
+    <li>Grade 8: Applications ≤ 500 kVA</li>
+    <li>Grade 9: All applications (≤ 400 kV)</li>
+  </ul>
+</div>
+
+
+<h2>4.2 LEW Dashboard</h2>
+
+<div class="screenshot">
+  <img src="screenshots/30-lew-dashboard.png" alt="LEW Dashboard">
+  <div class="caption">Figure 4.1 — LEW Dashboard</div>
+</div>
+
+<p>
+  Approved LEWs share the same Admin Dashboard view (without the Users and Settings menus). The dashboard shows:
+</p>
+<ul>
+  <li>Application statistics (Total, Pending Review, In Progress, Completed, etc.)</li>
+  <li>Recent Applications list with quick access links</li>
+</ul>
+
+<h2>4.3 Reviewing Applications</h2>
+
+<div class="screenshot">
+  <img src="screenshots/31-lew-applications.png" alt="LEW Applications List">
+  <div class="caption">Figure 4.2 — LEW Applications List</div>
+</div>
+
+<p>LEWs can view all applications assigned to them (or unassigned) via the <strong>Applications</strong> menu:</p>
+<ul>
+  <li>Search and filter applications by status, address, or applicant name</li>
+  <li>Click on an application to view its full details</li>
+  <li>Review applicant information, property details, uploaded documents, and applicant business profile</li>
+  <li>Available actions: <strong>Request Revision</strong> (with comments) or <strong>Approve &amp; Request Payment</strong></li>
+</ul>
+
+<div class="screenshot">
+  <img src="screenshots/32-lew-app-detail.png" alt="LEW Application Detail">
+  <div class="caption">Figure 4.3 — LEW Application Detail</div>
+</div>
+
+<h2>4.4 Managing SLD Requests</h2>
+<p>When an applicant selects <strong>"Request LEW to Prepare"</strong> for the SLD:</p>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Navigate to the application detail page. The <strong>SLD Drawing Request</strong> section shows the request with status <strong>"Requested"</strong> and any applicant notes.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Prepare the SLD document based on the installation details.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Click <strong>"Upload SLD"</strong> to upload the file. Optionally, add a <strong>LEW note</strong> for the applicant (e.g., revision notes, specifications used).</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">After upload, the status changes to <strong>"Uploaded"</strong>. Click <strong>"Confirm SLD"</strong> to finalize it. The applicant can then download the SLD.</div>
+</div>
+
+<h2>4.5 LOA Management</h2>
+<p>The LOA workflow differs by application type:</p>
+
+<h3>4.5.1 New Licence — LOA Auto-Generation</h3>
+<p>For <strong>New Licence</strong> applications, LEWs (and Admins) can auto-generate the LOA PDF:</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Navigate to the application detail page. Ensure a LEW is assigned to the application.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Check that the applicant's profile is complete (Full Name, Company Name, UEN, Designation, Correspondence Address). If incomplete, a warning lists the missing fields.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Click <strong>"Generate LOA"</strong>. The system automatically creates a PDF using EMA's official LOA form template, populated with:
+    <ul>
+      <li>LEW name and licence number</li>
+      <li>Installation address</li>
+      <li>Applicant company name, designation, and name</li>
+      <li>Correspondence address, UEN, postal code</li>
+      <li>Contact details (email, phone)</li>
+    </ul>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">Once generated, you can <strong>download the LOA</strong> for review, or click <strong>"Regenerate LOA"</strong> if profile information has been updated.</div>
+</div>
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-content">Wait for the applicant to review and digitally sign the LOA. The status will update to <strong>"Signed"</strong> once completed.</div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ Regeneration:</strong> You can regenerate the LOA as many times as needed <strong>before the applicant signs it</strong>. Once signed, the LOA is locked and cannot be regenerated.
+</div>
+
+<h3>4.5.2 Licence Renewal — LOA Upload</h3>
+<p>For <strong>Licence Renewal</strong> applications, LOA auto-generation is <strong>not available</strong>. The applicant obtains the LOA from the relevant authority and uploads it.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Navigate to the application detail page. The LOA section displays an upload interface instead of the "Generate LOA" button.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Choose the LOA file (PDF, JPG, JPEG, or PNG, max 10 MB) and click <strong>"Upload LOA"</strong>. The file can be one received from the applicant.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Once uploaded, the LOA appears with a download link and "Awaiting Signature" status. Click <strong>"Replace LOA"</strong> if a corrected version needs to be uploaded.</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">Wait for the applicant to review and digitally sign the LOA.</div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ Upload Paths:</strong> The LOA for renewal applications can be uploaded by the applicant during application submission (Step 1), via the Documents section, or by the Admin/LEW through the LOA section.
+</div>
+
+
+<!-- ===== 5. ADMIN GUIDE ===== -->
+<h1>5. Administrator Guide</h1>
+
+<h2>5.1 Admin Dashboard</h2>
+
+<div class="screenshot">
+  <img src="screenshots/20-admin-dashboard.png" alt="Admin Dashboard">
+  <div class="caption">Figure 5.1 — Admin Dashboard</div>
+</div>
+
+<p>The Admin Dashboard provides a comprehensive platform overview:</p>
+<ul>
+  <li><strong>10 Status Cards</strong> — Total Applications, Pending Review, Revision Requested, Pending Payment, Paid, In Progress, Completed, Expired, Total Users, Unassigned (click any card to filter applications)</li>
+  <li><strong>LEW Registration Toggle</strong> — Enable/disable new LEW sign-ups system-wide</li>
+  <li><strong>Recent Applications</strong> — Latest 5 applications with applicant, address, status, and quick links</li>
+</ul>
+
+<div class="screenshot">
+  <img src="screenshots/20-admin-dashboard-bottom.png" alt="Admin Dashboard Bottom">
+  <div class="caption">Figure 5.2 — LEW Registration Toggle &amp; Recent Applications</div>
+</div>
+
+
+<h2>5.2 Application Management</h2>
+
+<div class="screenshot">
+  <img src="screenshots/21-admin-applications.png" alt="Admin Applications">
+  <div class="caption">Figure 5.3 — All Applications List</div>
+</div>
+
+<p>The Applications page shows all submitted applications with:</p>
+<ul>
+  <li><strong>Search</strong> — Filter by address, applicant name, email, or application ID</li>
+  <li><strong>Status Filter</strong> — Dropdown to filter by status</li>
+  <li><strong>Pagination</strong> — 15 applications per page</li>
+  <li><strong>Columns</strong> — ID, Type (New/Renewal badge), Applicant, Address, kVA, Amount, Assigned LEW, Status, Date</li>
+  <li>Click any row to open the application detail page</li>
+</ul>
+
+
+<h2>5.3 Processing Applications (Step-by-Step)</h2>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-top.png" alt="Admin Application Detail">
+  <div class="caption">Figure 5.4 — Admin Application Detail (Top)</div>
+</div>
+
+<p>The Admin Application Detail page includes all applicant and property information, along with <strong>Admin Actions</strong> in the sidebar that change based on the current status.</p>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-info.png" alt="Admin Application Detail - Information">
+  <div class="caption">Figure 5.5 — Admin Application Detail — Property &amp; Pricing Information</div>
+</div>
+
+<h3>5.3.1 Review &amp; Approve (Pending Review → Approved or Revision Requested)</h3>
+
+<p>When an application is in <strong>Pending Review</strong>:</p>
+<table>
+  <tr><th>Action</th><th>Description</th><th>Required Input</th></tr>
+  <tr>
+    <td><strong>Request Revision</strong></td>
+    <td>Send the application back to the applicant with feedback</td>
+    <td>Review comments (required) — visible to the applicant</td>
+  </tr>
+  <tr>
+    <td><strong>Approve &amp; Request Payment</strong></td>
+    <td>Approve the application and move to Pending Payment status</td>
+    <td>Confirmation dialog</td>
+  </tr>
+</table>
+
+<div class="warning">
+  <strong>⚠️ Incomplete Profile Warning:</strong> If the applicant has not completed their Business Details (Full Name, Company Name, UEN, Designation, Correspondence Address), a yellow warning banner will appear on the detail page. Consider asking the applicant to update their profile before approving.
+</div>
+
+<h3>5.3.2 Payment Confirmation (Pending Payment → Paid)</h3>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-payment.png" alt="Admin Application Detail - Payment">
+  <div class="caption">Figure 5.6 — Admin Application Detail — Payment Section</div>
+</div>
+
+<table>
+  <tr><th>Action</th><th>Description</th><th>Required Input</th></tr>
+  <tr>
+    <td><strong>Confirm Payment</strong></td>
+    <td>Verify that payment has been received</td>
+    <td>Transaction ID (optional), Payment Method (default: PayNow), Payment Receipt file (optional — PDF or image, shared with the applicant)</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <strong>💡 Payment Receipt:</strong> When confirming payment, you can optionally attach a payment receipt (PDF or image). This receipt will be visible and downloadable by the applicant in the Payment Information section of their Application Detail page.
+</div>
+
+<h3>5.3.3 Processing &amp; Licence Issuance (Paid → In Progress → Completed)</h3>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-loa.png" alt="Admin Application Detail - LOA">
+  <div class="caption">Figure 5.7 — Admin Application Detail — LOA Section</div>
+</div>
+
+<table>
+  <tr><th>Action</th><th>Description</th><th>Required Input</th></tr>
+  <tr>
+    <td><strong>Start Processing</strong></td>
+    <td>Begin licence processing (Paid → In Progress)</td>
+    <td>Confirmation dialog</td>
+  </tr>
+  <tr>
+    <td><strong>Complete &amp; Issue Licence</strong></td>
+    <td>Issue the electrical installation licence (In Progress → Completed)</td>
+    <td>Licence Number (required), Licence Expiry Date (required)</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ Admin File Upload:</strong> When the application is in <strong>In Progress</strong> or <strong>Completed</strong> status, administrators can upload additional documents via the Documents section:
+  <ol>
+    <li>Select the <strong>File Type</strong> from the dropdown: Licence PDF, Report PDF, or Letter of Appointment.</li>
+    <li>Drag &amp; drop or click to upload the file (max 10 MB).</li>
+    <li>The uploaded file becomes immediately visible and downloadable by the applicant.</li>
+  </ol>
+  The uploaded Licence PDF will also appear in the applicant's sidebar <strong>Licence Information</strong> card as a convenient "Download Licence PDF" button.
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-docs.png" alt="Admin Detail - Documents">
+  <div class="caption">Figure 5.8 — Admin Application Detail — Documents Section</div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-bottom.png" alt="Admin Detail Bottom">
+  <div class="caption">Figure 5.9 — Admin Application Detail — Bottom &amp; Sidebar</div>
+</div>
+
+
+<h2>5.4 LEW Assignment</h2>
+<p>Administrators can assign a LEW to each application:</p>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Open the application detail page.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">In the <strong>"Assigned LEW"</strong> section (sidebar), click <strong>"Assign LEW"</strong>.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Select a LEW from the list. Only LEWs with a sufficient grade for the application's kVA are shown.</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">To change or remove the assigned LEW, use the <strong>"Change"</strong> or <strong>"Remove"</strong> buttons.</div>
+</div>
+
+<div class="info">
+  <strong>ℹ️ Automatic Filtering:</strong> The system automatically filters available LEWs based on the application's kVA capacity. For example, a 100 kVA application will only show Grade 8 and Grade 9 LEWs.
+</div>
+
+<div class="warning">
+  <strong>⚠️ LOA Dependency (New Licence only):</strong> A LEW must be assigned before the LOA can be generated, as the LEW's name and licence number are included in the LOA document. For Renewal applications, the LOA is uploaded instead of generated.
+</div>
+
+
+<h2>5.5 LOA Management</h2>
+<p>The <strong>Letter of Appointment</strong> section in the Admin Application Detail page manages the LOA lifecycle. The workflow differs by application type:</p>
+
+<h3>New Licence Applications</h3>
+<table>
+  <tr><th>State</th><th>Display</th><th>Admin Action</th></tr>
+  <tr>
+    <td><strong>No LEW Assigned</strong></td>
+    <td>"LEW Assignment Required" info message</td>
+    <td>Assign a LEW first (see Section 5.4)</td>
+  </tr>
+  <tr>
+    <td><strong>Profile Incomplete</strong></td>
+    <td>Warning listing missing fields (Full Name, Company Name, UEN, Designation, Correspondence Address)</td>
+    <td>Contact applicant to complete their profile</td>
+  </tr>
+  <tr>
+    <td><strong>Ready to Generate</strong></td>
+    <td>"Generate LOA" button</td>
+    <td>Click to auto-generate the LOA PDF from the EMA official template</td>
+  </tr>
+  <tr>
+    <td><strong>Generated (Unsigned)</strong></td>
+    <td>Download link, "Waiting for applicant signature" status, "Regenerate LOA" button</td>
+    <td>Download to review, regenerate if applicant info changes</td>
+  </tr>
+  <tr>
+    <td><strong>Signed</strong></td>
+    <td>"Signed" badge with date/time, download button</td>
+    <td>Download the signed LOA PDF with embedded signature</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ LOA Contents:</strong> The auto-generated LOA includes LEW details, installation address, applicant company information, UEN (character-by-character in boxes), correspondence address, and contact details.
+</div>
+
+<h3>Licence Renewal Applications</h3>
+<p>LOA auto-generation is <strong>not available</strong> for renewal applications. The applicant obtains the LOA from the relevant authority, and either the applicant or Admin/LEW uploads it.</p>
+
+<table>
+  <tr><th>State</th><th>Display</th><th>Admin Action</th></tr>
+  <tr>
+    <td><strong>Not Uploaded</strong></td>
+    <td>Upload interface with file picker and "Upload LOA" button</td>
+    <td>Select the LOA file (PDF/JPG/PNG, max 10 MB) received from the applicant and click "Upload LOA"</td>
+  </tr>
+  <tr>
+    <td><strong>Uploaded (Unsigned)</strong></td>
+    <td>Download link, "Waiting for applicant signature" status, "Replace LOA" button</td>
+    <td>Download to review; click "Replace LOA" to upload a corrected version if needed</td>
+  </tr>
+  <tr>
+    <td><strong>Signed</strong></td>
+    <td>"Signed" badge with date/time, download button</td>
+    <td>Download the signed LOA PDF with embedded signature</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> The applicant can also upload the LOA themselves — during application submission (Step 1) or from the Documents section on their Application Detail page.
+</div>
+
+
+<h2>5.6 SLD Request Management</h2>
+<p>When an applicant has requested LEW to prepare the SLD, the <strong>SLD Drawing Request</strong> section appears in the application detail:</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content"><strong>View Request</strong> — See the applicant's note and request date.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content"><strong>Upload SLD</strong> — Upload the prepared SLD file with an optional LEW note.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content"><strong>Confirm SLD</strong> — Finalize the SLD. The applicant will see it as "Confirmed" and it becomes part of the application documents.</div>
+</div>
+
+
+<h2>5.7 User Management</h2>
+
+<div class="screenshot">
+  <img src="screenshots/23-admin-users.png" alt="Admin Users">
+  <div class="caption">Figure 5.10 — User Management Page</div>
+</div>
+
+<p>The User Management page (Admin only) allows:</p>
+
+<h3>Search &amp; Filter</h3>
+<ul>
+  <li><strong>Search</strong> — By name, email, company name, or UEN</li>
+  <li><strong>Role Filter</strong> — All Roles, Applicant, LEW, Admin</li>
+  <li><strong>Pagination</strong> — 20 users per page</li>
+</ul>
+
+<h3>Role Management</h3>
+<ul>
+  <li>Click <strong>"Change"</strong> next to a user's role to switch between <strong>APPLICANT ↔ LEW</strong></li>
+  <li>Admin roles cannot be changed from this interface</li>
+  <li>A confirmation dialog appears before any role change</li>
+</ul>
+
+<h3>LEW Approval</h3>
+<ul>
+  <li>New LEW registrations appear with status <strong>"PENDING"</strong></li>
+  <li>Click <strong>"Approve"</strong> to grant platform access (the LEW must re-login to activate)</li>
+  <li>Click <strong>"Reject"</strong> to deny access</li>
+</ul>
+
+
+<h2>5.8 System Settings</h2>
+
+<p>The System Settings page consolidates all platform configuration into one page with four sections:</p>
+
+<h3>5.8.1 Email Verification</h3>
+
+<div class="screenshot">
+  <img src="screenshots/24-admin-settings-top.png" alt="Settings Top">
+  <div class="caption">Figure 5.11 — System Settings (Email Verification &amp; Service Fee)</div>
+</div>
+
+<ul>
+  <li><strong>Toggle Switch</strong> — Enable or disable email verification for new user registration</li>
+  <li><strong>Enabled</strong> — New users must verify their email via a verification link before accessing the platform</li>
+  <li><strong>Disabled</strong> (default) — Users can sign in immediately after registration</li>
+</ul>
+<p>An "Unsaved changes" indicator appears when the setting is modified. Click <strong>"Save"</strong> to apply.</p>
+
+<div class="warning">
+  <strong>⚠️ When disabled:</strong> An amber warning note reminds you that "New users can sign up without verifying their email."
+</div>
+
+<h3>5.8.2 Service Fee</h3>
+<ul>
+  <li><strong>Service Fee (SGD)</strong> — Numeric input field for the fee added to every application's kVA tier price</li>
+  <li>Accepts decimal values (e.g., $50.00)</li>
+  <li>Click <strong>"Save Fee"</strong> to apply changes</li>
+</ul>
+
+<h3>5.8.3 Payment Information</h3>
+
+<div class="screenshot">
+  <img src="screenshots/24-admin-settings-mid.png" alt="Settings - Payment Information">
+  <div class="caption">Figure 5.12 — System Settings (Payment Information &amp; QR Code)</div>
+</div>
+
+<p>Configure the PayNow payment details displayed to applicants when making payment:</p>
+<ul>
+  <li><strong>UEN Number</strong> — Your company's UEN for PayNow transfers</li>
+  <li><strong>Recipient Name</strong> — The name displayed to applicants for verification</li>
+  <li><strong>PayNow QR Code Image</strong> — Upload a QR code image (PNG, JPG, GIF, or WebP) that applicants can scan with their banking app for payment. Click <strong>"Upload QR"</strong> to add, or <strong>"Delete"</strong> to remove the current image.</li>
+</ul>
+<p>Click <strong>"Save Payment Info"</strong> to apply UEN and recipient name changes. The QR code image is saved separately upon upload. Applicants will see these details along with a unique reference number (BL-{applicationId}) and the QR code (if uploaded) when making their PayNow payment.</p>
+
+<h3>5.8.4 Price Tier Management</h3>
+
+<div class="screenshot">
+  <img src="screenshots/24-admin-settings-bottom.png" alt="Price Tiers">
+  <div class="caption">Figure 5.13 — kVA Price Tiers (Inline Editing)</div>
+</div>
+
+<p>The Price Tiers section uses an <strong>inline editable table</strong> for managing kVA pricing. All changes are batched and saved together.</p>
+
+<h4>Viewing &amp; Editing Tiers</h4>
+<p>Each tier row displays editable fields:</p>
+<table>
+  <tr><th>Field</th><th>Description</th><th>Validation</th></tr>
+  <tr><td><strong>Description</strong></td><td>Display name (e.g., "45 kVA", "46-100 kVA")</td><td>Max 50 characters</td></tr>
+  <tr><td><strong>kVA Min</strong></td><td>Minimum kVA for this tier</td><td>Must be ≥ 1</td></tr>
+  <tr><td><strong>kVA Max</strong></td><td>Maximum kVA for this tier</td><td>Must be ≥ kVA Min</td></tr>
+  <tr><td><strong>Price (SGD)</strong></td><td>Price for applications within this range</td><td>Must be ≥ 0</td></tr>
+  <tr><td><strong>Active</strong></td><td>Toggle switch — inactive tiers are hidden from applicants</td><td>—</td></tr>
+  <tr><td><strong>Delete</strong></td><td>Trash icon button to remove the tier</td><td>Existing tiers show confirmation dialog</td></tr>
+</table>
+
+<h4>Adding a New Tier</h4>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Click the <strong>"+ Add Tier"</strong> button at the bottom of the tier list.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">A new empty row appears. Fill in Description, kVA Min, kVA Max, and Price.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">The new tier is marked with "(New)" and is active by default.</div>
+</div>
+
+<h4>Deleting a Tier</h4>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Click the <strong>trash icon</strong> on the row you want to delete.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">For existing tiers, a confirmation dialog appears: "This change will take effect when you click 'Save All'." New (unsaved) tiers are removed immediately.</div>
+</div>
+
+<h4>Saving Changes</h4>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">When you modify any tier, an <strong>"Unsaved changes"</strong> indicator appears in the header.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">Click <strong>"Save All"</strong> to submit all changes as a single batch.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">The system validates all tiers before saving (see validation below).</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">On success, a confirmation toast appears and data is refreshed from the server.</div>
+</div>
+
+<p>To undo all changes, click <strong>"Discard"</strong> to restore the original values.</p>
+
+<h4>Validation Rules</h4>
+<p>The system performs both <strong>per-tier</strong> and <strong>cross-tier</strong> validation:</p>
+
+<table>
+  <tr><th>Type</th><th>Rule</th><th>Error Display</th></tr>
+  <tr>
+    <td><strong>Per-Tier</strong></td>
+    <td>kVA Min and kVA Max must be ≥ 1</td>
+    <td>Inline error on the field</td>
+  </tr>
+  <tr>
+    <td><strong>Per-Tier</strong></td>
+    <td>kVA Max must be ≥ kVA Min</td>
+    <td>Inline error on the field</td>
+  </tr>
+  <tr>
+    <td><strong>Per-Tier</strong></td>
+    <td>Price must be ≥ 0</td>
+    <td>Inline error on the field</td>
+  </tr>
+  <tr>
+    <td><strong>Cross-Tier</strong></td>
+    <td>No overlapping kVA ranges (e.g., tier 1 max 100 and tier 2 min 100 = overlap)</td>
+    <td>Red error banner at the top: "kVA range overlap detected"</td>
+  </tr>
+  <tr>
+    <td><strong>Cross-Tier</strong></td>
+    <td>No gaps between consecutive tiers (tier 1 max + 1 must equal tier 2 min)</td>
+    <td>Red error banner at the top: "Gap detected between tiers"</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ How Batch Save Works:</strong> All changes (additions, modifications, deletions) are sent to the server in a single request. The server performs the same validation and processes all changes atomically — either all succeed or none do. This ensures data integrity.
+</div>
+
+<div class="tip">
+  <strong>💡 Summary Footer:</strong> A summary at the bottom shows the total number of price tiers (e.g., "7 price tiers") and the active/inactive breakdown for quick reference.
+</div>
+
+<div class="tip">
+  <strong>💡 Responsive Design:</strong> On desktop, tiers are displayed in a compact table grid. On mobile devices, each tier is displayed as a stacked card for easier editing.
+</div>
+
+
+<!-- ===== 6. AI Chat Assistant ===== -->
+<h1>6. AI Chat Assistant</h1>
+
+<h2>6.1 Overview</h2>
+<p>LicenseKaki includes a built-in AI-powered chat assistant (<strong>LicenseKaki Assistant</strong>).
+It provides instant answers to common questions about Singapore electrical installation licences and is available on every page, whether you are logged in or not.</p>
+
+<p>Topics the chatbot can help with:</p>
+<ul>
+  <li><strong>New licence application process</strong> — step-by-step guidance, required documents, SP Group account requirements</li>
+  <li><strong>Licence renewal process</strong> — how to renew, required documents</li>
+  <li><strong>kVA-based pricing structure</strong> — tier prices, service fees, EMA fees</li>
+  <li><strong>Required documents</strong> — SLD (Single Line Diagram), LOA (Letter of Appointment), main breaker box photos, etc.</li>
+  <li><strong>Payment methods</strong> — PayNow QR, UEN transfer, payment reference numbers</li>
+  <li><strong>Application status flow</strong> — meaning of each status and next steps</li>
+  <li><strong>LEW (Licensed Electrical Worker)</strong> — roles, grades, assignment process</li>
+  <li><strong>Platform usage</strong> — registration, login, profile management, etc.</li>
+</ul>
+
+<div class="warning">
+  <strong>⚠️ Note:</strong> The AI chatbot provides general guidance only and is not legal advice. For official regulations or requirements, always verify with EMA or the relevant authorities directly. This platform is an unofficial service and is not the official EMA website.
+</div>
+
+<h2>6.2 How to Use the Chatbot</h2>
+
+<div class="screenshot">
+  <img src="screenshots/17-chatbot-bubble.png" alt="Chat bubble">
+  <div class="caption">Figure 6.1 — Chat bubble at the bottom-right corner</div>
+</div>
+
+<h3>Opening the Chatbot</h3>
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">Click the <strong>speech bubble icon</strong> (chat bubble) at the bottom-right corner of the screen. It is visible on every page.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">The chat window opens with a welcome message.</div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/17-chatbot-open.png" alt="Chat window">
+  <div class="caption">Figure 6.2 — AI Chat Assistant window</div>
+</div>
+
+<h3>Asking Questions</h3>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">Type your question in the input field at the bottom and press the <strong>Send button</strong> (or press Enter).</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">While the AI generates a response, a <strong>typing indicator</strong> (three bouncing dots) is displayed.</div>
+</div>
+<div class="step">
+  <div class="step-num">5</div>
+  <div class="step-content">After the response appears, <strong>suggested follow-up questions</strong> may appear as clickable chips below. Clicking one sends that question automatically.</div>
+</div>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> Press Shift+Enter to insert a line break. Pressing Enter alone sends the message.
+</div>
+
+<h3>Managing Conversations</h3>
+<ul>
+  <li><strong>Minimize</strong> — Click the <strong>— (minimize)</strong> button in the header to close the chat window, leaving only the bubble visible.</li>
+  <li><strong>Clear conversation</strong> — Click the <strong>🗑 (delete)</strong> button in the header to clear all messages and return to the initial state.</li>
+  <li><strong>Unread notification</strong> — If a new response arrives while the chatbot is closed, a <strong>red dot</strong> appears on the bubble.</li>
+</ul>
+
+<div class="info">
+  <strong>ℹ️ Conversation History:</strong> Conversations are stored in browser memory only and are reset when the page is refreshed. No conversation data is saved on the server.
+</div>
+
+<h2>6.3 Usage Limits</h2>
+<table>
+  <tr><th>Item</th><th>Limit</th></tr>
+  <tr><td>Maximum message length</td><td>1,000 characters</td></tr>
+  <tr><td>Non-logged-in users</td><td>20 requests per 15 minutes</td></tr>
+  <tr><td>Logged-in users</td><td>40 requests per 15 minutes</td></tr>
+  <tr><td>Conversation context</td><td>Last 10 messages (for contextual follow-ups)</td></tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ Rate Limit Exceeded:</strong> If you exceed the limit, a "Too many requests" message will be displayed. Please try again after 15 minutes.
+</div>
+
+
+<!-- ===== APPENDIX ===== -->
+<h1 style="page-break-before: always;">Appendix</h1>
+
+<h2>A. kVA Price Tiers (Default)</h2>
+<table>
+  <tr><th>#</th><th>Description</th><th>kVA Range</th><th>Price (SGD)</th></tr>
+  <tr><td>1</td><td>45 kVA</td><td>45 – 45 kVA</td><td>$350</td></tr>
+  <tr><td>2</td><td>46 – 100 kVA</td><td>46 – 100 kVA</td><td>$500</td></tr>
+  <tr><td>3</td><td>101 – 200 kVA</td><td>101 – 200 kVA</td><td>$750</td></tr>
+  <tr><td>4</td><td>201 – 500 kVA</td><td>201 – 500 kVA</td><td>$1,200</td></tr>
+  <tr><td>5</td><td>501 – 1,000 kVA</td><td>501 – 1,000 kVA</td><td>$1,800</td></tr>
+  <tr><td>6</td><td>1,001 – 2,000 kVA</td><td>1,001 – 2,000 kVA</td><td>$2,500</td></tr>
+  <tr><td>7</td><td>2,001 kVA and above</td><td>2,001 – 9,999 kVA</td><td>$3,500</td></tr>
+</table>
+
+<div class="info">
+  <strong>ℹ️ Note:</strong> Prices shown are default values. Administrators can add, modify, or remove tiers through the System Settings page. A Service Fee (default SGD $50) is added to each application. kVA ranges must be contiguous with no gaps or overlaps.
+</div>
+
+<h2>B. Supported File Formats</h2>
+<table>
+  <tr><th>Document Type</th><th>File Type Code</th><th>Accepted Formats</th><th>Max Size</th></tr>
+  <tr><td>Single Line Diagram (SLD)</td><td>DRAWING_SLD</td><td>PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP</td><td>10 MB</td></tr>
+  <tr><td>Letter of Appointment</td><td>OWNER_AUTH_LETTER</td><td>PDF, JPG, PNG, GIF</td><td>10 MB</td></tr>
+  <tr><td>Main Breaker Box Photo</td><td>SITE_PHOTO</td><td>JPG, JPEG, PNG, HEIC, HEIF</td><td>10 MB</td></tr>
+  <tr><td>Licence Document (Admin)</td><td>LICENSE_PDF</td><td>PDF</td><td>10 MB</td></tr>
+  <tr><td>Report Document (Admin)</td><td>REPORT_PDF</td><td>PDF</td><td>10 MB</td></tr>
+  <tr><td>Payment Receipt (Admin)</td><td>PAYMENT_RECEIPT</td><td>PDF, JPG, PNG</td><td>10 MB</td></tr>
+  <tr><td>LOA PDF (Auto-generated)</td><td>OWNER_AUTH_LETTER</td><td>PDF (system-generated)</td><td>—</td></tr>
+</table>
+
+<div class="warning">
+  <strong>⚠️ ELISE Submission:</strong> Files intended for ELISE submission to EMA should be under <strong>2 MB</strong>. The platform will display a warning for files exceeding this threshold, but will still allow the upload.
+</div>
+
+<h2>C. Licence Fees</h2>
+<table>
+  <tr><th>Licence Period</th><th>EMA Fee (SGD)</th><th>Notes</th></tr>
+  <tr><td>12 Months</td><td>$100</td><td>Standard licence period</td></tr>
+  <tr><td>3 Months</td><td>$50</td><td>Short-term licence</td></tr>
+</table>
+<p>EMA fees are <strong>included</strong> in the platform's total amount and displayed as a separate line item in the pricing breakdown on both the application form and detail page.</p>
+
+<h2>D. Additional Notes</h2>
+
+<h3>Login Attempt Limit</h3>
+<p>For security, the system limits login attempts to <strong>5 per 15 minutes</strong>. If exceeded, you will need to wait before trying again.</p>
+
+<h3>Form Navigation Guard</h3>
+<p>When filling out the New Application form, if you attempt to navigate away or close the page with unsaved data, a confirmation dialog will appear asking if you wish to leave. This prevents accidental data loss.</p>
+
+<h3>Real-time Price Calculation</h3>
+<p>On the kVA &amp; Pricing step, selecting a kVA capacity triggers a real-time price calculation that returns the tier description, base price, service fee, and total amount. The pricing updates instantly as you change the selection.</p>
+
+<h3>LOA Digital Signature</h3>
+<p>The LOA signing feature uses an HTML5 canvas-based signature pad. Your signature is captured as a PNG image and embedded into the official LOA PDF at the designated signature area. The signed date is automatically added. This process is irreversible — once signed, the LOA cannot be modified.</p>
+
+<h3>Responsive Design</h3>
+<p>The platform is fully responsive and works on desktop and mobile devices. Key responsive behaviors include:</p>
+<ul>
+  <li><strong>Application Detail</strong> — Two-column layout on desktop, single-column on mobile with progress tracker shown as a separate card</li>
+  <li><strong>Price Tier Management</strong> — Table grid on desktop, stacked cards on mobile</li>
+  <li><strong>Application Form</strong> — Card-based layout that adapts to screen width</li>
+</ul>
+
+<h3>Legal Pages</h3>
+<p>The platform includes the following legal pages accessible from the footer:</p>
+<ul>
+  <li><strong>Disclaimer</strong> — Service limitations, EMA ELISE submission notice, and liability disclaimers</li>
+  <li><strong>Privacy Policy</strong> — Personal data protection (PDPA) compliance details, data collection and usage policies</li>
+</ul>
+
+<h3>LEW Profile Fields</h3>
+<p>LEW users see additional fields in their Profile page: <strong>LEW Licence Number</strong> and <strong>LEW Grade</strong>, which can be updated as needed.</p>
+
+<h3>AI Chat Assistant</h3>
+<p>The platform includes an AI-powered chat assistant available on every page. It answers questions about the electrical installation licence process, required documents, pricing, payment methods, and platform usage. The chatbot supports contextual follow-up questions using the last 10 messages. Conversations are stored in browser memory only and are not persisted on the server. Rate limits apply: 20 requests per 15 minutes for non-logged-in users, 40 for logged-in users. For full details, see Section 6.</p>
+
+<div style="text-align: center; margin-top: 60px; color: #94a3b8; font-size: 10pt;">
+  <p>— End of Manual —</p>
+  <p>&copy; 2026 LicenseKaki Pte Ltd. All rights reserved.</p>
+</div>
+
+</body>
+</html>

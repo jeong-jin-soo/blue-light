@@ -26,7 +26,7 @@ export interface ApiError {
 /**
  * 사용자 역할
  */
-export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN';
+export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN' | 'SYSTEM_ADMIN';
 
 /**
  * LEW 승인 상태

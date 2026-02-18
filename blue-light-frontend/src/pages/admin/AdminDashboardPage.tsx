@@ -16,7 +16,7 @@ export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const toast = useToastStore();
   const { user: currentUser } = useAuthStore();
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN';
   const basePath = getBasePath(currentUser?.role);
 
   const [dashboard, setDashboard] = useState<AdminDashboard | null>(null);

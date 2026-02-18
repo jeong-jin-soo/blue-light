@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>LicenseKaki — AI 챗봇 도우미</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 25mm 18mm; }
+  @page:first { margin-top: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; color: #1e293b; line-height: 1.75; font-size: 11pt; }
+  .cover { page-break-after: always; text-align: center; padding-top: 180px; }
+  .cover h1 { font-size: 36pt; color: #1e3a5f; margin-bottom: 8px; }
+  .cover .subtitle { font-size: 16pt; color: #64748b; margin-bottom: 40px; }
+  .cover .meta { font-size: 11pt; color: #94a3b8; margin-top: 60px; line-height: 2; }
+  h1 { font-size: 22pt; color: #1e3a5f; border-bottom: 3px solid #1e3a5f; padding-bottom: 6px; margin-top: 30px; page-break-before: always; }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 { font-size: 16pt; color: #1e3a5f; margin-top: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  h3 { font-size: 13pt; color: #334155; margin-top: 18px; }
+  .screenshot { text-align: center; margin: 16px 0; page-break-inside: avoid; }
+  .screenshot img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .screenshot .caption { font-size: 9pt; color: #64748b; margin-top: 4px; font-style: italic; }
+  .info, .warning, .tip { padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  .info { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .warning { background: #fef3c7; border-left: 4px solid #f59e0b; }
+  .tip { background: #f0fdf4; border-left: 4px solid #22c55e; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  th { background: #1e3a5f; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) { background: #f8fafc; }
+  .step { display: flex; gap: 12px; margin: 10px 0; align-items: flex-start; page-break-inside: avoid; }
+  .step-num { background: #1e3a5f; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12pt; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; }
+  .flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 12px 0; font-size: 9pt; }
+  .flow .status { padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+  .flow .arrow { color: #94a3b8; font-size: 14pt; }
+  .s-pending { background: #dbeafe; color: #1e40af; }
+  .s-revision { background: #fef3c7; color: #92400e; }
+  .s-payment { background: #fce7f3; color: #9d174d; }
+  .s-paid { background: #d1fae5; color: #065f46; }
+  .s-progress { background: #e0e7ff; color: #3730a3; }
+  .s-completed { background: #dcfce7; color: #166534; }
+  .s-expired { background: #fee2e2; color: #991b1b; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  strong { color: #0f172a; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<!-- 표지 -->
+<div class="cover">
+  <div style="font-size:64pt;">💡</div>
+  <h1>LicenseKaki</h1>
+  <div class="subtitle">싱가포르 전기 설비 면허 플랫폼</div>
+  <div class="subtitle">AI 챗봇 도우미</div>
+  <div class="meta">
+    Version 3.0<br>
+    2026년 2월
+  </div>
+</div>
+
+<!-- AI 챗봇 도우미 -->
+<h1>AI 챗봇 도우미</h1>
+
+<h2>개요</h2>
+
+<p>
+  LicenseKaki는 <strong>AI 챗봇 도우미</strong>를 내장하고 있습니다. 이 챗봇은 Google Gemini 2.5 Flash 모델을
+  기반으로 하며, 전기 설비 면허 신청 과정에서 발생하는 다양한 질문에 실시간으로 답변합니다.
+  로그인 여부와 관계없이 모든 사용자가 이용할 수 있습니다.
+</p>
+
+<p>챗봇이 답변할 수 있는 주요 주제:</p>
+
+<ul>
+  <li>전기 설비 면허 신청 절차 및 요구 사항</li>
+  <li>필요 서류 안내 (ELISE 파일, SLD 도면 등)</li>
+  <li>신청 상태별 의미 및 다음 단계</li>
+  <li>kVA 기준 가격 및 수수료 정보</li>
+  <li>LOA(Letter of Appointment) 관련 안내</li>
+  <li>결제 방법 및 절차</li>
+  <li>플랫폼 사용 방법</li>
+  <li>싱가포르 전기 규정 일반 안내</li>
+</ul>
+
+<div class="warning">
+  <strong>주의:</strong> AI 챗봇의 답변은 일반적인 안내 목적으로만 제공됩니다.
+  법적 조언이나 공식 규정 해석을 대체하지 않습니다. 정확한 규정 확인은
+  반드시 EMA(Energy Market Authority) 공식 사이트를 참고하시기 바랍니다.
+</div>
+
+<h2>챗봇 사용 방법</h2>
+
+<p>화면 우측 하단에 표시되는 챗 버블을 클릭하여 AI 챗봇을 열 수 있습니다.</p>
+
+<div class="screenshot">
+  <img src="screenshots/17-chatbot-bubble.png" alt="챗봇 버블">
+  <div class="caption">그림 1 — 화면 우하단의 챗 버블</div>
+</div>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">
+    화면 우측 하단의 <strong>챗 버블 아이콘</strong>을 클릭합니다. 새로운 메시지가 있으면 버블 위에
+    빨간색 알림 배지가 표시됩니다.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">
+    챗봇 창이 열리면 하단 입력란에 질문을 입력합니다.
+  </div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/17-chatbot-open.png" alt="챗봇 창">
+  <div class="caption">그림 2 — AI 챗봇 도우미 창</div>
+</div>
+
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">
+    <strong>전송 버튼</strong>을 클릭하거나 <code>Enter</code> 키를 눌러 질문을 전송합니다.
+    AI가 답변을 생성하는 동안 로딩 표시가 나타납니다.
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">
+    답변이 표시되면 추가 질문을 이어서 입력할 수 있습니다. 이전 대화 맥락을 기반으로 답변합니다.
+  </div>
+</div>
+
+<div class="tip">
+  <strong>팁:</strong> 입력란에서 <code>Shift + Enter</code>를 누르면 줄바꿈을 할 수 있습니다.
+  <code>Enter</code>만 누르면 메시지가 바로 전송됩니다.
+</div>
+
+<h3>대화 관리</h3>
+
+<ul>
+  <li><strong>최소화:</strong> 챗봇 창 상단의 닫기 버튼(X)을 클릭하면 창이 최소화되어 버블 상태로 돌아갑니다.</li>
+  <li><strong>대화 삭제:</strong> 챗봇 창 상단의 휴지통 아이콘을 클릭하면 현재 대화 내역이 모두 삭제됩니다.</li>
+  <li><strong>읽지 않은 알림:</strong> 챗봇이 최소화된 상태에서 새 답변이 도착하면 버블에 빨간색 알림 배지가 표시됩니다.</li>
+</ul>
+
+<div class="info">
+  <strong>참고:</strong> 대화 내역은 브라우저의 로컬 스토리지에 저장됩니다.
+  브라우저 데이터를 삭제하면 대화 기록도 함께 삭제됩니다.
+  서버에는 대화 내역이 저장되지 않습니다.
+</div>
+
+<h2>사용 제한</h2>
+
+<p>AI 챗봇은 안정적인 서비스를 위해 다음과 같은 사용 제한이 적용됩니다:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>항목</th>
+      <th>제한</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>메시지 최대 길이</td>
+      <td>1,000자</td>
+    </tr>
+    <tr>
+      <td>비로그인 사용자 전송 제한</td>
+      <td>15분당 20회</td>
+    </tr>
+    <tr>
+      <td>로그인 사용자 전송 제한</td>
+      <td>15분당 40회</td>
+    </tr>
+    <tr>
+      <td>대화 맥락 유지</td>
+      <td>최근 10개 메시지</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="info">
+  <strong>속도 제한 안내:</strong> 전송 제한에 도달하면 "Too many requests" 메시지가 표시됩니다.
+  잠시 기다린 후 다시 시도해 주세요. 로그인하면 더 많은 전송 횟수가 제공됩니다.
+</div>
+
+<hr style="margin-top: 40px; border: none; border-top: 1px solid #e2e8f0;">
+<p style="text-align: center; font-size: 9pt; color: #94a3b8;">
+  — AI 챗봇 도우미 끝 —<br>
+  &copy; 2026 LicenseKaki Pte Ltd
+</p>
+
+</body>
+</html>

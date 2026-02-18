@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LicenseKaki — 관리자 가이드</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 25mm 18mm; }
+  @page:first { margin-top: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; color: #1e293b; line-height: 1.75; font-size: 11pt; }
+  .cover { page-break-after: always; text-align: center; padding-top: 180px; }
+  .cover h1 { font-size: 36pt; color: #1e3a5f; margin-bottom: 8px; }
+  .cover .subtitle { font-size: 16pt; color: #64748b; margin-bottom: 40px; }
+  .cover .meta { font-size: 11pt; color: #94a3b8; margin-top: 60px; line-height: 2; }
+  .toc { page-break-after: always; }
+  .toc h2 { font-size: 20pt; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 8px; }
+  .toc ul { list-style: none; padding: 0; }
+  .toc li { padding: 6px 0; border-bottom: 1px dotted #cbd5e1; font-size: 11pt; }
+  .toc li.l2 { padding-left: 24px; font-size: 10pt; color: #475569; }
+  .toc li.l3 { padding-left: 48px; font-size: 9.5pt; color: #64748b; }
+  h1 { font-size: 22pt; color: #1e3a5f; border-bottom: 3px solid #1e3a5f; padding-bottom: 6px; margin-top: 30px; page-break-before: always; }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 { font-size: 16pt; color: #1e3a5f; margin-top: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  h3 { font-size: 13pt; color: #334155; margin-top: 18px; }
+  h4 { font-size: 11pt; color: #475569; margin-top: 14px; font-style: italic; }
+  .screenshot { text-align: center; margin: 16px 0; page-break-inside: avoid; }
+  .screenshot img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .screenshot .caption { font-size: 9pt; color: #64748b; margin-top: 4px; font-style: italic; }
+  .info, .warning, .tip { padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  .info { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .warning { background: #fef3c7; border-left: 4px solid #f59e0b; }
+  .tip { background: #f0fdf4; border-left: 4px solid #22c55e; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  th { background: #1e3a5f; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) { background: #f8fafc; }
+  .step { display: flex; gap: 12px; margin: 10px 0; align-items: flex-start; page-break-inside: avoid; }
+  .step-num { background: #1e3a5f; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12pt; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  strong { color: #0f172a; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<!-- ==================== 표지 ==================== -->
+<div class="cover">
+  <h1>LicenseKaki</h1>
+  <div class="subtitle">싱가포르 전기 설비 면허 플랫폼</div>
+  <div class="subtitle" style="font-size:14pt; color:#475569;">관리자 가이드</div>
+  <div class="meta">
+    Version 3.0<br>
+    2026년 2월<br>
+    LicenseKaki Pte Ltd
+  </div>
+</div>
+
+<!-- ==================== 목차 ==================== -->
+<div class="toc">
+  <h2>목차</h2>
+  <ul>
+    <li><strong>1. 시작하기</strong></li>
+    <li class="l2">1.1 관리자 로그인</li>
+    <li><strong>2. 관리자 대시보드</strong></li>
+    <li><strong>3. 신청 관리</strong></li>
+    <li><strong>4. 신청 처리 (단계별)</strong></li>
+    <li class="l2">4.1 검토 및 승인</li>
+    <li class="l2">4.2 결제 확인</li>
+    <li class="l2">4.3 처리 및 면허 발급</li>
+    <li><strong>5. LEW 배정</strong></li>
+    <li><strong>6. LOA 관리</strong></li>
+    <li class="l2">6.1 신규 면허 신청</li>
+    <li class="l2">6.2 면허 갱신 신청</li>
+    <li><strong>7. SLD 요청 관리</strong></li>
+    <li><strong>8. 사용자 관리</strong></li>
+    <li class="l2">8.1 검색 및 필터</li>
+    <li class="l2">8.2 역할 관리</li>
+    <li class="l2">8.3 LEW 승인</li>
+    <li><strong>9. 시스템 설정</strong></li>
+    <li class="l2">9.1 이메일 인증</li>
+    <li class="l2">9.2 서비스 수수료</li>
+    <li class="l2">9.3 결제 정보</li>
+    <li class="l2">9.4 가격 등급 관리</li>
+  </ul>
+</div>
+
+<!-- ==================== 1. 시작하기 ==================== -->
+<h1>1. 시작하기</h1>
+
+<h2>1.1 관리자 로그인</h2>
+
+<div class="screenshot">
+  <img src="../common/screenshots/01-login.png" alt="로그인 페이지">
+  <div class="caption">그림 1.1 — 로그인 페이지</div>
+</div>
+
+<p>관리자 계정은 시스템에 사전 등록(Seed)되어 있으며, 별도 회원가입이 필요 없습니다. 발급받은 관리자 이메일과 비밀번호로 바로 로그인할 수 있습니다.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">이메일과 비밀번호를 입력합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content"><strong>"Sign In"</strong> 버튼을 클릭합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">관리자 대시보드(<code>/admin/dashboard</code>)로 자동 이동합니다.</div>
+</div>
+
+<div class="info">
+  <strong>참고:</strong> 보안을 위해 15분당 최대 5회 로그인 시도로 제한됩니다. 초과 시 일정 시간 후 다시 시도해 주세요.
+</div>
+
+<div class="tip">
+  <strong>팁:</strong> 비밀번호를 분실한 경우 로그인 페이지 하단의 <strong>"Forgot your password?"</strong> 링크를 통해 이메일 인증 기반 비밀번호 재설정이 가능합니다.
+</div>
+
+<!-- ==================== 2. 관리자 대시보드 ==================== -->
+<h1>2. 관리자 대시보드</h1>
+
+<div class="screenshot">
+  <img src="screenshots/20-admin-dashboard.png" alt="관리자 대시보드">
+  <div class="caption">그림 2.1 — 관리자 대시보드</div>
+</div>
+
+<p>관리자 대시보드는 플랫폼 전체 현황을 한눈에 파악할 수 있는 중심 화면입니다. 상단에 10개의 상태 카드가 배치되어 있으며, 각 카드를 클릭하면 해당 상태로 필터링된 목록으로 이동합니다.</p>
+
+<h3>상태 카드</h3>
+<table>
+  <tr><th>카드</th><th>설명</th></tr>
+  <tr><td>전체 신청</td><td>등록된 모든 신청 건수</td></tr>
+  <tr><td>검토 대기</td><td>Pending Review 상태의 신청 건수</td></tr>
+  <tr><td>수정 요청</td><td>Revision Requested 상태의 신청 건수</td></tr>
+  <tr><td>결제 대기</td><td>Pending Payment 상태의 신청 건수</td></tr>
+  <tr><td>결제 완료</td><td>Paid 상태의 신청 건수</td></tr>
+  <tr><td>처리 중</td><td>In Progress 상태의 신청 건수</td></tr>
+  <tr><td>완료</td><td>Completed 상태의 신청 건수</td></tr>
+  <tr><td>만료</td><td>Expired 상태의 신청 건수</td></tr>
+  <tr><td>전체 사용자</td><td>등록된 전체 사용자 수</td></tr>
+  <tr><td>미배정</td><td>LEW가 아직 배정되지 않은 신청 건수</td></tr>
+</table>
+
+<h3>LEW 가입 토글</h3>
+<p>대시보드 하단에 위치한 LEW 가입 토글을 통해 시스템 전체의 LEW 신규 가입을 활성화하거나 비활성화할 수 있습니다. 비활성화 시 새로운 LEW 회원가입이 차단됩니다.</p>
+
+<h3>최근 신청</h3>
+<p>최근 접수된 5건의 신청 목록이 표시되며, 신청자명, 주소, 현재 상태, 그리고 상세 페이지로의 바로가기 링크를 제공합니다.</p>
+
+<div class="screenshot">
+  <img src="screenshots/20-admin-dashboard-bottom.png" alt="LEW 가입 토글 및 최근 신청">
+  <div class="caption">그림 2.2 — LEW 가입 토글 및 최근 신청</div>
+</div>
+
+<!-- ==================== 3. 신청 관리 ==================== -->
+<h1>3. 신청 관리</h1>
+
+<div class="screenshot">
+  <img src="screenshots/21-admin-applications.png" alt="전체 신청 목록">
+  <div class="caption">그림 3.1 — 전체 신청 목록</div>
+</div>
+
+<p>좌측 메뉴의 <strong>Applications</strong>를 클릭하면 전체 신청 목록 페이지로 이동합니다. 이 페이지에서 모든 신청을 조회하고 관리할 수 있습니다.</p>
+
+<h3>검색 및 필터</h3>
+<ul>
+  <li><strong>검색</strong> — 주소, 신청자명, 이메일, 신청 ID로 검색 가능</li>
+  <li><strong>상태 필터</strong> — 드롭다운에서 특정 상태를 선택하여 필터링</li>
+  <li><strong>페이지네이션</strong> — 한 페이지에 15건씩 표시, 하단 페이지 이동 버튼</li>
+</ul>
+
+<h3>목록 컬럼</h3>
+<table>
+  <tr><th>컬럼</th><th>설명</th></tr>
+  <tr><td>ID</td><td>신청 고유 번호</td></tr>
+  <tr><td>유형</td><td>New (신규) 또는 Renewal (갱신)</td></tr>
+  <tr><td>신청자</td><td>신청자 이름</td></tr>
+  <tr><td>주소</td><td>설치 장소 주소</td></tr>
+  <tr><td>kVA</td><td>신청 kVA 용량</td></tr>
+  <tr><td>금액</td><td>산정된 요금 (SGD)</td></tr>
+  <tr><td>배정 LEW</td><td>배정된 LEW 이름 (미배정 시 비어 있음)</td></tr>
+  <tr><td>상태</td><td>현재 신청 상태</td></tr>
+  <tr><td>날짜</td><td>신청 접수일</td></tr>
+</table>
+
+<p>목록에서 행을 클릭하면 해당 신청의 상세 페이지로 이동합니다.</p>
+
+<!-- ==================== 4. 신청 처리 (단계별) ==================== -->
+<h1>4. 신청 처리 (단계별)</h1>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-top.png" alt="관리자 신청 상세 (상단)">
+  <div class="caption">그림 4.1 — 관리자 신청 상세 (상단)</div>
+</div>
+
+<p>관리자 신청 상세 페이지는 신청의 전체 정보를 확인하고, 상태를 진행시키는 핵심 화면입니다. 상단에 신청 상태 흐름이 표시되며, 현재 상태에 따라 사용 가능한 액션 버튼이 동적으로 변경됩니다.</p>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-info.png" alt="관리자 신청 정보">
+  <div class="caption">그림 4.2 — 관리자 신청 정보</div>
+</div>
+
+<h2>4.1 검토 및 승인</h2>
+<p>신청 상태가 <strong>Pending Review</strong>일 때 관리자가 취할 수 있는 액션입니다.</p>
+
+<table>
+  <tr><th>액션</th><th>설명</th></tr>
+  <tr>
+    <td><strong>Request Revision</strong></td>
+    <td>신청서에 수정이 필요한 경우 코멘트를 작성하고 수정을 요청합니다. <strong>코멘트는 필수</strong>이며, 신청자에게 수정 사유가 전달됩니다. 상태가 Revision Requested로 변경됩니다.</td>
+  </tr>
+  <tr>
+    <td><strong>Approve &amp; Request Payment</strong></td>
+    <td>신청 내용이 적합한 경우 승인하고 결제를 요청합니다. 확인 대화상자가 표시되며, 확인 시 상태가 Pending Payment로 변경됩니다.</td>
+  </tr>
+</table>
+
+<div class="warning">
+  <strong>주의:</strong> 신청자의 프로필 정보가 미완성인 경우 신청 상세 페이지 상단에 노란색 경고 배너가 표시됩니다. 프로필 완성을 요청한 후 승인을 진행하는 것을 권장합니다.
+</div>
+
+<h2>4.2 결제 확인</h2>
+<p>신청 상태가 <strong>Pending Payment</strong>일 때 신청자가 결제를 완료하면 관리자가 결제를 확인합니다.</p>
+
+<table>
+  <tr><th>항목</th><th>설명</th></tr>
+  <tr>
+    <td><strong>Confirm Payment</strong></td>
+    <td>결제 확인 시 다음 정보를 입력할 수 있습니다:<br>
+      - <strong>Transaction ID</strong> (선택) — 결제 거래 번호<br>
+      - <strong>결제 방법</strong> (기본값: PayNow) — 결제 수단 선택<br>
+      - <strong>결제 영수증</strong> (선택) — 영수증 파일 첨부<br>
+      확인 시 상태가 Paid로 변경됩니다.
+    </td>
+  </tr>
+</table>
+
+<div class="tip">
+  <strong>팁:</strong> 결제 영수증을 첨부하면 신청자가 자신의 신청 상세 페이지에서 영수증을 다운로드할 수 있습니다.
+</div>
+
+<h2>4.3 처리 및 면허 발급</h2>
+<p>결제 확인 후 면허 발급까지의 최종 단계입니다.</p>
+
+<table>
+  <tr><th>액션</th><th>설명</th></tr>
+  <tr>
+    <td><strong>Start Processing</strong></td>
+    <td>Paid 상태에서 클릭하면 확인 대화상자가 표시되며, 확인 시 상태가 <strong>In Progress</strong>로 변경됩니다.</td>
+  </tr>
+  <tr>
+    <td><strong>Complete &amp; Issue Licence</strong></td>
+    <td>In Progress 상태에서 클릭합니다. <strong>면허 번호</strong>와 <strong>만료일</strong>은 필수 입력 항목이며, 입력 완료 시 상태가 <strong>Completed</strong>로 변경됩니다.</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>참고:</strong> In Progress 및 Completed 상태에서 관리자는 Documents 섹션을 통해 추가 문서를 업로드할 수 있습니다. 업로드 가능한 문서 유형:
+  <ul>
+    <li><strong>Licence PDF</strong> — 발급된 면허 문서</li>
+    <li><strong>Report PDF</strong> — 검사 보고서</li>
+    <li><strong>Letter of Appointment</strong> — 위임장</li>
+  </ul>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-loa.png" alt="관리자 LOA 섹션">
+  <div class="caption">그림 4.3 — 관리자 LOA 섹션</div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-docs.png" alt="관리자 서류 섹션">
+  <div class="caption">그림 4.4 — 관리자 서류 섹션</div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-payment.png" alt="관리자 결제 및 액션">
+  <div class="caption">그림 4.5 — 관리자 결제 및 액션</div>
+</div>
+
+<div class="screenshot">
+  <img src="screenshots/22-admin-app-detail-bottom.png" alt="건물 상세, 가격, LOA 및 서류">
+  <div class="caption">그림 4.6 — 건물 상세, 가격, LOA 및 서류</div>
+</div>
+
+<!-- ==================== 5. LEW 배정 ==================== -->
+<h1>5. LEW 배정</h1>
+
+<p>신청서에 LEW(Licensed Electrical Worker)를 배정하는 절차입니다. LEW 배정은 신청 처리의 핵심 단계이며, LOA 생성 전에 반드시 완료해야 합니다.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">신청 목록에서 해당 신청을 클릭하여 <strong>신청 상세 페이지</strong>를 엽니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">LEW 배정 영역에서 <strong>"Assign LEW"</strong> 버튼을 클릭합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">표시되는 LEW 목록에서 적합한 LEW를 선택합니다. 신청의 kVA 용량에 따라 해당 등급 이상의 LEW만 자동으로 필터링되어 표시됩니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">배정 후 <strong>"Change"</strong> 버튼으로 다른 LEW로 변경하거나, <strong>"Remove"</strong> 버튼으로 배정을 해제할 수 있습니다.</div>
+</div>
+
+<div class="info">
+  <strong>자동 필터링 예시:</strong> 신청 kVA가 100인 경우, Grade 8 (500 kVA 이하) 및 Grade 9 (400 kV 이하)에 해당하는 LEW만 목록에 표시됩니다. Grade 7 (45 kVA 이하) LEW는 자격이 부족하므로 표시되지 않습니다.
+</div>
+
+<div class="warning">
+  <strong>주의:</strong> 신규 면허 신청의 경우, LOA(위임장)를 생성하려면 반드시 먼저 LEW가 배정되어 있어야 합니다. LEW 미배정 상태에서는 LOA 생성 버튼이 비활성화됩니다.
+</div>
+
+<!-- ==================== 6. LOA 관리 ==================== -->
+<h1>6. LOA 관리</h1>
+
+<p>관리자 신청 상세 페이지의 <strong>Letter of Appointment(위임장)</strong> 섹션에서 LOA를 관리합니다. 신규 면허와 갱신 면허의 LOA 처리 방식이 다릅니다.</p>
+
+<h2>6.1 신규 면허 신청</h2>
+
+<p>신규 면허 신청의 LOA는 시스템에서 자동 생성되며, 다음 5가지 상태로 관리됩니다.</p>
+
+<table>
+  <tr><th>상태</th><th>설명</th><th>가능한 액션</th></tr>
+  <tr>
+    <td><strong>LEW 미배정</strong></td>
+    <td>LEW가 아직 배정되지 않은 상태</td>
+    <td>LEW 배정 필요 (LOA 생성 불가)</td>
+  </tr>
+  <tr>
+    <td><strong>프로필 미완성</strong></td>
+    <td>LEW는 배정되었으나 신청자 프로필이 미완성</td>
+    <td>신청자에게 프로필 완성 요청 필요</td>
+  </tr>
+  <tr>
+    <td><strong>생성 가능</strong></td>
+    <td>LEW 배정 및 프로필 완성 상태</td>
+    <td><strong>"Generate LOA"</strong> 클릭하여 LOA 자동 생성</td>
+  </tr>
+  <tr>
+    <td><strong>생성됨 (미서명)</strong></td>
+    <td>LOA가 생성되었으나 신청자가 아직 서명하지 않음</td>
+    <td>다운로드, <strong>"Regenerate LOA"</strong>로 재생성 가능</td>
+  </tr>
+  <tr>
+    <td><strong>서명 완료</strong></td>
+    <td>신청자가 LOA에 서명을 완료한 상태</td>
+    <td>서명된 LOA 다운로드 (수정 불가, 잠김 상태)</td>
+  </tr>
+</table>
+
+<div class="info">
+  <strong>LOA 포함 내용:</strong> 자동 생성되는 LOA에는 다음 정보가 포함됩니다.
+  <ul>
+    <li>LEW 정보 (이름, 면허번호)</li>
+    <li>전기 설비 설치 주소</li>
+    <li>신청자 회사 정보</li>
+    <li>UEN (고유 법인 번호)</li>
+    <li>통신 주소</li>
+    <li>연락처 정보</li>
+  </ul>
+</div>
+
+<h2>6.2 면허 갱신 신청</h2>
+
+<p>면허 갱신 신청의 경우 LOA 자동 생성이 불가하며, 수동으로 업로드해야 합니다.</p>
+
+<table>
+  <tr><th>상태</th><th>설명</th><th>가능한 액션</th></tr>
+  <tr>
+    <td><strong>미업로드</strong></td>
+    <td>LOA가 아직 업로드되지 않은 상태</td>
+    <td>업로드 인터페이스를 통해 LOA 파일 업로드</td>
+  </tr>
+  <tr>
+    <td><strong>업로드됨 (미서명)</strong></td>
+    <td>LOA가 업로드되었으나 서명되지 않은 상태</td>
+    <td>다운로드 확인, <strong>"Replace LOA"</strong>로 파일 교체 가능</td>
+  </tr>
+  <tr>
+    <td><strong>서명 완료</strong></td>
+    <td>신청자가 LOA에 서명을 완료한 상태</td>
+    <td>서명된 LOA 다운로드 (수정 불가)</td>
+  </tr>
+</table>
+
+<div class="tip">
+  <strong>팁:</strong> 신청자도 직접 LOA를 업로드할 수 있습니다. 신청 제출 시(Step 1), 서류 섹션, 또는 LOA 섹션에서 업로드가 가능하므로 관리자가 반드시 업로드할 필요는 없습니다.
+</div>
+
+<!-- ==================== 7. SLD 요청 관리 ==================== -->
+<h1>7. SLD 요청 관리</h1>
+
+<p>신청자가 SLD(Single Line Diagram) 준비 시 <strong>"Request LEW to Prepare"</strong>를 선택한 경우, 관리자 또는 배정된 LEW가 SLD를 작성하고 업로드합니다.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content"><strong>요청 확인</strong> — 신청 상세 페이지에서 SLD 요청 섹션을 확인합니다. 신청자의 메모와 요청 날짜가 표시됩니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content"><strong>SLD 업로드</strong> — 설치 상세 정보를 기반으로 SLD 문서를 준비하고, <strong>"Upload SLD"</strong> 버튼을 클릭하여 파일을 업로드합니다. 필요 시 LEW 메모를 선택적으로 추가할 수 있습니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content"><strong>SLD 확정</strong> — <strong>"Confirm SLD"</strong> 버튼을 클릭하여 최종 확정합니다. 확정된 SLD는 신청자가 다운로드할 수 있습니다.</div>
+</div>
+
+<!-- ==================== 8. 사용자 관리 ==================== -->
+<h1>8. 사용자 관리</h1>
+
+<div class="screenshot">
+  <img src="screenshots/23-admin-users.png" alt="사용자 관리 페이지">
+  <div class="caption">그림 8.1 — 사용자 관리 페이지</div>
+</div>
+
+<p>좌측 메뉴의 <strong>Users</strong>를 클릭하면 사용자 관리 페이지로 이동합니다. 이 페이지는 <strong>관리자(Admin) 전용</strong>이며, LEW 역할로는 접근할 수 없습니다.</p>
+
+<h2>8.1 검색 및 필터</h2>
+
+<ul>
+  <li><strong>검색</strong> — 이름, 이메일, 회사명, UEN(고유 법인 번호)으로 사용자 검색</li>
+  <li><strong>역할 필터</strong> — 드롭다운에서 APPLICANT, LEW, ADMIN 등 역할별 필터링</li>
+  <li><strong>페이지네이션</strong> — 한 페이지에 20명씩 표시</li>
+</ul>
+
+<h2>8.2 역할 관리</h2>
+
+<p>사용자 목록에서 <strong>"Change"</strong> 버튼을 클릭하면 사용자의 역할을 변경할 수 있습니다.</p>
+
+<ul>
+  <li><strong>APPLICANT &harr; LEW</strong> 전환이 가능합니다.</li>
+  <li><strong>Admin 역할</strong>은 변경할 수 없습니다 (시스템 보안상 제한).</li>
+  <li>역할 변경 시 <strong>확인 대화상자</strong>가 표시되며, 확인 후 즉시 반영됩니다.</li>
+</ul>
+
+<h2>8.3 LEW 승인</h2>
+
+<p>LEW로 가입한 사용자는 초기 상태가 <strong>"PENDING"</strong>이며, 관리자의 승인이 필요합니다.</p>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">사용자 목록에서 PENDING 상태의 LEW를 확인합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content"><strong>"Approve"</strong> 버튼을 클릭하면 해당 LEW에게 플랫폼 접근 권한이 부여됩니다. LEW는 <strong>재로그인</strong> 후 기능이 활성화됩니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content"><strong>"Reject"</strong> 버튼을 클릭하면 가입 요청이 거부됩니다.</div>
+</div>
+
+<div class="warning">
+  <strong>주의:</strong> LEW 승인 후에도 해당 사용자는 반드시 <strong>로그아웃 후 재로그인</strong>해야 변경된 권한이 반영됩니다.
+</div>
+
+<!-- ==================== 9. 시스템 설정 ==================== -->
+<h1>9. 시스템 설정</h1>
+
+<p>좌측 메뉴의 <strong>Settings</strong>를 클릭하면 시스템 설정 페이지로 이동합니다. 이 페이지는 <strong>관리자(Admin) 전용</strong>입니다.</p>
+
+<h2>9.1 이메일 인증</h2>
+
+<div class="screenshot">
+  <img src="screenshots/24-admin-settings-top.png" alt="시스템 설정 (이메일, 서비스 수수료)">
+  <div class="caption">그림 9.1 — 시스템 설정 (이메일, 서비스 수수료)</div>
+</div>
+
+<p>회원가입 시 이메일 인증 필수 여부를 제어하는 토글 스위치입니다.</p>
+
+<ul>
+  <li><strong>활성화</strong> — 회원가입 시 이메일 인증 절차가 필수로 적용됩니다.</li>
+  <li><strong>비활성화 (기본값)</strong> — 이메일 인증 없이 바로 회원가입이 완료됩니다.</li>
+</ul>
+
+<p>토글을 변경하면 <strong>"Unsaved changes"</strong> 표시가 나타나며, <strong>"Save"</strong> 버튼을 클릭해야 변경 사항이 저장됩니다.</p>
+
+<div class="warning">
+  <strong>주의:</strong> 이메일 인증을 비활성화하면 유효하지 않은 이메일로도 가입이 가능해집니다. 운영 환경에서는 활성화를 권장합니다.
+</div>
+
+<h2>9.2 서비스 수수료</h2>
+
+<p>모든 신청에 공통으로 부과되는 서비스 수수료를 설정합니다.</p>
+
+<ul>
+  <li><strong>Service Fee (SGD)</strong> — 숫자 입력 필드이며, 소수점 입력이 허용됩니다.</li>
+  <li>값을 변경한 후 <strong>"Save Fee"</strong> 버튼을 클릭하여 저장합니다.</li>
+</ul>
+
+<h2>9.3 결제 정보</h2>
+
+<div class="screenshot">
+  <img src="screenshots/24-admin-settings-mid.png" alt="시스템 설정 (결제 정보)">
+  <div class="caption">그림 9.2 — 시스템 설정 (결제 정보)</div>
+</div>
+
+<p>신청자에게 표시되는 결제 수령 정보를 관리합니다.</p>
+
+<table>
+  <tr><th>항목</th><th>설명</th></tr>
+  <tr><td><strong>UEN Number</strong></td><td>회사 고유 법인 번호</td></tr>
+  <tr><td><strong>Recipient Name</strong></td><td>결제 수령인 이름</td></tr>
+  <tr><td><strong>PayNow QR 코드</strong></td><td>QR 코드 이미지 업로드/삭제 기능</td></tr>
+</table>
+
+<p>정보를 입력하거나 수정한 후 <strong>"Save Payment Info"</strong> 버튼을 클릭하여 저장합니다. 여기에 등록된 정보는 신청자가 결제 단계에서 확인하는 결제 안내 화면에 표시됩니다.</p>
+
+<h2>9.4 가격 등급 관리</h2>
+
+<div class="screenshot">
+  <img src="screenshots/24-admin-settings-bottom.png" alt="kVA 가격 등급 (인라인 편집)">
+  <div class="caption">그림 9.3 — kVA 가격 등급 (인라인 편집)</div>
+</div>
+
+<p>kVA 용량 구간별 가격을 인라인 편집 테이블로 관리합니다. 모든 변경 사항은 일괄 저장(Batch Save) 방식으로 처리됩니다.</p>
+
+<h3>등급 조회 및 편집</h3>
+
+<p>각 등급 행에서 다음 필드를 직접 편집할 수 있습니다.</p>
+
+<table>
+  <tr><th>필드</th><th>설명</th><th>제약 조건</th></tr>
+  <tr><td><strong>Description</strong></td><td>등급 설명</td><td>최대 50자</td></tr>
+  <tr><td><strong>kVA Min</strong></td><td>최소 kVA 값</td><td>1 이상</td></tr>
+  <tr><td><strong>kVA Max</strong></td><td>최대 kVA 값</td><td>kVA Min 이상</td></tr>
+  <tr><td><strong>Price</strong></td><td>가격 (SGD)</td><td>0 이상</td></tr>
+  <tr><td><strong>Active</strong></td><td>활성화 상태 토글</td><td>켜기/끄기</td></tr>
+  <tr><td><strong>Delete</strong></td><td>삭제 아이콘</td><td>클릭 시 삭제</td></tr>
+</table>
+
+<h3>새 등급 추가</h3>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">테이블 하단의 <strong>"+ Add Tier"</strong> 버튼을 클릭합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">빈 행이 추가되며, 각 필드에 값을 입력합니다. 신규 행에는 <strong>"(New)"</strong> 표시가 나타납니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">모든 입력을 완료한 후 <strong>"Save All"</strong> 버튼으로 저장합니다.</div>
+</div>
+
+<h3>등급 삭제</h3>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">삭제하려는 행의 <strong>휴지통 아이콘</strong>을 클릭합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content">기존 등급의 경우 <strong>확인 대화상자</strong>가 표시됩니다. 아직 저장되지 않은 신규 등급은 확인 없이 즉시 제거됩니다.</div>
+</div>
+
+<h3>변경 사항 저장</h3>
+
+<div class="step">
+  <div class="step-num">1</div>
+  <div class="step-content">등급 정보를 수정하면 상단에 <strong>"Unsaved changes"</strong> 표시가 나타납니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">2</div>
+  <div class="step-content"><strong>"Save All"</strong> 버튼을 클릭하여 모든 변경 사항을 일괄 저장합니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">3</div>
+  <div class="step-content">저장 시 검증 규칙이 적용되며, 오류가 있는 경우 해당 필드에 오류 메시지가 표시됩니다.</div>
+</div>
+<div class="step">
+  <div class="step-num">4</div>
+  <div class="step-content">저장 성공 시 성공 토스트 메시지가 표시됩니다. 변경을 취소하려면 <strong>"Discard"</strong> 버튼을 클릭합니다.</div>
+</div>
+
+<h3>검증 규칙</h3>
+
+<table>
+  <tr><th>구분</th><th>규칙</th></tr>
+  <tr><td><strong>개별 등급 — kVA Min/Max</strong></td><td>kVA Min과 kVA Max는 1 이상이어야 합니다.</td></tr>
+  <tr><td><strong>개별 등급 — Max &ge; Min</strong></td><td>kVA Max는 kVA Min보다 크거나 같아야 합니다.</td></tr>
+  <tr><td><strong>개별 등급 — Price</strong></td><td>Price는 0 이상이어야 합니다.</td></tr>
+  <tr><td><strong>등급 간 — 범위 겹침</strong></td><td>서로 다른 등급 간 kVA 범위가 겹치면 안 됩니다.</td></tr>
+  <tr><td><strong>등급 간 — 빈 구간</strong></td><td>등급 간 kVA 범위에 빈 구간이 없어야 합니다.</td></tr>
+</table>
+
+<div class="info">
+  <strong>일괄 저장 동작:</strong> "Save All"은 원자적(atomic) 처리로 동작합니다. 모든 등급이 유효한 경우에만 전체가 저장되며, 하나라도 오류가 있으면 전체 저장이 취소됩니다.
+</div>
+
+<div class="tip">
+  <strong>팁:</strong> 테이블 하단의 요약 푸터에서 전체 등급 수, 활성 등급 수, 비활성 등급 수를 한눈에 확인할 수 있습니다.
+</div>
+
+<div class="tip">
+  <strong>팁:</strong> 가격 등급 테이블은 반응형 디자인으로 구현되어 있습니다. 데스크탑에서는 테이블 형태로, 모바일에서는 카드 형태로 표시되어 다양한 화면 크기에서 편리하게 관리할 수 있습니다.
+</div>
+
+<!-- ==================== 푸터 ==================== -->
+<div style="text-align: center; margin-top: 60px; color: #94a3b8; font-size: 10pt;">
+  <p>— 관리자 가이드 끝 —</p>
+  <p>&copy; 2026 LicenseKaki Pte Ltd. All rights reserved.</p>
+</div>
+
+</body>
+</html>

@@ -76,7 +76,7 @@ export default function SignupPage() {
         navigate('/lew-pending', { replace: true });
         return;
       }
-      const dest = user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
+      const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system' : user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);

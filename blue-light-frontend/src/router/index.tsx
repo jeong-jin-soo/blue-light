@@ -30,6 +30,9 @@ import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPag
 import AdminUserListPage from '../pages/admin/AdminUserListPage';
 import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 
+// System Admin pages
+import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
+
 /**
  * 애플리케이션 라우터 설정
  */
@@ -101,6 +104,19 @@ const router = createBrowserRouter([
           { path: '/admin/applications/:id', element: <AdminApplicationDetailPage /> },
           { path: '/admin/users', element: <AdminUserListPage /> },
           { path: '/admin/prices', element: <AdminPriceManagementPage /> },
+        ],
+      },
+    ],
+  },
+
+  // System Admin routes (SYSTEM_ADMIN — system settings only)
+  {
+    element: <ProtectedRoute allowedRoles={['SYSTEM_ADMIN']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/admin/system', element: <SystemSettingsPage /> },
         ],
       },
     ],

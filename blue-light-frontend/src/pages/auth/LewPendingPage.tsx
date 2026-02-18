@@ -31,7 +31,7 @@ export default function LewPendingPage() {
 
     // LEW가 아닌 경우 해당 역할의 기본 페이지로
     if (user.role !== 'LEW') {
-      const dest = user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+      const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system' : user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
   }, [user, isAuthenticated, navigate]);

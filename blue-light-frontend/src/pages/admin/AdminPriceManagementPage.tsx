@@ -71,11 +71,6 @@ export default function AdminPriceManagementPage() {
   const [originalServiceFee, setOriginalServiceFee] = useState('');
   const [savingFee, setSavingFee] = useState(false);
 
-  // Email verification toggle state
-  const [emailVerificationEnabled, setEmailVerificationEnabled] = useState(false);
-  const [originalEmailVerification, setOriginalEmailVerification] = useState(false);
-  const [savingEmailVerification, setSavingEmailVerification] = useState(false);
-
   // Payment info state (PayNow only)
   const [paymentPaynowUen, setPaymentPaynowUen] = useState('');
   const [paymentPaynowName, setPaymentPaynowName] = useState('');
@@ -116,10 +111,6 @@ export default function AdminPriceManagementPage() {
         const fee = settings['service_fee'] || '0';
         setServiceFee(fee);
         setOriginalServiceFee(fee);
-
-        const emailVerif = settings['email_verification_enabled'] === 'true';
-        setEmailVerificationEnabled(emailVerif);
-        setOriginalEmailVerification(emailVerif);
 
         const pInfo: Record<string, string> = {
           payment_paynow_uen: settings['payment_paynow_uen'] || '',
@@ -312,29 +303,6 @@ export default function AdminPriceManagementPage() {
     }
   };
 
-  const handleSaveEmailVerification = async () => {
-    setSavingEmailVerification(true);
-    try {
-      await adminApi.updateSettings({
-        email_verification_enabled: emailVerificationEnabled ? 'true' : 'false',
-      });
-      setOriginalEmailVerification(emailVerificationEnabled);
-      toast.success(
-        emailVerificationEnabled
-          ? 'Email verification enabled. New users must verify their email.'
-          : 'Email verification disabled. New users are auto-verified.'
-      );
-    } catch (err: unknown) {
-      const message =
-        (err as { message?: string })?.message || 'Failed to update email verification setting';
-      toast.error(message);
-    } finally {
-      setSavingEmailVerification(false);
-    }
-  };
-
-  const emailVerificationChanged = emailVerificationEnabled !== originalEmailVerification;
-
   const paymentInfoChanged =
     paymentPaynowUen !== originalPaymentInfo.payment_paynow_uen ||
     paymentPaynowName !== originalPaymentInfo.payment_paynow_name;
@@ -411,57 +379,11 @@ export default function AdminPriceManagementPage() {
     <div className="space-y-6">
       {/* Page header */}
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">System Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage email verification, pricing, service fees, and payment information
+          Manage pricing, service fees, and payment information
         </p>
       </div>
-
-      {/* Email Verification Toggle Card */}
-      <Card>
-        <h2 className="text-lg font-semibold text-gray-800 mb-1">Email Verification</h2>
-        <p className="text-xs text-gray-500 mb-4">
-          When enabled, new users must verify their email address before accessing the platform.
-          Disable this for local development or testing.
-        </p>
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={emailVerificationEnabled}
-                onChange={(e) => setEmailVerificationEnabled(e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
-            </label>
-            <span className="text-sm text-gray-700">
-              {emailVerificationEnabled ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleSaveEmailVerification}
-              loading={savingEmailVerification}
-              disabled={!emailVerificationChanged}
-              size="sm"
-            >
-              Save
-            </Button>
-            {emailVerificationChanged && (
-              <span className="text-xs text-warning-600">Unsaved changes</span>
-            )}
-          </div>
-        </div>
-
-        {!emailVerificationEnabled && (
-          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">
-            Email verification is currently disabled. New users can sign up without verifying their
-            email.
-          </p>
-        )}
-      </Card>
 
       {/* Service Fee Card */}
       <Card>

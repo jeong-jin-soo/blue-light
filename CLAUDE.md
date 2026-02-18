@@ -50,3 +50,9 @@ PENDING_REVIEW → REVISION_REQUESTED ↔ PENDING_REVIEW → PENDING_PAYMENT →
 - `Project requester/` → 클라이언트 원본 자료
 - `Project Analysis/` → 분석·기획 산출물
 - `Project execution/` → 개발 진행·태스크 관리
+- `manual/` → 사용자 메뉴얼 (역할별 분리)
+  - `applicant/` — 신청자용 메뉴얼
+  - `lew/` — LEW용 메뉴얼
+  - `admin/` — 관리자용 메뉴얼
+  - 각 디렉토리: `index.html` + `screenshots/`
+  - 기존 통합본(`user-manual.html`, `user-manual-ko.html`)은 레거시

@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS files (
 -- 6. 시스템 설정 (key-value)
 CREATE TABLE IF NOT EXISTS system_settings (
     setting_key   VARCHAR(100)  NOT NULL,
-    setting_value VARCHAR(500)  NOT NULL,
+    setting_value TEXT          NOT NULL,
     description   VARCHAR(255),
     updated_at    DATETIME(6),
     updated_by    BIGINT,

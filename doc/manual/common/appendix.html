@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>LicenseKaki — 부록</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm 25mm 18mm; }
+  @page:first { margin-top: 0; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif; color: #1e293b; line-height: 1.75; font-size: 11pt; }
+  .cover { page-break-after: always; text-align: center; padding-top: 180px; }
+  .cover h1 { font-size: 36pt; color: #1e3a5f; margin-bottom: 8px; }
+  .cover .subtitle { font-size: 16pt; color: #64748b; margin-bottom: 40px; }
+  .cover .meta { font-size: 11pt; color: #94a3b8; margin-top: 60px; line-height: 2; }
+  h1 { font-size: 22pt; color: #1e3a5f; border-bottom: 3px solid #1e3a5f; padding-bottom: 6px; margin-top: 30px; page-break-before: always; }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 { font-size: 16pt; color: #1e3a5f; margin-top: 24px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  h3 { font-size: 13pt; color: #334155; margin-top: 18px; }
+  .screenshot { text-align: center; margin: 16px 0; page-break-inside: avoid; }
+  .screenshot img { max-width: 100%; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .screenshot .caption { font-size: 9pt; color: #64748b; margin-top: 4px; font-style: italic; }
+  .info, .warning, .tip { padding: 10px 14px; border-radius: 6px; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  .info { background: #eff6ff; border-left: 4px solid #3b82f6; }
+  .warning { background: #fef3c7; border-left: 4px solid #f59e0b; }
+  .tip { background: #f0fdf4; border-left: 4px solid #22c55e; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 10pt; page-break-inside: avoid; }
+  th { background: #1e3a5f; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) { background: #f8fafc; }
+  .step { display: flex; gap: 12px; margin: 10px 0; align-items: flex-start; page-break-inside: avoid; }
+  .step-num { background: #1e3a5f; color: #fff; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 12pt; flex-shrink: 0; margin-top: 2px; }
+  .step-content { flex: 1; }
+  .flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 12px 0; font-size: 9pt; }
+  .flow .status { padding: 4px 10px; border-radius: 12px; font-weight: 600; }
+  .flow .arrow { color: #94a3b8; font-size: 14pt; }
+  .s-pending { background: #dbeafe; color: #1e40af; }
+  .s-revision { background: #fef3c7; color: #92400e; }
+  .s-payment { background: #fce7f3; color: #9d174d; }
+  .s-paid { background: #d1fae5; color: #065f46; }
+  .s-progress { background: #e0e7ff; color: #3730a3; }
+  .s-completed { background: #dcfce7; color: #166534; }
+  .s-expired { background: #fee2e2; color: #991b1b; }
+  ul, ol { padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  strong { color: #0f172a; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<!-- 표지 -->
+<div class="cover">
+  <div style="font-size:64pt;">💡</div>
+  <h1>LicenseKaki</h1>
+  <div class="subtitle">싱가포르 전기 설비 면허 플랫폼</div>
+  <div class="subtitle">부록</div>
+  <div class="meta">
+    Version 3.0<br>
+    2026년 2월
+  </div>
+</div>
+
+<!-- 부록 -->
+<h1>부록</h1>
+
+<h2>A. kVA 가격표 (기본값)</h2>
+
+<p>면허 신청 비용은 전기 설비 용량(kVA)에 따라 구간별로 책정됩니다. 아래는 시스템 기본 가격표이며, 관리자가 언제든지 변경할 수 있습니다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>구간</th>
+      <th>kVA 범위</th>
+      <th>기본 가격 (SGD)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Tier 1</td>
+      <td>0 ~ 45 kVA</td>
+      <td>$250.00</td>
+    </tr>
+    <tr>
+      <td>Tier 2</td>
+      <td>46 ~ 100 kVA</td>
+      <td>$450.00</td>
+    </tr>
+    <tr>
+      <td>Tier 3</td>
+      <td>101 ~ 200 kVA</td>
+      <td>$700.00</td>
+    </tr>
+    <tr>
+      <td>Tier 4</td>
+      <td>201 ~ 500 kVA</td>
+      <td>$1,000.00</td>
+    </tr>
+    <tr>
+      <td>Tier 5</td>
+      <td>501 ~ 1,000 kVA</td>
+      <td>$1,500.00</td>
+    </tr>
+    <tr>
+      <td>Tier 6</td>
+      <td>1,001 ~ 2,000 kVA</td>
+      <td>$2,200.00</td>
+    </tr>
+    <tr>
+      <td>Tier 7</td>
+      <td>2,001 kVA 이상</td>
+      <td>$3,000.00</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="info">
+  <strong>참고:</strong> 위 가격은 시스템 초기 기본값입니다.
+  관리자는 <strong>Admin &gt; Price Management</strong> 메뉴에서 각 구간의 가격을 자유롭게 수정할 수 있습니다.
+  변경된 가격은 이후 새로 생성되는 신청서에 적용됩니다.
+</div>
+
+<h2>B. 지원 파일 형식</h2>
+
+<p>LicenseKaki에서 업로드할 수 있는 파일 형식과 용도는 다음과 같습니다:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>형식</th>
+      <th>확장자</th>
+      <th>주요 용도</th>
+      <th>최대 크기</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>PDF</td>
+      <td><code>.pdf</code></td>
+      <td>SLD 도면, LOA, 일반 문서</td>
+      <td>10 MB</td>
+    </tr>
+    <tr>
+      <td>JPEG</td>
+      <td><code>.jpg</code>, <code>.jpeg</code></td>
+      <td>현장 사진, 스캔 문서</td>
+      <td>10 MB</td>
+    </tr>
+    <tr>
+      <td>PNG</td>
+      <td><code>.png</code></td>
+      <td>스크린샷, 도면 이미지</td>
+      <td>10 MB</td>
+    </tr>
+    <tr>
+      <td>XML</td>
+      <td><code>.xml</code></td>
+      <td>ELISE 데이터 파일</td>
+      <td>2 MB</td>
+    </tr>
+    <tr>
+      <td>DWG</td>
+      <td><code>.dwg</code></td>
+      <td>AutoCAD 도면 파일</td>
+      <td>10 MB</td>
+    </tr>
+    <tr>
+      <td>DXF</td>
+      <td><code>.dxf</code></td>
+      <td>도면 교환 형식</td>
+      <td>10 MB</td>
+    </tr>
+    <tr>
+      <td>DOC/DOCX</td>
+      <td><code>.doc</code>, <code>.docx</code></td>
+      <td>보고서, 기술 문서</td>
+      <td>10 MB</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="warning">
+  <strong>주의:</strong> ELISE XML 파일의 최대 크기는 <strong>2 MB</strong>로 다른 파일 형식보다 작습니다.
+  EMA 시스템 사양에 맞춘 제한이므로 초과 시 업로드가 거부됩니다.
+</div>
+
+<h2>C. 면허 수수료</h2>
+
+<p>전기 설비 면허 신청 시 EMA에 납부하는 면허 수수료는 면허 기간에 따라 다릅니다:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>면허 기간</th>
+      <th>수수료 (SGD)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>12개월</td>
+      <td>$100.00</td>
+    </tr>
+    <tr>
+      <td>3개월</td>
+      <td>$50.00</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  면허 수수료는 LicenseKaki 서비스 이용 요금과 별도입니다.
+  서비스 이용 요금(kVA 기반 가격)은 LicenseKaki에 결제하고,
+  면허 수수료는 EMA에 별도로 납부해야 합니다.
+</p>
+
+<h2>D. 추가 참고사항</h2>
+
+<h3>로그인 시도 제한</h3>
+<p>
+  보안을 위해 로그인 시도 횟수가 제한됩니다.
+  연속 5회 로그인 실패 시 계정이 일시적으로 잠기며,
+  15분 후 자동으로 해제됩니다.
+  계속 문제가 발생하면 관리자에게 문의하세요.
+</p>
+
+<h3>폼 이탈 방지</h3>
+<p>
+  신청서 작성 중 페이지를 벗어나려고 하면 확인 대화 상자가 표시됩니다.
+  작성 중인 내용이 저장되지 않은 경우 데이터 손실을 방지하기 위한 기능입니다.
+  &ldquo;저장&rdquo; 또는 &ldquo;임시 저장&rdquo; 버튼을 먼저 클릭한 후 페이지를 이동하세요.
+</p>
+
+<h3>실시간 가격 계산</h3>
+<p>
+  신청서 작성 시 kVA 값을 입력하면 해당 구간에 맞는 가격이 실시간으로 표시됩니다.
+  가격은 관리자가 설정한 Price Tier 테이블을 기준으로 자동 계산됩니다.
+</p>
+
+<h3>LOA 전자 서명</h3>
+<p>
+  Letter of Appointment(위임장)에는 캔버스 기반 전자 서명을 적용합니다.
+  마우스 또는 터치스크린으로 서명할 수 있으며, 서명이 포함된 LOA는
+  PDF로 자동 생성되어 다운로드할 수 있습니다.
+</p>
+
+<h3>반응형 디자인</h3>
+<p>
+  LicenseKaki는 데스크톱, 태블릿, 모바일 기기 모두에서 최적화된 화면을 제공합니다.
+  모바일 환경에서는 햄버거 메뉴를 통해 네비게이션에 접근할 수 있습니다.
+</p>
+
+<h3>법적 페이지</h3>
+<p>
+  플랫폼 하단 푸터에서 다음 법적 페이지에 접근할 수 있습니다:
+</p>
+<ul>
+  <li><strong>Terms of Service</strong> — 서비스 이용 약관</li>
+  <li><strong>Privacy Policy</strong> — 개인정보 처리 방침</li>
+  <li><strong>Cookie Policy</strong> — 쿠키 정책</li>
+</ul>
+
+<h3>LEW 프로필 필드</h3>
+<p>
+  LEW(공인 전기 기술자)는 프로필에 다음 정보를 등록해야 합니다:
+</p>
+<ul>
+  <li><strong>면허 번호</strong> — EMA 발급 LEW 면허 번호</li>
+  <li><strong>면허 만료일</strong> — 면허 유효 기간 종료일</li>
+  <li><strong>회사명</strong> — 소속 회사 또는 사업체명</li>
+  <li><strong>연락처</strong> — 업무용 전화번호</li>
+  <li><strong>전문 분야</strong> — 전기 설비 전문 영역</li>
+</ul>
+
+<h3>AI 챗봇 도우미</h3>
+<p>
+  Google Gemini 2.5 Flash 모델 기반의 AI 챗봇이 플랫폼에 내장되어 있습니다.
+  전기 설비 면허 관련 일반적인 질문에 실시간으로 답변하며,
+  로그인 없이도 이용 가능합니다. 자세한 내용은 별도의 &ldquo;AI 챗봇 도우미&rdquo; 매뉴얼을 참고하세요.
+</p>
+
+<hr style="margin-top: 40px; border: none; border-top: 1px solid #e2e8f0;">
+<p style="text-align: center; font-size: 9pt; color: #94a3b8;">
+  — 부록 끝 —<br>
+  &copy; 2026 LicenseKaki Pte Ltd
+</p>
+
+</body>
+</html>

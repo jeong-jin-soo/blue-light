@@ -19,13 +19,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Admin 가격 및 시스템 설정 API 컨트롤러 (ADMIN only)
+ * Admin 가격 및 시스템 설정 API 컨트롤러 (ADMIN + SYSTEM_ADMIN)
  */
 @Slf4j
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN', 'SYSTEM_ADMIN')")
 public class AdminPriceSettingsController {
 
     private final AdminPriceSettingsService adminPriceSettingsService;

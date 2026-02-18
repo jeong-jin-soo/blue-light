@@ -8,7 +8,7 @@ export default function NotFoundPage() {
 
   const handleGoHome = () => {
     if (isAuthenticated && user) {
-      const dest = user.role === 'ADMIN' ? '/admin/dashboard' : '/dashboard';
+      const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system' : user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     } else {
       navigate('/login', { replace: true });

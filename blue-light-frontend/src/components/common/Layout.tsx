@@ -14,6 +14,7 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = user?.role === 'ADMIN';
+  const isSystemAdmin = user?.role === 'SYSTEM_ADMIN';
   const isLew = user?.role === 'LEW' && user?.approved;
 
   const handleLogout = () => {
@@ -36,14 +37,32 @@ export default function Layout() {
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
 
+  // SYSTEM_ADMIN: 시스템 설정 전용
+  const systemAdminMenu = [
+    { path: '/admin/system', label: 'System', icon: '🔧' },
+  ];
+
   const lewMenu = [
     { path: '/lew/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/lew/applications', label: 'Applications', icon: '📋' },
   ];
 
-  const menuItems = isAdmin ? adminMenu : isLew ? lewMenu : applicantMenu;
+  const menuItems = isSystemAdmin ? systemAdminMenu
+    : isAdmin ? adminMenu
+    : isLew ? lewMenu
+    : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
+
+  const roleLabel = isSystemAdmin ? 'System Admin'
+    : isAdmin ? 'Administrator'
+    : isLew ? 'LEW'
+    : 'Applicant';
+
+  const homePath = isSystemAdmin ? '/admin/system'
+    : isAdmin ? '/admin/dashboard'
+    : isLew ? '/lew/dashboard'
+    : '/dashboard';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -66,7 +85,7 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <Link to={isAdmin ? '/admin/dashboard' : isLew ? '/lew/dashboard' : '/dashboard'} className="flex items-center gap-2">
+          <Link to={homePath} className="flex items-center gap-2">
             <span className="text-xl">💡</span>
             <span className="text-lg font-bold tracking-tight">LicenseKaki</span>
           </Link>
@@ -95,7 +114,7 @@ export default function Layout() {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10">
           <div className="text-sm text-white/60 truncate">{user?.email}</div>
           <div className="text-xs text-white/40 mt-0.5">
-            {isAdmin ? 'Administrator' : isLew ? 'LEW' : 'Applicant'}
+            {roleLabel}
           </div>
         </div>
       </aside>

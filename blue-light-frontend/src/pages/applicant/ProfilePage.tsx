@@ -211,7 +211,7 @@ export default function ProfilePage() {
           <div>
             <h2 className="text-lg font-semibold text-gray-800">{profile?.name || authUser?.name}</h2>
             <p className="text-sm text-gray-500">{profile?.email || authUser?.email}</p>
-            <Badge variant={profile?.role === 'ADMIN' ? 'primary' : 'gray'} className="mt-1">
+            <Badge variant={(profile?.role === 'ADMIN' || profile?.role === 'SYSTEM_ADMIN') ? 'primary' : 'gray'} className="mt-1">
               {profile?.role || authUser?.role}
             </Badge>
           </div>

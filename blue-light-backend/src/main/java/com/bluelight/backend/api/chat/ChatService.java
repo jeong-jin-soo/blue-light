@@ -6,6 +6,7 @@ import com.bluelight.backend.api.chat.dto.ChatResponse;
 import com.bluelight.backend.config.GeminiConfig;
 import com.bluelight.backend.domain.chat.ChatMessage;
 import com.bluelight.backend.domain.chat.ChatMessageRepository;
+import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -24,6 +25,7 @@ import java.util.*;
 
 /**
  * AI 챗봇 서비스 — Gemini API 연동
+ * 시스템 프롬프트: DB(system_settings) 우선, 없으면 파일 fallback
  */
 @Slf4j
 @Service
@@ -33,15 +35,47 @@ public class ChatService {
     private final GeminiConfig geminiConfig;
     private final WebClient geminiWebClient;
     private final ChatMessageRepository chatMessageRepository;
+    private final SystemSettingRepository systemSettingRepository;
     private final ObjectMapper objectMapper;
 
-    private String systemPrompt;
+    private volatile String systemPrompt;
 
     @PostConstruct
-    public void init() throws IOException {
-        var resource = new ClassPathResource("chat-system-prompt.txt");
-        this.systemPrompt = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        log.info("Chatbot system prompt loaded ({} chars)", systemPrompt.length());
+    public void init() {
+        loadSystemPrompt();
+    }
+
+    /**
+     * 시스템 프롬프트 로드 (DB 우선, 파일 fallback)
+     */
+    private void loadSystemPrompt() {
+        // DB에서 먼저 확인
+        String dbPrompt = systemSettingRepository.findById("chat_system_prompt")
+                .map(s -> s.getSettingValue())
+                .filter(v -> !v.isBlank())
+                .orElse(null);
+
+        if (dbPrompt != null) {
+            this.systemPrompt = dbPrompt;
+            log.info("Chatbot system prompt loaded from DB ({} chars)", systemPrompt.length());
+        } else {
+            try {
+                var resource = new ClassPathResource("chat-system-prompt.txt");
+                this.systemPrompt = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                log.info("Chatbot system prompt loaded from file ({} chars)", systemPrompt.length());
+            } catch (IOException e) {
+                log.error("Failed to load system prompt from file", e);
+                this.systemPrompt = "You are a helpful assistant for the LicenseKaki platform.";
+            }
+        }
+    }
+
+    /**
+     * 시스템 프롬프트 리로드 (SystemAdminService에서 호출)
+     */
+    public void reloadSystemPrompt() {
+        loadSystemPrompt();
+        log.info("System prompt reloaded");
     }
 
     public ChatResponse chat(ChatRequest request, Long userSeq) {
