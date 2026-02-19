@@ -32,6 +32,8 @@ import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 
 // System Admin pages
 import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
+import AuditLogPage from '../pages/admin/AuditLogPage';
+import DataBreachPage from '../pages/admin/DataBreachPage';
 
 /**
  * 애플리케이션 라우터 설정
@@ -60,6 +62,10 @@ const router = createBrowserRouter([
   },
   {
     path: '/privacy',
+    element: <PrivacyPolicyPage />,
+  },
+  {
+    path: '/privacy-policy',
     element: <PrivacyPolicyPage />,
   },
   {
@@ -117,6 +123,8 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/system', element: <SystemSettingsPage /> },
+          { path: '/admin/audit-logs', element: <AuditLogPage /> },
+          { path: '/admin/data-breaches', element: <DataBreachPage /> },
         ],
       },
     ],

@@ -1,13 +1,19 @@
 package com.bluelight.backend.api.auth;
 
+import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.auth.dto.ForgotPasswordRequest;
 import com.bluelight.backend.api.auth.dto.LoginRequest;
 import com.bluelight.backend.api.auth.dto.ResetPasswordRequest;
 import com.bluelight.backend.api.auth.dto.SignupRequest;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.security.JwtTokenProvider;
 import com.bluelight.backend.security.LoginRateLimiter;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +37,8 @@ public class AuthController {
 
     private final AuthService authService;
     private final LoginRateLimiter loginRateLimiter;
+    private final AuditLogService auditLogService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * 가입 가능한 역할 목록 조회 (Public)
@@ -48,9 +56,21 @@ public class AuthController {
      * POST /api/auth/signup
      */
     @PostMapping("/signup")
-    public ResponseEntity<TokenResponse> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<TokenResponse> signup(
+            @Valid @RequestBody SignupRequest request,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         log.info("회원가입 요청: email={}", request.getEmail());
         TokenResponse response = authService.signup(request);
+        addJwtCookie(httpResponse, response.getAccessToken());
+        auditLogService.log(
+                response.getUserSeq(), request.getEmail(), response.getRole(),
+                AuditAction.SIGNUP, AuditCategory.AUTH,
+                "User", String.valueOf(response.getUserSeq()),
+                "회원가입: " + request.getEmail(),
+                null, null,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"),
+                "POST", "/api/auth/signup", 201);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -61,7 +81,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<TokenResponse> login(
             @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
 
         String clientIp = httpRequest.getRemoteAddr();
 
@@ -79,9 +100,26 @@ public class AuthController {
         try {
             TokenResponse response = authService.login(request);
             loginRateLimiter.clearAttempts(clientIp);
+            addJwtCookie(httpResponse, response.getAccessToken());
+            auditLogService.log(
+                    response.getUserSeq(), request.getEmail(), response.getRole(),
+                    AuditAction.LOGIN_SUCCESS, AuditCategory.AUTH,
+                    "User", String.valueOf(response.getUserSeq()),
+                    "로그인 성공: " + request.getEmail(),
+                    null, null,
+                    clientIp, httpRequest.getHeader("User-Agent"),
+                    "POST", "/api/auth/login", 200);
             return ResponseEntity.ok(response);
         } catch (BusinessException e) {
             loginRateLimiter.recordFailedAttempt(clientIp);
+            auditLogService.log(
+                    null, request.getEmail(), null,
+                    AuditAction.LOGIN_FAILURE, AuditCategory.AUTH,
+                    null, null,
+                    "로그인 실패: " + request.getEmail(),
+                    null, null,
+                    clientIp, httpRequest.getHeader("User-Agent"),
+                    "POST", "/api/auth/login", 401);
             throw e;
         }
     }
@@ -92,9 +130,18 @@ public class AuthController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<Map<String, String>> forgotPassword(
-            @Valid @RequestBody ForgotPasswordRequest request) {
+            @Valid @RequestBody ForgotPasswordRequest request,
+            HttpServletRequest httpRequest) {
         log.info("비밀번호 재설정 요청: email={}", request.getEmail());
         authService.forgotPassword(request);
+        auditLogService.log(
+                null, request.getEmail(), null,
+                AuditAction.PASSWORD_RESET_REQUEST, AuditCategory.AUTH,
+                null, null,
+                "비밀번호 재설정 요청: " + request.getEmail(),
+                null, null,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"),
+                "POST", "/api/auth/forgot-password", 200);
         // 보안: 이메일 존재 여부와 관계없이 동일한 응답
         return ResponseEntity.ok(Map.of(
                 "message", "If an account with that email exists, a password reset link has been sent."
@@ -107,9 +154,18 @@ public class AuthController {
      */
     @PostMapping("/reset-password")
     public ResponseEntity<Map<String, String>> resetPassword(
-            @Valid @RequestBody ResetPasswordRequest request) {
+            @Valid @RequestBody ResetPasswordRequest request,
+            HttpServletRequest httpRequest) {
         log.info("비밀번호 재설정 실행");
         authService.resetPassword(request);
+        auditLogService.log(
+                null, null, null,
+                AuditAction.PASSWORD_RESET_COMPLETE, AuditCategory.AUTH,
+                null, null,
+                "비밀번호 재설정 완료",
+                null, null,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"),
+                "POST", "/api/auth/reset-password", 200);
         return ResponseEntity.ok(Map.of(
                 "message", "Your password has been reset successfully."
         ));
@@ -120,9 +176,19 @@ public class AuthController {
      * GET /api/auth/verify-email?token=xxx
      */
     @GetMapping("/verify-email")
-    public ResponseEntity<Map<String, String>> verifyEmail(@RequestParam String token) {
+    public ResponseEntity<Map<String, String>> verifyEmail(
+            @RequestParam String token,
+            HttpServletRequest httpRequest) {
         log.info("이메일 인증 요청: token={}", token.substring(0, Math.min(8, token.length())) + "...");
         authService.verifyEmail(token);
+        auditLogService.log(
+                null, null, null,
+                AuditAction.EMAIL_VERIFIED, AuditCategory.AUTH,
+                null, null,
+                "이메일 인증 완료",
+                null, null,
+                getClientIp(httpRequest), httpRequest.getHeader("User-Agent"),
+                "GET", "/api/auth/verify-email", 200);
         return ResponseEntity.ok(Map.of(
                 "message", "Your email has been verified successfully."
         ));
@@ -144,5 +210,49 @@ public class AuthController {
         return ResponseEntity.ok(Map.of(
                 "message", "Verification email has been sent."
         ));
+    }
+
+    /**
+     * 로그아웃 (httpOnly 쿠키 삭제)
+     * POST /api/auth/logout
+     */
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(HttpServletResponse httpResponse) {
+        clearJwtCookie(httpResponse);
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    }
+
+    /**
+     * JWT 토큰을 httpOnly 쿠키에 설정
+     */
+    private void addJwtCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie("bluelight_token", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false); // 개발환경: false, 운영환경: true
+        cookie.setPath("/");
+        cookie.setMaxAge(jwtTokenProvider.getExpirationInSeconds().intValue());
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
+    }
+
+    /**
+     * JWT 쿠키 삭제 (로그아웃 시)
+     */
+    private void clearJwtCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie("bluelight_token", "");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+            return xForwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

@@ -2,6 +2,9 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -73,6 +76,7 @@ public class AdminApplicationController {
      * Update application status
      * PATCH /api/admin/applications/:id/status
      */
+    @Auditable(action = AuditAction.APPLICATION_STATUS_CHANGE, category = AuditCategory.ADMIN, entityType = "Application")
     @PatchMapping("/applications/{id}/status")
     public ResponseEntity<AdminApplicationResponse> updateStatus(
             @PathVariable Long id,
@@ -86,6 +90,7 @@ public class AdminApplicationController {
      * Confirm offline payment
      * POST /api/admin/applications/:id/payments/confirm
      */
+    @Auditable(action = AuditAction.PAYMENT_CONFIRMED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/payments/confirm")
     public ResponseEntity<PaymentResponse> confirmPayment(
             @PathVariable Long id,
@@ -99,6 +104,7 @@ public class AdminApplicationController {
      * Complete application and issue licence
      * POST /api/admin/applications/:id/complete
      */
+    @Auditable(action = AuditAction.APPLICATION_COMPLETED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/complete")
     public ResponseEntity<AdminApplicationResponse> completeApplication(
             @PathVariable Long id,
@@ -112,6 +118,7 @@ public class AdminApplicationController {
      * Request revision from applicant
      * POST /api/admin/applications/:id/revision
      */
+    @Auditable(action = AuditAction.APPLICATION_REVISION_REQUESTED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/revision")
     public ResponseEntity<AdminApplicationResponse> requestRevision(
             @PathVariable Long id,
@@ -125,6 +132,7 @@ public class AdminApplicationController {
      * Approve application and request payment
      * POST /api/admin/applications/:id/approve
      */
+    @Auditable(action = AuditAction.APPLICATION_APPROVED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/approve")
     public ResponseEntity<AdminApplicationResponse> approveForPayment(@PathVariable Long id) {
         log.info("Admin approve for payment: applicationSeq={}", id);

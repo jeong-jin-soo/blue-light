@@ -28,6 +28,7 @@ public class UserResponse {
     private String correspondenceAddress;
     private String correspondencePostalCode;
     private boolean hasSignature;
+    private LocalDateTime pdpaConsentAt;
     private LocalDateTime createdAt;
 
     public static UserResponse from(User user) {
@@ -46,6 +47,7 @@ public class UserResponse {
                 .correspondenceAddress(user.getCorrespondenceAddress())
                 .correspondencePostalCode(user.getCorrespondencePostalCode())
                 .hasSignature(user.getSignatureUrl() != null)
+                .pdpaConsentAt(user.getPdpaConsentAt())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

@@ -61,8 +61,32 @@ export const getSignatureDataUrl = async (): Promise<string | null> => {
   }
 };
 
+/**
+ * PDPA: Export my data (Right to Access / Data Portability)
+ */
+export const exportMyData = async (): Promise<Record<string, unknown>> => {
+  const response = await axiosClient.get<Record<string, unknown>>('/users/me/data-export');
+  return response.data;
+};
+
+/**
+ * PDPA: Withdraw PDPA consent (Right to Withdrawal)
+ */
+export const withdrawPdpaConsent = async (): Promise<{ message: string }> => {
+  const response = await axiosClient.post<{ message: string }>('/users/me/withdraw-consent');
+  return response.data;
+};
+
+/**
+ * PDPA: Delete my account (Right to Erasure)
+ */
+export const deleteMyAccount = async (): Promise<void> => {
+  await axiosClient.delete('/users/me');
+};
+
 export const userApi = {
   getMyProfile, updateProfile, changePassword,
   uploadSignature, deleteSignature, getSignatureDataUrl,
+  exportMyData, withdrawPdpaConsent, deleteMyAccount,
 };
 export default userApi;

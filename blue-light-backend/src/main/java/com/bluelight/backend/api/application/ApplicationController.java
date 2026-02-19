@@ -2,6 +2,9 @@ package com.bluelight.backend.api.application;
 
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.application.dto.*;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +30,7 @@ public class ApplicationController {
      * Create a new licence application
      * POST /api/applications
      */
+    @Auditable(action = AuditAction.APPLICATION_CREATED, category = AuditCategory.APPLICATION, entityType = "Application")
     @PostMapping
     public ResponseEntity<ApplicationResponse> createApplication(
             Authentication authentication,
@@ -67,6 +71,7 @@ public class ApplicationController {
      * Update and resubmit application (after revision request)
      * PUT /api/applications/:id
      */
+    @Auditable(action = AuditAction.APPLICATION_RESUBMITTED, category = AuditCategory.APPLICATION, entityType = "Application")
     @PutMapping("/{id}")
     public ResponseEntity<ApplicationResponse> updateApplication(
             Authentication authentication,

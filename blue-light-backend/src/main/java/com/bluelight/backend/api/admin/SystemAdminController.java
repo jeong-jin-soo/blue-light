@@ -1,5 +1,8 @@
 package com.bluelight.backend.api.admin;
 
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +59,7 @@ public class SystemAdminController {
      * 시스템 프롬프트 업데이트
      * PUT /api/admin/system/prompt
      */
+    @Auditable(action = AuditAction.SYSTEM_PROMPT_UPDATED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
     @PutMapping("/prompt")
     public ResponseEntity<Map<String, Object>> updateSystemPrompt(
             @RequestBody Map<String, String> request,
@@ -76,6 +80,7 @@ public class SystemAdminController {
      * 시스템 프롬프트 기본값 초기화
      * POST /api/admin/system/prompt/reset
      */
+    @Auditable(action = AuditAction.SYSTEM_PROMPT_RESET, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
     @PostMapping("/prompt/reset")
     public ResponseEntity<Map<String, Object>> resetSystemPrompt(Authentication authentication) {
         Long userSeq = (Long) authentication.getPrincipal();
@@ -106,6 +111,7 @@ public class SystemAdminController {
      * Gemini API 키 업데이트
      * PUT /api/admin/system/gemini-key
      */
+    @Auditable(action = AuditAction.GEMINI_KEY_UPDATED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
     @PutMapping("/gemini-key")
     public ResponseEntity<Map<String, String>> updateGeminiApiKey(
             @RequestBody Map<String, String> request,
@@ -123,6 +129,7 @@ public class SystemAdminController {
      * Gemini API 키 삭제 (환경변수 값으로 복귀)
      * DELETE /api/admin/system/gemini-key
      */
+    @Auditable(action = AuditAction.GEMINI_KEY_CLEARED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
     @DeleteMapping("/gemini-key")
     public ResponseEntity<Map<String, String>> clearGeminiApiKey(Authentication authentication) {
         Long userSeq = (Long) authentication.getPrincipal();
@@ -150,6 +157,7 @@ public class SystemAdminController {
      * 이메일 인증 설정 변경
      * PUT /api/admin/system/email-verification
      */
+    @Auditable(action = AuditAction.EMAIL_VERIFICATION_TOGGLED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
     @PutMapping("/email-verification")
     public ResponseEntity<Map<String, Object>> updateEmailVerification(
             @RequestBody Map<String, Object> request,

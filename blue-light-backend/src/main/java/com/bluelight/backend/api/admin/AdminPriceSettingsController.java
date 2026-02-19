@@ -3,6 +3,9 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminPriceResponse;
 import com.bluelight.backend.api.admin.dto.BatchUpdatePricesRequest;
 import com.bluelight.backend.api.admin.dto.UpdatePriceRequest;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.domain.setting.SystemSetting;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
@@ -47,6 +50,7 @@ public class AdminPriceSettingsController {
      * Batch update price tiers (create, update, delete in one request)
      * PUT /api/admin/prices/batch
      */
+    @Auditable(action = AuditAction.PRICE_UPDATED, category = AuditCategory.ADMIN, entityType = "MasterPrice")
     @PutMapping("/prices/batch")
     public ResponseEntity<List<AdminPriceResponse>> batchUpdatePrices(
             @Valid @RequestBody BatchUpdatePricesRequest request) {
@@ -83,6 +87,7 @@ public class AdminPriceSettingsController {
      * Update system settings
      * PATCH /api/admin/settings
      */
+    @Auditable(action = AuditAction.SETTINGS_UPDATED, category = AuditCategory.ADMIN, entityType = "SystemSetting")
     @PatchMapping("/settings")
     public ResponseEntity<Map<String, String>> updateSettings(
             @RequestBody Map<String, String> updates,

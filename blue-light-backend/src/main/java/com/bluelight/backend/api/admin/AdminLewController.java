@@ -3,6 +3,9 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminApplicationResponse;
 import com.bluelight.backend.api.admin.dto.AssignLewRequest;
 import com.bluelight.backend.api.admin.dto.LewSummaryResponse;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +31,7 @@ public class AdminLewController {
      * Assign LEW to application
      * POST /api/admin/applications/:id/assign-lew
      */
+    @Auditable(action = AuditAction.LEW_ASSIGNED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/assign-lew")
     public ResponseEntity<AdminApplicationResponse> assignLew(
             @PathVariable Long id,
@@ -41,6 +45,7 @@ public class AdminLewController {
      * Unassign LEW from application
      * DELETE /api/admin/applications/:id/assign-lew
      */
+    @Auditable(action = AuditAction.LEW_UNASSIGNED, category = AuditCategory.ADMIN, entityType = "Application")
     @DeleteMapping("/applications/{id}/assign-lew")
     public ResponseEntity<AdminApplicationResponse> unassignLew(@PathVariable Long id) {
         log.info("Admin unassign LEW: applicationSeq={}", id);

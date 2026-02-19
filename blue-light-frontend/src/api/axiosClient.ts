@@ -1,15 +1,15 @@
 /**
  * Axios 클라이언트 설정
  * - Base URL 설정
- * - JWT 토큰 자동 삽입 (Request Interceptor)
+ * - httpOnly 쿠키 기반 JWT 인증 (withCredentials)
  * - 401 에러 시 로그아웃 처리 (Response Interceptor)
  */
 
 import axios from 'axios';
-import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import type { AxiosError } from 'axios';
 import type { ApiError } from '../types';
 
-// 로컬 스토리지 키
+// 로컬 스토리지 키 (사용자 메타정보 전용 — 토큰은 httpOnly 쿠키에 저장)
 const TOKEN_KEY = 'bluelight_token';
 
 // Axios 인스턴스 생성
@@ -19,26 +19,9 @@ const axiosClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // httpOnly 쿠키를 모든 요청에 자동 포함
+  withCredentials: true,
 });
-
-/**
- * Request Interceptor
- * - 로컬 스토리지에서 JWT 토큰을 꺼내 Authorization 헤더에 자동 삽입
- */
-axiosClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
 
 /**
  * Response Interceptor
@@ -55,7 +38,7 @@ axiosClient.interceptors.response.use(
     if (response) {
       // 401 Unauthorized: 토큰 만료 또는 무효
       if (response.status === 401) {
-        // 토큰 및 Zustand 인증 상태 제거
+        // 레거시 토큰 제거 + Zustand 인증 상태 제거
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem('bluelight-auth');
 
@@ -95,16 +78,18 @@ axiosClient.interceptors.response.use(
 );
 
 // 토큰 관리 유틸리티
+// - 토큰은 httpOnly 쿠키에 저장 (서버에서 설정)
+// - localStorage는 레거시 호환 + 토큰 만료 시간 확인용으로만 사용
 export const tokenUtils = {
   /**
-   * 토큰 저장
+   * 토큰 저장 (레거시 호환: authStore에서 만료 검증용)
    */
   setToken: (token: string) => {
     localStorage.setItem(TOKEN_KEY, token);
   },
 
   /**
-   * 토큰 조회
+   * 토큰 조회 (만료 시간 확인용)
    */
   getToken: (): string | null => {
     return localStorage.getItem(TOKEN_KEY);

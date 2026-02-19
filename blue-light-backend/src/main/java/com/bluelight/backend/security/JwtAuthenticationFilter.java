@@ -2,6 +2,7 @@ package com.bluelight.backend.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -69,9 +70,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Authorization 헤더에서 Bearer 토큰 추출
+     * 토큰 추출 (우선순위: 1. httpOnly 쿠키, 2. Authorization 헤더)
+     * - 쿠키 우선: XSS 공격 시 Authorization 헤더 조작 방지
+     * - 헤더 하위 호환: 기존 클라이언트 지원 (전환 기간)
      */
     private String resolveToken(HttpServletRequest request) {
+        // 1. httpOnly 쿠키에서 추출
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("bluelight_token".equals(cookie.getName())) {
+                    String cookieToken = cookie.getValue();
+                    if (StringUtils.hasText(cookieToken)) {
+                        return cookieToken;
+                    }
+                }
+            }
+        }
+
+        // 2. Authorization 헤더 fallback (하위 호환)
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
             return bearerToken.substring(BEARER_PREFIX.length());

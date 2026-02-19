@@ -290,4 +290,38 @@ public class User extends BaseEntity {
     public void removeSignatureUrl() {
         this.signatureUrl = null;
     }
+
+    /**
+     * PDPA 동의 철회
+     * - pdpaConsentAt을 null로 설정
+     */
+    public void withdrawPdpaConsent() {
+        this.pdpaConsentAt = null;
+    }
+
+    /**
+     * PDPA 동의 여부 확인
+     */
+    public boolean hasPdpaConsent() {
+        return this.pdpaConsentAt != null;
+    }
+
+    /**
+     * PDPA 계정 삭제: 개인정보 익명화 (soft delete + 데이터 마스킹)
+     * - 법적 보존 의무가 있는 신청 기록은 유지하되, 개인 식별 정보는 마스킹
+     */
+    public void anonymize() {
+        this.name = "Deleted User";
+        this.phone = null;
+        this.lewLicenceNo = null;
+        this.lewGrade = null;
+        this.companyName = null;
+        this.uen = null;
+        this.designation = null;
+        this.correspondenceAddress = null;
+        this.correspondencePostalCode = null;
+        this.signatureUrl = null;
+        this.emailVerificationToken = null;
+        this.password = "DELETED";
+    }
 }

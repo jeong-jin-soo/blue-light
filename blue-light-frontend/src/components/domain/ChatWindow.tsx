@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useChatStore } from '../../stores/chatStore';
@@ -6,10 +7,14 @@ import type { ChatMessage } from '../../types';
 
 /**
  * 채팅 윈도우 — 메시지 목록, 입력, 추천 질문
+ * AI 동의 화면 포함 (PDPA 준수)
  */
 export default function ChatWindow() {
-  const { messages, isLoading, isStreaming, suggestedQuestions, sendMessage, closeChat, clearMessages } =
-    useChatStore();
+  const {
+    messages, isLoading, isStreaming, suggestedQuestions,
+    sendMessage, closeChat, clearMessages,
+    aiConsented, acceptAiConsent, declineAiConsent,
+  } = useChatStore();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -19,10 +24,12 @@ export default function ChatWindow() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading, isStreaming]);
 
-  // 열릴 때 포커스
+  // 열릴 때 포커스 (동의 완료 후)
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    if (aiConsented) {
+      inputRef.current?.focus();
+    }
+  }, [aiConsented]);
 
   const isBusy = isLoading || isStreaming;
 
@@ -90,103 +97,153 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      {/* 메시지 영역 */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {/* 웰컴 메시지 */}
-        {messages.length === 0 && (
-          <div className="flex gap-2">
-            <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+      {/* AI 동의 화면 (PDPA) */}
+      {!aiConsented ? (
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col justify-center">
+          <div className="space-y-4">
+            <div className="w-12 h-12 mx-auto rounded-full bg-amber-100 flex items-center justify-center">
+              <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
               </svg>
             </div>
-            <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-3.5 py-2.5 max-w-[85%]">
-              <p className="text-sm text-gray-700 leading-relaxed">
-                Hi! I'm the LicenseKaki assistant. I can help you with questions about Singapore
-                electrical installation licences, application procedures, and using this platform.
+            <div className="text-center">
+              <h4 className="text-sm font-semibold text-gray-800 mb-2">AI Data Processing Notice</h4>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                This chatbot is powered by <strong>Google Gemini AI</strong>.
+                Your messages will be sent to Google's servers for processing
+                and may be transferred overseas.
               </p>
-              <p className="text-sm text-gray-700 mt-2">How can I help you today?</p>
+              <p className="text-xs text-gray-600 leading-relaxed mt-2">
+                We do not send your personal account data (email, phone, address).
+                Only the messages you type are transmitted.
+              </p>
+              <p className="text-xs text-gray-500 mt-2">
+                See our{' '}
+                <a href="/privacy-policy" className="text-primary underline" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </a>{' '}
+                (Section 3) for details.
+              </p>
+            </div>
+            <div className="flex gap-2 justify-center pt-2">
+              <button
+                onClick={declineAiConsent}
+                className="px-4 py-2 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200
+                           rounded-lg transition-colors cursor-pointer"
+              >
+                Decline
+              </button>
+              <button
+                onClick={acceptAiConsent}
+                className="px-4 py-2 text-xs font-medium text-white bg-primary hover:bg-primary-hover
+                           rounded-lg transition-colors cursor-pointer"
+              >
+                I Agree &amp; Continue
+              </button>
             </div>
           </div>
-        )}
-
-        {/* 대화 메시지 */}
-        {messages.map((msg, idx) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            isStreamingCurrent={
-              isStreaming && msg.role === 'assistant' && idx === messages.length - 1
-            }
-          />
-        ))}
-
-        {/* 타이핑 인디케이터 (스트리밍 시작 전에만 표시) */}
-        {isLoading && !isStreaming && (
-          <div className="flex gap-2">
-            <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-              </svg>
-            </div>
-            <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+      ) : (
+        <>
+          {/* 메시지 영역 */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {/* 웰컴 메시지 */}
+            {messages.length === 0 && (
+              <div className="flex gap-2">
+                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  </svg>
+                </div>
+                <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-3.5 py-2.5 max-w-[85%]">
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    Hi! I'm the LicenseKaki assistant. I can help you with questions about Singapore
+                    electrical installation licences, application procedures, and using this platform.
+                  </p>
+                  <p className="text-sm text-gray-700 mt-2">How can I help you today?</p>
+                </div>
               </div>
+            )}
+
+            {/* 대화 메시지 */}
+            {messages.map((msg, idx) => (
+              <MessageBubble
+                key={msg.id}
+                message={msg}
+                isStreamingCurrent={
+                  isStreaming && msg.role === 'assistant' && idx === messages.length - 1
+                }
+              />
+            ))}
+
+            {/* 타이핑 인디케이터 (스트리밍 시작 전에만 표시) */}
+            {isLoading && !isStreaming && (
+              <div className="flex gap-2">
+                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-3.5 h-3.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                  </svg>
+                </div>
+                <div className="bg-gray-50 rounded-2xl rounded-tl-sm px-4 py-3">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* 추천 질문 */}
+          {suggestedQuestions.length > 0 && !isBusy && (
+            <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+              {suggestedQuestions.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => handleSuggestionClick(q)}
+                  className="text-xs px-2.5 py-1.5 bg-primary-50 text-primary-700 rounded-full
+                             hover:bg-primary-100 transition-colors whitespace-nowrap cursor-pointer"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* 입력 영역 */}
+          <div className="border-t border-gray-100 p-3">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your question..."
+                rows={1}
+                className="flex-1 resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm
+                           focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                           placeholder:text-gray-400 max-h-24"
+                disabled={isBusy}
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || isBusy}
+                className="p-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover
+                           disabled:opacity-40 disabled:cursor-not-allowed transition-colors
+                           flex-shrink-0 cursor-pointer"
+                aria-label="Send message"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+              </button>
             </div>
           </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* 추천 질문 */}
-      {suggestedQuestions.length > 0 && !isBusy && (
-        <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-          {suggestedQuestions.map((q) => (
-            <button
-              key={q}
-              onClick={() => handleSuggestionClick(q)}
-              className="text-xs px-2.5 py-1.5 bg-primary-50 text-primary-700 rounded-full
-                         hover:bg-primary-100 transition-colors whitespace-nowrap cursor-pointer"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
+        </>
       )}
-
-      {/* 입력 영역 */}
-      <div className="border-t border-gray-100 p-3">
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your question..."
-            rows={1}
-            className="flex-1 resize-none rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm
-                       focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
-                       placeholder:text-gray-400 max-h-24"
-            disabled={isBusy}
-          />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isBusy}
-            className="p-2.5 rounded-xl bg-primary text-white hover:bg-primary-hover
-                       disabled:opacity-40 disabled:cursor-not-allowed transition-colors
-                       flex-shrink-0 cursor-pointer"
-            aria-label="Send message"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardHeader } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -14,8 +15,9 @@ import userApi from '../../api/userApi';
 import type { User } from '../../types';
 
 export default function ProfilePage() {
-  const { user: authUser } = useAuthStore();
+  const { user: authUser, logout } = useAuthStore();
   const toast = useToastStore();
+  const navigate = useNavigate();
 
   const [profile, setProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,13 @@ export default function ProfilePage() {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [hasNewSignature, setHasNewSignature] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // PDPA: Data management
+  const [exporting, setExporting] = useState(false);
+  const [showConsentWithdrawConfirm, setShowConsentWithdrawConfirm] = useState(false);
+  const [withdrawingConsent, setWithdrawingConsent] = useState(false);
+  const [showAccountDeleteConfirm, setShowAccountDeleteConfirm] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
     userApi
@@ -183,6 +192,59 @@ export default function ProfilePage() {
       toast.success('Signature deleted');
     } catch {
       toast.error('Failed to delete signature');
+    }
+  };
+
+  // ── PDPA: Data Export ──
+  const handleExportData = async () => {
+    setExporting(true);
+    try {
+      const data = await userApi.exportMyData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `licensekaki-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('Your data has been exported successfully');
+    } catch {
+      toast.error('Failed to export data');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // ── PDPA: Consent Withdrawal ──
+  const handleWithdrawConsent = async () => {
+    setShowConsentWithdrawConfirm(false);
+    setWithdrawingConsent(true);
+    try {
+      await userApi.withdrawPdpaConsent();
+      setProfile((prev) => prev ? { ...prev, pdpaConsentAt: undefined } : prev);
+      toast.success('PDPA consent has been withdrawn. Some services may be restricted.');
+    } catch {
+      toast.error('Failed to withdraw consent');
+    } finally {
+      setWithdrawingConsent(false);
+    }
+  };
+
+  // ── PDPA: Account Deletion ──
+  const handleDeleteAccount = async () => {
+    setShowAccountDeleteConfirm(false);
+    setDeletingAccount(true);
+    try {
+      await userApi.deleteMyAccount();
+      toast.success('Your account has been deleted');
+      logout();
+      navigate('/login');
+    } catch {
+      toast.error('Failed to delete account');
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -476,6 +538,97 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {/* PDPA: Data Management */}
+      <Card>
+        <CardHeader title="Data Management" description="Your data rights under PDPA (Personal Data Protection Act)" />
+        <div className="space-y-4">
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h4 className="text-sm font-medium text-blue-800 mb-1">Export My Data</h4>
+            <p className="text-xs text-blue-600 mb-3">
+              Download all your personal data including profile information, application history,
+              and chat messages in JSON format.
+            </p>
+            <Button variant="outline" onClick={handleExportData} loading={exporting}>
+              <span className="flex items-center gap-1.5">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                </svg>
+                Export My Data
+              </span>
+            </Button>
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-medium text-amber-700 mb-1">Withdraw PDPA Consent</h4>
+            {profile?.pdpaConsentAt ? (
+              <>
+                <p className="text-xs text-gray-500 mb-1">
+                  You consented on{' '}
+                  <span className="font-medium">
+                    {new Date(profile.pdpaConsentAt).toLocaleDateString()}
+                  </span>.
+                </p>
+                <p className="text-xs text-gray-500 mb-3">
+                  Withdrawing consent will restrict consent-based services such as the AI chatbot.
+                  Your account and core services (applications, profile) will remain active.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowConsentWithdrawConfirm(true)}
+                  disabled={withdrawingConsent}
+                  className="px-4 py-2 text-sm font-medium text-amber-700 border border-amber-200 hover:bg-amber-50
+                             rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {withdrawingConsent ? 'Withdrawing...' : 'Withdraw Consent'}
+                </button>
+              </>
+            ) : (
+              <p className="text-xs text-gray-500">
+                PDPA consent has been withdrawn. Consent-based services are restricted.
+              </p>
+            )}
+          </div>
+
+          <div className="border-t border-gray-100 pt-4">
+            <h4 className="text-sm font-medium text-red-700 mb-1">Delete My Account</h4>
+            <p className="text-xs text-gray-500 mb-3">
+              Permanently delete your account and personal data. Your application records will be
+              retained for regulatory compliance (minimum 5 years) but will be anonymized.
+              This action cannot be undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAccountDeleteConfirm(true)}
+              disabled={deletingAccount}
+              className="px-4 py-2 text-sm font-medium text-red-600 border border-red-200 hover:bg-red-50
+                         rounded-lg transition-colors disabled:opacity-50"
+            >
+              {deletingAccount ? 'Deleting...' : 'Delete My Account'}
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      <ConfirmDialog
+        isOpen={showConsentWithdrawConfirm}
+        onClose={() => setShowConsentWithdrawConfirm(false)}
+        onConfirm={handleWithdrawConsent}
+        title="Withdraw PDPA Consent"
+        message="Are you sure you want to withdraw your PDPA consent? This will restrict consent-based services such as the AI chatbot. Your account and core services will remain active."
+        confirmLabel="Withdraw Consent"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={showAccountDeleteConfirm}
+        onClose={() => setShowAccountDeleteConfirm(false)}
+        onConfirm={handleDeleteAccount}
+        title="Delete Account"
+        message="Are you sure you want to permanently delete your account? Your personal data will be anonymized and your login will be disabled. Application records will be retained for regulatory compliance. This action cannot be undone."
+        confirmLabel="Delete My Account"
+        variant="danger"
+      />
     </div>
   );
 }

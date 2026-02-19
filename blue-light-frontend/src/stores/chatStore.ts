@@ -10,12 +10,15 @@ interface ChatState {
   suggestedQuestions: string[];
   hasUnread: boolean;
   sessionId: string;
+  aiConsented: boolean;
 
   toggleChat: () => void;
   openChat: () => void;
   closeChat: () => void;
   sendMessage: (content: string) => Promise<void>;
   clearMessages: () => void;
+  acceptAiConsent: () => void;
+  declineAiConsent: () => void;
 }
 
 const DEFAULT_SUGGESTIONS = [
@@ -35,10 +38,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
   suggestedQuestions: DEFAULT_SUGGESTIONS,
   hasUnread: false,
   sessionId: generateSessionId(),
+  aiConsented: false,
 
   toggleChat: () => set((s) => ({ isOpen: !s.isOpen, hasUnread: false })),
   openChat: () => set({ isOpen: true, hasUnread: false }),
   closeChat: () => set({ isOpen: false }),
+  acceptAiConsent: () => set({ aiConsented: true }),
+  declineAiConsent: () => set({ isOpen: false, aiConsented: false }),
 
   sendMessage: async (content: string) => {
     const userMsg: ChatMessage = {

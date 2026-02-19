@@ -40,6 +40,8 @@ export default function Layout() {
   // SYSTEM_ADMIN: 시스템 설정 전용
   const systemAdminMenu = [
     { path: '/admin/system', label: 'System', icon: '🔧' },
+    { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
+    { path: '/admin/data-breaches', label: 'Data Breach', icon: '🛡️' },
   ];
 
   const lewMenu = [

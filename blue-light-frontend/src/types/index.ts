@@ -57,6 +57,7 @@ export interface User {
   correspondenceAddress?: string;
   correspondencePostalCode?: string;
   hasSignature?: boolean;
+  pdpaConsentAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -602,4 +603,45 @@ export interface ChatRequest {
 export interface ChatResponse {
   message: string;
   suggestedQuestions?: string[];
+}
+
+// ============================================
+// Audit Log Types
+// ============================================
+
+export type AuditAction =
+  | 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'SIGNUP'
+  | 'PASSWORD_RESET_REQUEST' | 'PASSWORD_RESET_COMPLETE' | 'EMAIL_VERIFIED'
+  | 'APPLICATION_CREATED' | 'APPLICATION_UPDATED' | 'APPLICATION_STATUS_CHANGE'
+  | 'APPLICATION_REVISION_REQUESTED' | 'APPLICATION_APPROVED' | 'APPLICATION_COMPLETED'
+  | 'APPLICATION_RESUBMITTED'
+  | 'FILE_UPLOADED' | 'FILE_DELETED'
+  | 'LEW_APPROVED' | 'LEW_REJECTED' | 'USER_ROLE_CHANGED'
+  | 'PAYMENT_CONFIRMED' | 'LEW_ASSIGNED' | 'LEW_UNASSIGNED'
+  | 'SYSTEM_PROMPT_UPDATED' | 'SYSTEM_PROMPT_RESET'
+  | 'GEMINI_KEY_UPDATED' | 'GEMINI_KEY_CLEARED'
+  | 'EMAIL_VERIFICATION_TOGGLED' | 'PRICE_UPDATED' | 'SETTINGS_UPDATED'
+  | 'DATA_EXPORTED' | 'ACCOUNT_DELETED' | 'PDPA_CONSENT_WITHDRAWN'
+  | 'DATA_BREACH_REPORTED' | 'DATA_BREACH_PDPC_NOTIFIED'
+  | 'DATA_BREACH_USERS_NOTIFIED' | 'DATA_BREACH_RESOLVED';
+
+export type AuditCategory = 'AUTH' | 'APPLICATION' | 'ADMIN' | 'SYSTEM' | 'DATA_PROTECTION';
+
+export interface AuditLog {
+  auditLogSeq: number;
+  userSeq?: number;
+  userEmail?: string;
+  userRole?: string;
+  action: AuditAction;
+  actionCategory: AuditCategory;
+  entityType?: string;
+  entityId?: string;
+  description?: string;
+  beforeValue?: string;
+  afterValue?: string;
+  ipAddress?: string;
+  requestMethod?: string;
+  requestUri?: string;
+  httpStatus?: number;
+  createdAt: string;
 }

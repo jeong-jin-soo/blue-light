@@ -198,3 +198,53 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     KEY idx_chat_messages_session (session_id),
     KEY idx_chat_messages_user (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11. 데이터 유출 통보 (PDPA)
+CREATE TABLE IF NOT EXISTS data_breach_notifications (
+    breach_seq         BIGINT       NOT NULL AUTO_INCREMENT,
+    title              VARCHAR(200) NOT NULL,
+    description        TEXT         NOT NULL,
+    severity           VARCHAR(20)  NOT NULL DEFAULT 'HIGH',
+    status             VARCHAR(30)  NOT NULL DEFAULT 'DETECTED',
+    affected_count     INT          DEFAULT 0,
+    data_types_affected VARCHAR(500),
+    containment_actions TEXT,
+    pdpc_notified_at   DATETIME(6),
+    pdpc_reference_no  VARCHAR(100),
+    users_notified_at  DATETIME(6),
+    resolved_at        DATETIME(6),
+    reported_by        BIGINT,
+    created_at         DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at         DATETIME(6),
+    PRIMARY KEY (breach_seq),
+    KEY idx_breach_status (status),
+    KEY idx_breach_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 12. 감사 로그 (append-only)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    audit_log_seq    BIGINT       NOT NULL AUTO_INCREMENT,
+    user_seq         BIGINT,
+    user_email       VARCHAR(100),
+    user_role        VARCHAR(20),
+    action           VARCHAR(50)  NOT NULL,
+    action_category  VARCHAR(30)  NOT NULL,
+    entity_type      VARCHAR(50),
+    entity_id        VARCHAR(50),
+    description      VARCHAR(500),
+    before_value     JSON,
+    after_value      JSON,
+    ip_address       VARCHAR(45),
+    user_agent       VARCHAR(500),
+    request_method   VARCHAR(10),
+    request_uri      VARCHAR(255),
+    http_status      INT,
+    created_at       DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (audit_log_seq),
+    KEY idx_audit_logs_user (user_seq),
+    KEY idx_audit_logs_action (action),
+    KEY idx_audit_logs_category (action_category),
+    KEY idx_audit_logs_entity (entity_type, entity_id),
+    KEY idx_audit_logs_created_at (created_at),
+    KEY idx_audit_logs_composite (action_category, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

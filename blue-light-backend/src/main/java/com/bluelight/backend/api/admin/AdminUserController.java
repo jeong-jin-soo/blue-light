@@ -3,6 +3,9 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminUserResponse;
 import com.bluelight.backend.api.admin.dto.ChangeRoleRequest;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import com.bluelight.backend.common.util.EnumParser;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -73,6 +76,7 @@ public class AdminUserController {
      * Change user role (APPLICANT <-> LEW only)
      * PATCH /api/admin/users/:id/role
      */
+    @Auditable(action = AuditAction.USER_ROLE_CHANGED, category = AuditCategory.ADMIN, entityType = "User")
     @PatchMapping("/{id}/role")
     @Transactional
     public ResponseEntity<AdminUserResponse> changeRole(
@@ -110,6 +114,7 @@ public class AdminUserController {
      * Approve LEW user
      * POST /api/admin/users/:id/approve
      */
+    @Auditable(action = AuditAction.LEW_APPROVED, category = AuditCategory.ADMIN, entityType = "User")
     @PostMapping("/{id}/approve")
     @Transactional
     public ResponseEntity<AdminUserResponse> approveLew(@PathVariable Long id) {
@@ -133,6 +138,7 @@ public class AdminUserController {
      * Reject LEW user
      * POST /api/admin/users/:id/reject
      */
+    @Auditable(action = AuditAction.LEW_REJECTED, category = AuditCategory.ADMIN, entityType = "User")
     @PostMapping("/{id}/reject")
     @Transactional
     public ResponseEntity<AdminUserResponse> rejectLew(@PathVariable Long id) {

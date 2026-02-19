@@ -1,6 +1,9 @@
 package com.bluelight.backend.api.file;
 
 import com.bluelight.backend.api.file.dto.FileResponse;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.audit.Auditable;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileType;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ public class FileController {
      * Upload a file for an application (applicant)
      * POST /api/applications/:id/files
      */
+    @Auditable(action = AuditAction.FILE_UPLOADED, category = AuditCategory.APPLICATION, entityType = "File")
     @PostMapping("/api/applications/{applicationId}/files")
     public ResponseEntity<FileResponse> uploadFile(
             Authentication authentication,
@@ -50,6 +54,7 @@ public class FileController {
      * Upload a file for an application (admin)
      * POST /api/admin/applications/:id/files
      */
+    @Auditable(action = AuditAction.FILE_UPLOADED, category = AuditCategory.ADMIN, entityType = "File")
     @PostMapping("/api/admin/applications/{applicationId}/files")
     @PreAuthorize("hasAnyRole('ADMIN', 'LEW')")
     public ResponseEntity<FileResponse> uploadFileAsAdmin(
@@ -103,6 +108,7 @@ public class FileController {
      * Delete a file
      * DELETE /api/files/:fileId
      */
+    @Auditable(action = AuditAction.FILE_DELETED, category = AuditCategory.APPLICATION, entityType = "File")
     @DeleteMapping("/api/files/{fileId}")
     public ResponseEntity<Void> deleteFile(
             Authentication authentication,

@@ -13,6 +13,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Map;
+
 /**
  * User profile API controller
  */
@@ -101,5 +103,46 @@ public class UserController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .body(resource);
+    }
+
+    /**
+     * PDPA: Withdraw PDPA consent (Right to Withdrawal)
+     * POST /api/users/me/withdraw-consent
+     * - PDPA 동의 철회 → 계정은 유지하되, 동의 기반 서비스(챗봇 등) 제한
+     */
+    @PostMapping("/me/withdraw-consent")
+    public ResponseEntity<Map<String, String>> withdrawPdpaConsent(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("PDPA consent withdrawal requested: userSeq={}", userSeq);
+        userService.withdrawPdpaConsent(userSeq);
+        return ResponseEntity.ok(Map.of(
+                "message", "PDPA consent has been withdrawn. Some services may be restricted."
+        ));
+    }
+
+    /**
+     * PDPA: Export my personal data (Right to Access / Data Portability)
+     * GET /api/users/me/data-export
+     */
+    @GetMapping("/me/data-export")
+    public ResponseEntity<Map<String, Object>> exportMyData(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Data export requested: userSeq={}", userSeq);
+        Map<String, Object> data = userService.exportUserData(userSeq);
+        return ResponseEntity.ok(data);
+    }
+
+    /**
+     * PDPA: Delete my account (Right to Erasure)
+     * DELETE /api/users/me
+     * - 개인정보 익명화 + soft delete
+     * - 법적 보존 의무가 있는 신청 기록은 유지
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteMyAccount(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Account deletion requested: userSeq={}", userSeq);
+        userService.deleteAccount(userSeq);
+        return ResponseEntity.noContent().build();
     }
 }

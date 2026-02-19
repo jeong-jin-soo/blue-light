@@ -43,9 +43,12 @@ export const login = async (data: LoginRequest): Promise<TokenResponse> => {
 
 /**
  * 로그아웃
- * - 클라이언트 측에서만 토큰 제거 (서버에 별도 요청 없음)
+ * - 서버에 요청하여 httpOnly 쿠키 삭제
+ * - 클라이언트 localStorage 정리
  */
 export const logout = (): void => {
+  // 서버에 로그아웃 요청 (httpOnly 쿠키 삭제) — 실패해도 로컬은 정리
+  axiosClient.post('/auth/logout').catch(() => {});
   tokenUtils.removeToken();
 };
 

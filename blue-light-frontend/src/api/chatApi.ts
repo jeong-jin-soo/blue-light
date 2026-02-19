@@ -26,19 +26,16 @@ export const sendChatMessageStream = async (
   callbacks: StreamCallbacks,
 ): Promise<void> => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
-  const token = localStorage.getItem('bluelight_token');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
 
   const response = await fetch(`${baseUrl}/public/chat/stream`, {
     method: 'POST',
     headers,
     body: JSON.stringify(request),
+    credentials: 'include', // httpOnly 쿠키 자동 전송
   });
 
   if (!response.ok) {

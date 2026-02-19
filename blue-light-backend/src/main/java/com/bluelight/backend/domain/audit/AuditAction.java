@@ -1,0 +1,57 @@
+package com.bluelight.backend.domain.audit;
+
+/**
+ * 감사 로그 액션 유형
+ */
+public enum AuditAction {
+    // Auth
+    LOGIN_SUCCESS,
+    LOGIN_FAILURE,
+    SIGNUP,
+    PASSWORD_RESET_REQUEST,
+    PASSWORD_RESET_COMPLETE,
+    EMAIL_VERIFIED,
+
+    // Application lifecycle
+    APPLICATION_CREATED,
+    APPLICATION_UPDATED,
+    APPLICATION_STATUS_CHANGE,
+    APPLICATION_REVISION_REQUESTED,
+    APPLICATION_APPROVED,
+    APPLICATION_COMPLETED,
+    APPLICATION_RESUBMITTED,
+
+    // File
+    FILE_UPLOADED,
+    FILE_DELETED,
+
+    // Admin user management
+    LEW_APPROVED,
+    LEW_REJECTED,
+    USER_ROLE_CHANGED,
+
+    // Admin application management
+    PAYMENT_CONFIRMED,
+    LEW_ASSIGNED,
+    LEW_UNASSIGNED,
+
+    // System settings
+    SYSTEM_PROMPT_UPDATED,
+    SYSTEM_PROMPT_RESET,
+    GEMINI_KEY_UPDATED,
+    GEMINI_KEY_CLEARED,
+    EMAIL_VERIFICATION_TOGGLED,
+    PRICE_UPDATED,
+    SETTINGS_UPDATED,
+
+    // PDPA data rights
+    DATA_EXPORTED,
+    ACCOUNT_DELETED,
+    PDPA_CONSENT_WITHDRAWN,
+
+    // Data breach
+    DATA_BREACH_REPORTED,
+    DATA_BREACH_PDPC_NOTIFIED,
+    DATA_BREACH_USERS_NOTIFIED,
+    DATA_BREACH_RESOLVED
+}

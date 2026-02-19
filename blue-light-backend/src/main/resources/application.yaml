@@ -80,6 +80,8 @@ cors:
 # 파일 저장 설정
 file:
   upload-dir: ${FILE_UPLOAD_DIR:./uploads}
+  encryption-key: ${FILE_ENCRYPTION_KEY:}           # Base64 인코딩 AES-256 키 (비어있으면 암호화 비활성화)
+  encryption-migrate: ${FILE_ENCRYPTION_MIGRATE:false}  # true로 설정 시 기동 시 기존 평문 파일 일괄 암호화
 
 # 비밀번호 재설정 설정
 password-reset:
@@ -98,3 +100,11 @@ gemini:
   base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
   max-tokens: ${GEMINI_MAX_TOKENS:1024}
   temperature: ${GEMINI_TEMPERATURE:0.3}
+
+# 채팅 메시지 보유 설정
+chat:
+  retention-days: ${CHAT_RETENTION_DAYS:90}
+
+# 감사 로그 설정
+audit:
+  retention-days: ${AUDIT_RETENTION_DAYS:365}
