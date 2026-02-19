@@ -9,7 +9,6 @@ import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.api.application.dto.CreateSldRequestDto;
 import com.bluelight.backend.api.application.dto.SldRequestResponse;
-import com.bluelight.backend.api.price.PriceService;
 import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.price.MasterPrice;
@@ -43,7 +42,6 @@ public class ApplicationService {
     private final MasterPriceRepository masterPriceRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
-    private final PriceService priceService;
 
     /**
      * Create a new licence application (NEW or RENEWAL)
@@ -62,8 +60,15 @@ public class ApplicationService {
                         "PRICE_TIER_NOT_FOUND"
                 ));
 
-        // Service fee from settings
-        BigDecimal serviceFee = priceService.getServiceFee();
+        // Parse SLD option early (needed for fee calculation)
+        SldOption sldOption = SldOption.SELF_UPLOAD;
+        if ("REQUEST_LEW".equals(request.getSldOption())) {
+            sldOption = SldOption.REQUEST_LEW;
+        }
+
+        // SLD fee: only when REQUEST_LEW
+        BigDecimal sldFee = (sldOption == SldOption.REQUEST_LEW)
+                ? masterPrice.getSldPrice() : null;
 
         // Determine application type
         ApplicationType appType = ApplicationType.NEW;
@@ -89,8 +94,11 @@ public class ApplicationService {
             emaFee = calculateEmaFee(appType, renewalPeriodMonths);
         }
 
-        // Calculate total: kVA price + service fee + EMA fee (if applicable)
-        BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
+        // Calculate total: kVA price + SLD fee (if REQUEST_LEW) + EMA fee (if applicable)
+        BigDecimal quoteAmount = masterPrice.getPrice();
+        if (sldFee != null) {
+            quoteAmount = quoteAmount.add(sldFee);
+        }
         if (emaFee != null) {
             quoteAmount = quoteAmount.add(emaFee);
         }
@@ -132,12 +140,6 @@ public class ApplicationService {
             }
         }
 
-        // Parse SLD option
-        SldOption sldOption = SldOption.SELF_UPLOAD;
-        if ("REQUEST_LEW".equals(request.getSldOption())) {
-            sldOption = SldOption.REQUEST_LEW;
-        }
-
         // Create application
         Application application = Application.builder()
                 .user(user)
@@ -146,7 +148,7 @@ public class ApplicationService {
                 .buildingType(request.getBuildingType())
                 .selectedKva(request.getSelectedKva())
                 .quoteAmount(quoteAmount)
-                .serviceFee(serviceFee)
+                .sldFee(sldFee)
                 .spAccountNo(request.getSpAccountNo())
                 .sldOption(sldOption)
                 .applicationType(appType)
@@ -167,9 +169,9 @@ public class ApplicationService {
         }
 
         Application saved = applicationRepository.save(application);
-        log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, serviceFee={}, sldOption={}",
+        log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, sldFee={}, sldOption={}",
                 saved.getApplicationSeq(), appType, userSeq,
-                request.getSelectedKva(), quoteAmount, serviceFee, sldOption);
+                request.getSelectedKva(), quoteAmount, sldFee, sldOption);
 
         // SLD 요청 시 자동으로 SldRequest 생성
         if (sldOption == SldOption.REQUEST_LEW) {
@@ -204,13 +206,15 @@ public class ApplicationService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_EDIT");
         }
 
-        // Recalculate price if kVA changed (+ service fee + EMA fee)
+        // Recalculate price if kVA changed (+ SLD fee + EMA fee)
         MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
                 .orElseThrow(() -> new BusinessException(
                         "No price tier found for " + request.getSelectedKva() + " kVA",
                         HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
 
-        BigDecimal serviceFee = priceService.getServiceFee();
+        // SLD fee: only when REQUEST_LEW
+        BigDecimal sldFee = (application.getSldOption() == SldOption.REQUEST_LEW)
+                ? masterPrice.getSldPrice() : null;
 
         // Determine current EMA fee (may be updated below)
         BigDecimal currentEmaFee = application.getEmaFee();
@@ -227,8 +231,11 @@ public class ApplicationService {
             application.updateRenewalPeriod(months, currentEmaFee);
         }
 
-        // Calculate total: kVA price + service fee + EMA fee (if applicable)
-        BigDecimal quoteAmount = masterPrice.getPrice().add(serviceFee);
+        // Calculate total: kVA price + SLD fee (if REQUEST_LEW) + EMA fee (if applicable)
+        BigDecimal quoteAmount = masterPrice.getPrice();
+        if (sldFee != null) {
+            quoteAmount = quoteAmount.add(sldFee);
+        }
         if (currentEmaFee != null) {
             quoteAmount = quoteAmount.add(currentEmaFee);
         }
@@ -236,7 +243,7 @@ public class ApplicationService {
         application.updateDetails(
                 request.getAddress(), request.getPostalCode(),
                 request.getBuildingType(), request.getSelectedKva(),
-                quoteAmount, serviceFee
+                quoteAmount, sldFee
         );
 
         // SP Account No 수정

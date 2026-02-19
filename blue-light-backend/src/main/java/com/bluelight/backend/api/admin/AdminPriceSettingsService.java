@@ -182,10 +182,11 @@ public class AdminPriceSettingsService {
                     );
                 }
                 mp.updatePrice(tier.getPrice());
+                mp.updateSldPrice(tier.getSldPrice());
                 mp.updateKvaRange(tier.getKvaMin(), tier.getKvaMax(), tier.getDescription());
                 mp.setActive(tier.getIsActive());
-                log.info("Price tier updated: priceSeq={}, kvaMin={}, kvaMax={}, price={}",
-                        mp.getMasterPriceSeq(), tier.getKvaMin(), tier.getKvaMax(), tier.getPrice());
+                log.info("Price tier updated: priceSeq={}, kvaMin={}, kvaMax={}, price={}, sldPrice={}",
+                        mp.getMasterPriceSeq(), tier.getKvaMin(), tier.getKvaMax(), tier.getPrice(), tier.getSldPrice());
             } else {
                 // 신규 생성
                 MasterPrice newPrice = MasterPrice.builder()
@@ -193,11 +194,12 @@ public class AdminPriceSettingsService {
                         .kvaMin(tier.getKvaMin())
                         .kvaMax(tier.getKvaMax())
                         .price(tier.getPrice())
+                        .sldPrice(tier.getSldPrice())
                         .isActive(tier.getIsActive())
                         .build();
                 masterPriceRepository.save(newPrice);
-                log.info("Price tier created: kvaMin={}, kvaMax={}, price={}",
-                        tier.getKvaMin(), tier.getKvaMax(), tier.getPrice());
+                log.info("Price tier created: kvaMin={}, kvaMax={}, price={}, sldPrice={}",
+                        tier.getKvaMin(), tier.getKvaMax(), tier.getPrice(), tier.getSldPrice());
             }
         }
 

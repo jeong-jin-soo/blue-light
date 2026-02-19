@@ -115,10 +115,10 @@ public class Application extends BaseEntity {
     private ApplicationType applicationType = ApplicationType.NEW;
 
     /**
-     * 플랫폼 서비스 수수료 (생성 시점 스냅샷)
+     * SLD 작성 비용 (REQUEST_LEW 시에만 설정, 생성 시점 스냅샷)
      */
-    @Column(name = "service_fee", precision = 10, scale = 2)
-    private BigDecimal serviceFee;
+    @Column(name = "sld_fee", precision = 10, scale = 2)
+    private BigDecimal sldFee;
 
     /**
      * 원본 신청 (갱신 시 참조, nullable)
@@ -184,7 +184,7 @@ public class Application extends BaseEntity {
 
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
-                       Integer selectedKva, BigDecimal quoteAmount, BigDecimal serviceFee,
+                       Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
                        String spAccountNo, SldOption sldOption,
                        ApplicationType applicationType, Application originalApplication,
                        String existingLicenceNo, String renewalReferenceNo,
@@ -196,7 +196,7 @@ public class Application extends BaseEntity {
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
-        this.serviceFee = serviceFee;
+        this.sldFee = sldFee;
         this.spAccountNo = spAccountNo;
         this.sldOption = sldOption != null ? sldOption : SldOption.SELF_UPLOAD;
         this.applicationType = applicationType != null ? applicationType : ApplicationType.NEW;
@@ -243,13 +243,13 @@ public class Application extends BaseEntity {
      * 신청 내용 수정 (보완 시)
      */
     public void updateDetails(String address, String postalCode, String buildingType,
-                              Integer selectedKva, BigDecimal quoteAmount, BigDecimal serviceFee) {
+                              Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee) {
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
-        this.serviceFee = serviceFee;
+        this.sldFee = sldFee;
     }
 
     /**

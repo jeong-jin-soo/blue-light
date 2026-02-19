@@ -27,31 +27,31 @@ export function ApplicationPayment({ application, payments, paymentInfo, files =
       <Card>
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Pricing</h2>
         <div className="bg-primary-50 rounded-xl p-5 border border-primary-100">
-          {application.serviceFee != null && (
-            <div className="space-y-2 mb-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-primary-700">kVA Tier Price</span>
-                <span className="font-medium text-primary-800">
-                  SGD ${(application.quoteAmount - (application.serviceFee || 0) - (application.emaFee || 0)).toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-primary-700">Service Fee</span>
-                <span className="font-medium text-primary-800">
-                  SGD ${application.serviceFee.toLocaleString()}
-                </span>
-              </div>
-              {application.emaFee != null && application.emaFee > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-primary-700">EMA Fee ({application.renewalPeriodMonths}-month)</span>
-                  <span className="font-medium text-primary-800">
-                    SGD ${application.emaFee.toLocaleString()}
-                  </span>
-                </div>
-              )}
-              <div className="border-t border-primary-200 pt-2"></div>
+          <div className="space-y-2 mb-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-primary-700">kVA Tier Price</span>
+              <span className="font-medium text-primary-800">
+                SGD ${(application.quoteAmount - (application.sldFee || 0) - (application.emaFee || 0)).toLocaleString()}
+              </span>
             </div>
-          )}
+            {application.sldFee != null && application.sldFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-primary-700">SLD Drawing Fee</span>
+                <span className="font-medium text-primary-800">
+                  SGD ${application.sldFee.toLocaleString()}
+                </span>
+              </div>
+            )}
+            {application.emaFee != null && application.emaFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-primary-700">EMA Fee ({application.renewalPeriodMonths}-month)</span>
+                <span className="font-medium text-primary-800">
+                  SGD ${application.emaFee.toLocaleString()}
+                </span>
+              </div>
+            )}
+            <div className="border-t border-primary-200 pt-2"></div>
+          </div>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-primary-700">Total Amount</p>

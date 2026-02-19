@@ -137,16 +137,20 @@ export default function NewApplicationPage() {
     }
   }, [currentStep]);
 
-  // Calculate price when kVA or licence period changes
+  // Calculate price when kVA, licence period, or SLD option changes
   useEffect(() => {
     if (formData.selectedKva) {
-      priceApi.calculatePrice(formData.selectedKva, formData.renewalPeriodMonths || undefined)
+      priceApi.calculatePrice(
+        formData.selectedKva,
+        formData.renewalPeriodMonths || undefined,
+        formData.sldOption
+      )
         .then(setPriceResult)
         .catch(() => setPriceResult(null));
     } else {
       setPriceResult(null);
     }
-  }, [formData.selectedKva, formData.renewalPeriodMonths]);
+  }, [formData.selectedKva, formData.renewalPeriodMonths, formData.sldOption]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -1020,10 +1024,12 @@ export default function NewApplicationPage() {
                       <span className="text-primary-700">kVA Tier Price</span>
                       <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-primary-700">Service Fee</span>
-                      <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
-                    </div>
+                    {priceResult.sldFee != null && priceResult.sldFee > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-primary-700">SLD Drawing Fee</span>
+                        <span className="font-medium text-primary-800">SGD ${priceResult.sldFee.toLocaleString()}</span>
+                      </div>
+                    )}
                     {priceResult.emaFee != null && priceResult.emaFee > 0 && (
                       <div className="flex justify-between text-sm">
                         <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>

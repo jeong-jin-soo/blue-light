@@ -5,7 +5,6 @@ import com.bluelight.backend.api.price.dto.PriceResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
-import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -18,7 +17,7 @@ import java.util.List;
 /**
  * Price service
  * - Retrieve active price tiers
- * - Calculate price for a given kVA (including service fee)
+ * - Calculate price for a given kVA (including optional SLD fee and EMA fee)
  */
 @Slf4j
 @Service
@@ -27,7 +26,6 @@ import java.util.List;
 public class PriceService {
 
     private final MasterPriceRepository masterPriceRepository;
-    private final SystemSettingRepository systemSettingRepository;
 
     /**
      * Get all active price tiers ordered by kVA min ascending
@@ -40,23 +38,14 @@ public class PriceService {
     }
 
     /**
-     * Calculate price for a given kVA value (includes service fee)
+     * Calculate price for a given kVA value
      *
-     * @param kva the kVA capacity
-     * @return calculation result with tier, price, service fee, and total
+     * @param kva       the kVA capacity
+     * @param months    licence period in months (3 or 12), null if not applicable
+     * @param sldOption SLD option ("REQUEST_LEW" or "SELF_UPLOAD"), null defaults to SELF_UPLOAD
+     * @return calculation result with tier, price, SLD fee, EMA fee, and total
      */
-    public PriceCalculationResponse calculatePrice(Integer kva) {
-        return calculatePrice(kva, null);
-    }
-
-    /**
-     * Calculate price for a given kVA value (includes service fee + optional EMA fee)
-     *
-     * @param kva    the kVA capacity
-     * @param months licence period in months (3 or 12), null if not applicable
-     * @return calculation result with tier, price, service fee, EMA fee, and total
-     */
-    public PriceCalculationResponse calculatePrice(Integer kva, Integer months) {
+    public PriceCalculationResponse calculatePrice(Integer kva, Integer months, String sldOption) {
         if (kva == null || kva < 1) {
             throw new BusinessException("kVA must be a positive number", HttpStatus.BAD_REQUEST, "INVALID_KVA");
         }
@@ -68,21 +57,32 @@ public class PriceService {
                         "PRICE_TIER_NOT_FOUND"
                 ));
 
-        BigDecimal serviceFee = getServiceFee();
-        BigDecimal emaFee = (months != null) ? calculateEmaFee(months) : BigDecimal.ZERO;
-        BigDecimal totalAmount = masterPrice.getPrice().add(serviceFee).add(emaFee);
+        // SLD fee: only when REQUEST_LEW
+        BigDecimal sldFee = "REQUEST_LEW".equals(sldOption)
+                ? masterPrice.getSldPrice()
+                : BigDecimal.ZERO;
 
-        log.info("Price calculated: kva={}, tier={}, price={}, serviceFee={}, emaFee={}, total={}",
-                kva, masterPrice.getDescription(), masterPrice.getPrice(), serviceFee, emaFee, totalAmount);
+        BigDecimal emaFee = (months != null) ? calculateEmaFee(months) : BigDecimal.ZERO;
+        BigDecimal totalAmount = masterPrice.getPrice().add(sldFee).add(emaFee);
+
+        log.info("Price calculated: kva={}, tier={}, price={}, sldFee={}, emaFee={}, total={}",
+                kva, masterPrice.getDescription(), masterPrice.getPrice(), sldFee, emaFee, totalAmount);
 
         return PriceCalculationResponse.builder()
                 .kva(kva)
                 .tierDescription(masterPrice.getDescription())
                 .price(masterPrice.getPrice())
-                .serviceFee(serviceFee)
+                .sldFee(sldFee)
                 .emaFee(emaFee)
                 .totalAmount(totalAmount)
                 .build();
+    }
+
+    /**
+     * Calculate price (backward compatible — no SLD option)
+     */
+    public PriceCalculationResponse calculatePrice(Integer kva) {
+        return calculatePrice(kva, null, null);
     }
 
     /**
@@ -94,14 +94,5 @@ public class PriceService {
             return new BigDecimal("50.00");
         }
         return new BigDecimal("100.00");
-    }
-
-    /**
-     * system_settings에서 서비스 수수료 조회
-     */
-    public BigDecimal getServiceFee() {
-        return systemSettingRepository.findById("service_fee")
-                .map(s -> new BigDecimal(s.getSettingValue()))
-                .orElse(BigDecimal.ZERO);
     }
 }

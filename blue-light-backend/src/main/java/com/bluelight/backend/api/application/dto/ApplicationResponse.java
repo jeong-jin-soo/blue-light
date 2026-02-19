@@ -36,9 +36,9 @@ public class ApplicationResponse {
     // SP Group 계정 번호
     private String spAccountNo;
 
-    // ── Phase 18: 갱신 + 견적 개선 필드 ──
+    // ── 갱신 + 견적 필드 ──
     private String applicationType;
-    private BigDecimal serviceFee;
+    private BigDecimal sldFee;
     private Long originalApplicationSeq;
     private String existingLicenceNo;
     private String renewalReferenceNo;
@@ -76,7 +76,7 @@ public class ApplicationResponse {
                 .spAccountNo(application.getSpAccountNo())
                 // Phase 18 fields
                 .applicationType(application.getApplicationType().name())
-                .serviceFee(application.getServiceFee())
+                .sldFee(application.getSldFee())
                 .originalApplicationSeq(application.getOriginalApplication() != null
                         ? application.getOriginalApplication().getApplicationSeq() : null)
                 .existingLicenceNo(application.getExistingLicenceNo())

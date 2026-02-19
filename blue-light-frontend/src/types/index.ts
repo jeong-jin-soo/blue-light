@@ -129,9 +129,9 @@ export interface Application {
   assignedLewLicenceNo?: string;
   // SP Group 계정 번호
   spAccountNo?: string;
-  // Phase 18: 갱신 + 견적 개선
+  // 갱신 + 견적
   applicationType: ApplicationType;
-  serviceFee?: number;
+  sldFee?: number;
   originalApplicationSeq?: number;
   existingLicenceNo?: string;
   renewalReferenceNo?: string;
@@ -360,7 +360,7 @@ export interface PriceCalculation {
   kva: number;
   tierDescription: string;
   price: number;
-  serviceFee: number;
+  sldFee: number;
   totalAmount: number;
   emaFee?: number;
 }
@@ -531,6 +531,7 @@ export interface AdminPriceResponse {
   kvaMin: number;
   kvaMax: number;
   price: number;
+  sldPrice: number;
   isActive: boolean;
   updatedAt: string;
 }
@@ -555,6 +556,7 @@ export interface BatchPriceTierItem {
   kvaMin: number;
   kvaMax: number;
   price: number;
+  sldPrice: number;
   isActive: boolean;
 }
 

@@ -16,10 +16,10 @@ public class PriceCalculationResponse {
     private String tierDescription;
     private BigDecimal price;
 
-    // ── Phase 18: 서비스 수수료 분리 ──
-    private BigDecimal serviceFee;
+    // SLD 작성 비용 (REQUEST_LEW 시에만 포함)
+    private BigDecimal sldFee;
     private BigDecimal totalAmount;
 
-    // ── EMA 수수료 (총액에 포함) ──
+    // EMA 수수료 (총액에 포함)
     private BigDecimal emaFee;
 }

@@ -250,10 +250,12 @@ export function StepReview({ formData, priceResult, sldFile, loaEmailFile, break
               <span className="text-primary-700">kVA Tier Price</span>
               <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-primary-700">Service Fee</span>
-              <span className="font-medium text-primary-800">SGD ${priceResult.serviceFee.toLocaleString()}</span>
-            </div>
+            {priceResult.sldFee != null && priceResult.sldFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-primary-700">SLD Drawing Fee</span>
+                <span className="font-medium text-primary-800">SGD ${priceResult.sldFee.toLocaleString()}</span>
+              </div>
+            )}
             {priceResult.emaFee != null && priceResult.emaFee > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>

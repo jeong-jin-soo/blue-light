@@ -14,6 +14,7 @@ interface TierErrors {
   kvaMin?: string;
   kvaMax?: string;
   price?: string;
+  sldPrice?: string;
 }
 
 interface EditableTier {
@@ -23,6 +24,7 @@ interface EditableTier {
   kvaMin: string;
   kvaMax: string;
   price: string;
+  sldPrice: string;
   isActive: boolean;
   errors: TierErrors;
 }
@@ -35,6 +37,7 @@ function toEditableTier(price: AdminPriceResponse): EditableTier {
     kvaMin: String(price.kvaMin),
     kvaMax: String(price.kvaMax),
     price: String(price.price),
+    sldPrice: String(price.sldPrice ?? 0),
     isActive: price.isActive,
     errors: {},
   };
@@ -48,6 +51,7 @@ function createEmptyTier(): EditableTier {
     kvaMin: '',
     kvaMax: '',
     price: '',
+    sldPrice: '0',
     isActive: true,
     errors: {},
   };
@@ -65,11 +69,6 @@ export default function AdminPriceManagementPage() {
   const [batchSaving, setBatchSaving] = useState(false);
   const [crossTierErrors, setCrossTierErrors] = useState<string[]>([]);
   const [deleteConfirmTier, setDeleteConfirmTier] = useState<EditableTier | null>(null);
-
-  // Service fee state
-  const [serviceFee, setServiceFee] = useState('');
-  const [originalServiceFee, setOriginalServiceFee] = useState('');
-  const [savingFee, setSavingFee] = useState(false);
 
   // Payment info state (PayNow only)
   const [paymentPaynowUen, setPaymentPaynowUen] = useState('');
@@ -108,10 +107,6 @@ export default function AdminPriceManagementPage() {
     adminApi
       .getSettings()
       .then((settings) => {
-        const fee = settings['service_fee'] || '0';
-        setServiceFee(fee);
-        setOriginalServiceFee(fee);
-
         const pInfo: Record<string, string> = {
           payment_paynow_uen: settings['payment_paynow_uen'] || '',
           payment_paynow_name: settings['payment_paynow_name'] || '',
@@ -186,6 +181,7 @@ export default function AdminPriceManagementPage() {
         tier.kvaMin !== String(orig.kvaMin) ||
         tier.kvaMax !== String(orig.kvaMax) ||
         tier.price !== String(orig.price) ||
+        tier.sldPrice !== String(orig.sldPrice ?? 0) ||
         tier.isActive !== orig.isActive
       );
     });
@@ -203,6 +199,7 @@ export default function AdminPriceManagementPage() {
       const kvaMin = parseInt(tier.kvaMin);
       const kvaMax = parseInt(tier.kvaMax);
       const price = parseFloat(tier.price);
+      const sldPrice = parseFloat(tier.sldPrice);
 
       if (!tier.kvaMin || isNaN(kvaMin) || kvaMin < 1) {
         tier.errors.kvaMin = 'Required (min: 1)';
@@ -218,6 +215,10 @@ export default function AdminPriceManagementPage() {
       }
       if (tier.price === '' || isNaN(price) || price < 0) {
         tier.errors.price = 'Required (min: 0)';
+        isValid = false;
+      }
+      if (tier.sldPrice === '' || isNaN(sldPrice) || sldPrice < 0) {
+        tier.errors.sldPrice = 'Required (min: 0)';
         isValid = false;
       }
     });
@@ -267,6 +268,7 @@ export default function AdminPriceManagementPage() {
           kvaMin: parseInt(t.kvaMin),
           kvaMax: parseInt(t.kvaMax),
           price: parseFloat(t.price),
+          sldPrice: parseFloat(t.sldPrice),
           isActive: t.isActive,
         })),
       };
@@ -282,26 +284,6 @@ export default function AdminPriceManagementPage() {
   };
 
   // ── Settings 핸들러 ──────────────────────────────
-
-  const handleSaveServiceFee = async () => {
-    const feeValue = parseFloat(serviceFee);
-    if (isNaN(feeValue) || feeValue < 0) {
-      toast.error('Service fee must be a non-negative number');
-      return;
-    }
-
-    setSavingFee(true);
-    try {
-      await adminApi.updateSettings({ service_fee: serviceFee });
-      setOriginalServiceFee(serviceFee);
-      toast.success('Service fee updated successfully');
-    } catch (err: unknown) {
-      const message = (err as { message?: string })?.message || 'Failed to update service fee';
-      toast.error(message);
-    } finally {
-      setSavingFee(false);
-    }
-  };
 
   const paymentInfoChanged =
     paymentPaynowUen !== originalPaymentInfo.payment_paynow_uen ||
@@ -371,8 +353,6 @@ export default function AdminPriceManagementPage() {
     }
   };
 
-  const serviceFeeChanged = serviceFee !== originalServiceFee;
-
   // ── 렌더링 ──────────────────────────────
 
   return (
@@ -381,42 +361,9 @@ export default function AdminPriceManagementPage() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Manage pricing, service fees, and payment information
+          Manage pricing and payment information
         </p>
       </div>
-
-      {/* Service Fee Card */}
-      <Card>
-        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-          <div className="flex-1 max-w-xs">
-            <Input
-              label="Service Fee (SGD)"
-              type="number"
-              min="0"
-              step="0.01"
-              value={serviceFee}
-              onChange={(e) => setServiceFee(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleSaveServiceFee}
-              loading={savingFee}
-              disabled={!serviceFeeChanged}
-              size="sm"
-            >
-              Save Fee
-            </Button>
-            {serviceFeeChanged && (
-              <span className="text-xs text-warning-600">Unsaved changes</span>
-            )}
-          </div>
-        </div>
-        <p className="text-xs text-gray-500 mt-2">
-          This fee is added to the kVA tier price for every application quote.
-        </p>
-      </Card>
 
       {/* Payment Information Card */}
       <Card>
@@ -568,11 +515,12 @@ export default function AdminPriceManagementPage() {
         ) : (
           <>
             {/* 데스크톱 테이블 헤더 */}
-            <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_70px_44px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+            <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_70px_44px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
               <span>Description</span>
               <span>kVA Min</span>
               <span>kVA Max</span>
               <span>Price (SGD)</span>
+              <span>SLD Price</span>
               <span>Active</span>
               <span />
             </div>
@@ -589,7 +537,7 @@ export default function AdminPriceManagementPage() {
                 {editableTiers.map((tier, index) => (
                   <div key={tier.tempId}>
                     {/* 데스크톱 레이아웃 */}
-                    <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_70px_44px] gap-2 px-3 py-2.5 items-start">
+                    <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_70px_44px] gap-2 px-3 py-2.5 items-start">
                       <Input
                         value={tier.description}
                         onChange={(e) => updateTier(tier.tempId, 'description', e.target.value)}
@@ -620,6 +568,15 @@ export default function AdminPriceManagementPage() {
                         onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
                         placeholder="0.00"
                         error={tier.errors.price}
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tier.sldPrice}
+                        onChange={(e) => updateTier(tier.tempId, 'sldPrice', e.target.value)}
+                        placeholder="0.00"
+                        error={tier.errors.sldPrice}
                       />
                       <div className="flex items-center justify-center pt-2.5">
                         <label className="relative inline-flex items-center cursor-pointer">
@@ -713,6 +670,16 @@ export default function AdminPriceManagementPage() {
                         onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
                         placeholder="0.00"
                         error={tier.errors.price}
+                      />
+                      <Input
+                        label="SLD Price (SGD)"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tier.sldPrice}
+                        onChange={(e) => updateTier(tier.tempId, 'sldPrice', e.target.value)}
+                        placeholder="0.00"
+                        error={tier.errors.sldPrice}
                       />
                     </div>
                   </div>
