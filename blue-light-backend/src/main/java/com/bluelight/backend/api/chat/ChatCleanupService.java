@@ -3,6 +3,7 @@ package com.bluelight.backend.api.chat;
 import com.bluelight.backend.domain.chat.ChatMessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class ChatCleanupService {
      * - 감사 로그 정리(3시)와 시간대 분리
      */
     @Scheduled(cron = "0 0 4 * * *")
+    @SchedulerLock(name = "cleanupOldMessages", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void cleanupOldMessages() {
         LocalDateTime cutoff = LocalDateTime.now().minusDays(retentionDays);

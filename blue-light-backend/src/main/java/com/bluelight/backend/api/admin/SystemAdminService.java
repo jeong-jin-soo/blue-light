@@ -5,7 +5,6 @@ import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.config.GeminiConfig;
 import com.bluelight.backend.domain.setting.SystemSetting;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -34,19 +33,8 @@ public class SystemAdminService {
     private final ChatService chatService;
     private final GeminiConfig geminiConfig;
 
-    /**
-     * 애플리케이션 시작 시 DB에 저장된 Gemini API 키가 있으면 런타임에 반영
-     */
-    @PostConstruct
-    public void init() {
-        systemSettingRepository.findById("gemini_api_key")
-                .map(SystemSetting::getSettingValue)
-                .filter(v -> !v.isBlank())
-                .ifPresent(key -> {
-                    geminiConfig.setRuntimeApiKey(key);
-                    log.info("Loaded Gemini API key from DB on startup");
-                });
-    }
+    // DB 기반 TTL 캐시로 전환 — @PostConstruct init 불필요
+    // GeminiConfig.getApiKey()가 DB 조회 + 60초 캐시로 동작
 
     // ── 시스템 프롬프트 ──────────────────────────────
 
@@ -80,8 +68,8 @@ public class SystemAdminService {
         setting.updateValue(prompt, updatedBy);
         systemSettingRepository.save(setting);
 
-        // ChatService의 메모리 내 프롬프트도 즉시 갱신
-        chatService.reloadSystemPrompt();
+        // 같은 서버의 캐시 즉시 무효화 (다른 서버는 TTL 만료 시 자동 반영)
+        chatService.invalidatePromptCache();
 
         log.info("System prompt updated by userSeq={}, length={}", updatedBy, prompt.length());
     }
@@ -99,7 +87,7 @@ public class SystemAdminService {
         setting.updateValue(defaultPrompt, updatedBy);
         systemSettingRepository.save(setting);
 
-        chatService.reloadSystemPrompt();
+        chatService.invalidatePromptCache();
 
         log.info("System prompt reset to default by userSeq={}", updatedBy);
         return defaultPrompt;
@@ -118,7 +106,7 @@ public class SystemAdminService {
                 .orElse(null);
 
         // 환경변수 키 확인
-        String envKey = geminiConfig.getApiKey();
+        String envKey = geminiConfig.getEnvApiKey();
 
         String activeKey = dbKey != null ? dbKey : envKey;
         String source = dbKey != null ? "database" : "environment";
@@ -152,8 +140,8 @@ public class SystemAdminService {
         setting.updateValue(apiKey, updatedBy);
         systemSettingRepository.save(setting);
 
-        // GeminiConfig의 런타임 값 갱신
-        geminiConfig.setRuntimeApiKey(apiKey);
+        // 같은 서버의 캐시 즉시 무효화 (다른 서버는 TTL 만료 시 자동 반영)
+        geminiConfig.invalidateCache();
 
         log.info("Gemini API key updated by userSeq={}", updatedBy);
     }
@@ -168,7 +156,7 @@ public class SystemAdminService {
             systemSettingRepository.save(setting);
         });
 
-        geminiConfig.clearRuntimeApiKey();
+        geminiConfig.invalidateCache();
 
         log.info("Gemini API key cleared (reverted to env) by userSeq={}", updatedBy);
     }

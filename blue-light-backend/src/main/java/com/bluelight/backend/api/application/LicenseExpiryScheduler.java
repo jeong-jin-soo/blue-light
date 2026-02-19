@@ -6,6 +6,7 @@ import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,7 @@ public class LicenseExpiryScheduler {
      * 매일 새벽 2시 실행: 만료 알림 + 자동 만료 처리
      */
     @Scheduled(cron = "${license-expiry.schedule-cron:0 0 2 * * ?}")
+    @SchedulerLock(name = "processLicenseExpiry", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void processLicenseExpiry() {
         log.info("License expiry scheduler started");

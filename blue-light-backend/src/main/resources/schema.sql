@@ -250,7 +250,26 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     KEY idx_audit_logs_composite (action_category, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 13. 감사 로그 아카이브 (1년 초과 로그 보관, Privacy Policy 5년 보유)
+-- 13. ShedLock (스케줄러 분산 잠금)
+CREATE TABLE IF NOT EXISTS shedlock (
+    name       VARCHAR(64)  NOT NULL,
+    lock_until TIMESTAMP(3) NOT NULL,
+    locked_at  TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    locked_by  VARCHAR(255) NOT NULL,
+    PRIMARY KEY (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 14. Rate Limit 시도 기록 (DB 기반, 서버 다중화 대응)
+CREATE TABLE IF NOT EXISTS rate_limit_attempts (
+    attempt_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    limiter_type  VARCHAR(20)  NOT NULL,
+    identifier    VARCHAR(100) NOT NULL,
+    attempted_at  DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (attempt_seq),
+    KEY idx_rate_limit_lookup (limiter_type, identifier, attempted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 15. 감사 로그 아카이브 (1년 초과 로그 보관, Privacy Policy 5년 보유)
 CREATE TABLE IF NOT EXISTS audit_logs_archive (
     audit_log_seq    BIGINT       NOT NULL,
     user_seq         BIGINT,

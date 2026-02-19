@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -134,6 +135,7 @@ public class AuditLogService {
      * - 3단계: Privacy Policy 보유 기간(기본 5년) 초과 아카이브 영구 삭제
      */
     @Scheduled(cron = "0 0 3 * * *")
+    @SchedulerLock(name = "archiveAndCleanupLogs", lockAtMostFor = "30m", lockAtLeastFor = "5m")
     @Transactional
     public void archiveAndCleanupLogs() {
         int batchSize = 1000;

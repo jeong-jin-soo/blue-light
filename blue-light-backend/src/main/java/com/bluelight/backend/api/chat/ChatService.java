@@ -9,7 +9,6 @@ import com.bluelight.backend.domain.chat.ChatMessageRepository;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
@@ -21,16 +20,20 @@ import reactor.core.Disposable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.*;
 
 /**
  * AI 챗봇 서비스 — Gemini API 연동
  * 시스템 프롬프트: DB(system_settings) 우선, 없으면 파일 fallback
+ * - DB 기반 TTL 캐시 (60초) — 다중 서버 환경에서도 일관성 보장
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ChatService {
+
+    private static final long CACHE_TTL_SECONDS = 60;
 
     private final GeminiConfig geminiConfig;
     private final WebClient geminiWebClient;
@@ -38,44 +41,53 @@ public class ChatService {
     private final SystemSettingRepository systemSettingRepository;
     private final ObjectMapper objectMapper;
 
-    private volatile String systemPrompt;
-
-    @PostConstruct
-    public void init() {
-        loadSystemPrompt();
-    }
+    /** TTL 캐시: DB 조회 결과를 60초간 보관 */
+    private volatile String cachedSystemPrompt;
+    private volatile Instant promptCacheExpiry = Instant.MIN;
 
     /**
-     * 시스템 프롬프트 로드 (DB 우선, 파일 fallback)
+     * 시스템 프롬프트 조회 (DB 우선, 파일 fallback, 60초 TTL 캐시)
      */
-    private void loadSystemPrompt() {
-        // DB에서 먼저 확인
+    private String getSystemPrompt() {
+        Instant now = Instant.now();
+        if (now.isBefore(promptCacheExpiry) && cachedSystemPrompt != null) {
+            return cachedSystemPrompt;
+        }
+
+        // DB에서 조회
         String dbPrompt = systemSettingRepository.findById("chat_system_prompt")
                 .map(s -> s.getSettingValue())
                 .filter(v -> !v.isBlank())
                 .orElse(null);
 
+        String resolved;
         if (dbPrompt != null) {
-            this.systemPrompt = dbPrompt;
-            log.info("Chatbot system prompt loaded from DB ({} chars)", systemPrompt.length());
+            resolved = dbPrompt;
         } else {
-            try {
-                var resource = new ClassPathResource("chat-system-prompt.txt");
-                this.systemPrompt = new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-                log.info("Chatbot system prompt loaded from file ({} chars)", systemPrompt.length());
-            } catch (IOException e) {
-                log.error("Failed to load system prompt from file", e);
-                this.systemPrompt = "You are a helpful assistant for the LicenseKaki platform.";
-            }
+            resolved = loadDefaultPromptFromFile();
         }
+
+        this.cachedSystemPrompt = resolved;
+        this.promptCacheExpiry = now.plusSeconds(CACHE_TTL_SECONDS);
+        return resolved;
     }
 
     /**
-     * 시스템 프롬프트 리로드 (SystemAdminService에서 호출)
+     * 캐시 무효화 (설정 변경 시 즉시 반영용 — 같은 서버에서만 효과)
      */
-    public void reloadSystemPrompt() {
-        loadSystemPrompt();
-        log.info("System prompt reloaded");
+    public void invalidatePromptCache() {
+        this.promptCacheExpiry = Instant.MIN;
+        log.info("System prompt cache invalidated");
+    }
+
+    private String loadDefaultPromptFromFile() {
+        try {
+            var resource = new ClassPathResource("chat-system-prompt.txt");
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.error("Failed to load system prompt from file", e);
+            return "You are a helpful assistant for the LicenseKaki platform.";
+        }
     }
 
     public ChatResponse chat(ChatRequest request, Long userSeq) {
@@ -225,7 +237,7 @@ public class ChatService {
     private Map<String, Object> buildGeminiRequest(ChatRequest request, Long userSeq) {
         // System instruction
         Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", systemPrompt))
+                "parts", List.of(Map.of("text", getSystemPrompt()))
         );
 
         // Conversation contents
