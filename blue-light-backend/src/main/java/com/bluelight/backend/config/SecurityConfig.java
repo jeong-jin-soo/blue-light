@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -47,6 +48,12 @@ public class SecurityConfig {
                 // Security Response Headers
                 .headers(headers -> headers
                         .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(cto -> {})            // X-Content-Type-Options: nosniff
+                        .referrerPolicy(referrer ->
+                                referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        .permissionsPolicyHeader(permissions ->
+                                permissions.policy("camera=(), microphone=(), geolocation=(), payment=()"))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(buildCspPolicy()))
                 )
 
                 // 세션 비활성화 (Stateless)
@@ -110,5 +117,31 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Content-Security-Policy 구성
+     * - API 서버 자체 리소스 + CORS 허용 Origin 기반
+     * - Gemini API (generativelanguage.googleapis.com) 연결 허용
+     */
+    private String buildCspPolicy() {
+        // CORS 허용 Origin을 공백 구분 문자열로 변환
+        String originsSources = String.join(" ",
+                Arrays.stream(allowedOriginsRaw.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .toArray(String[]::new));
+
+        return String.join("; ",
+                "default-src 'self'",
+                "script-src 'self'",
+                "style-src 'self' 'unsafe-inline'",                    // Tailwind 인라인 스타일 허용
+                "img-src 'self' data: blob: " + originsSources,        // data:, blob: QR 미리보기
+                "font-src 'self'",
+                "connect-src 'self' " + originsSources + " https://generativelanguage.googleapis.com",  // API + Gemini
+                "frame-ancestors 'none'",                              // X-Frame-Options 보강
+                "base-uri 'self'",
+                "form-action 'self'"
+        );
     }
 }

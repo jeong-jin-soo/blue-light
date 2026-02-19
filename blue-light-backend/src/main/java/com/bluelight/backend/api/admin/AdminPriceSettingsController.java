@@ -138,7 +138,7 @@ public class AdminPriceSettingsController {
         systemSettingRepository.save(setting);
 
         log.info("PayNow QR image uploaded: {}", filePath);
-        return ResponseEntity.ok(Map.of("filePath", filePath, "url", "/api/public/payment-qr"));
+        return ResponseEntity.ok(Map.of("filePath", filePath, "url", "/public/payment-qr"));
     }
 
     /**

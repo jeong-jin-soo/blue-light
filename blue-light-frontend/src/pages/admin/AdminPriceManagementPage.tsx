@@ -325,9 +325,13 @@ export default function AdminPriceManagementPage() {
 
     setUploadingQr(true);
     try {
-      const result = await adminApi.uploadPaymentQr(file);
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
-      setQrImageUrl(`${apiBase}${result.url}?t=${Date.now()}`);
+      await adminApi.uploadPaymentQr(file);
+      // 이전 Object URL 메모리 해제
+      if (qrImageUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(qrImageUrl);
+      }
+      // 업로드 성공 후 로컬 파일로 즉시 미리보기 (서버 왕복 불필요)
+      setQrImageUrl(URL.createObjectURL(file));
       toast.success('QR image uploaded successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to upload QR image';
@@ -343,6 +347,10 @@ export default function AdminPriceManagementPage() {
     setDeletingQr(true);
     try {
       await adminApi.deletePaymentQr();
+      // Object URL 메모리 해제
+      if (qrImageUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(qrImageUrl);
+      }
       setQrImageUrl(null);
       toast.success('QR image removed');
     } catch (err: unknown) {

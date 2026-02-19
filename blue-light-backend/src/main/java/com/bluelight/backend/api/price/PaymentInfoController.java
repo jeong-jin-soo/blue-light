@@ -51,7 +51,8 @@ public class PaymentInfoController {
                         String value = setting.getSettingValue();
                         if ("payment_paynow_qr".equals(key) && value != null && !value.isBlank()) {
                             // QR 이미지는 파일 경로 대신 다운로드 URL 제공
-                            paymentInfo.put(key, "/api/public/payment-qr");
+                            // 프런트엔드 VITE_API_BASE_URL에 /api가 포함되므로 상대경로만 반환
+                            paymentInfo.put(key, "/public/payment-qr");
                         } else {
                             paymentInfo.put(key, value);
                         }
