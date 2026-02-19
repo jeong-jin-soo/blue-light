@@ -1,0 +1,55 @@
+version: '3.8'
+
+# ============================================
+# 개발/운영 공통: DB는 외부 서버(RDS 등)에서 별도 운영
+# 환경별 차이는 GitHub Secrets(.env)로 주입
+# ============================================
+
+services:
+  # ============================================
+  # Spring Boot Backend
+  # ============================================
+  backend:
+    image: ${DOCKER_REGISTRY}/bluelight-backend:${IMAGE_TAG:-latest}
+    container_name: bluelight-backend
+    restart: always
+    ports:
+      - "8090:8090"
+    environment:
+      # DB (외부 DB 서버)
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # JWT
+      JWT_SECRET: ${JWT_SECRET}
+      # CORS
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      # File
+      FILE_UPLOAD_DIR: /app/uploads
+      FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY}
+      # Email
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      # Gemini AI
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Password Reset
+      PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-http://localhost}
+    volumes:
+      - uploads_data:/app/uploads
+
+  # ============================================
+  # React Frontend (Nginx)
+  # ============================================
+  frontend:
+    image: ${DOCKER_REGISTRY}/bluelight-frontend:${IMAGE_TAG:-latest}
+    container_name: bluelight-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  uploads_data:
