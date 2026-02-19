@@ -29,3 +29,5 @@ release.properties
 # Project specific
 # ===================
 /db_data/
+/uploads/
+.env

@@ -31,15 +31,21 @@ npm install && npm run dev
 ## Environment Variables
 
 ```
-# Backend
+# Backend (blue-light-backend/.env — Git에서 제외됨)
 DB_USERNAME=user  |  DB_PASSWORD=password
 JWT_SECRET=bluelight-jwt-secret-key-for-development-minimum-256-bits-required
 FILE_UPLOAD_DIR=./uploads
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
+FILE_ENCRYPTION_KEY=<Base64 AES-256 키>  # .env 파일에 설정, bootRun 시 자동 로드
 
 # Frontend (.env)
 VITE_API_BASE_URL=http://localhost:8090/api
 ```
+
+### 파일 암호화 키 (FILE_ENCRYPTION_KEY)
+- **로컬/개발**: `blue-light-backend/.env`에 설정 (Gradle bootRun이 자동 로드)
+- **운영**: 서버 환경변수 또는 Secrets Manager에 별도 설정
+- 키 분실 시 암호화된 파일 복구 불가 — 안전한 곳에 백업 필수
 
 ## Application Status Flow
 ```

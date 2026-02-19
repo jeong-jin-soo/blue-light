@@ -53,3 +53,21 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// .env 파일에서 환경변수 로드 (bootRun 시)
+tasks.named('bootRun') {
+	doFirst {
+		def envFile = file('.env')
+		if (envFile.exists()) {
+			envFile.readLines().each { line ->
+				def trimmed = line.trim()
+				if (trimmed && !trimmed.startsWith('#') && trimmed.contains('=')) {
+					def idx = trimmed.indexOf('=')
+					def key = trimmed.substring(0, idx).trim()
+					def value = trimmed.substring(idx + 1).trim()
+					environment(key, value)
+				}
+			}
+		}
+	}
+}
