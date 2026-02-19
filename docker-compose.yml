@@ -32,8 +32,6 @@ services:
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-      # Gemini AI
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # Password Reset
       PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-http://localhost}
     volumes:
