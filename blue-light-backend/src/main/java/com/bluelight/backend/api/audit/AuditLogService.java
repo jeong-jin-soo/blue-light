@@ -29,6 +29,9 @@ public class AuditLogService {
     @Value("${audit.retention-days:365}")
     private int retentionDays;
 
+    @Value("${audit.archive-retention-years:5}")
+    private int archiveRetentionYears;
+
     /**
      * 비동기 감사 로그 기록 (AOP에서 호출)
      */
@@ -125,23 +128,49 @@ public class AuditLogService {
     }
 
     /**
-     * 보존 기간 초과 감사 로그 자동 정리 (매일 새벽 3시)
+     * 감사 로그 아카이브 (매일 새벽 3시)
+     * - 1단계: retention-days(기본 365일) 초과 로그 → audit_logs_archive로 이동
+     * - 2단계: 원본 테이블에서 아카이브 완료된 로그 삭제
+     * - 3단계: Privacy Policy 보유 기간(기본 5년) 초과 아카이브 영구 삭제
      */
     @Scheduled(cron = "0 0 3 * * *")
     @Transactional
-    public void cleanupOldLogs() {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(retentionDays);
-        int totalDeleted = 0;
+    public void archiveAndCleanupLogs() {
         int batchSize = 1000;
+        LocalDateTime archiveCutoff = LocalDateTime.now().minusDays(retentionDays);
 
+        // 1단계: 아카이브 테이블로 복사
+        int totalArchived = 0;
+        int archived;
+        do {
+            archived = auditLogRepository.archiveOlderThan(archiveCutoff, batchSize);
+            totalArchived += archived;
+        } while (archived == batchSize);
+
+        // 2단계: 아카이브 완료된 원본 삭제
+        int totalDeleted = 0;
         int deleted;
         do {
-            deleted = auditLogRepository.deleteOlderThan(cutoff, batchSize);
+            deleted = auditLogRepository.deleteArchivedLogs(archiveCutoff, batchSize);
             totalDeleted += deleted;
         } while (deleted == batchSize);
 
-        if (totalDeleted > 0) {
-            log.info("감사 로그 정리 완료: {}건 삭제 (보존 기간: {}일)", totalDeleted, retentionDays);
+        if (totalArchived > 0 || totalDeleted > 0) {
+            log.info("감사 로그 아카이브 완료: {}건 아카이브, {}건 원본 삭제 (보존 기간: {}일)",
+                    totalArchived, totalDeleted, retentionDays);
+        }
+
+        // 3단계: Privacy Policy 보유 기간 초과 아카이브 영구 삭제
+        LocalDateTime expiryCutoff = LocalDateTime.now().minusYears(archiveRetentionYears);
+        int totalExpired = 0;
+        int expired;
+        do {
+            expired = auditLogRepository.deleteExpiredArchives(expiryCutoff, batchSize);
+            totalExpired += expired;
+        } while (expired == batchSize);
+
+        if (totalExpired > 0) {
+            log.info("아카이브 로그 영구 삭제: {}건 (보유 기간: {}년 초과)", totalExpired, archiveRetentionYears);
         }
     }
 

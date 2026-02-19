@@ -249,3 +249,30 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     KEY idx_audit_logs_created_at (created_at),
     KEY idx_audit_logs_composite (action_category, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 13. 감사 로그 아카이브 (1년 초과 로그 보관, Privacy Policy 5년 보유)
+CREATE TABLE IF NOT EXISTS audit_logs_archive (
+    audit_log_seq    BIGINT       NOT NULL,
+    user_seq         BIGINT,
+    user_email       VARCHAR(100),
+    user_role        VARCHAR(20),
+    action           VARCHAR(50)  NOT NULL,
+    action_category  VARCHAR(30)  NOT NULL,
+    entity_type      VARCHAR(50),
+    entity_id        VARCHAR(50),
+    description      VARCHAR(500),
+    before_value     JSON,
+    after_value      JSON,
+    ip_address       VARCHAR(45),
+    user_agent       VARCHAR(500),
+    request_method   VARCHAR(10),
+    request_uri      VARCHAR(255),
+    http_status      INT,
+    created_at       DATETIME(6)  NOT NULL,
+    archived_at      DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (audit_log_seq),
+    KEY idx_archive_created_at (created_at),
+    KEY idx_archive_archived_at (archived_at),
+    KEY idx_archive_category (action_category),
+    KEY idx_archive_user (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

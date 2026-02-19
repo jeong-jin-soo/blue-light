@@ -96,8 +96,8 @@ public class SecurityConfig {
         // 허용할 HTTP 메서드
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
-        // 허용할 헤더
-        configuration.setAllowedHeaders(List.of("*"));
+        // 허용할 헤더 (필요한 것만 명시)
+        configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-Requested-With"));
 
         // 인증 정보 포함 허용
         configuration.setAllowCredentials(true);

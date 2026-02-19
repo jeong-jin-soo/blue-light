@@ -38,11 +38,43 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
             Pageable pageable);
 
     /**
-     * 보존 기간 초과 로그 batch 삭제
+     * 보존 기간 초과 로그를 아카이브 테이블로 복사 (batch)
      */
     @Modifying
-    @Query(value = "DELETE FROM audit_logs WHERE created_at < :cutoff LIMIT :batchSize", nativeQuery = true)
-    int deleteOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("batchSize") int batchSize);
+    @Query(value = """
+            INSERT INTO audit_logs_archive
+                (audit_log_seq, user_seq, user_email, user_role, action, action_category,
+                 entity_type, entity_id, description, before_value, after_value,
+                 ip_address, user_agent, request_method, request_uri, http_status, created_at, archived_at)
+            SELECT
+                audit_log_seq, user_seq, user_email, user_role, action, action_category,
+                entity_type, entity_id, description, before_value, after_value,
+                ip_address, user_agent, request_method, request_uri, http_status, created_at, NOW(6)
+            FROM audit_logs
+            WHERE created_at < :cutoff
+              AND audit_log_seq NOT IN (SELECT audit_log_seq FROM audit_logs_archive)
+            LIMIT :batchSize
+            """, nativeQuery = true)
+    int archiveOlderThan(@Param("cutoff") LocalDateTime cutoff, @Param("batchSize") int batchSize);
+
+    /**
+     * 아카이브 완료된 원본 로그 batch 삭제
+     */
+    @Modifying
+    @Query(value = """
+            DELETE FROM audit_logs
+            WHERE created_at < :cutoff
+              AND audit_log_seq IN (SELECT audit_log_seq FROM audit_logs_archive)
+            LIMIT :batchSize
+            """, nativeQuery = true)
+    int deleteArchivedLogs(@Param("cutoff") LocalDateTime cutoff, @Param("batchSize") int batchSize);
+
+    /**
+     * Privacy Policy 보유 기간(5년) 초과 아카이브 로그 삭제
+     */
+    @Modifying
+    @Query(value = "DELETE FROM audit_logs_archive WHERE created_at < :cutoff LIMIT :batchSize", nativeQuery = true)
+    int deleteExpiredArchives(@Param("cutoff") LocalDateTime cutoff, @Param("batchSize") int batchSize);
 
     /**
      * 삭제된 사용자의 감사 로그 개인정보 익명화 (PDPA Right to Erasure)

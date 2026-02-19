@@ -107,4 +107,5 @@ chat:
 
 # 감사 로그 설정
 audit:
-  retention-days: ${AUDIT_RETENTION_DAYS:365}
+  retention-days: ${AUDIT_RETENTION_DAYS:365}          # 원본 보존 기간 (이후 아카이브)
+  archive-retention-years: ${AUDIT_ARCHIVE_YEARS:5}    # 아카이브 보유 기간 (Privacy Policy 5년)
