@@ -112,7 +112,8 @@ CREATE TABLE IF NOT EXISTS inspections (
 -- 5. 첨부 파일
 CREATE TABLE IF NOT EXISTS files (
     file_seq        BIGINT       NOT NULL AUTO_INCREMENT,
-    application_seq BIGINT       NOT NULL,
+    application_seq BIGINT,
+    sld_order_seq   BIGINT,
     file_type       VARCHAR(30)  NOT NULL,
     file_url        VARCHAR(500) NOT NULL,
     original_filename VARCHAR(255),
@@ -124,6 +125,7 @@ CREATE TABLE IF NOT EXISTS files (
     deleted_at      DATETIME(6),
     PRIMARY KEY (file_seq),
     KEY idx_files_application_seq (application_seq),
+    KEY idx_files_sld_order_seq (sld_order_seq),
     CONSTRAINT fk_files_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -301,7 +303,8 @@ CREATE TABLE IF NOT EXISTS audit_logs_archive (
 -- 16. SLD AI 채팅 메시지 (신청별 AI 대화 이력)
 CREATE TABLE IF NOT EXISTS sld_chat_messages (
     sld_chat_message_seq  BIGINT       NOT NULL AUTO_INCREMENT,
-    application_seq       BIGINT       NOT NULL,
+    application_seq       BIGINT,
+    sld_order_seq         BIGINT,
     user_seq              BIGINT       NOT NULL,
     role                  VARCHAR(10)  NOT NULL,
     content               TEXT         NOT NULL,
@@ -309,10 +312,68 @@ CREATE TABLE IF NOT EXISTS sld_chat_messages (
     created_at            DATETIME(6),
     PRIMARY KEY (sld_chat_message_seq),
     KEY idx_sld_chat_app (application_seq),
+    KEY idx_sld_chat_sld_order (sld_order_seq),
     KEY idx_sld_chat_user (user_seq),
     CONSTRAINT fk_sld_chat_app FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
     CONSTRAINT fk_sld_chat_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 17. SLD 전용 주문
+CREATE TABLE IF NOT EXISTS sld_orders (
+    sld_order_seq        BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq             BIGINT        NOT NULL,
+    assigned_manager_seq BIGINT,
+    address              VARCHAR(255),
+    postal_code          VARCHAR(10),
+    building_type        VARCHAR(50),
+    selected_kva         INT,
+    applicant_note       TEXT,
+    sketch_file_seq      BIGINT,
+    status               VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
+    quote_amount         DECIMAL(10,2),
+    quote_note           TEXT,
+    manager_note         TEXT,
+    uploaded_file_seq    BIGINT,
+    revision_comment     TEXT,
+    created_at           DATETIME(6),
+    updated_at           DATETIME(6),
+    created_by           BIGINT,
+    updated_by           BIGINT,
+    deleted_at           DATETIME(6),
+    PRIMARY KEY (sld_order_seq),
+    KEY idx_sld_orders_user (user_seq),
+    KEY idx_sld_orders_status (status),
+    KEY idx_sld_orders_manager (assigned_manager_seq),
+    CONSTRAINT fk_sld_orders_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_sld_orders_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18. SLD 전용 주문 결제
+CREATE TABLE IF NOT EXISTS sld_order_payments (
+    sld_order_payment_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    sld_order_seq         BIGINT        NOT NULL,
+    transaction_id        VARCHAR(100),
+    amount                DECIMAL(10,2) NOT NULL,
+    payment_method        VARCHAR(20)   DEFAULT 'BANK_TRANSFER',
+    status                VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
+    paid_at               DATETIME(6),
+    updated_at            DATETIME(6),
+    created_by            BIGINT,
+    updated_by            BIGINT,
+    deleted_at            DATETIME(6),
+    PRIMARY KEY (sld_order_payment_seq),
+    KEY idx_sld_order_payments_order (sld_order_seq),
+    CONSTRAINT fk_sld_order_payments_order FOREIGN KEY (sld_order_seq) REFERENCES sld_orders (sld_order_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 마이그레이션: sld_requests.sketch_file_seq — MySQL에서 직접 실행:
 -- ALTER TABLE sld_requests ADD COLUMN sketch_file_seq BIGINT;
+
+-- 마이그레이션 (기존 운영 DB용): files, sld_chat_messages 테이블에 sld_order_seq 추가
+-- ALTER TABLE files ADD COLUMN sld_order_seq BIGINT;
+-- ALTER TABLE files MODIFY application_seq BIGINT NULL;
+-- ALTER TABLE files ADD CONSTRAINT fk_files_sld_order FOREIGN KEY (sld_order_seq) REFERENCES sld_orders (sld_order_seq);
+-- ALTER TABLE sld_chat_messages ADD COLUMN sld_order_seq BIGINT;
+-- ALTER TABLE sld_chat_messages MODIFY application_seq BIGINT NULL;
+-- ALTER TABLE sld_chat_messages ADD CONSTRAINT fk_sld_chat_sld_order FOREIGN KEY (sld_order_seq) REFERENCES sld_orders (sld_order_seq);
+-- 참고: CREATE TABLE 문에는 이미 sld_order_seq가 포함됨 (신규 DB는 자동 적용)

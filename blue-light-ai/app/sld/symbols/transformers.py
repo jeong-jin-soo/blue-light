@@ -6,9 +6,14 @@ IEC 60617 standard representation:
 - Single circle with designation for CT/PT
 """
 
-import ezdxf
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from app.sld.symbols.base import BaseSymbol
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class PowerTransformer(BaseSymbol):
@@ -29,26 +34,22 @@ class PowerTransformer(BaseSymbol):
             "bottom": (cx, -5),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         r = 8  # Radius of each coil circle
-        cx = self.width / 2
-        attribs = {"layer": self.layer}
+        cx = x + self.width / 2
+
+        backend.set_layer(self.layer)
 
         # Primary coil (top circle)
-        block.add_circle((cx, r + 6), radius=r, dxfattribs=attribs)
+        backend.add_circle((cx, y + r + 6), radius=r)
 
         # Secondary coil (bottom circle, overlapping)
-        block.add_circle((cx, r - 2), radius=r, dxfattribs=attribs)
+        backend.add_circle((cx, y + r - 2), radius=r)
 
         # Connection lines
-        block.add_line(
-            (cx, r + 6 + r), (cx, self.height + 5),
-            dxfattribs={"layer": "SLD_CONNECTIONS"},
-        )
-        block.add_line(
-            (cx, r - 2 - r), (cx, -5),
-            dxfattribs={"layer": "SLD_CONNECTIONS"},
-        )
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + r + 6 + r), (cx, y + self.height + 5))
+        backend.add_line((cx, y + r - 2 - r), (cx, y - 5))
 
 
 class CurrentTransformer(BaseSymbol):
@@ -66,21 +67,17 @@ class CurrentTransformer(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        cx = self.width / 2
-        cy = self.height / 2
-        attribs = {"layer": self.layer}
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+        cy = y + self.height / 2
 
-        block.add_circle((cx, cy), radius=5, dxfattribs=attribs)
-        block.add_mtext(
-            "CT",
-            dxfattribs={
-                "layer": "SLD_ANNOTATIONS",
-                "char_height": 3,
-                "insert": (cx - 2.5, cy - 1.5),
-            },
-        )
+        backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=5)
+
+        backend.set_layer("SLD_ANNOTATIONS")
+        backend.add_mtext("CT", insert=(cx - 2.5, cy + 1.5), char_height=3)
 
         # Connection stubs
-        block.add_line((cx, cy + 5), (cx, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, cy - 5), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, cy + 5), (cx, y + self.height + 3))
+        backend.add_line((cx, cy - 5), (cx, y - 3))

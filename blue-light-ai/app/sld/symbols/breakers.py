@@ -6,9 +6,14 @@ IEC 60617 standard representation:
 - Connection pins at top and bottom center
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from app.sld.symbols.base import BaseSymbol
 
-import ezdxf
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class CircuitBreaker(BaseSymbol):
@@ -30,25 +35,26 @@ class CircuitBreaker(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         w, h = self.width, self.height
-        attribs = {"layer": self.layer}
+
+        backend.set_layer(self.layer)
 
         # Rectangle
-        block.add_lwpolyline(
-            [(0, 0), (w, 0), (w, h), (0, h)],
+        backend.add_lwpolyline(
+            [(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
             close=True,
-            dxfattribs=attribs,
         )
 
         # X cross
-        block.add_line((0, 0), (w, h), dxfattribs=attribs)
-        block.add_line((w, 0), (0, h), dxfattribs=attribs)
+        backend.add_line((x, y), (x + w, y + h))
+        backend.add_line((x + w, y), (x, y + h))
 
         # Connection stubs (top and bottom)
-        cx = w / 2
-        block.add_line((cx, h), (cx, h + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, 0), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        cx = x + w / 2
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + h), (cx, y + h + 3))
+        backend.add_line((cx, y), (cx, y - 3))
 
 
 class ACB(CircuitBreaker):
@@ -59,7 +65,7 @@ class ACB(CircuitBreaker):
 
 
 class MCCB(CircuitBreaker):
-    """Moulded Case Circuit Breaker (100A–630A)."""
+    """Moulded Case Circuit Breaker (100A-630A)."""
 
     def __init__(self):
         super().__init__("MCCB")
@@ -98,31 +104,31 @@ class RCCB(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         w, h = self.width, self.height
-        attribs = {"layer": self.layer}
+
+        backend.set_layer(self.layer)
 
         # Rectangle
-        block.add_lwpolyline(
-            [(0, 0), (w, 0), (w, h), (0, h)],
+        backend.add_lwpolyline(
+            [(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
             close=True,
-            dxfattribs=attribs,
         )
 
         # X cross
-        block.add_line((0, 0), (w, h), dxfattribs=attribs)
-        block.add_line((w, 0), (0, h), dxfattribs=attribs)
+        backend.add_line((x, y), (x + w, y + h))
+        backend.add_line((x + w, y), (x, y + h))
 
         # Earth leakage indicator (small arc on the right side)
-        block.add_arc(
-            center=(w + 3, h / 2),
+        backend.add_arc(
+            center=(x + w + 3, y + h / 2),
             radius=3,
             start_angle=120,
             end_angle=240,
-            dxfattribs=attribs,
         )
 
         # Connection stubs
-        cx = w / 2
-        block.add_line((cx, h), (cx, h + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, 0), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        cx = x + w / 2
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + h), (cx, y + h + 3))
+        backend.add_line((cx, y), (cx, y - 3))

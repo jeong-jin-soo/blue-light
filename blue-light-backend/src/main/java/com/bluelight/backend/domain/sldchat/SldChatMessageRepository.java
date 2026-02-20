@@ -27,4 +27,23 @@ public interface SldChatMessageRepository extends JpaRepository<SldChatMessage, 
      * 특정 신청의 채팅 메시지 수 조회
      */
     long countByApplicationSeq(Long applicationSeq);
+
+    // ── SLD 전용 주문 관련 ──────────────────────
+
+    /**
+     * SLD 전용 주문의 채팅 이력 조회 (생성순)
+     */
+    List<SldChatMessage> findBySldOrderSeqOrderByCreatedAtAsc(Long sldOrderSeq);
+
+    /**
+     * SLD 전용 주문의 채팅 이력 삭제 (대화 초기화)
+     */
+    @Modifying
+    @Query("DELETE FROM SldChatMessage m WHERE m.sldOrderSeq = :sldOrderSeq")
+    void deleteBySldOrderSeq(Long sldOrderSeq);
+
+    /**
+     * SLD 전용 주문의 채팅 메시지 수 조회
+     */
+    long countBySldOrderSeq(Long sldOrderSeq);
 }

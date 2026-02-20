@@ -30,6 +30,15 @@ SELECT 'sysadmin@bluelight.sg',
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sysadmin@bluelight.sg');
 
+-- SLD Manager 계정 (password: admin1234 / BCrypt encoded, SLD 전용 주문 관리)
+INSERT INTO users (email, password, name, phone, role, email_verified, created_at, updated_at)
+SELECT 'sldmanager@bluelight.sg',
+       '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
+       'SLD Manager', '+65-0000-0002', 'SLD_MANAGER', TRUE,
+       NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sldmanager@bluelight.sg');
+
 -- 시스템 설정 초기값
 INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
 SELECT 'lew_registration_open', 'true', 'LEW 가입 허용 여부', NOW()

@@ -225,16 +225,15 @@ async def download_file(
     _: str = Depends(verify_service_key),
 ):
     """
-    Download a generated file (DXF or SVG).
+    Download a generated file (PDF or SVG).
     """
-    # Check temp directory for the file
-    for ext in ["dxf", "svg"]:
+    # Check temp directory for the file (prefer PDF, fallback to SVG)
+    for ext, media in [("pdf", "application/pdf"), ("svg", "image/svg+xml")]:
         file_path = os.path.join(settings.temp_file_dir, f"{file_id}.{ext}")
         if os.path.exists(file_path):
-            media_type = "application/dxf" if ext == "dxf" else "image/svg+xml"
             return FileResponse(
                 file_path,
-                media_type=media_type,
+                media_type=media,
                 filename=f"SLD_{file_id}.{ext}",
             )
 

@@ -2,9 +2,14 @@
 Protection symbols: Fuse, Earth, Surge Protector.
 """
 
-import ezdxf
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from app.sld.symbols.base import BaseSymbol
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class Fuse(BaseSymbol):
@@ -22,21 +27,22 @@ class Fuse(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         w, h = self.width, self.height
-        cx = w / 2
-        attribs = {"layer": self.layer}
+        cx = x + w / 2
+
+        backend.set_layer(self.layer)
 
         # Narrow rectangle
-        block.add_lwpolyline(
-            [(0, 2), (w, 2), (w, h - 2), (0, h - 2)],
+        backend.add_lwpolyline(
+            [(x, y + 2), (x + w, y + 2), (x + w, y + h - 2), (x, y + h - 2)],
             close=True,
-            dxfattribs=attribs,
         )
 
         # Connection stubs
-        block.add_line((cx, h - 2), (cx, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, 2), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + h - 2), (cx, y + self.height + 3))
+        backend.add_line((cx, y + 2), (cx, y - 3))
 
 
 class EarthSymbol(BaseSymbol):
@@ -56,17 +62,18 @@ class EarthSymbol(BaseSymbol):
             "top": (cx, self.height),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        cx = self.width / 2
-        attribs = {"layer": self.layer}
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+
+        backend.set_layer(self.layer)
 
         # Vertical line from top
-        block.add_line((cx, self.height), (cx, 8), dxfattribs=attribs)
+        backend.add_line((cx, y + self.height), (cx, y + 8))
 
         # Three descending horizontal lines
-        block.add_line((0, 8), (self.width, 8), dxfattribs=attribs)
-        block.add_line((2, 5), (self.width - 2, 5), dxfattribs=attribs)
-        block.add_line((4, 2), (self.width - 4, 2), dxfattribs=attribs)
+        backend.add_line((x, y + 8), (x + self.width, y + 8))
+        backend.add_line((x + 2, y + 5), (x + self.width - 2, y + 5))
+        backend.add_line((x + 4, y + 2), (x + self.width - 4, y + 2))
 
 
 class SurgeProtector(BaseSymbol):
@@ -84,24 +91,29 @@ class SurgeProtector(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         w, h = self.width, self.height
-        cx = w / 2
-        attribs = {"layer": self.layer}
+        cx = x + w / 2
+
+        backend.set_layer(self.layer)
 
         # Rectangle
-        block.add_lwpolyline(
-            [(0, 0), (w, 0), (w, h), (0, h)],
+        backend.add_lwpolyline(
+            [(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
             close=True,
-            dxfattribs=attribs,
         )
 
         # Lightning bolt (zigzag)
-        block.add_lwpolyline(
-            [(cx, h - 2), (cx + 2, h / 2 + 1), (cx - 2, h / 2 - 1), (cx, 2)],
-            dxfattribs=attribs,
+        backend.add_lwpolyline(
+            [
+                (cx, y + h - 2),
+                (cx + 2, y + h / 2 + 1),
+                (cx - 2, y + h / 2 - 1),
+                (cx, y + 2),
+            ],
         )
 
         # Connection stubs
-        block.add_line((cx, h), (cx, h + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, 0), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + h), (cx, y + h + 3))
+        backend.add_line((cx, y), (cx, y - 3))

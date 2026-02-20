@@ -26,7 +26,7 @@ export interface ApiError {
 /**
  * 사용자 역할
  */
-export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN' | 'SYSTEM_ADMIN';
+export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN' | 'SYSTEM_ADMIN' | 'SLD_MANAGER';
 
 /**
  * LEW 승인 상태
@@ -611,6 +611,96 @@ export interface ChatResponse {
 // ============================================
 // SLD Chat Types
 // ============================================
+
+// ============================================
+// SLD Order Types (SLD 전용 주문)
+// ============================================
+
+/**
+ * SLD 전용 주문 상태
+ */
+export type SldOrderStatus =
+  | 'PENDING_QUOTE'
+  | 'QUOTE_PROPOSED'
+  | 'QUOTE_REJECTED'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'IN_PROGRESS'
+  | 'SLD_UPLOADED'
+  | 'REVISION_REQUESTED'
+  | 'COMPLETED';
+
+/**
+ * SLD 전용 주문
+ */
+export interface SldOrder {
+  sldOrderSeq: number;
+  userSeq: number;
+  userName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: SldOrderStatus;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  uploadedFileSeq?: number;
+  revisionComment?: string;
+  assignedManagerSeq?: number;
+  assignedManagerName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * SLD 주문 생성 요청
+ */
+export interface CreateSldOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+/**
+ * SLD 주문 견적 제안 요청
+ */
+export interface ProposeQuoteRequest {
+  quoteAmount: number;
+  quoteNote?: string;
+}
+
+/**
+ * SLD Manager 대시보드
+ */
+export interface SldOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  inProgress: number;
+  sldUploaded: number;
+  completed: number;
+}
+
+/**
+ * SLD 주문 결제 정보
+ */
+export interface SldOrderPayment {
+  sldOrderPaymentSeq: number;
+  sldOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
 
 export interface SldChatMessage {
   sldChatMessageSeq: number;

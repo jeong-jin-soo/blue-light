@@ -196,7 +196,7 @@ async def process_message(
                 logger.info(f"Tool completed: {tool_name}")
 
                 # Check if SLD was generated (file_generated event)
-                if tool_name == "generate_sld_dxf":
+                if tool_name == "generate_sld":
                     try:
                         result = json.loads(output)
                         if result.get("success"):
@@ -236,7 +236,7 @@ def _tool_description(tool_name: str) -> str:
         "get_application_details": "Fetching application details...",
         "get_standard_specs": "Looking up Singapore electrical standards...",
         "validate_sld_requirements": "Validating SLD requirements...",
-        "generate_sld_dxf": "Generating SLD drawing (DXF + SVG)...",
+        "generate_sld": "Generating SLD drawing (PDF + SVG)...",
         "generate_preview": "Generating SLD preview...",
     }
     return descriptions.get(tool_name, f"Executing {tool_name}...")
@@ -265,7 +265,7 @@ def _summarize_tool_result(tool_name: str, output: str) -> str:
                 return "All requirements met"
             return f"Missing {missing} field(s)"
 
-        if tool_name == "generate_sld_dxf":
+        if tool_name == "generate_sld":
             if data.get("success"):
                 count = data.get("component_count", 0)
                 return f"SLD generated ({count} components)"

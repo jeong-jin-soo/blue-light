@@ -16,6 +16,7 @@ export default function Layout() {
   const isAdmin = user?.role === 'ADMIN';
   const isSystemAdmin = user?.role === 'SYSTEM_ADMIN';
   const isLew = user?.role === 'LEW' && user?.approved;
+  const isSldManager = user?.role === 'SLD_MANAGER';
 
   const handleLogout = () => {
     logout();
@@ -27,6 +28,8 @@ export default function Layout() {
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/applications', label: 'My Applications', icon: '📋' },
     { path: '/applications/new', label: 'New Application', icon: '➕' },
+    { path: '/sld-orders', label: 'SLD Orders', icon: '📐' },
+    { path: '/sld-orders/new', label: 'New SLD Order', icon: '➕' },
     { path: '/profile', label: 'My Profile', icon: '👤' },
   ];
 
@@ -49,9 +52,15 @@ export default function Layout() {
     { path: '/lew/applications', label: 'Applications', icon: '📋' },
   ];
 
+  const sldManagerMenu = [
+    { path: '/sld-manager/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/sld-manager/orders', label: 'Orders', icon: '📐' },
+  ];
+
   const menuItems = isSystemAdmin ? systemAdminMenu
     : isAdmin ? adminMenu
     : isLew ? lewMenu
+    : isSldManager ? sldManagerMenu
     : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
@@ -59,11 +68,13 @@ export default function Layout() {
   const roleLabel = isSystemAdmin ? 'System Admin'
     : isAdmin ? 'Administrator'
     : isLew ? 'LEW'
+    : isSldManager ? 'SLD Manager'
     : 'Applicant';
 
   const homePath = isSystemAdmin ? '/admin/system'
     : isAdmin ? '/admin/dashboard'
     : isLew ? '/lew/dashboard'
+    : isSldManager ? '/sld-manager/dashboard'
     : '/dashboard';
 
   return (

@@ -2,9 +2,14 @@
 Metering symbols: kWh Meter, Ammeter, Voltmeter.
 """
 
-import ezdxf
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from app.sld.symbols.base import BaseSymbol
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class KwhMeter(BaseSymbol):
@@ -22,24 +27,20 @@ class KwhMeter(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        cx = self.width / 2
-        cy = self.height / 2
-        attribs = {"layer": self.layer}
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+        cy = y + self.height / 2
 
-        block.add_circle((cx, cy), radius=8, dxfattribs=attribs)
-        block.add_mtext(
-            "kWh",
-            dxfattribs={
-                "layer": "SLD_ANNOTATIONS",
-                "char_height": 3.5,
-                "insert": (cx - 4, cy - 1.5),
-            },
-        )
+        backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=8)
+
+        backend.set_layer("SLD_ANNOTATIONS")
+        backend.add_mtext("kWh", insert=(cx - 4, cy + 1.5), char_height=3.5)
 
         # Connection stubs
-        block.add_line((cx, cy + 8), (cx, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, cy - 8), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, cy + 8), (cx, y + self.height + 3))
+        backend.add_line((cx, cy - 8), (cx, y - 3))
 
 
 class Ammeter(BaseSymbol):
@@ -57,20 +58,17 @@ class Ammeter(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        cx = self.width / 2
-        cy = self.height / 2
-        attribs = {"layer": self.layer}
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+        cy = y + self.height / 2
 
-        block.add_circle((cx, cy), radius=6, dxfattribs=attribs)
-        block.add_mtext(
-            "A",
-            dxfattribs={
-                "layer": "SLD_ANNOTATIONS",
-                "char_height": 5,
-                "insert": (cx - 2, cy - 2.5),
-            },
-        )
+        backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=6)
 
-        block.add_line((cx, cy + 6), (cx, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, cy - 6), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_ANNOTATIONS")
+        backend.add_mtext("A", insert=(cx - 2, cy + 2.5), char_height=5)
+
+        # Connection stubs
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, cy + 6), (cx, y + self.height + 3))
+        backend.add_line((cx, cy - 6), (cx, y - 3))

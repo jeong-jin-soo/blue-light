@@ -35,7 +35,7 @@ import java.util.Map;
  * SLD AI Agent 서비스
  * - Python FastAPI 서비스와 REST/SSE 통신
  * - 채팅 이력 관리 (MySQL)
- * - DXF 파일 수락 처리 (Python → Spring Boot → FileStorageService)
+ * - PDF 파일 수락 처리 (Python → Spring Boot → FileStorageService)
  */
 @Slf4j
 @Service
@@ -197,11 +197,11 @@ public class SldAgentService {
     }
 
     /**
-     * DXF 수락 — Python에서 생성된 DXF 파일을 가져와서 FileStorageService로 저장
+     * SLD PDF 수락 — Python에서 생성된 PDF 파일을 가져와서 FileStorageService로 저장
      * → SldRequest를 UPLOADED 상태로 전환
      */
     @Transactional
-    public SldRequestResponse acceptDxf(Long applicationSeq, String fileId) {
+    public SldRequestResponse acceptSld(Long applicationSeq, String fileId) {
         validateApplicationExists(applicationSeq);
 
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
@@ -210,36 +210,36 @@ public class SldAgentService {
 
         if (sldRequest.getStatus() != SldRequestStatus.AI_GENERATING) {
             throw new BusinessException(
-                    "DXF can only be accepted when status is AI_GENERATING",
+                    "SLD can only be accepted when status is AI_GENERATING",
                     HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
         }
 
-        // Python 서비스에서 DXF 파일 다운로드
-        byte[] dxfBytes;
+        // Python 서비스에서 PDF 파일 다운로드
+        byte[] pdfBytes;
         try {
-            dxfBytes = sldAgentWebClient
+            pdfBytes = sldAgentWebClient
                     .get()
                     .uri("/api/files/" + fileId)
                     .retrieve()
                     .bodyToMono(byte[].class)
                     .block();
         } catch (Exception e) {
-            log.error("Failed to download DXF from Python service: fileId={}", fileId, e);
+            log.error("Failed to download PDF from Python service: fileId={}", fileId, e);
             throw new BusinessException(
-                    "Failed to retrieve generated DXF file",
-                    HttpStatus.INTERNAL_SERVER_ERROR, "DXF_DOWNLOAD_FAILED");
+                    "Failed to retrieve generated PDF file",
+                    HttpStatus.INTERNAL_SERVER_ERROR, "PDF_DOWNLOAD_FAILED");
         }
 
-        if (dxfBytes == null || dxfBytes.length == 0) {
+        if (pdfBytes == null || pdfBytes.length == 0) {
             throw new BusinessException(
-                    "Generated DXF file is empty",
-                    HttpStatus.INTERNAL_SERVER_ERROR, "DXF_EMPTY");
+                    "Generated PDF file is empty",
+                    HttpStatus.INTERNAL_SERVER_ERROR, "PDF_EMPTY");
         }
 
         // FileStorageService로 저장 (바이트 배열 직접 저장)
-        String filename = "sld_" + applicationSeq + ".dxf";
+        String filename = "sld_" + applicationSeq + ".pdf";
         String subDirectory = "applications/" + applicationSeq;
-        String storedPath = fileStorageService.storeBytes(dxfBytes, filename, subDirectory);
+        String storedPath = fileStorageService.storeBytes(pdfBytes, filename, subDirectory);
 
         // FileEntity 생성 (DB 기록)
         Application application = applicationRepository.findById(applicationSeq)
@@ -251,12 +251,12 @@ public class SldAgentService {
                 .fileType(FileType.DRAWING_SLD)
                 .fileUrl(storedPath)
                 .originalFilename(filename)
-                .fileSize((long) dxfBytes.length)
+                .fileSize((long) pdfBytes.length)
                 .build();
 
         FileEntity savedFile = fileRepository.save(fileEntity);
-        log.info("AI-generated DXF saved: fileSeq={}, applicationSeq={}, size={}",
-                savedFile.getFileSeq(), applicationSeq, dxfBytes.length);
+        log.info("AI-generated SLD PDF saved: fileSeq={}, applicationSeq={}, size={}",
+                savedFile.getFileSeq(), applicationSeq, pdfBytes.length);
 
         // SldRequest 상태 전환 → UPLOADED
         sldRequest.markUploaded(savedFile.getFileSeq(), "AI-generated SLD");

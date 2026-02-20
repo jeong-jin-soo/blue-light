@@ -4,9 +4,14 @@ Busbar symbols: Main Busbar, Sub-Busbar.
 Busbars are represented as thick horizontal lines.
 """
 
-import ezdxf
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from app.sld.symbols.base import BaseSymbol
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class Busbar(BaseSymbol):
@@ -29,13 +34,11 @@ class Busbar(BaseSymbol):
             "center": (self.width / 2, 0),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        block.add_line(
-            (0, 0), (self.width, 0),
-            dxfattribs={
-                "layer": self.layer,
-                "lineweight": 50,  # Thick line for busbar
-            },
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        backend.set_layer(self.layer)
+        backend.add_line(
+            (x, y), (x + self.width, y),
+            lineweight=50,  # Thick line for busbar
         )
 
     def get_tap_point(self, index: int, total: int) -> tuple[float, float]:

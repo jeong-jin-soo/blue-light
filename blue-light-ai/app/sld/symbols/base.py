@@ -1,12 +1,17 @@
 """
 Base class for all SLD electrical symbols.
-Each symbol is defined as a DXF Block with standardized connection pins.
+
+Each symbol draws itself onto a DrawingBackend at a given (x, y) offset,
+using standardized connection pins for layout integration.
 """
 
-from abc import ABC, abstractmethod
+from __future__ import annotations
 
-import ezdxf
-from ezdxf.document import Drawing
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class BaseSymbol(ABC):
@@ -14,9 +19,9 @@ class BaseSymbol(ABC):
     Abstract base class for electrical symbols in the SLD.
 
     Each symbol defines:
-    - name: Unique block name in the DXF document
-    - width/height: Bounding box dimensions (drawing units, mm)
-    - pins: Named connection points relative to the symbol origin
+    - name: Unique identifier for this symbol type
+    - width/height: Bounding box dimensions (mm)
+    - pins: Named connection points relative to the symbol origin (0, 0)
             e.g., {"top": (5, 16), "bottom": (5, 0)}
     """
 
@@ -25,36 +30,33 @@ class BaseSymbol(ABC):
     height: float = 0
     pins: dict[str, tuple[float, float]] = {}
 
-    # Default DXF layer for this symbol type
+    # Default drawing layer for this symbol type
     layer: str = "SLD_SYMBOLS"
-    color: int = 4  # Cyan by default
 
     @abstractmethod
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         """
-        Draw the symbol geometry into the given block.
+        Draw the symbol onto the backend at position (x, y).
+
         Subclasses implement this to define their shape.
+        All internal coordinates should be offset by (x, y).
         """
         pass
 
-    def register(self, doc: Drawing) -> str:
-        """
-        Register this symbol as a block in the DXF document.
-        Returns the block name for use with INSERT.
-        """
-        if self.name in doc.blocks:
-            return self.name
-
-        block = doc.blocks.new(name=self.name)
-        self._draw(block)
-        return self.name
-
     def get_pin(self, pin_name: str) -> tuple[float, float]:
-        """Get the position of a named connection pin."""
+        """Get the position of a named connection pin (relative to origin)."""
         if pin_name not in self.pins:
-            raise ValueError(f"Symbol '{self.name}' has no pin '{pin_name}'. Available: {list(self.pins.keys())}")
+            raise ValueError(
+                f"Symbol '{self.name}' has no pin '{pin_name}'. "
+                f"Available: {list(self.pins.keys())}"
+            )
         return self.pins[pin_name]
 
+    def get_pin_absolute(self, pin_name: str, x: float, y: float) -> tuple[float, float]:
+        """Get the absolute position of a named connection pin."""
+        px, py = self.get_pin(pin_name)
+        return (x + px, y + py)
+
     def center(self) -> tuple[float, float]:
-        """Get the center point of the symbol bounding box."""
+        """Get the center point of the symbol bounding box (relative to origin)."""
         return (self.width / 2, self.height / 2)

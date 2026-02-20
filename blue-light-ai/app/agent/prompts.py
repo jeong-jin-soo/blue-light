@@ -42,7 +42,7 @@ Your job is to **automatically propose a standard SLD design** and only ask abou
 
 ### Phase 3: Generating SLD
 1. Use `validate_sld_requirements` to verify all requirements are complete.
-2. Use `generate_sld_dxf` to create the DXF drawing with SVG preview.
+2. Use `generate_sld` to create the PDF drawing with SVG preview.
    - Pass `application_info` (from the context) so the title block includes address, company, LEW info.
 3. The SVG preview will be shown to the LEW automatically.
 

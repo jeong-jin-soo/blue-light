@@ -2,9 +2,14 @@
 Switch symbols: Isolator, ATS (Automatic Transfer Switch), Contactor.
 """
 
-import ezdxf
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from app.sld.symbols.base import BaseSymbol
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
 class Isolator(BaseSymbol):
@@ -25,24 +30,26 @@ class Isolator(BaseSymbol):
             "bottom": (cx, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        cx = self.width / 2
-        attribs = {"layer": self.layer}
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+
+        backend.set_layer(self.layer)
 
         # Bottom contact point
-        block.add_line((cx, 0), (cx, 3), dxfattribs=attribs)
-        block.add_circle((cx, 3), radius=1, dxfattribs=attribs)
+        backend.add_line((cx, y), (cx, y + 3))
+        backend.add_circle((cx, y + 3), radius=1)
 
         # Diagonal blade
-        block.add_line((cx, 3), (cx + 4, 11), dxfattribs=attribs)
+        backend.add_line((cx, y + 3), (cx + 4, y + 11))
 
         # Top contact point
-        block.add_circle((cx, 11), radius=1, dxfattribs=attribs)
-        block.add_line((cx, 11), (cx, self.height), dxfattribs=attribs)
+        backend.add_circle((cx, y + 11), radius=1)
+        backend.add_line((cx, y + 11), (cx, y + self.height))
 
         # Connection stubs
-        block.add_line((cx, self.height), (cx, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((cx, 0), (cx, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + self.height), (cx, y + self.height + 3))
+        backend.add_line((cx, y), (cx, y - 3))
 
 
 class ATS(BaseSymbol):
@@ -63,29 +70,28 @@ class ATS(BaseSymbol):
             "output": (15, -3),
         }
 
-    def _draw(self, block: ezdxf.entities.BlockLayout) -> None:
-        attribs = {"layer": self.layer}
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        backend.set_layer(self.layer)
 
         # Rectangle enclosure
-        block.add_lwpolyline(
-            [(0, 0), (self.width, 0), (self.width, self.height), (0, self.height)],
+        backend.add_lwpolyline(
+            [
+                (x, y),
+                (x + self.width, y),
+                (x + self.width, y + self.height),
+                (x, y + self.height),
+            ],
             close=True,
-            dxfattribs=attribs,
         )
 
         # ATS label
-        block.add_mtext(
-            "ATS",
-            dxfattribs={
-                "layer": "SLD_ANNOTATIONS",
-                "char_height": 4,
-                "insert": (10, 12),
-            },
-        )
+        backend.set_layer("SLD_ANNOTATIONS")
+        backend.add_mtext("ATS", insert=(x + 10, y + 14), char_height=4)
 
         # Two input stubs
-        block.add_line((8, self.height), (8, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
-        block.add_line((22, self.height), (22, self.height + 3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x + 8, y + self.height), (x + 8, y + self.height + 3))
+        backend.add_line((x + 22, y + self.height), (x + 22, y + self.height + 3))
 
         # One output stub
-        block.add_line((15, 0), (15, -3), dxfattribs={"layer": "SLD_CONNECTIONS"})
+        backend.add_line((x + 15, y), (x + 15, y - 3))

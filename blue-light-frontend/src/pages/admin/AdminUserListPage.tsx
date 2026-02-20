@@ -14,6 +14,7 @@ const ROLE_OPTIONS = [
   { value: '', label: 'All Roles' },
   { value: 'APPLICANT', label: 'Applicant' },
   { value: 'LEW', label: 'LEW' },
+  { value: 'SLD_MANAGER', label: 'SLD Manager' },
   { value: 'ADMIN', label: 'Admin' },
 ];
 
@@ -121,6 +122,7 @@ export default function AdminUserListPage() {
     switch (role) {
       case 'ADMIN': return 'primary' as const;
       case 'LEW': return 'info' as const;
+      case 'SLD_MANAGER': return 'warning' as const;
       default: return 'gray' as const;
     }
   };
@@ -179,18 +181,23 @@ export default function AdminUserListPage() {
           <Badge variant={getRoleBadgeVariant(user.role)}>
             {user.role}
           </Badge>
-          {user.role !== 'ADMIN' && (
-            <button
-              onClick={() => {
-                const newRole: UserRole = user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT';
-                setRoleChangeTarget({ user, newRole });
+          {user.role !== 'ADMIN' && user.role !== 'SYSTEM_ADMIN' && (
+            <select
+              className="text-xs border border-gray-200 rounded px-1 py-0.5 text-primary cursor-pointer hover:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  setRoleChangeTarget({ user, newRole: e.target.value as UserRole });
+                  e.target.value = '';
+                }
               }}
-              className="text-xs text-primary hover:text-primary/80 hover:underline"
-              title={`Change to ${user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT'}`}
-              aria-label={`Change ${user.name}'s role to ${user.role === 'APPLICANT' ? 'LEW' : 'APPLICANT'}`}
+              aria-label={`Change ${user.name}'s role`}
             >
-              Change
-            </button>
+              <option value="" disabled>Change</option>
+              {user.role !== 'APPLICANT' && <option value="APPLICANT">Applicant</option>}
+              {user.role !== 'LEW' && <option value="LEW">LEW</option>}
+              {user.role !== 'SLD_MANAGER' && <option value="SLD_MANAGER">SLD Manager</option>}
+            </select>
           )}
         </div>
       ),

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { SvgPreviewViewer } from '../../../components/ui/SvgPreviewViewer';
 import { useSldChatStore } from '../../../stores/sldChatStore';
-import { acceptSldDxf } from '../../../api/sldChatApi';
+import { acceptSld } from '../../../api/sldChatApi';
 import type { SldRequest } from '../../../types';
 
 interface Props {
@@ -66,7 +66,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     if (!generatedFileId) return;
     setAcceptLoading(true);
     try {
-      await acceptSldDxf(applicationSeq, generatedFileId);
+      await acceptSld(applicationSeq, generatedFileId);
       onSldUpdated();
     } catch {
       // 에러 시 사용자에게 알림 (toast 등)
@@ -221,7 +221,7 @@ function formatToolName(tool: string): string {
     get_application_details: 'Fetching application details...',
     get_standard_specs: 'Looking up electrical standards...',
     validate_sld_requirements: 'Validating requirements...',
-    generate_sld_dxf: 'Generating SLD drawing...',
+    generate_sld: 'Generating SLD drawing...',
     generate_preview: 'Creating preview...',
   };
   return toolNames[tool] || `Running ${tool}...`;

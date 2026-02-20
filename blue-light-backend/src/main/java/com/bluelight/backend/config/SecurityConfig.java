@@ -71,6 +71,8 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         // Admin/LEW/SystemAdmin 경로 (URL-level defense-in-depth)
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
+                        // SLD Manager 경로
+                        .requestMatchers("/api/sld-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )

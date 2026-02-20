@@ -5,8 +5,8 @@ Tools:
 1. get_application_details — Return application info (from state) + standard specs
 2. get_standard_specs — Singapore electrical standards lookup
 3. validate_sld_requirements — Check if requirements are complete
-4. generate_sld_dxf — Generate DXF + SVG files
-5. generate_preview — Generate SVG preview from existing DXF
+4. generate_sld — Generate PDF + SVG files
+5. generate_preview — Generate SVG preview from existing file
 """
 
 import json
@@ -213,12 +213,12 @@ def validate_sld_requirements(requirements: dict) -> str:
     return json.dumps(result, ensure_ascii=False)
 
 
-# ── Tool 4: Generate SLD DXF ────────────────────────
+# ── Tool 4: Generate SLD (PDF + SVG) ─────────────────
 
 @tool
-def generate_sld_dxf(requirements: dict, application_info: dict | None = None) -> str:
+def generate_sld(requirements: dict, application_info: dict | None = None) -> str:
     """
-    Generate a Single Line Diagram in DXF format with SVG preview.
+    Generate a Single Line Diagram as PDF with SVG preview.
     Returns the file ID for download and the SVG preview string.
 
     Args:
@@ -229,7 +229,7 @@ def generate_sld_dxf(requirements: dict, application_info: dict | None = None) -
     from app.sld.generator import SldGenerator
 
     file_id = uuid.uuid4().hex[:12]
-    dxf_path = os.path.join(settings.temp_file_dir, f"{file_id}.dxf")
+    pdf_path = os.path.join(settings.temp_file_dir, f"{file_id}.pdf")
     svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg")
 
     try:
@@ -237,14 +237,14 @@ def generate_sld_dxf(requirements: dict, application_info: dict | None = None) -
         result = generator.generate(
             requirements=requirements,
             application_info=application_info or {},
-            dxf_output_path=dxf_path,
+            pdf_output_path=pdf_path,
             svg_output_path=svg_path,
         )
 
         return json.dumps({
             "success": True,
             "file_id": file_id,
-            "dxf_path": dxf_path,
+            "pdf_path": pdf_path,
             "svg_path": svg_path,
             "svg_preview": result.get("svg_string", ""),
             "component_count": result.get("component_count", 0),
@@ -279,22 +279,9 @@ def generate_preview(file_id: str) -> str:
             "svg": svg_content,
         })
 
-    # Try to regenerate from DXF
-    dxf_path = os.path.join(settings.temp_file_dir, f"{file_id}.dxf")
-    if os.path.exists(dxf_path):
-        from app.sld.preview import dxf_to_svg
-        svg_content = dxf_to_svg(dxf_path)
-        with open(svg_path, "w", encoding="utf-8") as f:
-            f.write(svg_content)
-        return json.dumps({
-            "success": True,
-            "file_id": file_id,
-            "svg": svg_content,
-        })
-
     return json.dumps({
         "success": False,
-        "error": f"No DXF file found for file_id={file_id}",
+        "error": f"No SVG file found for file_id={file_id}",
     })
 
 
@@ -304,6 +291,6 @@ ALL_TOOLS = [
     get_application_details,
     get_standard_specs,
     validate_sld_requirements,
-    generate_sld_dxf,
+    generate_sld,
     generate_preview,
 ]

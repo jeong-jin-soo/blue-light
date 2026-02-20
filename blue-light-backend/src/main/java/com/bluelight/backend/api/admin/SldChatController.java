@@ -73,17 +73,17 @@ public class SldChatController {
     }
 
     /**
-     * DXF 수락 — AI 생성 SLD를 파일 저장소에 저장하고 SldRequest 상태를 UPLOADED로 전환
+     * SLD 수락 — AI 생성 SLD PDF를 파일 저장소에 저장하고 SldRequest 상태를 UPLOADED로 전환
      * POST /api/admin/applications/:id/sld-chat/accept
      */
     @PostMapping("/applications/{id}/sld-chat/accept")
-    public ResponseEntity<SldRequestResponse> acceptDxf(
+    public ResponseEntity<SldRequestResponse> acceptSld(
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
 
         String fileId = body.get("fileId");
-        log.info("SLD DXF accept: applicationSeq={}, fileId={}", id, fileId);
-        SldRequestResponse response = sldAgentService.acceptDxf(id, fileId);
+        log.info("SLD accept: applicationSeq={}, fileId={}", id, fileId);
+        SldRequestResponse response = sldAgentService.acceptSld(id, fileId);
         return ResponseEntity.ok(response);
     }
 

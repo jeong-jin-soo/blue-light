@@ -146,9 +146,9 @@ export const resetSldChat = async (applicationId: number): Promise<void> => {
 };
 
 /**
- * SLD DXF 수락 — AI 생성 SLD를 확정
+ * SLD 수락 — AI 생성 SLD PDF를 확정
  */
-export const acceptSldDxf = async (
+export const acceptSld = async (
   applicationId: number,
   fileId: string,
 ): Promise<SldRequest> => {

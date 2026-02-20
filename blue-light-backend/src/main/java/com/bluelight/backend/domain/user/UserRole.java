@@ -6,10 +6,12 @@ package com.bluelight.backend.domain.user;
  * - LEW: Licensed Electrical Worker (면허 전기 기술자)
  * - ADMIN: 관리자 (실무 관리자)
  * - SYSTEM_ADMIN: 시스템 관리자 (개발자 — 시스템 설정, API 키, 챗봇 프롬프트 관리)
+ * - SLD_MANAGER: SLD 도면 전문가 (SLD 전용 주문 처리)
  */
 public enum UserRole {
     APPLICANT,
     LEW,
     ADMIN,
-    SYSTEM_ADMIN
+    SYSTEM_ADMIN,
+    SLD_MANAGER
 }

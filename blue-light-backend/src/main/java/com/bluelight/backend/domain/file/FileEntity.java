@@ -1,6 +1,7 @@
 package com.bluelight.backend.domain.file;
 
 import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.sldorder.SldOrder;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -34,11 +35,18 @@ public class FileEntity {
     private Long fileSeq;
 
     /**
-     * 관련 신청 (FK)
+     * 관련 신청 (FK, nullable — SLD 전용 주문은 application 없음)
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "application_seq", nullable = false)
+    @JoinColumn(name = "application_seq")
     private Application application;
+
+    /**
+     * 관련 SLD 전용 주문 (FK, nullable — 라이센스 신청 파일은 sldOrder 없음)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sld_order_seq")
+    private SldOrder sldOrder;
 
     /**
      * 파일 종류
@@ -98,8 +106,9 @@ public class FileEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public FileEntity(Application application, FileType fileType, String fileUrl, String originalFilename, Long fileSize) {
+    public FileEntity(Application application, SldOrder sldOrder, FileType fileType, String fileUrl, String originalFilename, Long fileSize) {
         this.application = application;
+        this.sldOrder = sldOrder;
         this.fileType = fileType;
         this.fileUrl = fileUrl;
         this.originalFilename = originalFilename;

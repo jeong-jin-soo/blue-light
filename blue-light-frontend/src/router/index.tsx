@@ -22,6 +22,9 @@ import ApplicationListPage from '../pages/applicant/ApplicationListPage';
 import NewApplicationPage from '../pages/applicant/NewApplicationPage';
 import ApplicationDetailPage from '../pages/applicant/ApplicationDetailPage';
 import ProfilePage from '../pages/applicant/ProfilePage';
+import SldOrderListPage from '../pages/applicant/SldOrderListPage';
+import NewSldOrderPage from '../pages/applicant/NewSldOrderPage';
+import SldOrderDetailPage from '../pages/applicant/SldOrderDetailPage';
 
 // Admin pages
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
@@ -34,6 +37,11 @@ import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
 import AuditLogPage from '../pages/admin/AuditLogPage';
 import DataBreachPage from '../pages/admin/DataBreachPage';
+
+// SLD Manager pages
+import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPage';
+import SldManagerOrderListPage from '../pages/sld-manager/SldManagerOrderListPage';
+import SldManagerOrderDetailPage from '../pages/sld-manager/SldManagerOrderDetailPage';
 
 /**
  * 애플리케이션 라우터 설정
@@ -92,6 +100,9 @@ const router = createBrowserRouter([
           { path: '/applications', element: <ApplicationListPage /> },
           { path: '/applications/new', element: <NewApplicationPage /> },
           { path: '/applications/:id', element: <ApplicationDetailPage /> },
+          { path: '/sld-orders', element: <SldOrderListPage /> },
+          { path: '/sld-orders/new', element: <NewSldOrderPage /> },
+          { path: '/sld-orders/:id', element: <SldOrderDetailPage /> },
           { path: '/profile', element: <ProfilePage /> },
         ],
       },
@@ -140,6 +151,21 @@ const router = createBrowserRouter([
           { path: '/lew/dashboard', element: <AdminDashboardPage /> },
           { path: '/lew/applications', element: <AdminApplicationListPage /> },
           { path: '/lew/applications/:id', element: <AdminApplicationDetailPage /> },
+        ],
+      },
+    ],
+  },
+
+  // SLD Manager routes (SLD_MANAGER only)
+  {
+    element: <ProtectedRoute allowedRoles={['SLD_MANAGER']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/sld-manager/dashboard', element: <SldManagerDashboardPage /> },
+          { path: '/sld-manager/orders', element: <SldManagerOrderListPage /> },
+          { path: '/sld-manager/orders/:id', element: <SldManagerOrderDetailPage /> },
         ],
       },
     ],

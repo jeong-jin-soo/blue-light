@@ -3,24 +3,28 @@ Drawing border and title block for SLD drawings.
 Standard A3 landscape (420mm x 297mm).
 """
 
-import ezdxf
-from ezdxf.layouts import Modelspace
+from __future__ import annotations
+
 from datetime import date
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
 
 
-def draw_border(msp: Modelspace, margin: float = 10) -> None:
+def draw_border(backend: DrawingBackend, margin: float = 10) -> None:
     """Draw the drawing border rectangle."""
     w = 420 - margin
     h = 297 - margin
-    msp.add_lwpolyline(
+    backend.set_layer("SLD_TITLE_BLOCK")
+    backend.add_lwpolyline(
         [(margin, margin), (w, margin), (w, h), (margin, h)],
         close=True,
-        dxfattribs={"layer": "SLD_TITLE_BLOCK"},
     )
 
 
 def draw_title_block(
-    msp: Modelspace,
+    backend: DrawingBackend,
     project_name: str = "Electrical Installation",
     address: str = "",
     postal_code: str = "",
@@ -29,6 +33,7 @@ def draw_title_block(
     lew_name: str = "",
     lew_licence: str = "",
     revision: str = "A",
+    sld_only_mode: bool = False,
 ) -> None:
     """
     Draw the title block in the bottom-right corner.
@@ -41,35 +46,37 @@ def draw_title_block(
     tb_top = 55
     tb_mid_y = (tb_top + tb_bottom) / 2
 
-    attribs = {"layer": "SLD_TITLE_BLOCK"}
+    backend.set_layer("SLD_TITLE_BLOCK")
 
     # Outer box
-    msp.add_lwpolyline(
+    backend.add_lwpolyline(
         [(tb_left, tb_bottom), (tb_right, tb_bottom), (tb_right, tb_top), (tb_left, tb_top)],
         close=True,
-        dxfattribs=attribs,
     )
 
     # Horizontal dividers
-    msp.add_line((tb_left, tb_mid_y), (tb_right, tb_mid_y), dxfattribs=attribs)
-    msp.add_line((tb_left, tb_mid_y - 10), (tb_right, tb_mid_y - 10), dxfattribs=attribs)
+    backend.add_line((tb_left, tb_mid_y), (tb_right, tb_mid_y))
+    backend.add_line((tb_left, tb_mid_y - 10), (tb_right, tb_mid_y - 10))
 
     # Vertical divider in top row
     mid_x = (tb_left + tb_right) / 2
-    msp.add_line((mid_x, tb_mid_y), (mid_x, tb_top), dxfattribs=attribs)
+    backend.add_line((mid_x, tb_mid_y), (mid_x, tb_top))
 
-    text_attribs = {"layer": "SLD_ANNOTATIONS", "char_height": 3}
+    # ── Text content ──────────────────────────────────
 
     # Title
-    msp.add_mtext(
+    backend.set_layer("SLD_ANNOTATIONS")
+    backend.add_mtext(
         "SINGLE LINE DIAGRAM",
-        dxfattribs={**text_attribs, "char_height": 4, "insert": (tb_left + 5, tb_top - 3)},
+        insert=(tb_left + 5, tb_top - 3),
+        char_height=4,
     )
 
     # Project name
-    msp.add_mtext(
+    backend.add_mtext(
         f"Project: {project_name}",
-        dxfattribs={**text_attribs, "insert": (tb_left + 5, tb_top - 10)},
+        insert=(tb_left + 5, tb_top - 10),
+        char_height=3,
     )
 
     # Address
@@ -77,54 +84,76 @@ def draw_title_block(
         addr_text = address
         if postal_code:
             addr_text += f"\\PSingapore {postal_code}"
-        msp.add_mtext(
+        backend.add_mtext(
             addr_text,
-            dxfattribs={**text_attribs, "char_height": 2.5, "insert": (tb_left + 5, tb_top - 16)},
+            insert=(tb_left + 5, tb_top - 16),
+            char_height=2.5,
         )
 
     # Capacity
     if kva:
-        msp.add_mtext(
+        backend.add_mtext(
             f"Capacity: {kva} kVA",
-            dxfattribs={**text_attribs, "insert": (mid_x + 5, tb_top - 3)},
+            insert=(mid_x + 5, tb_top - 3),
+            char_height=3,
         )
 
     # Drawing number
-    msp.add_mtext(
+    backend.add_mtext(
         f"Drawing No: {drawing_number}",
-        dxfattribs={**text_attribs, "insert": (mid_x + 5, tb_top - 10)},
+        insert=(mid_x + 5, tb_top - 10),
+        char_height=3,
     )
 
     # Revision and date
-    msp.add_mtext(
+    backend.add_mtext(
         f"Rev: {revision}  Date: {date.today().isoformat()}",
-        dxfattribs={**text_attribs, "char_height": 2.5, "insert": (mid_x + 5, tb_top - 16)},
+        insert=(mid_x + 5, tb_top - 16),
+        char_height=2.5,
     )
 
     # LEW information (bottom row)
-    msp.add_mtext(
-        "Prepared by:",
-        dxfattribs={**text_attribs, "char_height": 2.5, "insert": (tb_left + 5, tb_mid_y - 3)},
-    )
-
-    if lew_name:
-        msp.add_mtext(
-            f"LEW: {lew_name}",
-            dxfattribs={**text_attribs, "insert": (tb_left + 5, tb_mid_y - 8)},
+    if sld_only_mode:
+        # SLD 전용 모드: "Prepared by" 섹션을 비워둠 — 사용자가 인쇄 후 직접 기입
+        backend.add_mtext(
+            "Prepared by: (To be filled by LEW)",
+            insert=(tb_left + 5, tb_mid_y - 3),
+            char_height=2.5,
+        )
+        backend.add_mtext(
+            "LEW: ____________________",
+            insert=(tb_left + 5, tb_mid_y - 8),
+            char_height=3,
+        )
+        backend.add_mtext(
+            "Licence No: ____________________",
+            insert=(tb_left + 5, tb_mid_y - 14),
+            char_height=2.5,
+        )
+    else:
+        backend.add_mtext(
+            "Prepared by:",
+            insert=(tb_left + 5, tb_mid_y - 3),
+            char_height=2.5,
         )
 
-    if lew_licence:
-        msp.add_mtext(
-            f"Licence No: {lew_licence}",
-            dxfattribs={**text_attribs, "char_height": 2.5, "insert": (tb_left + 5, tb_mid_y - 14)},
-        )
+        if lew_name:
+            backend.add_mtext(
+                f"LEW: {lew_name}",
+                insert=(tb_left + 5, tb_mid_y - 8),
+                char_height=3,
+            )
+
+        if lew_licence:
+            backend.add_mtext(
+                f"Licence No: {lew_licence}",
+                insert=(tb_left + 5, tb_mid_y - 14),
+                char_height=2.5,
+            )
 
     # AI-generated notice
-    msp.add_mtext(
+    backend.add_mtext(
         "Generated by LicenseKaki AI — Verify before submission",
-        dxfattribs={
-            "layer": "SLD_ANNOTATIONS",
-            "char_height": 2,
-            "insert": (tb_left + 5, tb_bottom + 3),
-        },
+        insert=(tb_left + 5, tb_bottom + 3),
+        char_height=2,
     )

@@ -33,6 +33,7 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     const redirectPath = user.role === 'SYSTEM_ADMIN' ? '/admin/system'
       : user.role === 'ADMIN' ? '/admin/dashboard'
       : user.role === 'LEW' ? '/lew/dashboard'
+      : user.role === 'SLD_MANAGER' ? '/sld-manager/dashboard'
       : '/dashboard';
     return <Navigate to={redirectPath} replace />;
   }
