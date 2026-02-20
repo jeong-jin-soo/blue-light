@@ -45,14 +45,37 @@ public class AdminSldService {
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
 
-        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED) {
+        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED
+                && sldRequest.getStatus() != SldRequestStatus.AI_GENERATING) {
             throw new BusinessException(
-                    "SLD can only be uploaded when status is REQUESTED",
+                    "SLD can only be uploaded when status is REQUESTED or AI_GENERATING",
                     HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
         }
 
         sldRequest.markUploaded(dto.getFileSeq(), dto.getLewNote());
         log.info("SLD marked as uploaded: applicationSeq={}, fileSeq={}", applicationSeq, dto.getFileSeq());
+
+        return SldRequestResponse.from(sldRequest);
+    }
+
+    /**
+     * SLD AI 생성 시작 (REQUESTED → AI_GENERATING)
+     */
+    @Transactional
+    public SldRequestResponse startAiGeneration(Long applicationSeq) {
+        validateApplicationExists(applicationSeq);
+        SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
+
+        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED) {
+            throw new BusinessException(
+                    "AI generation can only start when status is REQUESTED",
+                    HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
+        }
+
+        sldRequest.startAiGeneration();
+        log.info("SLD AI generation started: applicationSeq={}", applicationSeq);
 
         return SldRequestResponse.from(sldRequest);
     }

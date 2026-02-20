@@ -42,6 +42,7 @@ export function formatFileType(type: string): string {
     case 'REPORT_PDF': return 'Report';
     case 'LICENSE_PDF': return 'Licence';
     case 'SP_ACCOUNT_DOC': return 'SP Account';
+    case 'SKETCH_SLD': return 'Sketch';
     default: return type;
   }
 }
@@ -55,6 +56,7 @@ export function getFileTypeBadge(type: string): 'primary' | 'info' | 'success' |
     case 'SP_ACCOUNT_DOC': return 'info';
     case 'REPORT_PDF': return 'gray';
     case 'LICENSE_PDF': return 'success';
+    case 'SKETCH_SLD': return 'info';
     default: return 'gray';
   }
 }

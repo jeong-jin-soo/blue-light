@@ -1,0 +1,92 @@
+{
+  "standard": "SS 638 / CP 5 (Singapore)",
+  "description": "Electrical installation standards for kVA capacity tiers",
+  "tiers": [
+    {
+      "max_kva": 45,
+      "supply_type": "three_phase",
+      "voltage": 400,
+      "calculated_current_A": 65,
+      "main_breaker": {"type": "MCCB", "rating_A": 80},
+      "recommended_busbar_A": 100,
+      "incoming_cable": {"cores": 4, "size_mm2": 25, "type": "XLPE/SWA"},
+      "typical_sub_circuits": [
+        {"name": "Lighting", "breaker": "MCB 20A", "cable": "4C x 4mm2 PVC"},
+        {"name": "Power", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"},
+        {"name": "ACMV", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"},
+        {"name": "Spare", "breaker": "MCB 20A", "cable": "4C x 4mm2 PVC"}
+      ]
+    },
+    {
+      "max_kva": 100,
+      "supply_type": "three_phase",
+      "voltage": 400,
+      "calculated_current_A": 145,
+      "main_breaker": {"type": "MCCB", "rating_A": 160},
+      "recommended_busbar_A": 200,
+      "incoming_cable": {"cores": 4, "size_mm2": 70, "type": "XLPE/SWA"},
+      "typical_sub_circuits": [
+        {"name": "Lighting", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"},
+        {"name": "Power", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
+        {"name": "ACMV", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
+        {"name": "Fire Alarm", "breaker": "MCB 16A", "cable": "4C x 2.5mm2 PVC"},
+        {"name": "Spare", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"}
+      ]
+    },
+    {
+      "max_kva": 200,
+      "supply_type": "three_phase",
+      "voltage": 400,
+      "calculated_current_A": 290,
+      "main_breaker": {"type": "MCCB", "rating_A": 315},
+      "recommended_busbar_A": 400,
+      "incoming_cable": {"cores": 4, "size_mm2": 150, "type": "XLPE/SWA"},
+      "typical_sub_circuits": [
+        {"name": "Lighting", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
+        {"name": "Power", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
+        {"name": "ACMV", "breaker": "MCCB 80A", "cable": "4C x 25mm2 XLPE/SWA"},
+        {"name": "Lift", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
+        {"name": "Fire Alarm", "breaker": "MCB 20A", "cable": "4C x 4mm2 PVC"},
+        {"name": "Spare", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"}
+      ]
+    },
+    {
+      "max_kva": 500,
+      "supply_type": "three_phase",
+      "voltage": 400,
+      "calculated_current_A": 722,
+      "main_breaker": {"type": "ACB", "rating_A": 800},
+      "recommended_busbar_A": 800,
+      "incoming_cable": {"cores": 4, "size_mm2": 400, "type": "XLPE/SWA"},
+      "typical_sub_circuits": [
+        {"name": "Lighting DB", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
+        {"name": "Power DB", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
+        {"name": "ACMV", "breaker": "MCCB 160A", "cable": "4C x 70mm2 XLPE/SWA"},
+        {"name": "Lift", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
+        {"name": "Fire Services", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
+        {"name": "UPS/IT", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
+        {"name": "Spare", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"}
+      ]
+    },
+    {
+      "max_kva": 1000,
+      "supply_type": "three_phase",
+      "voltage": 400,
+      "calculated_current_A": 1443,
+      "main_breaker": {"type": "ACB", "rating_A": 1600},
+      "recommended_busbar_A": 1600,
+      "incoming_cable": {"cores": 4, "size_mm2": 500, "type": "XLPE/SWA", "note": "May require parallel runs"},
+      "typical_sub_circuits": [
+        {"name": "Lighting DB-1", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
+        {"name": "Lighting DB-2", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
+        {"name": "Power DB", "breaker": "MCCB 400A", "cable": "4C x 240mm2 XLPE/SWA"},
+        {"name": "ACMV-1", "breaker": "MCCB 250A", "cable": "4C x 120mm2 XLPE/SWA"},
+        {"name": "ACMV-2", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
+        {"name": "Lift", "breaker": "MCCB 160A", "cable": "4C x 70mm2 XLPE/SWA"},
+        {"name": "Fire Services", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
+        {"name": "UPS/IT", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
+        {"name": "Spare", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"}
+      ]
+    }
+  ]
+}

@@ -19,6 +19,7 @@ public class SldRequestResponse {
     private String applicantNote;
     private String lewNote;
     private Long uploadedFileSeq;
+    private Long sketchFileSeq;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -30,6 +31,7 @@ public class SldRequestResponse {
                 .applicantNote(req.getApplicantNote())
                 .lewNote(req.getLewNote())
                 .uploadedFileSeq(req.getUploadedFileSeq())
+                .sketchFileSeq(req.getSketchFileSeq())
                 .createdAt(req.getCreatedAt())
                 .updatedAt(req.getUpdatedAt())
                 .build();

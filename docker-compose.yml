@@ -38,6 +38,28 @@ services:
       - uploads_data:/app/uploads
 
   # ============================================
+  # SLD AI Agent (Python)
+  # ============================================
+  sld-agent:
+    image: ${DOCKER_REGISTRY}/bluelight-sld-agent:${IMAGE_TAG:-latest}
+    container_name: bluelight-sld-agent
+    restart: always
+    ports:
+      - "8100:8100"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SPRING_BOOT_URL: http://backend:8090
+      SERVICE_KEY: ${SLD_AGENT_SERVICE_KEY:-dev-service-key}
+      SQLITE_DB_PATH: /app/data/checkpoints.db
+      TEMP_FILE_DIR: /app/temp
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - sld_data:/app/data
+      - sld_temp:/app/temp
+    depends_on:
+      - backend
+
+  # ============================================
   # React Frontend (Nginx)
   # ============================================
   frontend:
@@ -51,3 +73,5 @@ services:
 
 volumes:
   uploads_data:
+  sld_data:
+  sld_temp:

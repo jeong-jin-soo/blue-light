@@ -105,6 +105,13 @@ gemini:
 chat:
   retention-days: ${CHAT_RETENTION_DAYS:90}
 
+# SLD AI Agent (Python FastAPI) 설정
+sld:
+  agent:
+    url: ${SLD_AGENT_URL:http://localhost:8100}
+    service-key: ${SLD_AGENT_SERVICE_KEY:dev-service-key}
+    timeout-seconds: ${SLD_AGENT_TIMEOUT:120}
+
 # 감사 로그 설정
 audit:
   retention-days: ${AUDIT_RETENTION_DAYS:365}          # 원본 보존 기간 (이후 아카이브)

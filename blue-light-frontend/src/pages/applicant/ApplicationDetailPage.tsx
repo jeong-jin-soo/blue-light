@@ -45,6 +45,7 @@ export default function ApplicationDetailPage() {
   const [prices, setPrices] = useState<MasterPrice[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
+  const [savingSldRequest, setSavingSldRequest] = useState(false);
 
   const applicationId = Number(id);
 
@@ -183,6 +184,43 @@ export default function ApplicationDetailPage() {
       toast.error('Failed to delete file');
     } finally {
       setDeleteFileId(null);
+    }
+  };
+
+  // ── Sketch + SLD Request handlers ──────────────────
+
+  const handleSketchUpload = async (file: File) => {
+    await fileApi.uploadFile(applicationId, file, 'SKETCH_SLD');
+    toast.success('Sketch uploaded');
+    const updatedFiles = await fileApi.getFilesByApplication(applicationId);
+    setFiles(updatedFiles);
+  };
+
+  const handleSketchDelete = async (fileId: string | number) => {
+    try {
+      await fileApi.deleteFile(Number(fileId));
+      toast.success('Sketch deleted');
+      const updatedFiles = await fileApi.getFilesByApplication(applicationId);
+      setFiles(updatedFiles);
+    } catch {
+      toast.error('Failed to delete sketch');
+    }
+  };
+
+  const handleSldRequestUpdate = async (note: string, sketchFileSeq: number | null) => {
+    setSavingSldRequest(true);
+    try {
+      const updated = await applicationApi.updateSldRequest(applicationId, {
+        note: note || undefined,
+        sketchFileSeq,
+      });
+      setSldRequest(updated);
+      toast.success('SLD request details saved');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to save SLD request details';
+      toast.error(message);
+    } finally {
+      setSavingSldRequest(false);
     }
   };
 
@@ -333,7 +371,7 @@ export default function ApplicationDetailPage() {
 
           <ApplicationDocuments
             application={application}
-            files={files}
+            files={files.filter((f) => f.fileType !== 'SKETCH_SLD')}
             sldRequest={sldRequest}
             canUpload={canUpload}
             uploadFileType={uploadFileType}
@@ -341,6 +379,11 @@ export default function ApplicationDetailPage() {
             onFileUpload={handleFileUpload}
             onFileDelete={async (fileId) => { setDeleteFileId(fileId); }}
             onFileDownload={handleFileDownload}
+            onSketchUpload={handleSketchUpload}
+            onSketchDelete={handleSketchDelete}
+            onSldRequestUpdate={handleSldRequestUpdate}
+            sketchFiles={files.filter((f) => f.fileType === 'SKETCH_SLD')}
+            savingSldRequest={savingSldRequest}
           />
         </div>
 

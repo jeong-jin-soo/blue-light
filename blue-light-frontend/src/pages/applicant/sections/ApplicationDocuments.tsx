@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
 import { Select } from '../../../components/ui/Select';
+import { Textarea } from '../../../components/ui/Textarea';
 import { FileUpload } from '../../../components/domain/FileUpload';
 import fileApi from '../../../api/fileApi';
 import { formatFileSize, formatFileType, getFileTypeBadge } from '../../../utils/applicationUtils';
@@ -24,6 +26,12 @@ interface ApplicationDocumentsProps {
   onFileUpload: (file: File) => Promise<void>;
   onFileDelete: (fileId: string | number) => Promise<void>;
   onFileDownload: (fileInfo: FileInfo) => void;
+  // Sketch upload + note handlers
+  onSketchUpload?: (file: File) => Promise<void>;
+  onSketchDelete?: (fileId: string | number) => Promise<void>;
+  onSldRequestUpdate?: (note: string, sketchFileSeq: number | null) => Promise<void>;
+  sketchFiles?: FileInfo[];
+  savingSldRequest?: boolean;
 }
 
 export function ApplicationDocuments({
@@ -36,21 +44,102 @@ export function ApplicationDocuments({
   onFileUpload,
   onFileDelete,
   onFileDownload,
+  onSketchUpload,
+  onSketchDelete,
+  onSldRequestUpdate,
+  sketchFiles = [],
+  savingSldRequest = false,
 }: ApplicationDocumentsProps) {
+  const [noteValue, setNoteValue] = useState(sldRequest?.applicantNote || '');
+
+  // Sync note value when sldRequest changes (e.g. after save)
+  useEffect(() => {
+    setNoteValue(sldRequest?.applicantNote || '');
+  }, [sldRequest?.applicantNote]);
+
+  const handleSaveDetails = async () => {
+    if (!onSldRequestUpdate) return;
+    const sketchFileSeq = sketchFiles.length > 0 ? sketchFiles[0].fileSeq : null;
+    await onSldRequestUpdate(noteValue, sketchFileSeq);
+  };
+
   return (
     <>
       {/* SLD Request Status */}
       {application.sldOption === 'REQUEST_LEW' && sldRequest && (
         <Card>
           <h2 className="text-lg font-semibold text-gray-800 mb-4">SLD Drawing Request</h2>
+
+          {/* REQUESTED — 편집 가능한 폼 */}
           {sldRequest.status === 'REQUESTED' && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">🔧</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">SLD Drawing Request Sent</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Upload a sketch and add notes to help the LEW prepare your SLD drawing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sketch file upload */}
+              {onSketchUpload && (
+                <div>
+                  <FileUpload
+                    onUpload={onSketchUpload}
+                    onRemove={onSketchDelete}
+                    files={sketchFiles.map((f) => ({
+                      id: f.fileSeq,
+                      name: f.originalFilename || `Sketch #${f.fileSeq}`,
+                      size: f.fileSize || 0,
+                    }))}
+                    label="Sketch / Reference Drawing"
+                    hint="Upload a sketch or reference drawing for the LEW. PDF, JPG, PNG, DWG, DXF up to 10MB."
+                  />
+                </div>
+              )}
+
+              {/* Applicant note */}
+              <Textarea
+                label="Notes for LEW (Optional)"
+                rows={3}
+                maxLength={2000}
+                value={noteValue}
+                onChange={(e) => setNoteValue(e.target.value)}
+                placeholder="e.g. 3 circuits: lighting, power, ACMV. Need separate fire alarm circuit."
+                className="resize-none"
+              />
+
+              {/* Save button + timestamp */}
+              <div className="flex items-center justify-between">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveDetails}
+                  loading={savingSldRequest}
+                  disabled={savingSldRequest}
+                >
+                  Save Details
+                </Button>
+                <p className="text-xs text-blue-500">
+                  Requested on {new Date(sldRequest.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* AI_GENERATING — 읽기 전용 */}
+          {sldRequest.status === 'AI_GENERATING' && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <span className="text-lg">🔧</span>
+                <span className="text-lg">🤖</span>
                 <div>
-                  <p className="text-sm font-medium text-blue-800">SLD Drawing Request Sent</p>
+                  <p className="text-sm font-medium text-blue-800">SLD Being Generated</p>
                   <p className="text-xs text-blue-700 mt-1">
-                    Your SLD drawing request has been sent to the assigned LEW. You will be notified once the SLD is prepared.
+                    The AI is generating your SLD drawing. Please wait.
                   </p>
                   {sldRequest.applicantNote && (
                     <div className="mt-2 bg-white rounded p-2 border border-blue-100">
@@ -58,13 +147,12 @@ export function ApplicationDocuments({
                       <p className="text-sm text-gray-700">{sldRequest.applicantNote}</p>
                     </div>
                   )}
-                  <p className="text-xs text-blue-500 mt-2">
-                    Requested on {new Date(sldRequest.createdAt).toLocaleDateString()}
-                  </p>
                 </div>
               </div>
             </div>
           )}
+
+          {/* UPLOADED */}
           {sldRequest.status === 'UPLOADED' && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -98,6 +186,8 @@ export function ApplicationDocuments({
               </div>
             </div>
           )}
+
+          {/* CONFIRMED */}
           {sldRequest.status === 'CONFIRMED' && (
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <div className="flex items-start gap-3">

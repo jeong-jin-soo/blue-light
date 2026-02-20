@@ -390,11 +390,13 @@ export default function AdminApplicationDetailPage() {
 
           {application.sldOption === 'REQUEST_LEW' && sldRequest && (
             <AdminSldSection
+              applicationSeq={applicationId}
               sldRequest={sldRequest}
               sldLewNote={sldLewNote}
               onSldLewNoteChange={setSldLewNote}
               onSldUpload={handleSldUpload}
               onSldConfirmClick={() => setShowSldConfirm(true)}
+              onSldUpdated={fetchData}
               actionLoading={actionLoading}
             />
           )}

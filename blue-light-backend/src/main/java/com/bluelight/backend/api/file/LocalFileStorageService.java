@@ -92,6 +92,39 @@ public class LocalFileStorageService implements FileStorageService {
     }
 
     @Override
+    public String storeBytes(byte[] data, String filename, String subDirectory) {
+        if (data == null || data.length == 0) {
+            throw new BusinessException("Cannot store empty data", HttpStatus.BAD_REQUEST, "EMPTY_FILE");
+        }
+
+        try {
+            Path targetDir = this.rootLocation.resolve(subDirectory).normalize();
+            Files.createDirectories(targetDir);
+
+            String extension = "";
+            if (filename != null && filename.contains(".")) {
+                extension = filename.substring(filename.lastIndexOf("."));
+            }
+            String storedFilename = UUID.randomUUID() + extension;
+            Path targetPath = targetDir.resolve(storedFilename);
+
+            if (fileEncryptionUtil.isEnabled()) {
+                byte[] encryptedData = fileEncryptionUtil.encrypt(data);
+                Files.write(targetPath, encryptedData);
+                log.info("Bytes stored (encrypted): {} -> {}", filename, subDirectory + "/" + storedFilename);
+            } else {
+                Files.write(targetPath, data);
+                log.info("Bytes stored: {} -> {}", filename, subDirectory + "/" + storedFilename);
+            }
+
+            return subDirectory + "/" + storedFilename;
+
+        } catch (IOException e) {
+            throw new BusinessException("Failed to store file", HttpStatus.INTERNAL_SERVER_ERROR, "FILE_STORE_ERROR");
+        }
+    }
+
+    @Override
     public Resource loadAsResource(String filePath) {
         try {
             Path file = this.rootLocation.resolve(filePath).normalize();

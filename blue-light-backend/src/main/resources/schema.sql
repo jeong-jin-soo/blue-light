@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS sld_requests (
     applicant_note   TEXT,
     lew_note         TEXT,
     uploaded_file_seq BIGINT,
+    sketch_file_seq  BIGINT,
     created_at       DATETIME(6),
     updated_at       DATETIME(6),
     created_by       BIGINT,
@@ -167,7 +168,8 @@ CREATE TABLE IF NOT EXISTS sld_requests (
     PRIMARY KEY (sld_request_seq),
     KEY idx_sld_requests_application (application_seq),
     CONSTRAINT fk_sld_requests_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
-    CONSTRAINT fk_sld_requests_file FOREIGN KEY (uploaded_file_seq) REFERENCES files (file_seq)
+    CONSTRAINT fk_sld_requests_file FOREIGN KEY (uploaded_file_seq) REFERENCES files (file_seq),
+    CONSTRAINT fk_sld_requests_sketch_file FOREIGN KEY (sketch_file_seq) REFERENCES files (file_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 9. 용량별 단가표
@@ -295,3 +297,22 @@ CREATE TABLE IF NOT EXISTS audit_logs_archive (
     KEY idx_archive_category (action_category),
     KEY idx_archive_user (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 16. SLD AI 채팅 메시지 (신청별 AI 대화 이력)
+CREATE TABLE IF NOT EXISTS sld_chat_messages (
+    sld_chat_message_seq  BIGINT       NOT NULL AUTO_INCREMENT,
+    application_seq       BIGINT       NOT NULL,
+    user_seq              BIGINT       NOT NULL,
+    role                  VARCHAR(10)  NOT NULL,
+    content               TEXT         NOT NULL,
+    metadata              JSON,
+    created_at            DATETIME(6),
+    PRIMARY KEY (sld_chat_message_seq),
+    KEY idx_sld_chat_app (application_seq),
+    KEY idx_sld_chat_user (user_seq),
+    CONSTRAINT fk_sld_chat_app FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
+    CONSTRAINT fk_sld_chat_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 마이그레이션: sld_requests.sketch_file_seq — MySQL에서 직접 실행:
+-- ALTER TABLE sld_requests ADD COLUMN sketch_file_seq BIGINT;

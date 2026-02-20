@@ -9,7 +9,11 @@ import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.api.application.dto.CreateSldRequestDto;
 import com.bluelight.backend.api.application.dto.SldRequestResponse;
+import com.bluelight.backend.api.application.dto.UpdateSldRequestDto;
 import com.bluelight.backend.domain.application.*;
+import com.bluelight.backend.domain.file.FileEntity;
+import com.bluelight.backend.domain.file.FileRepository;
+import com.bluelight.backend.domain.file.FileType;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
@@ -42,6 +46,7 @@ public class ApplicationService {
     private final MasterPriceRepository masterPriceRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
+    private final FileRepository fileRepository;
 
     /**
      * Create a new licence application (NEW or RENEWAL)
@@ -391,6 +396,57 @@ public class ApplicationService {
         return sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .map(SldRequestResponse::from)
                 .orElse(null);
+    }
+
+    /**
+     * SLD 요청 수정 — 신청자가 메모 + 스케치 파일 업데이트
+     */
+    @Transactional
+    public SldRequestResponse updateSldRequest(Long userSeq, Long applicationSeq, UpdateSldRequestDto dto) {
+        Application application = applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
+
+        SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
+
+        // REQUESTED 상태에서만 수정 가능
+        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED) {
+            throw new BusinessException(
+                    "SLD request can only be updated in REQUESTED status",
+                    HttpStatus.BAD_REQUEST, "INVALID_SLD_REQUEST_STATUS");
+        }
+
+        // 스케치 파일 검증 (있는 경우)
+        Long sketchFileSeq = dto.getSketchFileSeq();
+        if (sketchFileSeq != null) {
+            FileEntity sketchFile = fileRepository.findById(sketchFileSeq)
+                    .orElseThrow(() -> new BusinessException(
+                            "Sketch file not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
+
+            // 해당 신청에 속하는 파일인지 확인
+            if (!sketchFile.getApplication().getApplicationSeq().equals(applicationSeq)) {
+                throw new BusinessException(
+                        "File does not belong to this application",
+                        HttpStatus.BAD_REQUEST, "FILE_NOT_OWNED");
+            }
+
+            // SKETCH_SLD 타입인지 확인
+            if (sketchFile.getFileType() != FileType.SKETCH_SLD) {
+                throw new BusinessException(
+                        "File is not a sketch file",
+                        HttpStatus.BAD_REQUEST, "INVALID_FILE_TYPE");
+            }
+        }
+
+        sldRequest.updateApplicantDetails(dto.getNote(), sketchFileSeq);
+
+        log.info("SLD request updated: applicationSeq={}, userSeq={}, hasSketch={}",
+                applicationSeq, userSeq, sketchFileSeq != null);
+        return SldRequestResponse.from(sldRequest);
     }
 
     /**

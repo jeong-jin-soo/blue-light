@@ -37,5 +37,10 @@ public enum FileType {
     /**
      * SP Group 계정 확인 문서
      */
-    SP_ACCOUNT_DOC
+    SP_ACCOUNT_DOC,
+
+    /**
+     * 신청자 스케치 (SLD 요청 참고용)
+     */
+    SKETCH_SLD
 }

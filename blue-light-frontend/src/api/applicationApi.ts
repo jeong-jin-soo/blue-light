@@ -92,6 +92,20 @@ export const getSldRequest = async (applicationId: number): Promise<SldRequest |
   return response.data;
 };
 
+/**
+ * Update SLD request (신청자가 메모 + 스케치 파일 업데이트)
+ */
+export const updateSldRequest = async (
+  applicationId: number,
+  data: { note?: string; sketchFileSeq?: number | null },
+): Promise<SldRequest> => {
+  const response = await axiosClient.put<SldRequest>(
+    `/applications/${applicationId}/sld-request`,
+    data,
+  );
+  return response.data;
+};
+
 export const applicationApi = {
   createApplication,
   updateApplication,
@@ -102,5 +116,6 @@ export const applicationApi = {
   getCompletedApplications,
   createSldRequest,
   getSldRequest,
+  updateSldRequest,
 };
 export default applicationApi;

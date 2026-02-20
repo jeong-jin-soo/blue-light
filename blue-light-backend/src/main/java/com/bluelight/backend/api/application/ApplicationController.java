@@ -151,4 +151,19 @@ public class ApplicationController {
         SldRequestResponse response = applicationService.getSldRequest(userSeq, id);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Update SLD request (신청자가 메모 + 스케치 파일 업데이트)
+     * PUT /api/applications/:id/sld-request
+     */
+    @PutMapping("/{id}/sld-request")
+    public ResponseEntity<SldRequestResponse> updateSldRequest(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateSldRequestDto request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Update SLD request: userSeq={}, applicationSeq={}", userSeq, id);
+        SldRequestResponse response = applicationService.updateSldRequest(userSeq, id, request);
+        return ResponseEntity.ok(response);
+    }
 }

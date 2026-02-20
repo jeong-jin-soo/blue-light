@@ -39,11 +39,21 @@ public class SldRequest extends BaseEntity {
     @Column(name = "uploaded_file_seq")
     private Long uploadedFileSeq;
 
+    @Column(name = "sketch_file_seq")
+    private Long sketchFileSeq;
+
     @Builder
     public SldRequest(Application application, String applicantNote) {
         this.application = application;
         this.applicantNote = applicantNote;
         this.status = SldRequestStatus.REQUESTED;
+    }
+
+    /**
+     * AI SLD 생성 시작
+     */
+    public void startAiGeneration() {
+        this.status = SldRequestStatus.AI_GENERATING;
     }
 
     /**
@@ -60,5 +70,13 @@ public class SldRequest extends BaseEntity {
      */
     public void confirm() {
         this.status = SldRequestStatus.CONFIRMED;
+    }
+
+    /**
+     * 신청자가 메모와 스케치 파일 정보를 업데이트
+     */
+    public void updateApplicantDetails(String applicantNote, Long sketchFileSeq) {
+        this.applicantNote = applicantNote;
+        this.sketchFileSeq = sketchFileSeq;
     }
 }

@@ -91,7 +91,7 @@ export type SldOption = 'SELF_UPLOAD' | 'REQUEST_LEW';
 /**
  * SLD 요청 상태
  */
-export type SldRequestStatus = 'REQUESTED' | 'UPLOADED' | 'CONFIRMED';
+export type SldRequestStatus = 'REQUESTED' | 'AI_GENERATING' | 'UPLOADED' | 'CONFIRMED';
 
 /**
  * SLD 요청 정보
@@ -103,6 +103,7 @@ export interface SldRequest {
   applicantNote?: string;
   lewNote?: string;
   uploadedFileSeq?: number;
+  sketchFileSeq?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -152,7 +153,7 @@ export interface Application {
 /**
  * 파일 종류
  */
-export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC';
+export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC' | 'SKETCH_SLD';
 
 /**
  * 첨부 파일
@@ -605,6 +606,40 @@ export interface ChatRequest {
 export interface ChatResponse {
   message: string;
   suggestedQuestions?: string[];
+}
+
+// ============================================
+// SLD Chat Types
+// ============================================
+
+export interface SldChatMessage {
+  sldChatMessageSeq: number;
+  applicationSeq: number;
+  role: 'user' | 'assistant';
+  content: string;
+  metadata?: string;
+  createdAt: string;
+}
+
+/**
+ * SLD SSE 이벤트 타입
+ */
+export type SldSseEventType =
+  | 'token'
+  | 'tool_start'
+  | 'tool_result'
+  | 'sld_preview'
+  | 'file_generated'
+  | 'done'
+  | 'error';
+
+export interface SldSseEvent {
+  type: SldSseEventType;
+  content?: string;
+  tool?: string;
+  summary?: string;
+  svg?: string;
+  fileId?: string;
 }
 
 // ============================================
