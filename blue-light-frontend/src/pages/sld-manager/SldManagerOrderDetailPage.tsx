@@ -176,16 +176,16 @@ export default function SldManagerOrderDetailPage() {
           <Card>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Applicant & Order Info</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InfoField label="신청자" value={order.userName} />
-              <InfoField label="이메일" value={order.userEmail} />
-              <InfoField label="주소" value={order.address || '-'} />
-              <InfoField label="우편번호" value={order.postalCode || '-'} />
-              <InfoField label="건물 유형" value={order.buildingType || '-'} />
-              <InfoField label="용량 (kVA)" value={order.selectedKva ? `${order.selectedKva} kVA` : '-'} />
+              <InfoField label="Applicant" value={order.userName} />
+              <InfoField label="Email" value={order.userEmail} />
+              <InfoField label="Address" value={order.address || '-'} />
+              <InfoField label="Postal Code" value={order.postalCode || '-'} />
+              <InfoField label="Building Type" value={order.buildingType || '-'} />
+              <InfoField label="Capacity (kVA)" value={order.selectedKva ? `${order.selectedKva} kVA` : '-'} />
             </div>
             {order.applicantNote && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <InfoField label="요구사항 메모" value={order.applicantNote} />
+                <InfoField label="Requirements Note" value={order.applicantNote} />
               </div>
             )}
             {order.sketchFileSeq && (
@@ -206,10 +206,10 @@ export default function SldManagerOrderDetailPage() {
           {/* PENDING_QUOTE: Quote proposal form */}
           {order.status === 'PENDING_QUOTE' && (
             <Card>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">견적 제안</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Propose Quote</h2>
               <div className="space-y-4">
                 <Input
-                  label="견적 금액 (SGD)"
+                  label="Quote Amount (SGD)"
                   type="number"
                   placeholder="e.g., 500"
                   value={quoteAmount}
@@ -218,7 +218,7 @@ export default function SldManagerOrderDetailPage() {
                   required
                 />
                 <Textarea
-                  label="견적 메모 (Optional)"
+                  label="Quote Note (Optional)"
                   placeholder="Additional notes about the quote..."
                   value={quoteNote}
                   onChange={(e) => setQuoteNote(e.target.value)}
@@ -243,7 +243,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#9202;</span>
                   <div>
-                    <p className="text-sm font-medium text-yellow-800">견적 제안 완료. 신청자 응답 대기 중.</p>
+                    <p className="text-sm font-medium text-yellow-800">Quote proposed. Waiting for applicant response.</p>
                     <p className="text-xs text-yellow-700 mt-1">
                       Quote: SGD ${order.quoteAmount?.toLocaleString()}
                     </p>
@@ -266,7 +266,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#10060;</span>
                   <div>
-                    <p className="text-sm font-medium text-red-800">견적이 거절되었습니다.</p>
+                    <p className="text-sm font-medium text-red-800">Quote has been rejected.</p>
                     <p className="text-xs text-red-700 mt-1">
                       The applicant has rejected the proposed quote.
                     </p>
@@ -283,7 +283,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128179;</span>
                   <div>
-                    <p className="text-sm font-medium text-orange-800">결제 대기 중</p>
+                    <p className="text-sm font-medium text-orange-800">Awaiting Payment</p>
                     <p className="text-xs text-orange-700 mt-1">
                       Waiting for applicant payment of SGD ${order.quoteAmount?.toLocaleString()}.
                     </p>
@@ -295,7 +295,7 @@ export default function SldManagerOrderDetailPage() {
                 onClick={() => setShowPaymentConfirm(true)}
                 loading={actionLoading}
               >
-                결제 확인 (Confirm Payment)
+                Confirm Payment
               </Button>
             </Card>
           )}
@@ -307,7 +307,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#9989;</span>
                   <div>
-                    <p className="text-sm font-medium text-green-800">결제 완료. 작업을 시작하세요.</p>
+                    <p className="text-sm font-medium text-green-800">Payment confirmed. Begin work on the SLD drawing.</p>
                     <p className="text-xs text-green-700 mt-1">
                       Payment has been confirmed. You can now prepare and upload the SLD drawing.
                     </p>
@@ -324,7 +324,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128736;</span>
                   <div>
-                    <p className="text-sm font-medium text-blue-800">SLD 작업 중</p>
+                    <p className="text-sm font-medium text-blue-800">SLD Work In Progress</p>
                     <p className="text-xs text-blue-700 mt-1">
                       Use the SLD section below to upload the drawing.
                     </p>
@@ -341,7 +341,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128221;</span>
                   <div>
-                    <p className="text-sm font-medium text-orange-800">수정 요청</p>
+                    <p className="text-sm font-medium text-orange-800">Revision Requested</p>
                     <p className="text-xs text-orange-700 mt-1">
                       The applicant has requested a revision.
                     </p>
@@ -373,7 +373,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128196;</span>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-purple-800">SLD 업로드 완료. 신청자 확인 대기 중.</p>
+                    <p className="text-sm font-medium text-purple-800">SLD uploaded. Waiting for applicant review.</p>
                     <p className="text-xs text-purple-700 mt-1">
                       The SLD drawing has been uploaded. Waiting for applicant to review.
                     </p>
@@ -401,7 +401,7 @@ export default function SldManagerOrderDetailPage() {
                 onClick={() => setShowCompleteConfirm(true)}
                 loading={actionLoading}
               >
-                완료 처리 (Mark Complete)
+                Mark Complete
               </Button>
             </Card>
           )}
@@ -413,7 +413,7 @@ export default function SldManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#9989;</span>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-green-800">완료</p>
+                    <p className="text-sm font-medium text-green-800">Completed</p>
                     <p className="text-xs text-green-700 mt-1">
                       This SLD order has been completed successfully.
                     </p>
@@ -445,23 +445,23 @@ export default function SldManagerOrderDetailPage() {
                 <span className="font-medium text-gray-700">#{order.sldOrderSeq}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">상태</span>
+                <span className="text-gray-500">Status</span>
                 <SldStatusBadge status={order.status} />
               </div>
               {order.quoteAmount != null && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">견적금액</span>
+                  <span className="text-gray-500">Quote</span>
                   <span className="font-medium text-gray-700">SGD ${order.quoteAmount.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-gray-500">요청일</span>
+                <span className="text-gray-500">Requested</span>
                 <span className="font-medium text-gray-700">
                   {new Date(order.createdAt).toLocaleDateString()}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">최종 수정</span>
+                <span className="text-gray-500">Last Updated</span>
                 <span className="font-medium text-gray-700">
                   {new Date(order.updatedAt).toLocaleDateString()}
                 </span>
@@ -486,7 +486,7 @@ export default function SldManagerOrderDetailPage() {
           {/* Assigned Manager */}
           {order.assignedManagerName && (
             <Card>
-              <h3 className="text-sm font-semibold text-gray-800 mb-3">담당 매니저</h3>
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Assigned Manager</h3>
               <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg border border-primary-100">
                 <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
                   <span className="text-sm">&#128100;</span>

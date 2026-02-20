@@ -74,7 +74,7 @@ export default function NewSldOrderPage() {
           <span>Back</span>
         </button>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">SLD 도면 요청</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New SLD Order</h1>
           <p className="text-sm text-gray-500 mt-0.5">Request a Single Line Diagram drawing</p>
         </div>
       </div>
@@ -84,7 +84,7 @@ export default function NewSldOrderPage() {
           <div className="space-y-5">
             {/* Address */}
             <Input
-              label="주소 (Address)"
+              label="Address"
               placeholder="e.g., 123 Orchard Road, #10-01, Singapore"
               value={formData.address}
               onChange={(e) => updateField('address', e.target.value)}
@@ -93,13 +93,13 @@ export default function NewSldOrderPage() {
             {/* Postal Code & Building Type */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
-                label="우편번호 (Postal Code)"
+                label="Postal Code"
                 placeholder="e.g., 238888"
                 value={formData.postalCode}
                 onChange={(e) => updateField('postalCode', e.target.value)}
               />
               <Input
-                label="건물 유형 (Building Type)"
+                label="Building Type"
                 placeholder="e.g., Residential, Commercial"
                 value={formData.buildingType}
                 onChange={(e) => updateField('buildingType', e.target.value)}
@@ -108,7 +108,7 @@ export default function NewSldOrderPage() {
 
             {/* kVA */}
             <Input
-              label="용량 kVA"
+              label="Capacity (kVA)"
               type="number"
               placeholder="e.g., 45"
               value={formData.selectedKva}
@@ -118,7 +118,7 @@ export default function NewSldOrderPage() {
 
             {/* Applicant Note */}
             <Textarea
-              label="요구사항 메모 (Requirements Note)"
+              label="Requirements Note"
               placeholder="Describe your requirements for the SLD drawing..."
               value={formData.applicantNote}
               onChange={(e) => updateField('applicantNote', e.target.value)}
@@ -130,7 +130,7 @@ export default function NewSldOrderPage() {
             {/* Sketch File */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                스케치 파일 첨부 (Sketch File)
+                Sketch File
               </label>
               <p className="text-xs text-gray-500 mb-2">
                 Upload a sketch or reference drawing. Accepted: images, PDF, DWG.

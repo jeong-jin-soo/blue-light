@@ -40,49 +40,49 @@ export default function SldManagerDashboardPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <DashboardCard
-          label="전체"
+          label="Total"
           value={dashboard?.total ?? 0}
           icon="📋"
           onClick={() => navigate('/sld-manager/orders')}
         />
         <DashboardCard
-          label="견적대기"
+          label="Pending Quote"
           value={dashboard?.pendingQuote ?? 0}
           icon="🔍"
           onClick={() => navigate('/sld-manager/orders?status=PENDING_QUOTE')}
         />
         <DashboardCard
-          label="견적제안"
+          label="Quote Proposed"
           value={dashboard?.quoteProposed ?? 0}
           icon="💬"
           onClick={() => navigate('/sld-manager/orders?status=QUOTE_PROPOSED')}
         />
         <DashboardCard
-          label="결제대기"
+          label="Pending Payment"
           value={dashboard?.pendingPayment ?? 0}
           icon="💳"
           onClick={() => navigate('/sld-manager/orders?status=PENDING_PAYMENT')}
         />
         <DashboardCard
-          label="결제완료"
+          label="Paid"
           value={dashboard?.paid ?? 0}
           icon="✅"
           onClick={() => navigate('/sld-manager/orders?status=PAID')}
         />
         <DashboardCard
-          label="작업중"
+          label="In Progress"
           value={dashboard?.inProgress ?? 0}
           icon="🔄"
           onClick={() => navigate('/sld-manager/orders?status=IN_PROGRESS')}
         />
         <DashboardCard
-          label="업로드완료"
+          label="Uploaded"
           value={dashboard?.sldUploaded ?? 0}
           icon="📄"
           onClick={() => navigate('/sld-manager/orders?status=SLD_UPLOADED')}
         />
         <DashboardCard
-          label="완료"
+          label="Completed"
           value={dashboard?.completed ?? 0}
           icon="🏁"
           onClick={() => navigate('/sld-manager/orders?status=COMPLETED')}

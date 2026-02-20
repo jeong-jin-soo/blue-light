@@ -163,11 +163,11 @@ export default function SldManagerOrderListPage() {
                 <thead>
                   <tr className="border-b border-gray-100">
                     <th className="text-left py-3 px-4 font-medium text-gray-500">#</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500">신청자</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500">주소</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500">상태</th>
-                    <th className="text-right py-3 px-4 font-medium text-gray-500">견적금액</th>
-                    <th className="text-left py-3 px-4 font-medium text-gray-500">요청일</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-500">Applicant</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-500">Address</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-500">Status</th>
+                    <th className="text-right py-3 px-4 font-medium text-gray-500">Quote</th>
+                    <th className="text-left py-3 px-4 font-medium text-gray-500">Requested</th>
                     <th className="py-3 px-4"></th>
                   </tr>
                 </thead>
