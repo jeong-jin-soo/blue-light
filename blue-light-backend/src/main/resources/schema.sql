@@ -56,6 +56,8 @@ CREATE TABLE IF NOT EXISTS applications (
     renewal_period_months    INT,
     ema_fee                  DECIMAL(10,2),
     sld_option               VARCHAR(20)   DEFAULT 'SELF_UPLOAD',
+    loa_signature_url        VARCHAR(255),
+    loa_signed_at            DATETIME(6),
     expiry_notified_at       DATETIME(6),
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
