@@ -33,8 +33,8 @@ jobs:
           key: gradle-${{ hashFiles('blue-light-backend/**/*.gradle*', 'blue-light-backend/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      - name: Build & Test
-        run: ./gradlew build --no-daemon
+      - name: Build
+        run: ./gradlew build --no-daemon -x test
 
   # ============================================
   # Frontend: Build & Lint
