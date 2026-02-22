@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fullName } from '../../utils/formatName';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Select } from '../../components/ui/Select';
@@ -140,7 +141,7 @@ export default function SldManagerOrderListPage() {
               >
                 <div className="flex items-start justify-between mb-1.5">
                   <div className="min-w-0 flex-1 mr-3">
-                    <p className="font-medium text-gray-800">{order.userName}</p>
+                    <p className="font-medium text-gray-800">{fullName(order.userFirstName, order.userLastName)}</p>
                     <p className="text-xs text-gray-400">{order.userEmail}</p>
                   </div>
                   <SldStatusBadge status={order.status} />
@@ -184,7 +185,7 @@ export default function SldManagerOrderListPage() {
                         <span className="font-mono text-xs text-gray-500">#{order.sldOrderSeq}</span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="font-medium text-gray-800">{order.userName}</div>
+                        <div className="font-medium text-gray-800">{fullName(order.userFirstName, order.userLastName)}</div>
                         <div className="text-xs text-gray-400">{order.userEmail}</div>
                       </td>
                       <td className="py-3 px-4">

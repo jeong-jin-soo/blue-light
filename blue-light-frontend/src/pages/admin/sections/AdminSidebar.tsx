@@ -1,3 +1,4 @@
+import { fullName } from '../../../utils/formatName';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
@@ -129,7 +130,7 @@ export function AdminSidebar({
                   <span className="text-sm">⚡</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{application.assignedLewName}</p>
+                  <p className="text-sm font-medium text-gray-800">{fullName(application.assignedLewFirstName, application.assignedLewLastName)}</p>
                   <p className="text-xs text-gray-500 truncate">{application.assignedLewEmail}</p>
                   {application.assignedLewLicenceNo && (
                     <p className="text-xs text-primary-600 font-mono mt-0.5">{application.assignedLewLicenceNo}</p>

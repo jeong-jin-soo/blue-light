@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { fullName } from '../../utils/formatName';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -86,7 +87,7 @@ export default function AdminUserListPage() {
     setChangingRole(true);
     try {
       await adminApi.changeUserRole(roleChangeTarget.user.userSeq, { role: roleChangeTarget.newRole });
-      toast.success(`${roleChangeTarget.user.name}'s role changed to ${roleChangeTarget.newRole}`);
+      toast.success(`${fullName(roleChangeTarget.user.firstName, roleChangeTarget.user.lastName)}'s role changed to ${roleChangeTarget.newRole}`);
       loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to change role';
@@ -103,10 +104,10 @@ export default function AdminUserListPage() {
     try {
       if (approvalTarget.action === 'approve') {
         await adminApi.approveLew(approvalTarget.user.userSeq);
-        toast.success(`${approvalTarget.user.name} has been approved as LEW`);
+        toast.success(`${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)} has been approved as LEW`);
       } else {
         await adminApi.rejectLew(approvalTarget.user.userSeq);
-        toast.success(`${approvalTarget.user.name}'s LEW registration has been rejected`);
+        toast.success(`${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)}'s LEW registration has been rejected`);
       }
       loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
@@ -151,7 +152,7 @@ export default function AdminUserListPage() {
       sortable: true,
       render: (user) => (
         <div>
-          <span className="font-medium text-gray-800">{user.name}</span>
+          <span className="font-medium text-gray-800">{fullName(user.firstName, user.lastName)}</span>
           {user.companyName && (
             <div className="text-xs text-gray-500 mt-0.5">{user.companyName}{user.uen ? ` (${user.uen})` : ''}</div>
           )}
@@ -191,7 +192,7 @@ export default function AdminUserListPage() {
                   e.target.value = '';
                 }
               }}
-              aria-label={`Change ${user.name}'s role`}
+              aria-label={`Change ${fullName(user.firstName, user.lastName)}'s role`}
             >
               <option value="" disabled>Change</option>
               {user.role !== 'APPLICANT' && <option value="APPLICANT">Applicant</option>}
@@ -216,7 +217,7 @@ export default function AdminUserListPage() {
               <button
                 onClick={() => setApprovalTarget({ user, action: 'approve' })}
                 className="text-xs text-success-600 hover:text-success-700 hover:underline"
-                aria-label={`Approve ${user.name} as LEW`}
+                aria-label={`Approve ${fullName(user.firstName, user.lastName)} as LEW`}
               >
                 Approve
               </button>
@@ -225,7 +226,7 @@ export default function AdminUserListPage() {
               <button
                 onClick={() => setApprovalTarget({ user, action: 'reject' })}
                 className="text-xs text-error-600 hover:text-error-700 hover:underline"
-                aria-label={`Reject ${user.name}'s LEW registration`}
+                aria-label={`Reject ${fullName(user.firstName, user.lastName)}'s LEW registration`}
               >
                 Reject
               </button>
@@ -345,7 +346,7 @@ export default function AdminUserListPage() {
         title="Change User Role"
         message={
           roleChangeTarget
-            ? `Are you sure you want to change ${roleChangeTarget.user.name}'s role from ${roleChangeTarget.user.role} to ${roleChangeTarget.newRole}?`
+            ? `Are you sure you want to change ${fullName(roleChangeTarget.user.firstName, roleChangeTarget.user.lastName)}'s role from ${roleChangeTarget.user.role} to ${roleChangeTarget.newRole}?`
             : ''
         }
         confirmLabel="Change Role"
@@ -361,8 +362,8 @@ export default function AdminUserListPage() {
         message={
           approvalTarget
             ? approvalTarget.action === 'approve'
-              ? `Are you sure you want to approve ${approvalTarget.user.name} as LEW? They will be able to manage applications after re-login.`
-              : `Are you sure you want to reject ${approvalTarget.user.name}'s LEW registration? They will not be able to access the system.`
+              ? `Are you sure you want to approve ${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)} as LEW? They will be able to manage applications after re-login.`
+              : `Are you sure you want to reject ${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)}'s LEW registration? They will not be able to access the system.`
             : ''
         }
         confirmLabel={approvalTarget?.action === 'approve' ? 'Approve' : 'Reject'}

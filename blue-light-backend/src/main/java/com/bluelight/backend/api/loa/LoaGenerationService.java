@@ -76,7 +76,7 @@ public class LoaGenerationService {
             over.beginText();
             over.setFontAndSize(bf, 10);
             over.setTextMatrix(331, 691);
-            over.showText(lew.getName() != null ? lew.getName() : "");
+            over.showText(lew.getFullName());
             over.endText();
 
             // LEW 면허번호: y_bu=666
@@ -111,7 +111,7 @@ public class LoaGenerationService {
             over.beginText();
             over.setFontAndSize(bf, 10);
             over.setTextMatrix(57, 375);
-            String nameDesignation = (applicant.getName() != null ? applicant.getName() : "")
+            String nameDesignation = applicant.getFullName()
                     + (applicant.getDesignation() != null ? "    " + applicant.getDesignation() : "");
             over.showText(nameDesignation);
             over.endText();

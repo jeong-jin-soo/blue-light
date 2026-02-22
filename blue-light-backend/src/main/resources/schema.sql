@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
     user_seq       BIGINT       NOT NULL AUTO_INCREMENT,
     email          VARCHAR(100) NOT NULL,
     password       VARCHAR(255) NOT NULL,
-    name           VARCHAR(50)  NOT NULL,
+    first_name     VARCHAR(50)  NOT NULL,
+    last_name      VARCHAR(50)  NOT NULL,
     phone          VARCHAR(20),
     role           VARCHAR(20)  NOT NULL DEFAULT 'APPLICANT',
     approved_status VARCHAR(20),
@@ -379,3 +380,10 @@ CREATE TABLE IF NOT EXISTS sld_order_payments (
 -- ALTER TABLE sld_chat_messages MODIFY application_seq BIGINT NULL;
 -- ALTER TABLE sld_chat_messages ADD CONSTRAINT fk_sld_chat_sld_order FOREIGN KEY (sld_order_seq) REFERENCES sld_orders (sld_order_seq);
 -- 참고: CREATE TABLE 문에는 이미 sld_order_seq가 포함됨 (신규 DB는 자동 적용)
+
+-- 마이그레이션 (기존 운영 DB용): name → first_name + last_name 분리
+-- ALTER TABLE users ADD COLUMN first_name VARCHAR(50) NOT NULL DEFAULT '' AFTER password;
+-- ALTER TABLE users ADD COLUMN last_name VARCHAR(50) NOT NULL DEFAULT '' AFTER first_name;
+-- UPDATE users SET first_name = SUBSTRING_INDEX(name, ' ', 1), last_name = TRIM(SUBSTR(name, LOCATE(' ', name) + 1)) WHERE name IS NOT NULL;
+-- UPDATE users SET last_name = '' WHERE first_name = last_name;
+-- ALTER TABLE users DROP COLUMN name;

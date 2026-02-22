@@ -151,7 +151,7 @@ export default function Layout() {
 
           {/* User menu */}
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
+            <span className="text-sm text-gray-600 hidden sm:block">{[user?.firstName, user?.lastName].filter(Boolean).join(' ')}</span>
             <button
               onClick={handleLogout}
               className="text-sm text-gray-500 hover:text-red-600 transition-colors cursor-pointer"

@@ -23,7 +23,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
 
   // Profile form
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [lewLicenceNo, setLewLicenceNo] = useState('');
   const [lewGrade, setLewGrade] = useState('');
@@ -62,7 +63,8 @@ export default function ProfilePage() {
       .getMyProfile()
       .then((data) => {
         setProfile(data);
-        setName(data.name);
+        setFirstName(data.firstName);
+        setLastName(data.lastName);
         setPhone(data.phone || '');
         setLewLicenceNo(data.lewLicenceNo || '');
         setLewGrade(data.lewGrade || '');
@@ -86,7 +88,8 @@ export default function ProfilePage() {
   const isProfileDirty = useMemo(() => {
     if (!profile) return false;
     return (
-      name !== profile.name ||
+      firstName !== profile.firstName ||
+      lastName !== profile.lastName ||
       phone !== (profile.phone || '') ||
       companyName !== (profile.companyName || '') ||
       uen !== (profile.uen || '') ||
@@ -94,19 +97,21 @@ export default function ProfilePage() {
       correspondenceAddress !== (profile.correspondenceAddress || '') ||
       correspondencePostalCode !== (profile.correspondencePostalCode || '')
     );
-  }, [profile, name, phone, companyName, uen, designation, correspondenceAddress, correspondencePostalCode]);
+  }, [profile, firstName, lastName, phone, companyName, uen, designation, correspondenceAddress, correspondencePostalCode]);
   useFormGuard(isProfileDirty);
 
   const handleProfileSave = async () => {
     const errors: Record<string, string> = {};
-    if (!name.trim()) errors.name = 'Name is required';
+    if (!firstName.trim()) errors.firstName = 'First name is required';
+    if (!lastName.trim()) errors.lastName = 'Last name is required';
     setProfileErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     setProfileSaving(true);
     try {
       const updated = await userApi.updateProfile({
-        name: name.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         phone: phone.trim() || undefined,
         lewLicenceNo: lewLicenceNo.trim() || undefined,
         lewGrade: lewGrade || undefined,
@@ -268,10 +273,10 @@ export default function ProfilePage() {
       <Card>
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center text-primary text-xl font-bold">
-            {(profile?.name || authUser?.name || '?').charAt(0).toUpperCase()}
+            {(profile?.firstName || authUser?.firstName || '?').charAt(0).toUpperCase()}
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800">{profile?.name || authUser?.name}</h2>
+            <h2 className="text-lg font-semibold text-gray-800">{[profile?.firstName || authUser?.firstName, profile?.lastName || authUser?.lastName].filter(Boolean).join(' ')}</h2>
             <p className="text-sm text-gray-500">{profile?.email || authUser?.email}</p>
             <Badge variant={(profile?.role === 'ADMIN' || profile?.role === 'SYSTEM_ADMIN') ? 'primary' : 'gray'} className="mt-1">
               {profile?.role || authUser?.role}
@@ -285,16 +290,28 @@ export default function ProfilePage() {
         <CardHeader title="Profile Information" description="Update your personal and business details" />
         <div className="space-y-4">
           {/* Personal Information */}
-          <Input
-            label="Full Name"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              setProfileErrors((prev) => ({ ...prev, name: '' }));
-            }}
-            error={profileErrors.name}
-            required
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="First Name"
+              value={firstName}
+              onChange={(e) => {
+                setFirstName(e.target.value);
+                setProfileErrors((prev) => ({ ...prev, firstName: '' }));
+              }}
+              error={profileErrors.firstName}
+              required
+            />
+            <Input
+              label="Last Name"
+              value={lastName}
+              onChange={(e) => {
+                setLastName(e.target.value);
+                setProfileErrors((prev) => ({ ...prev, lastName: '' }));
+              }}
+              error={profileErrors.lastName}
+              required
+            />
+          </div>
           <Input
             label="Email"
             type="email"

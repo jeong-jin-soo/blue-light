@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { fullName } from '../../utils/formatName';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -412,7 +413,7 @@ export default function ApplicationDetailPage() {
           </div>
 
           {/* Assigned LEW */}
-          {application.assignedLewName && (
+          {application.assignedLewFirstName && (
             <Card>
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Assigned LEW</h3>
               <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg border border-primary-100">
@@ -420,7 +421,7 @@ export default function ApplicationDetailPage() {
                   <span className="text-sm">⚡</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{application.assignedLewName}</p>
+                  <p className="text-sm font-medium text-gray-800">{fullName(application.assignedLewFirstName, application.assignedLewLastName)}</p>
                   {application.assignedLewLicenceNo && (
                     <p className="text-xs text-primary-600 font-mono mt-0.5">{application.assignedLewLicenceNo}</p>
                   )}

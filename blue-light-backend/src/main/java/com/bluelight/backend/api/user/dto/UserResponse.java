@@ -16,7 +16,8 @@ public class UserResponse {
 
     private Long userSeq;
     private String email;
-    private String name;
+    private String firstName;
+    private String lastName;
     private String phone;
     private UserRole role;
     private boolean approved;
@@ -35,7 +36,8 @@ public class UserResponse {
         return UserResponse.builder()
                 .userSeq(user.getUserSeq())
                 .email(user.getEmail())
-                .name(user.getName())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .phone(user.getPhone())
                 .role(user.getRole())
                 .approved(user.isApproved())

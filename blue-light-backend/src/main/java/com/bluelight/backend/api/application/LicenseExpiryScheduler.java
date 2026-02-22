@@ -76,7 +76,7 @@ public class LicenseExpiryScheduler {
 
                 emailService.sendLicenseExpiryWarningEmail(
                         app.getUser().getEmail(),
-                        app.getUser().getName(),
+                        app.getUser().getFullName(),
                         app.getLicenseNumber(),
                         app.getAddress(),
                         app.getLicenseExpiryDate(),

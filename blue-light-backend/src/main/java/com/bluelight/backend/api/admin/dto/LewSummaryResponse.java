@@ -12,7 +12,8 @@ import lombok.Getter;
 public class LewSummaryResponse {
 
     private Long userSeq;
-    private String name;
+    private String firstName;
+    private String lastName;
     private String email;
     private String lewLicenceNo;
     private String lewGrade;
@@ -21,7 +22,8 @@ public class LewSummaryResponse {
     public static LewSummaryResponse from(User user) {
         return LewSummaryResponse.builder()
                 .userSeq(user.getUserSeq())
-                .name(user.getName())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
                 .email(user.getEmail())
                 .lewLicenceNo(user.getLewLicenceNo())
                 .lewGrade(user.getLewGrade() != null ? user.getLewGrade().name() : null)

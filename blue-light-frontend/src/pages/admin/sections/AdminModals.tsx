@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { fullName } from '../../../utils/formatName';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../../components/ui/Modal';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { Button } from '../../../components/ui/Button';
@@ -238,7 +239,7 @@ export function AssignLewModal({
                   <span className="text-sm">⚡</span>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-800">{lew.name}</p>
+                  <p className="text-sm font-medium text-gray-800">{fullName(lew.firstName, lew.lastName)}</p>
                   <p className="text-xs text-gray-500 truncate">{lew.email}</p>
                   <div className="flex items-center gap-2 mt-0.5">
                     {lew.lewLicenceNo && (

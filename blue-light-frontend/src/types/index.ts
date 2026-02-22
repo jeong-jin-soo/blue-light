@@ -44,7 +44,8 @@ export type LewGrade = 'GRADE_7' | 'GRADE_8' | 'GRADE_9';
 export interface User {
   userSeq: number;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone?: string;
   role: UserRole;
   approved?: boolean;
@@ -126,7 +127,8 @@ export interface Application {
   createdAt: string;
   updatedAt: string;
   // Phase 19: Assigned LEW info
-  assignedLewName?: string;
+  assignedLewFirstName?: string;
+  assignedLewLastName?: string;
   assignedLewLicenceNo?: string;
   // SP Group 계정 번호
   spAccountNo?: string;
@@ -253,7 +255,8 @@ export interface LoginRequest {
 export interface SignupRequest {
   email: string;
   password: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone?: string;
   role?: string;
   lewLicenceNo?: string;
@@ -273,7 +276,8 @@ export interface TokenResponse {
   expiresIn: number;
   userSeq: number;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   approved: boolean;
   emailVerified: boolean;
@@ -371,7 +375,8 @@ export interface PriceCalculation {
  */
 export interface AdminApplication extends Application {
   userSeq: number;
-  userName: string;
+  userFirstName: string;
+  userLastName: string;
   userEmail: string;
   userPhone?: string;
   userCompanyName?: string;
@@ -383,7 +388,8 @@ export interface AdminApplication extends Application {
   spAccountNo?: string;
   // Assigned LEW info
   assignedLewSeq?: number;
-  assignedLewName?: string;
+  assignedLewFirstName?: string;
+  assignedLewLastName?: string;
   assignedLewEmail?: string;
   assignedLewLicenceNo?: string;
   assignedLewGrade?: LewGrade;
@@ -424,7 +430,8 @@ export interface Page<T> {
  * Update profile request
  */
 export interface UpdateProfileRequest {
-  name: string;
+  firstName: string;
+  lastName: string;
   phone?: string;
   lewLicenceNo?: string;
   lewGrade?: string;
@@ -482,7 +489,8 @@ export interface AssignLewRequest {
  */
 export interface LewSummary {
   userSeq: number;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   lewLicenceNo?: string;
   lewGrade?: LewGrade;
@@ -636,7 +644,8 @@ export type SldOrderStatus =
 export interface SldOrder {
   sldOrderSeq: number;
   userSeq: number;
-  userName: string;
+  userFirstName: string;
+  userLastName: string;
   userEmail: string;
   address?: string;
   postalCode?: string;
@@ -651,7 +660,8 @@ export interface SldOrder {
   uploadedFileSeq?: number;
   revisionComment?: string;
   assignedManagerSeq?: number;
-  assignedManagerName?: string;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
   createdAt: string;
   updatedAt: string;
 }

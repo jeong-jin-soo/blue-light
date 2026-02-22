@@ -65,7 +65,8 @@ public class UserService {
         LewGrade lewGrade = EnumParser.parseNullable(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
 
         user.updateProfile(
-                request.getName(),
+                request.getFirstName(),
+                request.getLastName(),
                 request.getPhone(),
                 request.getLewLicenceNo(),
                 lewGrade,
@@ -183,7 +184,8 @@ public class UserService {
         // 1. 프로필 정보
         Map<String, Object> profile = new LinkedHashMap<>();
         profile.put("email", user.getEmail());
-        profile.put("name", user.getName());
+        profile.put("firstName", user.getFirstName());
+        profile.put("lastName", user.getLastName());
         profile.put("phone", user.getPhone());
         profile.put("role", user.getRole().name());
         profile.put("lewLicenceNo", user.getLewLicenceNo());

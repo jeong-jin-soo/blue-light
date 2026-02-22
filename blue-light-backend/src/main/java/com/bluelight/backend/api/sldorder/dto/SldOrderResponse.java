@@ -27,14 +27,16 @@ public class SldOrderResponse {
     private String managerNote;
     private Long uploadedFileSeq;
     private String revisionComment;
-    private String assignedManagerName;
+    private String assignedManagerFirstName;
+    private String assignedManagerLastName;
     private Long assignedManagerSeq;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
     // Applicant info
     private Long userSeq;
-    private String userName;
+    private String userFirstName;
+    private String userLastName;
     private String userEmail;
 
     public static SldOrderResponse from(SldOrder order) {
@@ -52,14 +54,17 @@ public class SldOrderResponse {
                 .managerNote(order.getManagerNote())
                 .uploadedFileSeq(order.getUploadedFileSeq())
                 .revisionComment(order.getRevisionComment())
-                .assignedManagerName(order.getAssignedManager() != null
-                        ? order.getAssignedManager().getName() : null)
+                .assignedManagerFirstName(order.getAssignedManager() != null
+                        ? order.getAssignedManager().getFirstName() : null)
+                .assignedManagerLastName(order.getAssignedManager() != null
+                        ? order.getAssignedManager().getLastName() : null)
                 .assignedManagerSeq(order.getAssignedManager() != null
                         ? order.getAssignedManager().getUserSeq() : null)
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .userSeq(order.getUser().getUserSeq())
-                .userName(order.getUser().getName())
+                .userFirstName(order.getUser().getFirstName())
+                .userLastName(order.getUser().getLastName())
                 .userEmail(order.getUser().getEmail())
                 .build();
     }

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { fullName } from '../../utils/formatName';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Textarea } from '../../components/ui/Textarea';
@@ -192,9 +193,9 @@ export default function SldOrderDetailPage() {
                 <InfoField label="Requirements Note" value={order.applicantNote} />
               </div>
             )}
-            {order.assignedManagerName && (
+            {order.assignedManagerFirstName && (
               <div className="mt-4 pt-4 border-t border-gray-100">
-                <InfoField label="Assigned Manager" value={order.assignedManagerName} />
+                <InfoField label="Assigned Manager" value={fullName(order.assignedManagerFirstName, order.assignedManagerLastName)} />
               </div>
             )}
           </Card>
@@ -506,7 +507,7 @@ export default function SldOrderDetailPage() {
           </Card>
 
           {/* Assigned Manager */}
-          {order.assignedManagerName && (
+          {order.assignedManagerFirstName && (
             <Card>
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Assigned Manager</h3>
               <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg border border-primary-100">
@@ -514,7 +515,7 @@ export default function SldOrderDetailPage() {
                   <span className="text-sm">&#128100;</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{order.assignedManagerName}</p>
+                  <p className="text-sm font-medium text-gray-800">{fullName(order.assignedManagerFirstName, order.assignedManagerLastName)}</p>
                 </div>
               </div>
             </Card>

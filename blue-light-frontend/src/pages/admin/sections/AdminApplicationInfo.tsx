@@ -1,5 +1,6 @@
 import { Card } from '../../../components/ui/Card';
 import { InfoField } from '../../../components/common/InfoField';
+import { fullName } from '../../../utils/formatName';
 import type { AdminApplication } from '../../../types';
 
 interface Props {
@@ -18,7 +19,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
       <Card>
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Applicant Information</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <InfoField label="Name" value={application.userName} />
+          <InfoField label="Name" value={fullName(application.userFirstName, application.userLastName)} />
           <InfoField label="Email" value={application.userEmail} />
           <InfoField label="Phone" value={application.userPhone || 'Not provided'} />
           <InfoField label="Designation" value={application.userDesignation || '—'} />

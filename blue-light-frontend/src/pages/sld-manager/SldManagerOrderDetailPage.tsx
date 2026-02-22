@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { fullName } from '../../utils/formatName';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -176,7 +177,7 @@ export default function SldManagerOrderDetailPage() {
           <Card>
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Applicant & Order Info</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InfoField label="Applicant" value={order.userName} />
+              <InfoField label="Applicant" value={fullName(order.userFirstName, order.userLastName)} />
               <InfoField label="Email" value={order.userEmail} />
               <InfoField label="Address" value={order.address || '-'} />
               <InfoField label="Postal Code" value={order.postalCode || '-'} />
@@ -477,14 +478,14 @@ export default function SldManagerOrderDetailPage() {
                 <span className="text-sm">&#128100;</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800">{order.userName}</p>
+                <p className="text-sm font-medium text-gray-800">{fullName(order.userFirstName, order.userLastName)}</p>
                 <p className="text-xs text-gray-500 truncate">{order.userEmail}</p>
               </div>
             </div>
           </Card>
 
           {/* Assigned Manager */}
-          {order.assignedManagerName && (
+          {order.assignedManagerFirstName && (
             <Card>
               <h3 className="text-sm font-semibold text-gray-800 mb-3">Assigned Manager</h3>
               <div className="flex items-center gap-3 p-3 bg-primary-50 rounded-lg border border-primary-100">
@@ -492,7 +493,7 @@ export default function SldManagerOrderDetailPage() {
                   <span className="text-sm">&#128100;</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800">{order.assignedManagerName}</p>
+                  <p className="text-sm font-medium text-gray-800">{fullName(order.assignedManagerFirstName, order.assignedManagerLastName)}</p>
                 </div>
               </div>
             </Card>

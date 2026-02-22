@@ -120,7 +120,8 @@ public class AuthService {
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword)
-                .name(request.getName())
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
                 .phone(request.getPhone())
                 .role(selectedRole)
                 .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
@@ -141,7 +142,7 @@ public class AuthService {
         // 이메일 인증 메일 발송
         if (emailVerificationEnabled) {
             String verificationLink = resetBaseUrl + "/verify-email?token=" + emailVerificationToken;
-            emailService.sendEmailVerificationEmail(savedUser.getEmail(), savedUser.getName(), verificationLink);
+            emailService.sendEmailVerificationEmail(savedUser.getEmail(), savedUser.getFullName(), verificationLink);
         }
 
         // JWT 토큰 생성 및 반환
@@ -216,7 +217,7 @@ public class AuthService {
 
             // 비밀번호 재설정 링크 생성 및 이메일 발송
             String resetLink = resetBaseUrl + "/reset-password?token=" + token;
-            emailService.sendPasswordResetEmail(user.getEmail(), user.getName(), resetLink);
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetLink);
 
             log.info("Password reset token created for: {}", request.getEmail());
         });
@@ -333,7 +334,7 @@ public class AuthService {
         user.setEmailVerificationToken(newToken);
 
         String verificationLink = resetBaseUrl + "/verify-email?token=" + newToken;
-        emailService.sendEmailVerificationEmail(user.getEmail(), user.getName(), verificationLink);
+        emailService.sendEmailVerificationEmail(user.getEmail(), user.getFullName(), verificationLink);
 
         log.info("Verification email resent: userSeq={}, email={}", userSeq, user.getEmail());
     }
@@ -375,7 +376,8 @@ public class AuthService {
                 jwtTokenProvider.getExpirationInSeconds(),
                 user.getUserSeq(),
                 user.getEmail(),
-                user.getName(),
+                user.getFirstName(),
+                user.getLastName(),
                 user.getRole().name(),
                 approved,
                 emailVerified

@@ -33,7 +33,8 @@ function isTokenValid(): boolean {
 interface AuthUser {
   userSeq: number;
   email: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   approved: boolean;
   emailVerified: boolean;
@@ -81,7 +82,8 @@ export const useAuthStore = create<AuthState>()(
             user: {
               userSeq: response.userSeq,
               email: response.email,
-              name: response.name,
+              firstName: response.firstName,
+              lastName: response.lastName,
               role: response.role,
               approved: response.approved,
               emailVerified: response.emailVerified,
@@ -113,7 +115,8 @@ export const useAuthStore = create<AuthState>()(
             user: {
               userSeq: response.userSeq,
               email: response.email,
-              name: response.name,
+              firstName: response.firstName,
+              lastName: response.lastName,
               role: response.role,
               approved: response.approved,
               emailVerified: response.emailVerified,
@@ -156,7 +159,8 @@ export const useAuthStore = create<AuthState>()(
           user: {
             userSeq: tokenResponse.userSeq,
             email: tokenResponse.email,
-            name: tokenResponse.name,
+            firstName: tokenResponse.firstName,
+            lastName: tokenResponse.lastName,
             role: tokenResponse.role,
             approved: tokenResponse.approved,
             emailVerified: tokenResponse.emailVerified,
@@ -174,7 +178,8 @@ export const useAuthStore = create<AuthState>()(
             user: {
               userSeq: profile.userSeq,
               email: profile.email,
-              name: profile.name,
+              firstName: profile.firstName,
+              lastName: profile.lastName,
               role: profile.role as UserRole,
               approved: profile.approved ?? false,
               emailVerified: currentUser?.emailVerified ?? false,

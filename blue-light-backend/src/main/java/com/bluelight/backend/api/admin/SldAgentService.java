@@ -351,7 +351,7 @@ public class SldAgentService {
         }
         // 담당 LEW 정보
         if (app.getAssignedLew() != null) {
-            builder.put("assignedLewName", app.getAssignedLew().getName());
+            builder.put("assignedLewName", app.getAssignedLew().getFullName());
             builder.put("assignedLewLicenceNo", app.getAssignedLew().getLewLicenceNo() != null
                     ? app.getAssignedLew().getLewLicenceNo() : "");
         }

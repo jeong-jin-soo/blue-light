@@ -4,37 +4,37 @@
 -- ============================================
 
 -- Admin 계정 (password: admin1234 / BCrypt encoded, 이메일 인증 완료)
-INSERT INTO users (email, password, name, phone, role, email_verified, created_at, updated_at)
+INSERT INTO users (email, password, first_name, last_name, phone, role, email_verified, created_at, updated_at)
 SELECT 'admin@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'System Admin', '+65-0000-0000', 'ADMIN', TRUE,
+       'System', 'Admin', '+65-0000-0000', 'ADMIN', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@bluelight.sg');
 
 -- LEW 계정 (password: admin1234 / BCrypt encoded, 사전 승인됨, Grade 9, 이메일 인증 완료)
-INSERT INTO users (email, password, name, phone, role, approved_status, lew_licence_no, lew_grade, email_verified, created_at, updated_at)
+INSERT INTO users (email, password, first_name, last_name, phone, role, approved_status, lew_licence_no, lew_grade, email_verified, created_at, updated_at)
 SELECT 'lew@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'LEW Officer', '+65-0000-0001', 'LEW', 'APPROVED', 'LEW-2026-00001', 'GRADE_9', TRUE,
+       'LEW', 'Officer', '+65-0000-0001', 'LEW', 'APPROVED', 'LEW-2026-00001', 'GRADE_9', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'lew@bluelight.sg');
 
 -- System Admin 계정 (password: admin1234 / BCrypt encoded, 시스템 관리 전용)
-INSERT INTO users (email, password, name, phone, role, email_verified, created_at, updated_at)
+INSERT INTO users (email, password, first_name, last_name, phone, role, email_verified, created_at, updated_at)
 SELECT 'sysadmin@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'System Administrator', '+65-0000-0099', 'SYSTEM_ADMIN', TRUE,
+       'System', 'Administrator', '+65-0000-0099', 'SYSTEM_ADMIN', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sysadmin@bluelight.sg');
 
 -- SLD Manager 계정 (password: admin1234 / BCrypt encoded, SLD 전용 주문 관리)
-INSERT INTO users (email, password, name, phone, role, email_verified, created_at, updated_at)
+INSERT INTO users (email, password, first_name, last_name, phone, role, email_verified, created_at, updated_at)
 SELECT 'sldmanager@bluelight.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'SLD Manager', '+65-0000-0002', 'SLD_MANAGER', TRUE,
+       'SLD', 'Manager', '+65-0000-0002', 'SLD_MANAGER', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sldmanager@bluelight.sg');

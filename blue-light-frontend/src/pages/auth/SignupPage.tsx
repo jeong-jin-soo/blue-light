@@ -11,7 +11,8 @@ interface SignupForm {
   email: string;
   password: string;
   confirmPassword: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   phone: string;
   role: string;
   lewLicenceNo: string;
@@ -26,7 +27,8 @@ const INITIAL_FORM: SignupForm = {
   email: '',
   password: '',
   confirmPassword: '',
-  name: '',
+  firstName: '',
+  lastName: '',
   phone: '',
   role: 'APPLICANT',
   lewLicenceNo: '',
@@ -115,7 +117,8 @@ export default function SignupPage() {
       await signup({
         email: form.email,
         password: form.password,
-        name: form.name,
+        firstName: form.firstName,
+        lastName: form.lastName,
         phone: form.phone || undefined,
         role: form.role,
         lewLicenceNo: form.role === 'LEW' ? form.lewLicenceNo.trim() : undefined,
@@ -153,15 +156,26 @@ export default function SignupPage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="Full Name"
-          type="text"
-          required
-          maxLength={50}
-          value={form.name}
-          onChange={(e) => updateField('name', e.target.value)}
-          placeholder="John Doe"
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="First Name"
+            type="text"
+            required
+            maxLength={50}
+            value={form.firstName}
+            onChange={(e) => updateField('firstName', e.target.value)}
+            placeholder="John"
+          />
+          <Input
+            label="Last Name"
+            type="text"
+            required
+            maxLength={50}
+            value={form.lastName}
+            onChange={(e) => updateField('lastName', e.target.value)}
+            placeholder="Doe"
+          />
+        </div>
 
         <Input
           label="Email"

@@ -15,13 +15,14 @@ public class TokenResponse {
     private Long expiresIn;
     private Long userSeq;
     private String email;
-    private String name;
+    private String firstName;
+    private String lastName;
     private String role;
     private Boolean approved;
     private Boolean emailVerified;
 
     public static TokenResponse of(String accessToken, Long expiresIn, Long userSeq,
-                                   String email, String name, String role,
+                                   String email, String firstName, String lastName, String role,
                                    boolean approved, boolean emailVerified) {
         return TokenResponse.builder()
                 .accessToken(accessToken)
@@ -29,7 +30,8 @@ public class TokenResponse {
                 .expiresIn(expiresIn)
                 .userSeq(userSeq)
                 .email(email)
-                .name(name)
+                .firstName(firstName)
+                .lastName(lastName)
                 .role(role)
                 .approved(approved)
                 .emailVerified(emailVerified)

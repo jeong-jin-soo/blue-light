@@ -52,7 +52,7 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-            Welcome back{user?.name ? `, ${user.name}` : ''}
+            Welcome back{user?.firstName ? `, ${user.firstName}` : ''}
           </h1>
           <p className="text-sm text-gray-500 mt-1">Overview of your licence applications</p>
         </div>

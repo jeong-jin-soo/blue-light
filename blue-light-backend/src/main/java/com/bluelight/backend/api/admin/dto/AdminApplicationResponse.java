@@ -31,7 +31,8 @@ public class AdminApplicationResponse {
 
     // Applicant info
     private Long userSeq;
-    private String userName;
+    private String userFirstName;
+    private String userLastName;
     private String userEmail;
     private String userPhone;
     private String userCompanyName;
@@ -42,7 +43,8 @@ public class AdminApplicationResponse {
 
     // Assigned LEW info
     private Long assignedLewSeq;
-    private String assignedLewName;
+    private String assignedLewFirstName;
+    private String assignedLewLastName;
     private String assignedLewEmail;
     private String assignedLewLicenceNo;
     private String assignedLewGrade;
@@ -83,7 +85,8 @@ public class AdminApplicationResponse {
                 .createdAt(application.getCreatedAt())
                 .updatedAt(application.getUpdatedAt())
                 .userSeq(application.getUser().getUserSeq())
-                .userName(application.getUser().getName())
+                .userFirstName(application.getUser().getFirstName())
+                .userLastName(application.getUser().getLastName())
                 .userEmail(application.getUser().getEmail())
                 .userPhone(application.getUser().getPhone())
                 .userCompanyName(application.getUser().getCompanyName())
@@ -93,8 +96,10 @@ public class AdminApplicationResponse {
                 .userCorrespondencePostalCode(application.getUser().getCorrespondencePostalCode())
                 .assignedLewSeq(application.getAssignedLew() != null
                         ? application.getAssignedLew().getUserSeq() : null)
-                .assignedLewName(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getName() : null)
+                .assignedLewFirstName(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getFirstName() : null)
+                .assignedLewLastName(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getLastName() : null)
                 .assignedLewEmail(application.getAssignedLew() != null
                         ? application.getAssignedLew().getEmail() : null)
                 .assignedLewLicenceNo(application.getAssignedLew() != null

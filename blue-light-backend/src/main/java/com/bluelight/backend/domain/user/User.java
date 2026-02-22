@@ -41,10 +41,16 @@ public class User extends BaseEntity {
     private String password;
 
     /**
-     * 사용자 이름
+     * 이름 (First Name)
      */
-    @Column(name = "name", nullable = false, length = 50)
-    private String name;
+    @Column(name = "first_name", nullable = false, length = 50)
+    private String firstName;
+
+    /**
+     * 성 (Last Name)
+     */
+    @Column(name = "last_name", nullable = false, length = 50)
+    private String lastName;
 
     /**
      * 연락처
@@ -135,7 +141,7 @@ public class User extends BaseEntity {
     private String signatureUrl;
 
     @Builder
-    public User(String email, String password, String name, String phone,
+    public User(String email, String password, String firstName, String lastName, String phone,
                 UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
                 LewGrade lewGrade,
                 String companyName, String uen, String designation,
@@ -144,7 +150,8 @@ public class User extends BaseEntity {
                 LocalDateTime pdpaConsentAt) {
         this.email = email;
         this.password = password;
-        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.phone = phone;
         this.role = role != null ? role : UserRole.APPLICANT;
         this.approvedStatus = approvedStatus;
@@ -158,6 +165,16 @@ public class User extends BaseEntity {
         this.emailVerified = emailVerified != null ? emailVerified : false;
         this.emailVerificationToken = emailVerificationToken;
         this.pdpaConsentAt = pdpaConsentAt;
+    }
+
+    /**
+     * Full name 헬퍼 (firstName + lastName)
+     */
+    public String getFullName() {
+        if (firstName == null && lastName == null) return "";
+        if (firstName == null) return lastName;
+        if (lastName == null || lastName.isEmpty()) return firstName;
+        return firstName + " " + lastName;
     }
 
     /**
@@ -200,16 +217,18 @@ public class User extends BaseEntity {
     /**
      * 프로필 정보 수정
      */
-    public void updateProfile(String name, String phone) {
-        this.name = name;
+    public void updateProfile(String firstName, String lastName, String phone) {
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.phone = phone;
     }
 
     /**
      * 프로필 정보 수정 (LEW 면허번호 포함)
      */
-    public void updateProfile(String name, String phone, String lewLicenceNo) {
-        this.name = name;
+    public void updateProfile(String firstName, String lastName, String phone, String lewLicenceNo) {
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.phone = phone;
         this.lewLicenceNo = lewLicenceNo;
     }
@@ -217,11 +236,12 @@ public class User extends BaseEntity {
     /**
      * 프로필 정보 수정 (회사 정보 + LEW 등급 포함)
      */
-    public void updateProfile(String name, String phone, String lewLicenceNo,
+    public void updateProfile(String firstName, String lastName, String phone, String lewLicenceNo,
                               LewGrade lewGrade,
                               String companyName, String uen, String designation,
                               String correspondenceAddress, String correspondencePostalCode) {
-        this.name = name;
+        this.firstName = firstName;
+        this.lastName = lastName;
         this.phone = phone;
         this.lewLicenceNo = lewLicenceNo;
         this.lewGrade = lewGrade;
@@ -311,7 +331,8 @@ public class User extends BaseEntity {
      * - 법적 보존 의무가 있는 신청 기록은 유지하되, 개인 식별 정보는 마스킹
      */
     public void anonymize() {
-        this.name = "Deleted User";
+        this.firstName = "Deleted";
+        this.lastName = "User";
         this.phone = null;
         this.lewLicenceNo = null;
         this.lewGrade = null;

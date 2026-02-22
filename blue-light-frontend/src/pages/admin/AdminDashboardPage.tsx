@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fullName } from '../../utils/formatName';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -213,7 +214,7 @@ export default function AdminDashboardPage() {
                 >
                   <div className="flex items-start justify-between mb-1.5">
                     <div className="min-w-0 flex-1 mr-3">
-                      <p className="font-medium text-gray-800">{app.userName}</p>
+                      <p className="font-medium text-gray-800">{fullName(app.userFirstName, app.userLastName)}</p>
                       <p className="text-xs text-gray-400">{app.userEmail}</p>
                     </div>
                     <StatusBadge status={app.status} />
@@ -253,7 +254,7 @@ export default function AdminDashboardPage() {
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`${basePath}/applications/${app.applicationSeq}`); } }}
                     >
                       <td className="py-3 px-2">
-                        <div className="font-medium text-gray-800">{app.userName}</div>
+                        <div className="font-medium text-gray-800">{fullName(app.userFirstName, app.userLastName)}</div>
                         <div className="text-xs text-gray-400">{app.userEmail}</div>
                       </td>
                       <td className="py-3 px-2">

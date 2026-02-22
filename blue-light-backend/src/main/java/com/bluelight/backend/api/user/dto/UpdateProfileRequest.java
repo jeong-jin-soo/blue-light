@@ -12,9 +12,13 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class UpdateProfileRequest {
 
-    @NotBlank(message = "Name is required")
-    @Size(max = 50, message = "Name must be 50 characters or less")
-    private String name;
+    @NotBlank(message = "First name is required")
+    @Size(max = 50, message = "First name must be 50 characters or less")
+    private String firstName;
+
+    @NotBlank(message = "Last name is required")
+    @Size(max = 50, message = "Last name must be 50 characters or less")
+    private String lastName;
 
     @Size(max = 20, message = "Phone number must be 20 characters or less")
     private String phone;

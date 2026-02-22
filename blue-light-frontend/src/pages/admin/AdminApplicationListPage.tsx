@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { fullName } from '../../utils/formatName';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -107,7 +108,7 @@ export default function AdminApplicationListPage() {
       header: 'Applicant',
       render: (app) => (
         <div>
-          <div className="font-medium text-gray-800">{app.userName}</div>
+          <div className="font-medium text-gray-800">{fullName(app.userFirstName, app.userLastName)}</div>
           <div className="text-xs text-gray-400">{app.userEmail}</div>
         </div>
       ),
@@ -146,8 +147,8 @@ export default function AdminApplicationListPage() {
       key: 'assignedLewName',
       header: 'Assigned LEW',
       render: (app) => (
-        <span className={app.assignedLewName ? 'text-gray-700' : 'text-gray-400 italic'}>
-          {app.assignedLewName || 'Unassigned'}
+        <span className={app.assignedLewFirstName ? 'text-gray-700' : 'text-gray-400 italic'}>
+          {fullName(app.assignedLewFirstName, app.assignedLewLastName) || 'Unassigned'}
         </span>
       ),
     },
@@ -226,7 +227,7 @@ export default function AdminApplicationListPage() {
                     {app.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
                   </Badge>
                 </div>
-                <p className="font-medium text-gray-800">{app.userName}</p>
+                <p className="font-medium text-gray-800">{fullName(app.userFirstName, app.userLastName)}</p>
                 <p className="text-xs text-gray-400">{app.userEmail}</p>
               </div>
               <StatusBadge status={app.status} />
@@ -239,10 +240,10 @@ export default function AdminApplicationListPage() {
               </div>
               <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
             </div>
-            {app.assignedLewName && (
+            {app.assignedLewFirstName && (
               <div className="mt-1.5 text-xs text-gray-500">
                 <span className="inline-flex items-center gap-1">
-                  ⚡ {app.assignedLewName}
+                  ⚡ {fullName(app.assignedLewFirstName, app.assignedLewLastName)}
                 </span>
               </div>
             )}

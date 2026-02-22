@@ -22,9 +22,13 @@ public class SignupRequest {
     @Size(min = 8, max = 20, message = "Password must be between 8 and 20 characters")
     private String password;
 
-    @NotBlank(message = "Name is required")
-    @Size(max = 50, message = "Name must be 50 characters or less")
-    private String name;
+    @NotBlank(message = "First name is required")
+    @Size(max = 50, message = "First name must be 50 characters or less")
+    private String firstName;
+
+    @NotBlank(message = "Last name is required")
+    @Size(max = 50, message = "Last name must be 50 characters or less")
+    private String lastName;
 
     @Size(max = 20, message = "Phone number must be 20 characters or less")
     private String phone;

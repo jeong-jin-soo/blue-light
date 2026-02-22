@@ -30,7 +30,8 @@ public class ApplicationResponse {
     private LocalDateTime updatedAt;
 
     // ── Phase 19: Assigned LEW info (신청자용 — 이름+면허번호만 노출) ──
-    private String assignedLewName;
+    private String assignedLewFirstName;
+    private String assignedLewLastName;
     private String assignedLewLicenceNo;
 
     // SP Group 계정 번호
@@ -68,8 +69,10 @@ public class ApplicationResponse {
                 .createdAt(application.getCreatedAt())
                 .updatedAt(application.getUpdatedAt())
                 // Phase 19: Assigned LEW info
-                .assignedLewName(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getName() : null)
+                .assignedLewFirstName(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getFirstName() : null)
+                .assignedLewLastName(application.getAssignedLew() != null
+                        ? application.getAssignedLew().getLastName() : null)
                 .assignedLewLicenceNo(application.getAssignedLew() != null
                         ? application.getAssignedLew().getLewLicenceNo() : null)
                 // SP Account
