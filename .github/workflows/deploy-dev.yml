@@ -5,8 +5,8 @@ on:
     branches: [develop]
 
 env:
-  AWS_REGION: ap-southeast-1
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-1.amazonaws.com
+  AWS_REGION: ap-southeast-7
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-7.amazonaws.com
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
@@ -115,6 +115,14 @@ jobs:
           docker push ${{ env.ECR_REGISTRY }}/bluelight-frontend:${{ env.IMAGE_TAG }}
           docker push ${{ env.ECR_REGISTRY }}/bluelight-frontend:latest
 
+      - name: Build & Push SLD Agent image
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }} \
+                        -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:latest \
+                        ./blue-light-ai
+          docker push ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }}
+          docker push ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:latest
+
   # ============================================
   # Deploy to Dev Server
   # ============================================
@@ -146,7 +154,7 @@ jobs:
             cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
 
             # ECR 로그인
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
+            aws ecr get-login-password --region ap-southeast-7 | \
               docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY }}
 
             # 환경변수 설정
@@ -159,6 +167,10 @@ jobs:
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
             FILE_ENCRYPTION_KEY=${{ secrets.FILE_ENCRYPTION_KEY }}
+            FILE_STORAGE_TYPE=${{ secrets.FILE_STORAGE_TYPE }}
+            AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+            AWS_S3_REGION=${{ secrets.AWS_S3_REGION }}
+            SLD_AGENT_SERVICE_KEY=${{ secrets.SLD_AGENT_SERVICE_KEY }}
             MAIL_HOST=${{ secrets.MAIL_HOST }}
             MAIL_PORT=${{ secrets.MAIL_PORT }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
@@ -166,7 +178,7 @@ jobs:
             PASSWORD_RESET_BASE_URL=${{ secrets.PASSWORD_RESET_BASE_URL }}
             ENVEOF
 
-            # 배포 (개발: DB는 외부 서버)
+            # 배포 (개발: DB는 외부 RDS)
             docker compose -f docker-compose.yml pull
             docker compose -f docker-compose.yml up -d --remove-orphans
 

@@ -39,6 +39,11 @@ dependencies {
 	implementation 'net.javacrumbs.shedlock:shedlock-spring:7.6.0'
 	implementation 'net.javacrumbs.shedlock:shedlock-provider-jdbc-template:7.6.0'
 
+	// AWS S3
+	implementation platform('software.amazon.awssdk:bom:2.31.1')
+	implementation 'software.amazon.awssdk:s3'
+	implementation 'software.amazon.awssdk:sts'  // IAM Role 지원
+
 	// JWT
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

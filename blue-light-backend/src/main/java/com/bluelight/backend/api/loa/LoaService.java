@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.loa;
 
+import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
@@ -10,23 +11,17 @@ import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * LOA 비즈니스 로직 오케스트레이션 서비스
  * - PDF 생성, 서명, 상태 조회
+ * - FileStorageService를 통해 파일 저장 (Local/S3 무관)
  */
 @Slf4j
 @Service
@@ -37,9 +32,7 @@ public class LoaService {
     private final ApplicationRepository applicationRepository;
     private final FileRepository fileRepository;
     private final LoaGenerationService loaGenerationService;
-
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    private final FileStorageService fileStorageService;
 
     /**
      * LOA PDF 생성 (Admin/LEW 액션)
@@ -67,28 +60,22 @@ public class LoaService {
                 .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
         existingLoas.forEach(f -> fileRepository.delete(f));
 
-        // 타입에 따라 PDF 생성
-        String pdfRelativePath;
+        // 타입에 따라 PDF 생성 (LoaGenerationService가 FileStorageService로 저장)
+        String pdfStoredPath;
         if (application.getApplicationType() == ApplicationType.RENEWAL) {
-            pdfRelativePath = loaGenerationService.generateRenewalLoa(application);
+            pdfStoredPath = loaGenerationService.generateRenewalLoa(application);
         } else {
-            pdfRelativePath = loaGenerationService.generateNewLicenceLoa(application);
+            pdfStoredPath = loaGenerationService.generateNewLicenceLoa(application);
         }
 
-        // 파일 크기 확인
-        Path absolutePath = Paths.get(uploadDir).toAbsolutePath().normalize().resolve(pdfRelativePath);
-        long fileSize;
-        try {
-            fileSize = Files.size(absolutePath);
-        } catch (IOException e) {
-            fileSize = 0;
-        }
+        // 파일 크기: FileStorageService에서 로드하여 확인
+        long fileSize = getFileSize(pdfStoredPath);
 
         // FileEntity 레코드 생성
         FileEntity fileEntity = FileEntity.builder()
                 .application(application)
                 .fileType(FileType.OWNER_AUTH_LETTER)
-                .fileUrl(pdfRelativePath)
+                .fileUrl(pdfStoredPath)
                 .originalFilename("LOA_" + applicationSeq + ".pdf")
                 .fileSize(fileSize)
                 .build();
@@ -129,34 +116,16 @@ public class LoaService {
 
         FileEntity loaFile = loaFiles.get(loaFiles.size() - 1); // 최신 LOA
 
-        // 서명 이미지 저장
+        // 서명 이미지를 FileStorageService로 저장
         String subDirectory = "applications/" + applicationSeq;
-        String sigFilename = "signature_loa_" + UUID.randomUUID().toString().substring(0, 8) + ".png";
-        Path sigDir = Paths.get(uploadDir).toAbsolutePath().normalize().resolve(subDirectory);
+        String signatureRelativePath = fileStorageService.store(signatureImage, subDirectory);
 
-        try {
-            Files.createDirectories(sigDir);
-            Files.copy(signatureImage.getInputStream(), sigDir.resolve(sigFilename),
-                    StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException e) {
-            throw new BusinessException("Failed to save signature image",
-                    HttpStatus.INTERNAL_SERVER_ERROR, "SIGNATURE_SAVE_ERROR");
-        }
-
-        String signatureRelativePath = subDirectory + "/" + sigFilename;
-
-        // PDF에 서명 임베드
+        // PDF에 서명 임베드 (LoaGenerationService가 FileStorageService를 통해 로드/저장)
         String signedPdfPath = loaGenerationService.embedSignatureIntoPdf(
                 loaFile.getFileUrl(), signatureRelativePath, application);
 
         // FileEntity 업데이트 (서명된 PDF로 교체)
-        Path signedAbsPath = Paths.get(uploadDir).toAbsolutePath().normalize().resolve(signedPdfPath);
-        long fileSize;
-        try {
-            fileSize = Files.size(signedAbsPath);
-        } catch (IOException e) {
-            fileSize = 0;
-        }
+        long fileSize = getFileSize(signedPdfPath);
         loaFile.updateFileUrl(signedPdfPath, "LOA_SIGNED_" + applicationSeq + ".pdf", fileSize);
 
         // Application에 서명 정보 등록
@@ -203,5 +172,18 @@ public class LoaService {
         return applicationRepository.findById(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+    }
+
+    /**
+     * FileStorageService에서 파일을 로드하여 크기 확인
+     */
+    private long getFileSize(String storedPath) {
+        try {
+            return fileStorageService.loadAsResource(storedPath)
+                    .getInputStream().readAllBytes().length;
+        } catch (Exception e) {
+            log.warn("Failed to determine file size: {}", storedPath, e);
+            return 0;
+        }
     }
 }

@@ -80,8 +80,13 @@ cors:
 # 파일 저장 설정
 file:
   upload-dir: ${FILE_UPLOAD_DIR:./uploads}
-  encryption-key: ${FILE_ENCRYPTION_KEY:}           # Base64 인코딩 AES-256 키 (비어있으면 암호화 비활성화)
+  storage-type: ${FILE_STORAGE_TYPE:local}           # "local" (로컬 디스크) 또는 "s3" (AWS S3)
+  encryption-key: ${FILE_ENCRYPTION_KEY:}           # Base64 인코딩 AES-256 키 (비어있으면 암호화 비활성화, local 전용)
   encryption-migrate: ${FILE_ENCRYPTION_MIGRATE:false}  # true로 설정 시 기동 시 기존 평문 파일 일괄 암호화
+  s3:
+    bucket: ${AWS_S3_BUCKET:}
+    region: ${AWS_S3_REGION:ap-southeast-1}
+    endpoint: ${AWS_S3_ENDPOINT:}                   # 로컬 테스트용 (LocalStack 등, 비어있으면 AWS 기본)
 
 # 비밀번호 재설정 설정
 password-reset:

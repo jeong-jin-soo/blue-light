@@ -6,6 +6,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -23,6 +24,8 @@ import java.util.UUID;
 /**
  * Local disk file storage implementation with at-rest encryption
  *
+ * file.storage-type=local (기본값) 일 때 활성화.
+ *
  * 암호화 설정 시 (FILE_ENCRYPTION_KEY 환경변수):
  *   - store(): 파일 데이터 → AES-256-GCM 암호화 → 디스크 저장
  *   - loadAsResource(): 디스크 → 복호화 → ByteArrayResource 반환
@@ -31,6 +34,7 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
+@ConditionalOnProperty(name = "file.storage-type", havingValue = "local", matchIfMissing = true)
 @RequiredArgsConstructor
 public class LocalFileStorageService implements FileStorageService {
 
