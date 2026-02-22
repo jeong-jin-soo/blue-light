@@ -382,8 +382,5 @@ CREATE TABLE IF NOT EXISTS sld_order_payments (
 -- 참고: CREATE TABLE 문에는 이미 sld_order_seq가 포함됨 (신규 DB는 자동 적용)
 
 -- 마이그레이션 (기존 운영 DB용): name → first_name + last_name 분리
--- ALTER TABLE users ADD COLUMN first_name VARCHAR(50) NOT NULL DEFAULT '' AFTER password;
--- ALTER TABLE users ADD COLUMN last_name VARCHAR(50) NOT NULL DEFAULT '' AFTER first_name;
--- UPDATE users SET first_name = SUBSTRING_INDEX(name, ' ', 1), last_name = TRIM(SUBSTR(name, LOCATE(' ', name) + 1)) WHERE name IS NOT NULL;
--- UPDATE users SET last_name = '' WHERE first_name = last_name;
--- ALTER TABLE users DROP COLUMN name;
+-- 주의: 이 마이그레이션은 DatabaseMigrationRunner.java에서 Java 코드로 실행됨
+-- (MySQL의 DELIMITER/프로시저가 Spring ScriptUtils와 호환되지 않으므로)

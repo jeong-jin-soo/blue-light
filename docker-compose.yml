@@ -40,6 +40,8 @@ services:
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-LicenseKaki}
       # Password Reset
       PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-https://dev.licensekaki.com}
+      # SQL Init (운영: never, 로컬: always)
+      SQL_INIT_MODE: ${SQL_INIT_MODE:-always}
     volumes:
       - uploads_data:/app/uploads
 

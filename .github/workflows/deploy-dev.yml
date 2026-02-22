@@ -144,38 +144,6 @@ jobs:
           source: "docker-compose.yml"
           target: "/home/${{ secrets.DEV_SERVER_USER }}/bluelight"
 
-      - name: Run DB migration (name → firstName/lastName)
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEV_SERVER_HOST }}
-          username: ${{ secrets.DEV_SERVER_USER }}
-          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
-          script: |
-            # DB_URL에서 호스트/포트/DB명 추출 (jdbc:mysql://host:port/dbname)
-            DB_URL="${{ secrets.DB_URL }}"
-            DB_HOST=$(echo "$DB_URL" | sed -E 's|jdbc:mysql://([^:/]+).*|\1|')
-            DB_PORT=$(echo "$DB_URL" | sed -E 's|jdbc:mysql://[^:]+:([0-9]+).*|\1|')
-            DB_NAME=$(echo "$DB_URL" | sed -E 's|.*/([^?]+).*|\1|')
-
-            echo "Migrating: $DB_HOST:$DB_PORT/$DB_NAME"
-
-            # name 컬럼 존재 여부 확인 (이미 마이그레이션 완료 시 스킵)
-            HAS_NAME=$(docker run --rm mysql:8.0 mysql -h "$DB_HOST" -P "$DB_PORT" -u "${{ secrets.DB_USERNAME }}" -p"${{ secrets.DB_PASSWORD }}" "$DB_NAME" -N -e "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='$DB_NAME' AND TABLE_NAME='users' AND COLUMN_NAME='name';" 2>/dev/null)
-
-            if [ "$HAS_NAME" = "1" ]; then
-              echo "Running migration: name → first_name + last_name"
-              docker run --rm mysql:8.0 mysql -h "$DB_HOST" -P "$DB_PORT" -u "${{ secrets.DB_USERNAME }}" -p"${{ secrets.DB_PASSWORD }}" "$DB_NAME" -e "
-                ALTER TABLE users ADD COLUMN first_name VARCHAR(50) NOT NULL DEFAULT '' AFTER password;
-                ALTER TABLE users ADD COLUMN last_name VARCHAR(50) NOT NULL DEFAULT '' AFTER first_name;
-                UPDATE users SET first_name = SUBSTRING_INDEX(name, ' ', 1), last_name = TRIM(SUBSTR(name, LOCATE(' ', name) + 1)) WHERE name IS NOT NULL;
-                UPDATE users SET last_name = '' WHERE first_name = last_name;
-                ALTER TABLE users DROP COLUMN name;
-              "
-              echo "Migration completed successfully"
-            else
-              echo "Migration already applied, skipping"
-            fi
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -208,6 +176,7 @@ jobs:
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             PASSWORD_RESET_BASE_URL=${{ secrets.PASSWORD_RESET_BASE_URL }}
+            SQL_INIT_MODE=never
             ENVEOF
 
             # 배포 (개발: DB는 외부 RDS)

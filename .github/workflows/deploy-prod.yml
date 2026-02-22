@@ -171,6 +171,7 @@ jobs:
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             PASSWORD_RESET_BASE_URL=${{ secrets.PASSWORD_RESET_BASE_URL }}
+            SQL_INIT_MODE=never
             ENVEOF
 
             # 배포 (운영: DB는 외부 RDS)
