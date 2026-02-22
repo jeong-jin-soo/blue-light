@@ -50,7 +50,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 검색: 이름, 이메일, 회사명, UEN, ID로 검색 (Admin)
      */
     @Query("SELECT u FROM User u WHERE " +
-           "(LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "(LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.companyName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.uen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -63,7 +63,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Query("SELECT u FROM User u WHERE " +
            "u.role = :role AND " +
-           "(LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "(LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.companyName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.uen) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

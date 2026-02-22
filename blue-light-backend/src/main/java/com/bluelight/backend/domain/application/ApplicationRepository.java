@@ -56,7 +56,7 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
      */
     @Query("SELECT a FROM Application a JOIN a.user u WHERE " +
            "(LOWER(a.address) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "CAST(a.applicationSeq AS string) LIKE CONCAT('%', :keyword, '%')) " +
            "ORDER BY a.createdAt DESC")
@@ -68,7 +68,7 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     @Query("SELECT a FROM Application a JOIN a.user u WHERE " +
            "a.status = :status AND " +
            "(LOWER(a.address) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
            "CAST(a.applicationSeq AS string) LIKE CONCAT('%', :keyword, '%')) " +
            "ORDER BY a.createdAt DESC")
