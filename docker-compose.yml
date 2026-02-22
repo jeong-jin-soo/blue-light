@@ -31,13 +31,15 @@ services:
       # AWS S3 (FILE_STORAGE_TYPE=s3 일 때 사용)
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
       AWS_S3_REGION: ${AWS_S3_REGION:-ap-southeast-1}
-      # Email
+      # Email (AWS SES SMTP)
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@licensekaki.com}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-LicenseKaki}
       # Password Reset
-      PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-http://localhost}
+      PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-https://dev.licensekaki.com}
     volumes:
       - uploads_data:/app/uploads
 
