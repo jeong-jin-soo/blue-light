@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminPriceResponse, BatchUpdatePricesRequest } from '../../types';
+import { generateUUID } from '../../utils/uuid';
 
 // ── Editable Tier 타입 ──────────────────────────────
 
@@ -31,7 +32,7 @@ interface EditableTier {
 
 function toEditableTier(price: AdminPriceResponse): EditableTier {
   return {
-    tempId: crypto.randomUUID(),
+    tempId: generateUUID(),
     masterPriceSeq: price.masterPriceSeq,
     description: price.description || '',
     kvaMin: String(price.kvaMin),
@@ -45,7 +46,7 @@ function toEditableTier(price: AdminPriceResponse): EditableTier {
 
 function createEmptyTier(): EditableTier {
   return {
-    tempId: crypto.randomUUID(),
+    tempId: generateUUID(),
     masterPriceSeq: null,
     description: '',
     kvaMin: '',

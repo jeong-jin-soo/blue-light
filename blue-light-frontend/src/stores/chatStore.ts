@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ChatMessage } from '../types';
 import { sendChatMessageStream } from '../api/chatApi';
+import { generateUUID } from '../utils/uuid';
 
 interface ChatState {
   messages: ChatMessage[];
@@ -28,7 +29,7 @@ const DEFAULT_SUGGESTIONS = [
 ];
 
 let messageId = 0;
-const generateSessionId = () => crypto.randomUUID();
+const generateSessionId = () => generateUUID();
 
 export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
