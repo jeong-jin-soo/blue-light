@@ -103,7 +103,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Key Information</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { icon: '💰', title: 'Pricing', desc: 'Pricing includes kVA tier fee, service fee, and EMA fee (if applicable).' },
+              { icon: '💰', title: 'Pricing', desc: 'Pricing is based on kVA capacity tier and EMA fee (if applicable).' },
               { icon: '⏱️', title: 'Licence Period', desc: 'Choose between 3-month or 12-month licence validity.' },
               { icon: '🔌', title: 'SP Group Account', desc: 'An SP Group utilities account is required for New Licence applications.' },
               { icon: '📋', title: 'File Submission', desc: 'Files for licence submission must be under 2MB each.' },

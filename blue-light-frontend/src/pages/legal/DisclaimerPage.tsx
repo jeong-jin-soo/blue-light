@@ -34,10 +34,10 @@ export default function DisclaimerPage() {
           </section>
 
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-700">Service Fees</h2>
+            <h2 className="text-lg font-semibold text-gray-700">Fees</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
-              Fees displayed on this platform are LicenseKaki's service fees for facilitating your
-              application. These are separate from any official government fees charged by the EMA.
+              Fees displayed on this platform are based on kVA capacity tiers.
+              These are separate from any official government fees charged by the EMA.
               Please refer to the EMA's official website for current government fee schedules.
             </p>
           </section>
