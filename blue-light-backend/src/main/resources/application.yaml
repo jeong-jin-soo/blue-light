@@ -40,13 +40,6 @@ spring:
     port: ${MAIL_PORT:587}
     username: ${MAIL_USERNAME:}
     password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enabled: true
-            required: true
     sender:
       from: ${MAIL_FROM:noreply@licensekaki.com}
       name: ${MAIL_FROM_NAME:LicenseKaki}
@@ -116,6 +109,11 @@ sld:
     url: ${SLD_AGENT_URL:http://localhost:8100}
     service-key: ${SLD_AGENT_SERVICE_KEY:dev-service-key}
     timeout-seconds: ${SLD_AGENT_TIMEOUT:120}
+
+# SMTP 활성화 플래그 (MAIL_HOST가 설정된 서버 환경에서 true)
+mail:
+  smtp:
+    enabled: ${MAIL_SMTP_ENABLED:false}
 
 # 감사 로그 설정
 audit:

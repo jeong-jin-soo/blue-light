@@ -5,7 +5,7 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -17,14 +17,14 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * SMTP 기반 이메일 발송 서비스
- * - spring.mail.host 설정이 있을 때만 활성화
+ * - mail.smtp.enabled=true 일 때만 활성화
  * - AWS SES, Gmail SMTP 등 모든 SMTP 서버와 호환
  */
 @Slf4j
 @Service
 @Primary
 @RequiredArgsConstructor
-@ConditionalOnBean(JavaMailSender.class)
+@ConditionalOnProperty(name = "mail.smtp.enabled", havingValue = "true")
 public class SmtpEmailService implements EmailService {
 
     private final JavaMailSender mailSender;
