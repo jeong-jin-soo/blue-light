@@ -226,6 +226,42 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
             kva, main_breaker, busbar_rating, sub_circuits, etc.
         application_info: Optional application details (address, postal code, etc.)
     """
+    # 입력 검증: 필수 필드 확인
+    required_fields = ["supply_type", "kva", "main_breaker", "busbar_rating", "sub_circuits"]
+    missing = [f for f in required_fields if f not in requirements or not requirements[f]]
+    if missing:
+        return json.dumps({
+            "success": False,
+            "error": f"Missing required fields: {missing}. "
+                     "Please gather all requirements before generating.",
+        })
+
+    main_breaker = requirements.get("main_breaker", {})
+    if not isinstance(main_breaker, dict):
+        return json.dumps({
+            "success": False,
+            "error": "main_breaker must be a dict with 'type' and 'rating' (or 'rating_A') keys.",
+        })
+
+    if not main_breaker.get("type"):
+        return json.dumps({
+            "success": False,
+            "error": "main_breaker.type is required (ACB / MCCB / MCB).",
+        })
+
+    if not main_breaker.get("rating") and not main_breaker.get("rating_A"):
+        return json.dumps({
+            "success": False,
+            "error": "main_breaker.rating (or rating_A) is required (in Amps).",
+        })
+
+    sub_circuits = requirements.get("sub_circuits", [])
+    if not isinstance(sub_circuits, list) or len(sub_circuits) == 0:
+        return json.dumps({
+            "success": False,
+            "error": "At least one sub_circuit is required.",
+        })
+
     from app.sld.generator import SldGenerator
 
     file_id = uuid.uuid4().hex[:12]
@@ -254,7 +290,7 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
         logger.error(f"SLD generation failed: {e}", exc_info=True)
         return json.dumps({
             "success": False,
-            "error": str(e),
+            "error": f"Generation failed: {str(e)}",
         })
 
 

@@ -27,3 +27,17 @@ async def get_checkpointer() -> AsyncSqliteSaver:
         await _checkpointer.setup()
         logger.info(f"LangGraph checkpointer initialized: {settings.sqlite_db_path}")
     return _checkpointer
+
+
+async def close_checkpointer() -> None:
+    """Shutdown 시 checkpointer 연결 정리."""
+    global _checkpointer
+    if _checkpointer is not None:
+        try:
+            if hasattr(_checkpointer, "conn") and _checkpointer.conn:
+                await _checkpointer.conn.close()
+                logger.info("LangGraph checkpointer connection closed")
+        except Exception as e:
+            logger.warning(f"Failed to close checkpointer connection: {e}")
+        finally:
+            _checkpointer = None

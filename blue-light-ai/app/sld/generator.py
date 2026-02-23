@@ -2,18 +2,20 @@
 SLD Generator — orchestrates PDF creation using the symbol library and layout engine.
 
 Creates a complete Single Line Diagram with:
-- Incoming supply
+- Incoming supply (3-phase / single-phase line representation)
 - Metering
-- Main breaker
+- Main breaker (with circuit ID)
 - Main busbar
-- Sub-circuit breakers
-- Earth protection
+- Sub-circuit breakers (with circuit IDs, cable annotations, load info)
+- Earth protection (with dashed conductor connections)
 - Title block with project info
+- Cable schedule table
 
 Outputs PDF (for EMA submission) and SVG (for web preview).
 """
 
 import logging
+import math
 
 from app.sld.backend import DrawingBackend
 from app.sld.layout import LayoutConfig, LayoutResult, PlacedComponent, compute_layout
@@ -87,9 +89,12 @@ class SldGenerator:
         layout_result = compute_layout(requirements)
 
         # Draw to both backends simultaneously
+        component_count = 0
         for backend in (pdf, svg):
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
+            self._draw_dashed_connections(backend, layout_result)
+            self._draw_cable_schedule(backend, requirements, layout_result)
             draw_border(backend)
             draw_title_block(
                 backend,
@@ -145,7 +150,7 @@ class SldGenerator:
                 backend.add_mtext(
                     comp.label,
                     insert=(comp.x, comp.y),
-                    char_height=3,
+                    char_height=2.5,
                 )
                 count += 1
 
@@ -157,18 +162,21 @@ class SldGenerator:
                     (layout_result.busbar_end_x, layout_result.busbar_y),
                     lineweight=50,
                 )
-                # Busbar label
-                backend.set_layer("SLD_ANNOTATIONS")
-                backend.add_mtext(
-                    comp.label,
-                    insert=(layout_result.busbar_start_x, layout_result.busbar_y + 8),
-                    char_height=3,
-                )
+                # Busbar label (above)
+                if comp.label:
+                    backend.set_layer("SLD_ANNOTATIONS")
+                    backend.add_mtext(
+                        comp.label,
+                        insert=(layout_result.busbar_start_x, layout_result.busbar_y + 8),
+                        char_height=2.5,
+                    )
+                # Busbar rating (right side)
                 if comp.rating:
+                    backend.set_layer("SLD_ANNOTATIONS")
                     backend.add_mtext(
                         comp.rating,
                         insert=(layout_result.busbar_end_x - 30, layout_result.busbar_y + 4),
-                        char_height=2.5,
+                        char_height=2,
                     )
                 count += 1
 
@@ -178,13 +186,19 @@ class SldGenerator:
                 if symbol:
                     symbol.draw(backend, comp.x, comp.y)
 
-                    # Rating label (to the right)
-                    if comp.rating:
-                        backend.set_layer("SLD_ANNOTATIONS")
+                    # Circuit ID + rating label (to the right)
+                    backend.set_layer("SLD_ANNOTATIONS")
+                    label_text = ""
+                    if comp.circuit_id:
+                        label_text = f"{comp.circuit_id}\\P{comp.label} {comp.rating}"
+                    elif comp.rating:
+                        label_text = f"{comp.label}\\P{comp.rating}"
+
+                    if label_text:
                         backend.add_mtext(
-                            f"{comp.label}\\P{comp.rating}",
+                            label_text,
                             insert=(comp.x + 14, comp.y + 10),
-                            char_height=2.5,
+                            char_height=2.2,
                         )
 
                     # Cable annotation (below and to the right)
@@ -192,8 +206,8 @@ class SldGenerator:
                         backend.set_layer("SLD_ANNOTATIONS")
                         backend.add_mtext(
                             comp.cable_annotation,
-                            insert=(comp.x + 14, comp.y + 3),
-                            char_height=2,
+                            insert=(comp.x + 14, comp.y + 2),
+                            char_height=1.8,
                         )
 
                     count += 1
@@ -203,7 +217,105 @@ class SldGenerator:
         return count
 
     def _draw_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
-        """Draw all connection lines."""
+        """Draw all solid connection lines."""
         backend.set_layer("SLD_CONNECTIONS")
         for start, end in layout_result.connections:
             backend.add_line(start, end)
+
+    def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
+        """Draw dashed connection lines (earth conductors, etc.)."""
+        backend.set_layer("SLD_CONNECTIONS")
+        for start, end in layout_result.dashed_connections:
+            _draw_dashed_line(backend, start, end, dash_len=3.0, gap_len=2.0)
+
+    def _draw_cable_schedule(
+        self,
+        backend: DrawingBackend,
+        requirements: dict,
+        layout_result: LayoutResult,
+    ) -> None:
+        """Draw a compact cable schedule table in the lower-left area."""
+        sub_circuits = requirements.get("sub_circuits", [])
+        if not sub_circuits:
+            return
+
+        # Cable schedule position (bottom-left, above title block)
+        table_x = 15
+        table_y = 53  # Just above title block
+        row_height = 3.5
+        col_widths = [20, 50, 25, 25, 35]  # ID, Name, Breaker, Rating, Cable
+
+        backend.set_layer("SLD_TITLE_BLOCK")
+
+        # Header
+        headers = ["Circuit", "Description", "Breaker", "Rating", "Cable"]
+        header_y = table_y
+        x = table_x
+        for i, header in enumerate(headers):
+            backend.add_mtext(
+                header,
+                insert=(x + 1, header_y),
+                char_height=2,
+            )
+            x += col_widths[i]
+
+        # Header underline
+        total_width = sum(col_widths)
+        backend.add_line(
+            (table_x, header_y - 3),
+            (table_x + total_width, header_y - 3),
+        )
+
+        # Data rows
+        backend.set_layer("SLD_ANNOTATIONS")
+        for idx, circuit in enumerate(sub_circuits):
+            row_y = header_y - 3 - (idx + 1) * row_height
+            if row_y < 12:  # Don't go below page margin
+                break
+
+            circuit_id = f"CB-{idx + 1:02d}"
+            name = circuit.get("name", f"DB-{idx + 1}")
+            breaker_type = circuit.get("breaker_type", "MCB")
+            breaker_rating = circuit.get("breaker_rating", 32)
+            cable = circuit.get("cable", "-")
+
+            row_data = [circuit_id, name, breaker_type, f"{breaker_rating}A", cable or "-"]
+            x = table_x
+            for i, text in enumerate(row_data):
+                backend.add_mtext(
+                    str(text),
+                    insert=(x + 1, row_y),
+                    char_height=1.8,
+                )
+                x += col_widths[i]
+
+
+# ── Helper: Dashed line drawing ──────────────────────
+
+
+def _draw_dashed_line(
+    backend: DrawingBackend,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    dash_len: float = 3.0,
+    gap_len: float = 2.0,
+) -> None:
+    """Draw a dashed line between two points."""
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = math.sqrt(dx * dx + dy * dy)
+
+    if length < 0.1:
+        return
+
+    # Normalize direction
+    ux, uy = dx / length, dy / length
+    segment_len = dash_len + gap_len
+
+    pos = 0.0
+    while pos < length:
+        seg_start = (start[0] + ux * pos, start[1] + uy * pos)
+        seg_end_pos = min(pos + dash_len, length)
+        seg_end = (start[0] + ux * seg_end_pos, start[1] + uy * seg_end_pos)
+        backend.add_line(seg_start, seg_end)
+        pos += segment_len

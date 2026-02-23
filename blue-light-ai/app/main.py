@@ -5,9 +5,12 @@ Provides AI-powered Single Line Diagram generation for LicenseKaki.
 Communicates with the Spring Boot backend via REST/SSE.
 """
 
+import asyncio
+import glob as glob_module
 import json
 import logging
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -17,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 
 from app.agent.graph import get_agent, process_message
-from app.agent.checkpointer import get_checkpointer
+from app.agent.checkpointer import get_checkpointer, close_checkpointer
 from app.config import settings
 from app.dependencies import verify_service_key
 from app.models.schemas import (
@@ -37,6 +40,70 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+# ── Temp File Cleanup ────────────────────────────────
+
+TEMP_FILE_MAX_AGE_HOURS = 24  # 24시간 이상 된 임시 파일 자동 삭제
+
+
+async def _temp_file_cleanup_scheduler():
+    """Background task: 1시간마다 오래된 임시 파일을 삭제."""
+    while True:
+        await asyncio.sleep(3600)  # 1시간 간격
+        try:
+            cleanup_old_temp_files()
+        except Exception as e:
+            logger.error(f"Temp file cleanup scheduler error: {e}")
+
+
+def cleanup_old_temp_files() -> dict:
+    """TEMP_FILE_MAX_AGE_HOURS보다 오래된 임시 파일 삭제."""
+    cutoff = time.time() - (TEMP_FILE_MAX_AGE_HOURS * 3600)
+    deleted = []
+    errors = []
+
+    for pattern in ["*.pdf", "*.svg"]:
+        for file_path in glob_module.glob(
+            os.path.join(settings.temp_file_dir, pattern)
+        ):
+            try:
+                if os.path.getmtime(file_path) < cutoff:
+                    os.remove(file_path)
+                    deleted.append(os.path.basename(file_path))
+            except Exception as e:
+                errors.append({"file": os.path.basename(file_path), "error": str(e)})
+
+    if deleted:
+        logger.info(f"Temp cleanup: deleted {len(deleted)} old files: {deleted}")
+    if errors:
+        logger.warning(f"Temp cleanup errors: {errors}")
+
+    return {"deleted": deleted, "errors": errors}
+
+
+def cleanup_temp_file(file_id: str) -> dict:
+    """특정 file_id의 임시 파일(PDF + SVG) 삭제."""
+    deleted = []
+    not_found = []
+
+    for ext in ["pdf", "svg"]:
+        file_path = os.path.join(settings.temp_file_dir, f"{file_id}.{ext}")
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                deleted.append(f"{file_id}.{ext}")
+            except Exception as e:
+                logger.error(f"Failed to delete temp file {file_path}: {e}")
+        else:
+            not_found.append(f"{file_id}.{ext}")
+
+    if deleted:
+        logger.info(f"Temp file cleanup: deleted {deleted}")
+    if not_found:
+        logger.debug(f"Temp file cleanup: not found {not_found}")
+
+    return {"deleted": deleted, "not_found": not_found}
+
+
 # ── Lifespan ─────────────────────────────────────────
 
 @asynccontextmanager
@@ -49,9 +116,15 @@ async def lifespan(app: FastAPI):
     logger.info(f"Gemini model: {settings.gemini_model}")
     logger.info(f"Spring Boot URL: {settings.spring_boot_url}")
 
+    # 임시 파일 자동 삭제 스케줄러 시작
+    cleanup_task = asyncio.create_task(_temp_file_cleanup_scheduler())
+    logger.info(f"Temp file cleanup scheduler started (max age: {TEMP_FILE_MAX_AGE_HOURS}h)")
+
     yield
 
     # Shutdown
+    cleanup_task.cancel()
+    await close_checkpointer()
     logger.info("SLD Agent service shutting down")
 
 
@@ -68,7 +141,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.spring_boot_url],
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -256,6 +329,19 @@ async def get_svg_preview(
         svg_content = f.read()
 
     return {"file_id": file_id, "svg": svg_content}
+
+
+@app.delete("/api/files/{file_id}")
+async def delete_temp_file(
+    file_id: str,
+    _: str = Depends(verify_service_key),
+):
+    """
+    Delete temporary files (PDF + SVG) for a given file ID.
+    Called by Spring Boot after successfully storing the accepted SLD file.
+    """
+    result = cleanup_temp_file(file_id)
+    return {"status": "cleaned", "file_id": file_id, **result}
 
 
 # ── Helpers ──────────────────────────────────────────

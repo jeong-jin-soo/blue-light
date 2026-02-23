@@ -24,16 +24,23 @@ logger = logging.getLogger(__name__)
 
 # ── LLM Setup ───────────────────────────────────────
 
+# 모듈 레벨 LLM 캐싱 (매 호출마다 재생성 방지)
+_cached_llm = None
 
-def _create_llm() -> ChatGoogleGenerativeAI:
-    """Create the Gemini LLM instance with tool bindings."""
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
-        max_output_tokens=settings.gemini_max_tokens,
-        temperature=settings.gemini_temperature,
-    )
-    return llm.bind_tools(ALL_TOOLS)
+
+def _get_llm() -> ChatGoogleGenerativeAI:
+    """Get or create the Gemini LLM instance with tool bindings (cached)."""
+    global _cached_llm
+    if _cached_llm is None:
+        llm = ChatGoogleGenerativeAI(
+            model=settings.gemini_model,
+            google_api_key=settings.gemini_api_key,
+            max_output_tokens=settings.gemini_max_tokens,
+            temperature=settings.gemini_temperature,
+        )
+        _cached_llm = llm.bind_tools(ALL_TOOLS)
+        logger.info(f"LLM instance created: model={settings.gemini_model}")
+    return _cached_llm
 
 
 # ── Graph Nodes ─────────────────────────────────────
@@ -47,7 +54,7 @@ async def agent_node(state: SldAgentState) -> dict:
     Dynamically builds the system message with application context
     so the agent already knows kVA, address, building type, etc.
     """
-    llm = _create_llm()
+    llm = _get_llm()
 
     # Build dynamic system message with application context
     app_info = state.get("application_info", {})
