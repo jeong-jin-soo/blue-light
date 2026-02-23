@@ -361,7 +361,7 @@ export default function ProfilePage() {
             value={companyName}
             onChange={(e) => setCompanyName(e.target.value)}
             maxLength={100}
-            placeholder="e.g., BLUE LIGHT PTE LTD"
+            placeholder="e.g., LICENSEKAKI PTE LTD"
             hint="This name will be printed on your installation licence"
           />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

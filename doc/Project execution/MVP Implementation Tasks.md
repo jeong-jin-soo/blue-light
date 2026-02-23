@@ -1,4 +1,4 @@
-# Project Blue Light - MVP Implementation Tasks
+# Project LicenseKaki - MVP Implementation Tasks
 
 > 각 Phase는 독립적으로 실행 가능한 단위입니다.
 > Phase 완료 후 동작 확인 → 다음 Phase 진행 순서로 작업합니다.

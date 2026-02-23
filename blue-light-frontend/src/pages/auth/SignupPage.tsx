@@ -207,7 +207,7 @@ export default function SignupPage() {
               maxLength={100}
               value={form.companyName}
               onChange={(e) => updateField('companyName', e.target.value)}
-              placeholder="e.g., BLUE LIGHT PTE LTD"
+              placeholder="e.g., LICENSEKAKI PTE LTD"
               hint="Will be printed on your installation licence"
             />
             <div className="grid grid-cols-2 gap-3">

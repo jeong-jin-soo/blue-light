@@ -1,6 +1,6 @@
 # Payment Integration Guide
 
-Blue Light 플랫폼 결제 연동 가이드.
+LicenseKaki 플랫폼 결제 연동 가이드.
 신청자가 `PENDING_PAYMENT` 상태에서 결제하고, 결제 확인 후 `PAID`로 자동 전환하는 흐름을 구현하기 위한 3가지 옵션을 정리한다.
 
 > **현재 상태**: 수동 확인 방식 (Admin이 결제 확인 후 직접 상태 변경)
@@ -179,9 +179,9 @@ Body:
     "email": "applicant@example.com",
     "name": "Applicant Name",
     "reference_number": "BL-{applicationSeq}",
-    "redirect_url": "https://bluelight.sg/applications/{id}",
-    "webhook": "https://api.bluelight.sg/api/webhook/hitpay",
-    "purpose": "Blue Light Licence Application #{applicationSeq}"
+    "redirect_url": "https://licensekaki.sg/applications/{id}",
+    "webhook": "https://api.licensekaki.sg/api/webhook/hitpay",
+    "purpose": "LicenseKaki Licence Application #{applicationSeq}"
   }
 ```
 

@@ -1,0 +1,3002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LicenseKaki - Comprehensive Feature Test Sheet</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; padding: 24px; max-width: 1200px; margin: 0 auto; font-size: 13px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 12px; margin-bottom: 20px; }
+  h2 { font-size: 15px; background: #1e40af; color: #fff; padding: 6px 12px; margin: 20px 0 0; border-radius: 4px 4px 0 0; page-break-after: avoid; }
+  h3 { font-size: 13px; background: #e5e7eb; padding: 5px 12px; margin-top: 12px; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  th, td { border: 1px solid #d1d5db; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  td:nth-child(1) { width: 40px; text-align: center; }
+  td:nth-child(2) { width: 200px; }
+  td:nth-child(4) { width: 220px; }
+  td:nth-child(5) { width: 60px; text-align: center; }
+  td:nth-child(6) { width: 60px; text-align: center; }
+  .pass { background: #d1fae5; color: #065f46; font-weight: 600; }
+  .fail { background: #fee2e2; color: #991b1b; font-weight: 600; }
+  .skip { background: #fef3c7; color: #92400e; font-weight: 600; }
+  .section-info { font-size: 11px; color: #6b7280; padding: 4px 12px; background: #f9fafb; border: 1px solid #d1d5db; border-top: 0; }
+  .pre-cond { font-size: 11px; background: #eff6ff; border: 1px solid #bfdbfe; padding: 6px 10px; border-radius: 4px; margin: 8px 0; }
+  .pre-cond strong { color: #1e40af; }
+  .legend { display: flex; gap: 16px; font-size: 11px; margin: 16px 0; }
+  .legend span { padding: 2px 8px; border-radius: 3px; }
+  .meta-table { width: auto; margin-bottom: 16px; }
+  .meta-table td { border: none; padding: 2px 12px 2px 0; }
+  .meta-table td:first-child { font-weight: 600; color: #6b7280; }
+  .toc { background: #f9fafb; border: 1px solid #d1d5db; padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .toc h3 { background: none; padding: 0; margin: 0 0 8px; font-size: 14px; }
+  .toc ol { padding-left: 20px; font-size: 12px; line-height: 1.8; }
+  .toc ol li { color: #374151; }
+  .toc ol li a { color: #1e40af; text-decoration: none; }
+  .toc ol li a:hover { text-decoration: underline; }
+  .role-badge { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; font-weight: 600; }
+  .role-applicant { background: #dbeafe; color: #1e40af; }
+  .role-lew { background: #d1fae5; color: #065f46; }
+  .role-admin { background: #fce7f3; color: #9d174d; }
+  .role-sysadmin { background: #fef3c7; color: #92400e; }
+  .role-sldmgr { background: #e0e7ff; color: #3730a3; }
+  .role-public { background: #f3f4f6; color: #374151; }
+  @media print { body { padding: 12px; font-size: 11px; } h2 { break-before: auto; } .toc { break-after: page; } }
+</style>
+</head>
+<body>
+
+<h1>LicenseKaki - Comprehensive Feature Test Sheet</h1>
+<p class="subtitle">Full Platform UAT Test Cases &mdash; All Roles &amp; Features</p>
+
+<table class="meta-table">
+  <tr><td>Version</td><td>1.0</td></tr>
+  <tr><td>Date</td><td>2026-02-23</td></tr>
+  <tr><td>Tester</td><td></td></tr>
+  <tr><td>Environment</td><td>Local / Development / Production</td></tr>
+  <tr><td>Branch</td><td>develop</td></tr>
+</table>
+
+<div class="legend">
+  <span class="pass">PASS</span>
+  <span class="fail">FAIL</span>
+  <span class="skip">SKIP</span>
+  <span style="background:#f3f4f6; padding:2px 8px; border-radius:3px;">N/T (Not Tested)</span>
+  &nbsp;&nbsp;|&nbsp;&nbsp;
+  <span class="role-badge role-public">PUBLIC</span>
+  <span class="role-badge role-applicant">APPLICANT</span>
+  <span class="role-badge role-lew">LEW</span>
+  <span class="role-badge role-admin">ADMIN</span>
+  <span class="role-badge role-sysadmin">SYSTEM_ADMIN</span>
+  <span class="role-badge role-sldmgr">SLD_MANAGER</span>
+</div>
+
+<div class="pre-cond">
+  <strong>Seed Test Accounts:</strong><br>
+  <code>admin@licensekaki.sg / admin1234</code> (ADMIN) &nbsp;|&nbsp;
+  <code>lew@licensekaki.sg / admin1234</code> (LEW, APPROVED) &nbsp;|&nbsp;
+  <code>sysadmin@licensekaki.sg / admin1234</code> (SYSTEM_ADMIN) &nbsp;|&nbsp;
+  <code>sldmanager@licensekaki.sg / admin1234</code> (SLD_MANAGER)
+</div>
+
+<!-- ============================================================ -->
+<!-- Table of Contents -->
+<!-- ============================================================ -->
+
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <ol>
+    <li><a href="#s1">Authentication &amp; Authorization</a></li>
+    <li><a href="#s2">Applicant &mdash; Dashboard</a></li>
+    <li><a href="#s3">Applicant &mdash; Licence Application</a></li>
+    <li><a href="#s4">Applicant &mdash; Documents (Upload / Download / Delete)</a></li>
+    <li><a href="#s5">Applicant &mdash; Profile &amp; Signature</a></li>
+    <li><a href="#s6">Applicant &mdash; SLD Orders</a></li>
+    <li><a href="#s7">Admin / LEW &mdash; Dashboard</a></li>
+    <li><a href="#s8">Admin / LEW &mdash; Application Management</a></li>
+    <li><a href="#s9">Admin &mdash; User Management</a></li>
+    <li><a href="#s10">Admin &mdash; Price Management &amp; PayNow QR</a></li>
+    <li><a href="#s11">System Admin &mdash; System Settings</a></li>
+    <li><a href="#s12">System Admin &mdash; Audit Logs</a></li>
+    <li><a href="#s13">System Admin &mdash; Data Breach Management</a></li>
+    <li><a href="#s14">SLD Manager &mdash; Dashboard &amp; Order Management</a></li>
+    <li><a href="#s15">AI SLD Chat &amp; Generation</a></li>
+    <li><a href="#s16">SLD Generation Quality</a></li>
+    <li><a href="#s17">Public Chatbot</a></li>
+    <li><a href="#s18">PDPA Compliance (Data Export / Deletion / Consent)</a></li>
+    <li><a href="#s19">Payment Flows</a></li>
+    <li><a href="#s20">Security &amp; Infrastructure</a></li>
+    <li><a href="#s21">Legal Pages &amp; Static Content</a></li>
+    <li><a href="#s22">Scheduled Tasks &amp; Background Jobs</a></li>
+    <li><a href="#s23">LEW Assignment &amp; Grade Validation</a></li>
+    <li><a href="#s24">SLD Request Flow (Application-based)</a></li>
+    <li><a href="#s25">Email Notifications</a></li>
+    <li><a href="#s26">Gemini AI Consent</a></li>
+    <li><a href="#s27">Navigation &amp; Routing Guards</a></li>
+    <li><a href="#s28">Form Input Validation</a></li>
+    <li><a href="#s29">File Size &amp; Type Validation</a></li>
+    <li><a href="#s30">Soft Delete Verification</a></li>
+    <li><a href="#s31">Error Handling &amp; Edge Cases</a></li>
+    <li><a href="#s32">LEW Pending Approval Page</a></li>
+    <li><a href="#s33">Responsive Design &amp; Browser Compatibility</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<!-- SECTION 1: Authentication & Authorization -->
+<!-- ============================================================ -->
+
+<h2 id="s1">1. Authentication &amp; Authorization</h2>
+<div class="section-info"><span class="role-badge role-public">PUBLIC</span> Signup, Login, Password Reset, Email Verification, Logout</div>
+
+<h3>1-A. Signup</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>1.1</td>
+    <td>Signup as APPLICANT</td>
+    <td>Navigate to /signup, fill first name, last name, email, password, check PDPA consent, submit</td>
+    <td>Account created, redirected to dashboard (or email verification pending page if enabled)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.2</td>
+    <td>Signup as LEW</td>
+    <td>Select LEW role, fill licence number, grade (7/8/9), company name, UEN, submit</td>
+    <td>Account created with status PENDING, shown "Pending Approval" page</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.3</td>
+    <td>Signup with duplicate email</td>
+    <td>Use an email that already exists in the system</td>
+    <td>Error message: email already registered</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.4</td>
+    <td>Signup without PDPA consent</td>
+    <td>Leave PDPA consent checkbox unchecked, submit</td>
+    <td>Validation error: consent is required</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.5</td>
+    <td>PDPA consent audit log</td>
+    <td>After successful signup, check audit logs</td>
+    <td>Audit entry: action=SIGNUP, category=AUTH, with PDPA consent timestamp</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>1-B. Login</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>1.6</td>
+    <td>Login with valid credentials</td>
+    <td>Enter valid email/password on /login</td>
+    <td>JWT set as httpOnly cookie, redirected to role-appropriate dashboard</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.7</td>
+    <td>Login with wrong password</td>
+    <td>Enter valid email, wrong password</td>
+    <td>Error: invalid credentials</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.8</td>
+    <td>Login rate limiting (5 attempts)</td>
+    <td>Fail login 5 times with same IP</td>
+    <td>6th attempt blocked: "Too many login attempts. Please try again in 15 minutes."</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.9</td>
+    <td>Login as PENDING LEW</td>
+    <td>Login with LEW account that hasn't been approved</td>
+    <td>Error: account pending approval</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.10</td>
+    <td>Login audit log</td>
+    <td>Login successfully, check audit logs</td>
+    <td>Audit entry: LOGIN_SUCCESS with IP, User-Agent captured</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.11</td>
+    <td>Failed login audit log</td>
+    <td>Fail a login, check audit logs</td>
+    <td>Audit entry: LOGIN_FAILURE with attempted email, IP</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>1-C. Forgot / Reset Password</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>1.12</td>
+    <td>Forgot password request</td>
+    <td>Navigate to /forgot-password, enter registered email, submit</td>
+    <td>Generic success message (doesn't reveal email existence)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.13</td>
+    <td>Forgot password with unknown email</td>
+    <td>Enter unregistered email</td>
+    <td>Same generic success message (security: no email enumeration)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.14</td>
+    <td>Reset password with valid token</td>
+    <td>Use reset link from email, enter new password</td>
+    <td>Password updated, can login with new password</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.15</td>
+    <td>Reset password with expired/invalid token</td>
+    <td>Use expired or modified token</td>
+    <td>Error: invalid or expired token</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>1-D. Email Verification</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>1.16</td>
+    <td>Verify email with valid token</td>
+    <td>Click verification link from email</td>
+    <td>Email verified, can access full features</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.17</td>
+    <td>Resend verification email</td>
+    <td>On /email-verification-pending page, click resend</td>
+    <td>New verification email sent</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.18</td>
+    <td>Signup when email verification disabled</td>
+    <td>Disable email verification in System Settings, signup new user</td>
+    <td>User auto-verified, no verification email sent, goes straight to dashboard</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>1-E. Logout</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>1.19</td>
+    <td>Logout clears session</td>
+    <td>Click logout in navigation</td>
+    <td>JWT cookie cleared, redirected to login page</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>1.20</td>
+    <td>Access protected page after logout</td>
+    <td>Try to access /dashboard after logout</td>
+    <td>Redirected to login page</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 2: Applicant Dashboard -->
+<!-- ============================================================ -->
+
+<h2 id="s2">2. Applicant &mdash; Dashboard</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> /dashboard</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as APPLICANT role user
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>2.1</td>
+    <td>Dashboard loads with welcome message</td>
+    <td>Login as applicant, check dashboard</td>
+    <td>Shows "Welcome, [firstName]" with application statistics</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>2.2</td>
+    <td>Statistics cards display correctly</td>
+    <td>Check stat cards</td>
+    <td>Shows: Total, Pending Review, Pending Payment, In Progress, Completed counts</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>2.3</td>
+    <td>Recent applications list</td>
+    <td>Check recent applications section</td>
+    <td>Up to 5 most recent applications shown with status badges</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>2.4</td>
+    <td>New Application quick action</td>
+    <td>Click "New Application" button</td>
+    <td>Navigates to /applications/new</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>2.5</td>
+    <td>Empty state for new user</td>
+    <td>Login as fresh user with no applications</td>
+    <td>All stats show 0, empty recent applications with prompt to create first</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 3: Applicant - Licence Application -->
+<!-- ============================================================ -->
+
+<h2 id="s3">3. Applicant &mdash; Licence Application</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> Create, View, Update Applications</div>
+
+<h3>3-A. Create NEW Application (4-step form)</h3>
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as APPLICANT, navigate to /applications/new
+</div>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>3.1</td>
+    <td>Step 1: Select NEW application type</td>
+    <td>Select "New Application" on type selection step</td>
+    <td>Proceeds to Step 2 (Address &amp; Property)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.2</td>
+    <td>Step 2: Fill address &amp; property info</td>
+    <td>Enter SP account number, address, postal code, building type</td>
+    <td>All fields validate, can proceed to Step 3</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.3</td>
+    <td>Step 3: kVA selection &amp; price calculation</td>
+    <td>Select kVA value from dropdown</td>
+    <td>Price tier auto-calculated, total = kVA tier price + EMA fee displayed</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.4</td>
+    <td>Step 3: SLD option - Self Upload</td>
+    <td>Select "I will upload my own SLD"</td>
+    <td>SLD upload field shown in Step 4</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.5</td>
+    <td>Step 3: SLD option - Request LEW</td>
+    <td>Select "Request LEW to draw SLD"</td>
+    <td>SLD upload not required in Step 4, SLD request created on submission</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.6</td>
+    <td>Step 4: Upload required documents</td>
+    <td>Upload LOA email screenshot, main breaker photo, SP account doc</td>
+    <td>Files attached, preview available, form ready to submit</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.7</td>
+    <td>Submit application</td>
+    <td>Review all info, click Submit</td>
+    <td>Application created with status PENDING_REVIEW, redirected to detail page</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.8</td>
+    <td>Validation: missing required fields</td>
+    <td>Try to proceed without filling required fields</td>
+    <td>Field-level validation errors displayed, cannot proceed</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>3-B. Create RENEWAL Application</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>3.9</td>
+    <td>Select RENEWAL type</td>
+    <td>Choose "Renewal" on Step 1</td>
+    <td>Dropdown of completed applications appears to select original</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.10</td>
+    <td>Reference original application</td>
+    <td>Select completed application from dropdown</td>
+    <td>Address and kVA pre-filled from original, renewal reference saved</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>3-C. Application List &amp; Detail</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>3.11</td>
+    <td>Application list loads</td>
+    <td>Navigate to /applications</td>
+    <td>Paginated list with status badges, sorted by date descending</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.12</td>
+    <td>Status filter works</td>
+    <td>Filter by specific status (e.g., PENDING_REVIEW)</td>
+    <td>Only matching applications shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.13</td>
+    <td>Application detail page</td>
+    <td>Click on an application</td>
+    <td>Shows: status, kVA, price, dates, address, files, payment history</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.14</td>
+    <td>Cannot view other user's applications</td>
+    <td>Try to access another user's application by URL</td>
+    <td>403 Forbidden or "not found"</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>3-D. Revision Resubmission</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>3.15</td>
+    <td>Revision form available</td>
+    <td>Open application in REVISION_REQUESTED status</td>
+    <td>Edit form enabled with admin's revision comment visible</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.16</td>
+    <td>Resubmit revised application</td>
+    <td>Update fields, re-upload files if needed, submit</td>
+    <td>Status changes to PENDING_REVIEW, audit log: APPLICATION_RESUBMITTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>3.17</td>
+    <td>Cannot edit non-revision application</td>
+    <td>Try to edit application NOT in REVISION_REQUESTED status</td>
+    <td>Edit form not available (read-only view)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 4: Documents -->
+<!-- ============================================================ -->
+
+<h2 id="s4">4. Applicant &mdash; Documents</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> Upload, Download, Delete files</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>4.1</td>
+    <td>Upload document to application</td>
+    <td>In application detail, upload a file (e.g., SLD PDF)</td>
+    <td>File uploaded, encrypted at-rest (AES-256-GCM), shown in files list</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>4.2</td>
+    <td>Download own document</td>
+    <td>Click download on an uploaded file</td>
+    <td>File decrypted on-the-fly, downloaded with correct filename (UTF-8)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>4.3</td>
+    <td>Delete own document</td>
+    <td>Click delete on a file</td>
+    <td>Soft delete, file no longer visible, audit log: FILE_DELETED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>4.4</td>
+    <td>Cannot download other user's file</td>
+    <td>Try to access another user's file by URL (/api/files/{id}/download)</td>
+    <td>403 Forbidden</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>4.5</td>
+    <td>File type validation</td>
+    <td>Upload invalid file type (e.g., .exe)</td>
+    <td>Rejected with MIME type validation error</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>4.6</td>
+    <td>Upload audit log</td>
+    <td>Upload a file, check audit logs</td>
+    <td>Audit entry: FILE_UPLOADED with fileId, applicationId</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 5: Profile & Signature -->
+<!-- ============================================================ -->
+
+<h2 id="s5">5. Applicant &mdash; Profile &amp; Signature</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> /profile</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>5.1</td>
+    <td>View profile information</td>
+    <td>Navigate to /profile</td>
+    <td>Shows first name, last name, email, phone, company (if applicable)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>5.2</td>
+    <td>Edit profile</td>
+    <td>Update first name, last name, phone, save</td>
+    <td>Profile updated, success message</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>5.3</td>
+    <td>Change password</td>
+    <td>Enter current password + new password, submit</td>
+    <td>Password changed, can login with new password</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>5.4</td>
+    <td>Change password with wrong current</td>
+    <td>Enter incorrect current password</td>
+    <td>Error: current password incorrect</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>5.5</td>
+    <td>Upload signature</td>
+    <td>Upload PNG signature image</td>
+    <td>Signature stored (encrypted), preview shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>5.6</td>
+    <td>Delete signature</td>
+    <td>Click delete on signature</td>
+    <td>Signature removed</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 6: Applicant SLD Orders -->
+<!-- ============================================================ -->
+
+<h2 id="s6">6. Applicant &mdash; SLD Orders</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> Independent SLD-only ordering (no licence application needed)</div>
+
+<h3>6-A. Create SLD Order</h3>
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as APPLICANT, navigate to /sld-orders/new
+</div>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>6.1</td>
+    <td>Create SLD order with full info</td>
+    <td>Fill address, postal code, building type, kVA (optional), notes, submit</td>
+    <td>Order created, status = PENDING_QUOTE, redirected to detail page</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.2</td>
+    <td>Create SLD order without kVA</td>
+    <td>Leave kVA blank, fill other fields, submit</td>
+    <td>Order created (kVA optional &mdash; SLD Manager determines)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.3</td>
+    <td>Upload sketch file</td>
+    <td>Attach sketch/reference image during order creation</td>
+    <td>File uploaded and associated with order</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>6-B. SLD Order List &amp; Detail</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>6.4</td>
+    <td>Order list loads</td>
+    <td>Navigate to /sld-orders</td>
+    <td>Paginated list with status badges</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.5</td>
+    <td>Order detail page</td>
+    <td>Click on an order</td>
+    <td>Shows: status, address, kVA, quote (if proposed), files, payments</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.6</td>
+    <td>Update order (PENDING_QUOTE only)</td>
+    <td>Edit address/notes while status = PENDING_QUOTE</td>
+    <td>Order updated, changes saved</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>6-C. Quote &amp; Payment Flow</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>6.7</td>
+    <td>Accept quote</td>
+    <td>SLD Manager proposes quote &rarr; Applicant clicks Accept</td>
+    <td>Status: QUOTE_PROPOSED &rarr; PENDING_PAYMENT</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.8</td>
+    <td>Reject quote</td>
+    <td>Click Reject on proposed quote</td>
+    <td>Status: QUOTE_REJECTED (terminal state)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.9</td>
+    <td>View payment info</td>
+    <td>After payment confirmed by manager, check payment section</td>
+    <td>Payment history shows: method, amount, transaction ID, date</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>6-D. SLD Delivery &amp; Revision</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>6.10</td>
+    <td>Download uploaded SLD</td>
+    <td>After SLD_UPLOADED, download the SLD file</td>
+    <td>SLD PDF downloaded correctly</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.11</td>
+    <td>Request revision</td>
+    <td>Click "Request Revision" with comment</td>
+    <td>Status: SLD_UPLOADED &rarr; REVISION_REQUESTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>6.12</td>
+    <td>Confirm completion</td>
+    <td>Click "Confirm" when SLD is satisfactory</td>
+    <td>Status: SLD_UPLOADED &rarr; COMPLETED</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 7: Admin/LEW Dashboard -->
+<!-- ============================================================ -->
+
+<h2 id="s7">7. Admin / LEW &mdash; Dashboard</h2>
+<div class="section-info"><span class="role-badge role-admin">ADMIN</span> <span class="role-badge role-lew">LEW</span> /admin/dashboard</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>admin@licensekaki.sg</code> or <code>lew@licensekaki.sg</code>
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>7.1</td>
+    <td>Admin dashboard loads</td>
+    <td>Navigate to /admin/dashboard</td>
+    <td>Statistics cards: total applications by status, unassigned count</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>7.2</td>
+    <td>LEW dashboard (limited view)</td>
+    <td>Login as LEW, check dashboard</td>
+    <td>Same layout but only assigned/unassigned application stats visible</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>7.3</td>
+    <td>LEW cannot access user management</td>
+    <td>As LEW, try to navigate to /admin/users</td>
+    <td>Menu not visible, direct URL access blocked</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 8: Admin/LEW Application Management -->
+<!-- ============================================================ -->
+
+<h2 id="s8">8. Admin / LEW &mdash; Application Management</h2>
+<div class="section-info"><span class="role-badge role-admin">ADMIN</span> <span class="role-badge role-lew">LEW</span> /admin/applications</div>
+
+<h3>8-A. Application List &amp; Filters</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>8.1</td>
+    <td>Application list with pagination</td>
+    <td>Navigate to /admin/applications</td>
+    <td>Paginated list, status filter, search bar</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.2</td>
+    <td>Filter by status</td>
+    <td>Select specific status from filter</td>
+    <td>Only matching applications shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.3</td>
+    <td>Search by applicant name/email</td>
+    <td>Enter search term</td>
+    <td>Results filtered by applicant info</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>8-B. Application Detail &amp; Status Transitions</h3>
+<div class="pre-cond">
+  <strong>Status flow:</strong> PENDING_REVIEW &rarr; REVISION_REQUESTED &harr; PENDING_REVIEW &rarr; PENDING_PAYMENT &rarr; PAID &rarr; IN_PROGRESS &rarr; COMPLETED (or EXPIRED)
+</div>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>8.4</td>
+    <td>View application detail</td>
+    <td>Click on application in list</td>
+    <td>Full detail: applicant info, address, kVA, files, status, assigned LEW</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.5</td>
+    <td>Request revision</td>
+    <td>Click "Request Revision", enter comment, submit</td>
+    <td>Status &rarr; REVISION_REQUESTED, comment visible to applicant</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.6</td>
+    <td>Approve for payment</td>
+    <td>Click "Approve" on PENDING_REVIEW application</td>
+    <td>Status &rarr; PENDING_PAYMENT, audit: APPLICATION_APPROVED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.7</td>
+    <td>Confirm payment</td>
+    <td>Click "Confirm Payment" on PENDING_PAYMENT application</td>
+    <td>Status &rarr; PAID, payment record created</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.8</td>
+    <td>Complete application (issue licence)</td>
+    <td>Enter licence number + expiry date, click Complete</td>
+    <td>Status &rarr; COMPLETED, licence info saved, audit: APPLICATION_COMPLETED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.9</td>
+    <td>Invalid status transition</td>
+    <td>Try to approve an already PAID application</td>
+    <td>Error: invalid status transition</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>8-C. LOA (Letter of Appointment)</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>8.10</td>
+    <td>Generate LOA PDF</td>
+    <td>Click "Generate LOA" on application detail</td>
+    <td>LOA PDF generated with applicant and LEW info</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.11</td>
+    <td>Applicant signs LOA</td>
+    <td>As applicant, open LOA section, upload signature</td>
+    <td>Signature embedded in LOA PDF, loaSigned = true</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>8.12</td>
+    <td>Admin uploads documents</td>
+    <td>Upload LICENSE_PDF or PAYMENT_RECEIPT for application</td>
+    <td>File stored, visible in application files section</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 9: User Management -->
+<!-- ============================================================ -->
+
+<h2 id="s9">9. Admin &mdash; User Management</h2>
+<div class="section-info"><span class="role-badge role-admin">ADMIN</span> <span class="role-badge role-sysadmin">SYSTEM_ADMIN</span> /admin/users (ADMIN-only feature, not LEW)</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>admin@licensekaki.sg</code>
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>9.1</td>
+    <td>User list with pagination</td>
+    <td>Navigate to /admin/users</td>
+    <td>Paginated user list with email, name, role, status columns</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.2</td>
+    <td>Filter by role</td>
+    <td>Filter by APPLICANT, LEW, ADMIN, SYSTEM_ADMIN, SLD_MANAGER</td>
+    <td>Only matching users shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.3</td>
+    <td>Search by email/name</td>
+    <td>Enter search term in search bar</td>
+    <td>Results filtered by email or name</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.4</td>
+    <td>Change role: APPLICANT &rarr; LEW</td>
+    <td>Select user, change role from APPLICANT to LEW</td>
+    <td>Role changed, approval status set to PENDING</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.5</td>
+    <td>Change role: APPLICANT &rarr; SLD_MANAGER</td>
+    <td>Select user, change role to SLD_MANAGER</td>
+    <td>Role changed, user can now access SLD Manager pages</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.6</td>
+    <td>Cannot change ADMIN/SYSTEM_ADMIN role</td>
+    <td>Try to change an ADMIN or SYSTEM_ADMIN user's role</td>
+    <td>Operation blocked or option not available</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.7</td>
+    <td>Approve LEW</td>
+    <td>Click Approve on PENDING LEW</td>
+    <td>Status &rarr; APPROVED, LEW can now login, audit: LEW_APPROVED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.8</td>
+    <td>Reject LEW</td>
+    <td>Click Reject on PENDING LEW</td>
+    <td>Status &rarr; REJECTED, LEW cannot login, audit: LEW_REJECTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>9.9</td>
+    <td>Role change audit log</td>
+    <td>Change a user's role, check audit logs</td>
+    <td>Audit entry: USER_ROLE_CHANGED with before/after values</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 10: Price Management -->
+<!-- ============================================================ -->
+
+<h2 id="s10">10. Admin &mdash; Price Management &amp; PayNow QR</h2>
+<div class="section-info"><span class="role-badge role-admin">ADMIN</span> <span class="role-badge role-sysadmin">SYSTEM_ADMIN</span> /admin/prices</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>admin@licensekaki.sg</code>
+</div>
+
+<h3>10-A. Price Tiers</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>10.1</td>
+    <td>View all price tiers</td>
+    <td>Navigate to /admin/prices</td>
+    <td>Table of kVA tiers: min/max kVA, base price, SLD price, description, active status</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.2</td>
+    <td>Create new price tier</td>
+    <td>Add new tier with kVA range, base price, SLD price</td>
+    <td>Tier created, visible in list</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.3</td>
+    <td>Update price tier</td>
+    <td>Edit existing tier's price</td>
+    <td>Price updated, audit: PRICE_UPDATED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.4</td>
+    <td>Batch update/delete tiers</td>
+    <td>Modify multiple tiers at once, save</td>
+    <td>All changes applied in batch</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.5</td>
+    <td>Deactivate tier</td>
+    <td>Set tier to inactive</td>
+    <td>Tier not used in new application price calculations</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.6</td>
+    <td>Public price API</td>
+    <td>Call GET /api/prices (unauthenticated)</td>
+    <td>Returns all active price tiers</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.7</td>
+    <td>Price calculation API</td>
+    <td>Call GET /api/prices/calculate?kva=63</td>
+    <td>Returns correct tier, base price, SLD fee, total</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>10-B. PayNow QR Code</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>10.8</td>
+    <td>Upload PayNow QR image</td>
+    <td>Upload QR code image in payment settings section</td>
+    <td>QR image stored (encrypted), preview shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.9</td>
+    <td>Replace QR image</td>
+    <td>Upload new QR image</td>
+    <td>Old image auto-deleted, new image shown immediately</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.10</td>
+    <td>Delete QR image</td>
+    <td>Click delete on QR image</td>
+    <td>QR removed, payment section shows no QR</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>10.11</td>
+    <td>QR visible in applicant payment view</td>
+    <td>As applicant, view PENDING_PAYMENT application</td>
+    <td>PayNow QR image displayed for payment reference</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 11: System Admin - Settings -->
+<!-- ============================================================ -->
+
+<h2 id="s11">11. System Admin &mdash; System Settings</h2>
+<div class="section-info"><span class="role-badge role-sysadmin">SYSTEM_ADMIN</span> /admin/system (SYSTEM_ADMIN only)</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>sysadmin@licensekaki.sg / admin1234</code>
+</div>
+
+<h3>11-A. Email Verification Toggle</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>11.1</td>
+    <td>Toggle email verification ON</td>
+    <td>Enable toggle, save</td>
+    <td>New signups require email verification</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.2</td>
+    <td>Toggle email verification OFF</td>
+    <td>Disable toggle, save</td>
+    <td>New signups auto-verified, no verification email sent</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.3</td>
+    <td>Audit log for toggle</td>
+    <td>Toggle and save, check audit logs</td>
+    <td>Audit: EMAIL_VERIFICATION_TOGGLED</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>11-B. AI SLD Generation Toggle</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>11.4</td>
+    <td>Default state is Enabled</td>
+    <td>Check initial toggle state on fresh DB</td>
+    <td>Toggle ON, label: "Enabled"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.5</td>
+    <td>Toggle OFF with warning</td>
+    <td>Toggle OFF (don't save yet)</td>
+    <td>Label: "Disabled", amber warning, "Unsaved changes" shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.6</td>
+    <td>Save disabled state</td>
+    <td>Click Save after toggling OFF</td>
+    <td>Toast: "AI SLD generation disabled.", persists after reload</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.7</td>
+    <td>Save enabled state</td>
+    <td>Toggle ON and Save</td>
+    <td>Toast: "AI SLD generation enabled."</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.8</td>
+    <td>Save button disabled when no change</td>
+    <td>Without toggling, check Save button</td>
+    <td>Save button greyed out</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.9</td>
+    <td>Audit log for toggle</td>
+    <td>Toggle and save, check audit logs</td>
+    <td>Audit: SLD_AI_GENERATION_TOGGLED, category: SYSTEM</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>11-C. Gemini API Key Management</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>11.10</td>
+    <td>View API key status</td>
+    <td>Check Gemini API Key card</td>
+    <td>Shows: configured (yes/no), source (env/db), masked key, model, max tokens, temperature</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.11</td>
+    <td>Set new API key</td>
+    <td>Enter new Gemini API key, save</td>
+    <td>Key saved (DB source), masked key shown, audit: GEMINI_KEY_UPDATED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.12</td>
+    <td>Clear API key (revert to env)</td>
+    <td>Click Clear button</td>
+    <td>Reverts to environment variable, source changes to "env", audit: GEMINI_KEY_CLEARED</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>11-D. AI Chatbot System Prompt</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>11.13</td>
+    <td>View current system prompt</td>
+    <td>Check System Prompt card</td>
+    <td>Current prompt displayed in textarea with character count</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.14</td>
+    <td>Update system prompt</td>
+    <td>Edit prompt text, save</td>
+    <td>Prompt updated, audit: SYSTEM_PROMPT_UPDATED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.15</td>
+    <td>Reset to default prompt</td>
+    <td>Click "Reset to Default"</td>
+    <td>Prompt reverted to factory default, audit: SYSTEM_PROMPT_RESET</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.16</td>
+    <td>Chatbot uses updated prompt</td>
+    <td>Update prompt, test chatbot</td>
+    <td>Chatbot behavior reflects new system prompt (60s cache delay)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>11-E. Access Control</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>11.17</td>
+    <td>All 4 settings cards visible</td>
+    <td>Navigate to System Configuration</td>
+    <td>Cards: Email Verification, AI SLD Generation, Gemini API Key, Chatbot System Prompt</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>11.18</td>
+    <td>Non-SYSTEM_ADMIN cannot access</td>
+    <td>Login as ADMIN, navigate to /admin/system</td>
+    <td>Redirected or 403 Forbidden</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 12: Audit Logs -->
+<!-- ============================================================ -->
+
+<h2 id="s12">12. System Admin &mdash; Audit Logs</h2>
+<div class="section-info"><span class="role-badge role-sysadmin">SYSTEM_ADMIN</span> /admin/audit-logs</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>sysadmin@licensekaki.sg</code>
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>12.1</td>
+    <td>Audit log list with pagination</td>
+    <td>Navigate to /admin/audit-logs</td>
+    <td>Paginated log entries with: user, action, description, IP, timestamp</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>12.2</td>
+    <td>Filter by category</td>
+    <td>Select AUTH, APPLICATION, ADMIN, SYSTEM, DATA_PROTECTION</td>
+    <td>Only matching category entries shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>12.3</td>
+    <td>Filter by action</td>
+    <td>Select specific action (e.g., LOGIN_SUCCESS)</td>
+    <td>Only matching action entries shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>12.4</td>
+    <td>Filter by date range</td>
+    <td>Set start/end dates</td>
+    <td>Only entries within date range shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>12.5</td>
+    <td>Full-text search</td>
+    <td>Enter search term (e.g., user email)</td>
+    <td>Matching entries displayed</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>12.6</td>
+    <td>Audit log detail view</td>
+    <td>Click on a log entry</td>
+    <td>Shows: HTTP method, URI, status code, User-Agent, before/after values</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>12.7</td>
+    <td>Deleted user anonymization</td>
+    <td>Delete a user account, check their audit logs</td>
+    <td>Personal info in audit entries anonymized (name/email replaced)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 13: Data Breach Management -->
+<!-- ============================================================ -->
+
+<h2 id="s13">13. System Admin &mdash; Data Breach Management</h2>
+<div class="section-info"><span class="role-badge role-sysadmin">SYSTEM_ADMIN</span> /admin/data-breaches (PDPA compliance)</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>sysadmin@licensekaki.sg</code>
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>13.1</td>
+    <td>Report data breach</td>
+    <td>Click "Report Breach", fill description, affected users count, submit</td>
+    <td>Breach created, status = DETECTED, audit: DATA_BREACH_REPORTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>13.2</td>
+    <td>Breach list with status filter</td>
+    <td>View breach list, filter by status</td>
+    <td>Paginated list filtered by DETECTED, PDPC_NOTIFIED, etc.</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>13.3</td>
+    <td>Record PDPC notification</td>
+    <td>Click "Notify PDPC", enter PDPC reference number</td>
+    <td>Status &rarr; PDPC_NOTIFIED, reference number saved</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>13.4</td>
+    <td>Record user notification</td>
+    <td>Click "Notify Users", confirm</td>
+    <td>Status &rarr; USERS_NOTIFIED, timestamp recorded</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>13.5</td>
+    <td>Resolve breach</td>
+    <td>Click "Resolve", enter resolution notes</td>
+    <td>Status &rarr; RESOLVED, audit: DATA_BREACH_RESOLVED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>13.6</td>
+    <td>Breach detail view</td>
+    <td>Click on a breach entry</td>
+    <td>Full timeline: detected, PDPC notified, users notified, resolved with timestamps</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 14: SLD Manager -->
+<!-- ============================================================ -->
+
+<h2 id="s14">14. SLD Manager &mdash; Dashboard &amp; Order Management</h2>
+<div class="section-info"><span class="role-badge role-sldmgr">SLD_MANAGER</span> /sld-manager/*</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>sldmanager@licensekaki.sg / admin1234</code>
+</div>
+
+<h3>14-A. Dashboard</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>14.1</td>
+    <td>Dashboard loads with statistics</td>
+    <td>Navigate to /sld-manager/dashboard</td>
+    <td>Cards: total orders, by status (pending quote, paid, in progress, etc.)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>14-B. Order List &amp; Detail</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>14.2</td>
+    <td>Order list with pagination</td>
+    <td>Navigate to /sld-manager/orders</td>
+    <td>Paginated list with status filter</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.3</td>
+    <td>Filter by status</td>
+    <td>Select specific order status</td>
+    <td>Only matching orders shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.4</td>
+    <td>Order detail view</td>
+    <td>Click on an order</td>
+    <td>Shows: applicant info, address, kVA, files, notes, quote, payment, SLD chat panel</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>14-C. Order Actions</h3>
+<div class="pre-cond">
+  <strong>Status flow:</strong> PENDING_QUOTE &rarr; QUOTE_PROPOSED &rarr; PENDING_PAYMENT &rarr; PAID &rarr; IN_PROGRESS &rarr; SLD_UPLOADED &harr; REVISION_REQUESTED &rarr; COMPLETED
+</div>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>14.5</td>
+    <td>Propose quote</td>
+    <td>Enter amount + optional note, submit</td>
+    <td>Status &rarr; QUOTE_PROPOSED, applicant notified</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.6</td>
+    <td>Assign manager to order</td>
+    <td>Click Assign on unassigned order</td>
+    <td>Manager assigned, shown on order detail</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.7</td>
+    <td>Confirm payment</td>
+    <td>Enter transaction ID, payment method, confirm</td>
+    <td>Status &rarr; PAID, payment record created</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.8</td>
+    <td>Upload SLD manually</td>
+    <td>Upload SLD PDF file, mark as uploaded</td>
+    <td>Status &rarr; SLD_UPLOADED, file available for applicant download</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.9</td>
+    <td>Handle revision request</td>
+    <td>After applicant requests revision, update SLD, re-upload</td>
+    <td>Status: REVISION_REQUESTED &rarr; SLD_UPLOADED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>14.10</td>
+    <td>Mark order completed</td>
+    <td>Click Complete on SLD_UPLOADED order (after applicant confirms)</td>
+    <td>Status &rarr; COMPLETED</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 15: AI SLD Chat -->
+<!-- ============================================================ -->
+
+<h2 id="s15">15. AI SLD Chat &amp; Generation</h2>
+<div class="section-info">
+  <span class="role-badge role-admin">ADMIN</span> <span class="role-badge role-lew">LEW</span> Application SLD Chat &nbsp;|&nbsp;
+  <span class="role-badge role-sldmgr">SLD_MANAGER</span> SLD Order Chat
+</div>
+
+<h3>15-A. AI SLD Generation Disabled State</h3>
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> AI SLD generation disabled via System Settings (Section 11-B)
+</div>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>15.1</td>
+    <td>Application SLD chat shows disabled</td>
+    <td>As Admin/LEW, open SLD chat panel on application</td>
+    <td>Shows "AI SLD Generation is Disabled" message, no input area</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.2</td>
+    <td>SLD Order chat shows disabled</td>
+    <td>As SLD Manager, open SLD chat panel on order</td>
+    <td>Shows "AI SLD Generation is Disabled" message, no input area</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.3</td>
+    <td>Backend rejects chat when disabled</td>
+    <td>API: POST /api/admin/applications/{id}/sld-chat/stream</td>
+    <td>400 error, code: SLD_AI_GENERATION_DISABLED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.4</td>
+    <td>Re-enable restores chat UI</td>
+    <td>Enable toggle, reload chat panel</td>
+    <td>Full chat UI appears (input, preview, Reset button)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>15-B. Normal Chat Operation</h3>
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> AI SLD generation enabled, Python AI service (port 8100) running
+</div>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>15.5</td>
+    <td>Send message to AI</td>
+    <td>Type requirement, press Send (or Enter)</td>
+    <td>AI responds via SSE streaming, tokens appear incrementally</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.6</td>
+    <td>Tool execution indicator</td>
+    <td>During AI processing, observe tool calls</td>
+    <td>Yellow indicator: "Fetching details...", "Generating SLD...", etc.</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.7</td>
+    <td>SVG preview appears</td>
+    <td>Continue conversation until SLD generated</td>
+    <td>SVG preview in right panel, "Accept &amp; Upload" button visible</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.8</td>
+    <td>Accept generated SLD</td>
+    <td>Click "Accept &amp; Upload"</td>
+    <td>Success toast, SLD file saved, application/order status updated</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.9</td>
+    <td>Reset conversation</td>
+    <td>Click Reset, confirm dialog</td>
+    <td>Chat history cleared, fresh state</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.10</td>
+    <td>Chat history persists on reload</td>
+    <td>Send messages, reload page</td>
+    <td>Previous messages reloaded from server</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.11</td>
+    <td>Enter key sends message</td>
+    <td>Press Enter (without Shift)</td>
+    <td>Message sent</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.12</td>
+    <td>Shift+Enter adds newline</td>
+    <td>Press Shift+Enter in textarea</td>
+    <td>Newline inserted, message not sent</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.13</td>
+    <td>Input disabled during generation</td>
+    <td>Observe input field while AI is responding</td>
+    <td>Input field and Send button disabled, re-enabled after response</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>15.14</td>
+    <td>Error handling (AI service down)</td>
+    <td>Stop Python service, send message</td>
+    <td>Error displayed after timeout, no infinite loading</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 16: SLD Generation Quality -->
+<!-- ============================================================ -->
+
+<h2 id="s16">16. SLD Generation Quality</h2>
+<div class="section-info">Verify SLD output includes all required components</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Generate an SLD via AI chat and review the output
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>16.1</td>
+    <td>Circuit IDs displayed</td>
+    <td>Check sub-circuit breaker labels</td>
+    <td>Each breaker labeled CB-01, CB-02, ... with description</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.2</td>
+    <td>Load info (kW/A) shown</td>
+    <td>Check sub-circuit labels</td>
+    <td>Each circuit shows "Xkw / Y.ZA"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.3</td>
+    <td>3-phase supply lines</td>
+    <td>Generate SLD for 3-phase installation</td>
+    <td>Three parallel lines merge into single line before meter</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.4</td>
+    <td>Single-phase supply</td>
+    <td>Generate SLD for single-phase</td>
+    <td>Single supply line, voltage: 230V</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.5</td>
+    <td>Multi-row layout (9+ circuits)</td>
+    <td>Generate SLD with 9+ sub-circuits</td>
+    <td>Circuits split into rows (max 8 per row), second busbar row</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.6</td>
+    <td>Earth bar with dashed connections</td>
+    <td>Check bottom of SLD</td>
+    <td>Earth bar present with dashed lines</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.7</td>
+    <td>Cable schedule table</td>
+    <td>Check lower-left area</td>
+    <td>Table: Circuit, Description, Breaker, Rating, Cable</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.8</td>
+    <td>Title block with compliance</td>
+    <td>Check title block area</td>
+    <td>"SS 638:2018, CP 5:2018, IEC 60617"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.9</td>
+    <td>Main busbar label</td>
+    <td>Check busbar area</td>
+    <td>"MAIN SWITCHBOARD (MSB)" with voltage rating</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>16.10</td>
+    <td>SLD-only mode (no LEW info)</td>
+    <td>Generate SLD from SLD Order (not Application)</td>
+    <td>Title block LEW fields left blank for manual fill</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 17: Public Chatbot -->
+<!-- ============================================================ -->
+
+<h2 id="s17">17. Public Chatbot</h2>
+<div class="section-info"><span class="role-badge role-public">PUBLIC</span> <span class="role-badge role-applicant">APPLICANT</span> AI Chatbot for general queries</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>17.1</td>
+    <td>Public chat (unauthenticated)</td>
+    <td>Access chatbot without login</td>
+    <td>Chatbot responds to queries, rate limited per IP</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>17.2</td>
+    <td>Authenticated chat (higher rate limit)</td>
+    <td>Login, use chatbot</td>
+    <td>Higher rate limit, per-user tracking</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>17.3</td>
+    <td>SSE streaming response</td>
+    <td>Send message, observe response</td>
+    <td>Tokens stream incrementally via Server-Sent Events</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>17.4</td>
+    <td>Rate limiting (unauthenticated)</td>
+    <td>Send many rapid messages without login</td>
+    <td>Rate limit triggered, error message shown</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>17.5</td>
+    <td>Custom system prompt reflected</td>
+    <td>Update system prompt (Section 11-D), test chatbot</td>
+    <td>Chatbot behavior matches updated prompt (may take 60s cache)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 18: PDPA Compliance -->
+<!-- ============================================================ -->
+
+<h2 id="s18">18. PDPA Compliance</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> Data Export, Account Deletion, Consent Withdrawal</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as APPLICANT with existing data (applications, files, etc.)
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>18.1</td>
+    <td>Export personal data (Right to Access)</td>
+    <td>Call GET /api/users/me/data-export (or UI action)</td>
+    <td>JSON containing: profile, applications, files, payments, audit logs. Audit: DATA_EXPORTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>18.2</td>
+    <td>Delete account (Right to Erasure)</td>
+    <td>Call DELETE /api/users/me (or UI action), confirm</td>
+    <td>Personal info anonymized (name/email replaced), soft-deleted, cannot login. Audit: ACCOUNT_DELETED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>18.3</td>
+    <td>Deleted user data retention</td>
+    <td>After deletion, check applications and audit logs</td>
+    <td>Applications retained (legal obligation), audit logs anonymized</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>18.4</td>
+    <td>Withdraw PDPA consent</td>
+    <td>Call POST /api/users/me/withdraw-consent</td>
+    <td>Account active but PDPA-dependent features restricted. Audit: PDPA_CONSENT_WITHDRAWN</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>18.5</td>
+    <td>PDPA consent recorded at signup</td>
+    <td>Signup new user with PDPA consent, check DB</td>
+    <td>pdpaConsentAt timestamp stored on user record</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 19: Payment Flows -->
+<!-- ============================================================ -->
+
+<h2 id="s19">19. Payment Flows</h2>
+<div class="section-info">Application Payments + SLD Order Payments</div>
+
+<h3>19-A. Application Payment</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>19.1</td>
+    <td>Payment info shown after approval</td>
+    <td>As applicant, view PENDING_PAYMENT application</td>
+    <td>Payment amount, PayNow QR (if configured), instructions visible</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>19.2</td>
+    <td>Admin confirms payment</td>
+    <td>As admin, confirm payment for application</td>
+    <td>Status &rarr; PAID, payment record with method, amount, date</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>19.3</td>
+    <td>Payment history visible</td>
+    <td>View payment section on application detail</td>
+    <td>All payment records listed with details</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>19-B. SLD Order Payment</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>19.4</td>
+    <td>Quote amount shown after acceptance</td>
+    <td>As applicant, accept quote, view PENDING_PAYMENT order</td>
+    <td>Quote amount and payment instructions displayed</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>19.5</td>
+    <td>SLD Manager confirms payment</td>
+    <td>As SLD Manager, enter transaction ID + method, confirm</td>
+    <td>Status &rarr; PAID, payment record created</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>19.6</td>
+    <td>Payment details visible to applicant</td>
+    <td>As applicant, view order payment section</td>
+    <td>Payment info: amount, method, transaction ID, date</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 20: Security & Infrastructure -->
+<!-- ============================================================ -->
+
+<h2 id="s20">20. Security &amp; Infrastructure</h2>
+<div class="section-info">CORS, CSP, Rate Limiting, JWT, File Encryption</div>
+
+<h3>20-A. JWT Authentication</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>20.1</td>
+    <td>JWT stored as httpOnly cookie</td>
+    <td>Login, inspect cookies in DevTools</td>
+    <td>JWT cookie: httpOnly=true, SameSite=Lax, Secure (prod=true)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.2</td>
+    <td>JWT expiry (24h)</td>
+    <td>Wait 24 hours (or modify token expiry), access API</td>
+    <td>401 Unauthorized, redirected to login</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.3</td>
+    <td>Invalid JWT rejected</td>
+    <td>Send request with tampered JWT</td>
+    <td>401 Unauthorized</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>20-B. Rate Limiting</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>20.4</td>
+    <td>Login rate limit (5 per 15 min)</td>
+    <td>Fail login 5 times from same IP</td>
+    <td>6th attempt: 429 Too Many Requests</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.5</td>
+    <td>Rate limit persists across servers (DB-backed)</td>
+    <td>Verify rate_limit_attempts table in DB</td>
+    <td>Attempts stored in DB, not in-memory</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.6</td>
+    <td>Chat rate limit (unauthenticated)</td>
+    <td>Send rapid chatbot messages without login</td>
+    <td>Rate limit triggered after threshold</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>20-C. CORS</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>20.7</td>
+    <td>CORS headers present</td>
+    <td>Inspect API response headers</td>
+    <td>Access-Control-Allow-Origin matches configured origins</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.8</td>
+    <td>Disallowed origin blocked</td>
+    <td>Send request from non-configured origin</td>
+    <td>CORS error, request blocked</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.9</td>
+    <td>Minimal allowed headers</td>
+    <td>Check Access-Control-Allow-Headers</td>
+    <td>Only: Content-Type, Accept, X-Requested-With</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>20-D. Security Headers</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>20.10</td>
+    <td>X-Frame-Options: DENY</td>
+    <td>Check response headers</td>
+    <td>X-Frame-Options: DENY present</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.11</td>
+    <td>X-Content-Type-Options: nosniff</td>
+    <td>Check response headers</td>
+    <td>Header present</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.12</td>
+    <td>Content-Security-Policy</td>
+    <td>Check CSP header</td>
+    <td>default-src 'self', script-src 'self', frame-ancestors 'none'</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.13</td>
+    <td>Referrer-Policy</td>
+    <td>Check response headers</td>
+    <td>strict-origin-when-cross-origin</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>20-E. File Encryption</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>20.14</td>
+    <td>Files encrypted at-rest (AES-256-GCM)</td>
+    <td>Upload file, inspect raw file on disk</td>
+    <td>File contents encrypted (not readable without key)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.15</td>
+    <td>File decrypted correctly on download</td>
+    <td>Download uploaded file, verify contents</td>
+    <td>Downloaded file matches original (decrypted on-the-fly)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.16</td>
+    <td>Missing encryption key fails gracefully</td>
+    <td>Remove FILE_ENCRYPTION_KEY, attempt upload</td>
+    <td>Error message (not crash), encryption key required</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>20-F. Role-Based Access Control</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>20.17</td>
+    <td>APPLICANT cannot access /api/admin/**</td>
+    <td>As applicant, call admin API endpoint</td>
+    <td>403 Forbidden</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.18</td>
+    <td>APPLICANT cannot access /api/sld-manager/**</td>
+    <td>As applicant, call SLD manager API endpoint</td>
+    <td>403 Forbidden</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.19</td>
+    <td>LEW cannot access user management</td>
+    <td>As LEW, call GET /api/admin/users</td>
+    <td>403 Forbidden (only ADMIN/SYSTEM_ADMIN)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>20.20</td>
+    <td>SLD_MANAGER can access /api/sld-manager/**</td>
+    <td>As SLD Manager, call SLD manager API endpoints</td>
+    <td>200 OK, full access</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 21: Legal Pages -->
+<!-- ============================================================ -->
+
+<h2 id="s21">21. Legal Pages &amp; Static Content</h2>
+<div class="section-info"><span class="role-badge role-public">PUBLIC</span> Accessible without authentication</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>21.1</td>
+    <td>Disclaimer page loads</td>
+    <td>Navigate to /disclaimer</td>
+    <td>Disclaimer content visible, "Fees" section (not "Service Fees")</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>21.2</td>
+    <td>Privacy Policy page loads</td>
+    <td>Navigate to /privacy-policy</td>
+    <td>Privacy Policy content with audit logging details</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>21.3</td>
+    <td>No "service fee" text anywhere</td>
+    <td>Check Disclaimer, Before You Begin guide</td>
+    <td>Pricing references use "kVA capacity tier" terminology</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 22: Scheduled Tasks -->
+<!-- ============================================================ -->
+
+<h2 id="s22">22. Scheduled Tasks &amp; Background Jobs</h2>
+<div class="section-info">ShedLock-enabled scheduled tasks for multi-server deployment</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>22.1</td>
+    <td>Licence expiry check</td>
+    <td>Check scheduler logs / create licence with past expiry</td>
+    <td>Expired licences detected, status updated to EXPIRED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>22.2</td>
+    <td>Chat message cleanup (90-day retention)</td>
+    <td>Check scheduler logs / insert old chat messages</td>
+    <td>Messages older than 90 days auto-deleted</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>22.3</td>
+    <td>Rate limit cleanup</td>
+    <td>Check rate_limit_attempts table after scheduled run</td>
+    <td>Expired rate limit entries removed</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>22.4</td>
+    <td>Audit log archival</td>
+    <td>Check audit log table after scheduled run</td>
+    <td>Logs older than 1 year archived, older than 5 years deleted</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>22.5</td>
+    <td>ShedLock prevents duplicate execution</td>
+    <td>Verify shedlock table in DB</td>
+    <td>Lock entries present, prevents concurrent execution across servers</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>22.6</td>
+    <td>AI temp file cleanup (24h)</td>
+    <td>Check Python AI service logs</td>
+    <td>Temp files older than 24 hours cleaned up by scheduler</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 23: LEW Assignment & Grade Validation -->
+<!-- ============================================================ -->
+
+<h2 id="s23">23. LEW Assignment &amp; Grade Validation</h2>
+<div class="section-info"><span class="role-badge role-admin">ADMIN</span> Assign/Unassign LEW to Applications with kVA grade check</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Login as <code>admin@licensekaki.sg</code>. At least one APPROVED LEW exists.<br>
+  <strong>LEW Grade Limits:</strong> Grade 7 &le; 45 kVA &nbsp;|&nbsp; Grade 8 &le; 500 kVA &nbsp;|&nbsp; Grade 9 &le; 9999 kVA
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>23.1</td>
+    <td>View available LEWs for assignment</td>
+    <td>Open application detail, click "Assign LEW"</td>
+    <td>List of APPROVED LEW users with licence no, grade, max kVA displayed</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.2</td>
+    <td>Assign LEW to application</td>
+    <td>Select a LEW from list, confirm assignment</td>
+    <td>LEW assigned, shown on application detail, audit: LEW_ASSIGNED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.3</td>
+    <td>Grade validation: Grade 7 LEW + 63 kVA</td>
+    <td>Try to assign Grade 7 LEW (max 45 kVA) to 63 kVA application</td>
+    <td>Error: LEW_GRADE_INSUFFICIENT &mdash; grade cannot handle this kVA</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.4</td>
+    <td>Grade validation: Grade 8 LEW + 63 kVA</td>
+    <td>Assign Grade 8 LEW (max 500 kVA) to 63 kVA application</td>
+    <td>Assignment succeeds (500 &ge; 63)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.5</td>
+    <td>Cannot assign non-APPROVED LEW</td>
+    <td>Try to assign a PENDING LEW via API</td>
+    <td>Error: only APPROVED LEW users can be assigned</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.6</td>
+    <td>Cannot assign LEW without grade</td>
+    <td>Try to assign LEW that has no lewGrade set</td>
+    <td>Error: LEW_GRADE_NOT_SET</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.7</td>
+    <td>Unassign LEW from application</td>
+    <td>Click "Unassign" on assigned LEW</td>
+    <td>LEW removed, audit: LEW_UNASSIGNED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>23.8</td>
+    <td>Assigned LEW sees application</td>
+    <td>Login as the assigned LEW, check application list</td>
+    <td>Assigned application visible in LEW's list</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 24: SLD Request Flow -->
+<!-- ============================================================ -->
+
+<h2 id="s24">24. SLD Request Flow (Application-based)</h2>
+<div class="section-info">
+  <span class="role-badge role-applicant">APPLICANT</span> <span class="role-badge role-admin">ADMIN</span> <span class="role-badge role-lew">LEW</span>
+  SLD Request within Licence Application (REQUESTED &rarr; AI_GENERATING &rarr; UPLOADED &rarr; CONFIRMED)
+</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> Application created with SLD option = REQUEST_LEW<br>
+  <strong>Status flow:</strong> REQUESTED &rarr; AI_GENERATING &rarr; UPLOADED &rarr; CONFIRMED
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>24.1</td>
+    <td>SLD request created on application submission</td>
+    <td>Submit application with SLD option = REQUEST_LEW</td>
+    <td>SldRequest entity created, status = REQUESTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.2</td>
+    <td>Applicant adds note &amp; sketch</td>
+    <td>In application detail, add note to SLD request, upload sketch file</td>
+    <td>applicantNote and sketchFileSeq updated</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.3</td>
+    <td>LEW/Admin views SLD request</td>
+    <td>Open application detail as LEW/Admin, check SLD section</td>
+    <td>SLD request visible with applicant note, sketch file (if any), status = REQUESTED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.4</td>
+    <td>Start AI generation</td>
+    <td>LEW/Admin clicks to start AI SLD generation</td>
+    <td>Status &rarr; AI_GENERATING, AI chat panel becomes available</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.5</td>
+    <td>Accept AI-generated SLD (upload)</td>
+    <td>Accept SLD from AI chat</td>
+    <td>Status &rarr; UPLOADED, uploadedFileSeq set, lewNote can be added</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.6</td>
+    <td>Manual SLD upload (skip AI)</td>
+    <td>Upload SLD file manually without AI, mark as uploaded</td>
+    <td>Status: REQUESTED &rarr; UPLOADED directly</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.7</td>
+    <td>Admin confirms SLD</td>
+    <td>Admin clicks Confirm on UPLOADED SLD</td>
+    <td>Status &rarr; CONFIRMED, SLD finalized for application</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.8</td>
+    <td>Invalid status transition</td>
+    <td>Try to confirm SLD that is still in REQUESTED status</td>
+    <td>Error: can only confirm UPLOADED SLD</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>24.9</td>
+    <td>Applicant note max length</td>
+    <td>Enter note exceeding 2000 characters</td>
+    <td>Validation error: note too long (max 2000)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 25: Email Notifications -->
+<!-- ============================================================ -->
+
+<h2 id="s25">25. Email Notifications</h2>
+<div class="section-info">SMTP email sending (production) / Log-only (development)</div>
+
+<div class="pre-cond">
+  <strong>Dev environment:</strong> LogOnlyEmailService &mdash; emails logged to console, not sent<br>
+  <strong>Prod environment:</strong> SmtpEmailService &mdash; actual SMTP delivery<br>
+  <strong>From:</strong> <code>noreply@licensekaki.sg</code> (configurable)
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>25.1</td>
+    <td>Email verification email sent on signup</td>
+    <td>Signup with email verification enabled</td>
+    <td>Verification email sent (or logged in dev). Contains: user name, verification link</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.2</td>
+    <td>Password reset email sent</td>
+    <td>Request password reset for registered email</td>
+    <td>Reset email sent. Contains: user name, reset link (1h expiry)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.3</td>
+    <td>Licence expiry warning email</td>
+    <td>Set licence expiry date to near future, wait for scheduler</td>
+    <td>Warning email sent with urgency colors: red (&lt;7d), orange (&lt;14d), blue (other)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.4</td>
+    <td>Email failure does not crash</td>
+    <td>Configure invalid SMTP settings, trigger email</td>
+    <td>Email failure logged at ERROR level, no exception thrown to caller</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.5</td>
+    <td>Email failure does not reveal info</td>
+    <td>Trigger password reset with SMTP down</td>
+    <td>Same generic response returned (no email delivery leak)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.6</td>
+    <td>LogOnlyEmailService in dev</td>
+    <td>Check mail.smtp.enabled=false, trigger email</td>
+    <td>Email content logged to console instead of SMTP delivery</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.7</td>
+    <td>Email HTML template rendered</td>
+    <td>Check email content (log or actual)</td>
+    <td>Properly formatted HTML with LicenseKaki branding, UTF-8 encoding</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>25.8</td>
+    <td>Async email sending</td>
+    <td>Trigger email and observe API response time</td>
+    <td>API responds immediately (email sent asynchronously via @Async)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 26: Gemini AI Consent -->
+<!-- ============================================================ -->
+
+<h2 id="s26">26. Gemini AI Consent</h2>
+<div class="section-info"><span class="role-badge role-applicant">APPLICANT</span> <span class="role-badge role-public">PUBLIC</span> AI Data Processing consent before chatbot use</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>26.1</td>
+    <td>Consent modal shown on first chat open</td>
+    <td>Open chatbot for the first time</td>
+    <td>"AI Data Processing Notice" modal appears mentioning Google Gemini AI, overseas data transfer</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>26.2</td>
+    <td>Consent notice content</td>
+    <td>Read the consent modal text</td>
+    <td>Mentions: Google Gemini AI, overseas data transfer, personal data NOT sent, Privacy Policy link</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>26.3</td>
+    <td>Accept consent enables chat</td>
+    <td>Click "I Agree &amp; Continue"</td>
+    <td>Modal closes, chat input field enabled and focused</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>26.4</td>
+    <td>Decline consent closes chat</td>
+    <td>Click "Decline"</td>
+    <td>Chat window closes, aiConsented remains false</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>26.5</td>
+    <td>Consent persists within session</td>
+    <td>Accept consent, close chatbot, reopen</td>
+    <td>Consent modal not shown again (aiConsented = true in store)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>26.6</td>
+    <td>Only typed messages sent (no PII)</td>
+    <td>Send chat message, inspect API request payload</td>
+    <td>Payload: message, sessionId, history (last 10). No email/phone/address sent</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 27: Navigation & Routing Guards -->
+<!-- ============================================================ -->
+
+<h2 id="s27">27. Navigation &amp; Routing Guards</h2>
+<div class="section-info">ProtectedRoute redirect logic &amp; role-based menu rendering</div>
+
+<h3>27-A. ProtectedRoute Redirects</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>27.1</td>
+    <td>Unauthenticated &rarr; /login</td>
+    <td>Access /dashboard without login</td>
+    <td>Redirected to /login</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.2</td>
+    <td>Unverified email &rarr; /email-verification-pending</td>
+    <td>Login with unverified email (verification enabled)</td>
+    <td>Redirected to /email-verification-pending</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.3</td>
+    <td>Pending LEW &rarr; /lew-pending</td>
+    <td>Login as LEW with approved=false</td>
+    <td>Redirected to /lew-pending</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.4</td>
+    <td>APPLICANT &rarr; /dashboard (on wrong route)</td>
+    <td>As applicant, try to access /admin/dashboard</td>
+    <td>Redirected to /dashboard (applicant homepage)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.5</td>
+    <td>ADMIN &rarr; /admin/dashboard (on wrong route)</td>
+    <td>As admin, try to access /sld-manager/dashboard</td>
+    <td>Redirected to /admin/dashboard (admin homepage)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.6</td>
+    <td>SYSTEM_ADMIN &rarr; /admin/system (on wrong route)</td>
+    <td>As system admin, try to access /dashboard</td>
+    <td>Redirected to /admin/system (system admin homepage)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.7</td>
+    <td>SLD_MANAGER &rarr; /sld-manager/dashboard</td>
+    <td>As SLD manager, try to access /admin/dashboard</td>
+    <td>Redirected to /sld-manager/dashboard</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>27-B. Role-Based Menu Items</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>27.8</td>
+    <td>APPLICANT menu items</td>
+    <td>Login as applicant, check sidebar</td>
+    <td>Menu: Dashboard, My Applications, New Application, SLD Orders, New SLD Order, Profile</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.9</td>
+    <td>ADMIN menu items</td>
+    <td>Login as admin, check sidebar</td>
+    <td>Menu: Dashboard, Applications, Settings, Users</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.10</td>
+    <td>SYSTEM_ADMIN menu items</td>
+    <td>Login as system admin, check sidebar</td>
+    <td>Menu: System, Audit Logs, Data Breach</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.11</td>
+    <td>LEW menu items</td>
+    <td>Login as LEW, check sidebar</td>
+    <td>Menu: Dashboard, Applications (no Users, no System)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.12</td>
+    <td>SLD_MANAGER menu items</td>
+    <td>Login as SLD Manager, check sidebar</td>
+    <td>Menu: Dashboard, Orders</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>27.13</td>
+    <td>Logout button visible for all roles</td>
+    <td>Check sidebar for each role</td>
+    <td>Logout button always present at bottom</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 28: Form Input Validation -->
+<!-- ============================================================ -->
+
+<h2 id="s28">28. Form Input Validation</h2>
+<div class="section-info">Backend @Valid annotations + Frontend validation rules</div>
+
+<h3>28-A. Signup Form Validation</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>28.1</td>
+    <td>Email: blank</td>
+    <td>Leave email empty, submit signup</td>
+    <td>Error: "Email is required"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.2</td>
+    <td>Email: invalid format</td>
+    <td>Enter "notanemail", submit</td>
+    <td>Error: "Invalid email format"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.3</td>
+    <td>Password: too short (&lt;8 chars)</td>
+    <td>Enter "abc123", submit</td>
+    <td>Error: "Password must be between 8 and 20 characters"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.4</td>
+    <td>Password: too long (&gt;20 chars)</td>
+    <td>Enter 21+ character password</td>
+    <td>Error: "Password must be between 8 and 20 characters"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.5</td>
+    <td>First name: blank</td>
+    <td>Leave first name empty</td>
+    <td>Error: "First name is required"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.6</td>
+    <td>First name: exceeds 50 chars</td>
+    <td>Enter 51+ character first name</td>
+    <td>Error: "First name must be 50 characters or less"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.7</td>
+    <td>Last name: blank</td>
+    <td>Leave last name empty</td>
+    <td>Error: "Last name is required"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.8</td>
+    <td>Phone: exceeds 20 chars</td>
+    <td>Enter 21+ character phone number</td>
+    <td>Error: "Phone number must be 20 characters or less"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.9</td>
+    <td>PDPA consent: null/missing</td>
+    <td>Submit without checking PDPA consent</td>
+    <td>Error: "PDPA consent is required"</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>28-B. LEW-Specific Validation</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>28.10</td>
+    <td>Licence number: exceeds 50 chars</td>
+    <td>Enter 51+ char licence number</td>
+    <td>Error: "Licence number must be 50 characters or less"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.11</td>
+    <td>Company name: exceeds 100 chars</td>
+    <td>Enter 101+ char company name</td>
+    <td>Error: "Company name must be 100 characters or less"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.12</td>
+    <td>UEN: exceeds 20 chars</td>
+    <td>Enter 21+ char UEN</td>
+    <td>Error: "UEN must be 20 characters or less"</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>28-C. Application Form Validation</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>28.13</td>
+    <td>Address: exceeds 255 chars</td>
+    <td>Enter 256+ char address</td>
+    <td>Validation error</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.14</td>
+    <td>Postal code: exceeds 10 chars</td>
+    <td>Enter 11+ char postal code</td>
+    <td>Validation error (DB column: VARCHAR(10))</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>28.15</td>
+    <td>kVA selection required</td>
+    <td>Try to proceed Step 3 without selecting kVA</td>
+    <td>Validation error: kVA required</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 29: File Size & Type Validation -->
+<!-- ============================================================ -->
+
+<h2 id="s29">29. File Size &amp; Type Validation</h2>
+<div class="section-info">Upload constraints: 10 MB max, specific extensions only</div>
+
+<div class="pre-cond">
+  <strong>Allowed extensions:</strong> PDF, JPG, JPEG, PNG, TIF, TIFF, GIF, DWG, DXF, DGN, ZIP<br>
+  <strong>Max file size:</strong> 10 MB
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>29.1</td>
+    <td>Upload valid PDF</td>
+    <td>Upload .pdf file under 10 MB</td>
+    <td>Upload succeeds</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.2</td>
+    <td>Upload valid image (JPG, PNG)</td>
+    <td>Upload .jpg or .png file</td>
+    <td>Upload succeeds</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.3</td>
+    <td>Upload CAD file (DWG, DXF)</td>
+    <td>Upload .dwg or .dxf file</td>
+    <td>Upload succeeds</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.4</td>
+    <td>Upload disallowed type (.exe)</td>
+    <td>Try to upload .exe file</td>
+    <td>Error: "File type not allowed. Accepted: PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.5</td>
+    <td>Upload disallowed type (.html)</td>
+    <td>Try to upload .html file</td>
+    <td>Error: FILE_TYPE_NOT_ALLOWED</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.6</td>
+    <td>Upload file exceeding 10 MB</td>
+    <td>Try to upload 11 MB file</td>
+    <td>Error: FILE_TOO_LARGE "File size must not exceed 10MB"</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.7</td>
+    <td>Upload file with no extension</td>
+    <td>Try to upload file without extension</td>
+    <td>Error: INVALID_FILENAME</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.8</td>
+    <td>Extension case-insensitive</td>
+    <td>Upload file with .PDF or .Jpg extension</td>
+    <td>Upload succeeds (case-insensitive check)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>29.9</td>
+    <td>File size recorded in DB</td>
+    <td>Upload file, check files table</td>
+    <td>file_size column stores correct byte size</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 30: Soft Delete Verification -->
+<!-- ============================================================ -->
+
+<h2 id="s30">30. Soft Delete Verification</h2>
+<div class="section-info">@SQLDelete + @SQLRestriction pattern &mdash; deleted records filtered from queries</div>
+
+<div class="pre-cond">
+  <strong>Entities with soft delete:</strong> User, Application, SldRequest, SldOrder, SldOrderPayment, Payment, MasterPrice, Inspection<br>
+  <strong>Pattern:</strong> <code>UPDATE table SET deleted_at = NOW() WHERE pk = ?</code> &nbsp;|&nbsp; <code>WHERE deleted_at IS NULL</code>
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>30.1</td>
+    <td>Deleted user excluded from user list</td>
+    <td>Delete a user (via account deletion), check admin user list</td>
+    <td>Deleted user NOT visible in list (deleted_at IS NOT NULL)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>30.2</td>
+    <td>Deleted application excluded from list</td>
+    <td>Soft-delete an application in DB, check applicant list</td>
+    <td>Application NOT visible</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>30.3</td>
+    <td>Deleted file excluded from downloads</td>
+    <td>Delete a file, try to download via API</td>
+    <td>404 Not Found (soft-deleted, filtered by @SQLRestriction)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>30.4</td>
+    <td>Deleted_at timestamp set on delete</td>
+    <td>Delete an entity, check DB directly</td>
+    <td>deleted_at = current timestamp (not NULL, record still exists in DB)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>30.5</td>
+    <td>Deleted price tier excluded</td>
+    <td>Soft-delete a price tier, check public pricing API</td>
+    <td>Tier NOT returned in GET /api/prices</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>30.6</td>
+    <td>Deleted SLD order excluded</td>
+    <td>Soft-delete an SLD order, check applicant list</td>
+    <td>Order NOT visible in /sld-orders list</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 31: Error Handling & Edge Cases -->
+<!-- ============================================================ -->
+
+<h2 id="s31">31. Error Handling &amp; Edge Cases</h2>
+<div class="section-info">Frontend error boundary, toast notifications, network errors, edge cases</div>
+
+<h3>31-A. Error Boundary &amp; Toast</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>31.1</td>
+    <td>Error boundary catches rendering crash</td>
+    <td>Trigger a React rendering error (e.g., bad data)</td>
+    <td>Fallback UI with error details, "Try Again" and "Reload Page" buttons</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.2</td>
+    <td>Success toast auto-dismiss (5s)</td>
+    <td>Trigger success action (e.g., save settings)</td>
+    <td>Green toast appears, auto-dismisses after 5 seconds</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.3</td>
+    <td>Error toast auto-dismiss (8s)</td>
+    <td>Trigger error action (e.g., API failure)</td>
+    <td>Red error toast appears, auto-dismisses after 8 seconds</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.4</td>
+    <td>Toast manual dismiss</td>
+    <td>Click X button on toast notification</td>
+    <td>Toast removed immediately</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>31-B. Network &amp; API Errors</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>31.5</td>
+    <td>Backend down &mdash; API call fails</td>
+    <td>Stop backend, trigger any API call</td>
+    <td>Error toast: "Failed to [action]" or network error</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.6</td>
+    <td>401 Unauthorized &rarr; redirect to login</td>
+    <td>JWT expires during use, trigger API call</td>
+    <td>Redirect to /login with session expired indication</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.7</td>
+    <td>403 Forbidden &mdash; insufficient role</td>
+    <td>As applicant, manually call admin API</td>
+    <td>403 error, meaningful message</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.8</td>
+    <td>404 Not Found &mdash; invalid entity</td>
+    <td>Navigate to /applications/999999</td>
+    <td>Not found message or redirect</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.9</td>
+    <td>SSE stream connection lost</td>
+    <td>Disconnect network during AI SLD chat stream</td>
+    <td>Error shown after timeout, no infinite loading spinner</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>31-C. Pagination &amp; Empty States</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>31.10</td>
+    <td>Empty application list</td>
+    <td>Login as fresh user with no applications</td>
+    <td>Empty state message: "No applications found" or prompt to create first</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.11</td>
+    <td>Empty SLD order list</td>
+    <td>Login as fresh user with no SLD orders</td>
+    <td>Empty state message displayed</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.12</td>
+    <td>Filter returns no results</td>
+    <td>Apply filter that matches nothing (e.g., status=COMPLETED when none exist)</td>
+    <td>"No results found" message</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.13</td>
+    <td>Last page of pagination</td>
+    <td>Navigate to last page of results</td>
+    <td>Correct number of items shown, "Next" button disabled</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>31.14</td>
+    <td>Single-item list</td>
+    <td>Have exactly 1 application, view list</td>
+    <td>List shows 1 item, pagination shows page 1 of 1</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 32: LEW Pending Approval Page -->
+<!-- ============================================================ -->
+
+<h2 id="s32">32. LEW Pending Approval Page</h2>
+<div class="section-info"><span class="role-badge role-lew">LEW</span> /lew-pending &mdash; shown while waiting for admin approval</div>
+
+<div class="pre-cond">
+  <strong>Pre-condition:</strong> LEW user registered but NOT yet approved (approvedStatus = PENDING)
+</div>
+
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>32.1</td>
+    <td>Pending page displays correctly</td>
+    <td>Login as pending LEW</td>
+    <td>Shows: "Account Pending Approval" heading, 3-step instructions, Logout/Check Status/Sign In buttons</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>32.2</td>
+    <td>Check Status button (still pending)</td>
+    <td>Click "Check Status" while still pending</td>
+    <td>Loading indicator shown briefly, remains on pending page (not approved yet)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>32.3</td>
+    <td>Check Status button (now approved)</td>
+    <td>Admin approves LEW &rarr; LEW clicks "Check Status"</td>
+    <td>Auto-redirects to /lew/dashboard after refresh</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>32.4</td>
+    <td>Logout from pending page</td>
+    <td>Click Logout</td>
+    <td>Logged out, redirected to /login</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>32.5</td>
+    <td>Sign in again button</td>
+    <td>Click "Sign in again"</td>
+    <td>Logged out and redirected to /login page</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>32.6</td>
+    <td>Non-LEW redirected away</td>
+    <td>As APPLICANT, navigate to /lew-pending</td>
+    <td>Redirected to /dashboard (not LEW, shouldn't see pending page)</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>32.7</td>
+    <td>Already-approved LEW redirected</td>
+    <td>Approved LEW navigates to /lew-pending</td>
+    <td>Redirected to /lew/dashboard automatically</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SECTION 33: Responsive Design & Browser -->
+<!-- ============================================================ -->
+
+<h2 id="s33">33. Responsive Design &amp; Browser Compatibility</h2>
+<div class="section-info">Cross-browser testing &amp; mobile responsiveness</div>
+
+<h3>33-A. Responsive Layout</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>33.1</td>
+    <td>Desktop layout (1280px+)</td>
+    <td>View application in standard desktop viewport</td>
+    <td>Full sidebar navigation, content area with proper spacing</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.2</td>
+    <td>Tablet layout (768px-1279px)</td>
+    <td>Resize browser to tablet width</td>
+    <td>Layout adapts, sidebar collapses or becomes hamburger menu</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.3</td>
+    <td>Mobile layout (&lt;768px)</td>
+    <td>Resize to mobile width or use DevTools device emulation</td>
+    <td>Mobile-friendly layout, touch-friendly buttons, no horizontal scroll</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.4</td>
+    <td>Application form on mobile</td>
+    <td>Create new application on mobile viewport</td>
+    <td>4-step form navigable, fields full-width, submit button accessible</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.5</td>
+    <td>Tables on small screens</td>
+    <td>View application list on mobile</td>
+    <td>Table scrolls horizontally or stacks vertically, data readable</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.6</td>
+    <td>SLD chat panel on mobile</td>
+    <td>Open AI SLD chat on mobile viewport</td>
+    <td>Chat input usable, SVG preview accessible (stacked layout)</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<h3>33-B. Browser Compatibility</h3>
+<table>
+  <tr><th>#</th><th>Test Case</th><th>Steps</th><th>Expected Result</th><th>Result</th><th>Note</th></tr>
+  <tr>
+    <td>33.7</td>
+    <td>Chrome (latest)</td>
+    <td>Test core flows in Chrome</td>
+    <td>All features work correctly</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.8</td>
+    <td>Firefox (latest)</td>
+    <td>Test core flows in Firefox</td>
+    <td>All features work correctly</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.9</td>
+    <td>Safari (latest)</td>
+    <td>Test core flows in Safari</td>
+    <td>All features work, httpOnly cookie handled correctly</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.10</td>
+    <td>Edge (latest)</td>
+    <td>Test core flows in Edge</td>
+    <td>All features work correctly</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.11</td>
+    <td>SSE streaming cross-browser</td>
+    <td>Test AI SLD chat streaming in each browser</td>
+    <td>SSE EventSource works, tokens stream correctly in all browsers</td>
+    <td></td><td></td>
+  </tr>
+  <tr>
+    <td>33.12</td>
+    <td>File download cross-browser</td>
+    <td>Download encrypted file in each browser</td>
+    <td>File downloads with correct UTF-8 filename in all browsers</td>
+    <td></td><td></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- Sign-off -->
+<!-- ============================================================ -->
+
+<div style="margin-top: 32px; border-top: 2px solid #333; padding-top: 12px;">
+  <table class="meta-table">
+    <tr><td>Total Test Cases</td><td><strong>318</strong></td></tr>
+    <tr><td>Passed</td><td></td></tr>
+    <tr><td>Failed</td><td></td></tr>
+    <tr><td>Skipped</td><td></td></tr>
+    <tr><td>Not Tested</td><td></td></tr>
+    <tr><td>Tested By</td><td></td></tr>
+    <tr><td>Date</td><td></td></tr>
+    <tr><td>Sign-off</td><td></td></tr>
+  </table>
+</div>
+
+</body>
+</html>

@@ -1,10 +1,10 @@
-# Blue Light - Electrical Installation Licence Platform
+# LicenseKaki - Electrical Installation Licence Platform
 
 Singapore EMA (Energy Market Authority) Electrical Installation Licence application and management platform.
 
 ## Overview
 
-Blue Light streamlines the process of applying for electrical installation licences in Singapore. Applicants submit licence applications online with auto-calculated kVA-based pricing, upload required documents (SLD drawings), and track their application status. Administrators review applications, confirm payments, and issue licences.
+LicenseKaki streamlines the process of applying for electrical installation licences in Singapore. Applicants submit licence applications online with auto-calculated kVA-based pricing, upload required documents (SLD drawings), and track their application status. Administrators review applications, confirm payments, and issue licences.
 
 ### Key Features
 

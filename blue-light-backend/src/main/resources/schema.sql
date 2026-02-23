@@ -1,5 +1,5 @@
 -- ============================================
--- Project Blue Light - Database Schema
+-- Project LicenseKaki - Database Schema
 -- MySQL 8.0 / UTF8MB4
 -- ============================================
 

@@ -27,9 +27,9 @@ export default function LoginPage() {
 
   // 세션 만료로 인한 리다이렉트 감지
   useEffect(() => {
-    const reason = sessionStorage.getItem('bluelight_logout_reason');
+    const reason = sessionStorage.getItem('licensekaki_logout_reason');
     if (reason === 'session_expired') {
-      sessionStorage.removeItem('bluelight_logout_reason');
+      sessionStorage.removeItem('licensekaki_logout_reason');
       setSessionExpiredMsg('Your session has expired. Please sign in again.');
     }
   }, []);

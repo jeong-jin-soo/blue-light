@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LicenseKaki - UAT Feedback Form</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-light: #dbeafe;
+    --success: #16a34a;
+    --success-light: #dcfce7;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --danger: #dc2626;
+    --danger-light: #fee2e2;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-900);
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
+    color: white;
+    padding: 40px 32px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; margin-bottom: 8px; }
+  .header p { opacity: 0.9; font-size: 15px; }
+  .header .badge {
+    display: inline-block;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    margin-top: 12px;
+  }
+
+  /* Cards */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    border: 1px solid var(--gray-200);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary-light);
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h3 {
+    font-size: 15px;
+    margin: 16px 0 8px;
+    color: var(--gray-700);
+  }
+
+  /* Info Box */
+  .info-box {
+    background: var(--primary-light);
+    border-left: 4px solid var(--primary);
+    padding: 16px;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 16px;
+  }
+  .info-box.warning {
+    background: var(--warning-light);
+    border-left-color: var(--warning);
+  }
+  .info-box p { font-size: 14px; }
+  .info-box strong { color: var(--gray-900); }
+
+  /* Account Table */
+  .account-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    margin: 12px 0;
+  }
+  .account-table th {
+    background: var(--gray-100);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--gray-200);
+  }
+  .account-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .account-table tr:hover { background: var(--gray-50); }
+  .role-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .role-applicant { background: #dbeafe; color: #1d4ed8; }
+  .role-lew { background: #dcfce7; color: #15803d; }
+  .role-admin { background: #fef3c7; color: #b45309; }
+  .role-sysadmin { background: #f3e8ff; color: #7c3aed; }
+  .role-sldmgr { background: #ffe4e6; color: #be123c; }
+
+  /* Status Flow */
+  .status-flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 16px;
+    font-size: 13px;
+  }
+  .status-flow .step {
+    background: var(--gray-100);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .status-flow .arrow { color: var(--gray-300); font-weight: bold; }
+
+  /* Scenario */
+  .scenario {
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .scenario-header {
+    background: var(--gray-50);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--gray-200);
+    cursor: pointer;
+  }
+  .scenario-header:hover { background: var(--gray-100); }
+  .scenario-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 600;
+    margin-right: 10px;
+  }
+  .scenario-title { font-weight: 600; font-size: 14px; flex: 1; }
+  .scenario-body { padding: 16px; }
+
+  .steps-list {
+    list-style: none;
+    margin-bottom: 16px;
+  }
+  .steps-list li {
+    padding: 6px 0 6px 24px;
+    position: relative;
+    font-size: 14px;
+    color: var(--gray-700);
+  }
+  .steps-list li::before {
+    content: '→';
+    position: absolute;
+    left: 4px;
+    color: var(--primary);
+    font-weight: bold;
+  }
+
+  /* Form Elements */
+  .form-group {
+    margin-bottom: 14px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--gray-700);
+  }
+  .form-group select,
+  .form-group textarea,
+  .form-group input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  .form-group select:focus,
+  .form-group textarea:focus,
+  .form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+  }
+  .form-group textarea { resize: vertical; min-height: 80px; }
+
+  .radio-group {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+  }
+  .radio-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .radio-group input[type="radio"] {
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Tester Info */
+  .tester-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 600px) {
+    .tester-info { grid-template-columns: 1fr; }
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary {
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-300);
+  }
+  .btn-secondary:hover { background: var(--gray-200); }
+
+  .btn-group {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-top: 24px;
+  }
+
+  /* Section Divider */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 32px 0 20px;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gray-900);
+  }
+  .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: var(--gray-200);
+  }
+
+  /* Print Styles */
+  @media print {
+    body { background: white; }
+    .container { max-width: 100%; padding: 0; }
+    .card { break-inside: avoid; box-shadow: none; border: 1px solid #ccc; }
+    .scenario { break-inside: avoid; }
+    .btn-group { display: none; }
+    .no-print { display: none; }
+  }
+
+  /* Rating Stars */
+  .star-rating {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .star-rating input { display: none; }
+  .star-rating label {
+    font-size: 24px;
+    color: var(--gray-300);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .star-rating label:hover,
+  .star-rating label:hover ~ label,
+  .star-rating input:checked ~ label {
+    color: #f59e0b;
+  }
+  .star-rating { direction: rtl; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>⚡ LicenseKaki — UAT Feedback Form</h1>
+    <p>User Acceptance Testing &amp; Feedback Collection</p>
+    <div class="badge">Singapore Electrical Installation Licence Platform</div>
+  </div>
+
+  <!-- Test Environment Info -->
+  <div class="card">
+    <h2>🌐 Test Environment</h2>
+    <div class="info-box">
+      <p><strong>URL:</strong> <a href="https://dev.licensekaki.com" target="_blank">https://dev.licensekaki.com</a></p>
+      <p style="margin-top:4px;font-size:13px;color:var(--gray-500);">Please use a modern browser (Chrome, Safari, Edge). Mobile access is also supported.</p>
+    </div>
+
+    <h3>Test Accounts</h3>
+    <table class="account-table">
+      <thead>
+        <tr><th>Role</th><th>Email</th><th>Password</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="role-badge role-applicant">APPLICANT</span></td>
+          <td colspan="2"><em>Sign up to create a new account</em></td>
+          <td>Licence applicant (owner / building manager)</td>
+        </tr>
+        <tr>
+          <td><span class="role-badge role-lew">LEW</span></td>
+          <td>lew@licensekaki.sg</td><td>admin1234</td>
+          <td>Licensed Electrical Worker — reviews applications</td>
+        </tr>
+        <tr>
+          <td><span class="role-badge role-admin">ADMIN</span></td>
+          <td>admin@licensekaki.sg</td><td>admin1234</td>
+          <td>Administrator — manages users, applications, pricing</td>
+        </tr>
+        <tr>
+          <td><span class="role-badge role-sysadmin">SYS ADMIN</span></td>
+          <td>sysadmin@licensekaki.sg</td><td>admin1234</td>
+          <td>System Admin — audit logs, system settings</td>
+        </tr>
+        <tr>
+          <td><span class="role-badge role-sldmgr">SLD MANAGER</span></td>
+          <td>sldmanager@licensekaki.sg</td><td>admin1234</td>
+          <td>SLD Manager — handles SLD-only drawing orders</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="info-box warning">
+      <p>⚠️ <strong>Note:</strong> This is a development/test environment. Data may be reset periodically. Please do not enter real personal information.</p>
+    </div>
+  </div>
+
+  <!-- Tester Information -->
+  <div class="card">
+    <h2>👤 Tester Information</h2>
+    <div class="tester-info">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" placeholder="Your name">
+      </div>
+      <div class="form-group">
+        <label>Company / Organization</label>
+        <input type="text" placeholder="Company name">
+      </div>
+      <div class="form-group">
+        <label>Role / Position</label>
+        <input type="text" placeholder="e.g., Project Manager, LEW, Building Owner">
+      </div>
+      <div class="form-group">
+        <label>Test Date</label>
+        <input type="text" placeholder="DD/MM/YYYY">
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== SECTION A: Applicant ========== -->
+  <div class="section-divider">A. Applicant Flow</div>
+
+  <div class="card">
+    <h2>📋 Application Status Flow</h2>
+    <div class="status-flow">
+      <span class="step">PENDING_REVIEW</span><span class="arrow">→</span>
+      <span class="step">REVISION_REQUESTED</span><span class="arrow">↔</span>
+      <span class="step">PENDING_REVIEW</span><span class="arrow">→</span>
+      <span class="step">PENDING_PAYMENT</span><span class="arrow">→</span>
+      <span class="step">PAID</span><span class="arrow">→</span>
+      <span class="step">IN_PROGRESS</span><span class="arrow">→</span>
+      <span class="step">COMPLETED</span>
+    </div>
+  </div>
+
+  <!-- A-1 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">1</span><span class="scenario-title">Sign Up &amp; Login</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Go to Sign Up page and create a new applicant account</li>
+        <li>Fill in name, email, phone number, and password</li>
+        <li>Log in with the new account</li>
+        <li>Check dashboard loads correctly</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a1"> ✅ Pass</label>
+          <label><input type="radio" name="a1"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a1"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Describe any issues encountered, or general feedback..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-2 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">2</span><span class="scenario-title">New Application Submission</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Click "New Application" from the dashboard</li>
+        <li>Fill in all required fields (premises info, kVA, application type)</li>
+        <li>Select SLD option: Self Upload or Request LEW</li>
+        <li>Upload required documents (SLD drawing, site photos, etc.)</li>
+        <li>Review the application summary and submit</li>
+        <li>Verify the application appears in the list with "Pending Review" status</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a2"> ✅ Pass</label>
+          <label><input type="radio" name="a2"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a2"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the form easy to understand? Were file uploads smooth?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-3 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">3</span><span class="scenario-title">Application Detail &amp; Revision</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open a submitted application to view details</li>
+        <li>If revision is requested, check the revision message from Admin/LEW</li>
+        <li>Edit the application and re-upload corrected documents</li>
+        <li>Resubmit and verify status returns to "Pending Review"</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a3"> ✅ Pass</label>
+          <label><input type="radio" name="a3"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a3"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the revision workflow clear? Any confusion?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-4 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">4</span><span class="scenario-title">Payment (PayNow / Bank Transfer)</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open an application with "Pending Payment" status</li>
+        <li>View the pricing breakdown (kVA-based + SLD fee if applicable)</li>
+        <li>Check PayNow QR code or bank transfer details are displayed</li>
+        <li>Upload payment receipt</li>
+        <li>Verify status changes to "Paid" after admin confirmation</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a4"> ✅ Pass</label>
+          <label><input type="radio" name="a4"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a4"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the payment flow clear? Were prices displayed correctly?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-5 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">5</span><span class="scenario-title">LOA (Letter of Authorization) &amp; Document Downloads</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>In application detail, view the LOA document</li>
+        <li>Complete the digital signature for LOA</li>
+        <li>Download uploaded files and generated documents (licence PDF, receipt)</li>
+        <li>Verify all documents are readable and correctly generated</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a5"> ✅ Pass</label>
+          <label><input type="radio" name="a5"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a5"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Were documents generated correctly? Any display issues?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-6 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">6</span><span class="scenario-title">AI Chatbot</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Click the chatbot icon (bottom-right corner)</li>
+        <li>Ask a question about the licence application process</li>
+        <li>Verify the AI responds with relevant information</li>
+        <li>Check that responses render markdown correctly (lists, bold, links)</li>
+        <li>Test conversation history — close and reopen the chat</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a6"> ✅ Pass</label>
+          <label><input type="radio" name="a6"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a6"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the chatbot helpful? Were responses accurate?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- A-7 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">7</span><span class="scenario-title">Profile &amp; Data Management (PDPA)</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Navigate to Profile page</li>
+        <li>Update profile information (name, phone, etc.)</li>
+        <li>Test "Export My Data" — download a copy of personal data</li>
+        <li>Review privacy policy and consent settings</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="a7"> ✅ Pass</label>
+          <label><input type="radio" name="a7"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="a7"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was profile management intuitive? Did data export work?"></textarea>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========== SECTION B: SLD-Only Order ========== -->
+  <div class="section-divider">B. SLD-Only Order (Applicant)</div>
+
+  <div class="card">
+    <h2>📐 SLD Order Status Flow</h2>
+    <div class="status-flow">
+      <span class="step">PENDING_QUOTE</span><span class="arrow">→</span>
+      <span class="step">QUOTE_PROPOSED</span><span class="arrow">→</span>
+      <span class="step">PENDING_PAYMENT</span><span class="arrow">→</span>
+      <span class="step">PAID</span><span class="arrow">→</span>
+      <span class="step">IN_PROGRESS</span><span class="arrow">→</span>
+      <span class="step">SLD_UPLOADED</span><span class="arrow">→</span>
+      <span class="step">COMPLETED</span>
+    </div>
+    <p style="font-size:13px;color:var(--gray-500)">* Applicant may reject a quote (→ QUOTE_REJECTED) or request revision after SLD upload (→ REVISION_REQUESTED)</p>
+  </div>
+
+  <!-- B-1 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">1</span><span class="scenario-title">Create SLD-Only Order</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Navigate to SLD Orders section</li>
+        <li>Click "New SLD Order"</li>
+        <li>Fill in premises info, kVA (optional), and description</li>
+        <li>Upload sketch or reference materials (optional)</li>
+        <li>Submit the order request</li>
+        <li>Verify order appears with "Pending Quote" status</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="b1"> ✅ Pass</label>
+          <label><input type="radio" name="b1"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="b1"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the SLD order creation process clear?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- B-2 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">2</span><span class="scenario-title">Accept/Reject Quote &amp; Pay</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open an SLD order with "Quote Proposed" status</li>
+        <li>Review the proposed price from SLD Manager</li>
+        <li>Accept the quote (or reject and check status changes)</li>
+        <li>If accepted, upload payment receipt</li>
+        <li>Verify status progresses correctly</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="b2"> ✅ Pass</label>
+          <label><input type="radio" name="b2"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="b2"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the quote review and payment process smooth?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- B-3 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">3</span><span class="scenario-title">SLD Delivery &amp; Revision Request</span></div>
+      <span class="role-badge role-applicant">APPLICANT</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open an SLD order with "SLD Uploaded" status</li>
+        <li>Download and review the SLD drawing (PDF)</li>
+        <li>If satisfactory, complete the order</li>
+        <li>If revision needed, submit a revision request with comments</li>
+        <li>Verify chat communication with SLD Manager works</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="b3"> ✅ Pass</label>
+          <label><input type="radio" name="b3"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="b3"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the SLD review and revision process user-friendly?"></textarea>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========== SECTION C: LEW ========== -->
+  <div class="section-divider">C. LEW (Licensed Electrical Worker)</div>
+
+  <!-- C-1 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">1</span><span class="scenario-title">Dashboard &amp; Application Review</span></div>
+      <span class="role-badge role-lew">LEW</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Log in as LEW (lew@licensekaki.sg / admin1234)</li>
+        <li>View the dashboard with application statistics</li>
+        <li>Browse the application list and filter/search</li>
+        <li>Open an application to review details and uploaded documents</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="c1"> ✅ Pass</label>
+          <label><input type="radio" name="c1"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="c1"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the dashboard informative? Easy to find applications?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- C-2 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">2</span><span class="scenario-title">Approve / Request Revision / Reject</span></div>
+      <span class="role-badge role-lew">LEW</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open a "Pending Review" application</li>
+        <li>Review all documents (SLD, site photos, SP account)</li>
+        <li>Approve → verify status moves to "Pending Payment"</li>
+        <li>Request Revision → enter reason, verify applicant sees it</li>
+        <li>Check that status transitions are correct</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="c2"> ✅ Pass</label>
+          <label><input type="radio" name="c2"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="c2"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the review process efficient? Any missing information?"></textarea>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========== SECTION D: Admin ========== -->
+  <div class="section-divider">D. Admin</div>
+
+  <!-- D-1 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">1</span><span class="scenario-title">User Management</span></div>
+      <span class="role-badge role-admin">ADMIN</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Log in as Admin (admin@licensekaki.sg / admin1234)</li>
+        <li>Navigate to User Management page</li>
+        <li>View all users with role filters (Applicant, LEW, Admin, SLD Manager)</li>
+        <li>Approve a pending LEW registration</li>
+        <li>Change a user's role (e.g., assign SLD_MANAGER role)</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="d1"> ✅ Pass</label>
+          <label><input type="radio" name="d1"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="d1"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was user management straightforward? Any role-related issues?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- D-2 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">2</span><span class="scenario-title">Application Management &amp; Payment Confirmation</span></div>
+      <span class="role-badge role-admin">ADMIN</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>View all applications with status filters</li>
+        <li>Open an application and review all details</li>
+        <li>For "Paid" application, confirm payment receipt and advance status</li>
+        <li>Upload licence PDF or completion documents</li>
+        <li>Mark an application as "Completed"</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="d2"> ✅ Pass</label>
+          <label><input type="radio" name="d2"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="d2"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the full lifecycle management efficient?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- D-3 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">3</span><span class="scenario-title">Price / kVA Tier Management</span></div>
+      <span class="role-badge role-admin">ADMIN</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Navigate to Price Management page</li>
+        <li>View existing kVA price tiers</li>
+        <li>Edit a tier price and save</li>
+        <li>Add a new tier or remove an existing one</li>
+        <li>Verify price changes reflect in new applications</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="d3"> ✅ Pass</label>
+          <label><input type="radio" name="d3"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="d3"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was pricing configuration intuitive?"></textarea>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========== SECTION E: SLD Manager ========== -->
+  <div class="section-divider">E. SLD Manager</div>
+
+  <!-- E-1 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">1</span><span class="scenario-title">Dashboard &amp; Quote Proposal</span></div>
+      <span class="role-badge role-sldmgr">SLD MANAGER</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Log in as SLD Manager (sldmanager@licensekaki.sg / admin1234)</li>
+        <li>View the SLD order dashboard with statistics</li>
+        <li>Open a "Pending Quote" order</li>
+        <li>Review applicant's description, sketch, and kVA info</li>
+        <li>Propose a quote price and submit</li>
+        <li>Verify order status changes to "Quote Proposed"</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="e1"> ✅ Pass</label>
+          <label><input type="radio" name="e1"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="e1"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the quoting process clear? Enough info from applicant?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- E-2 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">2</span><span class="scenario-title">SLD Drawing Upload &amp; Completion</span></div>
+      <span class="role-badge role-sldmgr">SLD MANAGER</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open a "Paid" or "In Progress" order</li>
+        <li>Upload the SLD drawing file (PDF)</li>
+        <li>Verify status changes to "SLD Uploaded"</li>
+        <li>Handle revision requests if applicant sends feedback</li>
+        <li>Re-upload revised SLD drawing</li>
+        <li>Complete the order after applicant accepts</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="e2"> ✅ Pass</label>
+          <label><input type="radio" name="e2"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="e2"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was the SLD upload and revision cycle smooth?"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- E-3 -->
+  <div class="scenario">
+    <div class="scenario-header">
+      <div style="display:flex;align-items:center"><span class="scenario-num">3</span><span class="scenario-title">Chat Communication with Applicant</span></div>
+      <span class="role-badge role-sldmgr">SLD MANAGER</span>
+    </div>
+    <div class="scenario-body">
+      <ol class="steps-list">
+        <li>Open an SLD order detail page</li>
+        <li>Use the chat panel to communicate with the applicant</li>
+        <li>Send messages and verify real-time display</li>
+        <li>Test message history persistence</li>
+      </ol>
+      <div class="form-group">
+        <label>Result</label>
+        <div class="radio-group">
+          <label><input type="radio" name="e3"> ✅ Pass</label>
+          <label><input type="radio" name="e3"> ⚠️ Issue Found</label>
+          <label><input type="radio" name="e3"> ❌ Fail</label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Comments / Issues</label>
+        <textarea placeholder="Was communication smooth? Any message delays?"></textarea>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========== SECTION F: Overall ========== -->
+  <div class="section-divider">F. Overall Feedback</div>
+
+  <div class="card">
+    <h2>⭐ Overall Assessment</h2>
+
+    <div class="form-group">
+      <label>1. How would you rate the overall user experience? (1 = Poor, 5 = Excellent)</label>
+      <div class="radio-group">
+        <label><input type="radio" name="ux-rating" value="1"> 1</label>
+        <label><input type="radio" name="ux-rating" value="2"> 2</label>
+        <label><input type="radio" name="ux-rating" value="3"> 3</label>
+        <label><input type="radio" name="ux-rating" value="4"> 4</label>
+        <label><input type="radio" name="ux-rating" value="5"> 5</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>2. How intuitive was the navigation?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="nav-rating" value="1"> 1</label>
+        <label><input type="radio" name="nav-rating" value="2"> 2</label>
+        <label><input type="radio" name="nav-rating" value="3"> 3</label>
+        <label><input type="radio" name="nav-rating" value="4"> 4</label>
+        <label><input type="radio" name="nav-rating" value="5"> 5</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>3. How would you rate the page loading speed?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="speed-rating" value="1"> 1</label>
+        <label><input type="radio" name="speed-rating" value="2"> 2</label>
+        <label><input type="radio" name="speed-rating" value="3"> 3</label>
+        <label><input type="radio" name="speed-rating" value="4"> 4</label>
+        <label><input type="radio" name="speed-rating" value="5"> 5</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>4. How clear and professional is the visual design?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="design-rating" value="1"> 1</label>
+        <label><input type="radio" name="design-rating" value="2"> 2</label>
+        <label><input type="radio" name="design-rating" value="3"> 3</label>
+        <label><input type="radio" name="design-rating" value="4"> 4</label>
+        <label><input type="radio" name="design-rating" value="5"> 5</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>5. Did you test on mobile? If yes, how was the mobile experience?</label>
+      <div class="radio-group">
+        <label><input type="radio" name="mobile" value="good"> 👍 Good</label>
+        <label><input type="radio" name="mobile" value="issues"> ⚠️ Some Issues</label>
+        <label><input type="radio" name="mobile" value="poor"> 👎 Poor</label>
+        <label><input type="radio" name="mobile" value="na"> N/A (Not tested)</label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>6. What did you like most about the platform?</label>
+      <textarea placeholder="Share what worked well..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>7. What needs the most improvement?</label>
+      <textarea placeholder="Share what could be better..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>8. Any missing features or functionality you expected?</label>
+      <textarea placeholder="Features you think should be added..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label>9. Additional comments or suggestions</label>
+      <textarea rows="5" placeholder="Any other feedback, bugs found, or suggestions..."></textarea>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="btn-group no-print">
+    <button class="btn btn-secondary" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    <button class="btn btn-primary" onclick="exportFeedback()">📤 Export as Text</button>
+  </div>
+
+  <p style="text-align:center;margin-top:24px;font-size:13px;color:var(--gray-500);">
+    Thank you for your time and feedback! Your input helps us improve LicenseKaki. 🙏
+  </p>
+
+</div>
+
+<script>
+function exportFeedback() {
+  let output = '=== LicenseKaki UAT Feedback ===\n\n';
+  const now = new Date().toLocaleString();
+  output += `Exported: ${now}\n\n`;
+
+  // Tester info
+  const inputs = document.querySelectorAll('.tester-info input');
+  const labels = ['Name', 'Company', 'Role', 'Test Date'];
+  output += '--- Tester Information ---\n';
+  inputs.forEach((inp, i) => {
+    output += `${labels[i]}: ${inp.value || '(not filled)'}\n`;
+  });
+  output += '\n';
+
+  // Scenarios
+  const scenarios = document.querySelectorAll('.scenario');
+  scenarios.forEach((s) => {
+    const title = s.querySelector('.scenario-title')?.textContent || '';
+    const role = s.querySelector('.role-badge')?.textContent || '';
+    const checkedRadio = s.querySelector('input[type="radio"]:checked');
+    const result = checkedRadio ? checkedRadio.parentElement.textContent.trim() : '(not rated)';
+    const comment = s.querySelector('textarea')?.value || '(no comment)';
+
+    output += `[${role}] ${title}\n`;
+    output += `  Result: ${result}\n`;
+    output += `  Comment: ${comment}\n\n`;
+  });
+
+  // Overall
+  output += '--- Overall Assessment ---\n';
+  const overallCard = document.querySelectorAll('.card');
+  const lastCard = overallCard[overallCard.length - 1];
+  if (lastCard) {
+    const groups = lastCard.querySelectorAll('.form-group');
+    groups.forEach(g => {
+      const label = g.querySelector('label')?.textContent || '';
+      const checked = g.querySelector('input[type="radio"]:checked');
+      const ta = g.querySelector('textarea');
+      if (checked) {
+        output += `${label}: ${checked.parentElement.textContent.trim()}\n`;
+      } else if (ta) {
+        output += `${label}: ${ta.value || '(not filled)'}\n`;
+      }
+    });
+  }
+
+  // Download
+  const blob = new Blob([output], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `LicenseKaki_UAT_Feedback_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+</script>
+
+</body>
+</html>

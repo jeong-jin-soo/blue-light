@@ -194,7 +194,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'bluelight-auth',
+      name: 'licensekaki-auth',
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,

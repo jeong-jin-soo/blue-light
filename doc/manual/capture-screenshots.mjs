@@ -215,7 +215,7 @@ async function logout(page) {
 
   // ===== 3. Admin 화면 =====
   console.log('\n📌 3. Admin 화면');
-  await login(page, 'admin@bluelight.sg', 'admin1234');
+  await login(page, 'admin@licensekaki.sg', 'admin1234');
 
   // 20. 관리자 대시보드
   await page.goto(`${BASE_URL}/admin/dashboard`, { waitUntil: 'networkidle0' });
@@ -275,7 +275,7 @@ async function logout(page) {
 
   // ===== 4. LEW 화면 =====
   console.log('\n📌 4. LEW 화면');
-  await login(page, 'lew@bluelight.sg', 'admin1234');
+  await login(page, 'lew@licensekaki.sg', 'admin1234');
 
   // 30. LEW 대시보드
   await page.goto(`${BASE_URL}/admin/dashboard`, { waitUntil: 'networkidle0' });

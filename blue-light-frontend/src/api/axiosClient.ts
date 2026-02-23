@@ -10,7 +10,7 @@ import type { AxiosError } from 'axios';
 import type { ApiError } from '../types';
 
 // 로컬 스토리지 키 (사용자 메타정보 전용 — 토큰은 httpOnly 쿠키에 저장)
-const TOKEN_KEY = 'bluelight_token';
+const TOKEN_KEY = 'licensekaki_token';
 
 // Axios 인스턴스 생성
 const axiosClient = axios.create({
@@ -40,13 +40,13 @@ axiosClient.interceptors.response.use(
       if (response.status === 401) {
         // 레거시 토큰 제거 + Zustand 인증 상태 제거
         localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem('bluelight-auth');
+        localStorage.removeItem('licensekaki-auth');
 
         // 로그인/회원가입 페이지가 아닌 경우에만 리다이렉트 (무한 루프 방지)
         const isAuthRequest = response.config.url?.includes('/auth/');
         const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/signup';
         if (!isAuthRequest && !isAuthPage) {
-          sessionStorage.setItem('bluelight_logout_reason', 'session_expired');
+          sessionStorage.setItem('licensekaki_logout_reason', 'session_expired');
           window.location.href = '/login';
         }
       }

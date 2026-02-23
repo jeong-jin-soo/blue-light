@@ -38,7 +38,7 @@ async function screenshot(page, name) {
     inputs.forEach(i => { i.value = ''; i.dispatchEvent(new Event('input', {bubbles:true})); });
   });
   await sleep(200);
-  await page.type('input[type="email"]', 'admin@bluelight.sg');
+  await page.type('input[type="email"]', 'admin@licensekaki.sg');
   await page.type('input[type="password"]', 'admin1234');
   await page.click('button[type="submit"]');
   await page.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {});

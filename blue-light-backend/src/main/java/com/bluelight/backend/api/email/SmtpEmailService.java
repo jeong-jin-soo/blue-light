@@ -29,10 +29,10 @@ public class SmtpEmailService implements EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.sender.from:noreply@bluelight.sg}")
+    @Value("${spring.mail.sender.from:noreply@licensekaki.com}")
     private String fromAddress;
 
-    @Value("${spring.mail.sender.name:Blue Light}")
+    @Value("${spring.mail.sender.name:LicenseKaki}")
     private String fromName;
 
     @Override
@@ -44,7 +44,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Reset Your Password - Blue Light");
+            helper.setSubject("Reset Your Password - LicenseKaki");
 
             String htmlContent = buildPasswordResetHtml(userName, resetLink);
             helper.setText(htmlContent, true);
@@ -66,7 +66,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Verify Your Email - Blue Light");
+            helper.setSubject("Verify Your Email - LicenseKaki");
 
             String htmlContent = buildEmailVerificationHtml(userName, verificationLink);
             helper.setText(htmlContent, true);
@@ -89,7 +89,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Licence Expiry Notice - Blue Light");
+            helper.setSubject("Licence Expiry Notice - LicenseKaki");
 
             String htmlContent = buildLicenseExpiryHtml(userName, licenseNumber, address, expiryDate, daysRemaining);
             helper.setText(htmlContent, true);
@@ -109,7 +109,7 @@ public class SmtpEmailService implements EmailService {
                 <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
                   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                     <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
-                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Blue Light</h1>
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
                     </div>
                     <div style="padding: 32px 24px;">
                       <h2 style="color: #333333; margin-top: 0;">Reset Your Password</h2>
@@ -154,7 +154,7 @@ public class SmtpEmailService implements EmailService {
                 <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
                   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                     <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
-                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Blue Light</h1>
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
                     </div>
                     <div style="padding: 32px 24px;">
                       <h2 style="color: #333333; margin-top: 0;">Licence Expiry Notice</h2>
@@ -180,11 +180,11 @@ public class SmtpEmailService implements EmailService {
                       </div>
                       <p style="color: #555555; line-height: 1.6;">
                         To continue operating your electrical installation, please submit a renewal application
-                        before the expiry date. You can start the renewal process by logging into your Blue Light account.
+                        before the expiry date. You can start the renewal process by logging into your LicenseKaki account.
                       </p>
                       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
                       <p style="color: #aaaaaa; font-size: 12px;">
-                        This is an automated notification from Blue Light. If you have already renewed your licence, please disregard this email.
+                        This is an automated notification from LicenseKaki. If you have already renewed your licence, please disregard this email.
                       </p>
                     </div>
                   </div>
@@ -201,13 +201,13 @@ public class SmtpEmailService implements EmailService {
                 <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
                   <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
                     <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
-                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">Blue Light</h1>
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
                     </div>
                     <div style="padding: 32px 24px;">
                       <h2 style="color: #333333; margin-top: 0;">Verify Your Email</h2>
                       <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
                       <p style="color: #555555; line-height: 1.6;">
-                        Thank you for signing up with Blue Light. Please verify your email address by clicking the button below.
+                        Thank you for signing up with LicenseKaki. Please verify your email address by clicking the button below.
                       </p>
                       <div style="text-align: center; margin: 32px 0;">
                         <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: bold; font-size: 16px;">
@@ -215,7 +215,7 @@ public class SmtpEmailService implements EmailService {
                         </a>
                       </div>
                       <p style="color: #888888; font-size: 13px; line-height: 1.5;">
-                        If you didn't create an account with Blue Light, you can safely ignore this email.
+                        If you didn't create an account with LicenseKaki, you can safely ignore this email.
                       </p>
                       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
                       <p style="color: #aaaaaa; font-size: 12px;">

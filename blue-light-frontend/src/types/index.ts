@@ -1,5 +1,5 @@
 /**
- * Blue Light Frontend - Type Definitions
+ * LicenseKaki Frontend - Type Definitions
  * 백엔드 Entity와 일치하는 TypeScript Interface 정의
  */
 
