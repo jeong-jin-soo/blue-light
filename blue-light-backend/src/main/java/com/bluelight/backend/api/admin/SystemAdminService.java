@@ -186,6 +186,31 @@ public class SystemAdminService {
         log.info("Email verification {} by userSeq={}", enabled ? "enabled" : "disabled", updatedBy);
     }
 
+    // ── AI SLD 생성 ──────────────────────────────
+
+    /**
+     * AI SLD 생성 설정 조회
+     */
+    public boolean isSldAiGenerationEnabled() {
+        return systemSettingRepository.findById("sld_ai_generation_enabled")
+                .map(SystemSetting::toBooleanValue)
+                .orElse(true);
+    }
+
+    /**
+     * AI SLD 생성 설정 변경
+     */
+    @Transactional
+    public void updateSldAiGeneration(boolean enabled, Long updatedBy) {
+        SystemSetting setting = systemSettingRepository.findById("sld_ai_generation_enabled")
+                .orElseGet(() -> new SystemSetting(
+                        "sld_ai_generation_enabled", "true", "Enable AI-powered SLD generation"));
+        setting.updateValue(String.valueOf(enabled), updatedBy);
+        systemSettingRepository.save(setting);
+
+        log.info("SLD AI generation {} by userSeq={}", enabled ? "enabled" : "disabled", updatedBy);
+    }
+
     // ── 전체 시스템 설정 조회 ──────────────────────────────
 
     /**
@@ -196,6 +221,9 @@ public class SystemAdminService {
 
         // 이메일 인증 설정
         result.put("emailVerificationEnabled", isEmailVerificationEnabled());
+
+        // AI SLD 생성 설정
+        result.put("sldAiGenerationEnabled", isSldAiGenerationEnabled());
 
         // Gemini API 상태
         result.put("geminiApiKey", getGeminiApiKeyStatus());

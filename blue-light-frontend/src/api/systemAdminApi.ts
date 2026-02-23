@@ -43,6 +43,18 @@ export const clearGeminiApiKey = async (): Promise<{ message: string }> => {
   return response.data;
 };
 
+// ── SLD AI Generation ──────────────────────────────
+
+export const getSldAiGeneration = async (): Promise<{ enabled: boolean }> => {
+  const response = await axiosClient.get<{ enabled: boolean }>('/admin/system/sld-ai-generation');
+  return response.data;
+};
+
+export const updateSldAiGeneration = async (enabled: boolean): Promise<{ message: string; enabled: boolean }> => {
+  const response = await axiosClient.put<{ message: string; enabled: boolean }>('/admin/system/sld-ai-generation', { enabled });
+  return response.data;
+};
+
 // ── Email Verification ──────────────────────────────
 
 export const getEmailVerification = async (): Promise<{ enabled: boolean }> => {

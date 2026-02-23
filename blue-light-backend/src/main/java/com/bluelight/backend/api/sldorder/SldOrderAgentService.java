@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.sldorder;
 
+import com.bluelight.backend.api.admin.SystemAdminService;
 import com.bluelight.backend.api.admin.dto.SldChatMessageResponse;
 import com.bluelight.backend.api.sldorder.dto.SldOrderResponse;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -47,6 +48,7 @@ public class SldOrderAgentService {
     private final FileStorageService fileStorageService;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
+    private final SystemAdminService systemAdminService;
 
     /**
      * SSE 스트리밍 채팅 -- Python AI Agent 프록시
@@ -59,6 +61,13 @@ public class SldOrderAgentService {
      * 동기 DB 작업과 비동기 스트리밍을 분리하여 각각 별도 트랜잭션으로 처리.
      */
     public void chatStream(Long sldOrderSeq, Long userSeq, String message, SseEmitter emitter) {
+        // AI SLD 생성 토글 확인
+        if (!systemAdminService.isSldAiGenerationEnabled()) {
+            throw new BusinessException(
+                    "AI SLD generation is currently disabled by system administrator",
+                    HttpStatus.BAD_REQUEST, "SLD_AI_GENERATION_DISABLED");
+        }
+
         // 동기 트랜잭션: 주문 정보 조회 + 사용자 메시지 저장 + 상태 전환
         Map<String, Object> sldOrderInfo = transactionTemplate.execute(status -> {
             SldOrder order = sldOrderRepository.findById(sldOrderSeq)
@@ -200,6 +209,13 @@ public class SldOrderAgentService {
                 .orElseThrow(() -> new BusinessException(
                         "SLD order not found", HttpStatus.NOT_FOUND, "SLD_ORDER_NOT_FOUND"));
 
+        // IN_PROGRESS 상태에서만 SLD 수락 가능
+        if (order.getStatus() != com.bluelight.backend.domain.sldorder.SldOrderStatus.IN_PROGRESS) {
+            throw new BusinessException(
+                    "SLD can only be accepted when order status is IN_PROGRESS",
+                    HttpStatus.BAD_REQUEST, "INVALID_SLD_ORDER_STATUS");
+        }
+
         // Python 서비스에서 PDF 파일 다운로드
         byte[] pdfBytes;
         try {
@@ -242,6 +258,9 @@ public class SldOrderAgentService {
 
         // SldOrder 상태 전환 -> SLD_UPLOADED
         order.uploadSld(savedFile.getFileSeq(), "AI-generated SLD");
+
+        // Python 임시 파일 정리 (비동기, 실패해도 무시)
+        cleanupTempFile(fileId);
 
         return SldOrderResponse.from(order);
     }
@@ -332,6 +351,28 @@ public class SldOrderAgentService {
         }
 
         return builder;
+    }
+
+    /**
+     * Python 서비스의 임시 파일(PDF + SVG) 정리
+     * - 파일 저장 성공 후 호출 (비동기, 실패해도 무시)
+     */
+    private void cleanupTempFile(String fileId) {
+        try {
+            sldAgentWebClient
+                    .delete()
+                    .uri("/api/files/" + fileId)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .subscribe(
+                            result -> log.info("Python temp file cleaned up: fileId={}", fileId),
+                            error -> log.warn("Failed to cleanup Python temp file (non-critical): fileId={}, error={}",
+                                    fileId, error.getMessage())
+                    );
+        } catch (Exception e) {
+            log.warn("Failed to request Python temp file cleanup (non-critical): fileId={}, error={}",
+                    fileId, e.getMessage());
+        }
     }
 
     private void sendSseEvent(SseEmitter emitter, String eventName, Map<String, Object> data) {

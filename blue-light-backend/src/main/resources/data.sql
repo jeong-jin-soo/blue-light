@@ -85,6 +85,12 @@ SELECT 'email_verification_enabled', 'false', 'Enable email verification on sign
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'email_verification_enabled');
 
+-- AI SLD 생성 기능 활성화 여부 (기본: 활성화)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'sld_ai_generation_enabled', 'true', 'Enable AI-powered SLD generation', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'sld_ai_generation_enabled');
+
 
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입

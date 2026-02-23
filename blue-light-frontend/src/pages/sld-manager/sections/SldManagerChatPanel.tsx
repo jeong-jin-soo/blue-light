@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { SvgPreviewViewer } from '../../../components/ui/SvgPreviewViewer';
 import { useSldOrderChatStore } from '../../../stores/sldOrderChatStore';
+import { useToastStore } from '../../../stores/toastStore';
 import { sldOrderAcceptSld } from '../../../api/sldOrderChatApi';
+import { getSldAiGeneration } from '../../../api/systemAdminApi';
 
 interface Props {
   sldOrderSeq: number;
@@ -16,7 +18,9 @@ interface Props {
 export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [acceptLoading, setAcceptLoading] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const toast = useToastStore();
 
   const {
     messages,
@@ -29,6 +33,13 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
     loadHistory,
     resetChat,
   } = useSldOrderChatStore();
+
+  // AI SLD generation toggle check
+  useEffect(() => {
+    getSldAiGeneration()
+      .then((data) => setAiEnabled(data.enabled))
+      .catch(() => setAiEnabled(true));
+  }, []);
 
   // Load chat history
   useEffect(() => {
@@ -66,9 +77,12 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
     setAcceptLoading(true);
     try {
       await sldOrderAcceptSld(sldOrderSeq, generatedFileId);
+      toast.success('SLD accepted and uploaded successfully.');
       onSldUpdated();
-    } catch {
-      // Error handling via toast in parent
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to accept SLD. Please try again.';
+      toast.error(message);
     } finally {
       setAcceptLoading(false);
     }
@@ -79,6 +93,26 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
     if (!confirm('Reset the conversation? All chat history will be cleared.')) return;
     await resetChat(sldOrderSeq);
   }, [sldOrderSeq, resetChat]);
+
+  if (aiEnabled === false) {
+    return (
+      <div className="flex flex-col h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-white">
+        <div className="flex items-center px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+          <span className="text-base">&#129302;</span>
+          <span className="text-sm font-medium text-gray-700 ml-2">SLD AI Generator</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center px-6">
+            <p className="text-sm font-medium text-gray-600 mb-1">AI SLD Generation is Disabled</p>
+            <p className="text-xs text-gray-400">
+              The system administrator has disabled AI SLD generation.
+              Please contact the system administrator to enable this feature.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-white">

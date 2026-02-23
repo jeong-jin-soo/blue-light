@@ -34,14 +34,20 @@ export default function SystemSettingsPage() {
   const [originalEmailVerification, setOriginalEmailVerification] = useState(false);
   const [savingEmailVerification, setSavingEmailVerification] = useState(false);
 
+  // ── SLD AI Generation ──────────────────────────────
+  const [sldAiEnabled, setSldAiEnabled] = useState(true);
+  const [originalSldAi, setOriginalSldAi] = useState(true);
+  const [savingSldAi, setSavingSldAi] = useState(false);
+
   // ── Data Loading ──────────────────────────────
 
   const loadData = useCallback(async () => {
     try {
-      const [promptData, keyData, emailData] = await Promise.all([
+      const [promptData, keyData, emailData, sldAiData] = await Promise.all([
         systemAdminApi.getSystemPrompt(),
         systemAdminApi.getGeminiApiKeyStatus(),
         systemAdminApi.getEmailVerification(),
+        systemAdminApi.getSldAiGeneration(),
       ]);
 
       setPrompt(promptData.prompt);
@@ -49,6 +55,8 @@ export default function SystemSettingsPage() {
       setGeminiStatus(keyData);
       setEmailVerificationEnabled(emailData.enabled);
       setOriginalEmailVerification(emailData.enabled);
+      setSldAiEnabled(sldAiData.enabled);
+      setOriginalSldAi(sldAiData.enabled);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to load system settings';
       toast.error(message);
@@ -152,6 +160,24 @@ export default function SystemSettingsPage() {
     }
   };
 
+  // ── SLD AI Generation Handlers ──────────────────────────────
+
+  const sldAiChanged = sldAiEnabled !== originalSldAi;
+
+  const handleSaveSldAi = async () => {
+    setSavingSldAi(true);
+    try {
+      const result = await systemAdminApi.updateSldAiGeneration(sldAiEnabled);
+      setOriginalSldAi(sldAiEnabled);
+      toast.success(result.message);
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to update SLD AI generation setting';
+      toast.error(message);
+    } finally {
+      setSavingSldAi(false);
+    }
+  };
+
   // ── Render ──────────────────────────────
 
   return (
@@ -206,6 +232,52 @@ export default function SystemSettingsPage() {
           <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">
             Email verification is currently disabled. New users can sign up without verifying their
             email.
+          </p>
+        )}
+      </Card>
+
+      {/* ── SLD AI Generation ────────────────────── */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">AI SLD Generation</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          When enabled, administrators and SLD managers can use the AI-powered SLD (Single Line Diagram)
+          generation feature. Disable this to prevent AI SLD generation across the platform.
+        </p>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={sldAiEnabled}
+                onChange={(e) => setSldAiEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary" />
+            </label>
+            <span className="text-sm text-gray-700">
+              {sldAiEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleSaveSldAi}
+              loading={savingSldAi}
+              disabled={!sldAiChanged}
+              size="sm"
+            >
+              Save
+            </Button>
+            {sldAiChanged && (
+              <span className="text-xs text-warning-600">Unsaved changes</span>
+            )}
+          </div>
+        </div>
+
+        {!sldAiEnabled && (
+          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">
+            AI SLD generation is currently disabled. Users will not be able to generate SLD diagrams
+            using the AI chatbot.
           </p>
         )}
       </Card>

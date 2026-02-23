@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '../../../components/ui/Button';
 import { SvgPreviewViewer } from '../../../components/ui/SvgPreviewViewer';
 import { useSldChatStore } from '../../../stores/sldChatStore';
+import { useToastStore } from '../../../stores/toastStore';
 import { acceptSld } from '../../../api/sldChatApi';
+import { getSldAiGeneration } from '../../../api/systemAdminApi';
 import type { SldRequest } from '../../../types';
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
 export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpdated }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [acceptLoading, setAcceptLoading] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  const toast = useToastStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -30,6 +34,13 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     loadHistory,
     resetChat,
   } = useSldChatStore();
+
+  // AI SLD 생성 토글 상태 조회
+  useEffect(() => {
+    getSldAiGeneration()
+      .then((data) => setAiEnabled(data.enabled))
+      .catch(() => setAiEnabled(true));
+  }, []);
 
   // 채팅 이력 로드
   useEffect(() => {
@@ -61,15 +72,18 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     [handleSend],
   );
 
-  // DXF 수락
+  // SLD 수락
   const handleAccept = useCallback(async () => {
     if (!generatedFileId) return;
     setAcceptLoading(true);
     try {
       await acceptSld(applicationSeq, generatedFileId);
+      toast.success('SLD accepted and uploaded successfully.');
       onSldUpdated();
-    } catch {
-      // 에러 시 사용자에게 알림 (toast 등)
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to accept SLD. Please try again.';
+      toast.error(message);
     } finally {
       setAcceptLoading(false);
     }
@@ -80,6 +94,26 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     if (!confirm('Reset the conversation? All chat history will be cleared.')) return;
     await resetChat(applicationSeq);
   }, [applicationSeq, resetChat]);
+
+  if (aiEnabled === false) {
+    return (
+      <div className="flex flex-col h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-white">
+        <div className="flex items-center px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+          <span className="text-base">🤖</span>
+          <span className="text-sm font-medium text-gray-700 ml-2">SLD AI Generator</span>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center px-6">
+            <p className="text-sm font-medium text-gray-600 mb-1">AI SLD Generation is Disabled</p>
+            <p className="text-xs text-gray-400">
+              The system administrator has disabled AI SLD generation.
+              Please contact the system administrator to enable this feature.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[600px] border border-gray-200 rounded-lg overflow-hidden bg-white">

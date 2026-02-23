@@ -140,6 +140,40 @@ public class SystemAdminController {
         return ResponseEntity.ok(Map.of("message", "Gemini API key cleared (reverted to environment variable)"));
     }
 
+    // ── AI SLD 생성 ──────────────────────────────
+
+    /**
+     * AI SLD 생성 설정 조회
+     * GET /api/admin/system/sld-ai-generation
+     */
+    @GetMapping("/sld-ai-generation")
+    public ResponseEntity<Map<String, Object>> getSldAiGeneration() {
+        boolean enabled = systemAdminService.isSldAiGenerationEnabled();
+        return ResponseEntity.ok(Map.of("enabled", enabled));
+    }
+
+    /**
+     * AI SLD 생성 설정 변경
+     * PUT /api/admin/system/sld-ai-generation
+     */
+    @Auditable(action = AuditAction.SLD_AI_GENERATION_TOGGLED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
+    @PutMapping("/sld-ai-generation")
+    public ResponseEntity<Map<String, Object>> updateSldAiGeneration(
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        boolean enabled = Boolean.TRUE.equals(request.get("enabled"));
+
+        systemAdminService.updateSldAiGeneration(enabled, userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "message", enabled
+                        ? "AI SLD generation enabled."
+                        : "AI SLD generation disabled.",
+                "enabled", enabled
+        ));
+    }
+
     // ── 이메일 인증 ──────────────────────────────
 
     /**
