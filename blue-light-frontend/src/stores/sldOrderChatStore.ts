@@ -179,13 +179,8 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
         activeToolName: null,
       });
     } catch {
-      // Clear local state even on failure
-      set({
-        messages: [],
-        svgPreview: null,
-        generatedFileId: null,
-        activeToolName: null,
-      });
+      // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
+      console.warn('[SLD-Order-Chat] Failed to reset chat on server, keeping local state.');
     }
   },
 

@@ -63,11 +63,30 @@ export const sldOrderStreamChat = async (
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let receivedDone = false;
+
+  // 타임아웃: 120초 동안 데이터 수신이 없으면 연결 해제
+  const STREAM_TIMEOUT_MS = 120_000;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const resetTimeout = () => {
+    if (timeoutId) clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => {
+      reader.cancel();
+      if (!receivedDone) {
+        callbacks.onError('Connection timed out. Please try again.');
+      }
+    }, STREAM_TIMEOUT_MS);
+  };
 
   try {
+    resetTimeout();
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      resetTimeout(); // 데이터 수신마다 타임아웃 리셋
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -112,9 +131,11 @@ export const sldOrderStreamChat = async (
               if (parsed.fileId) callbacks.onFileGenerated(parsed.fileId);
               break;
             case 'done':
+              receivedDone = true;
               callbacks.onDone(parsed.content || '');
               break;
             case 'error':
+              receivedDone = true;
               callbacks.onError(parsed.content || 'Unknown error occurred.');
               break;
           }
@@ -123,7 +144,17 @@ export const sldOrderStreamChat = async (
         }
       }
     }
+
+    // 스트림 종료 후 done 이벤트를 받지 못했다면 에러 처리
+    if (!receivedDone) {
+      callbacks.onError('Connection closed unexpectedly. Please try again.');
+    }
+  } catch (err) {
+    if (!receivedDone) {
+      callbacks.onError('Connection lost. Please try again.');
+    }
   } finally {
+    if (timeoutId) clearTimeout(timeoutId);
     reader.releaseLock();
   }
 };

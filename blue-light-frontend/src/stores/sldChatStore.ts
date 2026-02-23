@@ -179,13 +179,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
         activeToolName: null,
       });
     } catch {
-      // 초기화 실패 시 로컬만 클리어
-      set({
-        messages: [],
-        svgPreview: null,
-        generatedFileId: null,
-        activeToolName: null,
-      });
+      // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
+      console.warn('[SLD-Chat] Failed to reset chat on server, keeping local state.');
     }
   },
 
