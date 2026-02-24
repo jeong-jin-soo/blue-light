@@ -114,6 +114,11 @@ public class SldAgentService {
                                         chunk, new TypeReference<Map<String, Object>>() {});
                                 String type = (String) parsed.get("type");
 
+                                // Heartbeat — 연결 유지용, 프런트엔드 전달 불필요
+                                if ("heartbeat".equals(type)) {
+                                    return;
+                                }
+
                                 // AI 응답 텍스트 누적 (최종 저장용)
                                 if ("token".equals(type)) {
                                     String content = (String) parsed.get("content");
@@ -216,9 +221,10 @@ public class SldAgentService {
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
 
-        if (sldRequest.getStatus() != SldRequestStatus.AI_GENERATING) {
+        if (sldRequest.getStatus() != SldRequestStatus.AI_GENERATING
+                && sldRequest.getStatus() != SldRequestStatus.UPLOADED) {
             throw new BusinessException(
-                    "SLD can only be accepted when status is AI_GENERATING",
+                    "SLD can only be accepted when status is AI_GENERATING or UPLOADED",
                     HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
         }
 
@@ -321,12 +327,14 @@ public class SldAgentService {
     }
 
     /**
-     * SLD 요청이 REQUESTED 상태이면 AI_GENERATING으로 자동 전환
+     * SLD 요청이 REQUESTED 또는 UPLOADED 상태이면 AI_GENERATING으로 자동 전환
+     * (UPLOADED 상태에서 AI 재생성 허용)
      */
     private void ensureAiGeneratingStatus(Long applicationSeq) {
         sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .ifPresent(sldRequest -> {
-                    if (sldRequest.getStatus() == SldRequestStatus.REQUESTED) {
+                    if (sldRequest.getStatus() == SldRequestStatus.REQUESTED
+                            || sldRequest.getStatus() == SldRequestStatus.UPLOADED) {
                         sldRequest.startAiGeneration();
                         log.info("SLD status auto-transitioned to AI_GENERATING: applicationSeq={}", applicationSeq);
                     }

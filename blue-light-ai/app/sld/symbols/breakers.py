@@ -2,7 +2,10 @@
 Circuit breaker symbols: ACB, MCCB, MCB, RCCB/ELCB.
 
 IEC 60617 standard representation:
-- Rectangle with X cross pattern
+- Rectangle with X cross pattern (common to all breakers)
+- ACB: Larger with double-contact indicator (horizontal bar)
+- MCCB: Standard size (14x20mm)
+- MCB: Smaller size (10x16mm)
 - Connection pins at top and bottom center
 
 Sizes scaled for professional A3 engineering drawings.
@@ -60,7 +63,11 @@ class CircuitBreaker(BaseSymbol):
 
 
 class ACB(CircuitBreaker):
-    """Air Circuit Breaker (for >630A)."""
+    """
+    Air Circuit Breaker (for >630A).
+    Distinctive: larger body + double-contact indicator (horizontal bar through center)
+    per IEC 60617 distinction for withdrawable/air-break type.
+    """
 
     width: float = 16
     height: float = 22
@@ -72,6 +79,32 @@ class ACB(CircuitBreaker):
             "top": (cx, self.height + 5),
             "bottom": (cx, -5),
         }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        w, h = self.width, self.height
+
+        backend.set_layer(self.layer)
+
+        # Rectangle (slightly thicker for ACB)
+        backend.add_lwpolyline(
+            [(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
+            close=True,
+        )
+
+        # X cross
+        backend.add_line((x, y), (x + w, y + h))
+        backend.add_line((x + w, y), (x, y + h))
+
+        # ACB distinctive: double-contact indicator (horizontal bar through center)
+        # This differentiates ACB from MCCB per IEC 60617
+        mid_y = y + h / 2
+        backend.add_line((x - 2, mid_y), (x + w + 2, mid_y))
+
+        # Connection stubs (top and bottom)
+        cx = x + w / 2
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + h), (cx, y + h + 5))
+        backend.add_line((cx, y), (cx, y - 5))
 
 
 class MCCB(CircuitBreaker):

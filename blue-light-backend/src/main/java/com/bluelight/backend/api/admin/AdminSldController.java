@@ -55,4 +55,15 @@ public class AdminSldController {
         SldRequestResponse response = adminSldService.confirmSld(id);
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * Unconfirm SLD (reopen for re-upload)
+     * POST /api/admin/applications/:id/sld-unconfirm
+     */
+    @PostMapping("/applications/{id}/sld-unconfirm")
+    public ResponseEntity<SldRequestResponse> unconfirmSld(@PathVariable Long id) {
+        log.info("Admin/LEW SLD unconfirmed (reopened): applicationSeq={}", id);
+        SldRequestResponse response = adminSldService.unconfirmSld(id);
+        return ResponseEntity.ok(response);
+    }
 }

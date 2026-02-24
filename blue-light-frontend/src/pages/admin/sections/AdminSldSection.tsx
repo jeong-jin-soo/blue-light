@@ -5,7 +5,7 @@ import { Textarea } from '../../../components/ui/Textarea';
 import { FileUpload } from '../../../components/domain/FileUpload';
 import { SldChatPanel } from './SldChatPanel';
 import fileApi from '../../../api/fileApi';
-import type { SldRequest } from '../../../types';
+import type { FileInfo, SldRequest } from '../../../types';
 
 interface Props {
   applicationSeq: number;
@@ -14,8 +14,11 @@ interface Props {
   onSldLewNoteChange: (note: string) => void;
   onSldUpload: (file: File) => Promise<void>;
   onSldConfirmClick: () => void;
+  onSldUnconfirmClick: () => void;
   onSldUpdated: () => void;
   actionLoading: boolean;
+  existingSldFiles?: FileInfo[];
+  onFileDelete?: (fileId: number) => Promise<void>;
 }
 
 type SldTab = 'manual' | 'ai';
@@ -32,8 +35,11 @@ export function AdminSldSection({
   onSldLewNoteChange,
   onSldUpload,
   onSldConfirmClick,
+  onSldUnconfirmClick,
   onSldUpdated,
   actionLoading,
+  existingSldFiles = [],
+  onFileDelete,
 }: Props) {
   // AI_GENERATING 상태면 AI 탭 자동 선택
   const [activeTab, setActiveTab] = useState<SldTab>(
@@ -44,8 +50,8 @@ export function AdminSldSection({
     <Card>
       <h2 className="text-lg font-semibold text-gray-800 mb-4">SLD Drawing Request</h2>
 
-      {/* REQUESTED or AI_GENERATING — 탭 인터페이스 */}
-      {(sldRequest.status === 'REQUESTED' || sldRequest.status === 'AI_GENERATING') && (
+      {/* REQUESTED, AI_GENERATING, or UPLOADED — 탭 인터페이스 (재업로드 허용) */}
+      {(sldRequest.status === 'REQUESTED' || sldRequest.status === 'AI_GENERATING' || sldRequest.status === 'UPLOADED') && (
         <div className="space-y-4">
           {/* Applicant info banner */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -137,12 +143,14 @@ export function AdminSldSection({
               applicationSeq={applicationSeq}
               sldRequest={sldRequest}
               onSldUpdated={onSldUpdated}
+              existingSldFiles={existingSldFiles}
+              onFileDelete={onFileDelete}
             />
           )}
         </div>
       )}
 
-      {/* UPLOADED */}
+      {/* UPLOADED — 현재 업로드 정보 + Confirm / 재업로드 가능 안내 */}
       {sldRequest.status === 'UPLOADED' && (
         <div className="space-y-4">
           <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -151,7 +159,8 @@ export function AdminSldSection({
               <div className="flex-1">
                 <p className="text-sm font-medium text-green-800">SLD Uploaded</p>
                 <p className="text-xs text-green-700 mt-1">
-                  The SLD drawing has been uploaded. Click "Confirm SLD" to finalize.
+                  The SLD drawing has been uploaded. Click "Confirm SLD" to finalize,
+                  or re-upload a new version using the section above.
                 </p>
                 {sldRequest.lewNote && (
                   <div className="mt-2 bg-white rounded p-2 border border-green-100">
@@ -189,30 +198,40 @@ export function AdminSldSection({
 
       {/* CONFIRMED */}
       {sldRequest.status === 'CONFIRMED' && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <div className="flex items-start gap-3">
-            <span className="text-lg">📋</span>
-            <div>
-              <p className="text-sm font-medium text-gray-700">SLD Confirmed</p>
-              <p className="text-xs text-gray-500 mt-1">
-                The SLD drawing has been confirmed and is included in this application.
-              </p>
-              {sldRequest.uploadedFileSeq && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-2"
-                  onClick={() => {
-                    if (sldRequest.uploadedFileSeq) {
-                      fileApi.downloadFile(sldRequest.uploadedFileSeq, 'SLD_Drawing');
-                    }
-                  }}
-                >
-                  Download SLD
-                </Button>
-              )}
+        <div className="space-y-3">
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">📋</span>
+              <div>
+                <p className="text-sm font-medium text-gray-700">SLD Confirmed</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  The SLD drawing has been confirmed and is included in this application.
+                </p>
+                {sldRequest.uploadedFileSeq && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => {
+                      if (sldRequest.uploadedFileSeq) {
+                        fileApi.downloadFile(sldRequest.uploadedFileSeq, 'SLD_Drawing');
+                      }
+                    }}
+                  >
+                    Download SLD
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onSldUnconfirmClick}
+            loading={actionLoading}
+          >
+            Reopen SLD
+          </Button>
         </div>
       )}
     </Card>

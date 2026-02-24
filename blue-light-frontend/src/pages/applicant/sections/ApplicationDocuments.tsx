@@ -1,20 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback, type ChangeEvent, type DragEvent } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
-import { Badge } from '../../../components/ui/Badge';
-import { Select } from '../../../components/ui/Select';
 import { Textarea } from '../../../components/ui/Textarea';
 import { FileUpload } from '../../../components/domain/FileUpload';
+import { FilePreviewCard } from '../../../components/domain/FilePreviewCard';
 import fileApi from '../../../api/fileApi';
-import { formatFileSize, formatFileType, getFileTypeBadge } from '../../../utils/applicationUtils';
+import {
+  DOCUMENT_CATEGORIES,
+  groupFilesByCategory,
+  MAX_UPLOAD_SIZE_MB,
+  WARN_UPLOAD_SIZE_MB,
+  ALLOWED_UPLOAD_EXTENSIONS,
+  type DocumentCategory,
+} from '../../../utils/applicationUtils';
 import type { Application, FileInfo, FileType, SldRequest } from '../../../types';
-
-const APPLICANT_FILE_TYPE_OPTIONS = [
-  { value: 'DRAWING_SLD', label: 'Single Line Diagram (SLD)' },
-  { value: 'OWNER_AUTH_LETTER', label: 'Letter of Appointment' },
-  { value: 'SITE_PHOTO', label: 'Main Breaker Box Photo' },
-  { value: 'SP_ACCOUNT_DOC', label: 'SP Account Document' },
-];
 
 interface ApplicationDocumentsProps {
   application: Application;
@@ -23,7 +22,7 @@ interface ApplicationDocumentsProps {
   canUpload: boolean;
   uploadFileType: FileType;
   onUploadFileTypeChange: (type: FileType) => void;
-  onFileUpload: (file: File) => Promise<void>;
+  onFileUpload: (file: File, fileType?: FileType) => Promise<void>;
   onFileDelete: (fileId: string | number) => Promise<void>;
   onFileDownload: (fileInfo: FileInfo) => void;
   // Sketch upload + note handlers
@@ -34,13 +33,109 @@ interface ApplicationDocumentsProps {
   savingSldRequest?: boolean;
 }
 
+/** Compact inline upload area per category */
+function CategoryUploadZone({
+  category,
+  onUpload,
+}: {
+  category: DocumentCategory;
+  onUpload: (file: File, fileType: FileType) => Promise<void>;
+}) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const fileType = category.fileTypes[0]; // primary file type for upload
+
+  const validateAndUpload = useCallback(
+    async (file: File) => {
+      setError('');
+      setWarning('');
+
+      if (file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024) {
+        setError(`File size must be less than ${MAX_UPLOAD_SIZE_MB}MB`);
+        return;
+      }
+      if (file.size > WARN_UPLOAD_SIZE_MB * 1024 * 1024) {
+        setWarning('This file exceeds 2MB and may need to be resized before ELISE submission to EMA.');
+      }
+
+      const allowed = ALLOWED_UPLOAD_EXTENSIONS.split(',').map((s) => s.trim().toLowerCase());
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (!allowed.includes(ext)) {
+        setError(`Allowed file types: ${ALLOWED_UPLOAD_EXTENSIONS}`);
+        return;
+      }
+
+      setIsUploading(true);
+      try {
+        await onUpload(file, fileType);
+      } catch {
+        setError('Upload failed. Please try again.');
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [onUpload, fileType],
+  );
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) validateAndUpload(file);
+    if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) validateAndUpload(file);
+  };
+
+  return (
+    <div>
+      <div
+        className={`border border-dashed rounded-lg px-4 py-3 text-center transition-colors cursor-pointer ${
+          isDragging
+            ? 'border-primary bg-primary-50'
+            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+        } ${isUploading ? 'opacity-60 pointer-events-none' : ''}`}
+        onDrop={handleDrop}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onClick={() => !isUploading && inputRef.current?.click()}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ALLOWED_UPLOAD_EXTENSIONS}
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <p className="text-xs text-gray-400">
+          {isUploading ? (
+            <span className="text-primary">Uploading...</span>
+          ) : (
+            <>
+              <span className="text-primary font-medium">Click to upload</span>
+              {' '}or drag and drop — up to {MAX_UPLOAD_SIZE_MB}MB
+            </>
+          )}
+        </p>
+      </div>
+      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {warning && !error && <p className="mt-1 text-xs text-amber-600">⚠️ {warning}</p>}
+    </div>
+  );
+}
+
 export function ApplicationDocuments({
   application,
   files,
   sldRequest,
   canUpload,
-  uploadFileType,
-  onUploadFileTypeChange,
   onFileUpload,
   onFileDelete,
   onFileDownload,
@@ -52,7 +147,6 @@ export function ApplicationDocuments({
 }: ApplicationDocumentsProps) {
   const [noteValue, setNoteValue] = useState(sldRequest?.applicantNote || '');
 
-  // Sync note value when sldRequest changes (e.g. after save)
   useEffect(() => {
     setNoteValue(sldRequest?.applicantNote || '');
   }, [sldRequest?.applicantNote]);
@@ -63,6 +157,13 @@ export function ApplicationDocuments({
     await onSldRequestUpdate(noteValue, sketchFileSeq);
   };
 
+  const grouped = groupFilesByCategory(files);
+
+  // Determine which categories to show
+  const applicantCategories = DOCUMENT_CATEGORIES.filter((c) => c.applicantUpload);
+  const licenceCategory = DOCUMENT_CATEGORIES.find((c) => c.key === 'licence');
+  const licenceFiles = grouped['licence'] || [];
+
   return (
     <>
       {/* SLD Request Status */}
@@ -70,7 +171,7 @@ export function ApplicationDocuments({
         <Card>
           <h2 className="text-lg font-semibold text-gray-800 mb-4">SLD Drawing Request</h2>
 
-          {/* REQUESTED — 편집 가능한 폼 */}
+          {/* REQUESTED */}
           {sldRequest.status === 'REQUESTED' && (
             <div className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -85,7 +186,6 @@ export function ApplicationDocuments({
                 </div>
               </div>
 
-              {/* Sketch file upload */}
               {onSketchUpload && (
                 <div>
                   <FileUpload
@@ -102,7 +202,6 @@ export function ApplicationDocuments({
                 </div>
               )}
 
-              {/* Applicant note */}
               <Textarea
                 label="Notes for LEW (Optional)"
                 rows={3}
@@ -113,7 +212,6 @@ export function ApplicationDocuments({
                 className="resize-none"
               />
 
-              {/* Save button + timestamp */}
               <div className="flex items-center justify-between">
                 <Button
                   variant="primary"
@@ -131,7 +229,7 @@ export function ApplicationDocuments({
             </div>
           )}
 
-          {/* AI_GENERATING — 읽기 전용 */}
+          {/* AI_GENERATING */}
           {sldRequest.status === 'AI_GENERATING' && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
@@ -204,118 +302,89 @@ export function ApplicationDocuments({
         </Card>
       )}
 
-      {/* Documents */}
+      {/* Documents — Grouped by Category */}
       <Card>
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Documents</h2>
 
-        {canUpload && (
-          <div className="space-y-3 mb-4">
-            <Select
-              label="Document Type"
-              value={uploadFileType}
-              onChange={(e) => onUploadFileTypeChange(e.target.value as FileType)}
-              options={APPLICANT_FILE_TYPE_OPTIONS}
-            />
-            <FileUpload
-              onUpload={onFileUpload}
-              onRemove={onFileDelete}
-              files={files.map((f) => ({
-                id: f.fileSeq,
-                name: f.originalFilename || `File #${f.fileSeq}`,
-                size: f.fileSize || 0,
-              }))}
-              label={APPLICANT_FILE_TYPE_OPTIONS.find((o) => o.value === uploadFileType)?.label || 'Document'}
-              hint="PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP up to 10MB. Files for ELISE submission should be under 2MB."
-              warnSizeMb={2}
-              warnSizeMessage="This file exceeds 2MB and may need to be resized before ELISE submission to EMA."
-            />
-          </div>
-        )}
+        <div className="space-y-4">
+          {/* Applicant upload categories */}
+          {applicantCategories.map((category) => {
+            const categoryFiles = grouped[category.key] || [];
+            // Hide empty categories when upload is not allowed
+            if (!canUpload && categoryFiles.length === 0) return null;
 
-        {/* File list (read-only view when upload is disabled) */}
-        {!canUpload && files.length === 0 && (
-          <p className="text-sm text-gray-500">No documents uploaded.</p>
-        )}
-
-        {!canUpload && files.length > 0 && (
-          <div className="space-y-2">
-            {files.map((f) => (
+            return (
               <div
-                key={f.fileSeq}
-                className="flex items-center justify-between px-3 py-2 bg-surface-secondary rounded-lg"
+                key={category.key}
+                className={`rounded-lg border ${category.borderColor} ${category.bgColor} overflow-hidden`}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-lg">📄</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-gray-700 truncate">
-                      {f.originalFilename || `File #${f.fileSeq}`}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <Badge variant={getFileTypeBadge(f.fileType)} className="text-[10px]">
-                        {formatFileType(f.fileType)}
-                      </Badge>
-                      {f.fileSize != null && f.fileSize > 0 && (
-                        <span>{formatFileSize(f.fileSize)}</span>
-                      )}
-                      <span>{new Date(f.uploadedAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
+                {/* Category header */}
+                <div className="px-4 py-2.5 flex items-center gap-2">
+                  <span className="text-base">{category.icon}</span>
+                  <h3 className={`text-sm font-semibold ${category.headerColor}`}>
+                    {category.label}
+                  </h3>
+                  <span className="text-xs text-gray-400 ml-auto">
+                    {categoryFiles.length} file{categoryFiles.length !== 1 ? 's' : ''}
+                  </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onFileDownload(f)}
-                >
-                  Download
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
 
-        {/* Licence Documents (admin-uploaded, read-only) */}
-        {(() => {
-          const adminFiles = files.filter((f) => f.fileType === 'LICENSE_PDF' || f.fileType === 'REPORT_PDF');
-          if (!canUpload || adminFiles.length === 0) return null;
-          return (
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Licence Documents</h3>
-              <div className="space-y-2">
-                {adminFiles.map((f) => (
-                  <div
+                {/* File list */}
+                <div className="px-3 pb-3 space-y-1.5">
+                  {categoryFiles.map((f) => (
+                    <FilePreviewCard
+                      key={f.fileSeq}
+                      file={f}
+                      onDownload={onFileDownload}
+                      onDelete={canUpload ? (id) => onFileDelete(id) : undefined}
+                    />
+                  ))}
+
+                  {categoryFiles.length === 0 && !canUpload && (
+                    <p className="text-xs text-gray-400 px-1 py-2">No files uploaded.</p>
+                  )}
+
+                  {/* Compact upload zone */}
+                  {canUpload && (
+                    <CategoryUploadZone
+                      category={category}
+                      onUpload={onFileUpload}
+                    />
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Licence Documents (admin-uploaded, read-only) */}
+          {licenceCategory && licenceFiles.length > 0 && (
+            <div className={`rounded-lg border ${licenceCategory.borderColor} ${licenceCategory.bgColor} overflow-hidden`}>
+              <div className="px-4 py-2.5 flex items-center gap-2">
+                <span className="text-base">{licenceCategory.icon}</span>
+                <h3 className={`text-sm font-semibold ${licenceCategory.headerColor}`}>
+                  {licenceCategory.label}
+                </h3>
+                <span className="text-xs text-gray-400 ml-auto">
+                  {licenceFiles.length} file{licenceFiles.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="px-3 pb-3 space-y-1.5">
+                {licenceFiles.map((f) => (
+                  <FilePreviewCard
                     key={f.fileSeq}
-                    className="flex items-center justify-between px-3 py-2 bg-green-50 rounded-lg border border-green-100"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">📋</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">
-                          {f.originalFilename || `File #${f.fileSeq}`}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <Badge variant={getFileTypeBadge(f.fileType)} className="text-[10px]">
-                            {formatFileType(f.fileType)}
-                          </Badge>
-                          {f.fileSize != null && f.fileSize > 0 && (
-                            <span>{formatFileSize(f.fileSize)}</span>
-                          )}
-                          <span>{new Date(f.uploadedAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onFileDownload(f)}
-                    >
-                      Download
-                    </Button>
-                  </div>
+                    file={f}
+                    onDownload={onFileDownload}
+                  />
                 ))}
               </div>
             </div>
-          );
-        })()}
+          )}
+
+          {/* Fallback when absolutely no files */}
+          {!canUpload && files.length === 0 && (
+            <p className="text-sm text-gray-500">No documents uploaded.</p>
+          )}
+        </div>
       </Card>
     </>
   );

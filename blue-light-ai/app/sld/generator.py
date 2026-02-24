@@ -1,18 +1,20 @@
 """
-SLD Generator (v3) -- orchestrates PDF creation using the symbol library and layout engine.
+SLD Generator (v4) -- orchestrates PDF creation using the symbol library and layout engine.
 
 Creates a complete Single Line Diagram with:
 - Incoming supply (3-phase / single-phase with L1/L2/L3/N labels)
+- Current flow direction arrow
 - Isolator (for >= 45kVA installations)
-- Metering
-- Main breaker (with circuit ID)
+- CT metering (for >= 45kVA installations)
+- SP kWh Metering
+- Main breaker (with circuit ID, kA fault rating, pole configuration)
 - Main busbar (double-line professional representation)
 - ELCB group protection
 - Sub-circuit breakers (with circuit IDs, cable annotations, vertical name labels)
-- Earth protection (with dashed conductor connections)
-- Professional 7-cell title block
+- Earth protection (with dashed conductor connections + conductor size)
+- Professional 7-cell title block with NTS/Sheet
 - Cable schedule table with grid lines
-- Symbol legend
+- Dynamic symbol legend (based on symbols actually used)
 
 Outputs PDF (for EMA submission) and SVG (for web preview).
 """
@@ -37,7 +39,7 @@ from app.sld.symbols.motors import Generator as GeneratorSymbol, Motor
 from app.sld.symbols.protection import EarthSymbol, Fuse, SurgeProtector
 from app.sld.symbols.switches import ATS, Isolator
 from app.sld.symbols.transformers import CurrentTransformer, PowerTransformer
-from app.sld.title_block import draw_border, draw_title_block
+from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +67,44 @@ class SldGenerator:
         "FUSE": Fuse,
         "EARTH": EarthSymbol,
         "SPD": SurgeProtector,
+    }
+
+    # Full legend descriptions for all known symbols
+    LEGEND_DESCRIPTIONS: dict[str, str] = {
+        "ACB": "Air Circuit Breaker",
+        "MCCB": "Moulded Case Circuit Breaker",
+        "MCB": "Miniature Circuit Breaker",
+        "ELCB": "Earth Leakage Circuit Breaker",
+        "RCCB": "Residual Current Circuit Breaker",
+        "KWH_METER": "kWh Meter (Energy Meter)",
+        "EARTH": "Earth Bar / Ground Connection",
+        "ISOLATOR": "Isolator / Disconnect Switch",
+        "CT": "Current Transformer",
+        "FUSE": "Fuse",
+        "SPD": "Surge Protection Device",
+        "ATS": "Automatic Transfer Switch",
+        "MOTOR": "Motor",
+        "GENERATOR": "Generator",
+        "BUSBAR": "Busbar (Main Distribution)",
+    }
+
+    # Legend abbreviations (shorter form for display)
+    LEGEND_ABBREVIATIONS: dict[str, str] = {
+        "ACB": "ACB",
+        "MCCB": "MCCB",
+        "MCB": "MCB",
+        "ELCB": "ELCB",
+        "RCCB": "RCCB",
+        "KWH_METER": "kWh",
+        "EARTH": "Earth",
+        "ISOLATOR": "Isolator",
+        "CT": "CT",
+        "FUSE": "Fuse",
+        "SPD": "SPD",
+        "ATS": "ATS",
+        "MOTOR": "Motor",
+        "GENERATOR": "Gen",
+        "BUSBAR": "Busbar",
     }
 
     def generate(
@@ -99,15 +139,24 @@ class SldGenerator:
         layout_result = compute_layout(requirements)
 
         # Draw to both backends simultaneously
+        # Phase 1: Template (border + title block frame with labels only)
+        # Phase 2: SLD drawing (components, connections, schedule, legend)
+        # Phase 3: Fill title block data values
         component_count = 0
         for backend in (pdf, svg):
+            # Phase 1 — Template frame
+            draw_border(backend)
+            draw_title_block_frame(backend)
+
+            # Phase 2 — SLD content on top of template
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
             self._draw_dashed_connections(backend, layout_result)
             self._draw_cable_schedule(backend, requirements, layout_result)
             self._draw_legend(backend, layout_result)
-            draw_border(backend)
-            draw_title_block(
+
+            # Phase 3 — Fill title block data
+            fill_title_block_data(
                 backend,
                 project_name=application_info.get("address", "Electrical Installation"),
                 address=application_info.get("address", ""),
@@ -169,6 +218,11 @@ class SldGenerator:
                 )
                 count += 1
 
+            elif comp.symbol_name == "FLOW_ARROW":
+                # Current flow direction arrow (downward pointing)
+                _draw_flow_arrow(backend, comp.x, comp.y)
+                count += 1
+
             elif comp.symbol_name == "BUSBAR":
                 # Busbar -- draw as double thick lines
                 backend.set_layer("SLD_SYMBOLS")
@@ -221,7 +275,7 @@ class SldGenerator:
                 count += 1
 
             else:
-                # Symbol (breaker, meter, earth, isolator, etc.)
+                # Symbol (breaker, meter, earth, isolator, CT, etc.)
                 symbol = self._get_symbol(comp.symbol_name)
                 if symbol:
                     symbol.draw(backend, comp.x, comp.y)
@@ -362,24 +416,45 @@ class SldGenerator:
         backend: DrawingBackend,
         layout_result: LayoutResult,
     ) -> None:
-        """Draw a symbol legend box in the right area (below incoming supply)."""
-        legend_x = 330
+        """
+        Draw a dynamic symbol legend box in the right area.
+        Only includes symbols that are actually used in the diagram.
+        """
+        legend_x = 320
         legend_y = 200  # Safely within page bounds (top will be at y=240)
         row_h = 8
-        col_w = 70
+        col_w = 80
 
         backend.set_layer("SLD_TITLE_BLOCK")
 
-        # Legend border
-        legend_items = [
-            ("MCCB", "Moulded Case Circuit Breaker"),
-            ("MCB", "Miniature Circuit Breaker"),
-            ("ELCB", "Earth Leakage Circuit Breaker"),
-            ("kWh", "kWh Meter"),
-            ("Earth", "Earth Bar / Ground Connection"),
+        # Build dynamic legend items based on symbols_used
+        legend_items = []
+
+        # Ordered list of possible legend entries (display priority)
+        legend_order = [
+            "ACB", "MCCB", "MCB", "ELCB", "RCCB",
+            "ISOLATOR", "CT", "KWH_METER", "FUSE", "SPD",
+            "ATS", "EARTH", "BUSBAR",
         ]
 
+        for sym_key in legend_order:
+            if sym_key in layout_result.symbols_used:
+                abbr = self.LEGEND_ABBREVIATIONS.get(sym_key, sym_key)
+                desc = self.LEGEND_DESCRIPTIONS.get(sym_key, sym_key)
+                legend_items.append((abbr, desc, sym_key))
+
+        # Always include busbar if there's a busbar in the layout
+        if "BUSBAR" not in layout_result.symbols_used:
+            legend_items.append(("Busbar", "Busbar (Main Distribution)", "BUSBAR"))
+
+        if not legend_items:
+            return
+
         legend_height = (len(legend_items) + 1) * row_h
+        # Adjust legend_y if it would go above page
+        if legend_y + legend_height > 275:
+            legend_y = 275 - legend_height
+
         backend.add_lwpolyline(
             [
                 (legend_x, legend_y),
@@ -407,34 +482,11 @@ class SldGenerator:
 
         # Legend entries
         backend.set_layer("SLD_ANNOTATIONS")
-        for i, (symbol_abbr, description) in enumerate(legend_items):
+        for i, (symbol_abbr, description, sym_key) in enumerate(legend_items):
             entry_y = legend_y + legend_height - (i + 2) * row_h + 2
 
             # Draw small symbol representation
-            if symbol_abbr in ("MCCB", "MCB", "ELCB"):
-                # Small rectangle with X
-                sx = legend_x + 4
-                sy = entry_y + 1
-                sw, sh = 5, 5
-                backend.set_layer("SLD_SYMBOLS")
-                backend.add_lwpolyline(
-                    [(sx, sy), (sx + sw, sy), (sx + sw, sy + sh), (sx, sy + sh)],
-                    close=True,
-                )
-                backend.add_line((sx, sy), (sx + sw, sy + sh))
-                backend.add_line((sx + sw, sy), (sx, sy + sh))
-            elif symbol_abbr == "kWh":
-                # Small circle
-                backend.set_layer("SLD_SYMBOLS")
-                backend.add_circle((legend_x + 7, entry_y + 3.5), radius=3)
-            elif symbol_abbr == "Earth":
-                # Earth symbol (three horizontal lines)
-                backend.set_layer("SLD_SYMBOLS")
-                sx = legend_x + 7
-                sy = entry_y + 1
-                backend.add_line((sx - 3, sy), (sx + 3, sy))
-                backend.add_line((sx - 2, sy + 1.5), (sx + 2, sy + 1.5))
-                backend.add_line((sx - 1, sy + 3), (sx + 1, sy + 3))
+            self._draw_legend_symbol(backend, sym_key, legend_x, entry_y)
 
             # Description text
             backend.set_layer("SLD_ANNOTATIONS")
@@ -443,6 +495,114 @@ class SldGenerator:
                 insert=(legend_x + 14, entry_y + 5),
                 char_height=2.0,
             )
+
+    def _draw_legend_symbol(
+        self,
+        backend: DrawingBackend,
+        sym_key: str,
+        legend_x: float,
+        entry_y: float,
+    ) -> None:
+        """Draw a small symbolic representation in the legend."""
+        sx = legend_x + 4
+        sy = entry_y + 1
+        sw, sh = 5, 5
+
+        if sym_key in ("MCCB", "MCB", "ELCB", "RCCB", "ACB"):
+            # Circuit breaker: Rectangle with X
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_lwpolyline(
+                [(sx, sy), (sx + sw, sy), (sx + sw, sy + sh), (sx, sy + sh)],
+                close=True,
+            )
+            backend.add_line((sx, sy), (sx + sw, sy + sh))
+            backend.add_line((sx + sw, sy), (sx, sy + sh))
+
+            # ACB: additional double-contact indicator (horizontal bar through center)
+            if sym_key == "ACB":
+                backend.add_line((sx - 1, sy + sh / 2), (sx + sw + 1, sy + sh / 2))
+
+            # ELCB/RCCB: arc indicator for earth leakage
+            if sym_key in ("ELCB", "RCCB"):
+                backend.add_arc(
+                    center=(sx + sw + 2, sy + sh / 2),
+                    radius=2,
+                    start_angle=120,
+                    end_angle=240,
+                )
+
+        elif sym_key == "KWH_METER":
+            # Small circle with "kWh"
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_circle((legend_x + 7, entry_y + 3.5), radius=3)
+
+        elif sym_key == "CT":
+            # Current Transformer: two overlapping circles
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_circle((legend_x + 6, entry_y + 3.5), radius=2.5)
+            backend.add_circle((legend_x + 8.5, entry_y + 3.5), radius=2.5)
+
+        elif sym_key == "EARTH":
+            # Earth symbol (three horizontal lines decreasing width)
+            backend.set_layer("SLD_SYMBOLS")
+            sx_e = legend_x + 7
+            sy_e = entry_y + 1
+            backend.add_line((sx_e - 3, sy_e), (sx_e + 3, sy_e))
+            backend.add_line((sx_e - 2, sy_e + 1.5), (sx_e + 2, sy_e + 1.5))
+            backend.add_line((sx_e - 1, sy_e + 3), (sx_e + 1, sy_e + 3))
+
+        elif sym_key == "ISOLATOR":
+            # Disconnect switch: diagonal line with contacts
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_circle((legend_x + 7, entry_y + 1), radius=1)
+            backend.add_line((legend_x + 7, entry_y + 1), (legend_x + 9.5, entry_y + 5))
+            backend.add_circle((legend_x + 7, entry_y + 5), radius=1)
+
+        elif sym_key == "FUSE":
+            # Fuse: small rectangle
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_lwpolyline(
+                [(sx, sy + 1), (sx + sw, sy + 1), (sx + sw, sy + 4), (sx, sy + 4)],
+                close=True,
+            )
+
+        elif sym_key == "BUSBAR":
+            # Busbar: double horizontal lines
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_line((sx, sy + 2), (sx + sw + 2, sy + 2), lineweight=60)
+            backend.add_line((sx, sy + 3.5), (sx + sw + 2, sy + 3.5), lineweight=60)
+
+        elif sym_key == "SPD":
+            # SPD: lightning arrow
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_line((legend_x + 5, entry_y + 5), (legend_x + 7, entry_y + 3))
+            backend.add_line((legend_x + 7, entry_y + 3), (legend_x + 6, entry_y + 3))
+            backend.add_line((legend_x + 6, entry_y + 3), (legend_x + 8, entry_y + 1))
+
+
+# -- Helper: Flow arrow drawing --
+
+
+def _draw_flow_arrow(backend: DrawingBackend, x: float, y: float) -> None:
+    """
+    Draw a downward current flow direction arrow.
+    IEC convention: arrow shows direction of conventional current flow.
+    """
+    backend.set_layer("SLD_ANNOTATIONS")
+
+    # Arrow shaft (short line going down)
+    backend.add_line((x, y + 3), (x, y - 3))
+
+    # Arrowhead (pointing down)
+    backend.add_line((x, y - 3), (x - 1.5, y - 1))
+    backend.add_line((x, y - 3), (x + 1.5, y - 1))
+
+    # "I" label for current
+    backend.add_mtext(
+        "I",
+        insert=(x + 2, y + 2),
+        char_height=2.5,
+    )
 
 
 # -- Helper: Dashed line drawing --

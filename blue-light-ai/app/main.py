@@ -173,12 +173,17 @@ async def chat_stream(
             # Send thread_id first
             yield _sse_event("session", {"type": "session", "thread_id": thread_id})
 
-            async for event in process_message(
-                application_seq=request.application_seq,
-                user_seq=request.user_seq,
-                message=request.message,
-                thread_id=thread_id,
-                application_info=request.application_info,
+            # Wrap process_message with heartbeat to keep SSE connection alive
+            # during long Gemini API calls (prevents WebClient ReadTimeout)
+            async for event in _with_heartbeat(
+                process_message(
+                    application_seq=request.application_seq,
+                    user_seq=request.user_seq,
+                    message=request.message,
+                    thread_id=thread_id,
+                    application_info=request.application_info,
+                ),
+                interval=15,
             ):
                 event_type = event.get("type", "token")
                 yield _sse_event(event_type, event)
@@ -345,6 +350,28 @@ async def delete_temp_file(
 
 
 # ── Helpers ──────────────────────────────────────────
+
+
+async def _with_heartbeat(
+    aiter: AsyncGenerator[dict, None],
+    interval: int = 15,
+) -> AsyncGenerator[dict, None]:
+    """
+    Wrap an async generator with periodic heartbeat events.
+    Prevents WebClient ReadTimeout during long Gemini API calls
+    by sending keepalive events every `interval` seconds when idle.
+    """
+    aiter_obj = aiter.__aiter__()
+    while True:
+        try:
+            event = await asyncio.wait_for(aiter_obj.__anext__(), timeout=interval)
+            yield event
+        except asyncio.TimeoutError:
+            # No event received within interval — send heartbeat
+            yield {"type": "heartbeat"}
+        except StopAsyncIteration:
+            break
+
 
 def _sse_event(event_name: str, data: dict) -> str:
     """Format an SSE event string."""

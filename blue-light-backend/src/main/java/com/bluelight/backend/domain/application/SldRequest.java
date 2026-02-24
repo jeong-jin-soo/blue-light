@@ -73,6 +73,13 @@ public class SldRequest extends BaseEntity {
     }
 
     /**
+     * SLD 확인 해제 → UPLOADED 상태로 복귀
+     */
+    public void unconfirm() {
+        this.status = SldRequestStatus.UPLOADED;
+    }
+
+    /**
      * 신청자가 메모와 스케치 파일 정보를 업데이트
      */
     public void updateApplicantDetails(String applicantNote, Long sketchFileSeq) {

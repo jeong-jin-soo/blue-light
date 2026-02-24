@@ -55,5 +55,16 @@ export const deleteFile = async (fileId: number): Promise<void> => {
   await axiosClient.delete(`/files/${fileId}`);
 };
 
-export const fileApi = { uploadFile, getFilesByApplication, downloadFile, deleteFile };
+/**
+ * Get a preview blob URL for a file (for image thumbnails).
+ * Caller must revoke the URL via URL.revokeObjectURL() when done.
+ */
+export const getFilePreviewUrl = async (fileId: number): Promise<string> => {
+  const response = await axiosClient.get(`/files/${fileId}/download`, {
+    responseType: 'blob',
+  });
+  return window.URL.createObjectURL(new Blob([response.data]));
+};
+
+export const fileApi = { uploadFile, getFilesByApplication, downloadFile, deleteFile, getFilePreviewUrl };
 export default fileApi;

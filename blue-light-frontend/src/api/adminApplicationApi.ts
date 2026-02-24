@@ -146,3 +146,10 @@ export const confirmSld = async (applicationId: number): Promise<SldRequest> => 
   );
   return response.data;
 };
+
+export const unconfirmSld = async (applicationId: number): Promise<SldRequest> => {
+  const response = await axiosClient.post<SldRequest>(
+    `/admin/applications/${applicationId}/sld-unconfirm`
+  );
+  return response.data;
+};

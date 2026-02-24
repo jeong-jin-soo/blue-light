@@ -181,14 +181,27 @@ def validate_sld_requirements(requirements: dict) -> str:
 
     main_breaker = requirements.get("main_breaker", {})
     breaker_type = str(main_breaker.get("type", "")).upper() if isinstance(main_breaker, dict) else ""
-    breaker_rating = (main_breaker.get("rating") or main_breaker.get("rating_A") or 0) if isinstance(main_breaker, dict) else 0
+    _br_raw = (main_breaker.get("rating") or main_breaker.get("rating_A") or 0) if isinstance(main_breaker, dict) else 0
+    if isinstance(_br_raw, str):
+        import re as _re
+        _br_digits = _re.sub(r"[^\d]", "", _br_raw)
+        breaker_rating = int(_br_digits) if _br_digits else 0
+    else:
+        breaker_rating = int(_br_raw) if _br_raw else 0
 
     if not breaker_type:
         missing.append("main_breaker.type (ACB / MCCB / MCB)")
     if not breaker_rating:
         missing.append("main_breaker.rating (in Amps)")
 
-    busbar_rating = requirements.get("busbar_rating", 0)
+    busbar_rating_raw = requirements.get("busbar_rating", 0)
+    # Normalize busbar_rating to int (Gemini may send "200A", "200", or 200)
+    if isinstance(busbar_rating_raw, str):
+        import re as _re
+        _digits = _re.sub(r"[^\d]", "", busbar_rating_raw)
+        busbar_rating = int(_digits) if _digits else 0
+    else:
+        busbar_rating = int(busbar_rating_raw) if busbar_rating_raw else 0
     if not busbar_rating:
         missing.append("busbar_rating (in Amps)")
 
@@ -348,8 +361,9 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
             "file_id": file_id,
             "pdf_path": pdf_path,
             "svg_path": svg_path,
-            "svg_preview": result.get("svg_string", ""),
             "component_count": result.get("component_count", 0),
+            "message": f"SLD generated successfully with {result.get('component_count', 0)} components. "
+                       "PDF and SVG files are ready for download.",
         }, ensure_ascii=False)
 
     except Exception as e:

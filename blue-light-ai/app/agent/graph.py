@@ -208,14 +208,20 @@ async def process_message(
                         result = json.loads(output)
                         if result.get("success"):
                             file_id = result.get("file_id", "")
-                            svg_preview = result.get("svg_preview", "")
+                            svg_path = result.get("svg_path", "")
 
-                            # Send SVG preview
-                            if svg_preview:
-                                yield {
-                                    "type": "sld_preview",
-                                    "svg": svg_preview,
-                                }
+                            # Read SVG from saved file (not from tool output to keep LLM context clean)
+                            if svg_path:
+                                try:
+                                    with open(svg_path, encoding="utf-8") as f:
+                                        svg_content = f.read()
+                                    if svg_content:
+                                        yield {
+                                            "type": "sld_preview",
+                                            "svg": svg_content,
+                                        }
+                                except FileNotFoundError:
+                                    logger.warning(f"SVG file not found: {svg_path}")
 
                             # Send file generated notification
                             yield {

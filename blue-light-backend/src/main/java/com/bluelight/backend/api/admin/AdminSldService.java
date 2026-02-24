@@ -46,9 +46,10 @@ public class AdminSldService {
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
 
         if (sldRequest.getStatus() != SldRequestStatus.REQUESTED
-                && sldRequest.getStatus() != SldRequestStatus.AI_GENERATING) {
+                && sldRequest.getStatus() != SldRequestStatus.AI_GENERATING
+                && sldRequest.getStatus() != SldRequestStatus.UPLOADED) {
             throw new BusinessException(
-                    "SLD can only be uploaded when status is REQUESTED or AI_GENERATING",
+                    "SLD can only be uploaded when status is REQUESTED, AI_GENERATING or UPLOADED",
                     HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
         }
 
@@ -59,7 +60,7 @@ public class AdminSldService {
     }
 
     /**
-     * SLD AI 생성 시작 (REQUESTED → AI_GENERATING)
+     * SLD AI 생성 시작 (REQUESTED/UPLOADED → AI_GENERATING)
      */
     @Transactional
     public SldRequestResponse startAiGeneration(Long applicationSeq) {
@@ -68,9 +69,10 @@ public class AdminSldService {
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
 
-        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED) {
+        if (sldRequest.getStatus() != SldRequestStatus.REQUESTED
+                && sldRequest.getStatus() != SldRequestStatus.UPLOADED) {
             throw new BusinessException(
-                    "AI generation can only start when status is REQUESTED",
+                    "AI generation can only start when status is REQUESTED or UPLOADED",
                     HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
         }
 
@@ -98,6 +100,28 @@ public class AdminSldService {
 
         sldRequest.confirm();
         log.info("SLD confirmed: applicationSeq={}", applicationSeq);
+
+        return SldRequestResponse.from(sldRequest);
+    }
+
+    /**
+     * SLD 확인 해제 (Admin/LEW) — CONFIRMED → UPLOADED
+     */
+    @Transactional
+    public SldRequestResponse unconfirmSld(Long applicationSeq) {
+        validateApplicationExists(applicationSeq);
+        SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
+
+        if (sldRequest.getStatus() != SldRequestStatus.CONFIRMED) {
+            throw new BusinessException(
+                    "SLD can only be unconfirmed when status is CONFIRMED",
+                    HttpStatus.BAD_REQUEST, "INVALID_SLD_STATUS");
+        }
+
+        sldRequest.unconfirm();
+        log.info("SLD unconfirmed (reopened): applicationSeq={}", applicationSeq);
 
         return SldRequestResponse.from(sldRequest);
     }

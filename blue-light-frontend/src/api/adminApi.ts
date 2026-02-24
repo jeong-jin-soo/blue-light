@@ -16,6 +16,7 @@ export {
   getAdminSldRequest,
   uploadSldComplete,
   confirmSld,
+  unconfirmSld,
 } from './adminApplicationApi';
 
 export {

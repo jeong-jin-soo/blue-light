@@ -5,21 +5,25 @@ import { useSldChatStore } from '../../../stores/sldChatStore';
 import { useToastStore } from '../../../stores/toastStore';
 import { acceptSld } from '../../../api/sldChatApi';
 import { getSldAiGeneration } from '../../../api/systemAdminApi';
-import type { SldRequest } from '../../../types';
+import fileApi from '../../../api/fileApi';
+import type { FileInfo, SldRequest } from '../../../types';
 
 interface Props {
   applicationSeq: number;
   sldRequest: SldRequest;
   onSldUpdated: () => void;
+  existingSldFiles?: FileInfo[];
+  onFileDelete?: (fileId: number) => Promise<void>;
 }
 
 /**
  * SLD AI 채팅 패널 — 2분할 레이아웃 (좌: 채팅, 우: SVG 미리보기)
  */
-export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpdated }: Props) {
+export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpdated, existingSldFiles = [], onFileDelete }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  const [showReplaceDialog, setShowReplaceDialog] = useState(false);
   const toast = useToastStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -72,11 +76,31 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     [handleSend],
   );
 
-  // SLD 수락
-  const handleAccept = useCallback(async () => {
+  // SLD 수락 — 기존 파일 존재 시 Replace/Add 선택
+  const handleAcceptClick = useCallback(() => {
     if (!generatedFileId) return;
+    if (existingSldFiles.length > 0) {
+      setShowReplaceDialog(true);
+    } else {
+      doAccept(false);
+    }
+  }, [generatedFileId, existingSldFiles]);
+
+  const doAccept = useCallback(async (replaceExisting: boolean) => {
+    if (!generatedFileId) return;
+    setShowReplaceDialog(false);
     setAcceptLoading(true);
     try {
+      // Replace 선택 시 기존 SLD 파일 모두 삭제
+      if (replaceExisting && onFileDelete) {
+        for (const f of existingSldFiles) {
+          try {
+            await fileApi.deleteFile(f.fileSeq);
+          } catch {
+            // 개별 파일 삭제 실패는 무시하고 계속 진행
+          }
+        }
+      }
       await acceptSld(applicationSeq, generatedFileId);
       toast.success('SLD accepted and uploaded successfully.');
       onSldUpdated();
@@ -87,7 +111,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     } finally {
       setAcceptLoading(false);
     }
-  }, [applicationSeq, generatedFileId, onSldUpdated]);
+  }, [applicationSeq, generatedFileId, existingSldFiles, onFileDelete, onSldUpdated]);
 
   // 대화 초기화
   const handleReset = useCallback(async () => {
@@ -149,22 +173,28 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
               </div>
             )}
 
-            {messages.map((msg) => (
-              <div
-                key={msg.sldChatMessageSeq}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            {messages.map((msg) => {
+              const displayContent = msg.role === 'assistant'
+                ? stripSvgContent(msg.content)
+                : msg.content;
+              if (!displayContent.trim()) return null;
+              return (
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
+                  key={msg.sldChatMessageSeq}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {msg.content}
+                  <div
+                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {displayContent}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Tool execution indicator */}
             {activeToolName && (
@@ -229,12 +259,17 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
         <div className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border-t border-gray-200">
           <div className="text-xs text-gray-500">
             SLD generated. Review the preview and accept when ready.
+            {existingSldFiles.length > 0 && (
+              <span className="text-amber-600 ml-1">
+                ({existingSldFiles.length} existing SLD file{existingSldFiles.length !== 1 ? 's' : ''})
+              </span>
+            )}
           </div>
           <div className="flex gap-2">
             <Button
               variant="primary"
               size="sm"
-              onClick={handleAccept}
+              onClick={handleAcceptClick}
               loading={acceptLoading}
               disabled={acceptLoading}
             >
@@ -243,8 +278,58 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
           </div>
         </div>
       )}
+
+      {/* Replace/Add dialog */}
+      {showReplaceDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4 p-5">
+            <h3 className="text-base font-semibold text-gray-800 mb-2">Existing SLD Files Found</h3>
+            <p className="text-sm text-gray-600 mb-1">
+              There {existingSldFiles.length === 1 ? 'is' : 'are'} {existingSldFiles.length} existing SLD file{existingSldFiles.length !== 1 ? 's' : ''}.
+            </p>
+            <p className="text-sm text-gray-600 mb-4">
+              Would you like to replace them or add the new SLD as an additional file?
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => doAccept(true)}
+                className="w-full"
+              >
+                Replace Existing
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => doAccept(false)}
+                className="w-full"
+              >
+                Add as Additional
+              </Button>
+              <button
+                onClick={() => setShowReplaceDialog(false)}
+                className="text-sm text-gray-500 hover:text-gray-700 mt-1"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * AI 응답에서 SVG 소스 코드를 제거 (미리보기 패널에 별도 표시되므로)
+ */
+function stripSvgContent(text: string): string {
+  return text
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+    .replace(/```svg[\s\S]*?```/gi, '')
+    .replace(/```xml[\s\S]*?<\/svg>[\s\S]*?```/gi, '')
+    .trim();
 }
 
 /**

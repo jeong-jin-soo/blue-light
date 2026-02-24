@@ -160,8 +160,9 @@ export default function ApplicationDetailPage() {
 
   // ── File handlers ──────────────────────────────
 
-  const handleFileUpload = async (file: File) => {
-    await fileApi.uploadFile(applicationId, file, uploadFileType);
+  const handleFileUpload = async (file: File, fileType?: FileType) => {
+    const type = fileType || uploadFileType;
+    await fileApi.uploadFile(applicationId, file, type);
     toast.success('File uploaded successfully');
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
     setFiles(updatedFiles);

@@ -184,8 +184,9 @@ export default function AdminApplicationDetailPage() {
     finally { setActionLoading(false); }
   };
 
-  const handleFileUpload = async (file: File) => {
-    await adminApi.uploadFile(applicationId, file, uploadFileType);
+  const handleFileUpload = async (file: File, fileType?: FileType) => {
+    const type = fileType || uploadFileType;
+    await adminApi.uploadFile(applicationId, file, type);
     toast.success('File uploaded successfully');
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
     setFiles(updatedFiles);
@@ -194,6 +195,16 @@ export default function AdminApplicationDetailPage() {
   const handleFileDownload = async (fileInfo: FileInfo) => {
     try { await fileApi.downloadFile(fileInfo.fileSeq, fileInfo.originalFilename || 'download'); }
     catch { toast.error('Failed to download file'); }
+  };
+
+  const handleFileDelete = async (fileId: number) => {
+    if (!confirm('Are you sure you want to delete this file?')) return;
+    try {
+      await fileApi.deleteFile(fileId);
+      toast.success('File deleted successfully');
+      const updatedFiles = await fileApi.getFilesByApplication(applicationId);
+      setFiles(updatedFiles);
+    } catch { toast.error('Failed to delete file'); }
   };
 
   // LEW Assignment
@@ -284,6 +295,17 @@ export default function AdminApplicationDetailPage() {
       toast.success('SLD confirmed');
       fetchData();
     } catch { toast.error('Failed to confirm SLD'); }
+    finally { setActionLoading(false); }
+  };
+
+  const handleSldUnconfirm = async () => {
+    if (!confirm('Reopen the SLD? This will allow re-uploading or regenerating the SLD drawing.')) return;
+    setActionLoading(true);
+    try {
+      await adminApi.unconfirmSld(applicationId);
+      toast.success('SLD reopened for editing');
+      fetchData();
+    } catch { toast.error('Failed to reopen SLD'); }
     finally { setActionLoading(false); }
   };
 
@@ -396,8 +418,11 @@ export default function AdminApplicationDetailPage() {
               onSldLewNoteChange={setSldLewNote}
               onSldUpload={handleSldUpload}
               onSldConfirmClick={() => setShowSldConfirm(true)}
+              onSldUnconfirmClick={handleSldUnconfirm}
               onSldUpdated={fetchData}
               actionLoading={actionLoading}
+              existingSldFiles={files.filter((f) => f.fileType === 'DRAWING_SLD')}
+              onFileDelete={handleFileDelete}
             />
           )}
 
@@ -408,6 +433,7 @@ export default function AdminApplicationDetailPage() {
             onUploadFileTypeChange={setUploadFileType}
             onFileUpload={handleFileUpload}
             onFileDownload={handleFileDownload}
+            onFileDelete={handleFileDelete}
           />
 
           <AdminPaymentSection payments={payments} files={files} />

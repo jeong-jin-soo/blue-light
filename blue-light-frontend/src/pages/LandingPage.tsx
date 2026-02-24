@@ -23,13 +23,13 @@ const features = [
   {
     icon: '👥',
     title: 'Multi-Role Collaboration',
-    desc: 'A unified platform connecting building owners, Licensed Electrical Workers, SLD professionals, and administrators in one seamless workflow.',
-    bullets: ['Building owners & companies', 'Licensed Electrical Workers', 'SLD drawing professionals'],
+    desc: 'A unified platform connecting building, business, and shop owners, Licensed Electrical Workers, SLD professionals, and administrators in one seamless workflow.',
+    bullets: ['Building, business & shop owners', 'Licensed Electrical Workers', 'SLD drawing professionals'],
   },
 ];
 
 const steps = [
-  { num: 1, title: 'Create Account', desc: 'Sign up as a building owner or company. Add your business details and SP account information.' },
+  { num: 1, title: 'Create Account', desc: 'Sign up as a building, business, or shop owner. Add your details and SP account information.' },
   { num: 2, title: 'Submit Application', desc: 'Choose NEW or RENEWAL, enter your property details, select kVA capacity, and upload required documents.' },
   { num: 3, title: 'Review & Payment', desc: 'Your application is reviewed by a Licensed Electrical Worker. Once approved, complete payment via PayNow or bank transfer.' },
   { num: 4, title: 'Licence Issued', desc: 'Track your application in real-time. Once processing is complete, your electrical installation licence is issued.' },
@@ -103,7 +103,7 @@ export default function LandingPage() {
             {/* Left — Copy */}
             <div>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary mb-6">
-                Singapore EMA Licensed Platform
+                Electrical Installation Licensing Platform
               </span>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
                 Electrical Installation Licences,{' '}
@@ -112,7 +112,7 @@ export default function LandingPage() {
               <p className="mt-5 text-base sm:text-lg text-gray-500 leading-relaxed max-w-lg">
                 The end-to-end digital platform for applying, tracking, and managing
                 EMA electrical installation licences in Singapore.
-                For building owners, LEWs, and SLD professionals.
+                For building, business, and shop owners, LEWs, and SLD professionals.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link to="/signup">
@@ -269,7 +269,7 @@ export default function LandingPage() {
             Ready to Simplify Your Licence Application?
           </h2>
           <p className="text-blue-200 mb-8 max-w-2xl mx-auto">
-            Join building owners and electrical professionals across Singapore who trust LicenseKaki.
+            Join building, business, and shop owners and electrical professionals across Singapore who trust LicenseKaki.
           </p>
           <Link to="/signup">
             <Button

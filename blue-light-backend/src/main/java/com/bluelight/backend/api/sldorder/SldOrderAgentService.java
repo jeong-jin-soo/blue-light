@@ -109,6 +109,11 @@ public class SldOrderAgentService {
                                         chunk, new TypeReference<Map<String, Object>>() {});
                                 String type = (String) parsed.get("type");
 
+                                // Heartbeat — 연결 유지용, 프런트엔드 전달 불필요
+                                if ("heartbeat".equals(type)) {
+                                    return;
+                                }
+
                                 // AI 응답 텍스트 누적 (최종 저장용)
                                 if ("token".equals(type)) {
                                     String content = (String) parsed.get("content");
