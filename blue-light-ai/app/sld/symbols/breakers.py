@@ -4,6 +4,8 @@ Circuit breaker symbols: ACB, MCCB, MCB, RCCB/ELCB.
 IEC 60617 standard representation:
 - Rectangle with X cross pattern
 - Connection pins at top and bottom center
+
+Sizes scaled for professional A3 engineering drawings.
 """
 
 from __future__ import annotations
@@ -22,8 +24,8 @@ class CircuitBreaker(BaseSymbol):
     Used as base for ACB, MCCB, MCB.
     """
 
-    width: float = 10
-    height: float = 16
+    width: float = 14
+    height: float = 20
     layer: str = "SLD_SYMBOLS"
 
     def __init__(self, breaker_type: str = "MCCB"):
@@ -31,8 +33,8 @@ class CircuitBreaker(BaseSymbol):
         self.name = f"CB_{breaker_type}"
         cx = self.width / 2
         self.pins = {
-            "top": (cx, self.height + 3),
-            "bottom": (cx, -3),
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
@@ -53,15 +55,23 @@ class CircuitBreaker(BaseSymbol):
         # Connection stubs (top and bottom)
         cx = x + w / 2
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, y + h), (cx, y + h + 3))
-        backend.add_line((cx, y), (cx, y - 3))
+        backend.add_line((cx, y + h), (cx, y + h + 5))
+        backend.add_line((cx, y), (cx, y - 5))
 
 
 class ACB(CircuitBreaker):
     """Air Circuit Breaker (for >630A)."""
 
+    width: float = 16
+    height: float = 22
+
     def __init__(self):
         super().__init__("ACB")
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
+        }
 
 
 class MCCB(CircuitBreaker):
@@ -74,15 +84,15 @@ class MCCB(CircuitBreaker):
 class MCB(CircuitBreaker):
     """Miniature Circuit Breaker (<100A)."""
 
-    width: float = 8
-    height: float = 12
+    width: float = 10
+    height: float = 16
 
     def __init__(self):
         super().__init__("MCB")
         cx = self.width / 2
         self.pins = {
-            "top": (cx, self.height + 3),
-            "bottom": (cx, -3),
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
         }
 
 
@@ -93,15 +103,15 @@ class RCCB(BaseSymbol):
     """
 
     name: str = "CB_RCCB"
-    width: float = 10
-    height: float = 16
+    width: float = 14
+    height: float = 20
     layer: str = "SLD_SYMBOLS"
 
     def __init__(self):
         cx = self.width / 2
         self.pins = {
-            "top": (cx, self.height + 3),
-            "bottom": (cx, -3),
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
@@ -121,8 +131,8 @@ class RCCB(BaseSymbol):
 
         # Earth leakage indicator (small arc on the right side)
         backend.add_arc(
-            center=(x + w + 3, y + h / 2),
-            radius=3,
+            center=(x + w + 4, y + h / 2),
+            radius=4,
             start_angle=120,
             end_angle=240,
         )
@@ -130,5 +140,60 @@ class RCCB(BaseSymbol):
         # Connection stubs
         cx = x + w / 2
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, y + h), (cx, y + h + 3))
-        backend.add_line((cx, y), (cx, y - 3))
+        backend.add_line((cx, y + h), (cx, y + h + 5))
+        backend.add_line((cx, y), (cx, y - 5))
+
+
+class ELCB(BaseSymbol):
+    """
+    Earth Leakage Circuit Breaker.
+    Similar to RCCB but with specific ELCB marking and earth indicator.
+    Used for sub-circuit group protection (e.g., 100A 4P ELCB 30mA).
+    """
+
+    name: str = "CB_ELCB"
+    width: float = 14
+    height: float = 20
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self):
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
+        }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        w, h = self.width, self.height
+
+        backend.set_layer(self.layer)
+
+        # Rectangle
+        backend.add_lwpolyline(
+            [(x, y), (x + w, y), (x + w, y + h), (x, y + h)],
+            close=True,
+        )
+
+        # X cross
+        backend.add_line((x, y), (x + w, y + h))
+        backend.add_line((x + w, y), (x, y + h))
+
+        # Earth leakage indicator (arc on right side)
+        backend.add_arc(
+            center=(x + w + 4, y + h / 2),
+            radius=4,
+            start_angle=120,
+            end_angle=240,
+        )
+
+        # Small earth symbol indicator (arrow down from arc)
+        arrow_x = x + w + 4
+        arrow_y = y + h / 2 - 6
+        backend.add_line((arrow_x, arrow_y), (arrow_x, arrow_y - 3))
+        backend.add_line((arrow_x - 2, arrow_y - 3), (arrow_x + 2, arrow_y - 3))
+
+        # Connection stubs
+        cx = x + w / 2
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + h), (cx, y + h + 5))
+        backend.add_line((cx, y), (cx, y - 5))

@@ -187,8 +187,10 @@ public class SldOrder extends BaseEntity {
      * SLD 업로드 완료 (SLD_MANAGER)
      */
     public void uploadSld(Long fileSeq, String managerNote) {
-        if (this.status != SldOrderStatus.IN_PROGRESS && this.status != SldOrderStatus.REVISION_REQUESTED) {
-            throw new IllegalStateException("SLD 업로드는 IN_PROGRESS 또는 REVISION_REQUESTED 상태에서만 가능합니다. 현재: " + this.status);
+        if (this.status != SldOrderStatus.IN_PROGRESS
+                && this.status != SldOrderStatus.REVISION_REQUESTED
+                && this.status != SldOrderStatus.SLD_UPLOADED) {
+            throw new IllegalStateException("SLD 업로드는 IN_PROGRESS, REVISION_REQUESTED 또는 SLD_UPLOADED 상태에서만 가능합니다. 현재: " + this.status);
         }
         this.uploadedFileSeq = fileSeq;
         this.managerNote = managerNote;

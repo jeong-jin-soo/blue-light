@@ -2,7 +2,13 @@
 Lightweight SVG drawing backend for SLD preview.
 
 Generates an SVG string directly without external dependencies.
-Replaces the ezdxf SVG rendering pipeline.
+
+Line weight standards (matching pdf_backend):
+- SLD_POWER_MAIN: 1.0mm
+- SLD_SYMBOLS: 0.7mm
+- SLD_CONNECTIONS: 0.5mm
+- SLD_ANNOTATIONS: 0.35mm
+- SLD_TITLE_BLOCK: 0.7mm
 """
 
 from __future__ import annotations
@@ -15,20 +21,22 @@ from xml.sax.saxutils import escape
 _PAGE_WIDTH = 420.0
 _PAGE_HEIGHT = 297.0
 
-# Layer → stroke color mapping (SVG on white background)
+# Layer -> stroke color mapping (SVG on white background)
 _LAYER_COLORS: dict[str, str] = {
     "SLD_SYMBOLS": "#000000",
     "SLD_CONNECTIONS": "#000000",
-    "SLD_ANNOTATIONS": "#333333",
+    "SLD_POWER_MAIN": "#000000",
+    "SLD_ANNOTATIONS": "#262626",
     "SLD_TITLE_BLOCK": "#000000",
 }
 
-# Layer → stroke width in mm
+# Layer -> stroke width in mm
 _LAYER_STROKE_WIDTHS: dict[str, float] = {
-    "SLD_SYMBOLS": 0.5,
-    "SLD_CONNECTIONS": 0.35,
-    "SLD_ANNOTATIONS": 0.25,
-    "SLD_TITLE_BLOCK": 0.5,
+    "SLD_SYMBOLS": 0.7,
+    "SLD_CONNECTIONS": 0.5,
+    "SLD_POWER_MAIN": 1.0,
+    "SLD_ANNOTATIONS": 0.35,
+    "SLD_TITLE_BLOCK": 0.7,
 }
 
 
@@ -61,14 +69,14 @@ class SvgBackend:
         return f'stroke="{color}" stroke-width="{width}" fill="none"'
 
     def _text_color(self) -> str:
-        return _LAYER_COLORS.get(self._current_layer, "#333333")
+        return _LAYER_COLORS.get(self._current_layer, "#262626")
 
-    # ── Layer management ──────────────────────────────
+    # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:
         self._current_layer = layer_name
 
-    # ── Drawing primitives ────────────────────────────
+    # -- Drawing primitives --
 
     def add_line(
         self,
@@ -80,13 +88,12 @@ class SvgBackend:
         x1, y1 = start[0], self._flip_y(start[1])
         x2, y2 = end[0], self._flip_y(end[1])
 
-        extra = ""
         if lineweight is not None:
-            w = lineweight / 100.0  # hundredths of mm → mm
+            w = lineweight / 100.0  # hundredths of mm -> mm
             color = _LAYER_COLORS.get(self._current_layer, "#000000")
-            extra = f' stroke="{color}" stroke-width="{w:.2f}"'
             self._elements.append(
-                f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}"{extra} fill="none" />'
+                f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" '
+                f'stroke="{color}" stroke-width="{w:.2f}" fill="none" />'
             )
         else:
             self._elements.append(
@@ -142,26 +149,21 @@ class SvgBackend:
         Angles: degrees, CCW from positive X-axis (DXF convention).
         SVG arcs use CW angles, so we negate the Y components.
         """
-        # Convert angles to radians
         sa_rad = math.radians(start_angle)
         ea_rad = math.radians(end_angle)
 
-        # Start and end points on the arc (in input coordinate space)
         sx = center[0] + radius * math.cos(sa_rad)
         sy = center[1] + radius * math.sin(sa_rad)
         ex = center[0] + radius * math.cos(ea_rad)
         ey = center[1] + radius * math.sin(ea_rad)
 
-        # Flip Y for SVG
         sy_svg = self._flip_y(sy)
         ey_svg = self._flip_y(ey)
 
-        # Determine arc sweep
         extent = end_angle - start_angle
         if extent < 0:
             extent += 360
         large_arc = 1 if extent > 180 else 0
-        # SVG sweep flag: 0 = CCW in SVG coords (which is CW in math coords due to Y flip)
         sweep = 0
 
         self._elements.append(
@@ -174,30 +176,43 @@ class SvgBackend:
         *,
         insert: tuple[float, float],
         char_height: float = 3.0,
+        rotation: float = 0.0,
     ) -> None:
         """
-        Draw multiline text. Insert is top-left anchor (DXF convention).
+        Draw multiline text with optional rotation.
+        Insert is top-left anchor (DXF convention).
         '\\P' is the line break marker.
+
+        Args:
+            rotation: Degrees CCW. 90 = vertical text (bottom-to-top).
         """
+        if not isinstance(text, str):
+            text = str(text)
         lines = text.split("\\P")
         x = insert[0]
-        # First line: top-left → SVG text anchor at baseline
-        base_y = self._flip_y(insert[1]) + char_height * 0.8  # approximate baseline offset
+        base_y = self._flip_y(insert[1]) + char_height * 0.8
         color = self._text_color()
         line_spacing = char_height * 1.4
+
+        # Build transform attribute for rotation
+        transform = ""
+        if abs(rotation) > 0.1:
+            svg_x = x
+            svg_y = self._flip_y(insert[1])
+            transform = f' transform="rotate({-rotation},{svg_x:.2f},{svg_y:.2f})"'
 
         if len(lines) == 1:
             escaped = escape(lines[0])
             self._elements.append(
                 f'<text x="{x:.2f}" y="{base_y:.2f}" '
                 f'font-family="Helvetica, Arial, sans-serif" font-size="{char_height:.1f}" '
-                f'fill="{color}">{escaped}</text>'
+                f'fill="{color}"{transform}>{escaped}</text>'
             )
         else:
             parts = [
                 f'<text x="{x:.2f}" y="{base_y:.2f}" '
                 f'font-family="Helvetica, Arial, sans-serif" font-size="{char_height:.1f}" '
-                f'fill="{color}">'
+                f'fill="{color}"{transform}>'
             ]
             for i, line in enumerate(lines):
                 escaped = escape(line)
@@ -210,7 +225,30 @@ class SvgBackend:
             parts.append("</text>")
             self._elements.append("".join(parts))
 
-    # ── Output ────────────────────────────────────────
+    def add_filled_rect(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        *,
+        fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
+    ) -> None:
+        """Draw a filled rectangle."""
+        svg_y = self._flip_y(y + height)
+
+        if isinstance(fill_color, str):
+            fill = fill_color
+        else:
+            r, g, b = fill_color
+            fill = f"rgb({int(r*255)},{int(g*255)},{int(b*255)})"
+
+        self._elements.append(
+            f'<rect x="{x:.2f}" y="{svg_y:.2f}" width="{width:.2f}" height="{height:.2f}" '
+            f'fill="{fill}" stroke="#000000" stroke-width="0.35" />'
+        )
+
+    # -- Output --
 
     def get_svg_string(self) -> str:
         """Build and return the complete SVG string."""

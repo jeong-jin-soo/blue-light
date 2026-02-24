@@ -209,10 +209,11 @@ public class SldOrderAgentService {
                 .orElseThrow(() -> new BusinessException(
                         "SLD order not found", HttpStatus.NOT_FOUND, "SLD_ORDER_NOT_FOUND"));
 
-        // IN_PROGRESS 상태에서만 SLD 수락 가능
-        if (order.getStatus() != com.bluelight.backend.domain.sldorder.SldOrderStatus.IN_PROGRESS) {
+        // IN_PROGRESS 또는 SLD_UPLOADED 상태에서 SLD 수락 가능 (신청자 확인 전 재작업 허용)
+        if (order.getStatus() != com.bluelight.backend.domain.sldorder.SldOrderStatus.IN_PROGRESS
+                && order.getStatus() != com.bluelight.backend.domain.sldorder.SldOrderStatus.SLD_UPLOADED) {
             throw new BusinessException(
-                    "SLD can only be accepted when order status is IN_PROGRESS",
+                    "SLD can only be accepted when order status is IN_PROGRESS or SLD_UPLOADED",
                     HttpStatus.BAD_REQUEST, "INVALID_SLD_ORDER_STATUS");
         }
 

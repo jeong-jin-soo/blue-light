@@ -3,6 +3,13 @@ PDF drawing backend using ReportLab.
 
 Implements DrawingBackend protocol to generate A3 landscape PDF files
 for SLD drawings submitted to EMA.
+
+Line weight standards (professional engineering drawing):
+- SLD_POWER_MAIN: 1.0mm (main power supply lines)
+- SLD_SYMBOLS: 0.7mm (symbol outlines)
+- SLD_CONNECTIONS: 0.5mm (branch connections)
+- SLD_ANNOTATIONS: 0.35mm (text, labels)
+- SLD_TITLE_BLOCK: 0.7mm (border, title block lines)
 """
 
 from __future__ import annotations
@@ -16,20 +23,22 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 
 
-# Layer → color mapping (PDF is on white paper, so use dark colors)
+# Layer -> color mapping (PDF is on white paper, so use dark colors)
 _LAYER_COLORS: dict[str, tuple[float, float, float]] = {
-    "SLD_SYMBOLS": (0.0, 0.0, 0.0),       # Black
-    "SLD_CONNECTIONS": (0.0, 0.0, 0.0),    # Black
-    "SLD_ANNOTATIONS": (0.2, 0.2, 0.2),    # Dark gray
-    "SLD_TITLE_BLOCK": (0.0, 0.0, 0.0),    # Black
+    "SLD_SYMBOLS": (0.0, 0.0, 0.0),         # Black
+    "SLD_CONNECTIONS": (0.0, 0.0, 0.0),      # Black
+    "SLD_POWER_MAIN": (0.0, 0.0, 0.0),       # Black (bold)
+    "SLD_ANNOTATIONS": (0.15, 0.15, 0.15),   # Very dark gray
+    "SLD_TITLE_BLOCK": (0.0, 0.0, 0.0),      # Black
 }
 
-# Default line widths per layer (in points)
-_LAYER_LINE_WIDTHS: dict[str, float] = {
-    "SLD_SYMBOLS": 0.5,
-    "SLD_CONNECTIONS": 0.35,
-    "SLD_ANNOTATIONS": 0.25,
-    "SLD_TITLE_BLOCK": 0.5,
+# Default line widths per layer (in mm -- converted to points at draw time)
+_LAYER_LINE_WIDTHS_MM: dict[str, float] = {
+    "SLD_SYMBOLS": 0.7,
+    "SLD_CONNECTIONS": 0.5,
+    "SLD_POWER_MAIN": 1.0,
+    "SLD_ANNOTATIONS": 0.35,
+    "SLD_TITLE_BLOCK": 0.7,
 }
 
 
@@ -63,7 +72,7 @@ class PdfBackend:
     def canvas(self) -> Canvas:
         return self._canvas
 
-    # ── Layer management ──────────────────────────────
+    # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:
         self._current_layer = layer_name
@@ -72,12 +81,12 @@ class PdfBackend:
     def _apply_layer_style(self) -> None:
         """Apply color and line width for the current layer."""
         color = _LAYER_COLORS.get(self._current_layer, (0, 0, 0))
-        width = _LAYER_LINE_WIDTHS.get(self._current_layer, 0.5)
+        width_mm = _LAYER_LINE_WIDTHS_MM.get(self._current_layer, 0.5)
         self._canvas.setStrokeColorRGB(*color)
         self._canvas.setFillColorRGB(*color)
-        self._canvas.setLineWidth(width)
+        self._canvas.setLineWidth(width_mm * mm)
 
-    # ── Drawing primitives ────────────────────────────
+    # -- Drawing primitives --
 
     def add_line(
         self,
@@ -167,37 +176,83 @@ class PdfBackend:
         *,
         insert: tuple[float, float],
         char_height: float = 3.0,
+        rotation: float = 0.0,
     ) -> None:
         """
-        Draw multiline text.
+        Draw multiline text with optional rotation.
 
+        Handles non-string input (e.g. dict from AI) by converting to str.
         Input insert is top-left anchor (DXF convention).
         ReportLab drawString anchors at baseline-left, so we offset by char_height.
         '\\P' is the DXF line break marker.
+
+        Args:
+            rotation: Degrees CCW. 90 = vertical text (bottom-to-top).
         """
         c = self._canvas
         font_size = char_height * mm  # Convert mm to points
 
         c.saveState()
         # Use annotation color for text
-        color = _LAYER_COLORS.get(self._current_layer, (0.2, 0.2, 0.2))
+        color = _LAYER_COLORS.get(self._current_layer, (0.15, 0.15, 0.15))
         c.setFillColorRGB(*color)
         c.setFont("Helvetica", font_size)
 
+        if not isinstance(text, str):
+            text = str(text)
         lines = text.split("\\P")
         line_spacing = char_height * 1.4  # 1.4x line height
 
         x_pt = insert[0] * mm
-        # First line: offset down by char_height from top (insert is top-left)
-        y_pt = insert[1] * mm - font_size
+        y_pt = insert[1] * mm
 
-        for line in lines:
-            c.drawString(x_pt, y_pt, line)
-            y_pt -= line_spacing * mm
+        if abs(rotation) > 0.1:
+            # Rotate around the insert point
+            c.translate(x_pt, y_pt)
+            c.rotate(rotation)
+
+            # Draw lines at local origin
+            local_y = -font_size  # First line offset
+            for line in lines:
+                c.drawString(0, local_y, line)
+                local_y -= line_spacing * mm
+        else:
+            # Non-rotated (fast path)
+            y_draw = y_pt - font_size
+            for line in lines:
+                c.drawString(x_pt, y_draw, line)
+                y_draw -= line_spacing * mm
 
         c.restoreState()
 
-    # ── Output ────────────────────────────────────────
+    def add_filled_rect(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        *,
+        fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
+    ) -> None:
+        """Draw a filled rectangle."""
+        c = self._canvas
+        c.saveState()
+
+        if isinstance(fill_color, str):
+            # Parse hex color
+            hex_str = fill_color.lstrip("#")
+            r = int(hex_str[0:2], 16) / 255.0
+            g = int(hex_str[2:4], 16) / 255.0
+            b = int(hex_str[4:6], 16) / 255.0
+            c.setFillColorRGB(r, g, b)
+        else:
+            c.setFillColorRGB(*fill_color)
+
+        c.setStrokeColorRGB(0, 0, 0)
+        c.rect(x * mm, y * mm, width * mm, height * mm, stroke=1, fill=1)
+        c.restoreState()
+
+    # -- Output --
 
     def save(self) -> None:
         """Save the PDF document."""

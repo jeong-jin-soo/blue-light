@@ -1,7 +1,7 @@
 """
 Busbar symbols: Main Busbar, Sub-Busbar.
 
-Busbars are represented as thick horizontal lines.
+Busbars are represented as double horizontal lines (professional standard).
 """
 
 from __future__ import annotations
@@ -16,13 +16,14 @@ if TYPE_CHECKING:
 
 class Busbar(BaseSymbol):
     """
-    Busbar symbol — thick horizontal line.
+    Busbar symbol -- double thick horizontal lines.
     Width is dynamic based on the number of connected circuits.
+    Professional representation: two parallel lines 2mm apart.
     """
 
     name: str = "BUSBAR"
     width: float = 200
-    height: float = 2
+    height: float = 3  # Gap between double lines
     layer: str = "SLD_SYMBOLS"
 
     def __init__(self, bus_width: float = 200, bus_name: str = "BUSBAR"):
@@ -36,9 +37,17 @@ class Busbar(BaseSymbol):
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         backend.set_layer(self.layer)
+        gap = 2.0  # 2mm gap between double lines
+
+        # Top line
         backend.add_line(
-            (x, y), (x + self.width, y),
-            lineweight=50,  # Thick line for busbar
+            (x, y + gap / 2), (x + self.width, y + gap / 2),
+            lineweight=80,  # 0.8mm thick
+        )
+        # Bottom line
+        backend.add_line(
+            (x, y - gap / 2), (x + self.width, y - gap / 2),
+            lineweight=80,
         )
 
     def get_tap_point(self, index: int, total: int) -> tuple[float, float]:

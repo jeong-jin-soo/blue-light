@@ -20,7 +20,8 @@ class DrawingBackend(Protocol):
     - add_lwpolyline: lightweight polyline (sequence of points, optionally closed)
     - add_circle: circle defined by center and radius
     - add_arc: arc defined by center, radius, and angular range
-    - add_mtext: multiline text with position and size
+    - add_mtext: multiline text with position, size, and optional rotation
+    - add_filled_rect: filled rectangle (for busbar, ELCB boxes, etc.)
     - set_layer: change current drawing layer (affects color/style)
 
     All coordinates are in mm, matching the A3 landscape drawing space (420x297mm).
@@ -31,10 +32,11 @@ class DrawingBackend(Protocol):
         Set the current drawing layer.
 
         Layers:
-        - SLD_SYMBOLS: Main symbol outlines
-        - SLD_CONNECTIONS: Connection lines between symbols
-        - SLD_ANNOTATIONS: Text labels, ratings, annotations
-        - SLD_TITLE_BLOCK: Border and title block elements
+        - SLD_SYMBOLS: Main symbol outlines (0.7mm)
+        - SLD_CONNECTIONS: Connection lines between symbols (0.5mm)
+        - SLD_POWER_MAIN: Main power supply lines (1.0mm, bold)
+        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.35mm)
+        - SLD_TITLE_BLOCK: Border and title block elements (0.7mm)
         """
         ...
 
@@ -87,6 +89,7 @@ class DrawingBackend(Protocol):
         *,
         insert: tuple[float, float],
         char_height: float = 3.0,
+        rotation: float = 0.0,
     ) -> None:
         """
         Draw multiline text.
@@ -95,5 +98,25 @@ class DrawingBackend(Protocol):
             text: Text content. Use '\\P' for line breaks (DXF convention).
             insert: Position (x, y) in mm — top-left anchor.
             char_height: Character height in mm.
+            rotation: Text rotation in degrees CCW. 90 = vertical (bottom-to-top).
+        """
+        ...
+
+    def add_filled_rect(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        *,
+        fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
+    ) -> None:
+        """
+        Draw a filled rectangle.
+
+        Args:
+            x, y: Bottom-left corner (in mm).
+            width, height: Dimensions (in mm).
+            fill_color: Fill color as (r, g, b) floats 0-1 or hex string.
         """
         ...

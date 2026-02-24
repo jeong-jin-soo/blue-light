@@ -157,31 +157,39 @@ def _get_fallback_specs(kva: int, supply_type: str) -> dict:
 @tool
 def validate_sld_requirements(requirements: dict) -> str:
     """
-    Validate whether the gathered SLD requirements are complete for generation.
-    Returns a validation result with any missing fields.
+    Validate whether the gathered SLD requirements are complete and comply
+    with Singapore standards (SS 638:2018 / CP 5:2018) for generation.
+    Returns a validation result with missing fields, compliance errors, and warnings.
 
     Args:
         requirements: Dictionary of SLD requirements gathered from the LEW conversation.
-            Expected keys: supply_type, main_breaker, busbar_rating, sub_circuits,
-            earth_protection, metering
+            Expected keys: supply_type, kva, main_breaker, busbar_rating, sub_circuits,
+            elcb, earth_protection, metering, incoming_cable
     """
     missing = []
+    errors = []      # Compliance violations — block generation
     warnings = []
 
-    # Required fields
-    if not requirements.get("supply_type"):
+    # ── Required fields ──────────────────────────────────
+    supply_type = requirements.get("supply_type", "")
+    if not supply_type:
         missing.append("supply_type (single_phase / three_phase)")
 
-    if not requirements.get("kva"):
+    kva = requirements.get("kva", 0)
+    if not kva:
         missing.append("kva (installation capacity)")
 
     main_breaker = requirements.get("main_breaker", {})
-    if not main_breaker.get("type"):
-        missing.append("main_breaker.type (ACB / MCCB)")
-    if not main_breaker.get("rating"):
+    breaker_type = str(main_breaker.get("type", "")).upper() if isinstance(main_breaker, dict) else ""
+    breaker_rating = (main_breaker.get("rating") or main_breaker.get("rating_A") or 0) if isinstance(main_breaker, dict) else 0
+
+    if not breaker_type:
+        missing.append("main_breaker.type (ACB / MCCB / MCB)")
+    if not breaker_rating:
         missing.append("main_breaker.rating (in Amps)")
 
-    if not requirements.get("busbar_rating"):
+    busbar_rating = requirements.get("busbar_rating", 0)
+    if not busbar_rating:
         missing.append("busbar_rating (in Amps)")
 
     sub_circuits = requirements.get("sub_circuits", [])
@@ -196,19 +204,77 @@ def validate_sld_requirements(requirements: dict) -> str:
             if not sc.get("breaker_rating"):
                 missing.append(f"sub_circuits[{i}].breaker_rating")
 
-    # Optional but recommended
-    if not requirements.get("earth_protection"):
-        warnings.append("earth_protection not specified — will use default ELCB configuration")
+    # ── SS 638 Compliance Checks ─────────────────────────
 
+    # 1. Busbar rating >= main breaker rating
+    if busbar_rating and breaker_rating and busbar_rating < breaker_rating:
+        errors.append(
+            f"SS 638: busbar_rating ({busbar_rating}A) must be ≥ "
+            f"main_breaker rating ({breaker_rating}A)"
+        )
+
+    # 2. Main breaker type must match current range
+    if breaker_type and breaker_rating:
+        if breaker_rating > 630 and breaker_type != "ACB":
+            errors.append(
+                f"SS 638: ACB required for rating > 630A "
+                f"(current: {breaker_type} {breaker_rating}A)"
+            )
+        elif breaker_rating > 63 and breaker_type == "MCB":
+            errors.append(
+                f"SS 638: MCB max rating is 63A, use MCCB for {breaker_rating}A"
+            )
+
+    # 3. ELCB is mandatory per SS 638
+    elcb = requirements.get("elcb")
+    if not elcb:
+        warnings.append(
+            "SS 638: ELCB is mandatory — add 'elcb' with 'rating' and "
+            "'sensitivity_ma' (e.g., 100mA for distribution, 30mA for sockets)"
+        )
+
+    # 4. Sub-circuit cable specs must be specified
+    for i, sc in enumerate(sub_circuits):
+        if not sc.get("cable"):
+            warnings.append(
+                f"SS 638: sub_circuits[{i}] '{sc.get('name', '')}' — "
+                f"cable specification missing (required per SS 638 Table 4D1A)"
+            )
+
+    # 5. Single-phase supply for > 24 kVA is unusual
+    if supply_type == "single_phase" and kva and kva > 24:
+        warnings.append(
+            f"SS 638: Single-phase is unusual for {kva} kVA — "
+            f"three-phase 400V recommended for installations > 24 kVA"
+        )
+
+    # 6. Incoming cable should be specified
+    if not requirements.get("incoming_cable"):
+        warnings.append(
+            "Incoming cable not specified — recommend specifying per SS 638 "
+            "Table 4D1A for the installation's kVA tier"
+        )
+
+    # ── Optional but recommended ─────────────────────────
     if not requirements.get("metering"):
-        warnings.append("metering arrangement not specified — will use standard SP meter")
+        warnings.append("metering not specified — will use standard SP kWh meter")
+
+    # ── Result ───────────────────────────────────────────
+    is_valid = len(missing) == 0 and len(errors) == 0
 
     result = {
-        "valid": len(missing) == 0,
+        "valid": is_valid,
         "missing_fields": missing,
+        "errors": errors,
         "warnings": warnings,
         "total_sub_circuits": len(sub_circuits),
     }
+
+    if not is_valid and errors:
+        result["action_required"] = (
+            "Fix the compliance errors above before generating. "
+            "These violate SS 638:2018 / CP 5:2018 requirements."
+        )
 
     return json.dumps(result, ensure_ascii=False)
 

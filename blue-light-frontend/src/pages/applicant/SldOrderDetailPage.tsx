@@ -550,8 +550,9 @@ export default function SldOrderDetailPage() {
         onClose={() => setShowCompleteConfirm(false)}
         onConfirm={handleConfirmCompletion}
         title="Confirm Completion"
-        message="Confirm that the SLD drawing is satisfactory and mark this order as complete?"
-        confirmLabel="Confirm"
+        message="Confirm that the uploaded SLD drawing is complete and acceptable? This action cannot be undone. Once confirmed, no further revisions can be requested."
+        confirmLabel="Confirm Completion"
+        variant="danger"
         loading={actionLoading}
       />
     </div>

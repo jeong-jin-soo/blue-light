@@ -1,5 +1,6 @@
 """
 Protection symbols: Fuse, Earth, Surge Protector.
+Scaled for professional A3 engineering drawings.
 """
 
 from __future__ import annotations
@@ -13,18 +14,18 @@ if TYPE_CHECKING:
 
 
 class Fuse(BaseSymbol):
-    """Fuse symbol — narrow rectangle."""
+    """Fuse symbol -- narrow rectangle."""
 
     name: str = "FUSE"
-    width: float = 6
-    height: float = 14
+    width: float = 8
+    height: float = 16
     layer: str = "SLD_SYMBOLS"
 
     def __init__(self):
         cx = self.width / 2
         self.pins = {
-            "top": (cx, self.height + 3),
-            "bottom": (cx, -3),
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
@@ -41,19 +42,19 @@ class Fuse(BaseSymbol):
 
         # Connection stubs
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, y + h - 2), (cx, y + self.height + 3))
-        backend.add_line((cx, y + 2), (cx, y - 3))
+        backend.add_line((cx, y + h - 2), (cx, y + self.height + 5))
+        backend.add_line((cx, y + 2), (cx, y - 5))
 
 
 class EarthSymbol(BaseSymbol):
     """
-    Earth/Ground symbol — descending horizontal lines.
+    Earth/Ground symbol -- descending horizontal lines.
     Standard IEC 60617 representation.
     """
 
     name: str = "EARTH"
-    width: float = 12
-    height: float = 14
+    width: float = 16
+    height: float = 18
     layer: str = "SLD_SYMBOLS"
 
     def __init__(self):
@@ -68,27 +69,27 @@ class EarthSymbol(BaseSymbol):
         backend.set_layer(self.layer)
 
         # Vertical line from top
-        backend.add_line((cx, y + self.height), (cx, y + 8))
+        backend.add_line((cx, y + self.height), (cx, y + 10))
 
         # Three descending horizontal lines
-        backend.add_line((x, y + 8), (x + self.width, y + 8))
-        backend.add_line((x + 2, y + 5), (x + self.width - 2, y + 5))
-        backend.add_line((x + 4, y + 2), (x + self.width - 4, y + 2))
+        backend.add_line((x, y + 10), (x + self.width, y + 10))
+        backend.add_line((x + 3, y + 6), (x + self.width - 3, y + 6))
+        backend.add_line((x + 6, y + 2), (x + self.width - 6, y + 2))
 
 
 class SurgeProtector(BaseSymbol):
     """Surge Protection Device (SPD)."""
 
     name: str = "SPD"
-    width: float = 10
-    height: float = 16
+    width: float = 12
+    height: float = 18
     layer: str = "SLD_SYMBOLS"
 
     def __init__(self):
         cx = self.width / 2
         self.pins = {
-            "top": (cx, self.height + 3),
-            "bottom": (cx, -3),
+            "top": (cx, self.height + 5),
+            "bottom": (cx, -5),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
@@ -106,14 +107,14 @@ class SurgeProtector(BaseSymbol):
         # Lightning bolt (zigzag)
         backend.add_lwpolyline(
             [
-                (cx, y + h - 2),
-                (cx + 2, y + h / 2 + 1),
-                (cx - 2, y + h / 2 - 1),
-                (cx, y + 2),
+                (cx, y + h - 3),
+                (cx + 3, y + h / 2 + 1),
+                (cx - 3, y + h / 2 - 1),
+                (cx, y + 3),
             ],
         )
 
         # Connection stubs
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, y + h), (cx, y + h + 3))
-        backend.add_line((cx, y), (cx, y - 3))
+        backend.add_line((cx, y + h), (cx, y + h + 5))
+        backend.add_line((cx, y), (cx, y - 5))

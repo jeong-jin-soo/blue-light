@@ -51,8 +51,8 @@ export default function SldManagerOrderDetailPage() {
   // Payment confirm
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
 
-  // Complete confirm
-  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  // Complete confirm — reserved for future admin use
+  // Completion is now triggered only by the applicant's "Confirm Completion" action
 
   const orderId = Number(id);
 
@@ -105,16 +105,8 @@ export default function SldManagerOrderDetailPage() {
     finally { setActionLoading(false); }
   };
 
-  const handleMarkComplete = async () => {
-    setShowCompleteConfirm(false);
-    setActionLoading(true);
-    try {
-      await sldManagerApi.markComplete(orderId);
-      toast.success('Order marked as complete');
-      fetchData();
-    } catch { toast.error('Failed to complete order'); }
-    finally { setActionLoading(false); }
-  };
+  // Note: markComplete removed from manager UI.
+  // Completion is now triggered only by the applicant's "Confirm Completion" action.
 
   const handleSldUpload = async (file: File, managerNote?: string) => {
     const uploadedFile = await sldManagerApi.uploadFile(orderId, file, 'DRAWING_SLD');
@@ -143,7 +135,7 @@ export default function SldManagerOrderDetailPage() {
 
   if (!order) return null;
 
-  const showSldSection = ['PAID', 'IN_PROGRESS', 'REVISION_REQUESTED'].includes(order.status);
+  const showSldSection = ['PAID', 'IN_PROGRESS', 'REVISION_REQUESTED', 'SLD_UPLOADED'].includes(order.status);
 
   return (
     <div className="space-y-6">
@@ -370,13 +362,14 @@ export default function SldManagerOrderDetailPage() {
           {/* SLD_UPLOADED: Waiting for applicant confirmation */}
           {order.status === 'SLD_UPLOADED' && (
             <Card>
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128196;</span>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-purple-800">SLD uploaded. Waiting for applicant review.</p>
                     <p className="text-xs text-purple-700 mt-1">
-                      The SLD drawing has been uploaded. Waiting for applicant to review.
+                      The SLD drawing has been uploaded. The applicant will review and confirm completion.
+                      You can re-upload a new version using the SLD section above if needed.
                     </p>
                     {order.managerNote && (
                       <div className="mt-2 bg-white rounded p-2 border border-purple-100">
@@ -397,13 +390,6 @@ export default function SldManagerOrderDetailPage() {
                   </div>
                 </div>
               </div>
-              <Button
-                variant="primary"
-                onClick={() => setShowCompleteConfirm(true)}
-                loading={actionLoading}
-              >
-                Mark Complete
-              </Button>
             </Card>
           )}
 
@@ -512,15 +498,6 @@ export default function SldManagerOrderDetailPage() {
         loading={actionLoading}
       />
 
-      <ConfirmDialog
-        isOpen={showCompleteConfirm}
-        onClose={() => setShowCompleteConfirm(false)}
-        onConfirm={handleMarkComplete}
-        title="Mark as Complete"
-        message="Mark this SLD order as completed? The applicant will be notified."
-        confirmLabel="Complete"
-        loading={actionLoading}
-      />
     </div>
   );
 }
