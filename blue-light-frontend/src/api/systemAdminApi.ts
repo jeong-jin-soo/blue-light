@@ -43,6 +43,23 @@ export const clearGeminiApiKey = async (): Promise<{ message: string }> => {
   return response.data;
 };
 
+// ── SLD System Prompt ──────────────────────────────
+
+export const getSldSystemPrompt = async (): Promise<{ prompt: string; length: number }> => {
+  const response = await axiosClient.get<{ prompt: string; length: number }>('/admin/system/sld-prompt');
+  return response.data;
+};
+
+export const updateSldSystemPrompt = async (prompt: string): Promise<{ message: string; length: number }> => {
+  const response = await axiosClient.put<{ message: string; length: number }>('/admin/system/sld-prompt', { prompt });
+  return response.data;
+};
+
+export const resetSldSystemPrompt = async (): Promise<{ message: string; prompt: string; length: number }> => {
+  const response = await axiosClient.post<{ message: string; prompt: string; length: number }>('/admin/system/sld-prompt/reset');
+  return response.data;
+};
+
 // ── SLD AI Generation ──────────────────────────────
 
 export const getSldAiGeneration = async (): Promise<{ enabled: boolean }> => {

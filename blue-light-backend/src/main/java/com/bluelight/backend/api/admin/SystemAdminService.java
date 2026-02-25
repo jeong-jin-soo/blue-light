@@ -14,12 +14,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * 시스템 관리자 전용 서비스
  * - 챗봇 시스템 프롬프트 관리
+ * - SLD AI 시스템 프롬프트 관리
  * - Gemini API 키 관리
  * - 이메일 인증 설정 관리
  */
@@ -29,12 +31,15 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class SystemAdminService {
 
+    private static final long CACHE_TTL_SECONDS = 60;
+
     private final SystemSettingRepository systemSettingRepository;
     private final ChatService chatService;
     private final GeminiConfig geminiConfig;
 
-    // DB 기반 TTL 캐시로 전환 — @PostConstruct init 불필요
-    // GeminiConfig.getApiKey()가 DB 조회 + 60초 캐시로 동작
+    // SLD 시스템 프롬프트 TTL 캐시 (SldAgentService에서 호출)
+    private volatile String cachedSldPrompt;
+    private volatile Instant sldPromptCacheExpiry = Instant.MIN;
 
     // ── 시스템 프롬프트 ──────────────────────────────
 
@@ -90,6 +95,83 @@ public class SystemAdminService {
         chatService.invalidatePromptCache();
 
         log.info("System prompt reset to default by userSeq={}", updatedBy);
+        return defaultPrompt;
+    }
+
+    // ── SLD 시스템 프롬프트 ──────────────────────────────
+
+    /**
+     * SLD 시스템 프롬프트 조회 (60초 TTL 캐시)
+     * SldAgentService / SldOrderAgentService에서 호출
+     */
+    public String getCachedSldSystemPrompt() {
+        Instant now = Instant.now();
+        if (now.isBefore(sldPromptCacheExpiry) && cachedSldPrompt != null) {
+            return cachedSldPrompt;
+        }
+
+        String dbPrompt = systemSettingRepository.findById("sld_system_prompt")
+                .map(SystemSetting::getSettingValue)
+                .filter(v -> !v.isBlank())
+                .orElse(null);
+
+        String resolved = (dbPrompt != null) ? dbPrompt : loadDefaultSldPromptFromFile();
+        this.cachedSldPrompt = resolved;
+        this.sldPromptCacheExpiry = now.plusSeconds(CACHE_TTL_SECONDS);
+        return resolved;
+    }
+
+    /**
+     * SLD 시스템 프롬프트 직접 조회 (Admin 화면용, 캐시 미사용)
+     */
+    public String getSldSystemPrompt() {
+        return systemSettingRepository.findById("sld_system_prompt")
+                .map(SystemSetting::getSettingValue)
+                .filter(v -> !v.isBlank())
+                .orElseGet(this::loadDefaultSldPromptFromFile);
+    }
+
+    /**
+     * SLD 시스템 프롬프트 업데이트
+     */
+    @Transactional
+    public void updateSldSystemPrompt(String prompt, Long updatedBy) {
+        if (prompt == null || prompt.isBlank()) {
+            throw new BusinessException(
+                    "SLD system prompt cannot be empty",
+                    HttpStatus.BAD_REQUEST,
+                    "EMPTY_SLD_SYSTEM_PROMPT"
+            );
+        }
+
+        SystemSetting setting = systemSettingRepository.findById("sld_system_prompt")
+                .orElseGet(() -> new SystemSetting(
+                        "sld_system_prompt", "", "AI SLD generation system prompt"));
+        setting.updateValue(prompt, updatedBy);
+        systemSettingRepository.save(setting);
+
+        // 같은 서버의 캐시 즉시 무효화 (다른 서버는 TTL 만료 시 자동 반영)
+        this.sldPromptCacheExpiry = Instant.MIN;
+
+        log.info("SLD system prompt updated by userSeq={}, length={}", updatedBy, prompt.length());
+    }
+
+    /**
+     * SLD 시스템 프롬프트를 파일 기본값으로 초기화
+     */
+    @Transactional
+    public String resetSldSystemPrompt(Long updatedBy) {
+        String defaultPrompt = loadDefaultSldPromptFromFile();
+
+        SystemSetting setting = systemSettingRepository.findById("sld_system_prompt")
+                .orElseGet(() -> new SystemSetting(
+                        "sld_system_prompt", "", "AI SLD generation system prompt"));
+        setting.updateValue(defaultPrompt, updatedBy);
+        systemSettingRepository.save(setting);
+
+        this.sldPromptCacheExpiry = Instant.MIN;
+
+        log.info("SLD system prompt reset to default by userSeq={}", updatedBy);
         return defaultPrompt;
     }
 
@@ -243,6 +325,16 @@ public class SystemAdminService {
             return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             log.error("Failed to load default system prompt from file", e);
+            return "";
+        }
+    }
+
+    private String loadDefaultSldPromptFromFile() {
+        try {
+            var resource = new ClassPathResource("sld-system-prompt.txt");
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            log.error("Failed to load default SLD system prompt from file", e);
             return "";
         }
     }

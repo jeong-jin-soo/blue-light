@@ -182,6 +182,7 @@ async def chat_stream(
                     message=request.message,
                     thread_id=thread_id,
                     application_info=request.application_info,
+                    system_prompt=request.system_prompt,
                 ),
                 interval=15,
             ):

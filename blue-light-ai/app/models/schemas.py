@@ -16,6 +16,10 @@ class ChatRequest(BaseModel):
         None,
         description="Application details from Spring Boot (kVA, address, building type, etc.)",
     )
+    system_prompt: str | None = Field(
+        None,
+        description="SLD system prompt from DB (overrides default if provided)",
+    )
 
 
 class ChatResponse(BaseModel):

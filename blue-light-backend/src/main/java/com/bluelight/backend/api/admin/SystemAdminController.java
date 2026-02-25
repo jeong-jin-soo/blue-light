@@ -140,6 +140,62 @@ public class SystemAdminController {
         return ResponseEntity.ok(Map.of("message", "Gemini API key cleared (reverted to environment variable)"));
     }
 
+    // ── SLD 시스템 프롬프트 ──────────────────────────────
+
+    /**
+     * SLD 시스템 프롬프트 조회
+     * GET /api/admin/system/sld-prompt
+     */
+    @GetMapping("/sld-prompt")
+    public ResponseEntity<Map<String, Object>> getSldSystemPrompt() {
+        log.info("System admin get SLD system prompt");
+        String prompt = systemAdminService.getSldSystemPrompt();
+        return ResponseEntity.ok(Map.of(
+                "prompt", prompt,
+                "length", prompt.length()
+        ));
+    }
+
+    /**
+     * SLD 시스템 프롬프트 업데이트
+     * PUT /api/admin/system/sld-prompt
+     */
+    @Auditable(action = AuditAction.SLD_SYSTEM_PROMPT_UPDATED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
+    @PutMapping("/sld-prompt")
+    public ResponseEntity<Map<String, Object>> updateSldSystemPrompt(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String prompt = request.get("prompt");
+
+        log.info("System admin update SLD system prompt: length={}", prompt != null ? prompt.length() : 0);
+        systemAdminService.updateSldSystemPrompt(prompt, userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "SLD system prompt updated successfully",
+                "length", prompt != null ? prompt.length() : 0
+        ));
+    }
+
+    /**
+     * SLD 시스템 프롬프트 기본값 초기화
+     * POST /api/admin/system/sld-prompt/reset
+     */
+    @Auditable(action = AuditAction.SLD_SYSTEM_PROMPT_RESET, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
+    @PostMapping("/sld-prompt/reset")
+    public ResponseEntity<Map<String, Object>> resetSldSystemPrompt(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+
+        log.info("System admin reset SLD system prompt to default");
+        String defaultPrompt = systemAdminService.resetSldSystemPrompt(userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "SLD system prompt reset to default",
+                "prompt", defaultPrompt,
+                "length", defaultPrompt.length()
+        ));
+    }
+
     // ── AI SLD 생성 ──────────────────────────────
 
     /**

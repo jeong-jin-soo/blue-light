@@ -90,13 +90,18 @@ public class SldAgentService {
             return buildApplicationInfo(application);
         });
 
+        // SLD 시스템 프롬프트 조회 (60초 TTL 캐시)
+        String sldSystemPrompt = systemAdminService.getCachedSldSystemPrompt();
+
         // Python 서비스 SSE 스트리밍 요청
-        Map<String, Object> requestBody = Map.of(
-                "application_seq", applicationSeq,
-                "user_seq", userSeq,
-                "message", message,
-                "application_info", applicationInfo
-        );
+        var requestBody = new java.util.HashMap<String, Object>();
+        requestBody.put("application_seq", applicationSeq);
+        requestBody.put("user_seq", userSeq);
+        requestBody.put("message", message);
+        requestBody.put("application_info", applicationInfo);
+        if (sldSystemPrompt != null && !sldSystemPrompt.isBlank()) {
+            requestBody.put("system_prompt", sldSystemPrompt);
+        }
 
         StringBuilder fullResponse = new StringBuilder();
 

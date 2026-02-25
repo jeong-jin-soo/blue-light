@@ -57,8 +57,10 @@ async def agent_node(state: SldAgentState) -> dict:
     llm = _get_llm()
 
     # Build dynamic system message with application context
+    # DB에서 전달된 프롬프트가 있으면 사용, 없으면 하드코딩 기본값 사용
     app_info = state.get("application_info", {})
-    system_content = SLD_EXPERT_SYSTEM_PROMPT
+    custom_prompt = state.get("system_prompt")
+    system_content = custom_prompt if custom_prompt else SLD_EXPERT_SYSTEM_PROMPT
     if app_info:
         system_content += "\n\n" + build_application_context(app_info)
 
@@ -134,6 +136,7 @@ async def process_message(
     message: str,
     thread_id: str,
     application_info: dict | None = None,
+    system_prompt: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Process a user message through the LangGraph agent.
@@ -154,6 +157,7 @@ async def process_message(
         "application_seq": application_seq,
         "user_seq": user_seq,
         "application_info": application_info or {},
+        "system_prompt": system_prompt,
     }
 
     try:

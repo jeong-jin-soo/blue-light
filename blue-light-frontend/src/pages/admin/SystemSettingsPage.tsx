@@ -39,15 +39,22 @@ export default function SystemSettingsPage() {
   const [originalSldAi, setOriginalSldAi] = useState(true);
   const [savingSldAi, setSavingSldAi] = useState(false);
 
+  // ── SLD System Prompt ──────────────────────────────
+  const [sldPrompt, setSldPrompt] = useState('');
+  const [originalSldPrompt, setOriginalSldPrompt] = useState('');
+  const [savingSldPrompt, setSavingSldPrompt] = useState(false);
+  const [showSldResetConfirm, setShowSldResetConfirm] = useState(false);
+
   // ── Data Loading ──────────────────────────────
 
   const loadData = useCallback(async () => {
     try {
-      const [promptData, keyData, emailData, sldAiData] = await Promise.all([
+      const [promptData, keyData, emailData, sldAiData, sldPromptData] = await Promise.all([
         systemAdminApi.getSystemPrompt(),
         systemAdminApi.getGeminiApiKeyStatus(),
         systemAdminApi.getEmailVerification(),
         systemAdminApi.getSldAiGeneration(),
+        systemAdminApi.getSldSystemPrompt(),
       ]);
 
       setPrompt(promptData.prompt);
@@ -57,6 +64,8 @@ export default function SystemSettingsPage() {
       setOriginalEmailVerification(emailData.enabled);
       setSldAiEnabled(sldAiData.enabled);
       setOriginalSldAi(sldAiData.enabled);
+      setSldPrompt(sldPromptData.prompt);
+      setOriginalSldPrompt(sldPromptData.prompt);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to load system settings';
       toast.error(message);
@@ -178,6 +187,40 @@ export default function SystemSettingsPage() {
     }
   };
 
+  // ── SLD System Prompt Handlers ──────────────────────────────
+
+  const sldPromptChanged = sldPrompt !== originalSldPrompt;
+
+  const handleSaveSldPrompt = async () => {
+    setSavingSldPrompt(true);
+    try {
+      await systemAdminApi.updateSldSystemPrompt(sldPrompt);
+      setOriginalSldPrompt(sldPrompt);
+      toast.success('SLD system prompt updated successfully');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to update SLD system prompt';
+      toast.error(message);
+    } finally {
+      setSavingSldPrompt(false);
+    }
+  };
+
+  const handleResetSldPrompt = async () => {
+    setSavingSldPrompt(true);
+    try {
+      const result = await systemAdminApi.resetSldSystemPrompt();
+      setSldPrompt(result.prompt);
+      setOriginalSldPrompt(result.prompt);
+      toast.success('SLD system prompt reset to default');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to reset SLD system prompt';
+      toast.error(message);
+    } finally {
+      setSavingSldPrompt(false);
+      setShowSldResetConfirm(false);
+    }
+  };
+
   // ── Render ──────────────────────────────
 
   return (
@@ -280,6 +323,61 @@ export default function SystemSettingsPage() {
             using the AI chatbot.
           </p>
         )}
+      </Card>
+
+      {/* ── SLD System Prompt ────────────────────── */}
+      <Card>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">AI SLD Generation Prompt</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              The system prompt that guides the AI when generating Single Line Diagrams (SLD).
+              Includes Singapore electrical standards, design rules, and conversation flow.
+              {sldPrompt.length > 0 && ` (${sldPrompt.length.toLocaleString()} characters)`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {sldPromptChanged && (
+              <span className="text-xs text-warning-600">Unsaved changes</span>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSldResetConfirm(true)}
+              disabled={savingSldPrompt}
+            >
+              Reset Default
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSaveSldPrompt}
+              loading={savingSldPrompt}
+              disabled={!sldPromptChanged}
+            >
+              Save Prompt
+            </Button>
+          </div>
+        </div>
+
+        {loadingPrompt ? (
+          <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
+        ) : (
+          <textarea
+            value={sldPrompt}
+            onChange={(e) => setSldPrompt(e.target.value)}
+            rows={20}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono
+                       leading-relaxed resize-y
+                       focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
+                       placeholder:text-gray-400"
+            placeholder="Enter SLD system prompt..."
+          />
+        )}
+
+        <p className="text-xs text-gray-400 mt-2">
+          Changes take effect within 60 seconds for new SLD generation sessions. Existing conversations
+          will use the updated prompt on the next message.
+        </p>
       </Card>
 
       {/* ── Gemini API Key ────────────────────── */}
@@ -428,6 +526,16 @@ export default function SystemSettingsPage() {
         onConfirm={handleResetPrompt}
         title="Reset System Prompt"
         message="This will replace the current system prompt with the default from the application's built-in template. This action cannot be undone."
+        confirmLabel="Reset to Default"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={showSldResetConfirm}
+        onClose={() => setShowSldResetConfirm(false)}
+        onConfirm={handleResetSldPrompt}
+        title="Reset SLD System Prompt"
+        message="This will replace the current SLD prompt with the default from the application's built-in template. This action cannot be undone."
         confirmLabel="Reset to Default"
         variant="danger"
       />

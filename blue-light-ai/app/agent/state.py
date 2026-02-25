@@ -21,6 +21,9 @@ class SldAgentState(TypedDict):
     # Application details from Spring Boot (kVA, address, building type, etc.)
     application_info: dict
 
+    # System prompt from DB (overrides default SLD_EXPERT_SYSTEM_PROMPT if provided)
+    system_prompt: str | None
+
     # Gathered SLD requirements
     sld_requirements: dict
     requirements_complete: bool
