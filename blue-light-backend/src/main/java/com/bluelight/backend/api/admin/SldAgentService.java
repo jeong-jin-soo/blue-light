@@ -119,8 +119,9 @@ public class SldAgentService {
                                         chunk, new TypeReference<Map<String, Object>>() {});
                                 String type = (String) parsed.get("type");
 
-                                // Heartbeat — 연결 유지용, 프런트엔드 전달 불필요
+                                // Heartbeat — 프런트엔드 SSE 타임아웃 방지를 위해 전달
                                 if ("heartbeat".equals(type)) {
+                                    sendSseEvent(emitter, "heartbeat", parsed);
                                     return;
                                 }
 
@@ -189,27 +190,28 @@ public class SldAgentService {
     }
 
     /**
-     * 대화 초기화 — MySQL 이력 + Python 체크포인트 모두 삭제
+     * 대화 초기화 — MySQL 이력 + Python 체크포인트 + temp 파일 모두 삭제
+     * Reset 후 다음 메시지는 완전히 새로운 AI 대화로 시작됨
      */
     @Transactional
     public void resetChat(Long applicationSeq) {
         validateApplicationExists(applicationSeq);
 
-        // MySQL 이력 삭제
+        // 1. MySQL 이력 삭제
         sldChatMessageRepository.deleteByApplicationSeq(applicationSeq);
         log.info("SLD chat history cleared from MySQL: applicationSeq={}", applicationSeq);
 
-        // Python 체크포인트 초기화 (비동기, 실패해도 무시)
+        // 2. Python 체크포인트 + temp 파일 초기화
         try {
-            sldAgentWebClient
+            String response = sldAgentWebClient
                     .post()
                     .uri("/api/chat/reset/" + applicationSeq)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
-            log.info("SLD chat checkpoint cleared from Python: applicationSeq={}", applicationSeq);
+            log.info("SLD chat reset from Python: applicationSeq={}, response={}", applicationSeq, response);
         } catch (Exception e) {
-            log.warn("Failed to reset Python checkpoint (non-critical): applicationSeq={}, error={}",
+            log.warn("Failed to reset Python state (non-critical): applicationSeq={}, error={}",
                     applicationSeq, e.getMessage());
         }
     }

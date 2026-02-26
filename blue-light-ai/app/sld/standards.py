@@ -57,10 +57,17 @@ EARTH_CONDUCTOR_TABLE = [
     (500, 240),
 ]
 
-# Standard fault levels (kA) for Singapore SP PowerGrid LV network
-# Maps breaker type to typical fault rating
+# Standard fault levels (kA) for main breakers — Singapore SP PowerGrid LV network
 FAULT_LEVEL_DEFAULTS = {
     "MCB": 10,
+    "MCCB": 25,
+    "ACB": 50,
+}
+
+# Sub-circuit fault levels (kA) — per actual SLD sample analysis
+# Sub-circuit MCBs in Singapore residential/commercial use 6kA (not 10kA)
+SUB_CIRCUIT_FAULT_DEFAULTS = {
+    "MCB": 6,
     "MCCB": 25,
     "ACB": 50,
 }

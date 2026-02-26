@@ -46,9 +46,12 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
     loadHistory(sldOrderSeq);
   }, [sldOrderSeq, loadHistory]);
 
-  // Auto-scroll on new messages
+  // Auto-scroll on new messages (chat container only, not the whole page)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesEndRef.current;
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [messages, isLoading, activeToolName]);
 
   // Send message
@@ -148,22 +151,28 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
               </div>
             )}
 
-            {messages.map((msg) => (
-              <div
-                key={msg.sldChatMessageSeq}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+            {messages.map((msg) => {
+              const displayContent = msg.role === 'assistant'
+                ? stripSvgContent(msg.content)
+                : msg.content;
+              if (!displayContent.trim()) return null;
+              return (
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
-                    msg.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}
+                  key={msg.sldChatMessageSeq}
+                  className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                 >
-                  {msg.content}
+                  <div
+                    className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                      msg.role === 'user'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    {displayContent}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Tool execution indicator */}
             {activeToolName && (
@@ -244,6 +253,26 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
       )}
     </div>
   );
+}
+
+/**
+ * AI 응답에서 SVG 소스 코드를 제거 (미리보기 패널에 별도 표시되므로)
+ * - 완성된 SVG 태그: <svg...>...</svg>
+ * - 스트리밍 중 미완성 SVG: <svg 이후 전체 (아직 </svg> 미도착)
+ * - 마크다운 코드블록: ```svg...``` 또는 ```xml...```
+ * - 스트리밍 중 미완성 코드블록: ```svg 또는 ```xml 이후 전체
+ */
+function stripSvgContent(text: string): string {
+  return text
+    // 완성된 SVG 태그
+    .replace(/<svg[\s\S]*?<\/svg>/gi, '')
+    // 스트리밍 중 미완성 SVG 태그 (<svg 시작했지만 </svg> 없음)
+    .replace(/<svg[\s\S]*$/gi, '')
+    // 완성된 마크다운 코드블록
+    .replace(/```(?:svg|xml)[\s\S]*?```/gi, '')
+    // 스트리밍 중 미완성 코드블록 (``` 시작했지만 닫는 ``` 없음)
+    .replace(/```(?:svg|xml)[\s\S]*$/gi, '')
+    .trim();
 }
 
 /**

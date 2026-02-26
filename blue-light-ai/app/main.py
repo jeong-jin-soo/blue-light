@@ -273,27 +273,59 @@ async def chat_reset(
 ):
     """
     Reset conversation state for an application.
-    Clears the LangGraph checkpoint (SQLite).
+    Clears the LangGraph checkpoint (SQLite) and temp files.
+    After reset, the next message will start a completely fresh AI conversation.
     """
     thread_id = f"sld-{application_seq}"
     logger.info(f"Chat reset: application_seq={application_seq}, thread_id={thread_id}")
 
+    checkpoint_cleared = False
+    temp_files_cleaned = 0
+
+    # 1. Clear LangGraph checkpoint (conversation memory)
     try:
         checkpointer = await get_checkpointer()
-        # AsyncSqliteSaver stores data in 'checkpoints' and 'checkpoint_writes' tables
+        # AsyncSqliteSaver stores data in 'checkpoints' and 'writes' tables
         if hasattr(checkpointer, "conn"):
-            await checkpointer.conn.execute(
+            cursor = await checkpointer.conn.execute(
                 "DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,)
             )
-            await checkpointer.conn.execute(
-                "DELETE FROM checkpoint_writes WHERE thread_id = ?", (thread_id,)
+            deleted_checkpoints = cursor.rowcount
+            cursor = await checkpointer.conn.execute(
+                "DELETE FROM writes WHERE thread_id = ?", (thread_id,)
             )
+            deleted_writes = cursor.rowcount
             await checkpointer.conn.commit()
-            logger.info(f"Checkpoint cleared: thread_id={thread_id}")
+            checkpoint_cleared = True
+            logger.info(
+                f"Checkpoint cleared: thread_id={thread_id}, "
+                f"checkpoints={deleted_checkpoints}, writes={deleted_writes}"
+            )
     except Exception as e:
-        logger.warning(f"Failed to clear checkpoint (non-critical): {e}")
+        logger.warning(f"Failed to clear checkpoint: {e}")
 
-    return {"status": "reset", "application_seq": application_seq}
+    # 2. Clean up temp files (PDF/SVG generated for this conversation)
+    try:
+        import glob
+        temp_dir = settings.temp_file_dir
+        for pattern in ("*.pdf", "*.svg"):
+            for fpath in glob.glob(os.path.join(temp_dir, pattern)):
+                try:
+                    os.remove(fpath)
+                    temp_files_cleaned += 1
+                except OSError:
+                    pass
+        if temp_files_cleaned:
+            logger.info(f"Cleaned {temp_files_cleaned} temp files from {temp_dir}")
+    except Exception as e:
+        logger.warning(f"Failed to clean temp files: {e}")
+
+    return {
+        "status": "reset",
+        "application_seq": application_seq,
+        "checkpoint_cleared": checkpoint_cleared,
+        "temp_files_cleaned": temp_files_cleaned,
+    }
 
 
 # ── File Endpoints ───────────────────────────────────

@@ -123,6 +123,8 @@ def fill_title_block_data(
     address: str = "",
     postal_code: str = "",
     kva: int = 0,
+    voltage: int = 0,
+    supply_type: str = "",
     drawing_number: str = "SLD-001",
     lew_name: str = "",
     lew_licence: str = "",
@@ -197,7 +199,7 @@ def fill_title_block_data(
 
     # -- Bottom row: Compliance & AI notice --
     backend.add_mtext(
-        f"Approved Load: {kva} kVA at {400 if kva else 230}V  |  "
+        f"Approved Load: {kva} kVA at {voltage or (230 if supply_type == 'single_phase' else (400 if kva else 230))}V  |  "
         f"Design in accordance with SS 638:2018, CP 5:2018, IEC 60617",
         insert=(TB_LEFT + 3, ROW_MID - 3),
         char_height=2.0,

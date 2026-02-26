@@ -166,6 +166,9 @@ def validate_sld_requirements(requirements: dict) -> str:
             Expected keys: supply_type, kva, main_breaker, busbar_rating, sub_circuits,
             elcb, earth_protection, metering, incoming_cable
     """
+    # Log full requirements for diagnostics
+    logger.info(f"validate_sld_requirements called with: {json.dumps(requirements, ensure_ascii=False, default=str)}")
+
     missing = []
     errors = []      # Compliance violations — block generation
     warnings = []
@@ -261,6 +264,96 @@ def validate_sld_requirements(requirements: dict) -> str:
             f"three-phase 400V recommended for installations > 24 kVA"
         )
 
+    # 5a. Three-phase supply with single-phase ELCB/RCCB indicators → ERROR (blocks generation)
+    elcb = requirements.get("elcb")
+    if supply_type == "three_phase" and elcb and isinstance(elcb, dict):
+        elcb_poles = elcb.get("poles", 4)
+        elcb_rating = elcb.get("rating", 0)
+        elcb_sensitivity = elcb.get("sensitivity_ma", 0)
+
+        # Check 1: 2-pole RCCB/ELCB is ALWAYS single-phase
+        if elcb_poles == 2:
+            errors.append(
+                f"CRITICAL MISMATCH: ELCB/RCCB is 2-pole (single-phase) "
+                f"but supply_type is 'three_phase'. "
+                f"2-pole protection devices require single_phase 230V supply. "
+                f"Change supply_type to 'single_phase', voltage to 230, "
+                f"and use 2-core cables (e.g., '2C x 2.5mm2 PVC')."
+            )
+
+        # Check 2: 30mA sensitivity is for personal protection (residential single-phase)
+        # Three-phase distribution boards use 100mA or 300mA — 30mA + 3-phase is almost always wrong
+        if elcb_sensitivity and elcb_sensitivity <= 30:
+            errors.append(
+                f"CRITICAL MISMATCH: ELCB/RCCB sensitivity is {elcb_sensitivity}mA "
+                f"(personal protection — residential single-phase) "
+                f"but supply_type is 'three_phase'. "
+                f"30mA sensitivity RCD is for single-phase 230V residential installations. "
+                f"Three-phase distribution boards typically use 100mA or 300mA sensitivity. "
+                f"If the user specified '30mA', this strongly indicates single-phase 230V. "
+                f"Change supply_type to 'single_phase', ELCB/RCCB poles to 2, "
+                f"voltage to 230, kVA estimated as RCCB_rating × 230 ÷ 1000."
+            )
+
+        # Check 3: RCCB ≤ 63A rating with three-phase is suspicious
+        if elcb_rating and elcb_rating <= 63:
+            errors.append(
+                f"CRITICAL MISMATCH: ELCB/RCCB rating is {elcb_rating}A "
+                f"but supply_type is 'three_phase'. "
+                f"For three-phase 400V, {elcb_rating}A RCCB can only protect up to "
+                f"~{round(elcb_rating * 400 * 1.732 / 1000)}kVA. "
+                f"A ≤63A RCCB/ELCB almost always indicates single-phase 230V residential. "
+                f"Change supply_type to 'single_phase', poles to 2, voltage to 230."
+            )
+
+    # 5a-2. Residential load pattern detection: all sub-circuits are lighting/fan/socket ≤ 32A MCB
+    if supply_type == "three_phase" and sub_circuits:
+        import re as _re
+        residential_keywords = {"lighting", "light", "fan", "socket", "spare"}
+        all_residential = True
+        all_small_mcb = True
+        for sc in sub_circuits:
+            sc_name = str(sc.get("name", "")).lower()
+            sc_type = str(sc.get("breaker_type", "")).upper()
+            sc_rating = sc.get("breaker_rating", 0)
+            if isinstance(sc_rating, str):
+                sc_rating = int(_re.sub(r"[^\d]", "", sc_rating) or "0")
+
+            # Check if name contains only residential keywords
+            name_words = set(_re.findall(r'[a-z]+', sc_name))
+            if not name_words.intersection(residential_keywords) and sc_name.strip():
+                all_residential = False
+            # Check if all breakers are small MCBs
+            if sc_type != "MCB" or (sc_rating and sc_rating > 32):
+                all_small_mcb = False
+
+        if all_residential and all_small_mcb and len(sub_circuits) <= 6:
+            errors.append(
+                f"RESIDENTIAL LOAD PATTERN DETECTED: All {len(sub_circuits)} sub-circuits "
+                f"are small MCBs (≤32A) with residential loads (lighting/fan/socket/spare), "
+                f"but supply_type is 'three_phase'. "
+                f"This load pattern strongly indicates a single-phase 230V residential installation. "
+                f"Change supply_type to 'single_phase', voltage to 230, ELCB/RCCB poles to 2, "
+                f"main breaker to MCB (≤63A), and use 2-core cables."
+            )
+
+    # 5b. ELCB/RCCB missing check — MANDATORY per SS 638
+    if not elcb:
+        errors.append(
+            "SS 638: Earth leakage protection (ELCB/RCCB) is MANDATORY. "
+            "Add 'elcb' dict with 'rating', 'sensitivity_ma', 'poles'. "
+            "If user specified RCCB, include '\"type\": \"RCCB\"'."
+        )
+
+    # 5c. Sub-circuit breaker_characteristic validation
+    for i, sc in enumerate(sub_circuits):
+        bc = sc.get("breaker_characteristic", "")
+        if bc and bc.upper() not in ("B", "C", "D", ""):
+            warnings.append(
+                f"sub_circuits[{i}] '{sc.get('name', '')}': "
+                f"breaker_characteristic '{bc}' is not a valid IEC 60898-1 type (B/C/D)."
+            )
+
     # 6. Incoming cable should be specified
     if not requirements.get("incoming_cable"):
         warnings.append(
@@ -305,6 +398,11 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
             kva, main_breaker, busbar_rating, sub_circuits, etc.
         application_info: Optional application details (address, postal code, etc.)
     """
+    # Log full requirements for diagnostics
+    logger.info(f"generate_sld called with requirements: {json.dumps(requirements, ensure_ascii=False, default=str)}")
+    if application_info:
+        logger.info(f"generate_sld application_info: {json.dumps(application_info, ensure_ascii=False, default=str)}")
+
     # 입력 검증: 필수 필드 확인
     required_fields = ["supply_type", "kva", "main_breaker", "busbar_rating", "sub_circuits"]
     missing = [f for f in required_fields if f not in requirements or not requirements[f]]
@@ -313,6 +411,17 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
             "success": False,
             "error": f"Missing required fields: {missing}. "
                      "Please gather all requirements before generating.",
+        })
+
+    # ELCB/RCCB is MANDATORY per SS 638 — block generation if missing
+    elcb = requirements.get("elcb")
+    if not elcb or not isinstance(elcb, dict) or not elcb.get("rating"):
+        return json.dumps({
+            "success": False,
+            "error": "ELCB/RCCB is MANDATORY per SS 638. "
+                     "Add 'elcb' dict with 'rating', 'sensitivity_ma', 'poles'. "
+                     "If user specified RCCB, include '\"type\": \"RCCB\"'. "
+                     "Generation blocked until earth leakage protection is specified.",
         })
 
     main_breaker = requirements.get("main_breaker", {})
@@ -359,11 +468,10 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
         return json.dumps({
             "success": True,
             "file_id": file_id,
-            "pdf_path": pdf_path,
-            "svg_path": svg_path,
             "component_count": result.get("component_count", 0),
             "message": f"SLD generated successfully with {result.get('component_count', 0)} components. "
-                       "PDF and SVG files are ready for download.",
+                       "The SVG preview is now displayed in the preview panel on the right. "
+                       "The user can review it there. Do NOT include or describe any SVG code in your response.",
         }, ensure_ascii=False)
 
     except Exception as e:
@@ -387,12 +495,11 @@ def generate_preview(file_id: str) -> str:
     svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg")
 
     if os.path.exists(svg_path):
-        with open(svg_path, encoding="utf-8") as f:
-            svg_content = f.read()
         return json.dumps({
             "success": True,
             "file_id": file_id,
-            "svg": svg_content,
+            "message": "SVG preview is now displayed in the preview panel on the right. "
+                       "Do NOT include or describe any SVG code in your response.",
         })
 
     return json.dumps({

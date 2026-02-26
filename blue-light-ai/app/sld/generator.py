@@ -1,20 +1,26 @@
 """
-SLD Generator (v4) -- orchestrates PDF creation using the symbol library and layout engine.
+SLD Generator (v6 LEW-style) -- orchestrates PDF creation using the symbol library and layout engine.
 
-Creates a complete Single Line Diagram with:
+Creates a complete Single Line Diagram matching real LEW (Licensed Electrical Worker) conventions:
+- Bottom-up layout: incoming supply at bottom, sub-circuits branch upward
+- Vertical text labels (90-degree rotation) for circuit descriptions
+- Multi-line breaker block labels (rating / poles / type / kA)
+- Inline cable annotations along conductors (no cable schedule table)
+- No legend (standard IEC symbols are self-explanatory to LEWs)
+- Dense packing for maximum circuits per row
+
+Components drawn:
 - Incoming supply (3-phase / single-phase with L1/L2/L3/N labels)
-- Current flow direction arrow
+- Current flow direction arrow (pointing upward)
 - Isolator (for >= 45kVA installations)
 - CT metering (for >= 45kVA installations)
 - SP kWh Metering
 - Main breaker (with circuit ID, kA fault rating, pole configuration)
 - Main busbar (double-line professional representation)
 - ELCB group protection
-- Sub-circuit breakers (with circuit IDs, cable annotations, vertical name labels)
+- Sub-circuit breakers (with breaker block labels, vertical text, cable annotations)
 - Earth protection (with dashed conductor connections + conductor size)
 - Professional 7-cell title block with NTS/Sheet
-- Cable schedule table with grid lines
-- Dynamic symbol legend (based on symbols actually used)
 
 Outputs PDF (for EMA submission) and SVG (for web preview).
 """
@@ -136,32 +142,36 @@ class SldGenerator:
         svg = SvgBackend()
 
         # Compute layout (pure coordinate computation -- backend-independent)
-        layout_result = compute_layout(requirements)
+        layout_result = compute_layout(requirements, application_info=application_info)
 
         # Draw to both backends simultaneously
         # Phase 1: Template (border + title block frame with labels only)
-        # Phase 2: SLD drawing (components, connections, schedule, legend)
+        # Phase 2: SLD drawing (components, connections)
         # Phase 3: Fill title block data values
         component_count = 0
         for backend in (pdf, svg):
-            # Phase 1 — Template frame
+            # Phase 1 -- Template frame
             draw_border(backend)
             draw_title_block_frame(backend)
 
-            # Phase 2 — SLD content on top of template
+            # Phase 2 -- SLD content on top of template
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
             self._draw_dashed_connections(backend, layout_result)
+
+            # Cable schedule and legend (disabled by default in v6 LEW-style)
             self._draw_cable_schedule(backend, requirements, layout_result)
             self._draw_legend(backend, layout_result)
 
-            # Phase 3 — Fill title block data
+            # Phase 3 -- Fill title block data
             fill_title_block_data(
                 backend,
                 project_name=application_info.get("address", "Electrical Installation"),
                 address=application_info.get("address", ""),
                 postal_code=application_info.get("postalCode", ""),
                 kva=requirements.get("kva", 0),
+                voltage=requirements.get("voltage", 0),
+                supply_type=requirements.get("supply_type", ""),
                 lew_name=application_info.get("assignedLewName", ""),
                 lew_licence=application_info.get("assignedLewLicenceNo", ""),
                 lew_mobile=application_info.get("assignedLewMobile", ""),
@@ -219,8 +229,13 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "FLOW_ARROW":
-                # Current flow direction arrow (downward pointing)
-                _draw_flow_arrow(backend, comp.x, comp.y)
+                # Current flow direction arrow (downward pointing -- legacy)
+                _draw_flow_arrow(backend, comp.x, comp.y, direction="down")
+                count += 1
+
+            elif comp.symbol_name == "FLOW_ARROW_UP":
+                # Current flow direction arrow (upward pointing -- v6 LEW-style)
+                _draw_flow_arrow(backend, comp.x, comp.y, direction="up")
                 count += 1
 
             elif comp.symbol_name == "BUSBAR":
@@ -244,32 +259,33 @@ class SldGenerator:
                         lineweight=80,
                     )
                 else:
-                    # Sub-busbar
+                    # Sub-busbar (for multi-row circuits)
+                    row_bus_width = bus_end_x - bus_start_x
                     backend.add_line(
                         (comp.x, comp.y + gap / 2),
-                        (comp.x + (bus_end_x - bus_start_x), comp.y + gap / 2),
+                        (comp.x + row_bus_width, comp.y + gap / 2),
                         lineweight=60,
                     )
                     backend.add_line(
                         (comp.x, comp.y - gap / 2),
-                        (comp.x + (bus_end_x - bus_start_x), comp.y - gap / 2),
+                        (comp.x + row_bus_width, comp.y - gap / 2),
                         lineweight=60,
                     )
 
-                # Busbar label (left side, above busbar -- 10mm gap avoids overlap)
+                # Busbar label (left side, below busbar for bottom-up layout)
                 if comp.label:
                     backend.set_layer("SLD_ANNOTATIONS")
                     backend.add_mtext(
                         comp.label,
-                        insert=(bus_start_x, layout_result.busbar_y + 10),
+                        insert=(bus_start_x, layout_result.busbar_y - 5),
                         char_height=3.0,
                     )
-                # Busbar rating (right side, above busbar)
+                # Busbar rating (right side, below busbar)
                 if comp.rating:
                     backend.set_layer("SLD_ANNOTATIONS")
                     backend.add_mtext(
                         comp.rating,
-                        insert=(bus_end_x - 30, layout_result.busbar_y + 10),
+                        insert=(bus_end_x - 30, layout_result.busbar_y - 5),
                         char_height=2.5,
                     )
                 count += 1
@@ -280,35 +296,115 @@ class SldGenerator:
                 if symbol:
                     symbol.draw(backend, comp.x, comp.y)
 
-                    # Circuit ID + rating label (to the right, above symbol center)
                     backend.set_layer("SLD_ANNOTATIONS")
-                    label_text = ""
-                    if comp.circuit_id:
-                        label_text = f"{comp.circuit_id}\\P{comp.label} {comp.rating}"
-                    elif comp.rating:
-                        label_text = f"{comp.label}\\P{comp.rating}"
 
-                    if label_text:
-                        backend.add_mtext(
-                            label_text,
-                            insert=(comp.x + 18, comp.y + 14),
-                            char_height=2.3,
-                        )
+                    if comp.label_style == "breaker_block":
+                        # LEW-style stacked breaker label block
+                        self._draw_breaker_block_label(backend, comp)
+                    else:
+                        # Default label rendering (for incoming chain components)
+                        label_text = ""
+                        if comp.circuit_id:
+                            label_text = f"{comp.circuit_id}\\P{comp.label} {comp.rating}"
+                        elif comp.rating:
+                            label_text = f"{comp.label}\\P{comp.rating}"
+                        elif comp.label:
+                            label_text = comp.label
 
-                    # Cable annotation (below symbol, to the right)
-                    if comp.cable_annotation:
-                        backend.set_layer("SLD_ANNOTATIONS")
-                        backend.add_mtext(
-                            comp.cable_annotation,
-                            insert=(comp.x + 18, comp.y - 3),
-                            char_height=2.0,
-                        )
+                        if label_text:
+                            backend.add_mtext(
+                                label_text,
+                                insert=(comp.x + 18, comp.y + 14),
+                                char_height=2.3,
+                            )
+
+                        # Cable annotation (below symbol, to the right)
+                        if comp.cable_annotation:
+                            backend.set_layer("SLD_ANNOTATIONS")
+                            backend.add_mtext(
+                                comp.cable_annotation,
+                                insert=(comp.x + 18, comp.y - 3),
+                                char_height=2.0,
+                            )
 
                     count += 1
                 else:
                     logger.warning(f"Unknown symbol: {comp.symbol_name}")
 
         return count
+
+    def _draw_breaker_block_label(
+        self,
+        backend: DrawingBackend,
+        comp: PlacedComponent,
+    ) -> None:
+        """
+        Draw LEW-style breaker block label.
+
+        Format (stacked multi-line):
+            {rating}A
+            {poles}
+            {breaker_type}
+            {fault_kA}kA
+
+        For vertical text (rotation=90), text runs upward from the breaker.
+        The circuit ID is NOT drawn here -- it's in the standalone label above the tail.
+        """
+        # Build breaker info -- render as SEPARATE text items for better spacing
+        # Each line drawn individually to control vertical position precisely
+        # Singapore SLD convention: characteristic prefix on rating (e.g., "B20A"),
+        # breaker type without suffix (e.g., "MCB" not "MCB-B")
+        info_items = []
+        if comp.rating:
+            rating_text = comp.rating  # e.g., "20A"
+            if comp.breaker_characteristic:
+                rating_text = f"{comp.breaker_characteristic}{comp.rating}"  # e.g., "B20A"
+            info_items.append(rating_text)
+        if comp.poles:
+            info_items.append(comp.poles)  # e.g., "SPN"
+        if comp.breaker_type_str:
+            info_items.append(comp.breaker_type_str)  # e.g., "MCB" (no characteristic suffix)
+        if comp.fault_kA:
+            info_items.append(f"{comp.fault_kA}kA")  # e.g., "6kA"
+
+        if abs(comp.rotation - 90.0) < 0.1:
+            # Vertical text: breaker info to the RIGHT of the breaker, rotated 90 degrees
+            # Draw each info line as a separate column, going rightward from breaker
+            # Order: rating closest to breaker, fault_kA furthest right
+            base_x = comp.x + 12  # Start just right of breaker symbol
+            char_h = 1.8
+            line_gap = char_h * 1.8  # ~3.2mm gap for clear separation
+            for idx, line_text in enumerate(info_items):
+                backend.add_mtext(
+                    line_text,
+                    insert=(base_x + idx * line_gap, comp.y),
+                    char_height=char_h,
+                    rotation=90.0,
+                )
+
+            # Inline cable annotation to the LEFT of conductor (vertical)
+            if comp.cable_annotation:
+                backend.add_mtext(
+                    comp.cable_annotation,
+                    insert=(comp.x - 6, comp.y),
+                    char_height=1.6,
+                    rotation=90.0,
+                )
+        else:
+            # Horizontal text: breaker block to the right of symbol (stacked)
+            block_text = "\\P".join(info_items)
+            backend.add_mtext(
+                block_text,
+                insert=(comp.x + 18, comp.y + 14),
+                char_height=2.0,
+            )
+
+            if comp.cable_annotation:
+                backend.add_mtext(
+                    comp.cable_annotation,
+                    insert=(comp.x + 18, comp.y - 3),
+                    char_height=1.8,
+                )
 
     def _draw_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw all solid connection lines."""
@@ -328,7 +424,13 @@ class SldGenerator:
         requirements: dict,
         layout_result: LayoutResult,
     ) -> None:
-        """Draw a cable schedule table with grid lines in the lower-left area."""
+        """
+        Draw a cable schedule table with grid lines in the lower-left area.
+        Disabled by default in v6 (LEW-style uses inline annotations).
+        """
+        if not layout_result.render_cable_schedule:
+            return
+
         sub_circuits = requirements.get("sub_circuits", [])
         if not sub_circuits:
             return
@@ -419,7 +521,11 @@ class SldGenerator:
         """
         Draw a dynamic symbol legend box in the right area.
         Only includes symbols that are actually used in the diagram.
+        Disabled by default in v6 (LEW-style -- symbols are self-explanatory).
         """
+        if not layout_result.render_legend:
+            return
+
         legend_x = 320
         legend_y = 200  # Safely within page bounds (top will be at y=240)
         row_h = 8
@@ -583,19 +689,33 @@ class SldGenerator:
 # -- Helper: Flow arrow drawing --
 
 
-def _draw_flow_arrow(backend: DrawingBackend, x: float, y: float) -> None:
+def _draw_flow_arrow(
+    backend: DrawingBackend,
+    x: float,
+    y: float,
+    direction: str = "up",
+) -> None:
     """
-    Draw a downward current flow direction arrow.
+    Draw a current flow direction arrow.
     IEC convention: arrow shows direction of conventional current flow.
+
+    Args:
+        direction: "up" for bottom-to-top flow (v6 default), "down" for legacy
     """
     backend.set_layer("SLD_ANNOTATIONS")
 
-    # Arrow shaft (short line going down)
-    backend.add_line((x, y + 3), (x, y - 3))
-
-    # Arrowhead (pointing down)
-    backend.add_line((x, y - 3), (x - 1.5, y - 1))
-    backend.add_line((x, y - 3), (x + 1.5, y - 1))
+    if direction == "up":
+        # Arrow shaft (short line going up)
+        backend.add_line((x, y - 3), (x, y + 3))
+        # Arrowhead (pointing up)
+        backend.add_line((x, y + 3), (x - 1.5, y + 1))
+        backend.add_line((x, y + 3), (x + 1.5, y + 1))
+    else:
+        # Arrow shaft (short line going down)
+        backend.add_line((x, y + 3), (x, y - 3))
+        # Arrowhead (pointing down)
+        backend.add_line((x, y - 3), (x - 1.5, y - 1))
+        backend.add_line((x, y - 3), (x + 1.5, y - 1))
 
     # "I" label for current
     backend.add_mtext(

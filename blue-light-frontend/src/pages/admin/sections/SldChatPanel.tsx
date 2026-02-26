@@ -51,9 +51,12 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     loadHistory(applicationSeq);
   }, [applicationSeq, loadHistory]);
 
-  // 새 메시지 시 자동 스크롤
+  // 새 메시지 시 자동 스크롤 (채팅 컨테이너 내부만, 페이지 전체 스크롤 방지)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesEndRef.current;
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }, [messages, isLoading, activeToolName]);
 
   // 메시지 전송
@@ -323,12 +326,21 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
 
 /**
  * AI 응답에서 SVG 소스 코드를 제거 (미리보기 패널에 별도 표시되므로)
+ * - 완성된 SVG 태그: <svg...>...</svg>
+ * - 스트리밍 중 미완성 SVG: <svg 이후 전체 (아직 </svg> 미도착)
+ * - 마크다운 코드블록: ```svg...``` 또는 ```xml...```
+ * - 스트리밍 중 미완성 코드블록: ```svg 또는 ```xml 이후 전체
  */
 function stripSvgContent(text: string): string {
   return text
+    // 완성된 SVG 태그
     .replace(/<svg[\s\S]*?<\/svg>/gi, '')
-    .replace(/```svg[\s\S]*?```/gi, '')
-    .replace(/```xml[\s\S]*?<\/svg>[\s\S]*?```/gi, '')
+    // 스트리밍 중 미완성 SVG 태그 (<svg 시작했지만 </svg> 없음)
+    .replace(/<svg[\s\S]*$/gi, '')
+    // 완성된 마크다운 코드블록
+    .replace(/```(?:svg|xml)[\s\S]*?```/gi, '')
+    // 스트리밍 중 미완성 코드블록 (``` 시작했지만 닫는 ``` 없음)
+    .replace(/```(?:svg|xml)[\s\S]*$/gi, '')
     .trim();
 }
 

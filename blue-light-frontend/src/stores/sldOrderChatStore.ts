@@ -174,6 +174,8 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
       await sldOrderResetChat(sldOrderSeq);
       set({
         messages: [],
+        isLoading: false,
+        isStreaming: false,
         svgPreview: null,
         generatedFileId: null,
         activeToolName: null,

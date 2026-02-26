@@ -7,6 +7,7 @@ Manages the conversation flow:
 
 import json
 import logging
+import os
 from typing import AsyncGenerator
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -206,15 +207,16 @@ async def process_message(
 
                 logger.info(f"Tool completed: {tool_name}")
 
-                # Check if SLD was generated (file_generated event)
-                if tool_name == "generate_sld":
+                # Check if SLD was generated or preview requested
+                if tool_name in ("generate_sld", "generate_preview"):
                     try:
                         result = json.loads(output)
                         if result.get("success"):
                             file_id = result.get("file_id", "")
-                            svg_path = result.get("svg_path", "")
 
-                            # Read SVG from saved file (not from tool output to keep LLM context clean)
+                            # Reconstruct SVG path from file_id (tool no longer returns SVG content to keep LLM context clean)
+                            svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg") if file_id else ""
+
                             if svg_path:
                                 try:
                                     with open(svg_path, encoding="utf-8") as f:
@@ -227,11 +229,12 @@ async def process_message(
                                 except FileNotFoundError:
                                     logger.warning(f"SVG file not found: {svg_path}")
 
-                            # Send file generated notification
-                            yield {
-                                "type": "file_generated",
-                                "fileId": file_id,
-                            }
+                            # Send file generated notification (only for generate_sld)
+                            if tool_name == "generate_sld":
+                                yield {
+                                    "type": "file_generated",
+                                    "fileId": file_id,
+                                }
                     except (json.JSONDecodeError, TypeError):
                         pass
 

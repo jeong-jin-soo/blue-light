@@ -1,136 +1,236 @@
 {
   "standard": "SS 638 / CP 5 (Singapore)",
-  "description": "Electrical installation standards for kVA capacity tiers",
+  "description": "Electrical installation standards — updated from actual SLD samples & Excel reference data",
+
+  "approved_load_kva": {
+    "_description": "Single-phase approved load by main breaker rating (rating × 230V / 1000)",
+    "single_phase": {
+      "32": 7.36,
+      "40": 9.2,
+      "63": 14.49,
+      "100": 23
+    },
+    "three_phase": {
+      "_formula": "rating × 400V × √3 / 1000",
+      "32": 22.17,
+      "40": 27.71,
+      "63": 43.65,
+      "80": 55.42,
+      "100": 69.28,
+      "150": 103.92,
+      "200": 138.56,
+      "300": 207.85,
+      "400": 277.13,
+      "500": 346.41
+    }
+  },
+
+  "incoming_cable_table": {
+    "_description": "Incoming cable sizing by main breaker rating (from Excel reference)",
+    "entries": [
+      {"rating_A": 32,  "cable": "2 x 1C 6mm PVC + 6mm CPC IN METAL TRUNKING",  "earth_mm2": 6},
+      {"rating_A": 40,  "cable": "2 x 1C 10mm PVC + 10mm CPC IN METAL TRUNKING", "earth_mm2": 10},
+      {"rating_A": 63,  "cable": "2 x 1C 16mm PVC + 16mm CPC IN METAL TRUNKING", "earth_mm2": 16},
+      {"rating_A": 80,  "cable": "4 x 1C 25mm XLPE/SWA + 16mm CPC IN CABLE TRAY", "earth_mm2": 16},
+      {"rating_A": 100, "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY", "earth_mm2": 16},
+      {"rating_A": 150, "cable": "4 x 1C 70mm XLPE/SWA + 35mm CPC IN CABLE TRAY", "earth_mm2": 35},
+      {"rating_A": 200, "cable": "4 x 1C 95mm XLPE/SWA + 50mm CPC IN CABLE TRAY", "earth_mm2": 50},
+      {"rating_A": 250, "cable": "4 x 1C 120mm XLPE/SWA + 70mm CPC IN CABLE TRAY", "earth_mm2": 70},
+      {"rating_A": 300, "cable": "4 x 1C 150mm XLPE/SWA + 70mm CPC IN CABLE TRAY", "earth_mm2": 70},
+      {"rating_A": 400, "cable": "4 x 1C 185mm XLPE/SWA + 95mm CPC IN CABLE TRAY", "earth_mm2": 95},
+      {"rating_A": 500, "cable": "4 x 1C 240mm XLPE/SWA + 120mm CPC IN CABLE TRAY", "earth_mm2": 120}
+    ]
+  },
+
+  "outgoing_cable_table": {
+    "_description": "Outgoing (sub-circuit) cable sizing by breaker rating (from Excel reference)",
+    "entries": [
+      {"rating_A": 6,  "cable_mm2": 1.5, "earth_mm2": 1.5, "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+      {"rating_A": 10, "cable_mm2": 1.5, "earth_mm2": 1.5, "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+      {"rating_A": 16, "cable_mm2": 2.5, "earth_mm2": 2.5, "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+      {"rating_A": 20, "cable_mm2": 2.5, "earth_mm2": 2.5, "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+      {"rating_A": 32, "cable_mm2": 6,   "earth_mm2": 6,   "cable": "2 x 1C 6mm PVC + 6mm CPC IN METAL TRUNKING"},
+      {"rating_A": 40, "cable_mm2": 10,  "earth_mm2": 10,  "cable": "2 x 1C 10mm PVC + 10mm CPC IN METAL TRUNKING"},
+      {"rating_A": 63, "cable_mm2": 16,  "earth_mm2": 16,  "cable": "2 x 1C 16mm PVC + 16mm CPC IN METAL TRUNKING"}
+    ]
+  },
+
   "tiers": [
     {
-      "max_kva": 12,
+      "max_kva": 7.36,
       "supply_type": "single_phase",
       "voltage": 230,
-      "calculated_current_A": 52,
-      "main_breaker": {"type": "MCB", "rating_A": 63, "poles": "2P", "fault_kA": 10},
-      "recommended_busbar_A": 63,
-      "incoming_cable": {"cores": 2, "size_mm2": 16, "type": "PVC/PVC"},
-      "elcb": {"rating_A": 63, "sensitivity_mA": 100, "poles": 2},
-      "earth_conductor_mm2": 10,
+      "main_breaker_rating_A": 32,
+      "calculated_current_A": 32,
+      "main_breaker": {"type": "MCB", "rating_A": 32, "poles": "DP", "fault_kA": 6},
+      "recommended_busbar_A": 100,
+      "incoming_cable": "2 x 1C 6mm PVC + 6mm CPC IN METAL TRUNKING",
+      "elcb": {"rating_A": 32, "sensitivity_mA": 30, "poles": 2, "type": "RCCB"},
+      "earth_conductor_mm2": 6,
       "typical_sub_circuits": [
-        {"name": "Lighting", "breaker": "MCB 16A", "cable": "2C x 2.5mm2 PVC"},
-        {"name": "Power", "breaker": "MCB 20A", "cable": "2C x 4mm2 PVC"},
-        {"name": "Aircon", "breaker": "MCB 20A", "cable": "2C x 4mm2 PVC"},
-        {"name": "Spare", "breaker": "MCB 16A", "cable": "2C x 2.5mm2 PVC"}
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"}
       ]
     },
     {
-      "max_kva": 24,
+      "max_kva": 9.2,
       "supply_type": "single_phase",
       "voltage": 230,
-      "calculated_current_A": 104,
-      "main_breaker": {"type": "MCCB", "rating_A": 125, "poles": "2P", "fault_kA": 16},
-      "recommended_busbar_A": 125,
-      "incoming_cable": {"cores": 2, "size_mm2": 35, "type": "XLPE/SWA"},
-      "elcb": {"rating_A": 125, "sensitivity_mA": 100, "poles": 2},
+      "main_breaker_rating_A": 40,
+      "calculated_current_A": 40,
+      "main_breaker": {"type": "MCB", "rating_A": 40, "poles": "DP", "fault_kA": 6},
+      "recommended_busbar_A": 100,
+      "incoming_cable": "2 x 1C 10mm PVC + 10mm CPC IN METAL TRUNKING",
+      "elcb": {"rating_A": 40, "sensitivity_mA": 30, "poles": 2, "type": "RCCB"},
+      "earth_conductor_mm2": 10,
+      "typical_sub_circuits": [
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Aircon", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"}
+      ]
+    },
+    {
+      "max_kva": 14.49,
+      "supply_type": "single_phase",
+      "voltage": 230,
+      "main_breaker_rating_A": 63,
+      "calculated_current_A": 63,
+      "main_breaker": {"type": "MCB", "rating_A": 63, "poles": "DP", "fault_kA": 10},
+      "recommended_busbar_A": 100,
+      "incoming_cable": "2 x 1C 16mm PVC + 16mm CPC IN METAL TRUNKING",
+      "elcb": {"rating_A": 63, "sensitivity_mA": 30, "poles": 2, "type": "RCCB"},
       "earth_conductor_mm2": 16,
       "typical_sub_circuits": [
-        {"name": "Lighting", "breaker": "MCB 20A", "cable": "2C x 4mm2 PVC"},
-        {"name": "Power", "breaker": "MCB 32A", "cable": "2C x 6mm2 PVC"},
-        {"name": "ACMV", "breaker": "MCB 32A", "cable": "2C x 6mm2 PVC"},
-        {"name": "Water Heater", "breaker": "MCB 20A", "cable": "2C x 4mm2 PVC"},
-        {"name": "Spare", "breaker": "MCB 20A", "cable": "2C x 4mm2 PVC"}
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Aircon", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"}
+      ]
+    },
+    {
+      "max_kva": 23,
+      "supply_type": "single_phase",
+      "voltage": 230,
+      "main_breaker_rating_A": 100,
+      "calculated_current_A": 100,
+      "main_breaker": {"type": "MCB", "rating_A": 100, "poles": "DP", "fault_kA": 10},
+      "recommended_busbar_A": 100,
+      "incoming_cable": "2 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY",
+      "elcb": {"rating_A": 100, "sensitivity_mA": 30, "poles": 2, "type": "RCCB"},
+      "earth_conductor_mm2": 16,
+      "typical_sub_circuits": [
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Aircon", "breaker": "MCB B32A SPN 6kA", "cable": "2 x 1C 6mm PVC + 6mm CPC IN METAL TRUNKING"},
+        {"name": "Water Heater", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"}
       ]
     },
     {
       "max_kva": 45,
       "supply_type": "three_phase",
       "voltage": 400,
+      "main_breaker_rating_A": 80,
       "calculated_current_A": 65,
-      "main_breaker": {"type": "MCCB", "rating_A": 80, "poles": "4P", "fault_kA": 16},
+      "main_breaker": {"type": "MCCB", "rating_A": 80, "poles": "TPN", "fault_kA": 16},
       "recommended_busbar_A": 100,
-      "incoming_cable": {"cores": 4, "size_mm2": 25, "type": "XLPE/SWA"},
-      "elcb": {"rating_A": 80, "sensitivity_mA": 100, "poles": 4},
+      "incoming_cable": "4 x 1C 25mm XLPE/SWA + 16mm CPC IN CABLE TRAY",
+      "elcb": {"rating_A": 80, "sensitivity_mA": 100, "poles": 4, "type": "ELCB"},
       "earth_conductor_mm2": 16,
       "typical_sub_circuits": [
-        {"name": "Lighting", "breaker": "MCB 20A", "cable": "4C x 4mm2 PVC"},
-        {"name": "Power", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"},
-        {"name": "ACMV", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"},
-        {"name": "Spare", "breaker": "MCB 20A", "cable": "4C x 4mm2 PVC"}
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "ACMV", "breaker": "MCB B32A SPN 6kA", "cable": "2 x 1C 6mm PVC + 6mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"}
       ]
     },
     {
       "max_kva": 100,
       "supply_type": "three_phase",
       "voltage": 400,
+      "main_breaker_rating_A": 160,
       "calculated_current_A": 145,
-      "main_breaker": {"type": "MCCB", "rating_A": 160, "poles": "4P", "fault_kA": 25},
+      "main_breaker": {"type": "MCCB", "rating_A": 160, "poles": "TPN", "fault_kA": 25},
       "recommended_busbar_A": 200,
-      "incoming_cable": {"cores": 4, "size_mm2": 70, "type": "XLPE/SWA"},
-      "elcb": {"rating_A": 160, "sensitivity_mA": 100, "poles": 4},
+      "incoming_cable": "4 x 1C 70mm XLPE/SWA + 35mm CPC IN CABLE TRAY",
+      "elcb": {"rating_A": 160, "sensitivity_mA": 100, "poles": 4, "type": "ELCB"},
       "earth_conductor_mm2": 25,
       "typical_sub_circuits": [
-        {"name": "Lighting", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"},
-        {"name": "Power", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
-        {"name": "ACMV", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
-        {"name": "Fire Alarm", "breaker": "MCB 16A", "cable": "4C x 2.5mm2 PVC"},
-        {"name": "Spare", "breaker": "MCB 32A", "cable": "4C x 6mm2 PVC"}
+        {"name": "Lighting", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Power", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "ACMV", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Fire Alarm", "breaker": "MCB B10A SPN 6kA", "cable": "2 x 1C 1.5mm PVC + 1.5mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"}
       ]
     },
     {
       "max_kva": 200,
       "supply_type": "three_phase",
       "voltage": 400,
+      "main_breaker_rating_A": 315,
       "calculated_current_A": 290,
-      "main_breaker": {"type": "MCCB", "rating_A": 315, "poles": "4P", "fault_kA": 36},
+      "main_breaker": {"type": "MCCB", "rating_A": 315, "poles": "TPN", "fault_kA": 36},
       "recommended_busbar_A": 400,
-      "incoming_cable": {"cores": 4, "size_mm2": 150, "type": "XLPE/SWA"},
-      "elcb": {"rating_A": 315, "sensitivity_mA": 100, "poles": 4},
+      "incoming_cable": "4 x 1C 150mm XLPE/SWA + 70mm CPC IN CABLE TRAY",
+      "elcb": {"rating_A": 315, "sensitivity_mA": 100, "poles": 4, "type": "ELCB"},
       "earth_conductor_mm2": 50,
       "typical_sub_circuits": [
-        {"name": "Lighting", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
-        {"name": "Power", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
-        {"name": "ACMV", "breaker": "MCCB 80A", "cable": "4C x 25mm2 XLPE/SWA"},
-        {"name": "Lift", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
-        {"name": "Fire Alarm", "breaker": "MCB 20A", "cable": "4C x 4mm2 PVC"},
-        {"name": "Spare", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"}
+        {"name": "Lighting", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Power", "breaker": "MCCB 100A TPN 25kA", "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "ACMV", "breaker": "MCCB 80A TPN 25kA", "cable": "4 x 1C 25mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Lift", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Fire Alarm", "breaker": "MCB B20A SPN 6kA", "cable": "2 x 1C 2.5mm PVC + 2.5mm CPC IN METAL TRUNKING"},
+        {"name": "Spare", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"}
       ]
     },
     {
       "max_kva": 500,
       "supply_type": "three_phase",
       "voltage": 400,
+      "main_breaker_rating_A": 800,
       "calculated_current_A": 722,
-      "main_breaker": {"type": "ACB", "rating_A": 800, "poles": "4P", "fault_kA": 50},
+      "main_breaker": {"type": "ACB", "rating_A": 800, "poles": "TPN", "fault_kA": 50},
       "recommended_busbar_A": 800,
-      "incoming_cable": {"cores": 4, "size_mm2": 400, "type": "XLPE/SWA"},
-      "elcb": {"rating_A": 800, "sensitivity_mA": 300, "poles": 4},
+      "incoming_cable": "4 x 1C 400mm XLPE/SWA + 185mm CPC IN CABLE TRAY",
+      "elcb": {"rating_A": 800, "sensitivity_mA": 300, "poles": 4, "type": "ELCB"},
       "earth_conductor_mm2": 120,
       "typical_sub_circuits": [
-        {"name": "Lighting DB", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
-        {"name": "Power DB", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
-        {"name": "ACMV", "breaker": "MCCB 160A", "cable": "4C x 70mm2 XLPE/SWA"},
-        {"name": "Lift", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
-        {"name": "Fire Services", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
-        {"name": "UPS/IT", "breaker": "MCCB 63A", "cable": "4C x 16mm2 XLPE/SWA"},
-        {"name": "Spare", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"}
+        {"name": "Lighting DB", "breaker": "MCCB 100A TPN 25kA", "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Power DB", "breaker": "MCCB 200A TPN 36kA", "cable": "4 x 1C 95mm XLPE/SWA + 50mm CPC IN CABLE TRAY"},
+        {"name": "ACMV", "breaker": "MCCB 160A TPN 25kA", "cable": "4 x 1C 70mm XLPE/SWA + 35mm CPC IN CABLE TRAY"},
+        {"name": "Lift", "breaker": "MCCB 100A TPN 25kA", "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Fire Services", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "UPS/IT", "breaker": "MCCB 63A TPN 25kA", "cable": "4 x 1C 16mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Spare", "breaker": "MCCB 100A TPN 25kA", "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY"}
       ]
     },
     {
       "max_kva": 1000,
       "supply_type": "three_phase",
       "voltage": 400,
+      "main_breaker_rating_A": 1600,
       "calculated_current_A": 1443,
-      "main_breaker": {"type": "ACB", "rating_A": 1600, "poles": "4P", "fault_kA": 65},
+      "main_breaker": {"type": "ACB", "rating_A": 1600, "poles": "TPN", "fault_kA": 65},
       "recommended_busbar_A": 1600,
-      "incoming_cable": {"cores": 4, "size_mm2": 500, "type": "XLPE/SWA", "note": "May require parallel runs"},
-      "elcb": {"rating_A": 1600, "sensitivity_mA": 300, "poles": 4},
+      "incoming_cable": "4 x 1C 500mm XLPE/SWA + 240mm CPC IN CABLE TRAY",
+      "elcb": {"rating_A": 1600, "sensitivity_mA": 300, "poles": 4, "type": "ELCB"},
       "earth_conductor_mm2": 185,
       "typical_sub_circuits": [
-        {"name": "Lighting DB-1", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
-        {"name": "Lighting DB-2", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
-        {"name": "Power DB", "breaker": "MCCB 400A", "cable": "4C x 240mm2 XLPE/SWA"},
-        {"name": "ACMV-1", "breaker": "MCCB 250A", "cable": "4C x 120mm2 XLPE/SWA"},
-        {"name": "ACMV-2", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"},
-        {"name": "Lift", "breaker": "MCCB 160A", "cable": "4C x 70mm2 XLPE/SWA"},
-        {"name": "Fire Services", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
-        {"name": "UPS/IT", "breaker": "MCCB 100A", "cable": "4C x 35mm2 XLPE/SWA"},
-        {"name": "Spare", "breaker": "MCCB 200A", "cable": "4C x 95mm2 XLPE/SWA"}
+        {"name": "Lighting DB-1", "breaker": "MCCB 200A TPN 36kA", "cable": "4 x 1C 95mm XLPE/SWA + 50mm CPC IN CABLE TRAY"},
+        {"name": "Lighting DB-2", "breaker": "MCCB 200A TPN 36kA", "cable": "4 x 1C 95mm XLPE/SWA + 50mm CPC IN CABLE TRAY"},
+        {"name": "Power DB", "breaker": "MCCB 400A TPN 36kA", "cable": "4 x 1C 240mm XLPE/SWA + 120mm CPC IN CABLE TRAY"},
+        {"name": "ACMV-1", "breaker": "MCCB 250A TPN 36kA", "cable": "4 x 1C 120mm XLPE/SWA + 70mm CPC IN CABLE TRAY"},
+        {"name": "ACMV-2", "breaker": "MCCB 200A TPN 36kA", "cable": "4 x 1C 95mm XLPE/SWA + 50mm CPC IN CABLE TRAY"},
+        {"name": "Lift", "breaker": "MCCB 160A TPN 25kA", "cable": "4 x 1C 70mm XLPE/SWA + 35mm CPC IN CABLE TRAY"},
+        {"name": "Fire Services", "breaker": "MCCB 100A TPN 25kA", "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "UPS/IT", "breaker": "MCCB 100A TPN 25kA", "cable": "4 x 1C 35mm XLPE/SWA + 16mm CPC IN CABLE TRAY"},
+        {"name": "Spare", "breaker": "MCCB 200A TPN 36kA", "cable": "4 x 1C 95mm XLPE/SWA + 50mm CPC IN CABLE TRAY"}
       ]
     }
   ]

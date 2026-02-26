@@ -174,6 +174,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
       await resetSldChat(applicationId);
       set({
         messages: [],
+        isLoading: false,
+        isStreaming: false,
         svgPreview: null,
         generatedFileId: null,
         activeToolName: null,
