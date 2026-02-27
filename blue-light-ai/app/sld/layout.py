@@ -149,6 +149,570 @@ class LayoutResult:
     render_legend: bool = False
 
 
+# =============================================
+# Overlap Resolution System
+# =============================================
+
+@dataclass
+class BoundingBox:
+    """Axis-aligned bounding box for overlap detection (mm coordinates)."""
+
+    x: float       # Left edge
+    y: float       # Bottom edge
+    width: float
+    height: float
+
+    @property
+    def right(self) -> float:
+        return self.x + self.width
+
+    @property
+    def top(self) -> float:
+        return self.y + self.height
+
+    def overlaps(self, other: "BoundingBox") -> bool:
+        """Check if this bounding box overlaps with another (strict, not touching)."""
+        if self.x >= other.right or other.x >= self.right:
+            return False
+        if self.y >= other.top or other.y >= self.top:
+            return False
+        return True
+
+    def overlap_area(self, other: "BoundingBox") -> float:
+        """Calculate the area of overlap between two bounding boxes."""
+        ox = max(0.0, min(self.right, other.right) - max(self.x, other.x))
+        oy = max(0.0, min(self.top, other.top) - max(self.y, other.y))
+        return ox * oy
+
+
+# Symbol dimensions: (width_mm, height_mm) — must match generator.py rendering
+_SYMBOL_DIMS: dict[str, tuple[float, float]] = {
+    "CB_MCB": (10, 16),
+    "CB_MCCB": (14, 20),
+    "CB_ACB": (16, 22),
+    "CB_ELCB": (14, 20),
+    "CB_RCCB": (14, 20),
+    "ISOLATOR": (12, 18),
+    "KWH_METER": (20, 14),
+    "CT": (12, 12),
+    "EARTH": (16, 18),
+    "CIRCUIT_ID_BOX": (8, 5),
+    "DB_INFO_BOX": (80, 18),
+    "FLOW_ARROW_UP": (8, 10),
+}
+
+_CHAR_W = 1.8    # Approximate mm per character
+_LABEL_CHAR_H = 2.8  # Default label char height (mm)
+
+
+def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
+    """
+    Compute the bounding box for a placed component.
+
+    Returns None for structural elements (BUSBAR) that should never be moved.
+    Handles text sizing and 90-degree rotation for labels.
+    """
+    name = comp.symbol_name
+
+    # Structural — skip
+    if name == "BUSBAR":
+        return None
+
+    # Special: CIRCUIT_ID_BOX is centered on tap_x
+    if name == "CIRCUIT_ID_BOX":
+        return BoundingBox(x=comp.x - 4, y=comp.y, width=8, height=5)
+
+    # Special: DB_INFO_BOX extends downward from comp.y
+    if name == "DB_INFO_BOX":
+        return BoundingBox(x=comp.x, y=comp.y - 18, width=80, height=18)
+
+    # Breaker with breaker_block label style (sub-circuit breakers, rotation=90)
+    if name.startswith("CB_") and comp.label_style == "breaker_block" and abs(comp.rotation - 90.0) < 0.1:
+        # Symbol dimensions
+        sym_w, sym_h = _SYMBOL_DIMS.get(name, (10, 16))
+
+        # Right-side label columns: base_offset + N × 3.5mm
+        if comp.breaker_type_str in ("MCCB", "ACB"):
+            base_offset = 16
+        else:
+            base_offset = 12  # MCB
+
+        num_info = sum([
+            bool(comp.rating),
+            bool(comp.poles),
+            bool(comp.breaker_type_str),
+            bool(comp.fault_kA),
+        ])
+        label_extent = base_offset + num_info * 3.5
+
+        # Left-side cable annotation
+        left_extent = 0.0
+        if comp.cable_annotation:
+            left_extent = 9.0  # comp.x - 6 with ~3mm text width
+
+        # Height: breaker + stub + tail + circuit name
+        name_len = len(comp.label) if comp.label else 0
+        total_h = sym_h + 5 + 6 + 2 + name_len * _CHAR_W  # breaker + stub + tail + gap + name
+
+        return BoundingBox(
+            x=comp.x - left_extent,
+            y=comp.y,
+            width=left_extent + label_extent,
+            height=total_h,
+        )
+
+    # Standard symbol (non-breaker-block)
+    if name in _SYMBOL_DIMS:
+        w, h = _SYMBOL_DIMS[name]
+        return BoundingBox(x=comp.x, y=comp.y, width=w, height=h)
+
+    # Text LABEL
+    if name == "LABEL":
+        text = comp.label or ""
+        lines = text.replace("\\P", "\n").split("\n")
+        max_line_len = max((len(line) for line in lines), default=0)
+        num_lines = len(lines)
+        char_h = _LABEL_CHAR_H
+
+        if abs(comp.rotation - 90.0) < 0.1:
+            # Rotated 90°: width↔height swap; text runs upward
+            return BoundingBox(
+                x=comp.x,
+                y=comp.y,
+                width=num_lines * char_h,
+                height=max_line_len * _CHAR_W,
+            )
+        else:
+            return BoundingBox(
+                x=comp.x,
+                y=comp.y,
+                width=max_line_len * _CHAR_W,
+                height=num_lines * char_h,
+            )
+
+    # Default: small generic box
+    return BoundingBox(x=comp.x, y=comp.y, width=5, height=5)
+
+
+@dataclass
+class SubCircuitGroup:
+    """All layout elements belonging to one sub-circuit column."""
+    tap_x: float                         # Original tap_x (breaker center)
+    breaker_idx: int | None = None       # Index in components list
+    circuit_id_idx: int | None = None    # CIRCUIT_ID_BOX index
+    name_label_idx: int | None = None    # Vertical circuit name LABEL index
+    spare_label_idx: int | None = None   # SPARE label index (if spare circuit)
+    connection_indices: list[int] = field(default_factory=list)  # Indices in connections list
+    is_spare: bool = False
+    min_width: float = 25.0              # Minimum horizontal space needed (mm)
+    left_extent: float = 12.5            # Distance from tap_x to BB left edge (mm)
+    right_extent: float = 12.5           # Distance from tap_x to BB right edge (mm)
+
+
+def _breaker_half_width(comp: PlacedComponent) -> float:
+    """Return half the breaker symbol width for tap_x calculation."""
+    if comp.symbol_name == "CB_MCB":
+        return 5.0   # 10mm / 2
+    elif comp.symbol_name == "CB_MCCB":
+        return 7.0   # 14mm / 2
+    elif comp.symbol_name == "CB_ACB":
+        return 8.0   # 16mm / 2
+    return 7.0
+
+
+def _identify_groups(
+    layout_result: LayoutResult,
+) -> tuple[list[SubCircuitGroup], float]:
+    """
+    Identify sub-circuit groups by scanning components and connections.
+
+    Each breaker_block or SPARE label anchors a group. Associated
+    CIRCUIT_ID_BOX, circuit name LABEL, and vertical connections are
+    matched by proximity to the group's tap_x.
+
+    Returns:
+        groups: list of SubCircuitGroup sorted by tap_x ascending
+        incoming_chain_x: x-coordinate of the incoming supply chain
+    """
+    components = layout_result.components
+    connections = layout_result.connections
+    _TOL = 1.5  # coordinate matching tolerance (mm)
+
+    groups: list[SubCircuitGroup] = []
+
+    # Step 1: Create groups from breaker_block components
+    for i, comp in enumerate(components):
+        if comp.label_style == "breaker_block" and comp.symbol_name.startswith("CB_"):
+            tap_x = comp.x + _breaker_half_width(comp)
+            g = SubCircuitGroup(tap_x=tap_x, breaker_idx=i)
+            groups.append(g)
+
+    # Step 2: Create groups from SPARE labels
+    for i, comp in enumerate(components):
+        if (comp.symbol_name == "LABEL"
+                and abs(comp.rotation - 90.0) < 0.1
+                and comp.label.strip().upper() == "SPARE"):
+            tap_x = comp.x - 3  # SPARE label placed at tap_x + 3
+            g = SubCircuitGroup(tap_x=tap_x, spare_label_idx=i, is_spare=True)
+            groups.append(g)
+
+    if not groups:
+        return [], 0.0
+
+    # Sort by tap_x
+    groups.sort(key=lambda g: g.tap_x)
+    tap_xs_set = {g.tap_x for g in groups}
+
+    # Step 3: Determine incoming chain x (most common vertical connection x
+    # that is NOT a sub-circuit tap)
+    vert_conn_x_count: dict[float, int] = {}
+    for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
+        if abs(sx - ex) < 0.5:  # Vertical connection
+            x_val = round(sx, 1)
+            vert_conn_x_count[x_val] = vert_conn_x_count.get(x_val, 0) + 1
+
+    # incoming chain x = x with most connections that isn't a tap_x
+    incoming_chain_x = 0.0
+    max_count = 0
+    for x_val, count in vert_conn_x_count.items():
+        is_tap = any(abs(x_val - g.tap_x) < _TOL for g in groups)
+        if not is_tap and count > max_count:
+            max_count = count
+            incoming_chain_x = x_val
+
+    # Step 4: Match CIRCUIT_ID_BOX to groups
+    for i, comp in enumerate(components):
+        if comp.symbol_name != "CIRCUIT_ID_BOX":
+            continue
+        for g in groups:
+            if abs(comp.x - g.tap_x) < _TOL and g.circuit_id_idx is None:
+                g.circuit_id_idx = i
+                break
+
+    # Step 5: Match vertical circuit name LABELs (at tap_x + 3)
+    for i, comp in enumerate(components):
+        if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
+            continue
+        if comp.label.strip().upper() == "SPARE":
+            continue  # Already handled as group anchor
+        for g in groups:
+            if g.is_spare:
+                continue
+            if abs(comp.x - (g.tap_x + 3)) < _TOL and g.name_label_idx is None:
+                g.name_label_idx = i
+                break
+
+    # Step 6: Match vertical connections to groups (exclude incoming chain)
+    for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
+        if abs(sx - ex) > 0.5:
+            continue  # Not vertical
+        conn_x = sx
+        # Skip incoming chain connections
+        if abs(conn_x - incoming_chain_x) < _TOL:
+            continue
+        for g in groups:
+            if abs(conn_x - g.tap_x) < _TOL:
+                g.connection_indices.append(ci)
+                break
+
+    return groups, incoming_chain_x
+
+
+def _compute_group_width(
+    group: SubCircuitGroup,
+    components: list[PlacedComponent],
+) -> float:
+    """
+    Compute minimum horizontal space (mm) for a sub-circuit group.
+
+    Also sets group.left_extent and group.right_extent for asymmetric spacing.
+    """
+    _MARGIN = 1.0  # mm inter-group safety margin per side
+
+    if group.is_spare:
+        group.left_extent = 7.5
+        group.right_extent = 7.5
+        return 15.0  # Spare circuits need minimal space
+
+    if group.breaker_idx is not None:
+        comp = components[group.breaker_idx]
+        bb = _compute_bounding_box(comp)
+        if bb is not None:
+            tap_x = group.tap_x
+            group.left_extent = (tap_x - bb.x) + _MARGIN
+            group.right_extent = (bb.right - tap_x) + _MARGIN
+            return group.left_extent + group.right_extent
+
+    group.left_extent = 12.5
+    group.right_extent = 12.5
+    return 25.0  # Default fallback
+
+
+def _determine_final_positions(
+    groups: list[SubCircuitGroup],
+    components: list[PlacedComponent],
+    layout_result: LayoutResult,
+    config: LayoutConfig,
+) -> list[float]:
+    """
+    Single-pass left-to-right layout of sub-circuit groups.
+
+    Ensures groups don't overlap by spacing them according to their
+    computed minimum widths. Fits within drawing bounds, expanding
+    the busbar if necessary.
+
+    Returns:
+        new_tap_xs: list of final tap_x positions (same order as groups)
+    """
+    if not groups:
+        return []
+
+    _MARGIN = 10.0  # busbar end margin
+    _BOUND_MARGIN = 20.0  # distance from drawing edge
+
+    # Detect ELCB presence (reserve left space)
+    has_elcb = any(
+        c.symbol_name in ("CB_ELCB", "CB_RCCB")
+        for c in components
+    )
+    elcb_offset = 30.0 if has_elcb else _MARGIN
+
+    sc_bus_start = layout_result.busbar_start_x + elcb_offset
+    sc_bus_end = layout_result.busbar_end_x - _MARGIN
+
+    # Compute total needed span using asymmetric extents:
+    # span = left_extent[0] + sum(right_extent[i] + left_extent[i+1]) + right_extent[-1]
+    n = len(groups)
+    left_exts = [g.left_extent for g in groups]
+    right_exts = [g.right_extent for g in groups]
+
+    # Total span = first group's left + all inter-group gaps + last group's right
+    total_needed = left_exts[0] + right_exts[-1]
+    for i in range(n - 1):
+        total_needed += right_exts[i] + left_exts[i + 1]
+
+    available = sc_bus_end - sc_bus_start
+
+    # Case B: If needed > available, try expanding busbar
+    if total_needed > available:
+        # Expand busbar rightward up to drawing bound
+        max_bus_end = config.max_x - 15.0
+        if layout_result.busbar_end_x < max_bus_end:
+            layout_result.busbar_end_x = max_bus_end
+            sc_bus_end = max_bus_end - _MARGIN
+            available = sc_bus_end - sc_bus_start
+
+        # Also try expanding leftward (only if no ELCB occupying the space)
+        if total_needed > available and not has_elcb:
+            min_bus_start = config.min_x + 15.0
+            if layout_result.busbar_start_x > min_bus_start:
+                layout_result.busbar_start_x = min_bus_start
+                sc_bus_start = min_bus_start + _MARGIN
+                available = sc_bus_end - sc_bus_start
+
+    # If still too tight after expansion, apply proportional compression
+    if total_needed > available and total_needed > 0:
+        scale = available / total_needed
+        left_exts = [e * scale for e in left_exts]
+        right_exts = [e * scale for e in right_exts]
+        # Enforce minimum 6mm per extent
+        left_exts = [max(e, 6.0) for e in left_exts]
+        right_exts = [max(e, 6.0) for e in right_exts]
+
+    # Place groups left-to-right using asymmetric extents
+    new_tap_xs: list[float] = []
+
+    if n == 1:
+        # Single circuit: center on available space
+        tap_x = (sc_bus_start + sc_bus_end) / 2
+        new_tap_xs.append(tap_x)
+    else:
+        # First tap: left edge + left_extent[0]
+        cursor = sc_bus_start + left_exts[0]
+        new_tap_xs.append(cursor)
+        # Subsequent taps: gap = right_extent[i] + left_extent[i+1]
+        for i in range(1, n):
+            cursor += right_exts[i - 1] + left_exts[i]
+            new_tap_xs.append(cursor)
+
+    # Clamp all positions to drawing bounds
+    min_tap = config.min_x + _BOUND_MARGIN
+    max_tap = config.max_x - _BOUND_MARGIN
+    new_tap_xs = [max(min_tap, min(t, max_tap)) for t in new_tap_xs]
+
+    return new_tap_xs
+
+
+def _rebuild_from_positions(
+    groups: list[SubCircuitGroup],
+    new_tap_xs: list[float],
+    layout_result: LayoutResult,
+) -> None:
+    """
+    Move all group elements to their final positions using stored indices.
+
+    Pure index-based repositioning — no coordinate matching needed.
+    Each element is set to its absolute final position, preventing
+    double-move bugs entirely.
+    """
+    components = layout_result.components
+    connections = layout_result.connections
+
+    for group, new_tap_x in zip(groups, new_tap_xs):
+        delta_x = new_tap_x - group.tap_x
+
+        if abs(delta_x) < 0.01:
+            continue  # No movement needed
+
+        # Breaker: shift by delta_x (maintains half_width offset)
+        if group.breaker_idx is not None:
+            components[group.breaker_idx].x += delta_x
+
+        # CIRCUIT_ID_BOX: set absolute position (centered on tap)
+        if group.circuit_id_idx is not None:
+            components[group.circuit_id_idx].x = new_tap_x
+
+        # Circuit name LABEL: set absolute position (tap_x + 3)
+        if group.name_label_idx is not None:
+            components[group.name_label_idx].x = new_tap_x + 3
+
+        # SPARE LABEL: set absolute position (tap_x + 3)
+        if group.spare_label_idx is not None:
+            components[group.spare_label_idx].x = new_tap_x + 3
+
+        # Connections: set both endpoints x to new_tap_x (vertical wires)
+        for conn_idx in group.connection_indices:
+            (sx, sy), (ex, ey) = connections[conn_idx]
+            connections[conn_idx] = ((new_tap_x, sy), (new_tap_x, ey))
+
+
+def _extend_busbar_to_cover_all(
+    groups: list[SubCircuitGroup],
+    new_tap_xs: list[float],
+    layout_result: LayoutResult,
+    components: list[PlacedComponent],
+    config: LayoutConfig,
+) -> None:
+    """
+    Extend busbar to cover all tap points including label extents.
+
+    Also updates BUSBAR component position, busbar rating LABEL,
+    and DB_INFO_BOX to match the new busbar extent.
+    """
+    if not new_tap_xs:
+        return
+
+    _TAP_MARGIN = 10.0  # mm padding beyond outermost tap
+
+    # Compute rightmost extent including label width
+    max_label_extent = 0.0
+    for g in groups:
+        if g.breaker_idx is not None:
+            bb = _compute_bounding_box(components[g.breaker_idx])
+            if bb is not None:
+                hw = _breaker_half_width(components[g.breaker_idx])
+                right_extent = bb.width - hw  # extent to the right of tap_x
+                max_label_extent = max(max_label_extent, right_extent)
+
+    needed_start = min(new_tap_xs) - _TAP_MARGIN
+    needed_end = max(new_tap_xs) + _TAP_MARGIN + max_label_extent
+
+    # Clamp to drawing bounds
+    needed_start = max(needed_start, config.min_x)
+    needed_end = min(needed_end, config.max_x)
+
+    changed = False
+
+    if needed_start < layout_result.busbar_start_x:
+        layout_result.busbar_start_x = needed_start
+        changed = True
+
+    if needed_end > layout_result.busbar_end_x:
+        layout_result.busbar_end_x = needed_end
+        changed = True
+
+    start_changed = needed_start < layout_result.busbar_start_x
+    end_changed = needed_end > layout_result.busbar_end_x
+
+    if start_changed:
+        layout_result.busbar_start_x = needed_start
+    if end_changed:
+        layout_result.busbar_end_x = needed_end
+
+    if not (start_changed or end_changed):
+        return
+
+    # Update BUSBAR component x if start changed
+    if start_changed:
+        for comp in components:
+            if comp.symbol_name == "BUSBAR" and comp.label:
+                comp.x = layout_result.busbar_start_x
+                break
+
+    # Update busbar rating LABEL position if end changed
+    if end_changed:
+        for comp in components:
+            if (comp.symbol_name == "LABEL"
+                    and "BUSBAR" in (comp.label or "").upper()
+                    and abs(comp.rotation) < 0.1):
+                comp.x = layout_result.busbar_end_x - 30
+                break
+
+    # Note: DB_INFO_BOX position is NOT updated here.
+    # It is correctly positioned in compute_layout() with ELCB offset
+    # and should not be overridden.
+
+
+def resolve_overlaps(
+    layout_result: LayoutResult,
+    config: LayoutConfig | None = None,
+) -> LayoutResult:
+    """
+    Post-layout overlap resolution using determine-then-rebuild approach.
+
+    Pipeline:
+      1. _identify_groups()          — classify components/connections by sub-circuit
+      2. _compute_group_width()      — bounding box based minimum widths
+      3. _determine_final_positions() — single-pass left-to-right with bounds fit
+      4. _rebuild_from_positions()    — index-based absolute repositioning
+      5. _extend_busbar_to_cover_all() — extent-aware busbar fitting
+
+    Guarantees:
+      - No text/symbol overlaps between adjacent sub-circuits
+      - All connections stay aligned with their breaker symbols
+      - All tap points remain within the busbar extent
+      - Incoming chain connections are never moved
+      - Deterministic: same input → same output
+    """
+    if config is None:
+        config = LayoutConfig()
+
+    # Step 1: Identify sub-circuit groups
+    groups, incoming_chain_x = _identify_groups(layout_result)
+
+    if not groups:
+        return layout_result
+
+    # Step 2: Compute minimum widths per group
+    for g in groups:
+        g.min_width = _compute_group_width(g, layout_result.components)
+
+    # Step 3: Determine final tap positions
+    new_tap_xs = _determine_final_positions(
+        groups, layout_result.components, layout_result, config,
+    )
+
+    # Step 4: Rebuild all positions (index-based, no coordinate matching)
+    _rebuild_from_positions(groups, new_tap_xs, layout_result)
+
+    # Step 5: Extend busbar if needed
+    _extend_busbar_to_cover_all(
+        groups, new_tap_xs, layout_result, layout_result.components, config,
+    )
+
+    return layout_result
+
+
 def compute_layout(requirements: dict, config: LayoutConfig | None = None, application_info: dict | None = None) -> LayoutResult:
     """
     Compute the layout for an SLD based on requirements.
@@ -457,7 +1021,14 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         x=bus_start_x,
         y=y,
         label=f"{breaker_rating}A DB",
-        rating=busbar_label,
+        rating="",
+    ))
+    # Busbar rating label as separate LABEL component (overlap-resolvable)
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL",
+        x=bus_end_x - 30,
+        y=y + 5,
+        label=busbar_label,
     ))
 
     # -- DB Info Box (dashed box below busbar with load info) --
@@ -611,6 +1182,9 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     # Horizontal dashed line: connect to the busbar end (right side)
     if earth_cx > result.busbar_end_x:
         result.dashed_connections.append(((result.busbar_end_x, result.busbar_y), (earth_cx, result.busbar_y)))
+
+    # -- Post-layout: resolve text/symbol overlaps --
+    resolve_overlaps(result, config)
 
     return result
 
