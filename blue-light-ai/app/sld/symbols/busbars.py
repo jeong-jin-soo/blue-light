@@ -26,6 +26,10 @@ class Busbar(BaseSymbol):
     height: float = 3  # Gap between double lines
     layer: str = "SLD_SYMBOLS"
 
+    lineweights: dict[str, float] = {
+        "bar": 0.8,
+    }
+
     def __init__(self, bus_width: float = 200, bus_name: str = "BUSBAR"):
         self.width = bus_width
         self.name = bus_name
@@ -33,6 +37,11 @@ class Busbar(BaseSymbol):
             "left": (0, 0),
             "right": (self.width, 0),
             "center": (self.width / 2, 0),
+        }
+        self.anchors = {
+            "label_below": (self.width / 2, -5),
+            "label_above": (self.width / 2, 5),
+            "rating_right": (self.width + 3, 0),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:

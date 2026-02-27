@@ -40,11 +40,13 @@ from app.sld.pdf_backend import PdfBackend
 from app.sld.svg_backend import SvgBackend
 from app.sld.symbols.breakers import ACB, MCB, MCCB, RCCB, ELCB, CircuitBreaker
 from app.sld.symbols.busbars import Busbar
-from app.sld.symbols.meters import Ammeter, KwhMeter
+from app.sld.symbols.loads import IndustrialSocket, Timer, TimerWithBypass
+from app.sld.symbols.meters import Ammeter, KwhMeter, Voltmeter
 from app.sld.symbols.motors import Generator as GeneratorSymbol, Motor
+from app.sld.symbols.msb_components import IndicatorLight, ProtectionRelay, ShuntTrip
 from app.sld.symbols.protection import EarthSymbol, Fuse, SurgeProtector
-from app.sld.symbols.switches import ATS, Isolator
-from app.sld.symbols.transformers import CurrentTransformer, PowerTransformer
+from app.sld.symbols.switches import ATS, BIConnector, DoublePoleSwitch, Isolator, IsolatorForMachine
+from app.sld.symbols.transformers import CurrentTransformer, PotentialTransformer, PowerTransformer
 from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
 
 logger = logging.getLogger(__name__)
@@ -66,13 +68,24 @@ class SldGenerator:
         "CT": CurrentTransformer,
         "KWH_METER": KwhMeter,
         "AMMETER": Ammeter,
+        "VOLTMETER": Voltmeter,
         "MOTOR": Motor,
         "GENERATOR": GeneratorSymbol,
         "ISOLATOR": Isolator,
+        "ISOLATOR_MACHINE": IsolatorForMachine,
+        "DOUBLE_POLE_SWITCH": DoublePoleSwitch,
         "ATS": ATS,
+        "BI_CONNECTOR": BIConnector,
         "FUSE": Fuse,
         "EARTH": EarthSymbol,
         "SPD": SurgeProtector,
+        "INDUSTRIAL_SOCKET": IndustrialSocket,
+        "TIMER": Timer,
+        "TIMER_BYPASS": TimerWithBypass,
+        "SHUNT_TRIP": ShuntTrip,
+        "INDICATOR_LIGHT": IndicatorLight,
+        "PROTECTION_RELAY": ProtectionRelay,
+        "PT": PotentialTransformer,
     }
 
     # Full legend descriptions for all known symbols
@@ -83,15 +96,28 @@ class SldGenerator:
         "ELCB": "Earth Leakage Circuit Breaker",
         "RCCB": "Residual Current Circuit Breaker",
         "KWH_METER": "kWh Meter (Energy Meter)",
+        "AMMETER": "Ammeter (Current Meter)",
+        "VOLTMETER": "Voltmeter (Voltage Meter)",
         "EARTH": "Earth Bar / Ground Connection",
         "ISOLATOR": "Isolator / Disconnect Switch",
+        "ISOLATOR_MACHINE": "Isolator for Machine",
+        "DOUBLE_POLE_SWITCH": "Double Pole Switch",
+        "TRANSFORMER": "Power Transformer",
         "CT": "Current Transformer",
         "FUSE": "Fuse",
         "SPD": "Surge Protection Device",
         "ATS": "Automatic Transfer Switch",
+        "BI_CONNECTOR": "BI Connector (Bus Isolator)",
         "MOTOR": "Motor",
         "GENERATOR": "Generator",
         "BUSBAR": "Busbar (Main Distribution)",
+        "INDUSTRIAL_SOCKET": "Industrial Socket (CEE-Form)",
+        "TIMER": "Timer / Time Switch",
+        "TIMER_BYPASS": "Timer with Bypass Switch",
+        "SHUNT_TRIP": "Shunt Trip",
+        "INDICATOR_LIGHT": "Indicator Light",
+        "PROTECTION_RELAY": "Protection Relay (O/C E/F)",
+        "PT": "Potential Transformer (Voltage Transformer)",
     }
 
     # Legend abbreviations (shorter form for display)
@@ -102,15 +128,28 @@ class SldGenerator:
         "ELCB": "ELCB",
         "RCCB": "RCCB",
         "KWH_METER": "kWh",
+        "AMMETER": "Ammeter",
+        "VOLTMETER": "Voltmeter",
         "EARTH": "Earth",
         "ISOLATOR": "Isolator",
+        "ISOLATOR_MACHINE": "Iso. Machine",
+        "DOUBLE_POLE_SWITCH": "DP Switch",
+        "TRANSFORMER": "Transformer",
         "CT": "CT",
         "FUSE": "Fuse",
         "SPD": "SPD",
         "ATS": "ATS",
+        "BI_CONNECTOR": "BI Conn.",
         "MOTOR": "Motor",
         "GENERATOR": "Gen",
         "BUSBAR": "Busbar",
+        "INDUSTRIAL_SOCKET": "Ind. Socket",
+        "TIMER": "Timer",
+        "TIMER_BYPASS": "Timer/BP",
+        "SHUNT_TRIP": "Shunt Trip",
+        "INDICATOR_LIGHT": "Ind. Light",
+        "PROTECTION_RELAY": "O/C E/F",
+        "PT": "PT",
     }
 
     def generate(
@@ -198,6 +237,57 @@ class SldGenerator:
             "pdf_path": pdf_output_path,
         }
 
+    @staticmethod
+    def generate_pdf_bytes(
+        requirements: dict,
+        application_info: dict | None = None,
+    ) -> tuple[bytes, str]:
+        """
+        Generate SLD as PDF bytes in memory (no file I/O).
+
+        Args:
+            requirements: SLD requirements dict.
+            application_info: Application details (address, kVA, etc.)
+
+        Returns:
+            Tuple of (pdf_bytes, svg_string).
+        """
+        app_info = application_info or {}
+        generator = SldGenerator()
+
+        pdf = PdfBackend(output_path=None)  # in-memory buffer
+        svg = SvgBackend()
+
+        layout_result = compute_layout(requirements, application_info=app_info)
+
+        for backend in (pdf, svg):
+            draw_border(backend)
+            draw_title_block_frame(backend)
+
+            generator._draw_components(backend, layout_result)
+            generator._draw_connections(backend, layout_result)
+            generator._draw_dashed_connections(backend, layout_result)
+            generator._draw_cable_schedule(backend, requirements, layout_result)
+            generator._draw_legend(backend, layout_result)
+
+            fill_title_block_data(
+                backend,
+                project_name=app_info.get("address", "Electrical Installation"),
+                address=app_info.get("address", ""),
+                postal_code=app_info.get("postalCode", ""),
+                kva=requirements.get("kva", 0),
+                voltage=requirements.get("voltage", 0),
+                supply_type=requirements.get("supply_type", ""),
+                lew_name=app_info.get("assignedLewName", ""),
+                lew_licence=app_info.get("assignedLewLicenceNo", ""),
+                lew_mobile=app_info.get("assignedLewMobile", ""),
+                sld_only_mode=app_info.get("sld_only_mode", False),
+                client_name=app_info.get("clientName", ""),
+                main_contractor=app_info.get("mainContractor", ""),
+            )
+
+        return pdf.get_bytes(), svg.get_svg_string()
+
     def _get_symbol(self, symbol_name: str):
         """Get a symbol instance by its block/type name."""
         # Map CB_XXX names back to the breaker type
@@ -272,21 +362,60 @@ class SldGenerator:
                         lineweight=60,
                     )
 
-                # Busbar label (left side, below busbar for bottom-up layout)
-                if comp.label:
-                    backend.set_layer("SLD_ANNOTATIONS")
-                    backend.add_mtext(
-                        comp.label,
-                        insert=(bus_start_x, layout_result.busbar_y - 5),
-                        char_height=3.0,
-                    )
-                # Busbar rating (right side, below busbar)
+                # Busbar rating label (right side, above busbar)
                 if comp.rating:
                     backend.set_layer("SLD_ANNOTATIONS")
                     backend.add_mtext(
                         comp.rating,
-                        insert=(bus_end_x - 30, layout_result.busbar_y - 5),
+                        insert=(bus_end_x - 30, layout_result.busbar_y + 5),
                         char_height=2.5,
+                    )
+                count += 1
+
+            elif comp.symbol_name == "CIRCUIT_ID_BOX":
+                # Small rectangle with circuit ID text at busbar tap point
+                box_w, box_h = 8, 5
+                bx = comp.x - box_w / 2
+                by = comp.y
+                backend.set_layer("SLD_SYMBOLS")
+                backend.add_lwpolyline(
+                    [(bx, by), (bx + box_w, by), (bx + box_w, by + box_h), (bx, by + box_h)],
+                    close=True,
+                )
+                backend.set_layer("SLD_ANNOTATIONS")
+                backend.add_mtext(
+                    comp.circuit_id,
+                    insert=(bx + 1, by + box_h - 1),
+                    char_height=1.8,
+                )
+                count += 1
+
+            elif comp.symbol_name == "DB_INFO_BOX":
+                # Dashed box with DB rating, approved load, and premises address
+                box_w = 80
+                box_h = 18
+                bx = comp.x
+                by = comp.y - box_h  # Box extends downward from comp.y
+
+                # Dashed box outline (4 sides)
+                _draw_dashed_line(backend, (bx, by), (bx + box_w, by), dash_len=2.5, gap_len=1.5)
+                _draw_dashed_line(backend, (bx + box_w, by), (bx + box_w, by + box_h), dash_len=2.5, gap_len=1.5)
+                _draw_dashed_line(backend, (bx + box_w, by + box_h), (bx, by + box_h), dash_len=2.5, gap_len=1.5)
+                _draw_dashed_line(backend, (bx, by + box_h), (bx, by), dash_len=2.5, gap_len=1.5)
+
+                # DB rating title (e.g., "100A DB")
+                backend.set_layer("SLD_ANNOTATIONS")
+                backend.add_mtext(
+                    comp.label,
+                    insert=(bx + 3, by + box_h - 2),
+                    char_height=3.0,
+                )
+                # Approved load + premises (multi-line via \\P)
+                if comp.rating:
+                    backend.add_mtext(
+                        comp.rating,
+                        insert=(bx + 3, by + box_h - 7),
+                        char_height=2.0,
                     )
                 count += 1
 
@@ -348,7 +477,7 @@ class SldGenerator:
             {fault_kA}kA
 
         For vertical text (rotation=90), text runs upward from the breaker.
-        The circuit ID is NOT drawn here -- it's in the standalone label above the tail.
+        The circuit ID is shown in the CIRCUIT_ID_BOX at the busbar tap point.
         """
         # Build breaker info -- render as SEPARATE text items for better spacing
         # Each line drawn individually to control vertical position precisely
@@ -371,9 +500,13 @@ class SldGenerator:
             # Vertical text: breaker info to the RIGHT of the breaker, rotated 90 degrees
             # Draw each info line as a separate column, going rightward from breaker
             # Order: rating closest to breaker, fault_kA furthest right
-            base_x = comp.x + 12  # Start just right of breaker symbol
+            # Wider offset for larger breaker types (MCCB/ACB have bigger arcs)
+            if comp.breaker_type_str in ("MCCB", "ACB"):
+                base_x = comp.x + 16
+            else:
+                base_x = comp.x + 12  # Standard offset for MCB
             char_h = 1.8
-            line_gap = char_h * 1.8  # ~3.2mm gap for clear separation
+            line_gap = 3.5  # Fixed 3.5mm gap for consistent column spacing
             for idx, line_text in enumerate(info_items):
                 backend.add_mtext(
                     line_text,
@@ -540,7 +673,7 @@ class SldGenerator:
         legend_order = [
             "ACB", "MCCB", "MCB", "ELCB", "RCCB",
             "ISOLATOR", "CT", "KWH_METER", "FUSE", "SPD",
-            "ATS", "EARTH", "BUSBAR",
+            "ATS", "BI_CONNECTOR", "EARTH", "BUSBAR",
         ]
 
         for sym_key in legend_order:
@@ -615,32 +748,40 @@ class SldGenerator:
         sw, sh = 5, 5
 
         if sym_key in ("MCCB", "MCB", "ELCB", "RCCB", "ACB"):
-            # Circuit breaker: Rectangle with X
+            # Circuit breaker: RIGHT-facing arc + contact arm (Singapore SLD style)
             backend.set_layer("SLD_SYMBOLS")
-            backend.add_lwpolyline(
-                [(sx, sy), (sx + sw, sy), (sx + sw, sy + sh), (sx, sy + sh)],
-                close=True,
+            mid_x = legend_x + 7
+            ar_leg = 2  # legend arc radius
+            arc_cy = sy + 3  # arc center y
+            contact_y_leg = arc_cy - ar_leg  # contact at bottom of arc (270°)
+            # Contact point (bottom of arc)
+            backend.add_circle((mid_x, contact_y_leg), radius=0.5)
+            # Contact arm (diagonal chord from 270° to 0°)
+            backend.add_line((mid_x, contact_y_leg), (mid_x + ar_leg, arc_cy))
+            # Arc (RIGHT-facing semicircle: 270° → 0° → 90°)
+            backend.add_arc(
+                center=(mid_x, arc_cy),
+                radius=ar_leg,
+                start_angle=270,
+                end_angle=90,
             )
-            backend.add_line((sx, sy), (sx + sw, sy + sh))
-            backend.add_line((sx + sw, sy), (sx, sy + sh))
 
-            # ACB: additional double-contact indicator (horizontal bar through center)
+            # ACB: additional horizontal bar through arc center
             if sym_key == "ACB":
-                backend.add_line((sx - 1, sy + sh / 2), (sx + sw + 1, sy + sh / 2))
+                backend.add_line((mid_x - 3, arc_cy), (mid_x + 3, arc_cy))
 
-            # ELCB/RCCB: arc indicator for earth leakage
+            # ELCB/RCCB: toroid circle indicator (to the RIGHT)
             if sym_key in ("ELCB", "RCCB"):
-                backend.add_arc(
-                    center=(sx + sw + 2, sy + sh / 2),
-                    radius=2,
-                    start_angle=120,
-                    end_angle=240,
-                )
+                backend.add_circle((mid_x + ar_leg + 2.5, arc_cy), radius=1.5)
 
         elif sym_key == "KWH_METER":
-            # Small circle with "kWh"
+            # Small rectangle with "KWH" (Singapore SLD standard)
             backend.set_layer("SLD_SYMBOLS")
-            backend.add_circle((legend_x + 7, entry_y + 3.5), radius=3)
+            backend.add_lwpolyline(
+                [(sx, sy + 0.5), (sx + sw + 1, sy + 0.5),
+                 (sx + sw + 1, sy + sh - 0.5), (sx, sy + sh - 0.5)],
+                close=True,
+            )
 
         elif sym_key == "CT":
             # Current Transformer: two overlapping circles
@@ -684,6 +825,23 @@ class SldGenerator:
             backend.add_line((legend_x + 5, entry_y + 5), (legend_x + 7, entry_y + 3))
             backend.add_line((legend_x + 7, entry_y + 3), (legend_x + 6, entry_y + 3))
             backend.add_line((legend_x + 6, entry_y + 3), (legend_x + 8, entry_y + 1))
+
+        elif sym_key == "BI_CONNECTOR":
+            # BI Connector: two opposing arrowheads
+            backend.set_layer("SLD_SYMBOLS")
+            mid_y_bi = entry_y + 3
+            # Left arrowhead
+            backend.add_lwpolyline(
+                [(sx, mid_y_bi + 1.5), (sx + 2.5, mid_y_bi), (sx, mid_y_bi - 1.5)],
+                close=True,
+            )
+            # Right arrowhead
+            backend.add_lwpolyline(
+                [(sx + sw, mid_y_bi + 1.5), (sx + sw - 2.5, mid_y_bi), (sx + sw, mid_y_bi - 1.5)],
+                close=True,
+            )
+            # Connecting bar
+            backend.add_line((sx + 2.5, mid_y_bi), (sx + sw - 2.5, mid_y_bi))
 
 
 # -- Helper: Flow arrow drawing --

@@ -15,17 +15,27 @@ if TYPE_CHECKING:
 
 
 class Motor(BaseSymbol):
-    """Motor symbol — circle with 'M'."""
+    """Motor symbol -- circle with 'M'."""
 
     name: str = "MOTOR"
     width: float = 16
     height: float = 16
     layer: str = "SLD_SYMBOLS"
 
+    lineweights: dict[str, float] = {
+        "circle": 0.7,
+        "text": 0.35,
+        "connection": 0.5,
+    }
+
     def __init__(self):
         cx = self.width / 2
         self.pins = {
             "top": (cx, self.height + 3),
+        }
+        self.anchors = {
+            "label_right": (self.width + 3, self.height / 2 + 2),
+            "label_below": (cx, -3),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
@@ -44,17 +54,27 @@ class Motor(BaseSymbol):
 
 
 class Generator(BaseSymbol):
-    """Generator symbol — circle with 'G'."""
+    """Generator symbol -- circle with 'G'."""
 
     name: str = "GENERATOR"
     width: float = 20
     height: float = 20
     layer: str = "SLD_SYMBOLS"
 
+    lineweights: dict[str, float] = {
+        "circle": 0.7,
+        "text": 0.35,
+        "connection": 0.5,
+    }
+
     def __init__(self):
         cx = self.width / 2
         self.pins = {
             "top": (cx, self.height + 5),
+        }
+        self.anchors = {
+            "label_right": (self.width + 3, self.height / 2 + 2),
+            "label_below": (cx, -3),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:

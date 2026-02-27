@@ -251,13 +251,14 @@ async def process_message(
 
 
 def _tool_description(tool_name: str) -> str:
-    """Human-readable description for tool execution."""
+    """Human-readable description for tool execution (with pipeline step numbers)."""
     descriptions = {
-        "get_application_details": "Fetching application details...",
-        "get_standard_specs": "Looking up Singapore electrical standards...",
-        "validate_sld_requirements": "Validating SLD requirements...",
-        "generate_sld": "Generating SLD drawing (PDF + SVG)...",
-        "generate_preview": "Generating SLD preview...",
+        "get_application_details": "[Step 1/5] 신청 정보 및 규격 조회 중...",
+        "get_standard_specs": "[Step 1/5] 싱가포르 전기 규격 조회 중...",
+        "extract_sld_data": "[Step 1-2/5] SLD 데이터 추출 및 구조화 중...",
+        "validate_sld_requirements": "[Step 3/5] SS 638 규격 검증 중...",
+        "generate_sld": "[Step 4/5] SLD 도면 생성 중 (PDF + SVG)...",
+        "generate_preview": "[Step 5/5] SLD 미리보기 생성 중...",
     }
     return descriptions.get(tool_name, f"Executing {tool_name}...")
 
@@ -270,31 +271,50 @@ def _summarize_tool_result(tool_name: str, output: str) -> str:
         if tool_name == "get_application_details":
             tiers = data.get("available_tiers", [])
             if tiers:
-                return f"Standards loaded ({len(tiers)} tiers: {', '.join(str(t) for t in tiers)} kVA)"
-            return "Application context loaded"
+                return f"[Step 1] Standards loaded ({len(tiers)} tiers: {', '.join(str(t) for t in tiers)} kVA)"
+            return "[Step 1] Application context loaded"
 
         if tool_name == "get_standard_specs":
             kva = data.get("kva", "?")
             breaker = data.get("main_breaker", {})
-            return f"{kva} kVA: {breaker.get('type', '?')} {breaker.get('rating_A', '?')}A"
+            return f"[Step 1] {kva} kVA: {breaker.get('type', '?')} {breaker.get('rating_A', '?')}A"
 
         if tool_name == "validate_sld_requirements":
             valid = data.get("valid", False)
             missing = len(data.get("missing_fields", []))
+            errors = len(data.get("errors", []))
+            warnings = len(data.get("warnings", []))
             if valid:
-                return "All requirements met"
-            return f"Missing {missing} field(s)"
+                suffix = f" ({warnings} warning(s))" if warnings else ""
+                return f"[Step 3] ✅ Validated{suffix}"
+            parts = []
+            if missing:
+                parts.append(f"{missing} missing")
+            if errors:
+                parts.append(f"{errors} error(s)")
+            return f"[Step 3] ❌ {', '.join(parts)}"
 
         if tool_name == "generate_sld":
             if data.get("success"):
                 count = data.get("component_count", 0)
-                return f"SLD generated ({count} components)"
-            return f"Generation failed: {data.get('error', 'unknown')}"
+                return f"[Step 4] ✅ Generated ({count} components)"
+            return f"[Step 4] ❌ {data.get('error', 'unknown')}"
 
         if tool_name == "generate_preview":
             if data.get("success"):
-                return "Preview ready"
-            return "Preview failed"
+                return "[Step 5] Preview ready"
+            return "[Step 5] Preview failed"
+
+        if tool_name == "extract_sld_data":
+            if data.get("success"):
+                validation = data.get("validation", {})
+                errors = len(validation.get("errors", []))
+                warnings = len(validation.get("warnings", []))
+                circuits = len(data.get("extracted", {}).get("outgoing_circuits", []))
+                if errors:
+                    return f"[Step 1-2] Extracted ({circuits} circuits) — {errors} error(s) need attention"
+                return f"[Step 1-2] ✅ Extracted ({circuits} circuits, {warnings} warning(s))"
+            return "[Step 1-2] ❌ Extraction failed"
 
     except (json.JSONDecodeError, TypeError):
         pass

@@ -41,6 +41,7 @@ COL5 = TB_LEFT + 330     # LEW
 ROW_TOP = TB_TOP          # 55
 ROW_MID = TB_TOP - 20     # 35  (header / data boundary)
 ROW_LOW = TB_TOP - 35     # 20  (CHECKED / DWG NO split)
+ROW_CHECK_DATE = 15       # Horizontal split between CHECKED and DATE sub-cells
 ROW_BOT = TB_BOTTOM       # 10
 
 # LEW sub-area vertical split
@@ -84,6 +85,9 @@ def draw_title_block_frame(backend: DrawingBackend) -> None:
     # -- Vertical divider in CHECKED / DWG NO area --
     backend.add_line((DWG_SPLIT_X, ROW_LOW), (DWG_SPLIT_X, TB_BOTTOM))
 
+    # -- Horizontal divider separating CHECKED and DATE sub-cells --
+    backend.add_line((COL5, ROW_CHECK_DATE), (DWG_SPLIT_X, ROW_CHECK_DATE))
+
     # ==========================================
     # FIELD LABELS (header text in each cell)
     # ==========================================
@@ -104,9 +108,10 @@ def draw_title_block_frame(backend: DrawingBackend) -> None:
     # Cell 5: LEW
     backend.add_mtext("LEW :", insert=(COL5 + 3, ROW_TOP - 2), char_height=2.0)
 
-    # Cell 6: CHECKED / DATE
+    # Cell 6a: CHECKED (upper sub-cell: ROW_LOW → ROW_CHECK_DATE)
     backend.add_mtext("CHECKED :", insert=(COL5 + 3, ROW_LOW - 2), char_height=2.0)
-    backend.add_mtext("DATE :", insert=(COL5 + 3, ROW_LOW - 7), char_height=2.0)
+    # Cell 6b: DATE (lower sub-cell: ROW_CHECK_DATE → ROW_BOT)
+    backend.add_mtext("DATE :", insert=(COL5 + 3, ROW_CHECK_DATE - 2), char_height=2.0)
 
     # Cell 7: DRAWING NO / REV
     backend.add_mtext("DRAWING NO. :", insert=(DWG_SPLIT_X + 3, ROW_LOW - 2), char_height=2.0)
@@ -186,10 +191,13 @@ def fill_title_block_data(
                 f"Mobile Number. : {lew_mobile}", insert=(COL5 + 3, ROW_TOP - 16), char_height=2.0,
             )
 
-    # -- Cell 6: CHECKED / DATE data --
+    # -- Cell 6a: CHECKED data (upper sub-cell) --
+    # Leave blank — to be filled by LEW after review
+
+    # -- Cell 6b: DATE data (lower sub-cell) --
     backend.add_mtext(
         date.today().strftime("%d %b %Y").upper(),
-        insert=(COL5 + 18, ROW_LOW - 7),
+        insert=(COL5 + 18, ROW_CHECK_DATE - 2),
         char_height=2.2,
     )
 

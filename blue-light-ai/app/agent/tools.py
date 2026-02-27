@@ -7,6 +7,7 @@ Tools:
 3. validate_sld_requirements — Check if requirements are complete
 4. generate_sld — Generate PDF + SVG files
 5. generate_preview — Generate SVG preview from existing file
+6. extract_sld_data — Extract structured SLD JSON from user text/description
 """
 
 import json
@@ -450,6 +451,31 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
             "error": "At least one sub_circuit is required.",
         })
 
+    # ── Defensive SS 638 compliance check ──────────────────────
+    # Even if agent skipped validate_sld_requirements step, block non-compliant generation.
+    from app.sld.sld_spec import validate_sld_requirements as spec_validate
+    spec_input = {
+        "kva": requirements.get("kva", 0),
+        "supply_type": requirements.get("supply_type", ""),
+        "breaker_rating": (main_breaker.get("rating") or main_breaker.get("rating_A") or 0),
+        "breaker_type": main_breaker.get("type", ""),
+        "breaker_poles": main_breaker.get("poles", ""),
+        "breaker_ka": main_breaker.get("fault_kA", 0),
+        "circuits": [
+            {"name": sc.get("name", ""), "breaker_rating": sc.get("breaker_rating", 0),
+             "breaker_type": sc.get("breaker_type", "MCB")}
+            for sc in sub_circuits
+        ],
+    }
+    spec_result = spec_validate(spec_input)
+    if spec_result.errors:
+        return json.dumps({
+            "success": False,
+            "error": "SS 638 compliance check failed. Call validate_sld_requirements first.",
+            "spec_errors": spec_result.errors,
+            "spec_warnings": spec_result.warnings,
+        })
+
     from app.sld.generator import SldGenerator
 
     file_id = uuid.uuid4().hex[:12]
@@ -508,6 +534,123 @@ def generate_preview(file_id: str) -> str:
     })
 
 
+# ── Tool 6: Extract SLD Data ──────────────────────────
+
+@tool
+def extract_sld_data(user_input: str) -> str:
+    """
+    Extract structured SLD data from user-provided text or description.
+    Analyzes the input to identify incoming supply specs, outgoing circuits,
+    and client information, then validates against SS 638/CP 5 standards.
+
+    Use this tool when the user provides SLD information as text or
+    describes an existing electrical installation for SLD generation.
+
+    The extracted data is automatically validated and corrected per
+    Singapore electrical standards. Returns a structured JSON with:
+    - extracted: Raw parsed data
+    - validation: Errors, warnings, auto-corrections
+    - generation_ready: Requirements dict ready for generate_sld()
+
+    Args:
+        user_input: Free-form text describing SLD requirements or installation details.
+            Can include breaker ratings, cable sizes, circuit descriptions, kVA, etc.
+    """
+    logger.info("extract_sld_data called with input (%d chars)", len(user_input))
+
+    from app.sld.extraction_schema import (
+        format_extraction_result,
+        parse_and_validate,
+    )
+
+    # For direct text parsing (without Gemini API), attempt JSON parse first
+    try:
+        raw_json = json.loads(user_input)
+        result = parse_and_validate(raw_json)
+    except (json.JSONDecodeError, TypeError):
+        # Not JSON — use Gemini for extraction
+        import asyncio
+        from app.sld.extraction_schema import extract_sld_from_text
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # We're already in an async context (LangGraph)
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    result = loop.run_in_executor(
+                        pool,
+                        lambda: asyncio.run(extract_sld_from_text(user_input)),
+                    )
+                    # Since we can't await here in a sync tool, use synchronous approach
+                    result = _sync_extract_sld(user_input)
+            else:
+                result = asyncio.run(extract_sld_from_text(user_input))
+        except RuntimeError:
+            result = _sync_extract_sld(user_input)
+
+    # Format for display
+    summary = format_extraction_result(result)
+
+    validation = result.get("validation", {})
+    has_errors = bool(validation.get("errors"))
+
+    return json.dumps({
+        "success": True,
+        "pipeline_steps_completed": ["input", "analysis", "validation"],
+        "next_step": (
+            "Fix the errors above, then re-extract or re-validate."
+            if has_errors
+            else "Proceed to generate_sld with generation_ready data."
+        ),
+        "summary": summary,
+        "extracted": result.get("extracted", {}),
+        "validation": validation,
+        "generation_ready": result.get("generation_ready", {}),
+    }, ensure_ascii=False, default=str)
+
+
+def _sync_extract_sld(user_input: str) -> dict:
+    """Synchronous wrapper for Gemini SLD extraction."""
+    import google.generativeai as genai
+
+    from app.sld.extraction_schema import (
+        SLD_EXTRACTION_PROMPT,
+        parse_and_validate,
+    )
+
+    genai.configure(api_key=settings.gemini_api_key)
+    model = genai.GenerativeModel(
+        model_name=settings.gemini_model,
+        system_instruction=SLD_EXTRACTION_PROMPT,
+        generation_config=genai.GenerationConfig(
+            response_mime_type="application/json",
+            temperature=0.1,
+        ),
+    )
+
+    response = model.generate_content(user_input)
+    raw_text = response.text
+
+    try:
+        raw_json = json.loads(raw_text)
+    except json.JSONDecodeError as e:
+        logger.error("Gemini returned invalid JSON: %s", e)
+        return {
+            "extracted": {},
+            "validation": {
+                "valid": False,
+                "errors": [f"Gemini returned invalid JSON: {e}"],
+                "warnings": [],
+                "corrections": {},
+            },
+            "corrected": {},
+            "generation_ready": {},
+        }
+
+    return parse_and_validate(raw_json)
+
+
 # ── Tool Registry ───────────────────────────────────
 
 ALL_TOOLS = [
@@ -516,4 +659,5 @@ ALL_TOOLS = [
     validate_sld_requirements,
     generate_sld,
     generate_preview,
+    extract_sld_data,
 ]
