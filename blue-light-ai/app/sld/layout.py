@@ -218,9 +218,10 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
     if name == "BUSBAR":
         return None
 
-    # Special: CIRCUIT_ID_BOX is centered on tap_x
+    # Special: CIRCUIT_ID_BOX — plain text label centered on tap_x (no box)
     if name == "CIRCUIT_ID_BOX":
-        return BoundingBox(x=comp.x - 4, y=comp.y, width=8, height=5)
+        text_w = len(comp.circuit_id or "") * _CHAR_W + 2
+        return BoundingBox(x=comp.x - text_w / 2, y=comp.y, width=text_w, height=3)
 
     # Special: DB_INFO_BOX extends downward from comp.y
     if name == "DB_INFO_BOX":
@@ -427,7 +428,7 @@ def _compute_group_width(
 
     Also sets group.left_extent and group.right_extent for asymmetric spacing.
     """
-    _MARGIN = 1.0  # mm inter-group safety margin per side
+    _MARGIN = 2.0  # mm inter-group safety margin per side
 
     if group.is_spare:
         group.left_extent = 7.5

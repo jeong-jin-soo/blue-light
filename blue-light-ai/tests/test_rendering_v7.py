@@ -453,12 +453,14 @@ class TestComputeBoundingBox:
         assert _compute_bounding_box(comp) is None
 
     def test_circuit_id_box_centered(self):
-        """CIRCUIT_ID_BOX should be centered on x."""
-        comp = PlacedComponent(symbol_name="CIRCUIT_ID_BOX", x=100, y=200, label="S1")
+        """CIRCUIT_ID_BOX should be centered on x (text-only, no box)."""
+        comp = PlacedComponent(symbol_name="CIRCUIT_ID_BOX", x=100, y=200, circuit_id="S1")
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        assert bb.x == pytest.approx(96.0)  # 100 - 4
-        assert bb.width == pytest.approx(8.0)
+        # Text width = len("S1") * 1.8 + 2 = 5.6, centered on x=100
+        assert bb.x == pytest.approx(100 - 5.6 / 2, abs=0.5)
+        assert bb.width == pytest.approx(5.6, abs=0.5)
+        assert bb.height == pytest.approx(3.0)
 
     def test_db_info_box_extends_down(self):
         """DB_INFO_BOX should extend downward from y."""

@@ -373,19 +373,11 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "CIRCUIT_ID_BOX":
-                # Small rectangle with circuit ID text at busbar tap point
-                box_w, box_h = 8, 5
-                bx = comp.x - box_w / 2
-                by = comp.y
-                backend.set_layer("SLD_SYMBOLS")
-                backend.add_lwpolyline(
-                    [(bx, by), (bx + box_w, by), (bx + box_w, by + box_h), (bx, by + box_h)],
-                    close=True,
-                )
+                # Circuit ID text at busbar tap point (no box)
                 backend.set_layer("SLD_ANNOTATIONS")
                 backend.add_mtext(
                     comp.circuit_id,
-                    insert=(bx + 1, by + box_h - 1),
+                    insert=(comp.x - 3, comp.y + 4),
                     char_height=1.8,
                 )
                 count += 1
