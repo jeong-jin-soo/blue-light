@@ -306,7 +306,41 @@ class SldGenerator:
         """Draw all components from the layout result. Returns count."""
         count = 0
 
-        for comp in layout_result.components:
+        # Pre-scan: identify duplicate breaker specs for label deduplication
+        # Build spec signature → list of component indices (sorted left-to-right)
+        breaker_spec_groups: dict[str, list[int]] = {}
+        for idx, comp in enumerate(layout_result.components):
+            if comp.label_style == "breaker_block":
+                sig = f"{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
+                breaker_spec_groups.setdefault(sig, []).append(idx)
+
+        # For groups with 2+ identical specs, only the FIRST (leftmost) gets full label
+        # Rest get a "ditto" arrow pointing left toward the first
+        ditto_breaker_indices: set[int] = set()
+        for sig, indices in breaker_spec_groups.items():
+            if len(indices) >= 2:
+                # Sort by x position (leftmost first)
+                sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
+                # All except the first are ditto
+                for i in sorted_indices[1:]:
+                    ditto_breaker_indices.add(i)
+
+        # Pre-scan: identify duplicate cable annotations for deduplication
+        # Cable annotation → list of component indices (sorted left-to-right)
+        cable_groups: dict[str, list[int]] = {}
+        for idx, comp in enumerate(layout_result.components):
+            if comp.label_style == "breaker_block" and comp.cable_annotation:
+                cable_groups.setdefault(comp.cable_annotation, []).append(idx)
+
+        # For groups with 2+ identical cables, only the FIRST (leftmost) gets cable text
+        ditto_cable_indices: set[int] = set()
+        for cable_text, indices in cable_groups.items():
+            if len(indices) >= 2:
+                sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
+                for i in sorted_indices[1:]:
+                    ditto_cable_indices.add(i)
+
+        for comp_idx, comp in enumerate(layout_result.components):
             if comp.symbol_name == "LABEL":
                 # Text-only component
                 backend.set_layer("SLD_ANNOTATIONS")
@@ -324,8 +358,8 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "FLOW_ARROW_UP":
-                # Current flow direction arrow (upward pointing -- v6 LEW-style)
-                _draw_flow_arrow(backend, comp.x, comp.y, direction="up")
+                # AC supply symbol "~" (per LEW guide convention)
+                _draw_ac_supply_symbol(backend, comp.x, comp.y)
                 count += 1
 
             elif comp.symbol_name == "BUSBAR":
@@ -421,7 +455,13 @@ class SldGenerator:
 
                     if comp.label_style == "breaker_block":
                         # LEW-style stacked breaker label block
-                        self._draw_breaker_block_label(backend, comp)
+                        is_ditto = comp_idx in ditto_breaker_indices
+                        is_cable_ditto = comp_idx in ditto_cable_indices
+                        self._draw_breaker_block_label(
+                            backend, comp,
+                            is_ditto=is_ditto,
+                            is_cable_ditto=is_cable_ditto,
+                        )
                     else:
                         # Default label rendering (for incoming chain components)
                         label_text = ""
@@ -458,6 +498,8 @@ class SldGenerator:
         self,
         backend: DrawingBackend,
         comp: PlacedComponent,
+        is_ditto: bool = False,
+        is_cable_ditto: bool = False,
     ) -> None:
         """
         Draw LEW-style breaker block label.
@@ -467,6 +509,9 @@ class SldGenerator:
             {poles}
             {breaker_type}
             {fault_kA}kA
+
+        When is_ditto=True, draws a "←" arrow instead of the full label
+        (LEW convention: identical specs written once, rest use ditto arrow).
 
         For vertical text (rotation=90), text runs upward from the breaker.
         The circuit ID is shown in the CIRCUIT_ID_BOX at the busbar tap point.
@@ -490,25 +535,38 @@ class SldGenerator:
 
         if abs(comp.rotation - 90.0) < 0.1:
             # Vertical text: breaker info to the RIGHT of the breaker, rotated 90 degrees
-            # Draw each info line as a separate column, going rightward from breaker
-            # Order: rating closest to breaker, fault_kA furthest right
-            # Wider offset for larger breaker types (MCCB/ACB have bigger arcs)
             if comp.breaker_type_str in ("MCCB", "ACB"):
                 base_x = comp.x + 16
             else:
                 base_x = comp.x + 12  # Standard offset for MCB
             char_h = 1.8
             line_gap = 3.5  # Fixed 3.5mm gap for consistent column spacing
-            for idx, line_text in enumerate(info_items):
+
+            if is_ditto:
+                # Ditto: draw "←" arrow pointing left (toward the first with full label)
+                # Arrow drawn at the center of where the label block would be
+                arrow_x = base_x + 2
+                arrow_y = comp.y + 2
+                # Horizontal arrow line (pointing left, rotated 90 for vertical layout)
                 backend.add_mtext(
-                    line_text,
-                    insert=(base_x + idx * line_gap, comp.y),
-                    char_height=char_h,
+                    "←",
+                    insert=(arrow_x, arrow_y),
+                    char_height=3.0,
                     rotation=90.0,
                 )
+            else:
+                # Full label: draw each info line as a separate column
+                for idx, line_text in enumerate(info_items):
+                    backend.add_mtext(
+                        line_text,
+                        insert=(base_x + idx * line_gap, comp.y),
+                        char_height=char_h,
+                        rotation=90.0,
+                    )
 
             # Inline cable annotation to the LEFT of conductor (vertical)
-            if comp.cable_annotation:
+            # Skip if cable is identical to a previous breaker (deduplication)
+            if comp.cable_annotation and not is_cable_ditto:
                 backend.add_mtext(
                     comp.cable_annotation,
                     insert=(comp.x - 6, comp.y),
@@ -872,6 +930,31 @@ def _draw_flow_arrow(
         "I",
         insert=(x + 2, y + 2),
         char_height=2.5,
+    )
+
+
+# -- Helper: AC supply symbol (~) --
+
+
+def _draw_ac_supply_symbol(
+    backend: DrawingBackend,
+    x: float,
+    y: float,
+) -> None:
+    """
+    Draw AC supply symbol: a circle with "~" inside.
+    Per LEW guide convention for incoming AC supply indication.
+    """
+    backend.set_layer("SLD_SYMBOLS")
+    r = 4.0  # Circle radius
+    backend.add_circle((x, y), radius=r)
+
+    # "~" text inside the circle
+    backend.set_layer("SLD_ANNOTATIONS")
+    backend.add_mtext(
+        "~",
+        insert=(x - 2, y + 2),
+        char_height=4.0,
     )
 
 

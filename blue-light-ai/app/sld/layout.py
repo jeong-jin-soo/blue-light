@@ -9,7 +9,7 @@ Bottom-up layout matching real LEW (Licensed Electrical Worker) SLD conventions:
 4. SP kWh Meter (direct metering for < 45kVA)
 5. Main breaker above metering (with kA fault rating & pole configuration)
 6. Main busbar horizontally (double-line professional representation)
-7. ELCB standalone branch on far-left of busbar (hanging BELOW per SG SLD samples)
+7. ELCB/RCCB inline in main chain (between main breaker and busbar per LEW guide)
 8. Sub-circuit breakers branching UPWARD from busbar
    with vertical text labels and multi-line breaker blocks
 9. Earth bar at bottom-left with dashed conductor connections
@@ -471,14 +471,7 @@ def _determine_final_positions(
     _MARGIN = 10.0  # busbar end margin
     _BOUND_MARGIN = 20.0  # distance from drawing edge
 
-    # Detect ELCB presence (reserve left space)
-    has_elcb = any(
-        c.symbol_name in ("CB_ELCB", "CB_RCCB")
-        for c in components
-    )
-    elcb_offset = 30.0 if has_elcb else _MARGIN
-
-    sc_bus_start = layout_result.busbar_start_x + elcb_offset
+    sc_bus_start = layout_result.busbar_start_x + _MARGIN
     sc_bus_end = layout_result.busbar_end_x - _MARGIN
 
     # Compute total needed span using asymmetric extents:
@@ -503,8 +496,8 @@ def _determine_final_positions(
             sc_bus_end = max_bus_end - _MARGIN
             available = sc_bus_end - sc_bus_start
 
-        # Also try expanding leftward (only if no ELCB occupying the space)
-        if total_needed > available and not has_elcb:
+        # Also try expanding leftward
+        if total_needed > available:
             min_bus_start = config.min_x + 15.0
             if layout_result.busbar_start_x > min_bus_start:
                 layout_result.busbar_start_x = min_bus_start
@@ -656,11 +649,11 @@ def _extend_busbar_to_cover_all(
             if (comp.symbol_name == "LABEL"
                     and "BUSBAR" in (comp.label or "").upper()
                     and abs(comp.rotation) < 0.1):
-                comp.x = layout_result.busbar_end_x - 30
+                comp.x = layout_result.busbar_end_x - 35
                 break
 
     # Note: DB_INFO_BOX position is NOT updated here.
-    # It is correctly positioned in compute_layout() with ELCB offset
+    # It is correctly positioned in compute_layout() relative to busbar_start_x
     # and should not be overridden.
 
 
@@ -761,43 +754,40 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
               f"\\P50Hz, SP PowerGrid",
     ))
 
-    # Phase lines with labels (at bottom, pointing upward)
+    # Phase lines with labels (at bottom, pointing upward) — compact layout
+    ph_half = 3  # Phase line half-height (was 5, reduced 40%)
     if supply_type == "three_phase":
-        spacing = 5  # 5mm between phase lines
+        spacing = 4  # 4mm between phase lines (was 5)
         for offset, label in [(-spacing*1.5, "L1"), (-spacing*0.5, "L2"),
                                (spacing*0.5, "L3"), (spacing*1.5, "N")]:
-            # Phase line (short vertical segment)
-            result.connections.append(((cx + offset, y - 5), (cx + offset, y + 5)))
-            # Phase label (below the lines)
+            result.connections.append(((cx + offset, y - ph_half), (cx + offset, y + ph_half)))
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
                 x=cx + offset - 2,
-                y=y - 8,
+                y=y - ph_half - 3,
                 label=label,
             ))
-        # Merge to single line (horizontal bar at top of phase lines)
-        result.connections.append(((cx - spacing * 1.5, y + 5), (cx + spacing * 1.5, y + 5)))
-        result.connections.append(((cx, y + 5), (cx, y + 10)))
+        result.connections.append(((cx - spacing * 1.5, y + ph_half), (cx + spacing * 1.5, y + ph_half)))
+        result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
     else:
-        # Single-phase: L and N labels
-        spacing = 5
+        spacing = 4
         for offset, label in [(-spacing * 0.5, "L"), (spacing * 0.5, "N")]:
-            result.connections.append(((cx + offset, y - 5), (cx + offset, y + 5)))
+            result.connections.append(((cx + offset, y - ph_half), (cx + offset, y + ph_half)))
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
                 x=cx + offset - 2,
-                y=y - 8,
+                y=y - ph_half - 3,
                 label=label,
             ))
-        result.connections.append(((cx - spacing * 0.5, y + 5), (cx + spacing * 0.5, y + 5)))
-        result.connections.append(((cx, y + 5), (cx, y + 10)))
-    y += 10
+        result.connections.append(((cx - spacing * 0.5, y + ph_half), (cx + spacing * 0.5, y + ph_half)))
+        result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
+    y += ph_half + 4  # Reduced from y += 10
 
-    # Current flow direction arrow (upward pointing)
+    # AC supply symbol "~" (per LEW guide — circle with ~ inside)
     result.components.append(PlacedComponent(
         symbol_name="FLOW_ARROW_UP",
-        x=cx + 25,
-        y=y - 4,
+        x=cx,
+        y=y,
     ))
 
     # Incoming cable annotation
@@ -837,8 +827,8 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     if metering:
         meter_board_start_y = y  # Track start of meter board for label positioning
         # Compact spacing for meter board (saves vertical space for sub-circuit labels)
-        _stub = 2   # Compact post-component stub (vs config.stub_len = 5)
-        _gap = 1    # Compact connection gap (vs 3)
+        _stub = 1   # Ultra-compact post-component stub
+        _gap = 1    # Compact connection gap
 
         # 2a. Meter Isolator (DP for single-phase, TPN for 3-phase)
         result.connections.append(((cx, y), (cx, y + _gap)))
@@ -938,7 +928,17 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         y += 2
         result.symbols_used.add("ISOLATOR")
 
+    # Read ELCB config early (needed for inline placement before busbar)
+    elcb_config = requirements.get("elcb", {})
+    elcb_rating = elcb_config.get("rating", 0) if isinstance(elcb_config, dict) else 0
+    elcb_ma = elcb_config.get("sensitivity_ma", 30) if isinstance(elcb_config, dict) else 30
+    elcb_type_str = (
+        elcb_config.get("type", "ELCB").upper()
+        if isinstance(elcb_config, dict) else "ELCB"
+    )
+
     # -- 4. Main Circuit Breaker --
+    db_box_start_y = y - 2  # Track DB box bottom (just below main breaker entry)
 
     if breaker_type == "ACB":
         cb_w, cb_h = 16, 22
@@ -965,10 +965,29 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         label=main_label,
         rating=main_rating,
     ))
-    y += cb_h + 3 + 2
-    result.connections.append(((cx, y), (cx, y + 2)))
-    y += 2
+    y += cb_h + 2 + 1  # Compact: stub(2) + gap(1)
+    result.connections.append(((cx, y), (cx, y + 1)))
+    y += 1
     result.symbols_used.add(breaker_type)
+
+    # -- 4a. ELCB/RCCB (inline between Main Breaker and Busbar per LEW guide) --
+    if elcb_rating:
+        elcb_symbol = "CB_RCCB" if elcb_type_str == "RCCB" else "CB_ELCB"
+        elcb_w, elcb_h = 14, 20  # ELCB/RCCB dims (same as MCCB)
+        elcb_poles = elcb_config.get("poles", 4) if isinstance(elcb_config, dict) else 4
+        elcb_poles_str = "DP" if elcb_poles == 2 else "4P"
+
+        result.components.append(PlacedComponent(
+            symbol_name=elcb_symbol,
+            x=cx - elcb_w / 2,
+            y=y,
+            label=f"{elcb_rating}A {elcb_poles_str} {elcb_type_str}",
+            rating=f"({elcb_ma}mA)",
+        ))
+        y += elcb_h + 2 + 1  # Compact: stub(2) + gap(1)
+        result.connections.append(((cx, y), (cx, y + 1)))
+        y += 1
+        result.symbols_used.add(elcb_type_str)
 
     # -- 5. Main Busbar --
     sub_circuits = requirements.get("sub_circuits", [])
@@ -1012,11 +1031,6 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         if busbar_rating <= 100
         else f"{busbar_rating}A BUSBAR"
     )
-    # Read ELCB config early (needed for label positioning below busbar)
-    elcb_config = requirements.get("elcb", {})
-    elcb_rating = elcb_config.get("rating", 0) if isinstance(elcb_config, dict) else 0
-    elcb_ma = elcb_config.get("sensitivity_ma", 30) if isinstance(elcb_config, dict) else 30
-
     result.components.append(PlacedComponent(
         symbol_name="BUSBAR",
         x=bus_start_x,
@@ -1024,11 +1038,12 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         label=f"{breaker_rating}A DB",
         rating="",
     ))
-    # Busbar rating label as separate LABEL component (overlap-resolvable)
+    # Busbar rating label — positioned BELOW busbar on the right side
+    # (moved from above to avoid overlap with sub-circuit labels)
     result.components.append(PlacedComponent(
         symbol_name="LABEL",
-        x=bus_end_x - 30,
-        y=y + 5,
+        x=bus_end_x - 35,
+        y=y - 3,
         label=busbar_label,
     ))
 
@@ -1044,8 +1059,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     if application_info:
         premises_addr = application_info.get("address", "")
 
-    # Position: offset right when ELCB hangs below left side
-    db_info_x = bus_start_x + (45 if elcb_rating else 0)
+    db_info_x = bus_start_x
     db_info_text = f"APPROVED LOAD: {approved_kva}KVA AT {voltage}V"
     if premises_addr:
         db_info_text += f"\\P(LOCATED AT PREMISES {premises_addr})"
@@ -1061,9 +1075,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     # Connection from main breaker to busbar
     result.connections.append(((cx, y - 3), (cx, y)))
 
-    # -- 6. ELCB + Sub-circuits (branching UPWARD) --
-    # (elcb_config, elcb_rating, elcb_ma already read above for label positioning)
-
+    # -- 6. Sub-circuits (branching UPWARD) --
     # Pre-assign circuit IDs (S/P for single-phase, L1P1/L2P1 for 3-phase)
     circuit_ids = _assign_circuit_ids(sub_circuits, supply_type)
 
@@ -1093,55 +1105,30 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
             # Vertical connection between rows
             result.connections.append(((cx, y + 2), (cx, busbar_y_row)))
 
-        # Add ELCB/RCCB hanging BELOW the busbar on the far left
-        # (matching real Singapore SLD samples where ELCB hangs under the busbar)
-        if elcb_rating and row_idx == 0:
-            elcb_tap_x = row_bus_start + 10
-            elcb_h = 20  # ELCB/RCCB symbol height
-            elcb_gap = 12  # Gap between busbar and ELCB top (clearance for labels)
-            elcb_comp_y = busbar_y_row - elcb_gap - elcb_h  # BELOW busbar
-
-            # Vertical line from busbar DOWN to ELCB top
-            elcb_top_y = elcb_comp_y + elcb_h + 5  # top pin of ELCB symbol
-            result.connections.append(((elcb_tap_x, busbar_y_row), (elcb_tap_x, elcb_top_y)))
-
-            # Determine symbol: RCCB or ELCB based on elcb_config "type" field
-            elcb_type_str = (
-                elcb_config.get("type", "ELCB").upper()
-                if isinstance(elcb_config, dict) else "ELCB"
-            )
-            elcb_symbol = "CB_RCCB" if elcb_type_str == "RCCB" else "CB_ELCB"
-            result.components.append(PlacedComponent(
-                symbol_name=elcb_symbol,
-                x=elcb_tap_x - 7,
-                y=elcb_comp_y,
-            ))
-
-            # Tail extending downward from ELCB bottom
-            elcb_bottom_y = elcb_comp_y - 5  # bottom pin of ELCB symbol
-            result.connections.append(((elcb_tap_x, elcb_bottom_y), (elcb_tap_x, elcb_bottom_y - 6)))
-
-            # Label -- to the RIGHT of the ELCB symbol (avoiding overlap with DB info box)
-            elcb_poles = elcb_config.get("poles", 4) if isinstance(elcb_config, dict) else 4
-            elcb_poles_str = "DP" if elcb_poles == 2 else "4P"
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=elcb_tap_x + 12,
-                y=elcb_comp_y + 10,
-                label=f"{elcb_rating}A {elcb_poles_str}\\P{elcb_type_str}\\P({elcb_ma}mA)",
-            ))
-            result.symbols_used.add(elcb_type_str)
-
-        # Offset sub-circuit area when ELCB is present (reserve left space)
         sc_bus_start = row_bus_start
-        if elcb_rating and row_idx == 0:
-            sc_bus_start = row_bus_start + 30  # Skip ELCB area
 
         _place_sub_circuits_upward(
             result, row_circuits, row_idx, row_count,
             busbar_y_row, sc_bus_start, row_bus_end,
             h_spacing, config, sub_circuits, supply_type, circuit_ids,
         )
+
+    # -- 6a. DB Box (dashed rectangle around distribution board per LEW guide) --
+    # Encompasses: main breaker, ELCB/RCCB, busbar, and all sub-circuit breakers
+    # Similar pattern to meter board dashed box (lines 900-918)
+    db_box_end_y = busbar_y_row + 8 + config.mcb_h + config.stub_len + 6 + 15
+    # = busbar + gap(8) + breaker_height + stub + tail(6) + label(15)
+    db_box_left = result.busbar_start_x - 5
+    db_box_right = result.busbar_end_x + 5
+    # Clamp to drawing bounds
+    db_box_left = max(db_box_left, config.min_x + 2)
+    db_box_right = min(db_box_right, config.max_x - 2)
+
+    # Four sides of dashed rectangle (DB Box)
+    result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_right, db_box_start_y)))
+    result.dashed_connections.append(((db_box_left, db_box_end_y), (db_box_right, db_box_end_y)))
+    result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_left, db_box_end_y)))
+    result.dashed_connections.append(((db_box_right, db_box_start_y), (db_box_right, db_box_end_y)))
 
     # -- 7. Earth Bar --
     # Position at right side, below busbar (Singapore SLD convention)

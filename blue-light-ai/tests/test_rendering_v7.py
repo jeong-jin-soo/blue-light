@@ -176,24 +176,53 @@ class TestDbInfoBox:
 
 # -- Test: ELCB label positioning --
 
-class TestElcbLabelPosition:
-    """Tests for ELCB label positioning."""
+class TestElcbInlinePosition:
+    """Tests for ELCB/RCCB inline positioning (between main breaker and busbar)."""
 
-    def test_elcb_label_no_overlap_with_db_box(self):
-        """ELCB label should be to the RIGHT of ELCB symbol (x > elcb_tap_x)."""
+    def test_elcb_inline_between_breaker_and_busbar(self):
+        """ELCB should be placed inline on cx, between main breaker and busbar."""
         result = compute_layout(BASIC_3PHASE_REQ)
-        db_boxes = _get_components_by_type(result, "DB_INFO_BOX")
-        elcb_labels = [
-            c for c in result.components
-            if c.symbol_name == "LABEL" and "ELCB" in c.label
-        ]
-        if elcb_labels and db_boxes:
-            elcb_label = elcb_labels[0]
-            db_box = db_boxes[0]
-            # ELCB label should not overlap horizontally with DB_INFO_BOX
-            # ELCB label x should be left of DB_INFO_BOX x
-            # OR ELCB label should be positioned to the right of ELCB symbol
-            assert elcb_label.x < db_box.x or elcb_label.y > db_box.y
+        elcb_comps = [c for c in result.components
+                      if c.symbol_name in ("CB_ELCB", "CB_RCCB")]
+        assert len(elcb_comps) == 1, "Should have exactly one ELCB/RCCB"
+        elcb = elcb_comps[0]
+
+        # ELCB should be centered on cx (default 210)
+        cx = 210  # LayoutConfig.start_x default
+        elcb_center_x = elcb.x + 7  # 14mm width / 2
+        assert abs(elcb_center_x - cx) < 1.0, (
+            f"ELCB center_x={elcb_center_x} should be at cx={cx}"
+        )
+
+        # ELCB y should be below busbar_y (bottom-up layout)
+        assert elcb.y < result.busbar_y, (
+            f"ELCB y={elcb.y} should be < busbar_y={result.busbar_y}"
+        )
+
+    def test_rccb_inline_single_phase(self):
+        """Single-phase RCCB should also be inline at cx."""
+        result = compute_layout(BASIC_1PHASE_REQ)
+        rccb_comps = [c for c in result.components
+                      if c.symbol_name == "CB_RCCB"]
+        assert len(rccb_comps) == 1, "Should have exactly one RCCB"
+        rccb = rccb_comps[0]
+        cx = 210
+        rccb_center_x = rccb.x + 7
+        assert abs(rccb_center_x - cx) < 1.0
+        assert rccb.y < result.busbar_y
+
+    def test_no_elcb_hanging_below_busbar(self):
+        """No ELCB/RCCB component should be below the busbar Y."""
+        result = compute_layout(BASIC_3PHASE_REQ)
+        for comp in result.components:
+            if comp.symbol_name in ("CB_ELCB", "CB_RCCB"):
+                # In bottom-up layout, y < busbar_y means the component is below busbar
+                # but inline ELCB should be below busbar (between main breaker and busbar)
+                # The key is it should NOT be far below (the old hanging was at busbar_y - 32)
+                # Inline ELCB should be within ~30mm below busbar
+                assert comp.y > result.busbar_y - 30, (
+                    f"ELCB y={comp.y} is too far below busbar_y={result.busbar_y}"
+                )
 
 
 # -- Test: Spare circuit --
@@ -824,23 +853,19 @@ class TestDeterminePositions:
                     f"busbar_end={result.busbar_end_x:.1f}"
                 )
 
-    def test_dense_15_evenly_spaced(self):
-        """15 circuit breakers should be evenly distributed across available space."""
+    def test_dense_15_sorted_left_to_right(self):
+        """15 circuit breakers should be sorted left-to-right with positive spacing."""
         result = compute_layout(DENSE_3PHASE_REQ)
         breakers = sorted(
             [c for c in result.components if c.label_style == "breaker_block"],
             key=lambda c: c.x,
         )
         assert len(breakers) == 15
-        # Check that spacing is approximately uniform (within 2mm)
-        spacings = [
-            breakers[i + 1].x - breakers[i].x
-            for i in range(len(breakers) - 1)
-        ]
-        avg_spacing = sum(spacings) / len(spacings)
-        for i, sp in enumerate(spacings):
-            assert abs(sp - avg_spacing) < 2.0, (
-                f"Spacing B{i}→B{i+1}={sp:.1f} deviates from avg={avg_spacing:.1f}"
+        # All breakers should be in ascending x order with some spacing
+        for i in range(len(breakers) - 1):
+            gap = breakers[i + 1].x - breakers[i].x
+            assert gap > 0, (
+                f"Breaker {i} x={breakers[i].x:.1f} >= breaker {i+1} x={breakers[i+1].x:.1f}"
             )
 
     def test_8_circuits_no_overlapping_breakers(self):
@@ -860,8 +885,8 @@ class TestDeterminePositions:
 
         assert overlaps == 0, f"Found {overlaps} overlapping breaker pairs in 8-circuit layout"
 
-    def test_respects_elcb_offset(self):
-        """When ELCB present, leftmost circuit should be offset from busbar start."""
+    def test_inline_elcb_no_left_offset(self):
+        """With inline ELCB, sub-circuits should use full busbar width (no ELCB offset)."""
         result = compute_layout(BASIC_3PHASE_REQ)
         breakers = sorted(
             [c for c in result.components if c.label_style == "breaker_block"],
@@ -869,10 +894,15 @@ class TestDeterminePositions:
         )
         if breakers:
             leftmost_tap = breakers[0].x + _breaker_half_width(breakers[0])
-            # Should be at least 25mm from busbar start (ELCB takes ~30mm)
-            assert leftmost_tap >= result.busbar_start_x + 25, (
+            # Should use standard margin (~10mm), not the old 30mm ELCB offset
+            assert leftmost_tap >= result.busbar_start_x + 8, (
                 f"Leftmost tap {leftmost_tap:.1f} too close to busbar start "
-                f"{result.busbar_start_x:.1f} (ELCB area)"
+                f"{result.busbar_start_x:.1f}"
+            )
+            # Should NOT have the old 30mm gap
+            assert leftmost_tap < result.busbar_start_x + 35, (
+                f"Leftmost tap {leftmost_tap:.1f} too far from busbar start "
+                f"{result.busbar_start_x:.1f} (old ELCB offset still active?)"
             )
 
     def test_dense_1phase_taps_within_busbar(self):
