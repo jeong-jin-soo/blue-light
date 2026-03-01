@@ -1,0 +1,112 @@
+filename,supply_type,kva,voltage,main_breaker_type,main_breaker_rating_a,main_breaker_poles,main_breaker_ka,main_breaker_char,incoming_cable,cable_size_mm2,cable_type,elcb_type,elcb_rating_a,elcb_sensitivity_ma,busbar_rating_a,busbar_type,metering_type,ct_ratio,total_sub_circuits,mcb_breakdown,has_sub_db,has_ats,is_cable_extension,sub_circuit_rows,client_name,address
+100A Single Phase DB 1.pdf,single_phase,23.0,230,MCB,100,DP,10,B,2 x 1C 50mm XLPE CABLE + 25sqmm CPC PVC CABLE,50mm,XLPE/PVC,RCCB,100,30,100,COMB,,,5,"{""10A"": 1, ""20A"": 4}",False,False,False,1,,"170 Upper Bukit Timah Rd
+B2-K01 Shoping Centre
+Singapore 588179"
+100A TPN SLD 1.pdf,three_phase,69.282,400,MCB,100,4P,10,B,4x50mm²/1C XLPE CABLE + 25mm² CPC IN METAL TRUNKING,50mm²,XLPE,,,,100,COMB,sp_meter,,4,"{""10A"": 4}",,,,,,
+100A TPN SLD 2.pdf,three_phase,69.282,400,MCB,100,4P,10,B,4x35mm²/1C PVC CABLE + 25mm² CPC IN METAL TRUNKING,35mm²,PVC,RCCB,100,30,100,COMB,sp_meter,,17,"{""10A"": 9, ""20A"": 8}",False,False,False,2,PINNACLE SPORTS SG PTE LTD,2 Gambas Crescent #08-37 Nordcom Tower 2 Singapore 757044
+125A TPN SLD 1.pdf,three_phase,69.282,400,MCCB,125,4P,10,C,4 x 1C 50mm XLPE CABLE + 25sqmm CPC PVC CABLE,50mm,XLPE/PVC,ELCB,100,30,100,COPPER,ct_meter,,0,,,,,,,
+150A RYB SLD 1.pdf,three_phase,104.0,400,MCCB,150,TPN,45,,4 x 120mm² XLPE/SWA/PVC (COPPER),120mm²,XLPE/SWA/PVC,,,,150,COPPER,ct_meter,150/5A,0,,,,,,,
+150A TPN SLD 1.pdf,three_phase,100.0,400,MCCB,150,4P,,,4 x 185sqmm XLPE + 185sqmm PVC CPC CABLE ON CABLE TRAY,185sqmm,XLPE/PVC,ELCB,150,300,150,COPPER,ct_meter,150/5A,0,,,,,,,
+150A TPN SLD 2.pdf,three_phase,103.92,400,MCCB,150,TPN,19,,4x1C 70mm² XLPE/PVC + 1x35mm² PVC/CPC IN METAL TRUNKING,70mm²,XLPE/PVC,,,,150,COPPER,ct_meter,150/5A,4,"{""20A"": 3}",,,,,,
+150A TPN SLD 3.pdf,three_phase,138.564,400,MCCB,150,TPN,35,,4 x 70mm² XPLE/PVC CABLE + 35mm² PVC EARTH IN TRUNKING,70mm²,XPLE/PVC,,,,100,COPPER,ct_meter,150/5A,0,,,,,,,
+150A TPN Sub DB SLD.pdf,three_phase,104.0,400,MCCB,150,TPN,36,,4 x 70sqmm XLPE + 70sqmm PVC CPC CABLE ON CABLE TRAY,70sqmm,XLPE/PVC,,,,,,,,21,"{""20A"": 21}",,,,,,
+200A RYB SLD 1.pdf,three_phase,138.0,400,MCCB,200,TPN,35,,4 x 95sqmm XLPE / PVC + 50sqmm PVC E ON CABLE TRAY,95sqmm,XLPE/PVC,,,,200,,ct_meter,200/5A,0,,,,,,,
+200A RYB SLD 2.pdf,three_phase,138.56,400,MCCB,200,4P,35,,4 x 120mm² PVC CABLE + 70mm² CPC IN CABLE TRAY,120mm²,PVC,,,,,,ct_meter,200/5A,7,"{""63A"": 4, ""100A"": 2, ""32A"": 1}",,,,,,
+200A TPN SLD 1.pdf,three_phase,138.0,400,MCCB,200,TPN,23,,4 x 120mm² PVC CABLE + 70mm² CPC IN CABLE TRAY,120mm²,PVC,,,,200,COPPER,ct_meter,200/5A,0,,,,,,,
+200A TPN SLD 2.pdf,three_phase,43.65,400,MCB,63,4P,,B,1 x 5C 25mm² NEOPRENE CABLE,25mm²,NEOPRENE,RCCB,63,30,63,,,,18,"{""20A"": 18}",True,False,False,1,CPCM AMUSEMENT PTE LTD,VIVO CITY
+200A TPN SLD 3.pdf,three_phase,138.564,400,MCCB,200,TPN,35,,4 x 95mm² XPLE/PVC CABLE + 50mm² CPC IN METAL TRUNKING,95mm²,XPLE/PVC,RCCB,40,30,100,,ct_meter,200/5A,6,"{""10A"": 6}",,,,,,
+3-Phase incoming tap Single Phase DB 1.pdf,single_phase,14.48,230,MCB,63,DP,10,B,2 x 1C 16sqmm PVC + 16sqmm PVC CPC IN TRUNKING/CONDUIT,16mm²,PVC,RCCB,63,30,100,COMB,ct_meter,63/5A,9,"{""20A"": 7, ""16A"": 2}",False,False,False,1,HERB & TEA FUTUROLOGY PTE LTD,"20 BIOPOLIS WY, B1-10E,LAB 5 SINGAPORE 138668"
+3-Phase incoming tap Single Phase DB 2.pdf,three_phase,32.89,400,MCB,63,TPN,10,C,4C 16mm² PVC CABLE + 16mm² PVC CPC IN METAL TRUNKING,16,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,5,"{""20A"": 4, ""63A"": 1}",True,False,False,1,BEWELL HEALTH TECHNOLOGY PTE LTD,"112 Katong #04-29
+112 East Coase Road
+Singapore 428802"
+300A TPN SLD 1.pdf,three_phase,207.84,400,MCCB,300,TPN,36,,4 x 150mm² PVC CABLE + 100mm² CPC IN CABLE TRAY,150mm²,PVC,,,,100,,ct_meter,300/5A,0,,,,,,,
+300A TPN SLD 2.pdf,three_phase,207.0,400,MCCB,300,TPN,36,,4 x 150sqmm XLPE / PVC CABLE + 75sqmm CPC IN CABLE TRAY,150sqmm,XLPE/PVC,,,,,COPPER,ct_meter,300/5A,1,"{""40A"": 1}",,,,,,
+32A Single Phase DB 1.pdf,single_phase,7.36,230,MCB,32,DP,10,C,2 x 1C 25mm² PVC CABLE + 25mm² PVC CPC IN METAL TRUNKING,25mm²,PVC,RCCB,40,30,100,COMB,sp_meter,,9,"{""10A"": 3, ""20A"": 6}",False,False,False,2,COMVITA,ONE RAFFLES PLACE
+32A Single Phase DB 2.pdf,single_phase,7.36,230,MCB,32,DP,10,B,4x10mm²/1C PVC/PVC CABLE + 10mm² CPC IN METAL TRUNKING,10mm²,PVC/PVC,ELCB,32,30,100,COMB,,,15,"{""10A"": 7, ""20A"": 8}",False,False,False,2,COMVITA,"TANGS, TANG PLAZA"
+32A Single Phase DB 3.pdf,single_phase,7.36,230,MCB,32,DP,10,C,2 x 1C 10mm² PVC CABLE + 10mm² CPC IN METAL TRUNKING,10mm²,PVC,RCCB,40,30,100,,sp_meter,,6,"{""20A"": 6}",False,False,False,1,INVESS0 PTE LTD,"80 MARINE PARADE ROAD
+#01-K31 PARKWAY PARADE
+SINGAPORE 449269"
+32A Single Phase DB 4.pdf,single_phase,7.36,230,MCB,32,DP,10,C,2 x 1C 25mm² PVC CABLE + 25mm² PVC CPC IN METAL TRUNKING,25mm²,PVC,ELCB,40,30,80,COMB,sp_meter,,6,"{""6A"": 2, ""20A"": 3, ""16A"": 1}",False,False,False,1,DIORA SPA BY MICHELLE,"14 SCOTTS ROAD, #05-80, FAR EAST PLAZA SINGAPORE 228213"
+32A Single Phase DB 5.pdf,single_phase,7.36,230,MCB,32,DP,10,C,2 x 1C 16mm² PVC CABLE + 16mm² PVC CPC IN METAL TRUNKING,16mm²,PVC,RCCB,32,30,100,COMB,sp_meter,,8,"{""10A"": 3, ""20A"": 5}",False,False,False,1,THOMSON PLAZA,#01-83
+32A Single Phase DB 6.pdf,single_phase,7.36,230,MCB,32,DP,10,C,2 x 1C 25mm² PVC CABLE + 25mm² PVC CPC IN METAL TRUNKING,25mm²,PVC,RCCB,40,30,80,COMB,sp_meter,,4,"{""10A"": 2, ""20A"": 2}",True,False,False,1,Promiss,"West Coast Plaza #01-06
+154 West Coast Road
+Singapore 127371"
+32A TPN SLD 1.pdf,three_phase,22.17,400,MCB,32,4P,,,4C 10mm² PVC CABLE + 10mm² CPC IN METAL TRUNKING,10mm²,PVC,RCCB,40,30,,,sp_meter,,0,,,,,,,
+400A TPN SLD 1.pdf,three_phase,276.0,400,MCCB,400,TPN,50,,4 x 185sqmm XLPE + 150sqmm PVC CPC CABLE ON CABLE TRAY (EXISTING),185sqmm,XLPE/PVC,,,,400,COPPER,ct_meter,400/5A,1,,,,,,,
+40A Single Phase DB 1.pdf,single_phase,9.2,230,MCB,40,DP,10,C,2 x 1C 10sqmm PVC + 10sqmm PVC CPC IN METAL TRUNKING,10sqmm,PVC/PVC,RCCB,40,30,80,COMB,sp_meter,,19,"{""10A"": 4, ""20A"": 15}",False,False,False,2,,
+40A Single Phase DB 2.pdf,single_phase,9.2,230,MCB,40,DP,10,C,2 x 1C 25sqmm PVC/PVC + 10sqmm PVC CPC IN METAL TRUNKING,25sqmm,PVC/PVC,RCCB,40,30,80,COMB,sp_meter,,11,"{""10A"": 3, ""20A"": 8}",False,False,False,2,,320 SEMBAWANG CLOSE #11-271 S 750320
+40A Single Phase DB 3.pdf,single_phase,9.2,230,MCB,40,DP,10,B,2 x 1C 10mm² PVC CABLE + 10mm² CPC IN METAL TRUNKING,10mm²,PVC,RCCB,40,30,100,,sp_meter,,10,"{""10A"": 6, ""20A"": 4}",False,False,False,2,EMMYCO PTE LTD,"FAR EAST PLAZA #04-113A
+14 SCOTTS ROAD
+SINGAPORE 228213"
+40A Single Phase DB 4.pdf,single_phase,9.2,230,MCB,40,DP,10,B,2 x 1C 16mm² PVC CABLE + 16mm² CPC IN TRUNKING,16mm²,PVC,RCCB,40,30,100,,sp_meter,,6,"{""10A"": 3, ""20A"": 3}",False,False,False,1,One2play Pte Ltd,"Waterway Point #02-K3
+83 Punggol Central,
+Singapore 828761"
+40A Single Phase DB 5.pdf,single_phase,9.2,230,MCB,40,DP,10,,2 x 10mm² PVC CABLE + CPC 10mm² IN TRUNKING,10mm²,PVC,RCCB,40,30,100,COMB,sp_meter,,6,"{""10A"": 2, ""16A"": 4}",False,False,False,1,HATSU HANA,"CUPPAGE PLAZA
+#02-15"
+40A Single Phase DB 6.pdf,single_phase,9.2,230,MCB,40,DP,10,B,2 x 1C 16mm² PVC CABLE + 16mm² PVC CPC IN TRUNKING / CONDUIT,16,PVC,RCCB,40,30,80,COMB,,,6,"{""10A"": 2, ""20A"": 4}",False,False,False,1,PROMISS,"WHITE SANDS MALL #02-23A
+1 PASIR RIS CENTRAL ST 3
+SINGAPORE 518457"
+40A TPN SLD 1.pdf,three_phase,22.17,400,MCB,40,4P,10,C,4x1C 16mm² PVC CABLE + 16mm² CPC IN TRUNKING,16mm²,PVC,RCCB,40,30,100,COPPER,sp_meter,,7,"{""10A"": 6}",,,,,,
+40A TPN SLD 2.pdf,three_phase,27.713,400,MCB,40,TPN,10,C,2 x 1C 25sqmm PVC/PVC + 10sqmm PVC CPC IN METAL TRUNKING,25sqmm,PVC/PVC,ELCB,40,30,100,COMB,sp_meter,,19,"{""10A"": 3, ""20A"": 6, ""32A"": 2}",True,False,False,1,YUYI 5 PTE LTD,"PLQ MALL #B2-K1
+10 PAYA LEBAR RD
+SINGAPORE 409057"
+40A TPN SLD 3.pdf,three_phase,55.426,400,MCB,80,4P,10,B,4x35mm²/1C XLPE CABLE + 25mm² CPC IN METAL TRUNKING,35mm²,XLPE,RCCB,40,30,100,COMB,sp_meter,,14,"{""10A"": 3, ""20A"": 10, ""40A"": 1}",,,,,,
+40A TPN SLD 4.pdf,three_phase,22.713,400,MCB,40,4P,10,C,4 x 1C 10mm² PVC CABLE + 10mm² CPC IN TRUNKING,10mm²,PVC,RCCB,40,30,100,,sp_meter,,13,"{""32A"": 1, ""10A"": 6, ""20A"": 6}",False,False,False,2,SUMMER ACAI (BUKIT TIMAH) PTE LTD,"Canberra Plaza #B1-07
+133 Canberra VW,
+Singapore 750133"
+40A TPN SLD 5.pdf,three_phase,22.713,400,MCB,40,TPN,10,B,4 x 1C 10mm² PVC CABLE + 10mm² CPC IN TRUNKING,10mm²,PVC,RCCB,40,30,100,,sp_meter,,2,"{""10A"": 2}",,,,,,
+40A TPN SLD 6.pdf,three_phase,22.17,400,MCB,40,4P,10,C,4x1C 16mm² PVC CABLE + 16mm² CPC IN TRUNKING,4x1C 16mm²,PVC,RCCB,40,30,100,,sp_meter,,12,"{""10A"": 6, ""20A"": 6}",False,False,False,2,,"3 Tampines North Drive 5, #04-07 Singapore 529484"
+500A TPN SLD 1.pdf,three_phase,95.426,400,MCCB,150,4P,35,,1 X 4C 35sqmm XLPE / PVC CABLE / 1 X 16sqmm GFCU IN CABLE TRAY,35sqmm,XLPE/PVC,ELCB,150,300,200,COPPER,ct_meter,200/5A,28,"{""20A"": 20, ""10A"": 8}",,,,,,
+63A RYB SLD 1.pdf,three_phase,43.648,400,MCB,63,4P,10,C,4 x 1C 25mm² PVC CABLE + 25mm² CPC IN METAL TRUNKING FROM LANDLORD SUPPLY,25mm²,PVC,RCCB,63,30,100,,sp_meter,,22,"{""10A"": 7, ""20A"": 13, ""32A"": 2}",False,False,False,1,playarena - 1008 TPY North,UNIT #05-14/15
+63A Single Phase DB 1.pdf,single_phase,14.49,230,MCB,63,DP,10,,2 x 16mm² PVC CABLE + CPC 2 16mm² IN TRUNKING,16mm²,PVC,RCCB,63,30,100,COMB,sp_meter,,9,"{""10A"": 3, ""20A"": 4, ""32A"": 2}",False,False,False,1,SOCIAL FIGHT COLLECTIVE PTE LTD,"4 Jalan Mat Jambol
+#B01-01
+Singapore 119554"
+63A Single Phase DB 2.pdf,single_phase,14.5,230,MCB,63,DP,10,B,2 x 1C 25mm² PVC CABLE + 25mm² PVC CPC IN METAL TRUNKING,25mm²,PVC,RCCB,63,30,80,COMB,sp_meter,,0,,,,,,,
+63A Single Phase DB 3.pdf,single_phase,14.7,230,MCB,63,DP,10,B,2 x 1C 25sqmm PVC + 16sqmm PVC CPC IN METAL TRUNKING,25sqmm,PVC,RCCB,63,30,100,COMB,sp_meter,,14,"{""10A"": 5, ""20A"": 8, ""32A"": 1}",False,False,False,2,Crossborders LLC,No. 133 New Bridge Road #09-07 Chinatown Point Singapore 059413
+63A Single Phase DB 4.pdf,single_phase,14.7,230,MCB,63,DP,10,C,2 x 1C 16sqmm PVC/PVC + 16sqmm PVC CPC IN METAL TRUNKING,16,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,7,"{""10A"": 5, ""20A"": 1, ""16A"": 1}",,,,,,
+63A Single Phase DB 5.pdf,single_phase,14.5,230,MCB,63,DP,6,B,2 x 1C 16mm² PVC CABLE + 16mm² PVC CPC IN METAL TRUNKING,16mm²,PVC,RCCB,63,30,80,COMB,,,5,"{""10A"": 1, ""20A"": 4}",False,False,False,1,one2play Pte Ltd,"CITY SQUARE MALL #02-K1
+180 Kitchener Rd,
+Singapore 208539"
+63A Single Phase DB 6.pdf,single_phase,14.49,230,MCB,63,DP,6,,2 x 1C 25mm² PVC CABLE + 16mm² PVC CPC IN METAL TRUNKING,25mm²,PVC,RCCB,63,30,80,COPPER,,,25,"{""10A"": 6, ""20A"": 19}",False,False,False,1,,13 LEEDON HEIGHT #22-44 SINGAPORE 266224
+63A Single Phase DB 7.pdf,single_phase,14.49,230,MCB,63,DP,10,C,2 x 1C 16sqmm PVC/PVC + 16sqmm PVC CPC IN METAL TRUNKING,16sqmm,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,6,"{""10A"": 2, ""20A"": 4}",False,False,False,1,,"3 INTERNATIONAL BUSINESS PARK #03-09
+NORDIC EUROPEAN CENTRE
+SINGAPORE 609927"
+63A Single Phase DB 8.pdf,single_phase,14.49,230,MCCB,63,DP,10,,2 x 1C 25mm² PVC/ PVC CABLE + 25mm² PVC CPC IN METAL TRUNKING,25,PVC/PVC,ELCB,63,30,100,COMB,sp_meter,,12,"{""10A"": 6, ""20A"": 6}",False,False,False,2,NBI BEARING (SINGAPORE) CO. PTE. LTD.,"2 Venture Dr #04-11, Vision Exchange, Singapore 680526"
+63A TPN SLD 1.pdf,three_phase,43.648,400,MCB,63,4P,,,2 x 1C 25sqmm PVC + 1C 10sqmm PVC CPC IN METAL TRUNKING,25sqmm,PVC,RCCB,63,30,100,COMB,ct_meter,200/5A,4,"{""10A"": 3, ""20A"": 1}",,,,,,
+63A TPN SLD 10.pdf,three_phase,43.648,400,MCB,63,TPN,10,C,4 x 1C 16mm² CU PVC/PVC + 16mm² CPC IN PVC PIPE / TRUNKING,16,PVC/PVC,RCCB,63,30,100,,sp_meter,,0,,,,,,,
+63A TPN SLD 11.pdf,three_phase,43.648,400,MCCB,63,TPN,,,4 x 1C 16mm² CU PVC/PVC + 16mm² CPC IN PVC PIPE / TRUNKING,16mm²,PVC/PVC,RCCB,63,30,100,,,,14,"{""10A"": 6, ""20A"": 6}",,,,,,
+63A TPN SLD 12.pdf,three_phase,43.6,400,MCB,63,4P,10,C,4C 16sqmm PVC + 16sqmm PVC CPC IN METAL TRUNKING/CONDUIT,16sqmm,PVC,RCCB,63,30,100,COMB,sp_meter,,13,"{""10A"": 13}",,,,,,
+63A TPN SLD 13.pdf,three_phase,43.648,400,MCB,63,4P,10,C,4x16mm² PVC/PVC CABLE + 16mm² CPC IN METAL TRUNKING,16,PVC/PVC,,,,100,COMB,sp_meter,,12,"{""10A"": 4, ""20A"": 8}",False,False,False,2,UNIVERSAL OPTICAL,"Square 2
+10 Sinaran Drive #02-70,
+Singapore 307506"
+63A TPN SLD 14.pdf,three_phase,69.282,400,MCB,63,TPN,10,B,4x16mm²/1C PVC/PVC CABLE + 16mm² CPC IN METAL TRUNKING,16mm²,PVC/PVC,ELCB,63,30,100,COMB,sp_meter,,12,"{""10A"": 12}",,,,,,
+63A TPN SLD 15.pdf,three_phase,43.6,400,MCB,63,TPN,10,C,4x16mmsq /1C PVC + 16mmsq PVC/CPC E IN TRUNKING,16,PVC,RCCB,63,30,100,COMB,sp_meter,,4,"{""10A"": 4}",,,,,,
+63A TPN SLD 16.pdf,three_phase,43.6,400,MCCB,63,TPN,25,,4C 16sqmm PVC/PVC + 16sqmm PVC CPC IN METAL TRUNKING,16sqmm,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,0,,,,,,,
+63A TPN SLD 2.pdf,three_phase,43.648,400,MCB,63,4P,10,C,2 x 1C 25sqmm PVC + 10sqmm PVC CPC IN METAL TRUNKING,25,PVC,RCCB,63,30,100,COMB,sp_meter,,17,"{""10A"": 6, ""20A"": 11}",True,False,False,1,Slurp Food Enterprise Pte Ltd,11 MANDAI ESTATE #08-09 S729908
+63A TPN SLD 3.pdf,three_phase,43.648,400,MCB,63,TPN,10,C,2 x 1C 16sqmm PVC/PVC + 16sqmm PVC CPC IN METAL TRUNKING,16sqmm,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,5,"{""10A"": 4}",,,,,,
+63A TPN SLD 4.pdf,three_phase,103.92,400,MCCB,150,TPN,36,,4 x 70sqmm XLPE + 70sqmm PVC CPC CABLE ON CABLE TRAY,70sqmm,XLPE/PVC,RCCB,125,100,,,,,25,"{""20A"": 25}",,,,,,
+63A TPN SLD 5.pdf,three_phase,43.6,400,MCB,63,4P,10,C,4C 16sqmm PVC + 16sqmm PVC CPC IN METAL TRUNKING,16sqmm,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,0,,,,,,,
+63A TPN SLD 6.pdf,three_phase,43.648,400,MCB,63,4P,10,B,4x16mm²/1C PVC/PVC CABLE + 16mm² CPC IN METAL TRUNKING,16mm²,PVC/PVC,MCCB,63,30,100,COMB,,,6,"{""20A"": 6}",False,False,False,1,BOROFONE @ B1 - K50,"WOODLEIGH MALL
+11 BIDADARI PARK DRIVE
+367803"
+63A TPN SLD 7.pdf,three_phase,43.65,400,MCB,63,TPN,10,B,4 x 25mm² 1C CU XLPE/PVC CABLE + CPC 16mm² IN TRUNKING/TRAY,25mm²,XLPE/PVC,RCCB,40,100,63,COPPER,sp_meter,,20,"{""15A"": 3, ""10A"": 6, ""20A"": 11}",False,False,False,2,,
+63A TPN SLD 8.pdf,three_phase,43.648,400,MCB,63,TPN,10,B,4 x 1C 25sqmm PVC CABLE + 25sqmm CPC IN TRUNKING,25mm²,PVC,RCCB,63,30,100,,sp_meter,,0,,,,,,,
+63A TPN SLD 9.pdf,three_phase,43.648,400,MCB,63,4P,10,B,4C 16sqmm PVC + 16sqmm PVC CPC IN METAL TRUNKING,16,PVC,RCCB,63,100,100,COMB,sp_meter,,0,,,,,,,
+80A TPN SLD 1.pdf,three_phase,43.5,400,MCB,63,TPN,10,,4x35mm²/1C PVC/PVC CABLE + 25mm² CPC IN METAL TRUNKING,35mm²,PVC/PVC,RCCB,63,30,100,COMB,sp_meter,,0,,,,,,,
+80A TPN SLD 2.pdf,three_phase,55.426,400,MCB,80,4P,10,B,4x35mm²/1C PVC CABLE + 25mm² CPC IN METAL TRUNKING,35mm²,PVC/PVC,RCCB,80,30,100,COMB,sp_meter,,16,"{""10A"": 6, ""20A"": 10}",,,,,,
+Cable Extension SLD 1.pdf,single_phase,2.99,230,ELCB,13,DP,,,,,,,,,13,,,,4,"{""13A"": 4}",False,,,,,
+Cable Extension SLD 2.pdf,single_phase,4.6,230,MCB,20,DP,6,,2 x 1C 4sqmm PVC + 4sqmm PVC CPC IN TRUNKING/CONDUIT,4sqmm,PVC,RCCB,40,30,,,,,4,,False,False,False,1,Inverso Pte Ltd,"Changi Airport Terminal 3
+Departure Hall,
+Next to Jewel Link Bridge
+Event Space"
+Cable Extension SLD 3.pdf,single_phase,,230,,,,,,2 x 1C 2.5sqmm PVC + 2.5sqmm PVC CPC IN TRUNKING/CONDUIT,2.5sqmm,PVC,,,,,,,,4,,False,False,False,1,INVESSO PTE LTD,"78 Airport Boulevard
+B1-CL-A
+Jewel Changi Airport
+Singapore 819666"
+Cable Extension SLD 4.pdf,three_phase,22.17,400,MCB,32,4P,6,B,1 x 3C 6mmsq NEOPRENE CABLE,6mm2,other,RCCB,40,30,,,,,12,"{""16A"": 12}",False,False,False,1,CPCM AMUSEMENT PTE LTD,GARDEN BY THE BAY
+Cable Extension SLD 5.pdf,three_phase,22.17,400,MCB,32,4P,6,B,1 x 3C 6mmsq NEOPRENE CABLE,6mmsq,NEOPRENE,RCCB,40,30,,,,,5,"{""32A"": 1, ""16A"": 4}",False,False,False,1,DGT PROFESSIONAL PTE LTD,"WEST MALL
+1 BUKIT BATOK CENTRAL
+SINGAPORE 565873
+(OPPOSITE BREADTALK, OUTSIDE)"
+Cable Extension SLD 6.pdf,single_phase,5.98,230,,,,,,2 x 1C 2.5sqmm PVC + 2.5sqmm PVC CPC IN METAL TRUNKING/G.I. CONDUIT,2.5,PVC,,,,,,,,3,"{""13A"": 3}",False,False,True,1,BEWELL HEALTH TECHNOLOGY PTE LTD,ONE RAFFLES PLACE UNIT #05-23
+Cable Extension with 3-Phase 63A TPN DB.pdf,three_phase,43.65,400,MCB,63,4P,,B,1 x 5C 25mm² NEOPRENE CABLE,25mm²,NEOPRENE,RCCB,63,30,,,,,14,"{""20A"": 13}",,,,,,

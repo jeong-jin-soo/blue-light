@@ -31,12 +31,12 @@ class DrawingBackend(Protocol):
         """
         Set the current drawing layer.
 
-        Layers:
-        - SLD_SYMBOLS: Main symbol outlines (0.7mm)
-        - SLD_CONNECTIONS: Connection lines between symbols (0.5mm)
-        - SLD_POWER_MAIN: Main power supply lines (1.0mm, bold)
-        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.35mm)
-        - SLD_TITLE_BLOCK: Border and title block elements (0.7mm)
+        Layers (calibrated from real LEW SLD samples):
+        - SLD_SYMBOLS: Main symbol outlines (0.25mm)
+        - SLD_CONNECTIONS: Connection lines between symbols (0.25mm)
+        - SLD_POWER_MAIN: Main power supply lines / busbar (0.50mm)
+        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.25mm)
+        - SLD_TITLE_BLOCK: Border and title block elements (0.25mm)
         """
         ...
 
@@ -117,6 +117,23 @@ class DrawingBackend(Protocol):
         Args:
             x, y: Bottom-left corner (in mm).
             width, height: Dimensions (in mm).
+            fill_color: Fill color as (r, g, b) floats 0-1 or hex string.
+        """
+        ...
+
+    def add_filled_circle(
+        self,
+        center: tuple[float, float],
+        radius: float,
+        *,
+        fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
+    ) -> None:
+        """
+        Draw a filled circle (e.g., junction dot).
+
+        Args:
+            center: Center point (x, y) in mm.
+            radius: Radius in mm.
             fill_color: Fill color as (r, g, b) floats 0-1 or hex string.
         """
         ...

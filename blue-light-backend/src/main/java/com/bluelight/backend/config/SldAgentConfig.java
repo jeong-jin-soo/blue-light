@@ -27,7 +27,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class SldAgentConfig {
 
-    @Value("${sld.agent.url:http://localhost:8100}")
+    @Value("${sld.agent.url:http://127.0.0.1:8100}")
     private String agentUrl;
 
     @Value("${sld.agent.service-key:dev-service-key}")

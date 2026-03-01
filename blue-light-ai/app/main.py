@@ -46,13 +46,18 @@ TEMP_FILE_MAX_AGE_HOURS = 24  # 24시간 이상 된 임시 파일 자동 삭제
 
 
 async def _temp_file_cleanup_scheduler():
-    """Background task: 1시간마다 오래된 임시 파일을 삭제."""
+    """Background task: 1시간마다 오래된 임시 파일 및 만료된 템플릿 캐시를 삭제."""
     while True:
         await asyncio.sleep(3600)  # 1시간 간격
         try:
             cleanup_old_temp_files()
         except Exception as e:
             logger.error(f"Temp file cleanup scheduler error: {e}")
+        try:
+            from app.sld.template_cache import cleanup_expired
+            cleanup_expired()
+        except Exception as e:
+            logger.error(f"Template cache cleanup error: {e}")
 
 
 def cleanup_old_temp_files() -> dict:
@@ -85,7 +90,7 @@ def cleanup_temp_file(file_id: str) -> dict:
     deleted = []
     not_found = []
 
-    for ext in ["pdf", "svg"]:
+    for ext in ["pdf", "svg", "dxf"]:
         file_path = os.path.join(settings.temp_file_dir, f"{file_id}.{ext}")
         if os.path.exists(file_path):
             try:
@@ -333,13 +338,34 @@ async def chat_reset(
 @app.get("/api/files/{file_id}")
 async def download_file(
     file_id: str,
+    format: str = "pdf",
     _: str = Depends(verify_service_key),
 ):
     """
-    Download a generated file (PDF or SVG).
+    Download a generated file (PDF, DXF, or SVG).
+
+    Args:
+        format: "pdf" (default), "dxf", or "svg"
     """
-    # Check temp directory for the file (prefer PDF, fallback to SVG)
-    for ext, media in [("pdf", "application/pdf"), ("svg", "image/svg+xml")]:
+    # Format-specific download
+    format_map = {
+        "pdf": ("pdf", "application/pdf"),
+        "dxf": ("dxf", "application/dxf"),
+        "svg": ("svg", "image/svg+xml"),
+    }
+
+    if format in format_map:
+        ext, media = format_map[format]
+        file_path = os.path.join(settings.temp_file_dir, f"{file_id}.{ext}")
+        if os.path.exists(file_path):
+            return FileResponse(
+                file_path,
+                media_type=media,
+                filename=f"SLD_{file_id}.{ext}",
+            )
+
+    # Fallback: check all formats (prefer PDF)
+    for ext, media in [("pdf", "application/pdf"), ("dxf", "application/dxf"), ("svg", "image/svg+xml")]:
         file_path = os.path.join(settings.temp_file_dir, f"{file_id}.{ext}")
         if os.path.exists(file_path):
             return FileResponse(

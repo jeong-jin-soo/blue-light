@@ -23,3 +23,12 @@ aiosqlite>=0.20.0
 
 # Multipart support
 python-multipart>=0.0.18
+
+# DXF CAD file generation
+ezdxf>=1.4.0
+
+# PDF analysis + Track A title block editing
+pymupdf>=1.27.0
+
+# MySQL (SLD 템플릿 DB 연동)
+pymysql>=1.1.0

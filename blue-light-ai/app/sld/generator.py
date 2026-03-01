@@ -29,6 +29,7 @@ import logging
 import math
 
 from app.sld.backend import DrawingBackend
+from app.sld.dxf_backend import DxfBackend
 from app.sld.layout import (
     LayoutConfig,
     LayoutResult,
@@ -37,6 +38,21 @@ from app.sld.layout import (
     format_cable_spec,
 )
 from app.sld.pdf_backend import PdfBackend
+from app.sld.real_symbols import (
+    REAL_SYMBOL_MAP,
+    RealACB,
+    RealCircuitBreaker,
+    RealCT,
+    RealELCB,
+    RealEarth,
+    RealFuse,
+    RealIsolator,
+    RealKwhMeter,
+    RealMCB,
+    RealMCCB,
+    RealRCCB,
+    get_real_symbol,
+)
 from app.sld.svg_backend import SvgBackend
 from app.sld.symbols.breakers import ACB, MCB, MCCB, RCCB, ELCB, CircuitBreaker
 from app.sld.symbols.busbars import Busbar
@@ -158,6 +174,7 @@ class SldGenerator:
         application_info: dict,
         pdf_output_path: str,
         svg_output_path: str | None = None,
+        backend_type: str = "dxf",
     ) -> dict:
         """
         Generate the SLD drawing.
@@ -167,90 +184,109 @@ class SldGenerator:
             application_info: Application details (address, kVA, etc.)
             pdf_output_path: Path to save the PDF file.
             svg_output_path: Optional path to save the SVG preview.
+            backend_type: "dxf" (default, real CAD output) or "pdf" (legacy ReportLab).
 
         Returns:
-            dict with keys: svg_string, component_count, pdf_path
+            dict with keys: svg_string, component_count, pdf_path, dxf_path (if dxf)
         """
         logger.info(
             f"Generating SLD: kVA={requirements.get('kva')}, "
-            f"sub_circuits={len(requirements.get('sub_circuits', []))}"
+            f"sub_circuits={len(requirements.get('sub_circuits', []))}, "
+            f"backend={backend_type}"
         )
-
-        # Create backends
-        pdf = PdfBackend(pdf_output_path)
-        svg = SvgBackend()
 
         # Compute layout (pure coordinate computation -- backend-independent)
         layout_result = compute_layout(requirements, application_info=application_info)
 
-        # Draw to both backends simultaneously
-        # Phase 1: Template (border + title block frame with labels only)
-        # Phase 2: SLD drawing (components, connections)
-        # Phase 3: Fill title block data values
+        # Title block data (shared across all backends)
+        title_block_kwargs = dict(
+            project_name=application_info.get("address", "Electrical Installation"),
+            address=application_info.get("address", ""),
+            postal_code=application_info.get("postalCode", ""),
+            kva=requirements.get("kva", 0),
+            voltage=requirements.get("voltage", 0),
+            supply_type=requirements.get("supply_type", ""),
+            lew_name=application_info.get("assignedLewName", ""),
+            lew_licence=application_info.get("assignedLewLicenceNo", ""),
+            lew_mobile=application_info.get("assignedLewMobile", ""),
+            sld_only_mode=application_info.get("sld_only_mode", False),
+            client_name=application_info.get("clientName", ""),
+            main_contractor=application_info.get("mainContractor", ""),
+        )
+
+        result = {}
+        dxf_path = None
+
+        # Create backends
+        if backend_type == "dxf":
+            # DXF backend (primary CAD output) + ReportLab PDF (EMA submission) + SVG (preview)
+            dxf = DxfBackend()
+            pdf = PdfBackend(pdf_output_path)
+            svg = SvgBackend()
+            backends = [dxf, pdf, svg]
+
+            dxf_path = pdf_output_path.replace(".pdf", ".dxf")
+        else:
+            # Legacy: ReportLab PDF + SVG only
+            pdf = PdfBackend(pdf_output_path)
+            svg = SvgBackend()
+            backends = [pdf, svg]
+
+        # Draw to all backends simultaneously
         component_count = 0
-        for backend in (pdf, svg):
-            # Phase 1 -- Template frame
+        for backend in backends:
             draw_border(backend)
             draw_title_block_frame(backend)
 
-            # Phase 2 -- SLD content on top of template
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
             self._draw_dashed_connections(backend, layout_result)
+            self._draw_junction_dots(backend, layout_result)
+            self._draw_arrow_points(backend, layout_result)
+            self._draw_solid_boxes(backend, layout_result)
 
-            # Cable schedule and legend (disabled by default in v6 LEW-style)
             self._draw_cable_schedule(backend, requirements, layout_result)
             self._draw_legend(backend, layout_result)
 
-            # Phase 3 -- Fill title block data
-            fill_title_block_data(
-                backend,
-                project_name=application_info.get("address", "Electrical Installation"),
-                address=application_info.get("address", ""),
-                postal_code=application_info.get("postalCode", ""),
-                kva=requirements.get("kva", 0),
-                voltage=requirements.get("voltage", 0),
-                supply_type=requirements.get("supply_type", ""),
-                lew_name=application_info.get("assignedLewName", ""),
-                lew_licence=application_info.get("assignedLewLicenceNo", ""),
-                lew_mobile=application_info.get("assignedLewMobile", ""),
-                sld_only_mode=application_info.get("sld_only_mode", False),
-                client_name=application_info.get("clientName", ""),
-                main_contractor=application_info.get("mainContractor", ""),
-            )
+            fill_title_block_data(backend, **title_block_kwargs)
 
-        # Save PDF
+        # Save outputs
         pdf.save()
         logger.info(f"PDF saved: {pdf_output_path}")
 
-        # Get SVG preview string
-        svg_string = svg.get_svg_string()
+        if backend_type == "dxf" and dxf_path:
+            dxf.save(dxf_path)
+            result["dxf_path"] = dxf_path
 
+        svg_string = svg.get_svg_string()
         if svg_output_path:
             with open(svg_output_path, "w", encoding="utf-8") as f:
                 f.write(svg_string)
             logger.info(f"SVG saved: {svg_output_path}")
 
-        return {
+        result.update({
             "svg_string": svg_string,
             "component_count": component_count,
             "pdf_path": pdf_output_path,
-        }
+        })
+        return result
 
     @staticmethod
     def generate_pdf_bytes(
         requirements: dict,
         application_info: dict | None = None,
-    ) -> tuple[bytes, str]:
+        backend_type: str = "dxf",
+    ) -> tuple[bytes, str, bytes | None]:
         """
         Generate SLD as PDF bytes in memory (no file I/O).
 
         Args:
             requirements: SLD requirements dict.
             application_info: Application details (address, kVA, etc.)
+            backend_type: "dxf" (default) or "pdf" (legacy).
 
         Returns:
-            Tuple of (pdf_bytes, svg_string).
+            Tuple of (pdf_bytes, svg_string, dxf_bytes_or_none).
         """
         app_info = application_info or {}
         generator = SldGenerator()
@@ -260,39 +296,63 @@ class SldGenerator:
 
         layout_result = compute_layout(requirements, application_info=app_info)
 
-        for backend in (pdf, svg):
+        title_block_kwargs = dict(
+            project_name=app_info.get("address", "Electrical Installation"),
+            address=app_info.get("address", ""),
+            postal_code=app_info.get("postalCode", ""),
+            kva=requirements.get("kva", 0),
+            voltage=requirements.get("voltage", 0),
+            supply_type=requirements.get("supply_type", ""),
+            lew_name=app_info.get("assignedLewName", ""),
+            lew_licence=app_info.get("assignedLewLicenceNo", ""),
+            lew_mobile=app_info.get("assignedLewMobile", ""),
+            sld_only_mode=app_info.get("sld_only_mode", False),
+            client_name=app_info.get("clientName", ""),
+            main_contractor=app_info.get("mainContractor", ""),
+        )
+
+        dxf_bytes = None
+        if backend_type == "dxf":
+            dxf = DxfBackend()
+            backends = [dxf, pdf, svg]
+        else:
+            backends = [pdf, svg]
+
+        for backend in backends:
             draw_border(backend)
             draw_title_block_frame(backend)
 
             generator._draw_components(backend, layout_result)
             generator._draw_connections(backend, layout_result)
             generator._draw_dashed_connections(backend, layout_result)
+            generator._draw_junction_dots(backend, layout_result)
+            generator._draw_arrow_points(backend, layout_result)
+            generator._draw_solid_boxes(backend, layout_result)
             generator._draw_cable_schedule(backend, requirements, layout_result)
             generator._draw_legend(backend, layout_result)
 
-            fill_title_block_data(
-                backend,
-                project_name=app_info.get("address", "Electrical Installation"),
-                address=app_info.get("address", ""),
-                postal_code=app_info.get("postalCode", ""),
-                kva=requirements.get("kva", 0),
-                voltage=requirements.get("voltage", 0),
-                supply_type=requirements.get("supply_type", ""),
-                lew_name=app_info.get("assignedLewName", ""),
-                lew_licence=app_info.get("assignedLewLicenceNo", ""),
-                lew_mobile=app_info.get("assignedLewMobile", ""),
-                sld_only_mode=app_info.get("sld_only_mode", False),
-                client_name=app_info.get("clientName", ""),
-                main_contractor=app_info.get("mainContractor", ""),
-            )
+            fill_title_block_data(backend, **title_block_kwargs)
 
-        return pdf.get_bytes(), svg.get_svg_string()
+        if backend_type == "dxf":
+            dxf_bytes = dxf.get_bytes()
+
+        return pdf.get_bytes(), svg.get_svg_string(), dxf_bytes
 
     def _get_symbol(self, symbol_name: str):
-        """Get a symbol instance by its block/type name."""
-        # Map CB_XXX names back to the breaker type
+        """Get a symbol instance by its block/type name.
+
+        Uses real-proportion symbols (calibrated from LEW samples) first,
+        falling back to legacy symbols for types not yet calibrated.
+        """
+        # Try real symbols first (calibrated from real LEW samples)
+        try:
+            return get_real_symbol(symbol_name)
+        except ValueError:
+            pass
+
+        # Fallback to legacy symbols for uncalibrated types
         if symbol_name.startswith("CB_"):
-            breaker_type = symbol_name[3:]  # e.g., "CB_MCCB" -> "MCCB"
+            breaker_type = symbol_name[3:]
             cls = self.SYMBOL_MAP.get(breaker_type)
             if cls:
                 return cls()
@@ -363,37 +423,24 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "BUSBAR":
-                # Busbar -- draw as double thick lines
+                # Busbar -- single bold line (heavier than connections)
                 backend.set_layer("SLD_SYMBOLS")
-                gap = 2.0
                 bus_start_x = layout_result.busbar_start_x
                 bus_end_x = layout_result.busbar_end_x
 
                 if comp.label:  # Main busbar
-                    # Top line
                     backend.add_line(
-                        (bus_start_x, layout_result.busbar_y + gap / 2),
-                        (bus_end_x, layout_result.busbar_y + gap / 2),
-                        lineweight=80,
-                    )
-                    # Bottom line
-                    backend.add_line(
-                        (bus_start_x, layout_result.busbar_y - gap / 2),
-                        (bus_end_x, layout_result.busbar_y - gap / 2),
-                        lineweight=80,
+                        (bus_start_x, layout_result.busbar_y),
+                        (bus_end_x, layout_result.busbar_y),
+                        lineweight=120,  # 1.2mm — bold, distinct from connections (0.5mm)
                     )
                 else:
                     # Sub-busbar (for multi-row circuits)
                     row_bus_width = bus_end_x - bus_start_x
                     backend.add_line(
-                        (comp.x, comp.y + gap / 2),
-                        (comp.x + row_bus_width, comp.y + gap / 2),
-                        lineweight=60,
-                    )
-                    backend.add_line(
-                        (comp.x, comp.y - gap / 2),
-                        (comp.x + row_bus_width, comp.y - gap / 2),
-                        lineweight=60,
+                        (comp.x, comp.y),
+                        (comp.x + row_bus_width, comp.y),
+                        lineweight=100,  # 1.0mm for sub-busbars
                     )
 
                 # Busbar rating label (right side, above busbar)
@@ -419,7 +466,7 @@ class SldGenerator:
             elif comp.symbol_name == "DB_INFO_BOX":
                 # Dashed box with DB rating, approved load, and premises address
                 box_w = 80
-                box_h = 18
+                box_h = 14  # Compact (was 18)
                 bx = comp.x
                 by = comp.y - box_h  # Box extends downward from comp.y
 
@@ -434,14 +481,14 @@ class SldGenerator:
                 backend.add_mtext(
                     comp.label,
                     insert=(bx + 3, by + box_h - 2),
-                    char_height=3.0,
+                    char_height=2.5,  # Compact (was 3.0)
                 )
                 # Approved load + premises (multi-line via \\P)
                 if comp.rating:
                     backend.add_mtext(
                         comp.rating,
-                        insert=(bx + 3, by + box_h - 7),
-                        char_height=2.0,
+                        insert=(bx + 3, by + box_h - 5),  # Compact (was box_h - 7)
+                        char_height=1.8,  # Compact (was 2.0)
                     )
                 count += 1
 
@@ -473,18 +520,22 @@ class SldGenerator:
                             label_text = comp.label
 
                         if label_text:
+                            # Label to the right of the symbol
+                            label_offset_x = symbol.width + 3 if symbol else 8
+                            label_offset_y = symbol.height / 2 + 2 if symbol else 14
                             backend.add_mtext(
                                 label_text,
-                                insert=(comp.x + 18, comp.y + 14),
+                                insert=(comp.x + label_offset_x, comp.y + label_offset_y),
                                 char_height=2.3,
                             )
 
                         # Cable annotation (below symbol, to the right)
                         if comp.cable_annotation:
                             backend.set_layer("SLD_ANNOTATIONS")
+                            cable_offset_x = symbol.width + 3 if symbol else 8
                             backend.add_mtext(
                                 comp.cable_annotation,
-                                insert=(comp.x + 18, comp.y - 3),
+                                insert=(comp.x + cable_offset_x, comp.y - 2),
                                 char_height=2.0,
                             )
 
@@ -535,10 +586,11 @@ class SldGenerator:
 
         if abs(comp.rotation - 90.0) < 0.1:
             # Vertical text: breaker info to the RIGHT of the breaker, rotated 90 degrees
+            # Offset calibrated for real-proportion symbols (~4mm wide)
             if comp.breaker_type_str in ("MCCB", "ACB"):
-                base_x = comp.x + 16
+                base_x = comp.x + 7  # MCCB/ACB slightly wider
             else:
-                base_x = comp.x + 12  # Standard offset for MCB
+                base_x = comp.x + 6  # MCB standard offset
             char_h = 1.8
             line_gap = 3.5  # Fixed 3.5mm gap for consistent column spacing
 
@@ -569,25 +621,57 @@ class SldGenerator:
             if comp.cable_annotation and not is_cable_ditto:
                 backend.add_mtext(
                     comp.cable_annotation,
-                    insert=(comp.x - 6, comp.y),
+                    insert=(comp.x - 4, comp.y),
                     char_height=1.6,
                     rotation=90.0,
                 )
         else:
-            # Horizontal text: breaker block to the right of symbol (stacked)
-            block_text = "\\P".join(info_items)
-            backend.add_mtext(
-                block_text,
-                insert=(comp.x + 18, comp.y + 14),
-                char_height=2.0,
-            )
+            # Horizontal text (all text upright, no rotation)
+            if comp.label_style == "breaker_block":
+                # Sub-circuit breaker — info items stacked vertically, right of symbol
+                if comp.breaker_type_str in ("MCCB", "ACB"):
+                    base_x = comp.x + 7
+                else:
+                    base_x = comp.x + 6
+                char_h = 1.8
+                line_gap = char_h + 0.8  # ~2.6mm per line
 
-            if comp.cable_annotation:
+                if is_ditto:
+                    backend.add_mtext(
+                        "←",
+                        insert=(base_x, comp.y + 6),
+                        char_height=3.0,
+                    )
+                else:
+                    for idx, line_text in enumerate(info_items):
+                        backend.add_mtext(
+                            line_text,
+                            insert=(base_x, comp.y + 2 + idx * line_gap),
+                            char_height=char_h,
+                        )
+
+                # Cable annotation — horizontal, to the LEFT of conductor
+                if comp.cable_annotation and not is_cable_ditto:
+                    backend.add_mtext(
+                        comp.cable_annotation,
+                        insert=(comp.x - 3, comp.y),
+                        char_height=1.3,
+                    )
+            else:
+                # Incoming chain breakers (original horizontal stacked logic)
+                block_text = "\\P".join(info_items)
                 backend.add_mtext(
-                    comp.cable_annotation,
-                    insert=(comp.x + 18, comp.y - 3),
-                    char_height=1.8,
+                    block_text,
+                    insert=(comp.x + 8, comp.y + 6),
+                    char_height=2.0,
                 )
+
+                if comp.cable_annotation:
+                    backend.add_mtext(
+                        comp.cable_annotation,
+                        insert=(comp.x + 8, comp.y - 2),
+                        char_height=1.8,
+                    )
 
     def _draw_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw all solid connection lines."""
@@ -600,6 +684,30 @@ class SldGenerator:
         backend.set_layer("SLD_CONNECTIONS")
         for start, end in layout_result.dashed_connections:
             _draw_dashed_line(backend, start, end, dash_len=3.0, gap_len=2.0)
+
+    def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
+        """Draw filled junction dots at busbar tap points."""
+        backend.set_layer("SLD_SYMBOLS")
+        for cx, cy in layout_result.junction_dots:
+            backend.add_filled_circle((cx, cy), radius=0.8)
+
+    def _draw_arrow_points(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
+        """Draw V-shaped arrowheads at wire termination points."""
+        backend.set_layer("SLD_SYMBOLS")
+        for ax, ay in layout_result.arrow_points:
+            # Downward-pointing filled arrowhead
+            backend.add_line((ax - 1.2, ay), (ax, ay - 2.0))
+            backend.add_line((ax + 1.2, ay), (ax, ay - 2.0))
+            backend.add_line((ax - 1.2, ay), (ax + 1.2, ay))
+
+    def _draw_solid_boxes(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
+        """Draw solid rectangle outlines (DB box, etc.)."""
+        backend.set_layer("SLD_CONNECTIONS")
+        for x1, y1, x2, y2 in layout_result.solid_boxes:
+            backend.add_lwpolyline(
+                [(x1, y1), (x2, y1), (x2, y2), (x1, y2)],
+                close=True,
+            )
 
     def _draw_cable_schedule(
         self,

@@ -369,6 +369,26 @@ CREATE TABLE IF NOT EXISTS sld_order_payments (
     CONSTRAINT fk_sld_order_payments_order FOREIGN KEY (sld_order_seq) REFERENCES sld_orders (sld_order_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 19. SLD 템플릿 DB (샘플 SLD에서 추출한 도면 정보)
+CREATE TABLE IF NOT EXISTS sld_templates (
+    sld_template_seq  BIGINT        NOT NULL AUTO_INCREMENT,
+    phase             VARCHAR(20)   NOT NULL COMMENT 'single_phase | three_phase',
+    kva               DECIMAL(10,2)          COMMENT 'kVA 용량 (nullable: Cable Extension 등)',
+    main_breaker_type VARCHAR(20)            COMMENT 'MCB | MCCB | ELCB',
+    circuit_count     INT           NOT NULL DEFAULT 0 COMMENT '서브 회로 수',
+    filename          VARCHAR(255)  NOT NULL COMMENT 'PDF 파일명',
+    file_path         VARCHAR(500)  NOT NULL COMMENT '템플릿 PDF 상대 경로',
+    detail_json       JSON          NOT NULL COMMENT '전체 도면 상세 정보 (JSON)',
+    created_at        DATETIME(6)            DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at        DATETIME(6)            DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (sld_template_seq),
+    UNIQUE KEY uk_sld_templates_filename (filename),
+    KEY idx_sld_templates_phase (phase),
+    KEY idx_sld_templates_kva (kva),
+    KEY idx_sld_templates_breaker (main_breaker_type),
+    KEY idx_sld_templates_phase_kva (phase, kva)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 마이그레이션: sld_requests.sketch_file_seq — MySQL에서 직접 실행:
 -- ALTER TABLE sld_requests ADD COLUMN sketch_file_seq BIGINT;
 

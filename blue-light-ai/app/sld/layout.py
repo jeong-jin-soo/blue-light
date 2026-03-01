@@ -20,7 +20,7 @@ Key v6 changes from v5:
 - Breaker label block format (rating / poles / type / kA as separate lines)
 - Cable schedule table removed (inline annotations instead)
 - Legend removed (standard symbols are self-explanatory to LEWs)
-- Dense packing: horizontal_spacing 22mm, max 20 circuits per row
+- Dense packing: horizontal_spacing 16mm (calibrated from real samples), max 24 circuits per row
 """
 
 from __future__ import annotations
@@ -69,21 +69,24 @@ def format_cable_spec(cable_input) -> str:
 
 @dataclass
 class LayoutConfig:
-    """Layout configuration parameters (all in mm)."""
+    """Layout configuration parameters (all in mm).
+
+    Calibrated from 73 real LEW SLD samples to match professional proportions.
+    """
 
     # Drawing area (A3 landscape minus margins and title block)
     drawing_width: float = 380
     drawing_height: float = 240
 
-    # Component spacing (dense packing for LEW-style)
-    vertical_spacing: float = 25      # Between components vertically (was 40)
-    horizontal_spacing: float = 35    # Between sub-circuits (needs room for vertical text columns)
-    min_horizontal_spacing: float = 25  # Minimum spacing between sub-circuits
-    busbar_margin: float = 18         # Margin from edges of busbar (was 25)
+    # Component spacing calibrated from real samples
+    vertical_spacing: float = 14      # Between components vertically (real samples: ~12-16mm)
+    horizontal_spacing: float = 16    # Between sub-circuits (real samples: ~10-18mm, needs text room)
+    min_horizontal_spacing: float = 12  # Minimum spacing between sub-circuits
+    busbar_margin: float = 10         # Margin from edges of busbar
 
     # Sub-circuit row layout
-    max_circuits_per_row: int = 20    # Max sub-circuits in a single row (was 12)
-    row_spacing: float = 55           # Vertical spacing between sub-circuit rows (was 65)
+    max_circuits_per_row: int = 24    # More circuits fit with smaller symbols
+    row_spacing: float = 35           # Vertical spacing between sub-circuit rows
 
     # Starting position
     start_x: float = 210             # Center of drawing
@@ -94,15 +97,15 @@ class LayoutConfig:
     max_x: float = 405
     min_y: float = 62                # Title block occupies bottom ~55mm
 
-    # Symbol dimension references (must match symbols/*.py)
-    breaker_w: float = 14
-    breaker_h: float = 20
-    mcb_w: float = 10
-    mcb_h: float = 16
-    meter_size: float = 20
-    isolator_h: float = 18
-    ct_size: float = 14              # CT (Current Transformer) symbol size
-    stub_len: float = 5              # Connection stub length
+    # Symbol dimension references (calibrated from real LEW SLD samples)
+    breaker_w: float = 4.2           # MCCB width (was 14)
+    breaker_h: float = 7.5           # MCCB height (was 20)
+    mcb_w: float = 3.6              # MCB width (was 10)
+    mcb_h: float = 6.5              # MCB height (was 16)
+    meter_size: float = 8.0          # kWh meter diameter (was 20)
+    isolator_h: float = 7.0          # Isolator height (was 18)
+    ct_size: float = 6.0             # CT diameter (was 14)
+    stub_len: float = 2.0            # Connection stub length (was 5)
 
 
 @dataclass
@@ -133,6 +136,9 @@ class LayoutResult:
     components: list[PlacedComponent] = field(default_factory=list)
     connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
+    junction_dots: list[tuple[float, float]] = field(default_factory=list)
+    solid_boxes: list[tuple[float, float, float, float]] = field(default_factory=list)
+    arrow_points: list[tuple[float, float]] = field(default_factory=list)
     busbar_y: float = 0
     busbar_start_x: float = 0
     busbar_end_x: float = 0
@@ -227,12 +233,12 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
     if name == "DB_INFO_BOX":
         return BoundingBox(x=comp.x, y=comp.y - 18, width=80, height=18)
 
-    # Breaker with breaker_block label style (sub-circuit breakers, rotation=90)
-    if name.startswith("CB_") and comp.label_style == "breaker_block" and abs(comp.rotation - 90.0) < 0.1:
+    # Breaker with breaker_block label style (sub-circuit breakers, vertical text)
+    if name.startswith("CB_") and comp.label_style == "breaker_block":
         # Symbol dimensions
         sym_w, sym_h = _SYMBOL_DIMS.get(name, (10, 16))
 
-        # Right-side label columns: base_offset + N × 3.5mm
+        # Right-side label: base_offset + info columns (vertical text, 3.5mm gap)
         if comp.breaker_type_str in ("MCCB", "ACB"):
             base_offset = 16
         else:
@@ -244,21 +250,18 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
             bool(comp.breaker_type_str),
             bool(comp.fault_kA),
         ])
-        label_extent = base_offset + num_info * 3.5
+        label_right = base_offset + num_info * 3.5  # 3.5mm column gap
 
-        # Left-side cable annotation
-        left_extent = 0.0
-        if comp.cable_annotation:
-            left_extent = 9.0  # comp.x - 6 with ~3mm text width
+        # Left-side cable annotation (vertical text)
+        left_extent = 6.0 if comp.cable_annotation else 0.0
 
-        # Height: breaker + stub + tail + circuit name
-        name_len = len(comp.label) if comp.label else 0
-        total_h = sym_h + 5 + 6 + 2 + name_len * _CHAR_W  # breaker + stub + tail + gap + name
+        # Height: breaker + stub + tail + name label (vertical)
+        total_h = sym_h + 5 + 10 + 10  # breaker + stub + tail + name label
 
         return BoundingBox(
             x=comp.x - left_extent,
             y=comp.y,
-            width=left_extent + label_extent,
+            width=left_extent + label_right,
             height=total_h,
         )
 
@@ -313,12 +316,12 @@ class SubCircuitGroup:
 def _breaker_half_width(comp: PlacedComponent) -> float:
     """Return half the breaker symbol width for tap_x calculation."""
     if comp.symbol_name == "CB_MCB":
-        return 5.0   # 10mm / 2
+        return 1.8   # 3.6mm / 2  (calibrated from real LEW samples)
     elif comp.symbol_name == "CB_MCCB":
-        return 7.0   # 14mm / 2
+        return 2.1   # 4.2mm / 2
     elif comp.symbol_name == "CB_ACB":
-        return 8.0   # 16mm / 2
-    return 7.0
+        return 2.5   # 5.0mm / 2
+    return 2.1
 
 
 def _identify_groups(
@@ -390,7 +393,7 @@ def _identify_groups(
                 g.circuit_id_idx = i
                 break
 
-    # Step 5: Match vertical circuit name LABELs (at tap_x + 3)
+    # Step 5: Match vertical circuit name LABELs (at tap_x + 3, rotation=90)
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
             continue
@@ -399,7 +402,7 @@ def _identify_groups(
         for g in groups:
             if g.is_spare:
                 continue
-            if abs(comp.x - (g.tap_x + 3)) < _TOL and g.name_label_idx is None:
+            if abs(comp.x - (g.tap_x + 3)) < 6.0 and g.name_label_idx is None:
                 g.name_label_idx = i
                 break
 
@@ -739,19 +742,26 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
 
     # -- 1. Incoming Supply (at bottom) --
     supply_type = requirements.get("supply_type", "three_phase")
+    supply_source = requirements.get("supply_source", "sp_powergrid")
     kva = requirements.get("kva", 0)
     voltage = 400 if supply_type == "three_phase" else 230
     result.supply_type = supply_type
     result.voltage = voltage
 
     # Supply label (to the LEFT of phase lines, outside the circuit path)
+    if supply_source == "landlord":
+        supply_label = "FROM LANDLORD SUPPLY"
+    else:
+        supply_label = (
+            f"INCOMING SUPPLY\\P{kva} kVA, {voltage}V, "
+            f"{'3-Phase 4-Wire' if supply_type == 'three_phase' else '1-Phase 2-Wire'}"
+            f"\\P50Hz, SP PowerGrid"
+        )
     result.components.append(PlacedComponent(
         symbol_name="LABEL",
         x=cx - 80,
         y=y + 8,
-        label=f"INCOMING SUPPLY\\P{kva} kVA, {voltage}V, "
-              f"{'3-Phase 4-Wire' if supply_type == 'three_phase' else '1-Phase 2-Wire'}"
-              f"\\P50Hz, SP PowerGrid",
+        label=supply_label,
     ))
 
     # Phase lines with labels (at bottom, pointing upward) — compact layout
@@ -770,16 +780,9 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         result.connections.append(((cx - spacing * 1.5, y + ph_half), (cx + spacing * 1.5, y + ph_half)))
         result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
     else:
-        spacing = 4
-        for offset, label in [(-spacing * 0.5, "L"), (spacing * 0.5, "N")]:
-            result.connections.append(((cx + offset, y - ph_half), (cx + offset, y + ph_half)))
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=cx + offset - 2,
-                y=y - ph_half - 3,
-                label=label,
-            ))
-        result.connections.append(((cx - spacing * 0.5, y + ph_half), (cx + spacing * 0.5, y + ph_half)))
+        # Single-phase: single bold vertical line (no L/N labels)
+        # AC symbol "~" above already indicates AC supply
+        result.connections.append(((cx, y - ph_half), (cx, y + ph_half)))
         result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
     y += ph_half + 4  # Reduced from y += 10
 
@@ -819,28 +822,33 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
 
     meter_poles = "DP" if supply_type == "single_phase" else "TPN"
 
-    # -- 2. Meter Board Section (SP PowerGrid standard — present in ALL installations) --
+    # -- 2. Meter Board Section (SP PowerGrid standard) --
     # Contains: Meter Isolator + [CT for ≥45kVA] + KWH Meter + Meter MCB TYPE C
     # Located at the building's meter compartment
-    metering = requirements.get("metering", "sp_meter")
+    # Skipped for landlord supply (no SP metering required)
+    if supply_source == "landlord":
+        metering = requirements.get("metering", None)
+    else:
+        metering = requirements.get("metering", "sp_meter")
 
     if metering:
         meter_board_start_y = y  # Track start of meter board for label positioning
-        # Compact spacing for meter board (saves vertical space for sub-circuit labels)
-        _stub = 1   # Ultra-compact post-component stub
-        _gap = 1    # Compact connection gap
+        # Compact spacing for meter board (30% reduced vertical allocation)
+        meter_scale = 0.7  # 30% size reduction
+        _stub = 0   # Zero post-component stub (was 1)
+        _gap = 0.5  # Halved connection gap (was 1)
 
         # 2a. Meter Isolator (DP for single-phase, TPN for 3-phase)
         result.connections.append(((cx, y), (cx, y + _gap)))
         y += _gap
         result.components.append(PlacedComponent(
             symbol_name="ISOLATOR",
-            x=cx - 6,
+            x=cx - config.isolator_h / 2,  # Center horizontally
             y=y,
             label=f"{breaker_rating}A {meter_poles}",
             rating="ISOLATOR",
         ))
-        y += config.isolator_h + _stub
+        y += config.isolator_h * meter_scale + _stub
         result.connections.append(((cx, y), (cx, y + _gap)))
         y += _gap
         result.symbols_used.add("ISOLATOR")
@@ -854,7 +862,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
                 y=y,
                 label="CT BY SP",
             ))
-            y += config.ct_size + _stub
+            y += config.ct_size * meter_scale + _stub
             result.connections.append(((cx, y), (cx, y + _gap)))
             y += _gap
             result.symbols_used.add("CT")
@@ -866,7 +874,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
             x=cx - meter_r,
             y=y,
         ))
-        y += config.meter_size + _stub
+        y += config.meter_size * meter_scale + _stub
         result.connections.append(((cx, y), (cx, y + _gap)))
         y += _gap
         result.symbols_used.add("KWH_METER")
@@ -880,7 +888,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
             label=f"{breaker_rating}A {meter_poles} MCB",
             rating="10kA TYPE C",
         ))
-        y += meter_mcb_h + _stub
+        y += meter_mcb_h * meter_scale + _stub
         result.connections.append(((cx, y), (cx, y + _gap)))
         y += _gap
         result.symbols_used.add("MCB")
@@ -889,7 +897,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
 
         # Dashed box around meter board components (per Singapore SLD samples)
         mb_box_left = cx - 20
-        mb_box_right = cx + 55  # Extra width to include component labels
+        mb_box_right = cx + 40  # Compact width (was 55)
         mb_box_bottom = meter_board_start_y + 1
         mb_box_top = meter_board_end_y - 1
         # Four sides of dashed rectangle
@@ -907,21 +915,33 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
             label="METER BOARD\\PLOCATED AT\\PMETER COMPARTMENT",
         ))
 
-    # -- 3. Unit Isolator (for >= 45kVA or explicitly specified) --
+    # -- 3. Unit Isolator (for >= 45kVA, landlord supply, or explicitly specified) --
     isolator_rating = requirements.get("isolator_rating", 0)
-    if not isolator_rating and kva >= 45:
+    isolator_label_extra = requirements.get("isolator_label", "")
+
+    # Landlord supply: always include isolator (regardless of kVA)
+    if supply_source == "landlord":
+        if not isolator_rating and breaker_rating:
+            isolator_rating = breaker_rating  # Same rating as main breaker
+        if not isolator_label_extra:
+            isolator_label_extra = "LOCATED INSIDE UNIT"
+    elif not isolator_rating and kva >= 45:
         if breaker_rating:
             isolator_rating = _next_standard_rating(breaker_rating)
 
     if isolator_rating:
         result.connections.append(((cx, y), (cx, y + 2)))
         y += 2
+        iso_main_label = f"{isolator_rating}A {meter_poles} ISOLATOR"
+        iso_rating_text = (
+            f"({isolator_label_extra})" if isolator_label_extra else "ISOLATOR"
+        )
         result.components.append(PlacedComponent(
             symbol_name="ISOLATOR",
-            x=cx - 6,
+            x=cx - config.isolator_h / 2,  # Center horizontally
             y=y,
-            label=f"{isolator_rating}A {meter_poles}",
-            rating="ISOLATOR",
+            label=iso_main_label,
+            rating=iso_rating_text,
         ))
         y += config.isolator_h + 2
         result.connections.append(((cx, y), (cx, y + 2)))
@@ -938,7 +958,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     )
 
     # -- 4. Main Circuit Breaker --
-    db_box_start_y = y - 2  # Track DB box bottom (just below main breaker entry)
+    db_box_start_y = y - 1  # Track DB box bottom (tighter fit to main breaker)
 
     if breaker_type == "ACB":
         cb_w, cb_h = 16, 22
@@ -1059,7 +1079,8 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     if application_info:
         premises_addr = application_info.get("address", "")
 
-    db_info_x = bus_start_x
+    db_info_box_w = 80
+    db_info_x = (bus_start_x + bus_end_x) / 2 - db_info_box_w / 2  # Centered on busbar
     db_info_text = f"APPROVED LOAD: {approved_kva}KVA AT {voltage}V"
     if premises_addr:
         db_info_text += f"\\P(LOCATED AT PREMISES {premises_addr})"
@@ -1067,7 +1088,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     result.components.append(PlacedComponent(
         symbol_name="DB_INFO_BOX",
         x=db_info_x,
-        y=y - 5,
+        y=y - 3,  # Positioned just below busbar (was y - 5)
         label=f"{breaker_rating}A DB",
         rating=db_info_text,
     ))
@@ -1116,24 +1137,20 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     # -- 6a. DB Box (dashed rectangle around distribution board per LEW guide) --
     # Encompasses: main breaker, ELCB/RCCB, busbar, and all sub-circuit breakers
     # Similar pattern to meter board dashed box (lines 900-918)
-    db_box_end_y = busbar_y_row + 8 + config.mcb_h + config.stub_len + 6 + 15
-    # = busbar + gap(8) + breaker_height + stub + tail(6) + label(15)
+    db_box_end_y = busbar_y_row + 8 + config.mcb_h + config.stub_len + 4 + 8
+    # = busbar + gap(8) + breaker_height + stub + tail(4) + label(8) — compact
     db_box_left = result.busbar_start_x - 5
     db_box_right = result.busbar_end_x + 5
     # Clamp to drawing bounds
     db_box_left = max(db_box_left, config.min_x + 2)
     db_box_right = min(db_box_right, config.max_x - 2)
 
-    # Four sides of dashed rectangle (DB Box)
-    result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_right, db_box_start_y)))
-    result.dashed_connections.append(((db_box_left, db_box_end_y), (db_box_right, db_box_end_y)))
-    result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_left, db_box_end_y)))
-    result.dashed_connections.append(((db_box_right, db_box_start_y), (db_box_right, db_box_end_y)))
+    # DB Box — solid rectangle (matches real Singapore SLD samples)
+    result.solid_boxes.append((db_box_left, db_box_start_y, db_box_right, db_box_end_y))
 
-    # -- 7. Earth Bar --
-    # Position at right side, below busbar (Singapore SLD convention)
-    earth_x = min(result.busbar_end_x + 5, config.max_x - 25)
-    earth_y = config.min_y + 8  # Near bottom, above title block
+    # -- 7. Earth Bar (outside DB box, right side) --
+    earth_x = db_box_right + 5      # 5mm right of DB box
+    earth_y = result.busbar_y - 15   # Below busbar level
 
     result.components.append(PlacedComponent(
         symbol_name="EARTH",
@@ -1163,13 +1180,14 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
             label=f"1 x {earth_conductor_mm2}sqmm CU/GRN-YEL",
         ))
 
-    # Dashed earth conductor -- from earth bar up to busbar level, then to busbar end
-    earth_cx = earth_x + 8
-    # Vertical dashed line: earth bar → busbar level
-    result.dashed_connections.append(((earth_cx, earth_y + 18), (earth_cx, result.busbar_y)))
-    # Horizontal dashed line: connect to the busbar end (right side)
-    if earth_cx > result.busbar_end_x:
-        result.dashed_connections.append(((result.busbar_end_x, result.busbar_y), (earth_cx, result.busbar_y)))
+    # Solid earth conductor -- from busbar end to earth bar (outside DB box)
+    earth_cx = earth_x + 8  # Center of earth symbol
+    # Horizontal: busbar end → earth bar center X
+    result.connections.append(((result.busbar_end_x, result.busbar_y),
+                               (earth_cx, result.busbar_y)))
+    # Vertical: from busbar level down to earth bar top
+    result.connections.append(((earth_cx, result.busbar_y),
+                               (earth_cx, earth_y + 18)))
 
     # -- Post-layout: resolve text/symbol overlaps --
     resolve_overlaps(result, config)
@@ -1347,6 +1365,7 @@ def _place_sub_circuits_upward(
             # Short vertical line from busbar (upward, past circuit ID box)
             spare_top_y = busbar_y + 15
             result.connections.append(((tap_x, busbar_y), (tap_x, spare_top_y)))
+            result.junction_dots.append((tap_x, busbar_y))
             # "SPARE" label (vertical text, above the tap)
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
@@ -1362,6 +1381,7 @@ def _place_sub_circuits_upward(
 
         # Vertical drop from busbar (upward)
         result.connections.append(((tap_x, busbar_y), (tap_x, sc_y)))
+        result.junction_dots.append((tap_x, busbar_y))
 
         # Sub-circuit breaker info
         sc_breaker_type = str(circuit.get("breaker_type", "MCB")).upper()
@@ -1399,7 +1419,7 @@ def _place_sub_circuits_upward(
             cable_annotation=sc_cable,
             circuit_id=circuit_id,
             load_info=load_info,
-            rotation=90.0,
+            rotation=90.0,  # Vertical text (matches real Singapore SLD)
             # LEW-style breaker block fields
             poles=sc_poles,
             breaker_type_str=sc_breaker_type,
@@ -1411,10 +1431,11 @@ def _place_sub_circuits_upward(
 
         # Tail from breaker top (extending upward)
         breaker_top_y = sc_y + sc_cb_h + config.stub_len
-        tail_end_y = breaker_top_y + 6
+        tail_end_y = breaker_top_y + 10
 
         # Connection from breaker top to tail end
         result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
+        result.arrow_points.append((tap_x, tail_end_y))
 
         # Circuit name label (vertical text, above the tail)
         # Circuit ID is already shown in the CIRCUIT_ID_BOX at the busbar tap

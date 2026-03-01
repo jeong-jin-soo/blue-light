@@ -92,7 +92,9 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
         },
 
         onToolResult: (_tool, _summary) => {
-          set({ activeToolName: null });
+          // Keep isLoading true so the loading indicator stays visible
+          // until the next tool_start or first token arrives
+          set({ activeToolName: null, isLoading: true });
         },
 
         onSldPreview: (svg) => {

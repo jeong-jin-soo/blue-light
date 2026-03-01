@@ -3,12 +3,10 @@ Lightweight SVG drawing backend for SLD preview.
 
 Generates an SVG string directly without external dependencies.
 
-Line weight standards (matching pdf_backend):
-- SLD_POWER_MAIN: 1.0mm
-- SLD_SYMBOLS: 0.7mm
-- SLD_CONNECTIONS: 0.5mm
-- SLD_ANNOTATIONS: 0.35mm
-- SLD_TITLE_BLOCK: 0.7mm
+Line weight standards calibrated from real LEW SLD samples:
+- All layers: 0.25mm (uniform)
+- SLD_POWER_MAIN: 0.50mm (busbar only)
+- Color: 100% black
 """
 
 from __future__ import annotations
@@ -21,22 +19,22 @@ from xml.sax.saxutils import escape
 _PAGE_WIDTH = 420.0
 _PAGE_HEIGHT = 297.0
 
-# Layer -> stroke color mapping (SVG on white background)
+# Layer -> stroke color (all black, matching real LEW SLD samples)
 _LAYER_COLORS: dict[str, str] = {
     "SLD_SYMBOLS": "#000000",
     "SLD_CONNECTIONS": "#000000",
     "SLD_POWER_MAIN": "#000000",
-    "SLD_ANNOTATIONS": "#262626",
+    "SLD_ANNOTATIONS": "#000000",
     "SLD_TITLE_BLOCK": "#000000",
 }
 
-# Layer -> stroke width in mm
+# Layer -> stroke width calibrated from real LEW SLD samples (0.25mm uniform)
 _LAYER_STROKE_WIDTHS: dict[str, float] = {
-    "SLD_SYMBOLS": 0.7,
-    "SLD_CONNECTIONS": 0.5,
-    "SLD_POWER_MAIN": 1.0,
-    "SLD_ANNOTATIONS": 0.35,
-    "SLD_TITLE_BLOCK": 0.7,
+    "SLD_SYMBOLS": 0.25,
+    "SLD_CONNECTIONS": 0.25,
+    "SLD_POWER_MAIN": 0.50,
+    "SLD_ANNOTATIONS": 0.25,
+    "SLD_TITLE_BLOCK": 0.25,
 }
 
 
@@ -136,6 +134,26 @@ class SvgBackend:
             f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{radius:.2f}" {self._stroke()} />'
         )
 
+    def add_filled_circle(
+        self,
+        center: tuple[float, float],
+        radius: float,
+        *,
+        fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
+    ) -> None:
+        """Draw a filled circle (junction dot, etc.)."""
+        cx = center[0]
+        cy = self._flip_y(center[1])
+        if isinstance(fill_color, str):
+            fill = fill_color
+        else:
+            r, g, b = fill_color
+            fill = f"rgb({int(r * 255)},{int(g * 255)},{int(b * 255)})"
+        self._elements.append(
+            f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{radius:.2f}" '
+            f'fill="{fill}" stroke="none" />'
+        )
+
     def add_arc(
         self,
         center: tuple[float, float],
@@ -205,13 +223,13 @@ class SvgBackend:
             escaped = escape(lines[0])
             self._elements.append(
                 f'<text x="{x:.2f}" y="{base_y:.2f}" '
-                f'font-family="Helvetica, Arial, sans-serif" font-size="{char_height:.1f}" '
+                f'font-family="Arial, Helvetica, sans-serif" font-size="{char_height:.1f}" '
                 f'fill="{color}"{transform}>{escaped}</text>'
             )
         else:
             parts = [
                 f'<text x="{x:.2f}" y="{base_y:.2f}" '
-                f'font-family="Helvetica, Arial, sans-serif" font-size="{char_height:.1f}" '
+                f'font-family="Arial, Helvetica, sans-serif" font-size="{char_height:.1f}" '
                 f'fill="{color}"{transform}>'
             ]
             for i, line in enumerate(lines):

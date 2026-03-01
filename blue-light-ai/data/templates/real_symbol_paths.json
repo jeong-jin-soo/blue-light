@@ -1,0 +1,95 @@
+{
+  "_comment": "Calibrated symbol dimensions measured from 73 real LEW SLD samples. All values in mm.",
+  "_source": "32A/63A/100A/200A Single Phase DB & TPN SLDs - PyMuPDF vector path analysis",
+
+  "MCB": {
+    "width_mm": 3.6,
+    "height_mm": 6.5,
+    "arc_radius_mm": 1.25,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "description": "Miniature Circuit Breaker (<100A)"
+  },
+  "MCCB": {
+    "width_mm": 4.2,
+    "height_mm": 7.5,
+    "arc_radius_mm": 1.5,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "description": "Moulded Case Circuit Breaker (100A-630A)"
+  },
+  "ACB": {
+    "width_mm": 5.0,
+    "height_mm": 8.5,
+    "arc_radius_mm": 1.8,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "crossbar_extend_mm": 1.0,
+    "description": "Air Circuit Breaker (>630A) with horizontal crossbar"
+  },
+  "RCCB": {
+    "width_mm": 4.2,
+    "height_mm": 7.5,
+    "arc_radius_mm": 1.5,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "rcd_bar_offset_mm": 2.5,
+    "rcd_bar_half_mm": 1.5,
+    "description": "Residual Current Circuit Breaker with RCD sensing element"
+  },
+  "ELCB": {
+    "width_mm": 4.2,
+    "height_mm": 7.5,
+    "arc_radius_mm": 1.5,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "rcd_bar_offset_mm": 2.5,
+    "rcd_bar_half_mm": 1.5,
+    "description": "Earth Leakage Circuit Breaker (same symbol as RCCB)"
+  },
+  "KWH_METER": {
+    "width_mm": 8.0,
+    "height_mm": 8.0,
+    "circle_radius_mm": 4.0,
+    "stub_mm": 2.0,
+    "description": "kWh Energy Meter (circle with kWh text)"
+  },
+  "CT": {
+    "width_mm": 6.0,
+    "height_mm": 6.0,
+    "outer_radius_mm": 3.0,
+    "inner_radius_mm": 1.8,
+    "stub_mm": 2.0,
+    "description": "Current Transformer (two concentric circles)"
+  },
+  "ISOLATOR": {
+    "width_mm": 4.0,
+    "height_mm": 7.0,
+    "blade_length_mm": 5.0,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "description": "Isolator / Disconnect Switch"
+  },
+  "DOUBLE_POLE_SWITCH": {
+    "width_mm": 4.0,
+    "height_mm": 7.0,
+    "blade_length_mm": 5.0,
+    "contact_radius_mm": 0.67,
+    "stub_mm": 2.0,
+    "description": "Double Pole Switch"
+  },
+  "EARTH": {
+    "width_mm": 6.0,
+    "height_mm": 5.0,
+    "line_count": 3,
+    "description": "Earth / Ground Symbol (3 decreasing horizontal lines)"
+  },
+  "FUSE": {
+    "width_mm": 2.5,
+    "height_mm": 6.0,
+    "rect_width_mm": 2.5,
+    "rect_height_mm": 5.0,
+    "stub_mm": 2.0,
+    "description": "Fuse (filled rectangle on conductor)"
+  }
+}

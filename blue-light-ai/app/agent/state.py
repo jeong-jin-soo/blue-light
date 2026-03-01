@@ -35,3 +35,6 @@ class SldAgentState(TypedDict):
 
     # Conversation phase: gathering → reviewing → generating → revising
     phase: str
+
+    # Template matching — reference image path for Gemini Vision
+    template_image_path: str | None

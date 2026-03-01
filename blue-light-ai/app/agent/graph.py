@@ -5,6 +5,7 @@ Manages the conversation flow:
   gathering → reviewing → generating → revising → END
 """
 
+import base64
 import json
 import logging
 import os
@@ -47,6 +48,30 @@ def _get_llm() -> ChatGoogleGenerativeAI:
 # ── Graph Nodes ─────────────────────────────────────
 
 
+def _extract_template_info(messages: list) -> dict | None:
+    """Scan messages for find_matching_templates ToolMessage and extract template info.
+
+    Returns dict with reference_image_path, best_template_filename, similarity_score
+    or None if not found.
+    """
+    from langchain_core.messages import ToolMessage
+
+    for msg in reversed(messages):
+        if isinstance(msg, ToolMessage) and msg.name == "find_matching_templates":
+            try:
+                data = json.loads(msg.content)
+                image_path = data.get("reference_image_path")
+                if image_path:
+                    return {
+                        "reference_image_path": image_path,
+                        "best_template_filename": data.get("best_template_filename", ""),
+                        "similarity_score": data.get("similarity_score", 0),
+                    }
+            except (json.JSONDecodeError, TypeError):
+                pass
+    return None
+
+
 async def agent_node(state: SldAgentState) -> dict:
     """
     Main agent node — calls the LLM with the current state.
@@ -72,9 +97,56 @@ async def agent_node(state: SldAgentState) -> dict:
     else:
         messages.insert(0, SystemMessage(content=system_content))
 
+    # Inject template reference image for Gemini Vision — ONCE only.
+    # After first injection, state["template_image_path"] is set to "__injected__"
+    # to prevent re-sending the large base64 image on every subsequent turn.
+    already_injected = state.get("template_image_path") == "__injected__"
+    state_update = {}
+
+    if not already_injected:
+        template_info = _extract_template_info(messages)
+        if template_info and os.path.exists(template_info["reference_image_path"]):
+            try:
+                with open(template_info["reference_image_path"], "rb") as f:
+                    image_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+                image_text = (
+                    "Below is a reference image of a real-world SLD template that closely matches "
+                    "the current requirements. Use this as your BASE layout reference. "
+                    "Preserve its visual structure, notation style, and component arrangement."
+                )
+                tmpl_filename = template_info.get("best_template_filename", "")
+                tmpl_score = template_info.get("similarity_score", 0)
+                if settings.environment != "production" and tmpl_filename:
+                    image_text += (
+                        f"\n\n📋 [DEV] Base template: \"{tmpl_filename}\" "
+                        f"(similarity: {tmpl_score:.2f}). "
+                        "You MUST mention this template filename in your response "
+                        "so the developer can verify which template was used."
+                    )
+
+                image_msg = HumanMessage(content=[
+                    {
+                        "type": "text",
+                        "text": image_text,
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{image_b64}"},
+                    },
+                ])
+                insert_pos = 1 if messages and isinstance(messages[0], SystemMessage) else 0
+                messages.insert(insert_pos, image_msg)
+                # Mark as injected so subsequent agent_node calls skip image
+                state_update["template_image_path"] = "__injected__"
+                logger.info(f"Template reference image injected (ONCE): {template_info['reference_image_path']} "
+                            f"(filename={tmpl_filename}, score={tmpl_score})")
+            except Exception as e:
+                logger.warning(f"Failed to inject template image: {e}")
+
     response = await llm.ainvoke(messages)
 
-    return {"messages": [response]}
+    return {"messages": [response], **state_update}
 
 
 def should_continue(state: SldAgentState) -> str:
@@ -207,6 +279,22 @@ async def process_message(
 
                 logger.info(f"Tool completed: {tool_name}")
 
+                # Capture template image path for Vision injection
+                if tool_name == "find_matching_templates":
+                    try:
+                        tmpl_result = json.loads(output)
+                        img_path = tmpl_result.get("reference_image_path")
+                        if img_path and os.path.exists(img_path):
+                            # Store in state via a separate SSE event
+                            # The actual state update happens via the ToolNode mechanism
+                            yield {
+                                "type": "template_matched",
+                                "filename": tmpl_result.get("best_template_filename", ""),
+                                "similarity_score": tmpl_result.get("similarity_score", 0),
+                            }
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
                 # Check if SLD was generated or preview requested
                 if tool_name in ("generate_sld", "generate_preview"):
                     try:
@@ -253,12 +341,13 @@ async def process_message(
 def _tool_description(tool_name: str) -> str:
     """Human-readable description for tool execution (with pipeline step numbers)."""
     descriptions = {
-        "get_application_details": "[Step 1/5] 신청 정보 및 규격 조회 중...",
-        "get_standard_specs": "[Step 1/5] 싱가포르 전기 규격 조회 중...",
-        "extract_sld_data": "[Step 1-2/5] SLD 데이터 추출 및 구조화 중...",
-        "validate_sld_requirements": "[Step 3/5] SS 638 규격 검증 중...",
-        "generate_sld": "[Step 4/5] SLD 도면 생성 중 (PDF + SVG)...",
-        "generate_preview": "[Step 5/5] SLD 미리보기 생성 중...",
+        "get_application_details": "[Step 1/6] 신청 정보 및 규격 조회 중...",
+        "get_standard_specs": "[Step 1/6] 싱가포르 전기 규격 조회 중...",
+        "find_matching_templates": "[Step 2/6] 유사 실무 SLD 템플릿 검색 중...",
+        "extract_sld_data": "[Step 1-3/6] SLD 데이터 추출 및 구조화 중...",
+        "validate_sld_requirements": "[Step 4/6] SS 638 규격 검증 중...",
+        "generate_sld": "[Step 5/6] SLD 도면 생성 중 (PDF + SVG)...",
+        "generate_preview": "[Step 6/6] SLD 미리보기 생성 중...",
     }
     return descriptions.get(tool_name, f"Executing {tool_name}...")
 
@@ -279,6 +368,13 @@ def _summarize_tool_result(tool_name: str, output: str) -> str:
             breaker = data.get("main_breaker", {})
             return f"[Step 1] {kva} kVA: {breaker.get('type', '?')} {breaker.get('rating_A', '?')}A"
 
+        if tool_name == "find_matching_templates":
+            if data.get("matched"):
+                score = data.get("similarity_score", 0)
+                filename = data.get("best_template_filename", "?")
+                return f"[Step 2] ✅ Template matched: {filename} (score: {score})"
+            return "[Step 2] No matching template found — using standards fallback"
+
         if tool_name == "validate_sld_requirements":
             valid = data.get("valid", False)
             missing = len(data.get("missing_fields", []))
@@ -286,24 +382,24 @@ def _summarize_tool_result(tool_name: str, output: str) -> str:
             warnings = len(data.get("warnings", []))
             if valid:
                 suffix = f" ({warnings} warning(s))" if warnings else ""
-                return f"[Step 3] ✅ Validated{suffix}"
+                return f"[Step 4] ✅ Validated{suffix}"
             parts = []
             if missing:
                 parts.append(f"{missing} missing")
             if errors:
                 parts.append(f"{errors} error(s)")
-            return f"[Step 3] ❌ {', '.join(parts)}"
+            return f"[Step 4] ❌ {', '.join(parts)}"
 
         if tool_name == "generate_sld":
             if data.get("success"):
                 count = data.get("component_count", 0)
-                return f"[Step 4] ✅ Generated ({count} components)"
-            return f"[Step 4] ❌ {data.get('error', 'unknown')}"
+                return f"[Step 5] ✅ Generated ({count} components)"
+            return f"[Step 5] ❌ {data.get('error', 'unknown')}"
 
         if tool_name == "generate_preview":
             if data.get("success"):
-                return "[Step 5] Preview ready"
-            return "[Step 5] Preview failed"
+                return "[Step 6] Preview ready"
+            return "[Step 6] Preview failed"
 
         if tool_name == "extract_sld_data":
             if data.get("success"):
@@ -312,9 +408,9 @@ def _summarize_tool_result(tool_name: str, output: str) -> str:
                 warnings = len(validation.get("warnings", []))
                 circuits = len(data.get("extracted", {}).get("outgoing_circuits", []))
                 if errors:
-                    return f"[Step 1-2] Extracted ({circuits} circuits) — {errors} error(s) need attention"
-                return f"[Step 1-2] ✅ Extracted ({circuits} circuits, {warnings} warning(s))"
-            return "[Step 1-2] ❌ Extraction failed"
+                    return f"[Step 1-3] Extracted ({circuits} circuits) — {errors} error(s) need attention"
+                return f"[Step 1-3] ✅ Extracted ({circuits} circuits, {warnings} warning(s))"
+            return "[Step 1-3] ❌ Extraction failed"
 
     except (json.JSONDecodeError, TypeError):
         pass

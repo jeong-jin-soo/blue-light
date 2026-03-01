@@ -257,23 +257,35 @@ class TestGeneratePdfBytes:
 
     def test_returns_valid_pdf_bytes(self):
         """generate_pdf_bytes() should return bytes starting with PDF header."""
-        pdf_bytes, svg_string = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
+        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
         assert isinstance(pdf_bytes, bytes)
         assert pdf_bytes[:5] == b"%PDF-"
         assert len(pdf_bytes) > 1000  # Non-trivial PDF
 
     def test_returns_svg_string(self):
         """generate_pdf_bytes() should also return a valid SVG string."""
-        pdf_bytes, svg_string = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
+        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
         assert isinstance(svg_string, str)
         assert svg_string.startswith("<svg")
         assert "</svg>" in svg_string
 
+    def test_returns_dxf_bytes(self):
+        """generate_pdf_bytes() should return DXF bytes when backend_type='dxf'."""
+        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ, backend_type="dxf")
+        assert isinstance(dxf_bytes, bytes)
+        assert len(dxf_bytes) > 1000
+
     def test_single_phase_pdf_bytes(self):
         """generate_pdf_bytes() should work with single-phase requirements."""
-        pdf_bytes, svg_string = SldGenerator.generate_pdf_bytes(BASIC_1PHASE_REQ)
+        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_1PHASE_REQ)
         assert isinstance(pdf_bytes, bytes)
         assert pdf_bytes[:5] == b"%PDF-"
+
+    def test_legacy_pdf_backend(self):
+        """generate_pdf_bytes() with backend_type='pdf' should return None for DXF."""
+        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ, backend_type="pdf")
+        assert isinstance(pdf_bytes, bytes)
+        assert dxf_bytes is None
 
 
 # -- Test: Title block CHECKED/DATE --
@@ -652,12 +664,12 @@ class TestConnectionAlignment:
     def _get_breaker_tap_x(self, comp: PlacedComponent) -> float:
         """Calculate the tap_x (center) from a breaker block component."""
         if comp.symbol_name == "CB_MCB":
-            return comp.x + 5.0
+            return comp.x + 1.8   # 3.6mm / 2 (calibrated)
         elif comp.symbol_name == "CB_MCCB":
-            return comp.x + 7.0
+            return comp.x + 2.1   # 4.2mm / 2
         elif comp.symbol_name == "CB_ACB":
-            return comp.x + 8.0
-        return comp.x + 7.0
+            return comp.x + 2.5   # 5.0mm / 2
+        return comp.x + 2.1
 
     def test_connections_match_breakers_standard(self):
         """For standard layout, connections should align with breaker tap points."""
@@ -727,13 +739,16 @@ class TestConnectionAlignment:
             )
 
     def test_busbar_tap_connections_vertical(self):
-        """All busbar tap connections should be purely vertical (same x at both ends)."""
+        """Busbar tap connections (vertical drops) should have same x at both ends."""
         result = compute_layout(DENSE_3PHASE_REQ)
         busbar_y = result.busbar_y
         for start, end in result.connections:
             # Identify busbar tap connections (one end at busbar_y)
             if abs(start[1] - busbar_y) < 0.5 or abs(end[1] - busbar_y) < 0.5:
-                # Both ends should have same x (vertical line)
+                # Skip horizontal connections (e.g., earth bar horizontal run)
+                if abs(start[1] - end[1]) < 0.5:
+                    continue
+                # Vertical connections should have same x at both ends
                 assert abs(start[0] - end[0]) < 0.5, (
                     f"Busbar tap connection not vertical: "
                     f"({start[0]:.1f},{start[1]:.1f}) → ({end[0]:.1f},{end[1]:.1f})"
@@ -968,7 +983,7 @@ class TestRebuildPositions:
                 )
 
     def test_name_label_offset_from_tap(self):
-        """Circuit name labels should be at tap_x + 3."""
+        """Circuit name labels should be at tap_x + 3 (vertical text offset)."""
         result = compute_layout(DENSE_3PHASE_REQ)
         groups, _ = _identify_groups(result)
         for g in groups:

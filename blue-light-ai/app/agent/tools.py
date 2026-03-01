@@ -65,10 +65,13 @@ def get_application_details(application_seq: int) -> str:
         if tiers:
             result["available_tiers"] = [t["max_kva"] for t in tiers]
             result["standards_data"] = tiers
-            result["instruction"] = (
-                "Match the application's selectedKva to the closest tier. "
-                "Use the tier's main_breaker, recommended_busbar_A, and "
-                "typical_sub_circuits as the default design proposal."
+            result["NEXT_ACTION_REQUIRED"] = (
+                "⚠️ DO NOT propose any design yet. "
+                "Your NEXT action MUST be to call `find_matching_templates` "
+                "with supply_type and kva inferred from the user's message "
+                "and the application context. "
+                "You are BLOCKED from outputting any design proposal "
+                "until find_matching_templates has been called."
             )
     except FileNotFoundError:
         result["warning"] = "Standards file not found — use fallback calculations."
@@ -363,7 +366,8 @@ def validate_sld_requirements(requirements: dict) -> str:
         )
 
     # ── Optional but recommended ─────────────────────────
-    if not requirements.get("metering"):
+    supply_source = requirements.get("supply_source", "sp_powergrid")
+    if not requirements.get("metering") and supply_source != "landlord":
         warnings.append("metering not specified — will use standard SP kWh meter")
 
     # ── Result ───────────────────────────────────────────
@@ -389,20 +393,61 @@ def validate_sld_requirements(requirements: dict) -> str:
 # ── Tool 4: Generate SLD (PDF + SVG) ─────────────────
 
 @tool
-def generate_sld(requirements: dict, application_info: dict | None = None) -> str:
+def generate_sld(
+    requirements: dict,
+    application_info: dict | None = None,
+    application_seq: int = 0,
+) -> str:
     """
     Generate a Single Line Diagram as PDF with SVG preview.
     Returns the file ID for download and the SVG preview string.
 
+    If a template was cached by find_matching_templates, it will be
+    AUTOMATICALLY deep-merged with requirements before generation.
+    This ensures professional cable specs, busbar config, etc. are preserved.
+
+    IMPORTANT: Always pass application_seq so the template auto-merge works.
+
     Args:
-        requirements: Complete SLD requirements dictionary containing supply_type,
-            kva, main_breaker, busbar_rating, sub_circuits, etc.
+        requirements: SLD requirements dictionary. Can contain only user-specified
+            fields — missing fields will be inherited from the cached template.
         application_info: Optional application details (address, postal code, etc.)
+        application_seq: Application ID for template cache lookup (required for auto-merge)
     """
     # Log full requirements for diagnostics
     logger.info(f"generate_sld called with requirements: {json.dumps(requirements, ensure_ascii=False, default=str)}")
     if application_info:
         logger.info(f"generate_sld application_info: {json.dumps(application_info, ensure_ascii=False, default=str)}")
+
+    # ── Template auto-merge ─────────────────────────────
+    # Resolve application_seq from parameter or application_info
+    app_seq = application_seq or (application_info or {}).get("application_seq", 0)
+    if isinstance(app_seq, str):
+        try:
+            app_seq = int(app_seq)
+        except (ValueError, TypeError):
+            app_seq = 0
+
+    if app_seq:
+        from app.sld.template_cache import retrieve
+        cached_template = retrieve(app_seq)
+
+        if cached_template:
+            from app.sld.template_merge import deep_merge_requirements
+            logger.info(
+                "Auto-merging template with user requirements (app_seq=%d). "
+                "User circuits=%d, Template circuits=%d",
+                app_seq,
+                len(requirements.get("sub_circuits", [])),
+                len(cached_template.get("sub_circuits", [])),
+            )
+            requirements = deep_merge_requirements(cached_template, requirements)
+            logger.info(
+                "Post-merge requirements: %s",
+                json.dumps(requirements, ensure_ascii=False, default=str),
+            )
+        else:
+            logger.info("No cached template for app_seq=%d, using requirements as-is", app_seq)
 
     # 입력 검증: 필수 필드 확인
     required_fields = ["supply_type", "kva", "main_breaker", "busbar_rating", "sub_circuits"]
@@ -477,25 +522,63 @@ def generate_sld(requirements: dict, application_info: dict | None = None) -> st
         })
 
     from app.sld.generator import SldGenerator
+    from app.sld.track_router import decide_track
 
     file_id = uuid.uuid4().hex[:12]
     pdf_path = os.path.join(settings.temp_file_dir, f"{file_id}.pdf")
     svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg")
+    dxf_path = os.path.join(settings.temp_file_dir, f"{file_id}.dxf")
 
     try:
-        generator = SldGenerator()
-        result = generator.generate(
-            requirements=requirements,
-            application_info=application_info or {},
-            pdf_output_path=pdf_path,
-            svg_output_path=svg_path,
-        )
+        # ── Track A/B routing ──────────────────────
+        matched_template = None
+        if app_seq:
+            from app.sld.template_cache import retrieve_matched_template
+            matched_template = retrieve_matched_template(app_seq)
+
+        track_decision = decide_track(requirements, matched_template)
+        logger.info(f"Track decision: {track_decision.track} — {track_decision.reason}")
+
+        if track_decision.track == "A" and track_decision.template_path:
+            # Track A: Use real LEW PDF with title block replacement
+            from app.sld.pdf_editor import PdfTemplateEditor
+            app = application_info or {}
+            with PdfTemplateEditor(track_decision.template_path) as editor:
+                editor.replace_title_block({
+                    "client_name": app.get("clientName", ""),
+                    "address": app.get("address", ""),
+                    "project_name": app.get("address", ""),
+                    "lew_name": app.get("assignedLewName", ""),
+                    "lew_licence": app.get("assignedLewLicenceNo", ""),
+                    "date": "",
+                })
+                editor.save(pdf_path)
+            component_count = 0
+            track_info = "Track A (template reuse)"
+        else:
+            # Track B: Generate new SLD with DXF + ReportLab + SVG
+            generator = SldGenerator()
+            result = generator.generate(
+                requirements=requirements,
+                application_info=application_info or {},
+                pdf_output_path=pdf_path,
+                svg_output_path=svg_path,
+                backend_type="dxf",
+            )
+            component_count = result.get("component_count", 0)
+            track_info = "Track B (generated)"
+
+        # Generation succeeded — clean up template cache
+        if app_seq:
+            from app.sld.template_cache import remove
+            remove(app_seq)
 
         return json.dumps({
             "success": True,
             "file_id": file_id,
-            "component_count": result.get("component_count", 0),
-            "message": f"SLD generated successfully with {result.get('component_count', 0)} components. "
+            "component_count": component_count,
+            "track": track_decision.track,
+            "message": f"SLD generated successfully ({track_info}, {component_count} components). "
                        "The SVG preview is now displayed in the preview panel on the right. "
                        "The user can review it there. Do NOT include or describe any SVG code in your response.",
         }, ensure_ascii=False)
@@ -651,6 +734,126 @@ def _sync_extract_sld(user_input: str) -> dict:
     return parse_and_validate(raw_json)
 
 
+# ── Tool 7: Find Matching Templates ─────────────────
+
+@tool
+def find_matching_templates(
+    supply_type: str,
+    kva: float,
+    application_seq: int = 0,
+    circuit_count: int = 0,
+    main_breaker_type: str = "",
+    metering_type: str = "",
+) -> str:
+    """
+    Find 2-3 most similar real-world SLD templates from the database.
+    The best match is automatically cached and will be deep-merged with
+    your requirements when generate_sld is called (no manual merge needed).
+
+    The reference PDF image is also provided for visual layout reference.
+
+    ALWAYS pass application_seq so the template can be cached for auto-merge.
+
+    Args:
+        supply_type: "single_phase" or "three_phase" (required)
+        kva: Installation capacity in kVA (required)
+        application_seq: Application ID for template caching (required for auto-merge)
+        circuit_count: Number of sub-circuits (0 = unknown, optional)
+        main_breaker_type: "MCB", "MCCB", or "ACB" (optional)
+        metering_type: "sp_meter" or "ct_meter" (optional)
+    """
+    from app.sld.template_matcher import (
+        convert_pdf_to_image,
+        find_similar_templates,
+        normalize_template_to_requirements,
+    )
+
+    spec = {
+        "supply_type": supply_type,
+        "kva": kva,
+        "circuit_count": circuit_count,
+        "main_breaker_type": main_breaker_type,
+        "metering_type": metering_type,
+    }
+
+    templates = find_similar_templates(spec, limit=3)
+
+    if not templates:
+        return json.dumps({
+            "matched": False,
+            "message": "No similar template found. Proceed with standard generation from scratch.",
+            "templates": [],
+        }, ensure_ascii=False)
+
+    best = templates[0]
+
+    # 최상위 템플릿 PDF → 이미지 변환 (Vision 참조용)
+    image_path = convert_pdf_to_image(best["absolute_path"])
+    if image_path:
+        best["reference_image_path"] = image_path
+
+    # 템플릿을 generator format으로 정규화
+    normalized_base = normalize_template_to_requirements(best["detail"])
+
+    # ── 캐시에 저장 (generate_sld에서 자동 딥 머지 + Track A 라우팅에 사용) ──
+    if application_seq and normalized_base:
+        from app.sld.template_cache import store
+        # Store both normalized template and original matched metadata (for Track A)
+        matched_meta = {
+            "match_score": best.get("similarity_score", 0),
+            "spec": best.get("detail", {}),
+            "pdf_path": best.get("absolute_path"),
+            "filename": best.get("filename"),
+        }
+        store(application_seq, normalized_base, matched_template=matched_meta)
+        logger.info(
+            "Template cached for auto-merge: app_seq=%d, template=%s, score=%.2f",
+            application_seq,
+            best["filename"],
+            best.get("similarity_score", 0),
+        )
+
+    # ── Gemini에게는 메타데이터만 반환 (template JSON은 주지 않는다) ──
+    # 이유: Gemini가 template JSON을 보면 그대로 복사하여 requirements에 넣음
+    #       → deep merge가 no-op이 됨 (user 값이 이미 모든 필드를 채우므로)
+    # 해결: template JSON은 캐시에만 저장, Gemini에게는 이미지 + 메타데이터만 제공
+    #       → Gemini는 사용자 요청만으로 최소 requirements 생성
+    #       → generate_sld에서 template과 자동 deep merge
+    result = {
+        "matched": True,
+        "best_template_filename": best["filename"],
+        "similarity_score": best["similarity_score"],
+        "best_template_kva": best["kva"],
+        "best_template_circuit_count": best["circuit_count"],
+        "best_template_main_breaker": best["detail"].get("main_breaker", {}).get("type", ""),
+        "reference_image_path": best.get("reference_image_path"),
+        "other_templates_summary": [
+            {
+                "filename": t["filename"],
+                "kva": t["kva"],
+                "circuit_count": t["circuit_count"],
+                "similarity_score": t["similarity_score"],
+            }
+            for t in templates[1:]
+        ],
+        "instruction": (
+            "A real-world template has been cached and will be AUTOMATICALLY deep-merged "
+            "with your requirements when you call generate_sld. "
+            "DO NOT generate cable specifications, busbar ratings, metering, or ELCB/RCCB values "
+            "unless the user EXPLICITLY specified them. These will be automatically inherited "
+            "from the matched template. "
+            "Your requirements should contain ONLY: "
+            "1) supply_type and kva, "
+            "2) sub_circuits with ONLY name, breaker_type, and breaker_rating (NO cable field), "
+            "3) main_breaker ONLY if user specified it, "
+            "4) elcb ONLY if user specified it. "
+            "OMIT all other fields — they will be auto-filled from the template."
+        ),
+    }
+
+    return json.dumps(result, ensure_ascii=False, default=str)
+
+
 # ── Tool Registry ───────────────────────────────────
 
 ALL_TOOLS = [
@@ -660,4 +863,5 @@ ALL_TOOLS = [
     generate_sld,
     generate_preview,
     extract_sld_data,
+    find_matching_templates,
 ]

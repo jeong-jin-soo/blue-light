@@ -4,12 +4,11 @@ PDF drawing backend using ReportLab.
 Implements DrawingBackend protocol to generate A3 landscape PDF files
 for SLD drawings submitted to EMA.
 
-Line weight standards (professional engineering drawing):
-- SLD_POWER_MAIN: 1.0mm (main power supply lines)
-- SLD_SYMBOLS: 0.7mm (symbol outlines)
-- SLD_CONNECTIONS: 0.5mm (branch connections)
-- SLD_ANNOTATIONS: 0.35mm (text, labels)
-- SLD_TITLE_BLOCK: 0.7mm (border, title block lines)
+Line weight standards calibrated from 73 real LEW SLD samples:
+- All layers: 0.25mm (uniform, matching real samples)
+- SLD_POWER_MAIN: 0.50mm (busbar only, slightly bolder)
+- Color: 100% black (no gray)
+- Font: Arial (matching ArialMT in real samples)
 """
 
 from __future__ import annotations
@@ -23,22 +22,22 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 
 
-# Layer -> color mapping (PDF is on white paper, so use dark colors)
+# Layer -> color mapping (all black, matching real LEW SLD samples)
 _LAYER_COLORS: dict[str, tuple[float, float, float]] = {
-    "SLD_SYMBOLS": (0.0, 0.0, 0.0),         # Black
-    "SLD_CONNECTIONS": (0.0, 0.0, 0.0),      # Black
-    "SLD_POWER_MAIN": (0.0, 0.0, 0.0),       # Black (bold)
-    "SLD_ANNOTATIONS": (0.15, 0.15, 0.15),   # Very dark gray
-    "SLD_TITLE_BLOCK": (0.0, 0.0, 0.0),      # Black
+    "SLD_SYMBOLS": (0.0, 0.0, 0.0),
+    "SLD_CONNECTIONS": (0.0, 0.0, 0.0),
+    "SLD_POWER_MAIN": (0.0, 0.0, 0.0),
+    "SLD_ANNOTATIONS": (0.0, 0.0, 0.0),
+    "SLD_TITLE_BLOCK": (0.0, 0.0, 0.0),
 }
 
-# Default line widths per layer (in mm -- converted to points at draw time)
+# Line widths per layer calibrated from real LEW SLD samples (0.25mm uniform)
 _LAYER_LINE_WIDTHS_MM: dict[str, float] = {
-    "SLD_SYMBOLS": 0.7,
-    "SLD_CONNECTIONS": 0.5,
-    "SLD_POWER_MAIN": 1.0,
-    "SLD_ANNOTATIONS": 0.35,
-    "SLD_TITLE_BLOCK": 0.7,
+    "SLD_SYMBOLS": 0.25,
+    "SLD_CONNECTIONS": 0.25,
+    "SLD_POWER_MAIN": 0.50,
+    "SLD_ANNOTATIONS": 0.25,
+    "SLD_TITLE_BLOCK": 0.25,
 }
 
 
@@ -144,6 +143,28 @@ class PdfBackend:
             fill=0,
         )
 
+    def add_filled_circle(
+        self,
+        center: tuple[float, float],
+        radius: float,
+        *,
+        fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
+    ) -> None:
+        """Draw a filled circle (junction dot, etc.)."""
+        c = self._canvas
+        c.saveState()
+        if isinstance(fill_color, str):
+            h = fill_color.lstrip("#")
+            c.setFillColorRGB(
+                int(h[0:2], 16) / 255.0,
+                int(h[2:4], 16) / 255.0,
+                int(h[4:6], 16) / 255.0,
+            )
+        else:
+            c.setFillColorRGB(*fill_color)
+        c.circle(center[0] * mm, center[1] * mm, radius * mm, stroke=0, fill=1)
+        c.restoreState()
+
     def add_arc(
         self,
         center: tuple[float, float],
@@ -196,7 +217,7 @@ class PdfBackend:
         # Use annotation color for text
         color = _LAYER_COLORS.get(self._current_layer, (0.15, 0.15, 0.15))
         c.setFillColorRGB(*color)
-        c.setFont("Helvetica", font_size)
+        c.setFont("Helvetica", font_size)  # ReportLab maps Helvetica ≈ Arial
 
         if not isinstance(text, str):
             text = str(text)
