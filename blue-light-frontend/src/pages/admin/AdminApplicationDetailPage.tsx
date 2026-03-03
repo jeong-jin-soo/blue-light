@@ -436,7 +436,7 @@ export default function AdminApplicationDetailPage() {
             onFileDelete={handleFileDelete}
           />
 
-          <AdminPaymentSection payments={payments} files={files} />
+          <AdminPaymentSection payments={payments} files={files} applicationStatus={application.status} />
         </div>
 
         {/* Sidebar */}

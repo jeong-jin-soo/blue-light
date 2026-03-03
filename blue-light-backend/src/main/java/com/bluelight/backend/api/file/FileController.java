@@ -20,6 +20,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -97,8 +99,16 @@ public class FileController {
 
         String encodedFilename = URLEncoder.encode(fileEntity.getOriginalFilename(), StandardCharsets.UTF_8)
                 .replaceAll("\\+", "%20");
+
+        // Detect MIME type from original filename; fall back to octet-stream
+        String mimeType = null;
+        try {
+            mimeType = Files.probeContentType(Path.of(fileEntity.getOriginalFilename()));
+        } catch (Exception ignored) {}
+        MediaType mediaType = mimeType != null ? MediaType.parseMediaType(mimeType) : MediaType.APPLICATION_OCTET_STREAM;
+
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + fileEntity.getOriginalFilename() + "\"; filename*=UTF-8''" + encodedFilename)
                 .body(resource);

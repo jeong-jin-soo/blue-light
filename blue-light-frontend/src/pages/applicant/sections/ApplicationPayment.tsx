@@ -1,7 +1,11 @@
+import { useRef, useState, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
 import { Button } from '../../../components/ui/Button';
+import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
+import { useToastStore } from '../../../stores/toastStore';
 import fileApi from '../../../api/fileApi';
+import { formatFileSize, isImageFile } from '../../../utils/applicationUtils';
 import type { Application, Payment, FileInfo } from '../../../types';
 
 interface ApplicationPaymentProps {
@@ -9,10 +13,104 @@ interface ApplicationPaymentProps {
   payments: Payment[];
   paymentInfo: Record<string, string>;
   files?: FileInfo[];
+  onPaymentAdviceUpload?: (file: File) => Promise<void>;
+  onPaymentAdviceDelete?: (fileSeq: number) => Promise<void>;
 }
 
-export function ApplicationPayment({ application, payments, paymentInfo, files = [] }: ApplicationPaymentProps) {
+/** Inline image/file preview card for a payment advice file */
+function AdviceFileCard({
+  file,
+  onDownload,
+  onDelete,
+}: {
+  file: FileInfo;
+  onDownload: (f: FileInfo) => void;
+  onDelete?: (f: FileInfo) => void;
+}) {
+  const filename = file.originalFilename || 'Payment Advice';
+  const isImage = isImageFile(filename);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isImage) return;
+    let revoked = false;
+    let url = '';
+    fileApi.getFilePreviewUrl(file.fileSeq)
+      .then((blobUrl) => {
+        if (revoked) { URL.revokeObjectURL(blobUrl); return; }
+        url = blobUrl;
+        setPreviewUrl(blobUrl);
+      })
+      .catch(() => {});
+    return () => { revoked = true; if (url) URL.revokeObjectURL(url); };
+  }, [file.fileSeq, isImage]);
+
+  return (
+    <div className="bg-white rounded-lg border border-blue-100 overflow-hidden">
+      {/* Image preview */}
+      {isImage && previewUrl && (
+        <div className="p-2 flex justify-center bg-gray-50">
+          <img
+            src={previewUrl}
+            alt={filename}
+            className="max-h-60 max-w-full object-contain rounded"
+          />
+        </div>
+      )}
+      {/* File info bar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-t border-blue-50">
+        <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-gray-600 truncate">{filename}</p>
+          {file.fileSize != null && (
+            <p className="text-[10px] text-gray-400">{formatFileSize(file.fileSize)}</p>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => onDownload(file)}
+          className="text-blue-600 hover:text-blue-800 p-1"
+          title="Download"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </button>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete(file)}
+            className="text-gray-400 hover:text-red-500 p-1"
+            title="Delete"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function ApplicationPayment({
+  application,
+  payments,
+  paymentInfo,
+  files = [],
+  onPaymentAdviceUpload,
+  onPaymentAdviceDelete,
+}: ApplicationPaymentProps) {
+  const toast = useToastStore();
   const receiptFiles = files.filter(f => f.fileType === 'PAYMENT_RECEIPT');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FileInfo | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const canUploadAdvice = application.status === 'PENDING_PAYMENT' && !!onPaymentAdviceUpload;
 
   const handleDownloadReceipt = async (file: FileInfo) => {
     try {
@@ -21,6 +119,43 @@ export function ApplicationPayment({ application, payments, paymentInfo, files =
       // silently fail
     }
   };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onPaymentAdviceUpload) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      e.target.value = '';
+      return;
+    }
+
+    setUploading(true);
+    try {
+      await onPaymentAdviceUpload(file);
+      toast.success('Payment advice uploaded successfully');
+    } catch {
+      toast.error('Failed to upload payment advice');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || !onPaymentAdviceDelete) return;
+    setDeleting(true);
+    try {
+      await onPaymentAdviceDelete(deleteTarget.fileSeq);
+      toast.success('Payment advice deleted');
+    } catch {
+      toast.error('Failed to delete payment advice');
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   return (
     <>
       {/* Pricing */}
@@ -114,6 +249,58 @@ export function ApplicationPayment({ application, payments, paymentInfo, files =
                 Please include the reference number in your PayNow transfer. Processing takes 1-2 business days after payment is received.
               </p>
             </div>
+
+            {/* Upload Payment Advice */}
+            {canUploadAdvice && (
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <div className="flex items-start gap-3 mb-3">
+                  <span className="text-lg">📄</span>
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">Upload Payment Advice</p>
+                    <p className="text-xs text-blue-700 mt-0.5">
+                      After making payment, please upload a screenshot or PDF of your payment confirmation. This helps us verify your payment faster.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Already uploaded files with inline preview */}
+                {receiptFiles.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {receiptFiles.map((file) => (
+                      <AdviceFileCard
+                        key={file.fileSeq}
+                        file={file}
+                        onDownload={handleDownloadReceipt}
+                        onDelete={(f) => setDeleteTarget(f)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full border-2 border-dashed border-blue-300 rounded-lg p-3 text-center hover:border-blue-400 hover:bg-blue-100/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploading ? (
+                    <p className="text-xs text-blue-600">Uploading...</p>
+                  ) : (
+                    <p className="text-xs text-blue-600">
+                      {receiptFiles.length > 0 ? 'Upload additional payment advice' : 'Click to upload payment advice (PDF, image)'}
+                    </p>
+                  )}
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -164,36 +351,34 @@ export function ApplicationPayment({ application, payments, paymentInfo, files =
             </table>
           </div>
 
-          {/* Payment Receipt Download */}
+          {/* Payment Receipt Download (after payment confirmed) */}
           {receiptFiles.length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-sm font-medium text-gray-700 mb-2">Payment Receipt</p>
               <div className="space-y-2">
                 {receiptFiles.map((file) => (
-                  <div key={file.fileSeq} className="flex items-center gap-3 p-2.5 bg-green-50 border border-green-200 rounded-lg">
-                    <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-green-800 truncate">{file.originalFilename || 'Payment Receipt'}</p>
-                      {file.fileSize && (
-                        <p className="text-xs text-green-600">{(file.fileSize / 1024).toFixed(0)} KB</p>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDownloadReceipt(file)}
-                    >
-                      Download
-                    </Button>
-                  </div>
+                  <AdviceFileCard
+                    key={file.fileSeq}
+                    file={file}
+                    onDownload={handleDownloadReceipt}
+                  />
                 ))}
               </div>
             </div>
           )}
         </Card>
       )}
+
+      {/* Delete Confirm Dialog */}
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete Payment Advice"
+        message={`Delete "${deleteTarget?.originalFilename || 'this file'}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </>
   );
 }

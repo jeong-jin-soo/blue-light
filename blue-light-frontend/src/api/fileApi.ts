@@ -63,7 +63,8 @@ export const getFilePreviewUrl = async (fileId: number): Promise<string> => {
   const response = await axiosClient.get(`/files/${fileId}/download`, {
     responseType: 'blob',
   });
-  return window.URL.createObjectURL(new Blob([response.data]));
+  const contentType = response.headers['content-type'] || 'application/octet-stream';
+  return window.URL.createObjectURL(new Blob([response.data], { type: contentType }));
 };
 
 export const fileApi = { uploadFile, getFilesByApplication, downloadFile, deleteFile, getFilePreviewUrl };
