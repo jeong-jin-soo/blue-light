@@ -3,6 +3,7 @@ package com.bluelight.backend.api.loa;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationType;
@@ -143,13 +144,11 @@ public class LoaService {
     public LoaStatusResponse getLoaStatus(Long userSeq, String role, Long applicationSeq) {
         Application application = findApplicationOrThrow(applicationSeq);
 
-        // 접근 권한 검증: owner 또는 ADMIN/LEW
-        boolean isAdminOrLew = "ROLE_ADMIN".equals(role) || "ROLE_LEW".equals(role);
-        boolean isOwner = application.getUser().getUserSeq().equals(userSeq);
-
-        if (!isAdminOrLew && !isOwner) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
+        // 접근 권한 검증: Admin 전체 / LEW는 담당 신청서만 / Applicant는 본인 소유만
+        Long assignedLewSeq = application.getAssignedLew() != null
+                ? application.getAssignedLew().getUserSeq() : null;
+        OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
+                application.getUser().getUserSeq(), userSeq, role, assignedLewSeq);
 
         List<FileEntity> loaFiles = fileRepository
                 .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);

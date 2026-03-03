@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.PaymentConfirmRequest;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
+import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -9,6 +10,7 @@ import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.payment.Payment;
 import com.bluelight.backend.domain.payment.PaymentRepository;
 import com.bluelight.backend.domain.payment.PaymentStatus;
+import com.bluelight.backend.domain.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ public class AdminPaymentService {
 
     private final ApplicationRepository applicationRepository;
     private final PaymentRepository paymentRepository;
+    private final EmailService emailService;
 
     /**
      * Confirm offline payment (creates Payment record + changes status to PAID)
@@ -64,6 +67,15 @@ public class AdminPaymentService {
 
         log.info("Payment confirmed: applicationSeq={}, paymentSeq={}, amount={}",
                 applicationSeq, savedPayment.getPaymentSeq(), savedPayment.getAmount());
+
+        // 신청자에게 결제 확인 이메일 발송
+        User applicant = application.getUser();
+        emailService.sendPaymentConfirmEmail(
+                applicant.getEmail(),
+                applicant.getFirstName() + " " + applicant.getLastName(),
+                applicationSeq,
+                application.getAddress(),
+                savedPayment.getAmount());
 
         return PaymentResponse.from(savedPayment);
     }

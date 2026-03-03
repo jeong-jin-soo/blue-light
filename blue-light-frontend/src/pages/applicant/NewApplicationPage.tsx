@@ -12,12 +12,18 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { SamplePreviewModal } from '../../components/domain/SamplePreviewModal';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
+import { useFormAutoSave } from '../../hooks/useFormAutoSave';
 import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
 import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
 import fileApi from '../../api/fileApi';
 import sampleFileApi from '../../api/sampleFileApi';
+import {
+  validateApplicationStep0,
+  validateApplicationStep1,
+  validateApplicationStep2,
+} from '../../utils/validation';
 import type { MasterPrice, PriceCalculation, Application, ApplicationType, SampleFileInfo } from '../../types';
 
 const STEPS = [
@@ -114,6 +120,16 @@ export default function NewApplicationPage() {
   }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva]);
   useFormGuard(isFormDirty);
 
+  // 폼 자동 저장 — sessionStorage 기반 (새로고침 시 복원)
+  const { clear: clearDraft } = useFormAutoSave('new-application-draft', formData, setFormData, {
+    debounceMs: 500,
+    onRestore: () => {
+      toast.info('Previous draft restored. Continue where you left off.');
+      setShowGuide(false); // 가이드 스킵하고 폼으로 바로 이동
+      return true;
+    },
+  });
+
   // Load sample files for guide buttons
   useEffect(() => {
     sampleFileApi.getSampleFiles()
@@ -195,46 +211,21 @@ export default function NewApplicationPage() {
     }
   };
 
-  // Validation per step
+  // Validation per step (validation.ts 유틸리티 사용)
   const validateStep0 = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    // Licence period is required for both NEW and RENEWAL
-    if (!formData.renewalPeriodMonths) {
-      newErrors.renewalPeriodMonths = 'Please select a licence period';
-    }
-    if (formData.applicationType === 'RENEWAL') {
-      if (formData.manualEntry) {
-        if (!formData.existingLicenceNo.trim()) {
-          newErrors.existingLicenceNo = 'Existing licence number is required';
-        }
-        if (!formData.existingExpiryDate.trim()) {
-          newErrors.existingExpiryDate = 'Existing expiry date is required';
-        }
-      } else if (!formData.originalApplicationSeq) {
-        newErrors.originalApplicationSeq = 'Please select an existing application';
-      }
-      if (!formData.renewalReferenceNo.trim()) {
-        newErrors.renewalReferenceNo = 'Renewal reference number is required';
-      }
-    }
+    const newErrors = validateApplicationStep0(formData);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const validateStep1 = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.address.trim()) newErrors.address = 'Address is required';
-    if (!formData.postalCode.trim()) newErrors.postalCode = 'Postal code is required';
-    if (formData.postalCode && !/^\d{6}$/.test(formData.postalCode.trim())) {
-      newErrors.postalCode = 'Postal code must be 6 digits';
-    }
+    const newErrors = validateApplicationStep1(formData);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.selectedKva) newErrors.selectedKva = 'Please select a kVA capacity';
+    const newErrors = validateApplicationStep2(formData);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -279,6 +270,7 @@ export default function NewApplicationPage() {
         }
       }
       const result = await applicationApi.createApplication(payload as any);
+      clearDraft(); // 신청서 생성 성공 → draft 삭제
 
       // Upload SLD file if attached
       if (sldFile && formData.sldOption === 'SELF_UPLOAD') {

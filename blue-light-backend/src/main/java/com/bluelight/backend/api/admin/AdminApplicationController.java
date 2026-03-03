@@ -5,6 +5,7 @@ import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
+import com.bluelight.backend.security.GenericRateLimiter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +32,12 @@ public class AdminApplicationController {
 
     private final AdminApplicationService adminApplicationService;
     private final AdminPaymentService adminPaymentService;
+    private final GenericRateLimiter rateLimiter;
+
+    /** 결제 확인: 신청서당 5분 내 최대 3회 */
+    private static final String RATE_TYPE_PAYMENT = "PAYMENT_CONFIRM";
+    private static final int PAYMENT_MAX = 3;
+    private static final long PAYMENT_WINDOW_MIN = 5;
 
     /**
      * Get admin dashboard summary
@@ -95,6 +102,7 @@ public class AdminApplicationController {
     public ResponseEntity<PaymentResponse> confirmPayment(
             @PathVariable Long id,
             @Valid @RequestBody PaymentConfirmRequest request) {
+        rateLimiter.checkAndRecord(RATE_TYPE_PAYMENT, "app:" + id, PAYMENT_MAX, PAYMENT_WINDOW_MIN);
         log.info("Admin confirm payment: applicationSeq={}", id);
         PaymentResponse response = adminPaymentService.confirmPayment(id, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

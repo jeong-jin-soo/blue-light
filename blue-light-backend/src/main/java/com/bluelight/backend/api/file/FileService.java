@@ -107,8 +107,9 @@ public class FileService {
         Application application = applicationRepository.findById(applicationSeq)
                 .orElseThrow(() -> new BusinessException("Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
-        // Admins can view any application's files; applicants can only view their own
-        OwnershipValidator.validateOwnerOrAdmin(application.getUser().getUserSeq(), userSeq, role);
+        // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
+        OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
+                application.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(application));
 
         return fileRepository.findByApplicationApplicationSeq(applicationSeq)
                 .stream()
@@ -123,8 +124,10 @@ public class FileService {
         FileEntity fileEntity = fileRepository.findById(fileSeq)
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
-        // Admins can download any file; applicants can only download their own
-        OwnershipValidator.validateOwnerOrAdmin(fileEntity.getApplication().getUser().getUserSeq(), userSeq, role);
+        // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
+        Application application = fileEntity.getApplication();
+        OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
+                application.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(application));
 
         return fileStorageService.loadAsResource(fileEntity.getFileUrl());
     }
@@ -136,8 +139,10 @@ public class FileService {
         FileEntity fileEntity = fileRepository.findById(fileSeq)
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
-        // Admins can access any file; applicants can only access their own
-        OwnershipValidator.validateOwnerOrAdmin(fileEntity.getApplication().getUser().getUserSeq(), userSeq, role);
+        // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
+        Application app = fileEntity.getApplication();
+        OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
+                app.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(app));
 
         return fileEntity;
     }
@@ -150,8 +155,10 @@ public class FileService {
         FileEntity fileEntity = fileRepository.findById(fileSeq)
                 .orElseThrow(() -> new BusinessException("File not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
 
-        // Admins can delete any file; applicants can only delete their own
-        OwnershipValidator.validateOwnerOrAdmin(fileEntity.getApplication().getUser().getUserSeq(), userSeq, role);
+        // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
+        Application delApp = fileEntity.getApplication();
+        OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
+                delApp.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(delApp));
 
         // Delete from disk
         fileStorageService.delete(fileEntity.getFileUrl());
@@ -159,6 +166,15 @@ public class FileService {
         // Soft delete from DB
         fileRepository.delete(fileEntity);
         log.info("File deleted: fileSeq={}", fileSeq);
+    }
+
+    /**
+     * 신청서에 할당된 LEW의 userSeq 반환 (없으면 null)
+     */
+    private Long getAssignedLewSeq(Application application) {
+        return application.getAssignedLew() != null
+                ? application.getAssignedLew().getUserSeq()
+                : null;
     }
 
     private void validateFileExtension(String filename) {

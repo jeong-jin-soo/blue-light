@@ -6,6 +6,7 @@ import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileType;
+import com.bluelight.backend.security.GenericRateLimiter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -33,6 +34,12 @@ import java.util.List;
 public class FileController {
 
     private final FileService fileService;
+    private final GenericRateLimiter rateLimiter;
+
+    /** 파일 업로드: 사용자당 10분 내 최대 30회 */
+    private static final String RATE_TYPE_UPLOAD = "FILE_UPLOAD";
+    private static final int UPLOAD_MAX = 30;
+    private static final long UPLOAD_WINDOW_MIN = 10;
 
     /**
      * Upload a file for an application (applicant)
@@ -46,6 +53,7 @@ public class FileController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "fileType", defaultValue = "DRAWING_SLD") FileType fileType) {
         Long userSeq = (Long) authentication.getPrincipal();
+        rateLimiter.checkAndRecord(RATE_TYPE_UPLOAD, String.valueOf(userSeq), UPLOAD_MAX, UPLOAD_WINDOW_MIN);
         log.info("File upload request: userSeq={}, applicationSeq={}, type={}, name={}",
                 userSeq, applicationId, fileType, file.getOriginalFilename());
         FileResponse response = fileService.uploadFile(userSeq, applicationId, file, fileType);

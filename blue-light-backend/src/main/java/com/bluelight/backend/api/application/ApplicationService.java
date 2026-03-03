@@ -133,6 +133,14 @@ public class ApplicationService {
                 // Verify ownership
                 OwnershipValidator.validateOwner(originalApp.getUser().getUserSeq(), userSeq);
 
+                // 원본 신청서가 COMPLETED 또는 EXPIRED 상태인지 검증
+                if (originalApp.getStatus() != ApplicationStatus.COMPLETED
+                        && originalApp.getStatus() != ApplicationStatus.EXPIRED) {
+                    throw new BusinessException(
+                            "Original application must be completed or expired for renewal",
+                            HttpStatus.BAD_REQUEST, "ORIGINAL_APP_NOT_ELIGIBLE");
+                }
+
                 // Auto-fill from original
                 existingLicenceNo = originalApp.getLicenseNumber();
                 existingExpiryDate = originalApp.getLicenseExpiryDate();

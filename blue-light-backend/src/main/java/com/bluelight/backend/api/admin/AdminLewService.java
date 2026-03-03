@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminApplicationResponse;
 import com.bluelight.backend.api.admin.dto.AssignLewRequest;
 import com.bluelight.backend.api.admin.dto.LewSummaryResponse;
+import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -29,6 +30,7 @@ public class AdminLewService {
 
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
 
     /**
      * 신청에 LEW 할당
@@ -65,6 +67,15 @@ public class AdminLewService {
 
         application.assignLew(lew);
         log.info("LEW assigned: applicationSeq={}, lewSeq={}", applicationSeq, lew.getUserSeq());
+
+        // LEW에게 할당 알림 이메일 발송
+        User applicant = application.getUser();
+        emailService.sendLewAssignedEmail(
+                lew.getEmail(),
+                lew.getFirstName() + " " + lew.getLastName(),
+                applicationSeq,
+                application.getAddress(),
+                applicant.getFirstName() + " " + applicant.getLastName());
 
         return AdminApplicationResponse.from(application);
     }

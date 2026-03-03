@@ -1,8 +1,10 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
+import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.*;
+import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +26,7 @@ public class AdminApplicationService {
 
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
+    private final EmailService emailService;
 
     /**
      * Get admin dashboard summary
@@ -119,6 +122,16 @@ public class AdminApplicationService {
         log.info("Application completed: applicationSeq={}, licenseNumber={}, expiryDate={}",
                 applicationSeq, request.getLicenseNumber(), request.getLicenseExpiryDate());
 
+        // 신청자에게 면허 발급 완료 이메일 발송
+        User applicant = application.getUser();
+        emailService.sendLicenseIssuedEmail(
+                applicant.getEmail(),
+                applicant.getFirstName() + " " + applicant.getLastName(),
+                applicationSeq,
+                application.getAddress(),
+                request.getLicenseNumber(),
+                request.getLicenseExpiryDate());
+
         return AdminApplicationResponse.from(application);
     }
 
@@ -138,6 +151,15 @@ public class AdminApplicationService {
         application.requestRevision(request.getComment());
         log.info("Revision requested: applicationSeq={}", applicationSeq);
 
+        // 신청자에게 보완 요청 이메일 발송
+        User applicant = application.getUser();
+        emailService.sendRevisionRequestEmail(
+                applicant.getEmail(),
+                applicant.getFirstName() + " " + applicant.getLastName(),
+                applicationSeq,
+                application.getAddress(),
+                request.getComment());
+
         return AdminApplicationResponse.from(application);
     }
 
@@ -156,6 +178,15 @@ public class AdminApplicationService {
 
         application.approveForPayment();
         log.info("Application approved for payment: applicationSeq={}", applicationSeq);
+
+        // 신청자에게 결제 요청 이메일 발송
+        User applicant = application.getUser();
+        emailService.sendPaymentRequestEmail(
+                applicant.getEmail(),
+                applicant.getFirstName() + " " + applicant.getLastName(),
+                applicationSeq,
+                application.getAddress(),
+                application.getQuoteAmount());
 
         return AdminApplicationResponse.from(application);
     }

@@ -3,6 +3,7 @@ package com.bluelight.backend.api.email;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -46,6 +47,68 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Address: {}", address);
         log.info("  Expiry Date: {}", expiryDate);
         log.info("  Days Remaining: {}", daysRemaining);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendRevisionRequestEmail(String to, String userName, Long appSeq, String address, String comment) {
+        log.info("==================================================");
+        log.info("[DEV] Revision Request Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Address: {}", address);
+        log.info("  Comment: {}", comment);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendPaymentRequestEmail(String to, String userName, Long appSeq, String address, BigDecimal amount) {
+        log.info("==================================================");
+        log.info("[DEV] Payment Request Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Address: {}", address);
+        log.info("  Amount: ${}", amount);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendPaymentConfirmEmail(String to, String userName, Long appSeq, String address, BigDecimal amount) {
+        log.info("==================================================");
+        log.info("[DEV] Payment Confirm Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Address: {}", address);
+        log.info("  Amount: ${}", amount);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendLicenseIssuedEmail(String to, String userName, Long appSeq,
+                                        String address, String licenseNo, LocalDate expiryDate) {
+        log.info("==================================================");
+        log.info("[DEV] License Issued Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Address: {}", address);
+        log.info("  License No: {}", licenseNo);
+        log.info("  Expiry Date: {}", expiryDate);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendLewAssignedEmail(String to, String lewName, Long appSeq, String address, String applicantName) {
+        log.info("==================================================");
+        log.info("[DEV] LEW Assigned Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Address: {}", address);
+        log.info("  Applicant: {}", applicantName);
         log.info("==================================================");
     }
 }
