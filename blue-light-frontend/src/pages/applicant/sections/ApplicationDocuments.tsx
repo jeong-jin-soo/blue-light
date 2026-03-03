@@ -4,7 +4,9 @@ import { Button } from '../../../components/ui/Button';
 import { Textarea } from '../../../components/ui/Textarea';
 import { FileUpload } from '../../../components/domain/FileUpload';
 import { FilePreviewCard } from '../../../components/domain/FilePreviewCard';
+import { SamplePreviewModal } from '../../../components/domain/SamplePreviewModal';
 import fileApi from '../../../api/fileApi';
+import sampleFileApi from '../../../api/sampleFileApi';
 import {
   DOCUMENT_CATEGORIES,
   groupFilesByCategory,
@@ -13,7 +15,8 @@ import {
   ALLOWED_UPLOAD_EXTENSIONS,
   type DocumentCategory,
 } from '../../../utils/applicationUtils';
-import type { Application, FileInfo, FileType, SldRequest } from '../../../types';
+import { useToastStore } from '../../../stores/toastStore';
+import type { Application, FileInfo, FileType, SldRequest, SampleFileInfo } from '../../../types';
 
 interface ApplicationDocumentsProps {
   application: Application;
@@ -31,6 +34,8 @@ interface ApplicationDocumentsProps {
   onSldRequestUpdate?: (note: string, sketchFileSeq: number | null) => Promise<void>;
   sketchFiles?: FileInfo[];
   savingSldRequest?: boolean;
+  // Sample files for guide
+  sampleFiles?: SampleFileInfo[];
 }
 
 /** Compact inline upload area per category */
@@ -144,8 +149,11 @@ export function ApplicationDocuments({
   onSldRequestUpdate,
   sketchFiles = [],
   savingSldRequest = false,
+  sampleFiles = [],
 }: ApplicationDocumentsProps) {
+  const toast = useToastStore();
   const [noteValue, setNoteValue] = useState(sldRequest?.applicantNote || '');
+  const [samplePreviewKey, setSamplePreviewKey] = useState<string | null>(null);
 
   useEffect(() => {
     setNoteValue(sldRequest?.applicantNote || '');
@@ -155,6 +163,10 @@ export function ApplicationDocuments({
     if (!onSldRequestUpdate) return;
     const sketchFileSeq = sketchFiles.length > 0 ? sketchFiles[0].fileSeq : null;
     await onSldRequestUpdate(noteValue, sketchFileSeq);
+  };
+
+  const handleViewSample = (categoryKey: string) => {
+    setSamplePreviewKey(categoryKey);
   };
 
   const grouped = groupFilesByCategory(files);
@@ -324,6 +336,18 @@ export function ApplicationDocuments({
                   <h3 className={`text-sm font-semibold ${category.headerColor}`}>
                     {category.label}
                   </h3>
+                  <button
+                    type="button"
+                    onClick={() => handleViewSample(category.key)}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 ml-1 hover:underline"
+                    title="View sample file uploaded by admin"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    View Sample
+                  </button>
                   <span className="text-xs text-gray-400 ml-auto">
                     {categoryFiles.length} file{categoryFiles.length !== 1 ? 's' : ''}
                   </span>
@@ -386,6 +410,13 @@ export function ApplicationDocuments({
           )}
         </div>
       </Card>
+      {/* Sample File Preview Modal */}
+      <SamplePreviewModal
+        isOpen={samplePreviewKey !== null}
+        onClose={() => setSamplePreviewKey(null)}
+        categoryKey={samplePreviewKey}
+        sampleFiles={sampleFiles}
+      />
     </>
   );
 }

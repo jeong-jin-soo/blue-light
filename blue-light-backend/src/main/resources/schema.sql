@@ -404,3 +404,18 @@ CREATE TABLE IF NOT EXISTS sld_templates (
 -- 마이그레이션 (기존 운영 DB용): name → first_name + last_name 분리
 -- 주의: 이 마이그레이션은 DatabaseMigrationRunner.java에서 Java 코드로 실행됨
 -- (MySQL의 DELIMITER/프로시저가 Spring ScriptUtils와 호환되지 않으므로)
+
+-- 14. 샘플 파일 (카테고리별 1개)
+CREATE TABLE IF NOT EXISTS sample_files (
+    sample_file_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    category_key      VARCHAR(30)  NOT NULL,
+    file_url          VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(255),
+    file_size         BIGINT,
+    uploaded_at       DATETIME(6),
+    updated_at        DATETIME(6),
+    created_by        BIGINT,
+    updated_by        BIGINT,
+    PRIMARY KEY (sample_file_seq),
+    UNIQUE KEY uk_sample_files_category (category_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

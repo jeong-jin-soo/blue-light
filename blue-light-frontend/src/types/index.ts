@@ -170,6 +170,17 @@ export interface FileInfo {
   uploadedAt: string;
 }
 
+/**
+ * 샘플 파일 (관리자가 업로드한 참고용 파일)
+ */
+export interface SampleFileInfo {
+  sampleFileSeq: number;
+  categoryKey: string;
+  originalFilename: string;
+  fileSize: number;
+  uploadedAt: string;
+}
+
 // ============================================
 // Inspection Types
 // ============================================

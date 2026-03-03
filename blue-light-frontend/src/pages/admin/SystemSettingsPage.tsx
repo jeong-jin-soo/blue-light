@@ -1,10 +1,13 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, type ChangeEvent } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import * as systemAdminApi from '../../api/systemAdminApi';
 import type { GeminiKeyStatus } from '../../api/systemAdminApi';
+import sampleFileApi from '../../api/sampleFileApi';
+import { DOCUMENT_CATEGORIES, formatFileSize } from '../../utils/applicationUtils';
+import type { SampleFileInfo } from '../../types';
 
 /**
  * SYSTEM_ADMIN 전용 — 시스템 설정 관리 페이지
@@ -45,16 +48,28 @@ export default function SystemSettingsPage() {
   const [savingSldPrompt, setSavingSldPrompt] = useState(false);
   const [showSldResetConfirm, setShowSldResetConfirm] = useState(false);
 
+  // ── Sample Files ──────────────────────────────
+  const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
+  const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
+  const [showDeleteSampleConfirm, setShowDeleteSampleConfirm] = useState(false);
+  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<string>('');
+  const sampleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  // 신청자 업로드 대상 카테고리만 (sld, loa, sp_account, photo)
+  const sampleCategories = DOCUMENT_CATEGORIES.filter((c) => c.applicantUpload);
+
   // ── Data Loading ──────────────────────────────
 
   const loadData = useCallback(async () => {
     try {
-      const [promptData, keyData, emailData, sldAiData, sldPromptData] = await Promise.all([
+      const [promptData, keyData, emailData, sldAiData, sldPromptData, sampleData] = await Promise.all([
         systemAdminApi.getSystemPrompt(),
         systemAdminApi.getGeminiApiKeyStatus(),
         systemAdminApi.getEmailVerification(),
         systemAdminApi.getSldAiGeneration(),
         systemAdminApi.getSldSystemPrompt(),
+        sampleFileApi.getSampleFiles(),
       ]);
 
       setPrompt(promptData.prompt);
@@ -66,6 +81,7 @@ export default function SystemSettingsPage() {
       setOriginalSldAi(sldAiData.enabled);
       setSldPrompt(sldPromptData.prompt);
       setOriginalSldPrompt(sldPromptData.prompt);
+      setSampleFiles(sampleData);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to load system settings';
       toast.error(message);
@@ -221,6 +237,51 @@ export default function SystemSettingsPage() {
     }
   };
 
+  // ── Sample File Handlers ──────────────────────────────
+
+  const getSampleForCategory = (categoryKey: string): SampleFileInfo | undefined =>
+    sampleFiles.find((f) => f.categoryKey === categoryKey);
+
+  const handleSampleUpload = async (categoryKey: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input value
+    if (sampleInputRefs.current[categoryKey]) {
+      sampleInputRefs.current[categoryKey]!.value = '';
+    }
+
+    setUploadingCategory(categoryKey);
+    try {
+      await sampleFileApi.uploadSampleFile(categoryKey, file);
+      const updated = await sampleFileApi.getSampleFiles();
+      setSampleFiles(updated);
+      toast.success('Sample file uploaded successfully');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to upload sample file';
+      toast.error(message);
+    } finally {
+      setUploadingCategory(null);
+    }
+  };
+
+  const handleSampleDelete = async () => {
+    if (!deleteCategoryTarget) return;
+    setDeletingCategory(deleteCategoryTarget);
+    try {
+      await sampleFileApi.deleteSampleFile(deleteCategoryTarget);
+      const updated = await sampleFileApi.getSampleFiles();
+      setSampleFiles(updated);
+      toast.success('Sample file deleted');
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to delete sample file';
+      toast.error(message);
+    } finally {
+      setDeletingCategory(null);
+      setShowDeleteSampleConfirm(false);
+      setDeleteCategoryTarget('');
+    }
+  };
+
   // ── Render ──────────────────────────────
 
   return (
@@ -277,6 +338,76 @@ export default function SystemSettingsPage() {
             email.
           </p>
         )}
+      </Card>
+
+      {/* ── Document Sample Files ────────────────────── */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">Document Sample Files</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Upload sample files for applicants to reference when preparing their documents.
+          Each category supports one sample file at a time.
+        </p>
+
+        <div className="space-y-3">
+          {sampleCategories.map((category) => {
+            const sample = getSampleForCategory(category.key);
+            const isUploading = uploadingCategory === category.key;
+            const isDeleting = deletingCategory === category.key;
+
+            return (
+              <div
+                key={category.key}
+                className={`flex items-center justify-between p-3 rounded-lg border ${category.borderColor} ${category.bgColor}`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-lg flex-shrink-0">{category.icon}</span>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium ${category.headerColor}`}>{category.label}</p>
+                    {sample ? (
+                      <p className="text-xs text-gray-500 truncate" title={sample.originalFilename}>
+                        {sample.originalFilename} ({formatFileSize(sample.fileSize)})
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-400">No sample uploaded</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <input
+                    ref={(el) => { sampleInputRefs.current[category.key] = el; }}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
+                    onChange={(e) => handleSampleUpload(category.key, e)}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => sampleInputRefs.current[category.key]?.click()}
+                    loading={isUploading}
+                    disabled={isUploading || isDeleting}
+                  >
+                    {sample ? 'Replace' : 'Upload'}
+                  </Button>
+                  {sample && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteCategoryTarget(category.key);
+                        setShowDeleteSampleConfirm(true);
+                      }}
+                      disabled={isUploading || isDeleting}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </Card>
 
       {/* ── SLD AI Generation ────────────────────── */}
@@ -547,6 +678,16 @@ export default function SystemSettingsPage() {
         title="Clear API Key"
         message="This will remove the database-stored API key and revert to the environment variable value. The chatbot will use the environment variable API key."
         confirmLabel="Clear Key"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={showDeleteSampleConfirm}
+        onClose={() => { setShowDeleteSampleConfirm(false); setDeleteCategoryTarget(''); }}
+        onConfirm={handleSampleDelete}
+        title="Delete Sample File"
+        message="This will permanently remove the sample file. Applicants will no longer be able to view this sample."
+        confirmLabel="Delete"
         variant="danger"
       />
     </div>

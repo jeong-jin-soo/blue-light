@@ -9,6 +9,7 @@ import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/
 import { StepTracker } from '../../components/domain/StepTracker';
 import { SpAccountEmailSample } from '../../components/domain/SpAccountEmailSample';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { SamplePreviewModal } from '../../components/domain/SamplePreviewModal';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
 import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
@@ -16,7 +17,8 @@ import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
 import fileApi from '../../api/fileApi';
-import type { MasterPrice, PriceCalculation, Application, ApplicationType } from '../../types';
+import sampleFileApi from '../../api/sampleFileApi';
+import type { MasterPrice, PriceCalculation, Application, ApplicationType, SampleFileInfo } from '../../types';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
@@ -75,6 +77,9 @@ export default function NewApplicationPage() {
   const [spAccountFile, setSpAccountFile] = useState<File | null>(null);
   // SP Account sample modal
   const [showSpSample, setShowSpSample] = useState(false);
+  // Sample files for guide buttons
+  const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
+  const [samplePreviewKey, setSamplePreviewKey] = useState<string | null>(null);
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
@@ -108,6 +113,17 @@ export default function NewApplicationPage() {
     return !!(formData.address || formData.postalCode || formData.spAccountNo || formData.selectedKva);
   }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva]);
   useFormGuard(isFormDirty);
+
+  // Load sample files for guide buttons
+  useEffect(() => {
+    sampleFileApi.getSampleFiles()
+      .then(setSampleFiles)
+      .catch(() => { /* non-critical */ });
+  }, []);
+
+  const handleViewSample = (categoryKey: string) => {
+    setSamplePreviewKey(categoryKey);
+  };
 
   // Load completed applications when selecting RENEWAL
   useEffect(() => {
@@ -637,9 +653,23 @@ export default function NewApplicationPage() {
 
             {/* Main Breaker Box Photo */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
-              <label className="block text-sm font-medium text-gray-700">
-                Main Breaker Box Photo
-              </label>
+              <div className="flex items-center gap-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Main Breaker Box Photo
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleViewSample('photo')}
+                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
+                  title="View sample file uploaded by admin"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  View Sample
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mb-2">
                 Upload a photo of the main breaker box at the installation site. This helps verify the electrical capacity (kVA). You can also upload it later.
               </p>
@@ -753,8 +783,22 @@ export default function NewApplicationPage() {
                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-start gap-2 mb-3">
                     <span className="text-sm">📎</span>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Attach SLD File (Optional)</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-gray-700">Attach SLD File (Optional)</p>
+                        <button
+                          type="button"
+                          onClick={() => handleViewSample('sld')}
+                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
+                          title="View sample file uploaded by admin"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                          View Sample
+                        </button>
+                      </div>
                       <p className="text-xs text-gray-500 mt-0.5">
                         You can attach your SLD now, or upload it later from the application detail page.
                       </p>
@@ -1124,6 +1168,14 @@ export default function NewApplicationPage() {
           <Button variant="outline" onClick={() => setShowSpSample(false)}>Close</Button>
         </ModalFooter>
       </Modal>
+
+      {/* Sample File Preview Modal */}
+      <SamplePreviewModal
+        isOpen={samplePreviewKey !== null}
+        onClose={() => setSamplePreviewKey(null)}
+        categoryKey={samplePreviewKey}
+        sampleFiles={sampleFiles}
+      />
     </div>
   );
 }

@@ -14,12 +14,13 @@ import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
 import priceApi from '../../api/priceApi';
 import loaApi from '../../api/loaApi';
+import sampleFileApi from '../../api/sampleFileApi';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import { ApplicationInfo } from './sections/ApplicationInfo';
 import { ApplicationPayment } from './sections/ApplicationPayment';
 import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
-import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus } from '../../types';
+import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus, SampleFileInfo } from '../../types';
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
@@ -35,6 +36,7 @@ export default function ApplicationDetailPage() {
   const [paymentInfo, setPaymentInfo] = useState<Record<string, string>>({});
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
+  const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -66,6 +68,12 @@ export default function ApplicationDetailPage() {
         const loaData = await loaApi.getLoaStatus(applicationId);
         setLoaStatus(loaData);
       } catch { /* LOA status might not be available */ }
+
+      // Sample files (non-critical)
+      try {
+        const sampleData = await sampleFileApi.getSampleFiles();
+        setSampleFiles(sampleData);
+      } catch { /* Sample files are non-critical */ }
 
       if (appData.sldOption === 'REQUEST_LEW') {
         try {
@@ -187,6 +195,20 @@ export default function ApplicationDetailPage() {
     } finally {
       setDeleteFileId(null);
     }
+  };
+
+  // ── Payment Advice handlers ──────────────────
+
+  const handlePaymentAdviceUpload = async (file: File) => {
+    await fileApi.uploadFile(applicationId, file, 'PAYMENT_RECEIPT');
+    const updatedFiles = await fileApi.getFilesByApplication(applicationId);
+    setFiles(updatedFiles);
+  };
+
+  const handlePaymentAdviceDelete = async (fileSeq: number) => {
+    await fileApi.deleteFile(fileSeq);
+    const updatedFiles = await fileApi.getFilesByApplication(applicationId);
+    setFiles(updatedFiles);
   };
 
   // ── Sketch + SLD Request handlers ──────────────────
@@ -363,6 +385,8 @@ export default function ApplicationDetailPage() {
             payments={payments}
             paymentInfo={paymentInfo}
             files={files}
+            onPaymentAdviceUpload={handlePaymentAdviceUpload}
+            onPaymentAdviceDelete={handlePaymentAdviceDelete}
           />
 
           <ApplicationLoaSection
@@ -386,6 +410,7 @@ export default function ApplicationDetailPage() {
             onSldRequestUpdate={handleSldRequestUpdate}
             sketchFiles={files.filter((f) => f.fileType === 'SKETCH_SLD')}
             savingSldRequest={savingSldRequest}
+            sampleFiles={sampleFiles}
           />
         </div>
 
