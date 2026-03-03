@@ -65,7 +65,7 @@ function ReceiptPreviewCard({
           <p className={`text-sm ${colors.text} truncate`}>{filename}</p>
           <p className={`text-xs ${colors.sub}`}>
             {file.fileSize ? formatFileSize(file.fileSize) : ''}
-            {file.createdAt && ` \u00B7 ${new Date(file.createdAt).toLocaleString()}`}
+            {file.uploadedAt && ` \u00B7 ${new Date(file.uploadedAt).toLocaleString()}`}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => onDownload(file)}>

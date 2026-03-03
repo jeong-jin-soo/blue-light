@@ -6,7 +6,6 @@ import { FileUpload } from '../../../components/domain/FileUpload';
 import { FilePreviewCard } from '../../../components/domain/FilePreviewCard';
 import { SamplePreviewModal } from '../../../components/domain/SamplePreviewModal';
 import fileApi from '../../../api/fileApi';
-import sampleFileApi from '../../../api/sampleFileApi';
 import {
   DOCUMENT_CATEGORIES,
   groupFilesByCategory,
@@ -15,7 +14,6 @@ import {
   ALLOWED_UPLOAD_EXTENSIONS,
   type DocumentCategory,
 } from '../../../utils/applicationUtils';
-import { useToastStore } from '../../../stores/toastStore';
 import type { Application, FileInfo, FileType, SldRequest, SampleFileInfo } from '../../../types';
 
 interface ApplicationDocumentsProps {
@@ -151,7 +149,6 @@ export function ApplicationDocuments({
   savingSldRequest = false,
   sampleFiles = [],
 }: ApplicationDocumentsProps) {
-  const toast = useToastStore();
   const [noteValue, setNoteValue] = useState(sldRequest?.applicantNote || '');
   const [samplePreviewKey, setSamplePreviewKey] = useState<string | null>(null);
 

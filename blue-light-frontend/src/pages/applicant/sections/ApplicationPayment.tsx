@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
-import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../../stores/toastStore';
 import fileApi from '../../../api/fileApi';
