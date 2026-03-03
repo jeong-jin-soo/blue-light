@@ -32,6 +32,9 @@ public class DatabaseMigrationRunner {
     private void migrateAll() {
         try (Connection conn = dataSource.getConnection()) {
             migrateUserNameSplit(conn);
+            migrateApplicationsLoaColumns(conn);
+            migrateSldTemplatesTable(conn);
+            migrateSampleFilesTable(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -85,11 +88,111 @@ public class DatabaseMigrationRunner {
     }
 
     /**
+     * 마이그레이션: applications 테이블에 LOA 서명 컬럼 추가
+     * - loa_signature_url, loa_signed_at 컬럼이 없으면 추가
+     */
+    private void migrateApplicationsLoaColumns(Connection conn) throws SQLException {
+        if (columnExists(conn, "applications", "loa_signature_url")) {
+            log.debug("Migration [applications-loa-columns]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [applications-loa-columns]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN loa_signature_url VARCHAR(255) AFTER sld_option"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN loa_signed_at DATETIME(6) AFTER loa_signature_url"
+            );
+            log.info("Migration [applications-loa-columns]: added loa_signature_url, loa_signed_at columns");
+        }
+    }
+
+    /**
+     * 마이그레이션: sld_templates 테이블 생성
+     * - SQL_INIT_MODE=never 환경(dev/prod)에서 schema.sql이 실행되지 않으므로
+     *   여기서 직접 CREATE TABLE IF NOT EXISTS 실행
+     */
+    private void migrateSldTemplatesTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "sld_templates")) {
+            log.debug("Migration [sld-templates-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [sld-templates-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE sld_templates (" +
+                "  sld_template_seq  BIGINT        NOT NULL AUTO_INCREMENT," +
+                "  phase             VARCHAR(20)   NOT NULL COMMENT 'single_phase | three_phase'," +
+                "  kva               DECIMAL(10,2)          COMMENT 'kVA capacity (nullable: Cable Extension etc)'," +
+                "  main_breaker_type VARCHAR(20)            COMMENT 'MCB | MCCB | ELCB'," +
+                "  circuit_count     INT           NOT NULL DEFAULT 0 COMMENT 'Sub circuit count'," +
+                "  filename          VARCHAR(255)  NOT NULL COMMENT 'PDF filename'," +
+                "  file_path         VARCHAR(500)  NOT NULL COMMENT 'Template PDF relative path'," +
+                "  detail_json       JSON          NOT NULL COMMENT 'Full drawing detail info (JSON)'," +
+                "  created_at        DATETIME(6)            DEFAULT CURRENT_TIMESTAMP(6)," +
+                "  updated_at        DATETIME(6)            DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)," +
+                "  PRIMARY KEY (sld_template_seq)," +
+                "  UNIQUE KEY uk_sld_templates_filename (filename)," +
+                "  KEY idx_sld_templates_phase (phase)," +
+                "  KEY idx_sld_templates_kva (kva)," +
+                "  KEY idx_sld_templates_breaker (main_breaker_type)," +
+                "  KEY idx_sld_templates_phase_kva (phase, kva)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [sld-templates-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: sample_files 테이블 생성
+     * - 카테고리별 샘플 파일 관리용 테이블
+     */
+    private void migrateSampleFilesTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "sample_files")) {
+            log.debug("Migration [sample-files-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [sample-files-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE sample_files (" +
+                "  sample_file_seq   BIGINT       NOT NULL AUTO_INCREMENT," +
+                "  category_key      VARCHAR(30)  NOT NULL," +
+                "  file_url          VARCHAR(500) NOT NULL," +
+                "  original_filename VARCHAR(255)," +
+                "  file_size         BIGINT," +
+                "  uploaded_at       DATETIME(6)," +
+                "  updated_at        DATETIME(6)," +
+                "  created_by        BIGINT," +
+                "  updated_by        BIGINT," +
+                "  PRIMARY KEY (sample_file_seq)," +
+                "  UNIQUE KEY uk_sample_files_category (category_key)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [sample-files-table]: table created");
+        }
+    }
+
+    /**
      * 특정 테이블에 컬럼이 존재하는지 확인
      */
     private boolean columnExists(Connection conn, String table, String column) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet rs = meta.getColumns(conn.getCatalog(), null, table, column)) {
+            return rs.next();
+        }
+    }
+
+    /**
+     * 특정 테이블이 존재하는지 확인
+     */
+    private boolean tableExists(Connection conn, String table) throws SQLException {
+        DatabaseMetaData meta = conn.getMetaData();
+        try (ResultSet rs = meta.getTables(conn.getCatalog(), null, table, new String[]{"TABLE"})) {
             return rs.next();
         }
     }
