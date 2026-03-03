@@ -29,9 +29,13 @@ public class AdminApplicationService {
     private final EmailService emailService;
 
     /**
-     * Get admin dashboard summary
+     * Get admin dashboard summary (역할별 범위 분리)
      */
-    public AdminDashboardResponse getDashboardSummary() {
+    public AdminDashboardResponse getDashboardSummary(Long userSeq, String role) {
+        if ("ROLE_LEW".equals(role)) {
+            return getLewDashboardSummary(userSeq);
+        }
+
         long totalApplications = applicationRepository.count();
         long pendingReview = applicationRepository.countByStatus(ApplicationStatus.PENDING_REVIEW);
         long revisionRequested = applicationRepository.countByStatus(ApplicationStatus.REVISION_REQUESTED);
@@ -59,29 +63,98 @@ public class AdminApplicationService {
     }
 
     /**
-     * Get all applications (paginated, optional status filter and search)
+     * LEW 전용 대시보드: 자기 배정 신청서만 집계
      */
-    public Page<AdminApplicationResponse> getAllApplications(ApplicationStatus status, String search, Pageable pageable) {
+    private AdminDashboardResponse getLewDashboardSummary(Long lewSeq) {
+        long totalApplications = applicationRepository.countByAssignedLewUserSeq(lewSeq);
+        long pendingReview = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.PENDING_REVIEW);
+        long revisionRequested = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.REVISION_REQUESTED);
+        long pendingPayment = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.PENDING_PAYMENT);
+        long paid = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.PAID);
+        long inProgress = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.IN_PROGRESS);
+        long completed = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.COMPLETED);
+        long expired = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.EXPIRED);
+
+        return AdminDashboardResponse.builder()
+                .totalApplications(totalApplications)
+                .pendingReview(pendingReview)
+                .revisionRequested(revisionRequested)
+                .pendingPayment(pendingPayment)
+                .paid(paid)
+                .inProgress(inProgress)
+                .completed(completed)
+                .expired(expired)
+                .totalUsers(0)
+                .unassigned(0)
+                .build();
+    }
+
+    /**
+     * Get all applications (paginated, optional status filter and search)
+     * LEW는 자신에게 배정된 신청서만, Admin/SystemAdmin은 전체
+     */
+    public Page<AdminApplicationResponse> getAllApplications(
+            ApplicationStatus status, String search, Pageable pageable, Long userSeq, String role) {
         Page<Application> page;
         boolean hasSearch = search != null && !search.trim().isEmpty();
+        boolean isLew = "ROLE_LEW".equals(role);
 
-        if (hasSearch && status != null) {
-            page = applicationRepository.searchByKeywordAndStatus(search.trim(), status, pageable);
-        } else if (hasSearch) {
-            page = applicationRepository.searchByKeyword(search.trim(), pageable);
-        } else if (status != null) {
-            page = applicationRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+        if (isLew) {
+            page = getLewApplications(status, search, hasSearch, userSeq, pageable);
         } else {
-            page = applicationRepository.findAllByOrderByCreatedAtDesc(pageable);
+            page = getAdminApplications(status, search, hasSearch, pageable);
         }
         return page.map(AdminApplicationResponse::from);
     }
 
     /**
-     * Get application detail (admin view)
+     * LEW 전용: 배정된 신청서만 조회
      */
-    public AdminApplicationResponse getApplication(Long applicationSeq) {
+    private Page<Application> getLewApplications(
+            ApplicationStatus status, String search, boolean hasSearch, Long lewSeq, Pageable pageable) {
+        if (hasSearch && status != null) {
+            return applicationRepository.searchByKeywordAndStatusAndAssignedLew(search.trim(), status, lewSeq, pageable);
+        } else if (hasSearch) {
+            return applicationRepository.searchByKeywordAndAssignedLew(search.trim(), lewSeq, pageable);
+        } else if (status != null) {
+            return applicationRepository.findByAssignedLewUserSeqAndStatusOrderByCreatedAtDesc(lewSeq, status, pageable);
+        } else {
+            return applicationRepository.findByAssignedLewUserSeqOrderByCreatedAtDesc(lewSeq, pageable);
+        }
+    }
+
+    /**
+     * Admin/SystemAdmin: 전체 신청서 조회
+     */
+    private Page<Application> getAdminApplications(
+            ApplicationStatus status, String search, boolean hasSearch, Pageable pageable) {
+        if (hasSearch && status != null) {
+            return applicationRepository.searchByKeywordAndStatus(search.trim(), status, pageable);
+        } else if (hasSearch) {
+            return applicationRepository.searchByKeyword(search.trim(), pageable);
+        } else if (status != null) {
+            return applicationRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+        } else {
+            return applicationRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
+    }
+
+    /**
+     * Get application detail (admin view)
+     * LEW는 자신에게 배정된 신청서만 조회 가능
+     */
+    public AdminApplicationResponse getApplication(Long applicationSeq, Long userSeq, String role) {
         Application application = findApplicationOrThrow(applicationSeq);
+
+        // LEW → 배정된 신청서만 접근 허용
+        if ("ROLE_LEW".equals(role)) {
+            Long assignedLewSeq = application.getAssignedLew() != null
+                    ? application.getAssignedLew().getUserSeq() : null;
+            if (assignedLewSeq == null || !assignedLewSeq.equals(userSeq)) {
+                throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+            }
+        }
+
         return AdminApplicationResponse.from(application);
     }
 

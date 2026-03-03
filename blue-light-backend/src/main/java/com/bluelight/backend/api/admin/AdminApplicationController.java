@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,38 +45,50 @@ public class AdminApplicationController {
      * GET /api/admin/dashboard
      */
     @GetMapping("/dashboard")
-    public ResponseEntity<AdminDashboardResponse> getDashboard() {
-        log.info("Admin dashboard requested");
-        AdminDashboardResponse response = adminApplicationService.getDashboardSummary();
+    public ResponseEntity<AdminDashboardResponse> getDashboard(Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        log.info("Admin dashboard requested: userSeq={}, role={}", userSeq, role);
+        AdminDashboardResponse response = adminApplicationService.getDashboardSummary(userSeq, role);
         return ResponseEntity.ok(response);
     }
 
     /**
      * Get all applications (paginated, optional status filter)
      * GET /api/admin/applications?status=PENDING_PAYMENT&page=0&size=20
+     * LEW는 자신에게 배정된 신청서만 조회
      */
     @GetMapping("/applications")
     public ResponseEntity<Page<AdminApplicationResponse>> getAllApplications(
+            Authentication authentication,
             @RequestParam(required = false) ApplicationStatus status,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
         int validPage = Math.max(0, page);
         int validSize = Math.min(Math.max(1, size), 100);
-        log.info("Admin get all applications: status={}, search={}, page={}, size={}", status, search, validPage, validSize);
+        log.info("Admin get all applications: userSeq={}, role={}, status={}, search={}, page={}, size={}",
+                userSeq, role, status, search, validPage, validSize);
         Pageable pageable = PageRequest.of(validPage, validSize);
-        Page<AdminApplicationResponse> applications = adminApplicationService.getAllApplications(status, search, pageable);
+        Page<AdminApplicationResponse> applications =
+                adminApplicationService.getAllApplications(status, search, pageable, userSeq, role);
         return ResponseEntity.ok(applications);
     }
 
     /**
      * Get application detail (admin view)
      * GET /api/admin/applications/:id
+     * LEW는 자신에게 배정된 신청서만 조회 가능
      */
     @GetMapping("/applications/{id}")
-    public ResponseEntity<AdminApplicationResponse> getApplication(@PathVariable Long id) {
-        log.info("Admin get application detail: applicationSeq={}", id);
-        AdminApplicationResponse response = adminApplicationService.getApplication(id);
+    public ResponseEntity<AdminApplicationResponse> getApplication(
+            Authentication authentication, @PathVariable Long id) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        log.info("Admin get application detail: applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
+        AdminApplicationResponse response = adminApplicationService.getApplication(id, userSeq, role);
         return ResponseEntity.ok(response);
     }
 

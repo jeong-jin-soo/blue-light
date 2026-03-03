@@ -101,6 +101,39 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
             Long lewSeq, ApplicationStatus status, Pageable pageable);
 
     /**
+     * LEW 전용: 할당된 신청서 중 키워드 검색
+     */
+    @Query("SELECT a FROM Application a JOIN a.user u WHERE " +
+           "a.assignedLew.userSeq = :lewSeq AND " +
+           "(LOWER(a.address) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "CAST(a.applicationSeq AS string) LIKE CONCAT('%', :keyword, '%')) " +
+           "ORDER BY a.createdAt DESC")
+    Page<Application> searchByKeywordAndAssignedLew(
+            @Param("keyword") String keyword, @Param("lewSeq") Long lewSeq, Pageable pageable);
+
+    /**
+     * LEW 전용: 할당된 신청서 중 키워드 + 상태 검색
+     */
+    @Query("SELECT a FROM Application a JOIN a.user u WHERE " +
+           "a.assignedLew.userSeq = :lewSeq AND " +
+           "a.status = :status AND " +
+           "(LOWER(a.address) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(CONCAT(u.firstName, ' ', u.lastName)) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "CAST(a.applicationSeq AS string) LIKE CONCAT('%', :keyword, '%')) " +
+           "ORDER BY a.createdAt DESC")
+    Page<Application> searchByKeywordAndStatusAndAssignedLew(
+            @Param("keyword") String keyword, @Param("status") ApplicationStatus status,
+            @Param("lewSeq") Long lewSeq, Pageable pageable);
+
+    /**
+     * LEW 전용: 할당된 신청서 중 특정 상태 건수
+     */
+    long countByAssignedLewUserSeqAndStatus(Long lewSeq, ApplicationStatus status);
+
+    /**
      * 만료 대상: COMPLETED + 만료일 경과
      */
     List<Application> findByStatusAndLicenseExpiryDateBefore(
