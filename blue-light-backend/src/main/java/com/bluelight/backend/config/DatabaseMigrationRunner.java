@@ -35,6 +35,7 @@ public class DatabaseMigrationRunner {
             migrateApplicationsLoaColumns(conn);
             migrateSldTemplatesTable(conn);
             migrateSampleFilesTable(conn);
+            seedSystemSettings(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -174,6 +175,43 @@ public class DatabaseMigrationRunner {
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
             log.info("Migration [sample-files-table]: table created");
+        }
+    }
+
+    /**
+     * 시드 데이터: SQL_INIT_MODE=never 환경에서 data.sql이 실행되지 않으므로
+     * 필수 system_settings 초기값을 여기서 INSERT (이미 존재하면 스킵)
+     */
+    private void seedSystemSettings(Connection conn) throws SQLException {
+        String[][] settings = {
+            // key, value, description
+            {"sld_ai_generation_enabled", "true", "Enable AI-powered SLD generation"},
+            {"chat_system_prompt", "", "AI Chatbot system prompt"},
+            {"sld_system_prompt", "", "AI SLD generation system prompt"},
+        };
+
+        int seeded = 0;
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM system_settings WHERE setting_key = ?");
+             PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO system_settings (setting_key, setting_value, description, updated_at) VALUES (?, ?, ?, NOW())")) {
+
+            for (String[] s : settings) {
+                check.setString(1, s[0]);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) continue; // already exists
+                }
+                insert.setString(1, s[0]);
+                insert.setString(2, s[1]);
+                insert.setString(3, s[2]);
+                insert.executeUpdate();
+                seeded++;
+            }
+        }
+        if (seeded > 0) {
+            log.info("Migration [seed-system-settings]: seeded {} new settings", seeded);
+        } else {
+            log.debug("Migration [seed-system-settings]: all settings exist, skipping");
         }
     }
 
