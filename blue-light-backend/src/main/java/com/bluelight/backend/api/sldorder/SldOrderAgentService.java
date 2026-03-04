@@ -158,19 +158,28 @@ public class SldOrderAgentService {
                                 log.error("Response body: {}", wce.getResponseBodyAsString());
                             }
                             sendSseEvent(emitter, "error", Map.of("type", "error", "content", errorMsg));
-                            emitter.complete();
+                            try {
+                                emitter.complete();
+                            } catch (Exception e) {
+                                log.debug("SSE emitter already completed (error handler): {}", e.getMessage());
+                            }
                         },
                         () -> {
+                            // AI 응답 DB 저장 (별도 트랜잭션, 실패해도 SSE 종료에 영향 없음)
                             try {
-                                // AI 응답 DB 저장 (별도 트랜잭션)
                                 String aiResponse = fullResponse.toString();
                                 if (!aiResponse.isEmpty()) {
                                     saveAssistantMessage(sldOrderSeq, userSeq, aiResponse);
                                 }
+                            } catch (Exception e) {
+                                log.warn("Failed to save AI response: sldOrderSeq={}, error={}",
+                                        sldOrderSeq, e.getMessage());
+                            }
+                            // SSE emitter 종료 (이미 닫힌 연결이면 무시)
+                            try {
                                 emitter.complete();
                             } catch (Exception e) {
-                                log.error("Error completing SLD Order chat stream", e);
-                                emitter.completeWithError(e);
+                                log.debug("SSE emitter already completed: {}", e.getMessage());
                             }
                         }
                 );
