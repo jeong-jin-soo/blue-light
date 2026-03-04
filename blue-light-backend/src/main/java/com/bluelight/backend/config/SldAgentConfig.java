@@ -14,7 +14,6 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 
-import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -40,9 +39,10 @@ public class SldAgentConfig {
     public WebClient sldAgentWebClient() {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)  // 연결 타임아웃 10초
-                .responseTimeout(Duration.ofSeconds(timeoutSeconds))   // 응답 타임아웃
+                // responseTimeout 제거 — SSE 스트리밍에서는 전체 응답 시간 제한 불필요
+                // SseEmitter(600s)와 Nginx(300s)가 상위 레벨에서 타임아웃 관리
                 .doOnConnected(conn -> conn
-                        .addHandlerLast(new ReadTimeoutHandler(timeoutSeconds, TimeUnit.SECONDS))
+                        .addHandlerLast(new ReadTimeoutHandler(300, TimeUnit.SECONDS))  // Nginx proxy_read_timeout과 동일
                         .addHandlerLast(new WriteTimeoutHandler(timeoutSeconds, TimeUnit.SECONDS)));
 
         return WebClient.builder()
