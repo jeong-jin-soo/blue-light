@@ -138,6 +138,12 @@ export const sendSldChatStream = async (
               receivedDone = true;
               callbacks.onError(parsed.content || 'Unknown error occurred.');
               break;
+            case 'model_switch':
+              // AI model fallback — show user which model is being used
+              if (parsed.content) {
+                callbacks.onToken(`\n⚡ ${parsed.content}\n\n`);
+              }
+              break;
             case 'status':
               // AI retry status — show as token so user sees progress
               if (parsed.content) callbacks.onToken(parsed.content + '\n');

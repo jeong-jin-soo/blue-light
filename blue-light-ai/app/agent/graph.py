@@ -27,35 +27,33 @@ logger = logging.getLogger(__name__)
 
 # ── LLM Setup ───────────────────────────────────────
 
-# 모듈 레벨 LLM 캐싱 (매 호출마다 재생성 방지)
-_cached_llm = None
-_cached_api_key: str | None = None
+# 모델+키 조합별 LLM 캐싱 (동시 요청에서 다른 모델 사용 가능)
+_llm_cache: dict[str, ChatGoogleGenerativeAI] = {}
 
 
-def _get_llm(api_key: str | None = None) -> ChatGoogleGenerativeAI:
-    """Get or create the Gemini LLM instance with tool bindings (cached).
+def _get_llm(api_key: str | None = None, model: str | None = None) -> ChatGoogleGenerativeAI:
+    """Get or create the Gemini LLM instance with tool bindings (cached per model+key).
 
     Args:
         api_key: Gemini API key from Spring Boot (DB-managed).
                  If provided, overrides the env var setting.
-                 LLM is re-created when the key changes.
+        model: Model name override (e.g., fallback model on 503).
+               If None, uses settings.gemini_model.
     """
-    global _cached_llm, _cached_api_key
-
     resolved_key = api_key or settings.gemini_api_key
+    resolved_model = model or settings.gemini_model
+    cache_key = f"{resolved_model}:{resolved_key}"
 
-    # Re-create LLM if key changed or not yet created
-    if _cached_llm is None or resolved_key != _cached_api_key:
+    if cache_key not in _llm_cache:
         llm = ChatGoogleGenerativeAI(
-            model=settings.gemini_model,
+            model=resolved_model,
             google_api_key=resolved_key,
             max_output_tokens=settings.gemini_max_tokens,
             temperature=settings.gemini_temperature,
         )
-        _cached_llm = llm.bind_tools(ALL_TOOLS)
-        _cached_api_key = resolved_key
-        logger.info(f"LLM instance created: model={settings.gemini_model}, key_source={'db' if api_key else 'env'}")
-    return _cached_llm
+        _llm_cache[cache_key] = llm.bind_tools(ALL_TOOLS)
+        logger.info(f"LLM instance created: model={resolved_model}, key_source={'db' if api_key else 'env'}")
+    return _llm_cache[cache_key]
 
 
 # ── Graph Nodes ─────────────────────────────────────
@@ -93,7 +91,7 @@ async def agent_node(state: SldAgentState) -> dict:
     Dynamically builds the system message with application context
     so the agent already knows kVA, address, building type, etc.
     """
-    llm = _get_llm(api_key=state.get("api_key"))
+    llm = _get_llm(api_key=state.get("api_key"), model=state.get("fallback_model"))
 
     # Build dynamic system message with application context
     # DB에서 전달된 프롬프트가 있으면 사용, 없으면 하드코딩 기본값 사용
@@ -249,14 +247,16 @@ async def process_message(
         "api_key": api_key,
     }
 
-    # Retry logic for transient Gemini API errors (503 Service Unavailable)
+    # Retry logic: on 503/429 from primary model, fall back to gemini-2.5-flash
     max_retries = 3
     retry_delay = 5  # seconds
+    fallback_model = settings.gemini_fallback_model  # "gemini-2.5-flash"
 
     for attempt in range(1, max_retries + 1):
         had_error = False
+        current_model = input_state.get("fallback_model") or settings.gemini_model
         try:
-            logger.info(f"Agent processing: thread_id={thread_id}, attempt={attempt}/{max_retries}")
+            logger.info(f"Agent processing: thread_id={thread_id}, attempt={attempt}/{max_retries}, model={current_model}")
             async for event in agent.astream_events(
                 input_state,
                 config=config,
@@ -362,13 +362,24 @@ async def process_message(
             is_retryable = any(code in error_str for code in ["503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded"])
 
             if is_retryable and attempt < max_retries:
-                logger.warning(f"Retryable error (attempt {attempt}/{max_retries}): {e}")
-                yield {"type": "status", "content": f"AI service temporarily busy. Retrying... ({attempt}/{max_retries})"}
-                await asyncio.sleep(retry_delay * attempt)  # exponential-ish backoff
+                # 503/429 → 폴백 모델로 전환하여 재시도
+                if "fallback_model" not in input_state and fallback_model:
+                    input_state["fallback_model"] = fallback_model
+                    logger.warning(f"Switching to fallback model '{fallback_model}' after {error_str[:80]}")
+                    yield {
+                        "type": "model_switch",
+                        "content": f"Primary model ({settings.gemini_model}) is busy. Switching to {fallback_model}...",
+                        "from_model": settings.gemini_model,
+                        "to_model": fallback_model,
+                    }
+                else:
+                    logger.warning(f"Retryable error (attempt {attempt}/{max_retries}): {error_str[:120]}")
+                    yield {"type": "status", "content": f"AI service temporarily busy. Retrying... ({attempt}/{max_retries})"}
+                await asyncio.sleep(retry_delay)
                 had_error = True
             else:
                 if is_retryable:
-                    logger.error(f"Agent processing error after {max_retries} retries: {e}")
+                    logger.error(f"Agent processing error after {max_retries} retries (last model={current_model}): {e}")
                     yield {"type": "error", "content": "AI service is temporarily unavailable due to high demand. Please try again in a few minutes."}
                 else:
                     logger.error(f"Agent processing error: {e}", exc_info=True)

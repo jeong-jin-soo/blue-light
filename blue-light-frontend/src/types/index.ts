@@ -744,6 +744,7 @@ export type SldSseEventType =
   | 'done'
   | 'error'
   | 'status'
+  | 'model_switch'
   | 'heartbeat'
   | 'session'
   | 'template_matched';
@@ -756,6 +757,8 @@ export interface SldSseEvent {
   summary?: string;
   svg?: string;
   fileId?: string;
+  from_model?: string;
+  to_model?: string;
 }
 
 // ============================================
