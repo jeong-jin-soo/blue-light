@@ -6,7 +6,7 @@ import type { SldChatMessage, SldRequest, SldSseEvent } from '../types';
  */
 export interface SldStreamCallbacks {
   onToken: (text: string) => void;
-  onToolStart: (tool: string) => void;
+  onToolStart: (tool: string, description?: string) => void;
   onToolResult: (tool: string, summary: string) => void;
   onSldPreview: (svg: string) => void;
   onFileGenerated: (fileId: string) => void;
@@ -119,7 +119,7 @@ export const sendSldChatStream = async (
               if (parsed.content) callbacks.onToken(parsed.content);
               break;
             case 'tool_start':
-              if (parsed.tool) callbacks.onToolStart(parsed.tool);
+              if (parsed.tool) callbacks.onToolStart(parsed.tool, parsed.description);
               break;
             case 'tool_result':
               if (parsed.tool) callbacks.onToolResult(parsed.tool, parsed.summary || '');

@@ -29,6 +29,7 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
     svgPreview,
     generatedFileId,
     activeToolName,
+    activeToolDescription,
     sendMessage,
     loadHistory,
     resetChat,
@@ -179,7 +180,7 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
               <div className="flex justify-start">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-700 flex items-center gap-2">
                   <span className="animate-spin">&#9881;&#65039;</span>
-                  {formatToolName(activeToolName)}
+                  {activeToolDescription || formatToolName(activeToolName)}
                 </div>
               </div>
             )}

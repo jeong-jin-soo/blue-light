@@ -356,13 +356,13 @@ async def process_message(
 def _tool_description(tool_name: str) -> str:
     """Human-readable description for tool execution (with pipeline step numbers)."""
     descriptions = {
-        "get_application_details": "[Step 1/6] 신청 정보 및 규격 조회 중...",
-        "get_standard_specs": "[Step 1/6] 싱가포르 전기 규격 조회 중...",
-        "find_matching_templates": "[Step 2/6] 유사 실무 SLD 템플릿 검색 중...",
-        "extract_sld_data": "[Step 1-3/6] SLD 데이터 추출 및 구조화 중...",
-        "validate_sld_requirements": "[Step 4/6] SS 638 규격 검증 중...",
-        "generate_sld": "[Step 5/6] SLD 도면 생성 중 (PDF + SVG)...",
-        "generate_preview": "[Step 6/6] SLD 미리보기 생성 중...",
+        "get_application_details": "[Step 1/6] Fetching application details & specifications...",
+        "get_standard_specs": "[Step 1/6] Looking up Singapore electrical standards...",
+        "find_matching_templates": "[Step 2/6] Searching for matching SLD templates...",
+        "extract_sld_data": "[Step 1-3/6] Extracting & structuring SLD data...",
+        "validate_sld_requirements": "[Step 4/6] Validating against SS 638 standards...",
+        "generate_sld": "[Step 5/6] Generating SLD drawing (PDF + SVG)...",
+        "generate_preview": "[Step 6/6] Creating SLD preview...",
     }
     return descriptions.get(tool_name, f"Executing {tool_name}...")
 

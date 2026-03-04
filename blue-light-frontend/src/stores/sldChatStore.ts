@@ -9,6 +9,7 @@ interface SldChatState {
   svgPreview: string | null;
   generatedFileId: string | null;
   activeToolName: string | null;
+  activeToolDescription: string | null;
 
   // Actions
   sendMessage: (applicationId: number, content: string) => Promise<void>;
@@ -27,6 +28,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
   svgPreview: null,
   generatedFileId: null,
   activeToolName: null,
+  activeToolDescription: null,
 
   sendMessage: async (applicationId: number, content: string) => {
     // 사용자 메시지 즉시 표시
@@ -45,6 +47,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
       isLoading: true,
       isStreaming: false,
       activeToolName: null,
+      activeToolDescription: null,
     }));
 
     try {
@@ -65,6 +68,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
                 isLoading: false,
                 isStreaming: true,
                 activeToolName: null,
+                activeToolDescription: null,
               };
             } else {
               // 첫 토큰: assistant 메시지 생성
@@ -82,19 +86,20 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
                 isLoading: false,
                 isStreaming: true,
                 activeToolName: null,
+                activeToolDescription: null,
               };
             }
           });
         },
 
-        onToolStart: (tool) => {
-          set({ activeToolName: tool, isLoading: false });
+        onToolStart: (tool, description) => {
+          set({ activeToolName: tool, activeToolDescription: description || null, isLoading: false });
         },
 
         onToolResult: (_tool, _summary) => {
           // Keep isLoading true so the loading indicator stays visible
           // until the next tool_start or first token arrives
-          set({ activeToolName: null, isLoading: true });
+          set({ activeToolName: null, activeToolDescription: null, isLoading: true });
         },
 
         onSldPreview: (svg) => {
@@ -110,6 +115,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
             isStreaming: false,
             isLoading: false,
             activeToolName: null,
+            activeToolDescription: null,
           });
         },
 
@@ -123,6 +129,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
                 isLoading: false,
                 isStreaming: false,
                 activeToolName: null,
+                activeToolDescription: null,
               };
             }
             return {
@@ -139,6 +146,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
               isLoading: false,
               isStreaming: false,
               activeToolName: null,
+              activeToolDescription: null,
             };
           });
         },
@@ -158,6 +166,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
         isLoading: false,
         isStreaming: false,
         activeToolName: null,
+        activeToolDescription: null,
       }));
     }
   },
@@ -181,6 +190,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
         svgPreview: null,
         generatedFileId: null,
         activeToolName: null,
+        activeToolDescription: null,
       });
     } catch {
       // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
@@ -196,6 +206,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
       svgPreview: null,
       generatedFileId: null,
       activeToolName: null,
+      activeToolDescription: null,
     }),
 
   setSvgPreview: (svg: string | null) => set({ svgPreview: svg }),

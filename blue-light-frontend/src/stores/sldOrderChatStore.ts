@@ -9,6 +9,7 @@ interface SldOrderChatState {
   svgPreview: string | null;
   generatedFileId: string | null;
   activeToolName: string | null;
+  activeToolDescription: string | null;
 
   // Actions
   sendMessage: (sldOrderSeq: number, content: string) => Promise<void>;
@@ -27,6 +28,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
   svgPreview: null,
   generatedFileId: null,
   activeToolName: null,
+  activeToolDescription: null,
 
   sendMessage: async (sldOrderSeq: number, content: string) => {
     // Show user message immediately
@@ -45,6 +47,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
       isLoading: true,
       isStreaming: false,
       activeToolName: null,
+      activeToolDescription: null,
     }));
 
     try {
@@ -65,6 +68,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
                 isLoading: false,
                 isStreaming: true,
                 activeToolName: null,
+                activeToolDescription: null,
               };
             } else {
               // First token: create assistant message
@@ -82,19 +86,20 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
                 isLoading: false,
                 isStreaming: true,
                 activeToolName: null,
+                activeToolDescription: null,
               };
             }
           });
         },
 
-        onToolStart: (tool) => {
-          set({ activeToolName: tool, isLoading: false });
+        onToolStart: (tool, description) => {
+          set({ activeToolName: tool, activeToolDescription: description || null, isLoading: false });
         },
 
         onToolResult: (_tool, _summary) => {
           // Keep isLoading true so the loading indicator stays visible
           // until the next tool_start or first token arrives
-          set({ activeToolName: null, isLoading: true });
+          set({ activeToolName: null, activeToolDescription: null, isLoading: true });
         },
 
         onSldPreview: (svg) => {
@@ -110,6 +115,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
             isStreaming: false,
             isLoading: false,
             activeToolName: null,
+            activeToolDescription: null,
           });
         },
 
@@ -123,6 +129,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
                 isLoading: false,
                 isStreaming: false,
                 activeToolName: null,
+                activeToolDescription: null,
               };
             }
             return {
@@ -139,6 +146,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
               isLoading: false,
               isStreaming: false,
               activeToolName: null,
+              activeToolDescription: null,
             };
           });
         },
@@ -158,6 +166,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
         isLoading: false,
         isStreaming: false,
         activeToolName: null,
+        activeToolDescription: null,
       }));
     }
   },
@@ -181,6 +190,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
         svgPreview: null,
         generatedFileId: null,
         activeToolName: null,
+        activeToolDescription: null,
       });
     } catch {
       // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
@@ -196,6 +206,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
       svgPreview: null,
       generatedFileId: null,
       activeToolName: null,
+      activeToolDescription: null,
     }),
 
   setSvgPreview: (svg: string | null) => set({ svgPreview: svg }),

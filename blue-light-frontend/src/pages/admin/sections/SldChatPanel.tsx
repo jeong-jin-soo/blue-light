@@ -34,6 +34,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     svgPreview,
     generatedFileId,
     activeToolName,
+    activeToolDescription,
     sendMessage,
     loadHistory,
     resetChat,
@@ -204,7 +205,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
               <div className="flex justify-start">
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-700 flex items-center gap-2">
                   <span className="animate-spin">⚙️</span>
-                  {formatToolName(activeToolName)}
+                  {activeToolDescription || formatToolName(activeToolName)}
                 </div>
               </div>
             )}
