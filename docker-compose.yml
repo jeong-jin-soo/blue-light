@@ -43,6 +43,9 @@ services:
       PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-https://dev.licensekaki.com}
       # SQL Init (운영: never, 로컬: always)
       SQL_INIT_MODE: ${SQL_INIT_MODE:-always}
+      # SLD AI Agent 연결 (Docker 네트워크에서 서비스명 사용)
+      SLD_AGENT_URL: http://sld-agent:8100
+      SLD_AGENT_SERVICE_KEY: ${SLD_AGENT_SERVICE_KEY:-dev-service-key}
     volumes:
       - uploads_data:/app/uploads
 
