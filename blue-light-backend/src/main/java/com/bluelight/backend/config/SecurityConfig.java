@@ -19,6 +19,8 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import jakarta.servlet.DispatcherType;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -62,6 +64,12 @@ public class SecurityConfig {
 
                 // URL별 권한 설정
                 .authorizeHttpRequests(auth -> auth
+                        // SSE 비동기 완료 디스패치 허용
+                        // SseEmitter.complete() 호출 시 Tomcat이 async dispatch를 발생시키는데,
+                        // 이 디스패치는 원래 요청 URL로 Security 필터 체인을 재통과함.
+                        // 이때 SecurityContext가 없어 AuthorizationDeniedException 발생 방지.
+                        // 원본 요청은 이미 인증/인가를 통과했으므로 ASYNC dispatch는 안전하게 허용.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         // 인증 없이 접근 가능한 경로
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/public/**").permitAll()
@@ -101,7 +109,7 @@ public class SecurityConfig {
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
         // 허용할 헤더 (필요한 것만 명시)
-        configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-Requested-With"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "Accept", "X-Requested-With", "Authorization"));
 
         // 인증 정보 포함 허용
         configuration.setAllowCredentials(true);
