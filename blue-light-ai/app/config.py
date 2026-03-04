@@ -11,7 +11,7 @@ class Settings(BaseSettings):
 
     # Gemini API
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3-flash-preview"
+    gemini_model: str = "gemini-2.5-flash"
     gemini_fallback_model: str = "gemini-2.5-flash"
     gemini_max_tokens: int = 8192
     gemini_temperature: float = 0.3
