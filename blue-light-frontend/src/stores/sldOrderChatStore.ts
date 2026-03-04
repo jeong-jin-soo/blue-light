@@ -10,6 +10,7 @@ interface SldOrderChatState {
   generatedFileId: string | null;
   activeToolName: string | null;
   activeToolDescription: string | null;
+  isToolCompleted: boolean;
 
   // Actions
   sendMessage: (sldOrderSeq: number, content: string) => Promise<void>;
@@ -29,6 +30,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
   generatedFileId: null,
   activeToolName: null,
   activeToolDescription: null,
+  isToolCompleted: false,
 
   sendMessage: async (sldOrderSeq: number, content: string) => {
     // Show user message immediately
@@ -48,6 +50,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
       isStreaming: false,
       activeToolName: null,
       activeToolDescription: null,
+      isToolCompleted: false,
     }));
 
     try {
@@ -69,6 +72,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
                 isStreaming: true,
                 activeToolName: null,
                 activeToolDescription: null,
+                isToolCompleted: false,
               };
             } else {
               // First token: create assistant message
@@ -87,19 +91,23 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
                 isStreaming: true,
                 activeToolName: null,
                 activeToolDescription: null,
+                isToolCompleted: false,
               };
             }
           });
         },
 
         onToolStart: (tool, description) => {
-          set({ activeToolName: tool, activeToolDescription: description || null, isLoading: false });
+          set({ activeToolName: tool, activeToolDescription: description || null, isToolCompleted: false, isLoading: false });
         },
 
-        onToolResult: (_tool, _summary) => {
-          // Keep isLoading true so the loading indicator stays visible
-          // until the next tool_start or first token arrives
-          set({ activeToolName: null, activeToolDescription: null, isLoading: true });
+        onToolResult: (_tool, summary) => {
+          // Keep tool indicator visible with result summary until next tool_start or token
+          // This prevents showing "..." dots during LLM thinking time (several seconds)
+          set((s) => ({
+            activeToolDescription: summary || s.activeToolDescription,
+            isToolCompleted: true,
+          }));
         },
 
         onSldPreview: (svg) => {
@@ -116,6 +124,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
             isLoading: false,
             activeToolName: null,
             activeToolDescription: null,
+            isToolCompleted: false,
           });
         },
 
@@ -130,6 +139,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
                 isStreaming: false,
                 activeToolName: null,
                 activeToolDescription: null,
+                isToolCompleted: false,
               };
             }
             return {
@@ -147,6 +157,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
               isStreaming: false,
               activeToolName: null,
               activeToolDescription: null,
+              isToolCompleted: false,
             };
           });
         },
@@ -167,6 +178,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
         isStreaming: false,
         activeToolName: null,
         activeToolDescription: null,
+        isToolCompleted: false,
       }));
     }
   },
@@ -191,6 +203,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
         generatedFileId: null,
         activeToolName: null,
         activeToolDescription: null,
+        isToolCompleted: false,
       });
     } catch {
       // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
@@ -207,6 +220,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
       generatedFileId: null,
       activeToolName: null,
       activeToolDescription: null,
+      isToolCompleted: false,
     }),
 
   setSvgPreview: (svg: string | null) => set({ svgPreview: svg }),

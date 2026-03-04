@@ -35,6 +35,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     generatedFileId,
     activeToolName,
     activeToolDescription,
+    isToolCompleted,
     sendMessage,
     loadHistory,
     resetChat,
@@ -150,7 +151,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
         <div className="flex items-center gap-2">
           <span className="text-base">🤖</span>
           <span className="text-sm font-medium text-gray-700">SLD AI Generator</span>
-          {(isLoading || isStreaming) && (
+          {(isLoading || isStreaming || activeToolName) && (
             <span className="text-xs text-blue-600 animate-pulse">generating...</span>
           )}
         </div>
@@ -203,8 +204,15 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
             {/* Tool execution indicator */}
             {activeToolName && (
               <div className="flex justify-start">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2 text-xs text-yellow-700 flex items-center gap-2">
-                  <span className="animate-spin">⚙️</span>
+                <div className={`rounded-lg px-3 py-2 text-xs flex items-center gap-2 ${
+                  isToolCompleted
+                    ? 'bg-green-50 border border-green-200 text-green-700'
+                    : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
+                }`}>
+                  {isToolCompleted
+                    ? <span>✅</span>
+                    : <span className="animate-spin">⚙️</span>
+                  }
                   {activeToolDescription || formatToolName(activeToolName)}
                 </div>
               </div>
