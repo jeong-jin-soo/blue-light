@@ -69,6 +69,8 @@ public class SecurityConfig {
                         // Swagger, Health Check 등
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // Error 페이지 (SSE 비동기 완료 시 SecurityContext 없이 디스패치됨)
+                        .requestMatchers("/error").permitAll()
                         // Admin/LEW/SystemAdmin 경로 (URL-level defense-in-depth)
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
                         // SLD Manager 경로
