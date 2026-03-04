@@ -65,6 +65,12 @@ services:
       SQLITE_DB_PATH: /app/data/db/checkpoints.db
       TEMP_FILE_DIR: /app/temp
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # MySQL (SLD 템플릿 DB — Backend와 동일한 RDS 사용)
+      MYSQL_HOST: ${MYSQL_HOST:-localhost}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bluelight}
+      MYSQL_USER: ${DB_USERNAME:-user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
     volumes:
       - sld_data:/app/data/db
       - sld_temp:/app/temp

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # MySQL (SLD 템플릿 DB)
     mysql_host: str = "localhost"
-    mysql_port: int = 3307
+    mysql_port: int = 3306
     mysql_database: str = "bluelight"
     mysql_user: str = "user"
     mysql_password: str = "password"

@@ -180,6 +180,15 @@ jobs:
             SQL_INIT_MODE=never
             ENVEOF
 
+            # DB_URL(JDBC)에서 MySQL 개별 파라미터 추출 → sld-agent용
+            DB_URL_RAW=$(grep 'DB_URL=' .env | head -1 | sed 's/^[[:space:]]*DB_URL=//')
+            MYSQL_HOST=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d: -f1)
+            MYSQL_PORT=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d: -f2 | cut -d/ -f1)
+            MYSQL_DATABASE=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d/ -f2 | cut -d? -f1)
+            echo "MYSQL_HOST=$MYSQL_HOST" >> .env
+            echo "MYSQL_PORT=$MYSQL_PORT" >> .env
+            echo "MYSQL_DATABASE=$MYSQL_DATABASE" >> .env
+
             # 배포 (개발: DB는 외부 RDS)
             docker compose -f docker-compose.yml pull
             docker compose -f docker-compose.yml up -d --remove-orphans
