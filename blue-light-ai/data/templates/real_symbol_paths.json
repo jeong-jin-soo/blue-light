@@ -1,55 +1,50 @@
 {
-  "_comment": "Calibrated symbol dimensions from DXF block analysis + PyMuPDF vector analysis of 73 real LEW SLD samples. All values in mm.",
-  "_source": "DXF block geometry extracted from slds-dxf/*.dxf (MCCB/RCCB/DP ISOL blocks), cross-validated with PyMuPDF analysis",
+  "_comment": "Calibrated symbol dimensions measured from 73 real LEW SLD samples. All values in mm.",
+  "_source": "32A/63A/100A/200A Single Phase DB & TPN SLDs - PyMuPDF vector path analysis",
 
   "MCB": {
     "width_mm": 3.6,
     "height_mm": 6.5,
     "arc_radius_mm": 1.25,
-    "blade_offset_mm": 0.84,
-    "contact_radius_mm": 0.54,
+    "contact_radius_mm": 0.67,
     "stub_mm": 2.0,
-    "description": "Miniature Circuit Breaker (<100A) — blade offset from DXF block proportions"
+    "description": "Miniature Circuit Breaker (<100A)"
   },
   "MCCB": {
     "width_mm": 4.2,
     "height_mm": 7.5,
     "arc_radius_mm": 1.5,
-    "blade_offset_mm": 0.97,
-    "contact_radius_mm": 0.62,
+    "contact_radius_mm": 0.67,
     "stub_mm": 2.0,
-    "description": "Moulded Case Circuit Breaker (100A-630A) — blade offset from DXF MCCB block"
+    "description": "Moulded Case Circuit Breaker (100A-630A)"
   },
   "ACB": {
     "width_mm": 5.0,
     "height_mm": 8.5,
     "arc_radius_mm": 1.8,
-    "blade_offset_mm": 1.10,
-    "contact_radius_mm": 0.70,
+    "contact_radius_mm": 0.67,
     "stub_mm": 2.0,
     "crossbar_extend_mm": 1.0,
-    "description": "Air Circuit Breaker (>630A) with horizontal crossbar — proportionally scaled blade offset"
+    "description": "Air Circuit Breaker (>630A) with horizontal crossbar"
   },
   "RCCB": {
     "width_mm": 4.2,
     "height_mm": 7.5,
     "arc_radius_mm": 1.5,
-    "blade_offset_mm": 0.97,
-    "contact_radius_mm": 0.62,
+    "contact_radius_mm": 0.67,
     "stub_mm": 2.0,
     "rcd_bar_offset_mm": 2.5,
-    "rcd_bar_half_mm": 1.37,
-    "description": "Residual Current Circuit Breaker — blade + T-bar from DXF RCCB block"
+    "rcd_bar_half_mm": 1.5,
+    "description": "Residual Current Circuit Breaker with RCD sensing element"
   },
   "ELCB": {
     "width_mm": 4.2,
     "height_mm": 7.5,
     "arc_radius_mm": 1.5,
-    "blade_offset_mm": 0.97,
-    "contact_radius_mm": 0.62,
+    "contact_radius_mm": 0.67,
     "stub_mm": 2.0,
     "rcd_bar_offset_mm": 2.5,
-    "rcd_bar_half_mm": 1.37,
+    "rcd_bar_half_mm": 1.5,
     "description": "Earth Leakage Circuit Breaker (same symbol as RCCB)"
   },
   "KWH_METER": {
