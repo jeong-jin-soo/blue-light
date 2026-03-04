@@ -188,6 +188,7 @@ async def chat_stream(
                     thread_id=thread_id,
                     application_info=request.application_info,
                     system_prompt=request.system_prompt,
+                    api_key=request.api_key,
                 ),
                 interval=15,
             ):
@@ -233,6 +234,8 @@ async def chat(
         message=request.message,
         thread_id=thread_id,
         application_info=request.application_info,
+        system_prompt=request.system_prompt,
+        api_key=request.api_key,
     ):
         event_type = event.get("type")
         if event_type == "token":

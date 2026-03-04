@@ -4,6 +4,7 @@ import com.bluelight.backend.api.admin.SystemAdminService;
 import com.bluelight.backend.api.admin.dto.SldChatMessageResponse;
 import com.bluelight.backend.api.sldorder.dto.SldOrderResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.config.GeminiConfig;
 import com.bluelight.backend.config.SldAgentConfig;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileRepository;
@@ -49,6 +50,7 @@ public class SldOrderAgentService {
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactionTemplate;
     private final SystemAdminService systemAdminService;
+    private final GeminiConfig geminiConfig;
 
     /**
      * SSE 스트리밍 채팅 -- Python AI Agent 프록시
@@ -96,6 +98,12 @@ public class SldOrderAgentService {
         requestBody.put("application_info", sldOrderInfo);
         if (sldSystemPrompt != null && !sldSystemPrompt.isBlank()) {
             requestBody.put("system_prompt", sldSystemPrompt);
+        }
+
+        // DB에서 관리하는 Gemini API Key를 Python 서비스에 전달
+        String apiKey = geminiConfig.getApiKey();
+        if (apiKey != null && !apiKey.isBlank()) {
+            requestBody.put("api_key", apiKey);
         }
 
         StringBuilder fullResponse = new StringBuilder();

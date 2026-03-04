@@ -20,6 +20,10 @@ class ChatRequest(BaseModel):
         None,
         description="SLD system prompt from DB (overrides default if provided)",
     )
+    api_key: str | None = Field(
+        None,
+        description="Gemini API key from DB (passed by Spring Boot)",
+    )
 
 
 class ChatResponse(BaseModel):

@@ -24,6 +24,9 @@ class SldAgentState(TypedDict):
     # System prompt from DB (overrides default SLD_EXPERT_SYSTEM_PROMPT if provided)
     system_prompt: str | None
 
+    # Gemini API key from DB (passed by Spring Boot per request)
+    api_key: str | None
+
     # Gathered SLD requirements
     sld_requirements: dict
     requirements_complete: bool

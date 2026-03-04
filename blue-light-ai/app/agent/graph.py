@@ -28,20 +28,32 @@ logger = logging.getLogger(__name__)
 
 # 모듈 레벨 LLM 캐싱 (매 호출마다 재생성 방지)
 _cached_llm = None
+_cached_api_key: str | None = None
 
 
-def _get_llm() -> ChatGoogleGenerativeAI:
-    """Get or create the Gemini LLM instance with tool bindings (cached)."""
-    global _cached_llm
-    if _cached_llm is None:
+def _get_llm(api_key: str | None = None) -> ChatGoogleGenerativeAI:
+    """Get or create the Gemini LLM instance with tool bindings (cached).
+
+    Args:
+        api_key: Gemini API key from Spring Boot (DB-managed).
+                 If provided, overrides the env var setting.
+                 LLM is re-created when the key changes.
+    """
+    global _cached_llm, _cached_api_key
+
+    resolved_key = api_key or settings.gemini_api_key
+
+    # Re-create LLM if key changed or not yet created
+    if _cached_llm is None or resolved_key != _cached_api_key:
         llm = ChatGoogleGenerativeAI(
             model=settings.gemini_model,
-            google_api_key=settings.gemini_api_key,
+            google_api_key=resolved_key,
             max_output_tokens=settings.gemini_max_tokens,
             temperature=settings.gemini_temperature,
         )
         _cached_llm = llm.bind_tools(ALL_TOOLS)
-        logger.info(f"LLM instance created: model={settings.gemini_model}")
+        _cached_api_key = resolved_key
+        logger.info(f"LLM instance created: model={settings.gemini_model}, key_source={'db' if api_key else 'env'}")
     return _cached_llm
 
 
@@ -80,7 +92,7 @@ async def agent_node(state: SldAgentState) -> dict:
     Dynamically builds the system message with application context
     so the agent already knows kVA, address, building type, etc.
     """
-    llm = _get_llm()
+    llm = _get_llm(api_key=state.get("api_key"))
 
     # Build dynamic system message with application context
     # DB에서 전달된 프롬프트가 있으면 사용, 없으면 하드코딩 기본값 사용
@@ -210,6 +222,7 @@ async def process_message(
     thread_id: str,
     application_info: dict | None = None,
     system_prompt: str | None = None,
+    api_key: str | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Process a user message through the LangGraph agent.
@@ -217,6 +230,7 @@ async def process_message(
 
     Args:
         application_info: Application details from Spring Boot (kVA, address, etc.)
+        api_key: Gemini API key from Spring Boot (DB-managed).
     """
     agent = await get_agent()
 
@@ -231,6 +245,7 @@ async def process_message(
         "user_seq": user_seq,
         "application_info": application_info or {},
         "system_prompt": system_prompt,
+        "api_key": api_key,
     }
 
     try:
