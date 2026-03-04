@@ -420,6 +420,21 @@ async def delete_temp_file(
 # ── Helpers ──────────────────────────────────────────
 
 
+_SENTINEL = object()
+
+
+async def _safe_anext(aiter_obj):
+    """async generator의 __anext__()를 StopAsyncIteration 안전하게 래핑.
+
+    StopAsyncIteration은 asyncio Task 안에서 RuntimeError로 변환되므로
+    sentinel 값으로 대체하여 안전하게 처리한다.
+    """
+    try:
+        return await aiter_obj.__anext__()
+    except StopAsyncIteration:
+        return _SENTINEL
+
+
 async def _with_heartbeat(
     aiter: AsyncGenerator[dict, None],
     interval: int = 15,
@@ -428,17 +443,31 @@ async def _with_heartbeat(
     Wrap an async generator with periodic heartbeat events.
     Prevents WebClient ReadTimeout during long Gemini API calls
     by sending keepalive events every `interval` seconds when idle.
+
+    CRITICAL: asyncio.wait (not wait_for) 사용.
+    wait_for는 timeout 시 내부 태스크를 cancel하여 async generator를 파괴하지만,
+    asyncio.wait는 태스크를 cancel하지 않고 단순히 대기만 중단한다.
     """
     aiter_obj = aiter.__aiter__()
     while True:
+        task = asyncio.ensure_future(_safe_anext(aiter_obj))
         try:
-            event = await asyncio.wait_for(aiter_obj.__anext__(), timeout=interval)
-            yield event
-        except asyncio.TimeoutError:
-            # No event received within interval — send heartbeat
-            yield {"type": "heartbeat"}
-        except StopAsyncIteration:
-            break
+            while True:
+                done, _ = await asyncio.wait({task}, timeout=interval)
+                if done:
+                    result = task.result()
+                    if result is _SENTINEL:
+                        return  # Generator exhausted
+                    yield result
+                    break  # 다음 이벤트 대기를 위해 outer loop으로
+                else:
+                    # Timeout — heartbeat 전송, 태스크는 계속 실행 중
+                    yield {"type": "heartbeat"}
+        except Exception:
+            # Task 내부 예외 전파
+            if not task.done():
+                task.cancel()
+            raise
 
 
 def _sse_event(event_name: str, data: dict) -> str:
