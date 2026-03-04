@@ -174,7 +174,9 @@ async def chat_stream(
     thread_id = request.thread_id or f"sld-{request.application_seq}"
 
     async def event_generator() -> AsyncGenerator[str, None]:
+        event_count = 0
         try:
+            logger.info(f"SSE stream started: thread_id={thread_id}, app_seq={request.application_seq}")
             # Send thread_id first
             yield _sse_event("session", {"type": "session", "thread_id": thread_id})
 
@@ -193,13 +195,17 @@ async def chat_stream(
                 interval=15,
             ):
                 event_type = event.get("type", "token")
+                event_count += 1
+                if event_type != "token":
+                    logger.info(f"SSE event #{event_count}: type={event_type}")
                 yield _sse_event(event_type, event)
 
             # Signal completion
+            logger.info(f"SSE stream completed: thread_id={thread_id}, events={event_count}")
             yield _sse_event("done", {"type": "done"})
 
         except Exception as e:
-            logger.error(f"Chat stream error: {e}", exc_info=True)
+            logger.error(f"Chat stream error (thread_id={thread_id}, events={event_count}): {e}", exc_info=True)
             yield _sse_event("error", {"type": "error", "content": str(e)})
 
     return StreamingResponse(

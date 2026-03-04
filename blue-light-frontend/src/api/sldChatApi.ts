@@ -138,6 +138,15 @@ export const sendSldChatStream = async (
               receivedDone = true;
               callbacks.onError(parsed.content || 'Unknown error occurred.');
               break;
+            case 'status':
+              // AI retry status — show as token so user sees progress
+              if (parsed.content) callbacks.onToken(parsed.content + '\n');
+              break;
+            case 'heartbeat':
+            case 'session':
+            case 'template_matched':
+              // Silently handled — no user-visible action needed
+              break;
           }
         } catch (parseErr) {
           console.warn('[SLD-SSE] Parse error:', parseErr, 'data:', data.slice(0, 200));

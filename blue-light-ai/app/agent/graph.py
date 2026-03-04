@@ -5,6 +5,7 @@ Manages the conversation flow:
   gathering → reviewing → generating → revising → END
 """
 
+import asyncio
 import base64
 import json
 import logging
@@ -248,109 +249,134 @@ async def process_message(
         "api_key": api_key,
     }
 
-    try:
-        async for event in agent.astream_events(
-            input_state,
-            config=config,
-            version="v2",
-        ):
-            kind = event.get("event")
+    # Retry logic for transient Gemini API errors (503 Service Unavailable)
+    max_retries = 3
+    retry_delay = 5  # seconds
 
-            # Stream LLM tokens
-            if kind == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk and hasattr(chunk, "content") and chunk.content:
-                    content = chunk.content
-                    # Gemini may return content as list of parts
-                    if isinstance(content, list):
-                        text_parts = [
-                            p.get("text", "") if isinstance(p, dict) else str(p)
-                            for p in content
-                        ]
-                        content = "".join(text_parts)
-                    if content:
-                        yield {"type": "token", "content": content}
+    for attempt in range(1, max_retries + 1):
+        had_error = False
+        try:
+            logger.info(f"Agent processing: thread_id={thread_id}, attempt={attempt}/{max_retries}")
+            async for event in agent.astream_events(
+                input_state,
+                config=config,
+                version="v2",
+            ):
+                kind = event.get("event")
 
-            # Tool call started
-            elif kind == "on_tool_start":
-                tool_name = event.get("name", "unknown")
-                logger.info(f"Tool started: {tool_name}")
-                yield {
-                    "type": "tool_start",
-                    "tool": tool_name,
-                    "description": _tool_description(tool_name),
-                }
+                # Stream LLM tokens
+                if kind == "on_chat_model_stream":
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk and hasattr(chunk, "content") and chunk.content:
+                        content = chunk.content
+                        # Gemini may return content as list of parts
+                        if isinstance(content, list):
+                            text_parts = [
+                                p.get("text", "") if isinstance(p, dict) else str(p)
+                                for p in content
+                            ]
+                            content = "".join(text_parts)
+                        if content:
+                            yield {"type": "token", "content": content}
 
-            # Tool call completed
-            elif kind == "on_tool_end":
-                tool_name = event.get("name", "unknown")
-                raw_output = event.get("data", {}).get("output", "")
+                # Tool call started
+                elif kind == "on_tool_start":
+                    tool_name = event.get("name", "unknown")
+                    logger.info(f"Tool started: {tool_name}")
+                    yield {
+                        "type": "tool_start",
+                        "tool": tool_name,
+                        "description": _tool_description(tool_name),
+                    }
 
-                # ToolMessage has .content attribute; raw string otherwise
-                if hasattr(raw_output, "content"):
-                    output = raw_output.content
-                else:
-                    output = str(raw_output)
+                # Tool call completed
+                elif kind == "on_tool_end":
+                    tool_name = event.get("name", "unknown")
+                    raw_output = event.get("data", {}).get("output", "")
 
-                logger.info(f"Tool completed: {tool_name}")
+                    # ToolMessage has .content attribute; raw string otherwise
+                    if hasattr(raw_output, "content"):
+                        output = raw_output.content
+                    else:
+                        output = str(raw_output)
 
-                # Capture template image path for Vision injection
-                if tool_name == "find_matching_templates":
-                    try:
-                        tmpl_result = json.loads(output)
-                        img_path = tmpl_result.get("reference_image_path")
-                        if img_path and os.path.exists(img_path):
-                            # Store in state via a separate SSE event
-                            # The actual state update happens via the ToolNode mechanism
-                            yield {
-                                "type": "template_matched",
-                                "filename": tmpl_result.get("best_template_filename", ""),
-                                "similarity_score": tmpl_result.get("similarity_score", 0),
-                            }
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+                    logger.info(f"Tool completed: {tool_name}")
 
-                # Check if SLD was generated or preview requested
-                if tool_name in ("generate_sld", "generate_preview"):
-                    try:
-                        result = json.loads(output)
-                        if result.get("success"):
-                            file_id = result.get("file_id", "")
-
-                            # Reconstruct SVG path from file_id (tool no longer returns SVG content to keep LLM context clean)
-                            svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg") if file_id else ""
-
-                            if svg_path:
-                                try:
-                                    with open(svg_path, encoding="utf-8") as f:
-                                        svg_content = f.read()
-                                    if svg_content:
-                                        yield {
-                                            "type": "sld_preview",
-                                            "svg": svg_content,
-                                        }
-                                except FileNotFoundError:
-                                    logger.warning(f"SVG file not found: {svg_path}")
-
-                            # Send file generated notification (only for generate_sld)
-                            if tool_name == "generate_sld":
+                    # Capture template image path for Vision injection
+                    if tool_name == "find_matching_templates":
+                        try:
+                            tmpl_result = json.loads(output)
+                            img_path = tmpl_result.get("reference_image_path")
+                            if img_path and os.path.exists(img_path):
+                                # Store in state via a separate SSE event
+                                # The actual state update happens via the ToolNode mechanism
                                 yield {
-                                    "type": "file_generated",
-                                    "fileId": file_id,
+                                    "type": "template_matched",
+                                    "filename": tmpl_result.get("best_template_filename", ""),
+                                    "similarity_score": tmpl_result.get("similarity_score", 0),
                                 }
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+                        except (json.JSONDecodeError, TypeError):
+                            pass
 
-                # Send tool result summary
-                yield {
-                    "type": "tool_result",
-                    "tool": tool_name,
-                    "summary": _summarize_tool_result(tool_name, output),
-                }
+                    # Check if SLD was generated or preview requested
+                    if tool_name in ("generate_sld", "generate_preview"):
+                        try:
+                            result = json.loads(output)
+                            if result.get("success"):
+                                file_id = result.get("file_id", "")
 
-    except Exception as e:
-        logger.error(f"Agent processing error: {e}", exc_info=True)
-        yield {"type": "error", "content": f"Processing error: {e}"}
+                                # Reconstruct SVG path from file_id (tool no longer returns SVG content to keep LLM context clean)
+                                svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg") if file_id else ""
+
+                                if svg_path:
+                                    try:
+                                        with open(svg_path, encoding="utf-8") as f:
+                                            svg_content = f.read()
+                                        if svg_content:
+                                            yield {
+                                                "type": "sld_preview",
+                                                "svg": svg_content,
+                                            }
+                                    except FileNotFoundError:
+                                        logger.warning(f"SVG file not found: {svg_path}")
+
+                                # Send file generated notification (only for generate_sld)
+                                if tool_name == "generate_sld":
+                                    yield {
+                                        "type": "file_generated",
+                                        "fileId": file_id,
+                                    }
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+                    # Send tool result summary
+                    yield {
+                        "type": "tool_result",
+                        "tool": tool_name,
+                        "summary": _summarize_tool_result(tool_name, output),
+                    }
+
+        except Exception as e:
+            # Check if this is a retryable error (Gemini 503, rate limit, etc.)
+            error_str = str(e)
+            is_retryable = any(code in error_str for code in ["503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded"])
+
+            if is_retryable and attempt < max_retries:
+                logger.warning(f"Retryable error (attempt {attempt}/{max_retries}): {e}")
+                yield {"type": "status", "content": f"AI service temporarily busy. Retrying... ({attempt}/{max_retries})"}
+                await asyncio.sleep(retry_delay * attempt)  # exponential-ish backoff
+                had_error = True
+            else:
+                if is_retryable:
+                    logger.error(f"Agent processing error after {max_retries} retries: {e}")
+                    yield {"type": "error", "content": "AI service is temporarily unavailable due to high demand. Please try again in a few minutes."}
+                else:
+                    logger.error(f"Agent processing error: {e}", exc_info=True)
+                    yield {"type": "error", "content": f"Processing error: {e}"}
+                return  # Exit the generator
+
+        if not had_error:
+            return  # Success — exit the retry loop
 
 
 def _tool_description(tool_name: str) -> str:

@@ -742,7 +742,11 @@ export type SldSseEventType =
   | 'sld_preview'
   | 'file_generated'
   | 'done'
-  | 'error';
+  | 'error'
+  | 'status'
+  | 'heartbeat'
+  | 'session'
+  | 'template_matched';
 
 export interface SldSseEvent {
   type: SldSseEventType;
