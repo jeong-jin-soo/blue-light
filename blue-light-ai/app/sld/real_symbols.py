@@ -1,14 +1,20 @@
 """
 Calibrated electrical symbols matching real LEW SLD proportions.
 
-Dimensions measured from 73 real Singapore SLD samples (PyMuPDF vector analysis).
+Dimensions from DXF block analysis of 26 real Singapore SLD templates,
+cross-validated with PyMuPDF vector analysis of 73 SLD samples.
 All symbols implement the DrawingBackend protocol and can render to DXF/PDF/SVG.
 
-Key differences from symbols/breakers.py:
-- MCB: 3.6x6.5mm (vs 14x20mm) — matches real sample proportions
-- MCCB: 4.2x7.5mm (vs 14x20mm)
-- Contact radius: 0.67mm (vs 1.0mm)
-- Stub length: 2.0mm (vs 5.0mm)
+DXF Block Geometry (IEC 60617):
+- Circuit breakers (MCB/MCCB/ACB): two terminal circles + blade line (offset from center)
+- RCCB/ELCB: same as MCCB + horizontal arm + vertical T-bar (RCD sensing element)
+- Blade offset extracted from DXF MCCB block: 0.97mm at 7.5mm height
+
+Key dimensions (calibrated from real LEW SLDs):
+- MCB: 3.6x6.5mm, blade_offset 0.84mm, contact_r 0.54mm
+- MCCB: 4.2x7.5mm, blade_offset 0.97mm, contact_r 0.62mm
+- ACB: 5.0x8.5mm, blade_offset 1.10mm, contact_r 0.70mm
+- Stub length: 2.0mm (uniform)
 """
 
 from __future__ import annotations
@@ -56,7 +62,13 @@ def get_symbol_dimensions(symbol_type: str) -> dict:
 class RealCircuitBreaker(BaseSymbol):
     """
     Circuit breaker symbol at real LEW SLD proportions.
-    IEC 60617: arc (semicircle) + two contact circles on conductor.
+
+    IEC 60617 style extracted from DXF blocks:
+    - Two terminal circles (contacts) on the vertical conductor
+    - Blade line offset to the right (moving contact indicator)
+    - Connection stubs top and bottom
+
+    DXF reference: MCCB block in slds-dxf/*.dxf — 2 CIRCLE + 1 LWPOLYLINE.
     """
 
     layer: str = "SLD_SYMBOLS"
@@ -68,7 +80,8 @@ class RealCircuitBreaker(BaseSymbol):
         dims = get_symbol_dimensions(breaker_type)
         self.width = dims["width_mm"]
         self.height = dims["height_mm"]
-        self._arc_r = dims["arc_radius_mm"]
+        self._arc_r = dims["arc_radius_mm"]  # kept for pin/anchor spacing
+        self._blade_offset = dims.get("blade_offset_mm", dims["arc_radius_mm"] * 0.6)
         self._contact_r = dims["contact_radius_mm"]
         self._stub = dims["stub_mm"]
 
@@ -78,7 +91,7 @@ class RealCircuitBreaker(BaseSymbol):
             "bottom": (cx, -self._stub),
         }
         self.anchors = {
-            "label_right": (self.width / 2 + self._arc_r + 2, self.height / 2 + 2),
+            "label_right": (self.width / 2 + self._blade_offset + 2, self.height / 2 + 2),
             "rating_below": (self.width / 2, -self._stub - 2),
             "label_above": (self.width / 2, self.height + self._stub + 2),
         }
@@ -86,27 +99,23 @@ class RealCircuitBreaker(BaseSymbol):
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         w, h = self.width, self.height
         cx = x + w / 2
-        ar = self._arc_r
         cr = self._contact_r
+        blade_x = cx + self._blade_offset
 
         backend.set_layer(self.layer)
 
-        arc_center_y = y + h / 2
+        # Contact circles — positioned symmetrically around vertical center
+        # Spacing derived from DXF: contacts at ~10% and ~90% of symbol height
+        contact_gap = h * 0.8  # distance between contact centers
+        contact_bottom_y = y + (h - contact_gap) / 2
+        contact_top_y = y + (h + contact_gap) / 2
 
-        # Contact circles
-        contact_bottom_y = arc_center_y - ar
         backend.add_circle((cx, contact_bottom_y), radius=cr)
-
-        contact_top_y = arc_center_y + ar
         backend.add_circle((cx, contact_top_y), radius=cr)
 
-        # Arc (RIGHT-facing semicircle: 270 -> 90)
-        backend.add_arc(
-            center=(cx, arc_center_y),
-            radius=ar - cr,
-            start_angle=270,
-            end_angle=90,
-        )
+        # Blade line — vertical line offset to the right (DXF: LWPOLYLINE)
+        # Represents the moving contact / break mechanism
+        backend.add_line((blade_x, contact_bottom_y), (blade_x, contact_top_y))
 
         # Connection lines (from contact outer edges to symbol bounds)
         backend.add_line((cx, contact_top_y + cr), (cx, y + h))
@@ -145,12 +154,17 @@ class RealACB(RealCircuitBreaker):
         backend.set_layer(self.layer)
         cx = x + self.width / 2
         mid_y = y + self.height / 2
-        ext = self._arc_r + self._crossbar_extend
+        ext = self._blade_offset + self._crossbar_extend
         backend.add_line((cx - ext, mid_y), (cx + ext, mid_y))
 
 
 class RealRCCB(BaseSymbol):
-    """Residual Current Circuit Breaker at real proportions."""
+    """
+    Residual Current Circuit Breaker at real proportions.
+
+    DXF reference: RCCB block — same as MCCB (2 circles + blade) plus
+    horizontal arm + vertical T-bar for RCD sensing element.
+    """
 
     name: str = "CB_RCCB"
     layer: str = "SLD_SYMBOLS"
@@ -159,11 +173,12 @@ class RealRCCB(BaseSymbol):
         dims = get_symbol_dimensions("RCCB")
         self.width = dims["width_mm"]
         self.height = dims["height_mm"]
-        self._arc_r = dims["arc_radius_mm"]
+        self._arc_r = dims["arc_radius_mm"]  # kept for spacing reference
+        self._blade_offset = dims.get("blade_offset_mm", dims["arc_radius_mm"] * 0.6)
         self._contact_r = dims["contact_radius_mm"]
         self._stub = dims["stub_mm"]
         self._rcd_offset = dims.get("rcd_bar_offset_mm", 2.5)
-        self._rcd_half = dims.get("rcd_bar_half_mm", 1.5)
+        self._rcd_half = dims.get("rcd_bar_half_mm", 1.37)
 
         cx = self.width / 2
         self.pins = {
@@ -171,7 +186,7 @@ class RealRCCB(BaseSymbol):
             "bottom": (cx, -self._stub),
         }
         self.anchors = {
-            "label_right": (cx + self._arc_r + self._rcd_offset + 2, self.height / 2 + 2),
+            "label_right": (cx + self._blade_offset + self._rcd_offset + 2, self.height / 2 + 2),
             "rating_below": (cx, -self._stub - 2),
             "label_above": (cx, self.height + self._stub + 2),
         }
@@ -179,35 +194,32 @@ class RealRCCB(BaseSymbol):
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         w, h = self.width, self.height
         cx = x + w / 2
-        ar = self._arc_r
         cr = self._contact_r
+        blade_x = cx + self._blade_offset
 
         backend.set_layer(self.layer)
 
-        arc_center_y = y + h / 2
+        mid_y = y + h / 2
 
-        # Contact circles
-        contact_bottom_y = arc_center_y - ar
+        # Contact circles — symmetrically spaced around center
+        contact_gap = h * 0.8
+        contact_bottom_y = y + (h - contact_gap) / 2
+        contact_top_y = y + (h + contact_gap) / 2
+
         backend.add_circle((cx, contact_bottom_y), radius=cr)
-        contact_top_y = arc_center_y + ar
         backend.add_circle((cx, contact_top_y), radius=cr)
 
-        # Arc
-        backend.add_arc(
-            center=(cx, arc_center_y),
-            radius=ar - cr,
-            start_angle=270,
-            end_angle=90,
-        )
+        # Blade line (DXF: LWPOLYLINE offset to the right)
+        backend.add_line((blade_x, contact_bottom_y), (blade_x, contact_top_y))
 
         # Connection lines
         backend.add_line((cx, contact_top_y + cr), (cx, y + h))
         backend.add_line((cx, y), (cx, contact_bottom_y - cr))
 
-        # RCD sensing element (horizontal line + vertical bar)
-        bar_x = cx + ar + self._rcd_offset
-        backend.add_line((cx + ar - cr, arc_center_y), (bar_x, arc_center_y))
-        backend.add_line((bar_x, arc_center_y - self._rcd_half), (bar_x, arc_center_y + self._rcd_half))
+        # RCD sensing element (DXF: horizontal LINE + vertical LINE forming T-bar)
+        bar_x = cx + self._blade_offset + self._rcd_offset
+        backend.add_line((blade_x, mid_y), (bar_x, mid_y))
+        backend.add_line((bar_x, mid_y - self._rcd_half), (bar_x, mid_y + self._rcd_half))
 
         # Stubs
         backend.set_layer("SLD_CONNECTIONS")

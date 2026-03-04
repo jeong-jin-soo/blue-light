@@ -27,6 +27,7 @@ Outputs PDF (for EMA submission) and SVG (for web preview).
 
 import logging
 import math
+from pathlib import Path
 
 from app.sld.backend import DrawingBackend
 from app.sld.dxf_backend import DxfBackend
@@ -66,6 +67,28 @@ from app.sld.symbols.transformers import CurrentTransformer, PotentialTransforme
 from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
 
 logger = logging.getLogger(__name__)
+
+# Reference DXF file for importing native CAD symbol blocks (MCCB, RCCB, DP ISOL).
+# All 26 DXF template files contain identical block definitions.
+_REFERENCE_DXF_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "sld-info" / "slds-dxf" / "100A TPN SLD 1 DWG.dxf"
+
+# DXF block bounding heights in drawing units (for scale computation).
+# Measured from the DXF MCCB/RCCB blocks: total height = top_circle_top - bottom_circle_bottom.
+_DXF_BLOCK_HEIGHTS = {
+    "MCCB": 597.82,   # (548.35 + 49.47) - (49.47 - 49.47)
+    "RCCB": 597.82,   # Same geometry as MCCB for the breaker portion
+    "DP ISOL": 430.63,  # From DXF block analysis
+}
+
+# Map symbol type names to DXF block names
+_SYMBOL_TO_DXF_BLOCK = {
+    "MCCB": "MCCB",
+    "CB_MCCB": "MCCB",
+    "RCCB": "RCCB",
+    "CB_RCCB": "RCCB",
+    "ELCB": "RCCB",  # ELCB uses RCCB block (same IEC symbol)
+    "CB_ELCB": "RCCB",
+}
 
 
 class SldGenerator:
@@ -221,6 +244,9 @@ class SldGenerator:
         if backend_type == "dxf":
             # DXF backend (primary CAD output) + ReportLab PDF (EMA submission) + SVG (preview)
             dxf = DxfBackend()
+            # Import native CAD symbol blocks from reference DXF template
+            if _REFERENCE_DXF_PATH.exists():
+                dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
             pdf = PdfBackend(pdf_output_path)
             svg = SvgBackend()
             backends = [dxf, pdf, svg]
@@ -314,6 +340,9 @@ class SldGenerator:
         dxf_bytes = None
         if backend_type == "dxf":
             dxf = DxfBackend()
+            # Import native CAD symbol blocks from reference DXF template
+            if _REFERENCE_DXF_PATH.exists():
+                dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
             backends = [dxf, pdf, svg]
         else:
             backends = [pdf, svg]
@@ -337,6 +366,11 @@ class SldGenerator:
             dxf_bytes = dxf.get_bytes()
 
         return pdf.get_bytes(), svg.get_svg_string(), dxf_bytes
+
+    @staticmethod
+    def _get_dxf_block_name(symbol_name: str) -> str | None:
+        """Map a symbol type name to its DXF block name, if one exists."""
+        return _SYMBOL_TO_DXF_BLOCK.get(symbol_name)
 
     def _get_symbol(self, symbol_name: str):
         """Get a symbol instance by its block/type name.
@@ -496,7 +530,20 @@ class SldGenerator:
                 # Symbol (breaker, meter, earth, isolator, CT, etc.)
                 symbol = self._get_symbol(comp.symbol_name)
                 if symbol:
-                    symbol.draw(backend, comp.x, comp.y)
+                    # For DXF backend: use native block INSERT when available
+                    # (MCCB/RCCB blocks imported from reference DXF template)
+                    dxf_block_used = False
+                    if isinstance(backend, DxfBackend):
+                        dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
+                        if dxf_block_name and backend.has_block(dxf_block_name):
+                            scale = symbol.height / _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82)
+                            backend.insert_block(
+                                dxf_block_name, comp.x, comp.y, scale=scale
+                            )
+                            dxf_block_used = True
+
+                    if not dxf_block_used:
+                        symbol.draw(backend, comp.x, comp.y)
 
                     backend.set_layer("SLD_ANNOTATIONS")
 

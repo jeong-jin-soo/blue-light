@@ -218,6 +218,75 @@ class DxfBackend:
             end_angle=360,
         )
 
+    # -- DXF block import (native CAD symbol quality) --
+
+    def import_symbol_blocks(self, reference_dxf_path: str) -> None:
+        """
+        Import symbol block definitions (MCCB, RCCB, DP ISOL) from a reference DXF file.
+
+        These blocks are identical across all 26 SLD template DXF files and represent
+        the authoritative IEC 60617 circuit breaker symbols used in real LEW SLDs.
+
+        Args:
+            reference_dxf_path: Path to a template DXF file (e.g., "100A TPN SLD 1 DWG.dxf")
+        """
+        try:
+            ref_doc = ezdxf.readfile(reference_dxf_path)
+        except Exception as e:
+            logger.warning(f"Failed to read reference DXF for block import: {e}")
+            return
+
+        target_blocks = ["MCCB", "RCCB", "DP ISOL"]
+        imported = []
+
+        for block_name in target_blocks:
+            if block_name in ref_doc.blocks and block_name not in self._doc.blocks:
+                try:
+                    # Copy block definition from reference to current document
+                    ref_block = ref_doc.blocks.get(block_name)
+                    new_block = self._doc.blocks.new(name=block_name)
+                    for entity in ref_block:
+                        new_block.add_entity(entity.copy())
+                    imported.append(block_name)
+                except Exception as e:
+                    logger.warning(f"Failed to import block '{block_name}': {e}")
+
+        if imported:
+            logger.info(f"Imported DXF symbol blocks: {imported}")
+
+    def has_block(self, block_name: str) -> bool:
+        """Check if a named block definition exists in this document."""
+        return block_name in self._doc.blocks
+
+    def insert_block(
+        self,
+        block_name: str,
+        x: float,
+        y: float,
+        *,
+        scale: float = 1.0,
+        rotation: float = 0.0,
+    ) -> None:
+        """
+        Insert a block reference at the given position.
+
+        Args:
+            block_name: Name of the block to insert (must exist via import_symbol_blocks).
+            x, y: Insertion point in mm.
+            scale: Uniform scale factor (xscale = yscale).
+            rotation: Rotation in degrees CCW.
+        """
+        self._msp.add_blockref(
+            block_name,
+            insert=(x, y),
+            dxfattribs={
+                "layer": self._current_layer,
+                "xscale": scale,
+                "yscale": scale,
+                "rotation": rotation,
+            },
+        )
+
     # -- Output --
 
     def save(self, path: str) -> None:
