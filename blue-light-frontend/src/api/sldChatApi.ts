@@ -1,5 +1,5 @@
 import axiosClient from './axiosClient';
-import type { SldChatMessage, SldRequest, SldSseEvent } from '../types';
+import type { SldChatMessage, SldProgressStage, SldRequest, SldSseEvent } from '../types';
 
 /**
  * SLD AI 채팅 SSE 콜백 인터페이스
@@ -12,6 +12,7 @@ export interface SldStreamCallbacks {
   onFileGenerated: (fileId: string) => void;
   onDone: (fullMessage: string) => void;
   onError: (error: string) => void;
+  onProgress?: (stage: SldProgressStage, message: string, elapsed: number) => void;
 }
 
 /**
@@ -65,8 +66,9 @@ export const sendSldChatStream = async (
   let buffer = '';
   let receivedDone = false;
 
-  // 타임아웃: 120초 동안 데이터 수신이 없으면 연결 해제
-  const STREAM_TIMEOUT_MS = 120_000;
+  // 타임아웃: 300초(5분) 동안 데이터 수신이 없으면 연결 해제
+  // 하트비트(15초 간격)가 정상이면 리셋되므로 실질적 영향 없음
+  const STREAM_TIMEOUT_MS = 300_000;
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   const resetTimeout = () => {
@@ -147,6 +149,11 @@ export const sendSldChatStream = async (
             case 'status':
               // AI retry status — show as token so user sees progress
               if (parsed.content) callbacks.onToken(parsed.content + '\n');
+              break;
+            case 'progress':
+              if (parsed.stage && parsed.message) {
+                callbacks.onProgress?.(parsed.stage, parsed.message, parsed.elapsed ?? 0);
+              }
               break;
             case 'heartbeat':
             case 'session':

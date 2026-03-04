@@ -747,7 +747,25 @@ export type SldSseEventType =
   | 'model_switch'
   | 'heartbeat'
   | 'session'
-  | 'template_matched';
+  | 'template_matched'
+  | 'progress';
+
+/**
+ * Progress 단계 (AI 요청 생명주기)
+ */
+export type SldProgressStage =
+  | 'initializing'
+  | 'analyzing'
+  | 'gathering'
+  | 'matching'
+  | 'extracting'
+  | 'validating'
+  | 'generating'
+  | 'previewing'
+  | 'responding'
+  | 'retrying'
+  | 'completed'
+  | 'error';
 
 export interface SldSseEvent {
   type: SldSseEventType;
@@ -759,6 +777,10 @@ export interface SldSseEvent {
   fileId?: string;
   from_model?: string;
   to_model?: string;
+  // progress 이벤트 필드
+  stage?: SldProgressStage;
+  message?: string;
+  elapsed?: number;
 }
 
 // ============================================

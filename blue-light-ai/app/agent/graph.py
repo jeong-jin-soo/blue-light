@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import os
+import time
 from typing import AsyncGenerator
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -211,6 +212,66 @@ async def get_agent():
     return _compiled_agent
 
 
+# ── Progress Tracking ──────────────────────────────
+
+# 도구 이름 → 진행 단계 매핑
+_TOOL_TO_STAGE: dict[str, str] = {
+    "get_application_details": "gathering",
+    "get_standard_specs": "gathering",
+    "find_matching_templates": "matching",
+    "extract_sld_data": "extracting",
+    "validate_sld_requirements": "validating",
+    "generate_sld": "generating",
+    "generate_preview": "previewing",
+}
+
+# 각 단계의 사용자 표시 메시지
+_STAGE_MESSAGES: dict[str, str] = {
+    "initializing": "Initializing AI agent...",
+    "analyzing": "Analyzing your request...",
+    "gathering": "Fetching application details...",
+    "matching": "Searching for matching templates...",
+    "extracting": "Extracting SLD specifications...",
+    "validating": "Validating against SS 638 standards...",
+    "generating": "Generating SLD drawing...",
+    "previewing": "Creating preview...",
+    "responding": "Composing response...",
+    "retrying": "Retrying with alternative model...",
+    "completed": "Complete",
+    "error": "Error occurred",
+}
+
+
+class ProgressTracker:
+    """요청 생명주기 전체를 추적하며 단계 변경 시 progress 이벤트를 생성한다."""
+
+    def __init__(self, thread_id: str, application_seq: int):
+        self.thread_id = thread_id
+        self.app_seq = application_seq
+        self.stage = ""
+        self.start_time = time.time()
+
+    def update(self, new_stage: str) -> dict | None:
+        """단계가 변경되면 progress 이벤트 dict를 반환, 동일 단계면 None."""
+        if new_stage == self.stage:
+            return None
+        self.stage = new_stage
+        event = {
+            "type": "progress",
+            "stage": new_stage,
+            "message": _STAGE_MESSAGES.get(new_stage, new_stage),
+            "elapsed": round(time.time() - self.start_time, 1),
+        }
+        logger.info(f"Progress: stage={new_stage}, elapsed={event['elapsed']}s")
+        return event
+
+    def ensure_final(self, is_error: bool = False) -> dict | None:
+        """완료/에러 이벤트가 아직 전송되지 않았으면 강제 전송."""
+        if self.stage not in ("completed", "error"):
+            return self.update("error" if is_error else "completed")
+        return None
+
+
 # ── Message Processing ──────────────────────────────
 
 
@@ -232,6 +293,7 @@ async def process_message(
         api_key: Gemini API key from Spring Boot (DB-managed).
     """
     agent = await get_agent()
+    tracker = ProgressTracker(thread_id, application_seq)
 
     config = {"configurable": {"thread_id": thread_id}}
 
@@ -246,6 +308,9 @@ async def process_message(
         "system_prompt": system_prompt,
         "api_key": api_key,
     }
+
+    # 시작 알림
+    yield tracker.update("initializing")
 
     # Retry logic: on 503/429 from primary model, fall back to gemini-2.5-flash
     max_retries = 3
@@ -263,9 +328,19 @@ async def process_message(
                 version="v2",
             ):
                 kind = event.get("event")
+                node = event.get("metadata", {}).get("langgraph_node", "")
 
-                # Stream LLM tokens
-                if kind == "on_chat_model_stream":
+                # ── 노드 진입: agent 노드 = LLM 분석/응답 생성 중
+                if kind == "on_chain_start" and node == "agent":
+                    progress = tracker.update("analyzing")
+                    if progress:
+                        yield progress
+
+                # ── LLM 토큰 스트리밍 → "responding" 단계
+                elif kind == "on_chat_model_stream":
+                    progress = tracker.update("responding")
+                    if progress:
+                        yield progress
                     chunk = event.get("data", {}).get("chunk")
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         content = chunk.content
@@ -279,9 +354,14 @@ async def process_message(
                         if content:
                             yield {"type": "token", "content": content}
 
-                # Tool call started
+                # ── 도구 시작 → 해당 도구의 단계로 변경
                 elif kind == "on_tool_start":
                     tool_name = event.get("name", "unknown")
+                    stage = _TOOL_TO_STAGE.get(tool_name)
+                    if stage:
+                        progress = tracker.update(stage)
+                        if progress:
+                            yield progress
                     logger.info(f"Tool started: {tool_name}")
                     yield {
                         "type": "tool_start",
@@ -289,7 +369,7 @@ async def process_message(
                         "description": _tool_description(tool_name),
                     }
 
-                # Tool call completed
+                # ── 도구 완료
                 elif kind == "on_tool_end":
                     tool_name = event.get("name", "unknown")
                     raw_output = event.get("data", {}).get("output", "")
@@ -308,8 +388,6 @@ async def process_message(
                             tmpl_result = json.loads(output)
                             img_path = tmpl_result.get("reference_image_path")
                             if img_path and os.path.exists(img_path):
-                                # Store in state via a separate SSE event
-                                # The actual state update happens via the ToolNode mechanism
                                 yield {
                                     "type": "template_matched",
                                     "filename": tmpl_result.get("best_template_filename", ""),
@@ -325,7 +403,6 @@ async def process_message(
                             if result.get("success"):
                                 file_id = result.get("file_id", "")
 
-                                # Reconstruct SVG path from file_id (tool no longer returns SVG content to keep LLM context clean)
                                 svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg") if file_id else ""
 
                                 if svg_path:
@@ -340,7 +417,6 @@ async def process_message(
                                     except FileNotFoundError:
                                         logger.warning(f"SVG file not found: {svg_path}")
 
-                                # Send file generated notification (only for generate_sld)
                                 if tool_name == "generate_sld":
                                     yield {
                                         "type": "file_generated",
@@ -357,12 +433,15 @@ async def process_message(
                     }
 
         except Exception as e:
-            # Check if this is a retryable error (Gemini 503, rate limit, etc.)
             error_str = str(e)
             is_retryable = any(code in error_str for code in ["503", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "overloaded"])
 
             if is_retryable and attempt < max_retries:
-                # 503/429 → 폴백 모델로 전환하여 재시도
+                # 재시도 단계 알림
+                progress = tracker.update("retrying")
+                if progress:
+                    yield progress
+
                 if "fallback_model" not in input_state and fallback_model:
                     input_state["fallback_model"] = fallback_model
                     logger.warning(f"Switching to fallback model '{fallback_model}' after {error_str[:80]}")
@@ -378,16 +457,22 @@ async def process_message(
                 await asyncio.sleep(retry_delay)
                 had_error = True
             else:
+                # 최종 에러 단계 알림
+                yield tracker.update("error")
                 if is_retryable:
                     logger.error(f"Agent processing error after {max_retries} retries (last model={current_model}): {e}")
                     yield {"type": "error", "content": "AI service is temporarily unavailable due to high demand. Please try again in a few minutes."}
                 else:
                     logger.error(f"Agent processing error: {e}", exc_info=True)
                     yield {"type": "error", "content": f"Processing error: {e}"}
-                return  # Exit the generator
+                return
 
         if not had_error:
-            return  # Success — exit the retry loop
+            # 정상 완료 알림
+            final = tracker.ensure_final()
+            if final:
+                yield final
+            return
 
 
 def _tool_description(tool_name: str) -> str:

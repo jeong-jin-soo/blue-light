@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SldChatMessage } from '../types';
+import type { SldChatMessage, SldProgressStage } from '../types';
 import { sendSldChatStream, getSldChatHistory, resetSldChat } from '../api/sldChatApi';
 
 interface SldChatState {
@@ -11,6 +11,9 @@ interface SldChatState {
   activeToolName: string | null;
   activeToolDescription: string | null;
   isToolCompleted: boolean;
+  // Progress tracking (AI 요청 생명주기)
+  progressStage: SldProgressStage | null;
+  progressMessage: string | null;
 
   // Actions
   sendMessage: (applicationId: number, content: string) => Promise<void>;
@@ -31,6 +34,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
   activeToolName: null,
   activeToolDescription: null,
   isToolCompleted: false,
+  progressStage: null,
+  progressMessage: null,
 
   sendMessage: async (applicationId: number, content: string) => {
     // 사용자 메시지 즉시 표시
@@ -118,6 +123,10 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
           set({ generatedFileId: fileId });
         },
 
+        onProgress: (stage, message) => {
+          set({ progressStage: stage, progressMessage: message });
+        },
+
         onDone: (_fullMessage) => {
           set({
             isStreaming: false,
@@ -125,23 +134,35 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
             activeToolName: null,
             activeToolDescription: null,
             isToolCompleted: false,
+            progressStage: null,
+            progressMessage: null,
           });
         },
 
         onError: (errorText) => {
           set((s) => {
-            const hasStreamingMsg = s.messages.some(
+            const streamingMsgIdx = s.messages.findIndex(
               (m) => m.sldChatMessageSeq === assistantMsgSeq,
             );
-            if (hasStreamingMsg) {
+            if (streamingMsgIdx >= 0) {
+              // 스트리밍 중 에러: 기존 메시지에 에러 텍스트 추가
+              const updated = [...s.messages];
+              updated[streamingMsgIdx] = {
+                ...updated[streamingMsgIdx],
+                content: updated[streamingMsgIdx].content + `\n\n⚠️ ${errorText}`,
+              };
               return {
+                messages: updated,
                 isLoading: false,
                 isStreaming: false,
                 activeToolName: null,
                 activeToolDescription: null,
                 isToolCompleted: false,
+                progressStage: 'error',
+                progressMessage: null,
               };
             }
+            // 스트리밍 전 에러: 에러 메시지 버블 생성
             return {
               messages: [
                 ...s.messages,
@@ -149,7 +170,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
                   sldChatMessageSeq: assistantMsgSeq,
                   applicationSeq: applicationId,
                   role: 'assistant' as const,
-                  content: errorText,
+                  content: `⚠️ ${errorText}`,
                   createdAt: new Date().toISOString(),
                 },
               ],
@@ -158,6 +179,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
               activeToolName: null,
               activeToolDescription: null,
               isToolCompleted: false,
+              progressStage: 'error',
+              progressMessage: null,
             };
           });
         },
@@ -170,7 +193,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
             sldChatMessageSeq: --messageSeq,
             applicationSeq: applicationId,
             role: 'assistant' as const,
-            content: 'Sorry, the AI service is currently unavailable. Please try again later.',
+            content: '⚠️ Sorry, the AI service is currently unavailable. Please try again later.',
             createdAt: new Date().toISOString(),
           },
         ],
@@ -179,6 +202,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
         activeToolName: null,
         activeToolDescription: null,
         isToolCompleted: false,
+        progressStage: 'error',
+        progressMessage: null,
       }));
     }
   },
@@ -204,6 +229,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
         activeToolName: null,
         activeToolDescription: null,
         isToolCompleted: false,
+        progressStage: null,
+        progressMessage: null,
       });
     } catch {
       // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
@@ -221,6 +248,8 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
       activeToolName: null,
       activeToolDescription: null,
       isToolCompleted: false,
+      progressStage: null,
+      progressMessage: null,
     }),
 
   setSvgPreview: (svg: string | null) => set({ svgPreview: svg }),

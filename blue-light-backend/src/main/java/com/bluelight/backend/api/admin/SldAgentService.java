@@ -31,6 +31,8 @@ import reactor.core.Disposable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * SLD AI Agent 서비스
@@ -111,6 +113,8 @@ public class SldAgentService {
         }
 
         StringBuilder fullResponse = new StringBuilder();
+        AtomicReference<Disposable> subscriptionRef = new AtomicReference<>();
+        AtomicBoolean clientDisconnected = new AtomicBoolean(false);
 
         Disposable subscription = sldAgentWebClient
                 .post()
@@ -120,6 +124,9 @@ public class SldAgentService {
                 .bodyToFlux(String.class)
                 .subscribe(
                         chunk -> {
+                            // 클라이언트 연결 끊김 시 처리 중단
+                            if (clientDisconnected.get()) return;
+
                             // Python SSE 청크를 프런트엔드로 재전송
                             try {
                                 Map<String, Object> parsed = objectMapper.readValue(
@@ -128,7 +135,9 @@ public class SldAgentService {
 
                                 // Heartbeat — 프런트엔드 SSE 타임아웃 방지를 위해 전달
                                 if ("heartbeat".equals(type)) {
-                                    sendSseEvent(emitter, "heartbeat", parsed);
+                                    if (!sendSseEvent(emitter, "heartbeat", parsed)) {
+                                        handleClientDisconnect(subscriptionRef, clientDisconnected, applicationSeq);
+                                    }
                                     return;
                                 }
 
@@ -149,7 +158,9 @@ public class SldAgentService {
                                     }
                                 }
 
-                                sendSseEvent(emitter, type != null ? type : "message", parsed);
+                                if (!sendSseEvent(emitter, type != null ? type : "message", parsed)) {
+                                    handleClientDisconnect(subscriptionRef, clientDisconnected, applicationSeq);
+                                }
                             } catch (Exception e) {
                                 // JSON 파싱 실패 시 원본 텍스트 전달
                                 sendSseEvent(emitter, "message", Map.of("type", "message", "content", chunk));
@@ -162,11 +173,7 @@ public class SldAgentService {
                                 log.error("Response body: {}", wce.getResponseBodyAsString());
                             }
                             sendSseEvent(emitter, "error", Map.of("type", "error", "content", errorMsg));
-                            try {
-                                emitter.complete();
-                            } catch (Exception e) {
-                                log.debug("SSE emitter already completed (error handler): {}", e.getMessage());
-                            }
+                            completeEmitter(emitter);
                         },
                         () -> {
                             // AI 응답 DB 저장 (별도 트랜잭션, 실패해도 SSE 종료에 영향 없음)
@@ -179,19 +186,30 @@ public class SldAgentService {
                                 log.warn("Failed to save AI response: applicationSeq={}, error={}",
                                         applicationSeq, e.getMessage());
                             }
-                            // SSE emitter 종료 (이미 닫힌 연결이면 무시)
-                            try {
-                                emitter.complete();
-                            } catch (Exception e) {
-                                log.debug("SSE emitter already completed: {}", e.getMessage());
-                            }
+                            completeEmitter(emitter);
                         }
                 );
 
+        subscriptionRef.set(subscription);
+
         // 클라이언트 연결 해제 시 구독 정리
-        emitter.onCompletion(subscription::dispose);
-        emitter.onTimeout(subscription::dispose);
-        emitter.onError(t -> subscription.dispose());
+        emitter.onCompletion(() -> {
+            clientDisconnected.set(true);
+            subscription.dispose();
+        });
+        emitter.onTimeout(() -> {
+            log.warn("SSE emitter timed out: applicationSeq={}", applicationSeq);
+            sendSseEvent(emitter, "error", Map.of(
+                    "type", "error",
+                    "content", "Connection timed out. The AI processing took too long. Please try again."));
+            clientDisconnected.set(true);
+            subscription.dispose();
+        });
+        emitter.onError(t -> {
+            log.warn("SSE emitter error: applicationSeq={}, error={}", applicationSeq, t.getMessage());
+            clientDisconnected.set(true);
+            subscription.dispose();
+        });
     }
 
     /**
@@ -433,13 +451,45 @@ public class SldAgentService {
         }
     }
 
-    private void sendSseEvent(SseEmitter emitter, String eventName, Map<String, Object> data) {
+    /**
+     * SSE 이벤트 전송. 성공 시 true, 실패(클라이언트 연결 끊김 등) 시 false 반환.
+     */
+    private boolean sendSseEvent(SseEmitter emitter, String eventName, Map<String, Object> data) {
         try {
             emitter.send(SseEmitter.event()
                     .name(eventName)
                     .data(objectMapper.writeValueAsString(data)));
+            return true;
         } catch (Exception e) {
-            log.debug("Failed to send SSE event: {}", e.getMessage());
+            log.debug("Failed to send SSE event ({}): {}", eventName, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 클라이언트 연결 끊김 처리 — 구독 취소하여 Python 에이전트 리소스 해제.
+     */
+    private void handleClientDisconnect(
+            AtomicReference<Disposable> subscriptionRef,
+            AtomicBoolean clientDisconnected,
+            Long applicationSeq) {
+        if (clientDisconnected.compareAndSet(false, true)) {
+            log.info("Client disconnected, cancelling Python agent subscription: applicationSeq={}", applicationSeq);
+            Disposable sub = subscriptionRef.get();
+            if (sub != null && !sub.isDisposed()) {
+                sub.dispose();
+            }
+        }
+    }
+
+    /**
+     * SseEmitter 안전 종료 (이미 닫힌 연결이면 무시).
+     */
+    private void completeEmitter(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (Exception e) {
+            log.debug("SSE emitter already completed: {}", e.getMessage());
         }
     }
 }
