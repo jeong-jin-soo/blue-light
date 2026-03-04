@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     service_key: str = "dev-service-key"
 
     # Storage
-    sqlite_db_path: str = "./data/checkpoints.db"
+    sqlite_db_path: str = "./data/db/checkpoints.db"
     temp_file_dir: str = "./temp"
 
     # MySQL (SLD 템플릿 DB)

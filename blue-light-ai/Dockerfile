@@ -14,7 +14,7 @@ COPY app/ ./app/
 COPY data/ ./data/
 
 # Create temp directory for generated files
-RUN mkdir -p /app/temp /app/data
+RUN mkdir -p /app/temp /app/data/db
 
 EXPOSE 8100
 
