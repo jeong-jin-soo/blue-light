@@ -748,6 +748,7 @@ export interface SldSseEvent {
   type: SldSseEventType;
   content?: string;
   tool?: string;
+  description?: string;
   summary?: string;
   svg?: string;
   fileId?: string;
