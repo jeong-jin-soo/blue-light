@@ -22,6 +22,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -113,13 +115,17 @@ public class SldOrderAgentService {
                 .uri("/api/chat/stream")
                 .bodyValue(requestBody)
                 .retrieve()
-                .bodyToFlux(String.class)
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {})
                 .subscribe(
-                        chunk -> {
+                        sseEvent -> {
+                            // ServerSentEvent에서 data 필드 추출
+                            String data = sseEvent.data();
+                            if (data == null || data.isBlank()) return;
+
                             // Python SSE 청크를 프런트엔드로 재전송
                             try {
                                 Map<String, Object> parsed = objectMapper.readValue(
-                                        chunk, new TypeReference<Map<String, Object>>() {});
+                                        data, new TypeReference<Map<String, Object>>() {});
                                 String type = (String) parsed.get("type");
 
                                 // Heartbeat — 프런트엔드 SSE 타임아웃 방지를 위해 전달
@@ -148,7 +154,7 @@ public class SldOrderAgentService {
                                 sendSseEvent(emitter, type != null ? type : "message", parsed);
                             } catch (Exception e) {
                                 // JSON 파싱 실패 시 원본 텍스트 전달
-                                sendSseEvent(emitter, "message", Map.of("type", "message", "content", chunk));
+                                sendSseEvent(emitter, "message", Map.of("type", "message", "content", data));
                             }
                         },
                         error -> {
