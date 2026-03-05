@@ -361,12 +361,12 @@ class SldGenerator:
                 sig = f"{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
                 breaker_spec_groups.setdefault(sig, []).append(idx)
 
-        # For groups with 5+ identical specs, only the FIRST (leftmost) gets full label
-        # Rest get a "ditto" arrow pointing left toward the first
-        # Real LEW SLDs show full labels on most circuits — only use ditto for very large groups
+        # For groups with 2+ identical specs, only the FIRST (leftmost) gets full label
+        # Rest are omitted (blank — no arrow, no label)
+        # Singapore LEW convention: "Only state B10A MCB 10KA one time"
         ditto_breaker_indices: set[int] = set()
         for sig, indices in breaker_spec_groups.items():
-            if len(indices) >= 5:
+            if len(indices) >= 2:
                 # Sort by x position (leftmost first)
                 sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
                 # All except the first are ditto
@@ -380,11 +380,11 @@ class SldGenerator:
             if comp.label_style == "breaker_block" and comp.cable_annotation:
                 cable_groups.setdefault(comp.cable_annotation, []).append(idx)
 
-        # For groups with 5+ identical cables, only the FIRST gets cable text
-        # Real LEW SLDs show cable specs on each circuit
+        # For groups with 2+ identical cables, only the FIRST gets cable text
+        # Singapore LEW convention: cable spec written once for identical circuits
         ditto_cable_indices: set[int] = set()
         for cable_text, indices in cable_groups.items():
-            if len(indices) >= 5:
+            if len(indices) >= 2:
                 sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
                 for i in sorted_indices[1:]:
                     ditto_cable_indices.add(i)
@@ -598,15 +598,8 @@ class SldGenerator:
             line_gap = 4.0  # Column spacing between breaker spec items
 
             if is_ditto:
-                # Ditto: draw "←" arrow pointing left (toward the first with full label)
-                arrow_x = base_x + 2
-                arrow_y = comp.y + 2
-                backend.add_mtext(
-                    "←",
-                    insert=(arrow_x, arrow_y),
-                    char_height=3.0,
-                    rotation=90.0,
-                )
+                # Ditto: skip label entirely (Singapore convention — spec stated once)
+                pass
             else:
                 # Full label: draw each info line as a separate column
                 for idx, line_text in enumerate(info_items):
@@ -618,11 +611,25 @@ class SldGenerator:
                     )
 
             # Cable annotation to the LEFT of conductor (vertical)
-            # Real LEW SLDs show cable specs on each sub-circuit
+            # Positioned on the TAIL section (above breaker, outside DB box)
+            # Singapore convention: cable text runs vertically alongside the outgoing wire
             if comp.cable_annotation and not is_cable_ditto:
+                # Calculate tail start position (above breaker symbol + stub)
+                if comp.breaker_type_str in ("RCCB", "ELCB"):
+                    _sym_h = 15.0
+                elif comp.breaker_type_str in ("MCCB",):
+                    _sym_h = 15.0
+                elif comp.breaker_type_str in ("ACB",):
+                    _sym_h = 17.0
+                else:  # MCB
+                    _sym_h = 13.0
+                # Place cable text above the DB box boundary:
+                # breaker top = comp.y + sym_h + stub(3)
+                # DB box top ≈ comp.y + 24 (for MCB: busbar+12=comp.y, box extends +36-12=+24)
+                cable_text_y = comp.y + _sym_h + 3.0 + 10.0  # tail start + 10mm offset
                 backend.add_mtext(
                     comp.cable_annotation,
-                    insert=(comp.x - 6, comp.y),
+                    insert=(comp.x - 6, cable_text_y),
                     char_height=2.0,
                     rotation=90.0,
                 )
@@ -638,11 +645,8 @@ class SldGenerator:
                 line_gap = char_h + 0.8  # ~2.6mm per line
 
                 if is_ditto:
-                    backend.add_mtext(
-                        "←",
-                        insert=(base_x, comp.y + 6),
-                        char_height=3.0,
-                    )
+                    # Ditto: skip label entirely (Singapore convention — spec stated once)
+                    pass
                 else:
                     for idx, line_text in enumerate(info_items):
                         backend.add_mtext(
@@ -1051,19 +1055,14 @@ def _draw_ac_supply_symbol(
     y: float,
 ) -> None:
     """
-    Draw AC supply symbol: a circle with "~" inside.
-    Per LEW guide convention for incoming AC supply indication.
+    Draw AC supply symbol: "~" wave sign on the incoming supply line.
+    Singapore LEW convention — simple wave sign without enclosing circle.
     """
-    backend.set_layer("SLD_SYMBOLS")
-    r = 4.0  # Circle radius
-    backend.add_circle((x, y), radius=r)
-
-    # "~" text inside the circle
     backend.set_layer("SLD_ANNOTATIONS")
     backend.add_mtext(
         "~",
         insert=(x - 2, y + 2),
-        char_height=4.0,
+        char_height=5.0,
     )
 
 

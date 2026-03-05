@@ -255,8 +255,10 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
         ])
         label_right = base_offset + num_info * 3.5  # 3.5mm column gap
 
-        # Left-side cable annotation (vertical text)
-        left_extent = 6.0 if comp.cable_annotation else 0.0
+        # Left-side cable annotation now drawn on the TAIL (above breaker, outside DB box)
+        # so it does not contribute to the breaker-level bounding box width.
+        # Keep a small margin for the conductor line itself.
+        left_extent = 2.0
 
         # Height: breaker + stub + tail + name label (vertical)
         total_h = sym_h + 5 + 10 + 10  # breaker + stub + tail + name label
@@ -805,6 +807,13 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         label=supply_label,
     ))
 
+    # AC supply symbol "~" (wave sign at bottom — Singapore LEW convention)
+    result.components.append(PlacedComponent(
+        symbol_name="FLOW_ARROW_UP",
+        x=cx,
+        y=y - 3,  # Slightly below the phase line start
+    ))
+
     # Phase lines with labels (at bottom, pointing upward) — compact layout
     ph_half = 3  # Phase line half-height (was 5, reduced 40%)
     if supply_type == "three_phase":
@@ -822,17 +831,9 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
     else:
         # Single-phase: single bold vertical line (no L/N labels)
-        # AC symbol "~" above already indicates AC supply
         result.connections.append(((cx, y - ph_half), (cx, y + ph_half)))
         result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
     y += ph_half + 4  # Reduced from y += 10
-
-    # AC supply symbol "~" (per LEW guide — circle with ~ inside)
-    result.components.append(PlacedComponent(
-        symbol_name="FLOW_ARROW_UP",
-        x=cx,
-        y=y,
-    ))
 
     # Incoming cable annotation
     incoming_cable = requirements.get("incoming_cable", "")
@@ -1035,9 +1036,9 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         label=main_label,
         rating=main_rating,
     ))
-    y += cb_h + config.stub_len + 2  # stub + gap(2)
-    result.connections.append(((cx, y), (cx, y + 2)))
-    y += 2
+    y += cb_h + config.stub_len + 4  # stub + gap(4) — extra space to avoid label overlap with RCCB
+    result.connections.append(((cx, y), (cx, y + 3)))
+    y += 3
     result.symbols_used.add(breaker_type)
 
     # -- 4a. ELCB/RCCB (inline between Main Breaker and Busbar per LEW guide) --
@@ -1060,9 +1061,9 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
             label=f"{elcb_rating}A {elcb_poles_str} {elcb_type_str}",
             rating=f"({elcb_ma}mA)",
         ))
-        y += elcb_h + config.stub_len + 2  # stub + gap(2)
-        result.connections.append(((cx, y), (cx, y + 2)))
-        y += 2
+        y += elcb_h + config.stub_len + 4  # stub + gap(4) — extra space for label clearance
+        result.connections.append(((cx, y), (cx, y + 3)))
+        y += 3
         result.symbols_used.add(elcb_type_str)
 
     # -- 5. Main Busbar --
