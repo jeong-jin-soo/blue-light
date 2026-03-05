@@ -130,6 +130,46 @@ class RealCircuitBreaker(BaseSymbol):
         backend.add_line((cx, y + h), (cx, y + h + self._stub))
         backend.add_line((cx, y), (cx, y - self._stub))
 
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw circuit breaker rotated 90 degrees — connection points at LEFT and RIGHT.
+
+        For horizontal meter board layout. The arc opens upward instead of rightward.
+        Left pin at (x - stub, cy), Right pin at (x + h_extent + stub, cy).
+        """
+        h_extent = self.height  # horizontal span (was vertical height)
+        cy = y  # vertical center
+        ar = self._arc_r
+        cr = self._contact_r
+
+        backend.set_layer(self.layer)
+
+        arc_center_x = x + h_extent / 2
+
+        # Contact circles (left and right of arc center)
+        contact_left_x = arc_center_x - ar
+        backend.add_circle((contact_left_x, cy), radius=cr)
+
+        contact_right_x = arc_center_x + ar
+        backend.add_circle((contact_right_x, cy), radius=cr)
+
+        # Arc — rotated 90 degrees (subtract 90 from original angles)
+        # Original: right-facing arc. Rotated: upward-facing arc
+        backend.add_arc(
+            center=(arc_center_x, cy),
+            radius=ar,
+            start_angle=self._arc_start + 90,
+            end_angle=self._arc_end + 90,
+        )
+
+        # Connection lines (from contact outer edges to symbol horizontal bounds)
+        backend.add_line((contact_right_x + cr, cy), (x + h_extent, cy))
+        backend.add_line((x, cy), (contact_left_x - cr, cy))
+
+        # Connection stubs (horizontal)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
+        backend.add_line((x, cy), (x - self._stub, cy))
+
 
 class RealMCB(RealCircuitBreaker):
     """Miniature Circuit Breaker (≤100A) at real proportions."""
@@ -307,6 +347,38 @@ class RealKwhMeter(BaseSymbol):
         backend.add_line((cx, cy + rh / 2), (cx, cy + rh / 2 + self._stub))
         backend.add_line((cx, cy - rh / 2), (cx, cy - rh / 2 - self._stub))
 
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw KWH meter rotated 90 degrees — connection points at LEFT and RIGHT.
+
+        For horizontal meter board layout. The rectangle is drawn as a HORIZONTAL box:
+        wider than tall, matching reference LEW drawings.
+        """
+        # Horizontal orientation: wide rectangle (landscape)
+        # rect_w (12.0) becomes horizontal width, rect_h (6.0) becomes vertical height
+        hrw = self._rect_w  # horizontal rect width (wide dimension)
+        hrh = self._rect_h  # horizontal rect height (narrow dimension)
+        cx = x  # horizontal center
+        cy = y  # vertical center
+
+        backend.set_layer(self.layer)
+        # Draw rectangle (rotated 90 degrees)
+        backend.add_lwpolyline([
+            (cx - hrw / 2, cy - hrh / 2),
+            (cx + hrw / 2, cy - hrh / 2),
+            (cx + hrw / 2, cy + hrh / 2),
+            (cx - hrw / 2, cy + hrh / 2),
+        ], close=True)
+
+        # "KWH" label inside (uppercase, matching real samples)
+        backend.set_layer("SLD_ANNOTATIONS")
+        label_size = min(hrw * 0.35, 3.5)  # Scale text to fit box
+        backend.add_mtext("KWH", insert=(cx - hrw * 0.35, cy + label_size * 0.5), char_height=label_size)
+
+        # Connection lines (horizontal: left and right)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx + hrw / 2, cy), (cx + hrw / 2 + self._stub, cy))  # right
+        backend.add_line((cx - hrw / 2, cy), (cx - hrw / 2 - self._stub, cy))  # left
+
 
 class RealCT(BaseSymbol):
     """Current Transformer at real proportions (two concentric circles)."""
@@ -392,6 +464,36 @@ class RealIsolator(BaseSymbol):
         backend.set_layer("SLD_CONNECTIONS")
         backend.add_line((cx, y + h), (cx, y + h + self._stub))
         backend.add_line((cx, y), (cx, y - self._stub))
+
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw isolator rotated 90 degrees — connection points at LEFT and RIGHT.
+
+        For horizontal meter board layout. The symbol is drawn with:
+        - Left pin at (x - stub, cy)
+        - Right pin at (x + h_extent + stub, cy)
+        where h_extent is the original height used as the horizontal span.
+        """
+        # In horizontal mode: original height becomes horizontal span, original width becomes vertical span
+        h_extent = self.height  # horizontal span (was vertical height)
+        cy = y  # vertical center line
+
+        backend.set_layer(self.layer)
+
+        # Left fixed contact (circle) — was bottom
+        backend.add_circle((x + 1, cy), radius=self._contact_r)
+
+        # Moving blade (angled line from left contact rightward and upward)
+        blade_tip_x = x + h_extent - 1
+        blade_tip_y = cy + self._blade * 0.3
+        backend.add_line((x + 1 + self._contact_r, cy), (blade_tip_x, blade_tip_y))
+
+        # Right fixed contact (short vertical line = open gap indicator) — was top
+        backend.add_line((x + h_extent - 1, cy - 0.5), (x + h_extent - 1, cy + 0.5))
+
+        # Stubs (horizontal)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))  # right stub
+        backend.add_line((x, cy), (x - self._stub, cy))  # left stub
 
 
 class RealEarth(BaseSymbol):
