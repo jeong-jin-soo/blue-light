@@ -160,13 +160,17 @@ def _capture_git_info() -> dict:
 
     로컬 개발 시 --reload 없이 실행하면 코드가 변경되어도 프로세스에
     반영되지 않는 문제를 진단하기 위한 엔드포인트용 정보.
+
+    Docker 컨테이너에서는 .git이 없으므로 빌드 시 주입된
+    GIT_COMMIT / GIT_BRANCH 환경변수를 fallback으로 사용.
     """
     info = {
-        "commit": "unknown",
-        "branch": "unknown",
+        "commit": os.environ.get("GIT_COMMIT", "unknown"),
+        "branch": os.environ.get("GIT_BRANCH", "unknown"),
         "dirty": False,
         "started_at": datetime.now(timezone.utc).isoformat(),
     }
+    # 로컬 환경(.git 존재)이면 실시간 git 정보로 덮어쓰기
     try:
         info["commit"] = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],

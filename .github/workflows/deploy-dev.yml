@@ -119,6 +119,8 @@ jobs:
         run: |
           docker build -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }} \
                         -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:latest \
+                        --build-arg GIT_COMMIT=$(echo ${{ github.sha }} | cut -c1-7) \
+                        --build-arg GIT_BRANCH=${{ github.ref_name }} \
                         ./blue-light-ai
           docker push ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }}
           docker push ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:latest

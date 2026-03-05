@@ -16,6 +16,12 @@ COPY data/ ./data/
 # Create temp directory for generated files
 RUN mkdir -p /app/temp /app/data/db
 
+# Git version info (injected at build time)
+ARG GIT_COMMIT=unknown
+ARG GIT_BRANCH=unknown
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+
 EXPOSE 8100
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8100"]
