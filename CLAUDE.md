@@ -18,7 +18,18 @@ docker compose up -d && ./gradlew bootRun
 # Frontend (port 5174)
 cd blue-light-frontend
 npm install && npm run dev
+
+# AI Service (port 8100) — 반드시 --reload 사용!
+cd blue-light-ai
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
+
+### AI Service 개발 주의사항
+- **`--reload` 필수**: `--reload` 없이 실행하면 소스 변경이 실행 중인 프로세스에 반영되지 않음
+  - `--reload` 미사용 시 디스크의 소스와 메모리의 코드가 달라져 디버깅이 극히 어려움
+- **버전 확인**: `GET /api/version` 엔드포인트로 실행 중인 코드의 git commit, branch, dirty 상태 확인 가능
+  - `curl http://localhost:8100/api/version`
+- **개발서버**: `43.210.92.190:8100` (Docker 컨테이너 `bluelight-sld-agent`)
 
 ## Key Conventions
 - 한국어 커밋 메시지 사용

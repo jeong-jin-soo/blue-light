@@ -10,9 +10,11 @@ import glob as glob_module
 import json
 import logging
 import os
+import subprocess
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -151,12 +153,65 @@ app.add_middleware(
 )
 
 
+# ── Version Info (프로세스 시작 시점의 Git 상태 캡처) ──
+
+def _capture_git_info() -> dict:
+    """프로세스 시작 시점의 Git 커밋/브랜치/dirty 상태를 캡처.
+
+    로컬 개발 시 --reload 없이 실행하면 코드가 변경되어도 프로세스에
+    반영되지 않는 문제를 진단하기 위한 엔드포인트용 정보.
+    """
+    info = {
+        "commit": "unknown",
+        "branch": "unknown",
+        "dirty": False,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        info["commit"] = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        pass
+    try:
+        info["branch"] = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            stderr=subprocess.DEVNULL,
+        ).decode().strip()
+    except Exception:
+        pass
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True,
+            timeout=5,
+        )
+        info["dirty"] = bool(result.stdout.strip())
+    except Exception:
+        pass
+    return info
+
+
+_VERSION_INFO = _capture_git_info()
+
+
 # ── Health Check ─────────────────────────────────────
 
 @app.get("/health", response_model=HealthResponse)
 async def health():
     """Health check endpoint."""
     return HealthResponse()
+
+
+@app.get("/api/version")
+async def version():
+    """프로세스 시작 시점의 Git 버전 정보 반환.
+
+    commit, branch, dirty 상태, 프로세스 시작 시각을 반환하여
+    현재 실행 중인 코드가 어떤 버전인지 확인할 수 있다.
+    """
+    return _VERSION_INFO
 
 
 # ── Chat Endpoints ───────────────────────────────────
