@@ -55,15 +55,6 @@ from app.sld.real_symbols import (
     get_real_symbol,
 )
 from app.sld.svg_backend import SvgBackend
-from app.sld.symbols.breakers import ACB, MCB, MCCB, RCCB, ELCB, CircuitBreaker
-from app.sld.symbols.busbars import Busbar
-from app.sld.symbols.loads import IndustrialSocket, Timer, TimerWithBypass
-from app.sld.symbols.meters import Ammeter, KwhMeter, Voltmeter
-from app.sld.symbols.motors import Generator as GeneratorSymbol, Motor
-from app.sld.symbols.msb_components import IndicatorLight, ProtectionRelay, ShuntTrip
-from app.sld.symbols.protection import EarthSymbol, Fuse, SurgeProtector
-from app.sld.symbols.switches import ATS, BIConnector, DoublePoleSwitch, Isolator, IsolatorForMachine
-from app.sld.symbols.transformers import CurrentTransformer, PotentialTransformer, PowerTransformer
 from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
 
 logger = logging.getLogger(__name__)
@@ -95,37 +86,6 @@ class SldGenerator:
     """
     Generates complete SLD drawings in PDF format with SVG preview.
     """
-
-    # Symbol registry -- maps type names to symbol classes
-    SYMBOL_MAP: dict[str, type] = {
-        "ACB": ACB,
-        "MCCB": MCCB,
-        "MCB": MCB,
-        "RCCB": RCCB,
-        "ELCB": ELCB,
-        "TRANSFORMER": PowerTransformer,
-        "CT": CurrentTransformer,
-        "KWH_METER": KwhMeter,
-        "AMMETER": Ammeter,
-        "VOLTMETER": Voltmeter,
-        "MOTOR": Motor,
-        "GENERATOR": GeneratorSymbol,
-        "ISOLATOR": Isolator,
-        "ISOLATOR_MACHINE": IsolatorForMachine,
-        "DOUBLE_POLE_SWITCH": DoublePoleSwitch,
-        "ATS": ATS,
-        "BI_CONNECTOR": BIConnector,
-        "FUSE": Fuse,
-        "EARTH": EarthSymbol,
-        "SPD": SurgeProtector,
-        "INDUSTRIAL_SOCKET": IndustrialSocket,
-        "TIMER": Timer,
-        "TIMER_BYPASS": TimerWithBypass,
-        "SHUNT_TRIP": ShuntTrip,
-        "INDICATOR_LIGHT": IndicatorLight,
-        "PROTECTION_RELAY": ProtectionRelay,
-        "PT": PotentialTransformer,
-    }
 
     # Full legend descriptions for all known symbols
     LEGEND_DESCRIPTIONS: dict[str, str] = {
@@ -382,28 +342,12 @@ class SldGenerator:
         return _SYMBOL_TO_DXF_BLOCK.get(symbol_name)
 
     def _get_symbol(self, symbol_name: str):
-        """Get a symbol instance by its block/type name.
-
-        Uses real-proportion symbols (calibrated from LEW samples) first,
-        falling back to legacy symbols for types not yet calibrated.
-        """
-        # Try real symbols first (calibrated from real LEW samples)
+        """Get a calibrated symbol instance by its block/type name."""
         try:
             return get_real_symbol(symbol_name)
         except ValueError:
-            pass
-
-        # Fallback to legacy symbols for uncalibrated types
-        if symbol_name.startswith("CB_"):
-            breaker_type = symbol_name[3:]
-            cls = self.SYMBOL_MAP.get(breaker_type)
-            if cls:
-                return cls()
-
-        cls = self.SYMBOL_MAP.get(symbol_name)
-        if cls:
-            return cls()
-        return None
+            logger.warning("Unknown symbol type: %s", symbol_name)
+            return None
 
     def _draw_components(self, backend: DrawingBackend, layout_result: LayoutResult) -> int:
         """Draw all components from the layout result. Returns count."""
