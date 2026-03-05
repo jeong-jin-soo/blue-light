@@ -84,13 +84,13 @@ INCOMING_SPEC: dict[int, IncomingSpec] = {
         rating_a=80, cable_size="25 + 16mmsq E", cable_cores="1 X 4 CORE",
         cable_type="XLPE/PVC", poles="DP", breaker_type="MCB", breaker_ka=10,
         phase="single_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
-        requires_ct=True, requires_isolator=True,
+        requires_ct=False, requires_isolator=False,
     ),
     100: IncomingSpec(
         rating_a=100, cable_size="35 + 16mmsq E", cable_cores="1 X 4 CORE",
         cable_type="XLPE/PVC", poles="DP", breaker_type="MCB", breaker_ka=10,
         phase="single_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
-        requires_ct=True, requires_isolator=True,
+        requires_ct=False, requires_isolator=False,
     ),
     150: IncomingSpec(
         rating_a=150, cable_size="70", cable_cores="1 X 4 CORE",
@@ -159,6 +159,54 @@ _INCOMING_RATINGS_ASC = sorted(INCOMING_SPEC.keys())
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 1b. Three-phase INCOMING specification (small TPN: 32A–125A)
+# ─────────────────────────────────────────────────────────────────────
+#
+# DWG data analysis (26 files) reveals three-phase TPN installations from 32A.
+# These overlap with single-phase ratings (32-100A) but have different cable/pole specs.
+# INCOMING_SPEC above covers single-phase (DP) variants; this covers TPN variants.
+
+INCOMING_SPEC_3PHASE: dict[int, IncomingSpec] = {
+    32: IncomingSpec(
+        rating_a=32, cable_size="10", cable_cores="4 X 1 CORE",
+        cable_type="PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
+        phase="three_phase", earth_prot_types=["RCCB"],
+        requires_ct=False, requires_isolator=False,
+    ),
+    40: IncomingSpec(
+        rating_a=40, cable_size="16", cable_cores="4 X 1 CORE",
+        cable_type="PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
+        phase="three_phase", earth_prot_types=["RCCB"],
+        requires_ct=False, requires_isolator=False,
+    ),
+    63: IncomingSpec(
+        rating_a=63, cable_size="16", cable_cores="4 X 1 CORE",
+        cable_type="PVC/PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
+        phase="three_phase", earth_prot_types=["RCCB"],
+        requires_ct=False, requires_isolator=False,
+    ),
+    80: IncomingSpec(
+        rating_a=80, cable_size="35", cable_cores="4 X 1 CORE",
+        cable_type="PVC/PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
+        phase="three_phase", earth_prot_types=["RCCB"],
+        requires_ct=False, requires_isolator=False,
+    ),
+    100: IncomingSpec(
+        rating_a=100, cable_size="50", cable_cores="4 X 1 CORE",
+        cable_type="XLPE", poles="TPN", breaker_type="MCB", breaker_ka=10,
+        phase="three_phase", earth_prot_types=["RCCB"],
+        requires_ct=False, requires_isolator=False,
+    ),
+    125: IncomingSpec(
+        rating_a=125, cable_size="50", cable_cores="4 X 1 CORE",
+        cable_type="XLPE/PVC", poles="TPN", breaker_type="MCCB", breaker_ka=25,
+        phase="three_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
+        requires_ct=True, requires_isolator=True,
+    ),
+}
+
+
+# ─────────────────────────────────────────────────────────────────────
 # 2. OUTGOING specification table (from "Table form" OUTGOING section)
 # ─────────────────────────────────────────────────────────────────────
 #
@@ -215,7 +263,15 @@ KVA_TO_BREAKER_MAP: list[tuple[float, int, str]] = [
     (14.49, 63, "single_phase"),     # 63A × 230V = 14.49 kVA
     (18.4, 80, "single_phase"),      # 80A × 230V = 18.4 kVA
     (23.0, 100, "single_phase"),     # 100A × 230V = 23.0 kVA
-    # Three-phase (400V): kVA = A × 400 × √3 / 1000
+    # Three-phase small TPN (400V): kVA = A × 400 × √3 / 1000
+    # DWG data confirms 32A–125A TPN installations are common
+    (22.17, 32, "three_phase"),      # 32A × 400 × √3 = 22.17 kVA
+    (27.71, 40, "three_phase"),      # 40A × 400 × √3 = 27.71 kVA
+    (43.65, 63, "three_phase"),      # 63A × 400 × √3 = 43.65 kVA
+    (55.43, 80, "three_phase"),      # 80A × 400 × √3 = 55.43 kVA
+    (69.28, 100, "three_phase"),     # 100A × 400 × √3 = 69.28 kVA
+    (86.60, 125, "three_phase"),     # 125A × 400 × √3 = 86.60 kVA
+    # Three-phase large (400V):
     (103.9, 150, "three_phase"),     # 150A × 400 × √3 = 103.9 kVA
     (138.6, 200, "three_phase"),     # 200A × 400 × √3 = 138.6 kVA
     (173.2, 250, "three_phase"),     # 250A × 400 × √3 = 173.2 kVA
@@ -229,15 +285,20 @@ KVA_TO_BREAKER_MAP: list[tuple[float, int, str]] = [
 ]
 
 
-def lookup_incoming_by_kva(kva: float) -> IncomingSpec:
+def lookup_incoming_by_kva(kva: float, supply_type: str = "") -> IncomingSpec:
     """
     Given kVA, determine the complete incoming specification.
 
     Selects the smallest standard breaker rating that can handle the load,
     then returns all associated cable, phase, and protection parameters.
 
+    When supply_type is specified, only entries matching that phase are considered.
+    This is critical for distinguishing between single-phase and three-phase
+    at overlapping kVA ranges (e.g. 22 kVA can be 100A single-phase or 32A TPN).
+
     Args:
         kva: Load in kilo-volt-amperes.
+        supply_type: Optional phase filter ("single_phase" or "three_phase").
 
     Returns:
         IncomingSpec with all incoming parameters.
@@ -245,8 +306,13 @@ def lookup_incoming_by_kva(kva: float) -> IncomingSpec:
     Raises:
         ValueError: If kVA exceeds maximum supported rating (1600A / ~1108 kVA).
     """
-    for max_kva, rating_a, _phase in KVA_TO_BREAKER_MAP:
+    for max_kva, rating_a, phase in KVA_TO_BREAKER_MAP:
+        if supply_type and phase != supply_type:
+            continue
         if kva <= max_kva:
+            # Three-phase small TPN: use INCOMING_SPEC_3PHASE if available
+            if phase == "three_phase" and rating_a in INCOMING_SPEC_3PHASE:
+                return INCOMING_SPEC_3PHASE[rating_a]
             return INCOMING_SPEC[rating_a]
 
     raise ValueError(
@@ -390,7 +456,7 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     spec: IncomingSpec | None = None
     if kva:
         try:
-            spec = lookup_incoming_by_kva(kva)
+            spec = lookup_incoming_by_kva(kva, supply_type=supply_type)
         except ValueError as e:
             result.add_error(str(e))
             return result
@@ -438,10 +504,12 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
                     f"This is acceptable but may be over-specified."
                 )
             elif user_in_table and breaker_rating < spec.rating_a:
-                # User specified a smaller breaker — error
-                result.add_error(
-                    f"Main breaker {breaker_rating}A is undersized for "
-                    f"{kva} kVA load. Minimum required: {spec.rating_a}A."
+                # User specified a smaller breaker — auto-correct to minimum
+                result.add_correction(
+                    "breaker_rating",
+                    breaker_rating, spec.rating_a,
+                    f"Undersized {breaker_rating}A for {kva} kVA. "
+                    f"Auto-corrected to {spec.rating_a}A.",
                 )
             elif not user_in_table:
                 result.add_correction(
@@ -456,7 +524,9 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
         )
 
     # ── 5. Validate / auto-correct breaker_type ───────────────────
-    effective_rating = breaker_rating or (spec.rating_a if spec else 0)
+    # Use corrected breaker_rating if it was auto-corrected in Step 4
+    corrected_rating = result.corrections.get("breaker_rating", {}).get("corrected")
+    effective_rating = corrected_rating or breaker_rating or (spec.rating_a if spec else 0)
     effective_spec = INCOMING_SPEC.get(effective_rating, spec)
 
     if effective_spec and breaker_type:
@@ -476,10 +546,13 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     # ── 6. Validate / auto-correct breaker_ka ─────────────────────
     if effective_spec and breaker_ka:
         if breaker_ka < effective_spec.breaker_ka:
-            result.add_error(
-                f"Fault rating {breaker_ka}kA is insufficient for "
+            # Auto-correct insufficient fault rating instead of blocking
+            result.add_correction(
+                "breaker_ka",
+                breaker_ka, effective_spec.breaker_ka,
+                f"Fault rating {breaker_ka}kA insufficient for "
                 f"{effective_spec.breaker_type} at {effective_rating}A. "
-                f"Minimum required: {effective_spec.breaker_ka}kA."
+                f"Auto-corrected to {effective_spec.breaker_ka}kA.",
             )
         elif breaker_ka > effective_spec.breaker_ka:
             result.add_warning(
@@ -600,7 +673,7 @@ def apply_corrections(requirements: dict, result: ValidationResult) -> dict:
 # 5. Convenience: full lookup from kVA alone
 # ─────────────────────────────────────────────────────────────────────
 
-def get_full_spec_from_kva(kva: float) -> dict[str, Any]:
+def get_full_spec_from_kva(kva: float, supply_type: str = "") -> dict[str, Any]:
     """
     Given only kVA, return a complete specification dictionary
     ready for SLD generation.
@@ -609,6 +682,7 @@ def get_full_spec_from_kva(kva: float) -> dict[str, Any]:
 
     Args:
         kva: Load in kilo-volt-amperes.
+        supply_type: Optional phase filter ("single_phase" or "three_phase").
 
     Returns:
         dict with all incoming parameters determined:
@@ -628,7 +702,7 @@ def get_full_spec_from_kva(kva: float) -> dict[str, Any]:
             "earth_protection_types": list[str],
         }
     """
-    spec = lookup_incoming_by_kva(kva)
+    spec = lookup_incoming_by_kva(kva, supply_type=supply_type)
     return {
         "kva": kva,
         "supply_type": spec.phase,

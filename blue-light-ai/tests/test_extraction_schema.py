@@ -306,8 +306,8 @@ class TestParseAndValidate:
         )
         assert has_3phase_warning, f"Expected 3-Phase warning, got warnings: {warnings}"
 
-    def test_undersized_breaker_error(self):
-        """Undersized breaker triggers validation error."""
+    def test_undersized_breaker_auto_correction(self):
+        """Undersized breaker triggers auto-correction (not error)."""
         undersized = {
             "incoming": {
                 "kva": 200,
@@ -318,10 +318,10 @@ class TestParseAndValidate:
             },
         }
         result = parse_and_validate(undersized)
-        errors = result["validation"]["errors"]
-        # 200 kVA → needs 300A, but specified 150A → error
-        has_undersized = any("undersized" in e.lower() for e in errors)
-        assert has_undersized, f"Expected undersized error, got: {errors}"
+        corrections = result["validation"].get("corrections", {})
+        # 200 kVA → needs 300A, but specified 150A → auto-corrected
+        has_correction = "breaker_rating" in corrections
+        assert has_correction, f"Expected breaker_rating correction, got: {corrections}"
 
     def test_missing_kva_and_breaker_error(self):
         """Missing both kVA and breaker_rating → error."""
@@ -552,11 +552,9 @@ class TestFormatExtractionResult:
 
     def test_format_with_errors(self):
         """Errors appear in formatted output."""
+        # Missing both kva and breaker_rating → validation error
         result = parse_and_validate({
-            "incoming": {
-                "kva": 200,
-                "main_breaker": {"type": "MCCB", "rating_a": 150},
-            },
+            "incoming": {},
         })
         formatted = format_extraction_result(result)
         assert "❌" in formatted or "Error" in formatted
@@ -597,11 +595,11 @@ class TestE2ESampleData:
     def test_e2e_full_pipeline(self):
         """Complete pipeline: parse → validate → correct → normalize.
 
-        Note: 69.28 kVA maps to 150A three-phase in sld_spec's KVA_TO_BREAKER_MAP.
-        The sample data specifies 100A MCCB TPN, which sld_spec flags as undersized
-        and auto-corrects breaker_type to MCB (per INCOMING_SPEC[100] = single-phase MCB).
-        This is a known gap — real-world 100A TPN MCCB at 69.28 kVA is valid but
-        the spec table transitions from single-phase (≤100A) to three-phase (≥150A).
+        With INCOMING_SPEC_3PHASE, 69.28 kVA + three_phase maps to 100A TPN MCB.
+        The sample data specifies 100A MCCB TPN, so:
+        - breaker_type auto-corrected: MCCB → MCB (100A should be MCB)
+        - breaker_rating 100A is correct (no correction needed)
+        - poles TPN is correct (no correction needed)
         """
         result = parse_and_validate(SAMPLE_FULL_SLD)
 
@@ -611,17 +609,19 @@ class TestE2ESampleData:
         assert extracted["incoming"]["phase"] == "three_phase"
         assert len(extracted["outgoing_circuits"]) == 3
 
-        # Validation should flag 100A as undersized for 69.28 kVA
-        errors = result["validation"]["errors"]
-        has_undersized = any("undersized" in e.lower() for e in errors)
-        assert has_undersized, f"Expected undersized error for 100A at 69.28 kVA, got: {errors}"
+        # Validation should auto-correct MCCB → MCB (100A is MCB range)
+        corrections = result["validation"]["corrections"]
+        has_type_correction = "breaker_type" in corrections
+        assert has_type_correction, f"Expected breaker_type correction (MCCB→MCB), got: {corrections}"
+        assert corrections["breaker_type"]["corrected"] == "MCB"
+        # breaker_rating 100A matches spec — no rating correction needed
+        assert "breaker_rating" not in corrections
 
         # Generation-ready format should reflect extracted + corrections
         gen = result["generation_ready"]
         assert gen["supply_type"] == "three_phase"
         assert gen["kva"] == 69.28
-        # breaker_type gets corrected to MCB (INCOMING_SPEC[100] is single-phase MCB)
-        assert gen["main_breaker"]["type"] in ("MCB", "MCCB")
+        assert gen["main_breaker"]["type"] == "MCB"
         assert gen["main_breaker"]["rating"] == 100
         assert len(gen["sub_circuits"]) == 3
         assert gen["elcb"]["rating"] == 100

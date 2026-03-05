@@ -240,9 +240,9 @@ def validate_sld_requirements(requirements: dict) -> str:
                 f"SS 638: ACB required for rating > 630A "
                 f"(current: {breaker_type} {breaker_rating}A)"
             )
-        elif breaker_rating > 63 and breaker_type == "MCB":
+        elif breaker_rating > 100 and breaker_type == "MCB":
             errors.append(
-                f"SS 638: MCB max rating is 63A, use MCCB for {breaker_rating}A"
+                f"SS 638: MCB max rating is 100A, use MCCB for {breaker_rating}A"
             )
 
     # 3. ELCB is mandatory per SS 638
@@ -285,28 +285,26 @@ def validate_sld_requirements(requirements: dict) -> str:
                 f"and use 2-core cables (e.g., '2C x 2.5mm2 PVC')."
             )
 
-        # Check 2: 30mA sensitivity is for personal protection (residential single-phase)
-        # Three-phase distribution boards use 100mA or 300mA — 30mA + 3-phase is almost always wrong
-        if elcb_sensitivity and elcb_sensitivity <= 30:
+        # Check 2: 30mA sensitivity — depends on pole count
+        # 30mA + 2-pole → single-phase (error for three_phase)
+        # 30mA + 4-pole → valid for three-phase (DWG data confirms: 30mA 4P RCCB used in 3-phase)
+        if elcb_sensitivity and elcb_sensitivity <= 30 and elcb_poles == 2:
             errors.append(
                 f"CRITICAL MISMATCH: ELCB/RCCB sensitivity is {elcb_sensitivity}mA "
-                f"(personal protection — residential single-phase) "
+                f"with 2-pole (single-phase device) "
                 f"but supply_type is 'three_phase'. "
-                f"30mA sensitivity RCD is for single-phase 230V residential installations. "
-                f"Three-phase distribution boards typically use 100mA or 300mA sensitivity. "
-                f"If the user specified '30mA', this strongly indicates single-phase 230V. "
+                f"2-pole 30mA RCD is for single-phase 230V residential installations. "
                 f"Change supply_type to 'single_phase', ELCB/RCCB poles to 2, "
                 f"voltage to 230, kVA estimated as RCCB_rating × 230 ÷ 1000."
             )
 
-        # Check 3: RCCB ≤ 63A rating with three-phase is suspicious
-        if elcb_rating and elcb_rating <= 63:
+        # Check 3: RCCB ≤ 63A rating with three-phase — only error if 2-pole
+        # DWG data confirms: 40A/63A 4-pole RCCB used in small 3-phase TPN installations
+        if elcb_rating and elcb_rating <= 63 and elcb_poles == 2:
             errors.append(
-                f"CRITICAL MISMATCH: ELCB/RCCB rating is {elcb_rating}A "
+                f"CRITICAL MISMATCH: ELCB/RCCB rating is {elcb_rating}A with 2-pole "
                 f"but supply_type is 'three_phase'. "
-                f"For three-phase 400V, {elcb_rating}A RCCB can only protect up to "
-                f"~{round(elcb_rating * 400 * 1.732 / 1000)}kVA. "
-                f"A ≤63A RCCB/ELCB almost always indicates single-phase 230V residential. "
+                f"A 2-pole ≤63A RCCB/ELCB indicates single-phase 230V residential. "
                 f"Change supply_type to 'single_phase', poles to 2, voltage to 230."
             )
 
@@ -338,7 +336,7 @@ def validate_sld_requirements(requirements: dict) -> str:
                 f"but supply_type is 'three_phase'. "
                 f"This load pattern strongly indicates a single-phase 230V residential installation. "
                 f"Change supply_type to 'single_phase', voltage to 230, ELCB/RCCB poles to 2, "
-                f"main breaker to MCB (≤63A), and use 2-core cables."
+                f"main breaker to MCB (≤100A), and use 2-core cables."
             )
 
     # 5b. ELCB/RCCB missing check — MANDATORY per SS 638
@@ -520,6 +518,34 @@ def generate_sld(
             "spec_errors": spec_result.errors,
             "spec_warnings": spec_result.warnings,
         })
+
+    # Apply auto-corrections from spec validation to requirements
+    if spec_result.corrections:
+        from app.sld.sld_spec import apply_corrections
+        corrected = apply_corrections(spec_input, spec_result)
+        # Propagate corrections back to requirements dict
+        if "breaker_rating" in spec_result.corrections:
+            new_rating = corrected["breaker_rating"]
+            main_breaker["rating"] = new_rating
+            if "rating_A" in main_breaker:
+                main_breaker["rating_A"] = new_rating
+            requirements["main_breaker"] = main_breaker
+        if "breaker_type" in spec_result.corrections:
+            main_breaker["type"] = corrected["breaker_type"]
+            requirements["main_breaker"] = main_breaker
+        if "breaker_ka" in spec_result.corrections:
+            main_breaker["fault_kA"] = corrected["breaker_ka"]
+            requirements["main_breaker"] = main_breaker
+        if "breaker_poles" in spec_result.corrections:
+            main_breaker["poles"] = corrected["breaker_poles"]
+            requirements["main_breaker"] = main_breaker
+        if "cable_size" in spec_result.corrections:
+            requirements["cable_size"] = corrected["cable_size"]
+        if "metering" in spec_result.corrections:
+            requirements["metering"] = corrected["metering"]
+        if "supply_type" in spec_result.corrections:
+            requirements["supply_type"] = corrected["supply_type"]
+        logger.info(f"Applied {len(spec_result.corrections)} spec corrections to requirements")
 
     from app.sld.generator import SldGenerator
     from app.sld.track_router import decide_track
@@ -763,7 +789,7 @@ def find_matching_templates(
         metering_type: "sp_meter" or "ct_meter" (optional)
     """
     from app.sld.template_matcher import (
-        convert_pdf_to_image,
+        convert_to_image,
         find_similar_templates,
         normalize_template_to_requirements,
     )
@@ -787,8 +813,13 @@ def find_matching_templates(
 
     best = templates[0]
 
-    # 최상위 템플릿 PDF → 이미지 변환 (Vision 참조용)
-    image_path = convert_pdf_to_image(best["absolute_path"])
+    # 최상위 템플릿 → 이미지 변환 (Vision 참조용)
+    # DWG 항목도 매칭 PDF가 존재하므로 absolute_path(PDF) 사용
+    dxf_abs = ""
+    if best.get("dxf_path"):
+        from app.sld.template_matcher import TEMPLATES_BASE_DIR
+        dxf_abs = str(TEMPLATES_BASE_DIR / best["dxf_path"])
+    image_path = convert_to_image(best["absolute_path"], dxf_path=dxf_abs)
     if image_path:
         best["reference_image_path"] = image_path
 
@@ -804,6 +835,9 @@ def find_matching_templates(
             "spec": best.get("detail", {}),
             "pdf_path": best.get("absolute_path"),
             "filename": best.get("filename"),
+            "source": best.get("source", ""),
+            "dwg_path": best.get("dwg_path", ""),
+            "dxf_path": best.get("dxf_path", ""),
         }
         store(application_seq, normalized_base, matched_template=matched_meta)
         logger.info(

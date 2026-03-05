@@ -14,9 +14,14 @@ requirements exactly match an existing template. Track B is the primary path.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# 템플릿 PDF 루트 디렉토리 (DWG→PDF 경로 도출용)
+_TEMPLATES_BASE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "sld-info"
 
 
 @dataclass
@@ -58,6 +63,17 @@ def decide_track(
 
     template_spec = matched_template.get("spec", {})
     template_path = matched_template.get("pdf_path")
+
+    # DWG 항목의 경우 pdf_path가 DXF 절대 경로일 수 있음 → PDF 경로 도출
+    if template_path and not os.path.exists(template_path):
+        # DWG→PDF 매핑 시도: filename 기반으로 PDF 찾기
+        filename = matched_template.get("filename", "")
+        if filename:
+            derived_pdf = str(_TEMPLATES_BASE_DIR / "slds" / filename)
+            if os.path.exists(derived_pdf):
+                template_path = derived_pdf
+                logger.info(f"Track A: DWG→PDF 경로 도출: {derived_pdf}")
+
     if not template_path:
         return TrackDecision(track="B", reason="Template has no PDF path")
 

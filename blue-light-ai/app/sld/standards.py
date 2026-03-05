@@ -125,10 +125,14 @@ def calculate_current(kva: float, voltage: float = 400, phase: str = "three_phas
 
 
 def get_breaker_type(current_a: float) -> str:
-    """Determine breaker type based on current rating."""
+    """Determine breaker type based on current rating.
+
+    DWG data confirms: MCB used up to 100A (including 80A/100A TPN),
+    MCCB starts at 125A.
+    """
     if current_a > 630:
         return "ACB"
-    elif current_a > 100:
+    elif current_a >= 125:
         return "MCCB"
     else:
         return "MCB"

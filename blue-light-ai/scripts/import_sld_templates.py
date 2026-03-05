@@ -155,8 +155,26 @@ def verify_data(conn: pymysql.Connection):
         """)
         breaker_stats = cursor.fetchall()
 
+        # DWG 소스 항목 확인
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt
+            FROM sld_templates
+            WHERE JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.source')) = 'dwg_parsed'
+        """)
+        dwg_count = cursor.fetchone()["cnt"]
+
+        cursor.execute("""
+            SELECT COUNT(*) AS cnt
+            FROM sld_templates
+            WHERE JSON_UNQUOTE(JSON_EXTRACT(detail_json, '$.source')) = 'pdf_gemini'
+        """)
+        pdf_count = cursor.fetchone()["cnt"]
+
     logger.info(f"\n=== 임포트 검증 ===")
     logger.info(f"총 템플릿 수: {total}건")
+    logger.info(f"\n[Source별 분포]")
+    logger.info(f"  dwg_parsed: {dwg_count}건")
+    logger.info(f"  pdf_gemini: {pdf_count}건")
     logger.info(f"\n[Phase별 분포]")
     for row in stats:
         logger.info(f"  {row['phase']}: {row['cnt']}건 (kVA: {row['min_kva']} ~ {row['max_kva']})")

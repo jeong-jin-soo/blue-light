@@ -1,95 +1,112 @@
 {
-  "_comment": "Calibrated symbol dimensions measured from 73 real LEW SLD samples. All values in mm.",
-  "_source": "32A/63A/100A/200A Single Phase DB & TPN SLDs - PyMuPDF vector path analysis",
+  "_comment": "Symbol dimensions calibrated from 26 DWG files (libredwg dwg2dxf conversion). Block definitions + inline entity analysis.",
+  "_source": "26 DWG samples: 32A~500A Single Phase DB & TPN SLDs - ezdxf block/entity extraction (2026-03-02)",
+  "_proportions": {
+    "MCB_inline": "contact_r/arc_r=0.2008, arc_sweep=151.4deg, 64 samples",
+    "MCCB_block": "contact_r/arc_r=0.1765, arc_sweep=125.8deg, 23 blocks (bulge=0.611)",
+    "RCCB_block": "same as MCCB + rcd_h=0.4298*arc_r, rcd_v=0.7777*arc_r, 18 blocks",
+    "KWH_rect":   "width/height=2.0, 31 rectangles"
+  },
 
   "MCB": {
-    "width_mm": 3.6,
-    "height_mm": 6.5,
-    "arc_radius_mm": 1.25,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
-    "description": "Miniature Circuit Breaker (<100A)"
+    "width_mm": 7.2,
+    "height_mm": 13.0,
+    "arc_radius_mm": 2.5,
+    "contact_radius_mm": 0.5,
+    "stub_mm": 3.0,
+    "arc_start_deg": 283.8,
+    "arc_end_deg": 75.2,
+    "description": "Miniature Circuit Breaker (<100A) — 151.4deg arc from DWG inline entities"
   },
   "MCCB": {
-    "width_mm": 4.2,
-    "height_mm": 7.5,
-    "arc_radius_mm": 1.5,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
-    "description": "Moulded Case Circuit Breaker (100A-630A)"
+    "width_mm": 8.4,
+    "height_mm": 15.0,
+    "arc_radius_mm": 3.0,
+    "contact_radius_mm": 0.55,
+    "stub_mm": 3.0,
+    "arc_start_deg": 297.1,
+    "arc_end_deg": 62.9,
+    "description": "Moulded Case Circuit Breaker (100A-630A) — 125.8deg arc from DWG block definitions"
   },
   "ACB": {
-    "width_mm": 5.0,
-    "height_mm": 8.5,
-    "arc_radius_mm": 1.8,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
-    "crossbar_extend_mm": 1.0,
-    "description": "Air Circuit Breaker (>630A) with horizontal crossbar"
+    "width_mm": 10.0,
+    "height_mm": 17.0,
+    "arc_radius_mm": 3.6,
+    "contact_radius_mm": 0.6,
+    "stub_mm": 3.0,
+    "arc_start_deg": 297.1,
+    "arc_end_deg": 62.9,
+    "crossbar_extend_mm": 2.0,
+    "description": "Air Circuit Breaker (>630A) with horizontal crossbar — same arc as MCCB"
   },
   "RCCB": {
-    "width_mm": 4.2,
-    "height_mm": 7.5,
-    "arc_radius_mm": 1.5,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
-    "rcd_bar_offset_mm": 2.5,
-    "rcd_bar_half_mm": 1.5,
-    "description": "Residual Current Circuit Breaker with RCD sensing element"
+    "width_mm": 10.0,
+    "height_mm": 15.0,
+    "arc_radius_mm": 3.0,
+    "contact_radius_mm": 0.55,
+    "stub_mm": 3.0,
+    "arc_start_deg": 297.1,
+    "arc_end_deg": 62.9,
+    "rcd_h_ratio": 0.4298,
+    "rcd_v_ratio": 0.7777,
+    "description": "Residual Current Circuit Breaker — 125.8deg arc + RCD bar from DWG blocks"
   },
   "ELCB": {
-    "width_mm": 4.2,
-    "height_mm": 7.5,
-    "arc_radius_mm": 1.5,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
-    "rcd_bar_offset_mm": 2.5,
-    "rcd_bar_half_mm": 1.5,
+    "width_mm": 10.0,
+    "height_mm": 15.0,
+    "arc_radius_mm": 3.0,
+    "contact_radius_mm": 0.55,
+    "stub_mm": 3.0,
+    "arc_start_deg": 297.1,
+    "arc_end_deg": 62.9,
+    "rcd_h_ratio": 0.4298,
+    "rcd_v_ratio": 0.7777,
     "description": "Earth Leakage Circuit Breaker (same symbol as RCCB)"
   },
   "KWH_METER": {
-    "width_mm": 8.0,
-    "height_mm": 8.0,
-    "circle_radius_mm": 4.0,
-    "stub_mm": 2.0,
-    "description": "kWh Energy Meter (circle with kWh text)"
+    "width_mm": 14.0,
+    "height_mm": 10.0,
+    "circle_radius_mm": 7.0,
+    "rect_ratio": 2.0,
+    "stub_mm": 3.0,
+    "description": "kWh Energy Meter — rectangle w/h=2.0 from DWG polylines"
   },
   "CT": {
-    "width_mm": 6.0,
-    "height_mm": 6.0,
-    "outer_radius_mm": 3.0,
-    "inner_radius_mm": 1.8,
-    "stub_mm": 2.0,
+    "width_mm": 12.0,
+    "height_mm": 12.0,
+    "outer_radius_mm": 6.0,
+    "inner_radius_mm": 3.6,
+    "stub_mm": 3.0,
     "description": "Current Transformer (two concentric circles)"
   },
   "ISOLATOR": {
-    "width_mm": 4.0,
-    "height_mm": 7.0,
-    "blade_length_mm": 5.0,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
-    "description": "Isolator / Disconnect Switch"
+    "width_mm": 8.0,
+    "height_mm": 14.0,
+    "blade_length_mm": 10.0,
+    "contact_radius_mm": 0.5,
+    "stub_mm": 3.0,
+    "description": "Isolator / Disconnect Switch — DP ISOL block: rectangle + L-stem"
   },
   "DOUBLE_POLE_SWITCH": {
-    "width_mm": 4.0,
-    "height_mm": 7.0,
-    "blade_length_mm": 5.0,
-    "contact_radius_mm": 0.67,
-    "stub_mm": 2.0,
+    "width_mm": 8.0,
+    "height_mm": 14.0,
+    "blade_length_mm": 10.0,
+    "contact_radius_mm": 0.5,
+    "stub_mm": 3.0,
     "description": "Double Pole Switch"
   },
   "EARTH": {
-    "width_mm": 6.0,
-    "height_mm": 5.0,
+    "width_mm": 12.0,
+    "height_mm": 10.0,
     "line_count": 3,
     "description": "Earth / Ground Symbol (3 decreasing horizontal lines)"
   },
   "FUSE": {
-    "width_mm": 2.5,
-    "height_mm": 6.0,
-    "rect_width_mm": 2.5,
-    "rect_height_mm": 5.0,
-    "stub_mm": 2.0,
+    "width_mm": 5.0,
+    "height_mm": 12.0,
+    "rect_width_mm": 5.0,
+    "rect_height_mm": 10.0,
+    "stub_mm": 3.0,
     "description": "Fuse (filled rectangle on conductor)"
   }
 }

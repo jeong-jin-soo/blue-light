@@ -1,20 +1,24 @@
 """
 Calibrated electrical symbols matching real LEW SLD proportions.
 
-Dimensions measured from 73 real Singapore SLD samples (PyMuPDF vector analysis).
-All symbols implement the DrawingBackend protocol and can render to DXF/PDF/SVG.
+Dimensions extracted from 26 DWG files via libredwg (dwg2dxf) + ezdxf analysis.
+Block definitions (MCCB, RCCB) and inline entities (MCB) used for exact proportions.
 
-Key differences from symbols/breakers.py:
-- MCB: 3.6x6.5mm (vs 14x20mm) — matches real sample proportions
-- MCCB: 4.2x7.5mm (vs 14x20mm)
-- Contact radius: 0.67mm (vs 1.0mm)
-- Stub length: 2.0mm (vs 5.0mm)
+Key DWG findings vs previous PDF-based calibration:
+- MCB arc: 151.4° sweep (was 180° semicircle), start=283.8°, end=75.2°
+- MCCB arc: 125.8° sweep (from LWPOLYLINE bulge=0.611 in block definitions)
+- Contact radius: ~0.20 × arc_radius (was ~0.48) — much smaller contacts
+- RCCB RCD bar: h_len=0.43×arc_r, v_len=0.78×arc_r (from 18 block definitions)
+- KWH meter: rectangle w/h ratio = 2.0 (from 31 polyline rectangles)
+
+All symbols implement the DrawingBackend protocol and can render to DXF/PDF/SVG.
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import math
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -50,13 +54,17 @@ def get_symbol_dimensions(symbol_type: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Calibrated circuit breaker symbols
+# Calibrated circuit breaker symbols (from DWG block/entity analysis)
 # ---------------------------------------------------------------------------
 
 class RealCircuitBreaker(BaseSymbol):
     """
     Circuit breaker symbol at real LEW SLD proportions.
-    IEC 60617: arc (semicircle) + two contact circles on conductor.
+
+    DWG analysis (26 files):
+    - Arc is NOT a semicircle — MCB uses 151.4° sweep, MCCB uses 125.8°
+    - Contact circles are small: ~0.20 × arc_radius
+    - Arc and contacts are separate visual elements on the conductor
     """
 
     layer: str = "SLD_SYMBOLS"
@@ -71,6 +79,9 @@ class RealCircuitBreaker(BaseSymbol):
         self._arc_r = dims["arc_radius_mm"]
         self._contact_r = dims["contact_radius_mm"]
         self._stub = dims["stub_mm"]
+        # DWG-calibrated arc angles (not 270→90 semicircle!)
+        self._arc_start = dims.get("arc_start_deg", 283.8)
+        self._arc_end = dims.get("arc_end_deg", 75.2)
 
         cx = self.width / 2
         self.pins = {
@@ -93,19 +104,21 @@ class RealCircuitBreaker(BaseSymbol):
 
         arc_center_y = y + h / 2
 
-        # Contact circles
+        # Contact circles (small, ~0.20 × arc_r — from DWG data)
         contact_bottom_y = arc_center_y - ar
         backend.add_circle((cx, contact_bottom_y), radius=cr)
 
         contact_top_y = arc_center_y + ar
         backend.add_circle((cx, contact_top_y), radius=cr)
 
-        # Arc (RIGHT-facing semicircle: 270 -> 90)
+        # Arc — DWG-calibrated angles (NOT 180° semicircle)
+        # MCB: 283.8° → 75.2° (151.4° sweep, right-facing)
+        # MCCB: 297.1° → 62.9° (125.8° sweep, tighter right-facing)
         backend.add_arc(
             center=(cx, arc_center_y),
-            radius=ar - cr,
-            start_angle=270,
-            end_angle=90,
+            radius=ar,  # Full arc radius (not ar-cr like before)
+            start_angle=self._arc_start,
+            end_angle=self._arc_end,
         )
 
         # Connection lines (from contact outer edges to symbol bounds)
@@ -119,14 +132,14 @@ class RealCircuitBreaker(BaseSymbol):
 
 
 class RealMCB(RealCircuitBreaker):
-    """Miniature Circuit Breaker (<100A) at real proportions."""
+    """Miniature Circuit Breaker (≤100A) at real proportions."""
 
     def __init__(self):
         super().__init__("MCB")
 
 
 class RealMCCB(RealCircuitBreaker):
-    """Moulded Case Circuit Breaker (100A-630A) at real proportions."""
+    """Moulded Case Circuit Breaker (125A-630A) at real proportions."""
 
     def __init__(self):
         super().__init__("MCCB")
@@ -150,7 +163,13 @@ class RealACB(RealCircuitBreaker):
 
 
 class RealRCCB(BaseSymbol):
-    """Residual Current Circuit Breaker at real proportions."""
+    """
+    Residual Current Circuit Breaker at real proportions.
+
+    DWG block analysis (18 identical blocks across files):
+    - Same arc as MCCB (125.8° sweep)
+    - RCD sensing bar: horizontal line (0.43×arc_r) + vertical bar (0.78×arc_r)
+    """
 
     name: str = "CB_RCCB"
     layer: str = "SLD_SYMBOLS"
@@ -162,8 +181,11 @@ class RealRCCB(BaseSymbol):
         self._arc_r = dims["arc_radius_mm"]
         self._contact_r = dims["contact_radius_mm"]
         self._stub = dims["stub_mm"]
-        self._rcd_offset = dims.get("rcd_bar_offset_mm", 2.5)
-        self._rcd_half = dims.get("rcd_bar_half_mm", 1.5)
+        self._arc_start = dims.get("arc_start_deg", 297.1)
+        self._arc_end = dims.get("arc_end_deg", 62.9)
+        # RCD bar proportions from DWG block definitions
+        self._rcd_h_ratio = dims.get("rcd_h_ratio", 0.4298)
+        self._rcd_v_ratio = dims.get("rcd_v_ratio", 0.7777)
 
         cx = self.width / 2
         self.pins = {
@@ -171,7 +193,7 @@ class RealRCCB(BaseSymbol):
             "bottom": (cx, -self._stub),
         }
         self.anchors = {
-            "label_right": (cx + self._arc_r + self._rcd_offset + 2, self.height / 2 + 2),
+            "label_right": (cx + self._arc_r + self._rcd_h_ratio * self._arc_r + 4, self.height / 2 + 2),
             "rating_below": (cx, -self._stub - 2),
             "label_above": (cx, self.height + self._stub + 2),
         }
@@ -186,28 +208,37 @@ class RealRCCB(BaseSymbol):
 
         arc_center_y = y + h / 2
 
-        # Contact circles
+        # Contact circles (small, from DWG data)
         contact_bottom_y = arc_center_y - ar
         backend.add_circle((cx, contact_bottom_y), radius=cr)
         contact_top_y = arc_center_y + ar
         backend.add_circle((cx, contact_top_y), radius=cr)
 
-        # Arc
+        # Arc — DWG block definition angles (125.8° sweep)
         backend.add_arc(
             center=(cx, arc_center_y),
-            radius=ar - cr,
-            start_angle=270,
-            end_angle=90,
+            radius=ar,  # Full arc radius
+            start_angle=self._arc_start,
+            end_angle=self._arc_end,
         )
 
         # Connection lines
         backend.add_line((cx, contact_top_y + cr), (cx, y + h))
         backend.add_line((cx, y), (cx, contact_bottom_y - cr))
 
-        # RCD sensing element (horizontal line + vertical bar)
-        bar_x = cx + ar + self._rcd_offset
-        backend.add_line((cx + ar - cr, arc_center_y), (bar_x, arc_center_y))
-        backend.add_line((bar_x, arc_center_y - self._rcd_half), (bar_x, arc_center_y + self._rcd_half))
+        # RCD sensing element — from DWG block: horizontal line + vertical bar
+        # Horizontal line extends from arc right edge to bar position
+        rcd_h_len = ar * self._rcd_h_ratio
+        rcd_v_len = ar * self._rcd_v_ratio
+        # Compute arc rightmost point at 0° (= arc center x + arc_r * cos(0) - but
+        # the arc doesn't reach 0°; use the effective right extent)
+        # For the arc center at cx, the rightmost extent of the arc:
+        arc_right_x = cx + ar  # approximate (the actual max-x depends on sweep)
+        bar_x = arc_right_x + rcd_h_len
+
+        backend.add_line((arc_right_x, arc_center_y), (bar_x, arc_center_y))
+        backend.add_line((bar_x, arc_center_y - rcd_v_len / 2),
+                         (bar_x, arc_center_y + rcd_v_len / 2))
 
         # Stubs
         backend.set_layer("SLD_CONNECTIONS")
@@ -222,7 +253,11 @@ class RealELCB(RealRCCB):
 
 
 class RealKwhMeter(BaseSymbol):
-    """kWh Meter at real proportions (circle with kWh label)."""
+    """kWh Meter at real proportions (rectangle with KWH label).
+
+    DWG analysis: 31 rectangles across files, consistent w/h ratio = 2.0.
+    Real LEW SLDs use a rectangular box for kWh meters, not a circle.
+    """
 
     name: str = "KWH_METER"
     layer: str = "SLD_SYMBOLS"
@@ -231,34 +266,46 @@ class RealKwhMeter(BaseSymbol):
         dims = get_symbol_dimensions("KWH_METER")
         self.width = dims["width_mm"]
         self.height = dims["height_mm"]
-        self._circle_r = dims["circle_radius_mm"]
+        self._circle_r = dims["circle_radius_mm"]  # used for stub offset
         self._stub = dims["stub_mm"]
+        # Rectangle dimensions — DWG-calibrated ratio of 2.0
+        rect_ratio = dims.get("rect_ratio", 2.0)
+        self._rect_h = self.height * 0.6  # ~6.0mm tall
+        self._rect_w = self._rect_h * rect_ratio  # ~12.0mm wide (ratio 2:1)
 
         cx = self.width / 2
         self.pins = {
-            "top": (cx, self.height / 2 + self._circle_r + self._stub),
-            "bottom": (cx, self.height / 2 - self._circle_r - self._stub),
+            "top": (cx, self.height / 2 + self._rect_h / 2 + self._stub),
+            "bottom": (cx, self.height / 2 - self._rect_h / 2 - self._stub),
         }
         self.anchors = {
-            "label_right": (self.width / 2 + self._circle_r + 2, self.height / 2),
+            "label_right": (self.width / 2 + self._rect_w / 2 + 2, self.height / 2),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         cx = x + self.width / 2
         cy = y + self.height / 2
-        r = self._circle_r
+        rw = self._rect_w
+        rh = self._rect_h
 
         backend.set_layer(self.layer)
-        backend.add_circle((cx, cy), radius=r)
+        # Draw rectangle (matching real LEW SLD kWh meter box)
+        backend.add_lwpolyline([
+            (cx - rw / 2, cy - rh / 2),
+            (cx + rw / 2, cy - rh / 2),
+            (cx + rw / 2, cy + rh / 2),
+            (cx - rw / 2, cy + rh / 2),
+        ], close=True)
 
-        # "kWh" label inside
+        # "KWH" label inside (uppercase, matching real samples)
         backend.set_layer("SLD_ANNOTATIONS")
-        backend.add_mtext("kWh", insert=(cx - 2, cy + 1), char_height=2.0)
+        label_size = min(rw * 0.35, 3.5)  # Scale text to fit box
+        backend.add_mtext("KWH", insert=(cx - rw * 0.35, cy + label_size * 0.5), char_height=label_size)
 
         # Connection lines
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, cy + r), (cx, cy + r + self._stub))
-        backend.add_line((cx, cy - r), (cx, cy - r - self._stub))
+        backend.add_line((cx, cy + rh / 2), (cx, cy + rh / 2 + self._stub))
+        backend.add_line((cx, cy - rh / 2), (cx, cy - rh / 2 - self._stub))
 
 
 class RealCT(BaseSymbol):
@@ -299,7 +346,10 @@ class RealCT(BaseSymbol):
 
 
 class RealIsolator(BaseSymbol):
-    """Isolator / Disconnect Switch at real proportions."""
+    """Isolator / Disconnect Switch at real proportions.
+
+    DWG block 'DP ISOL': Rectangle + L-shaped stem.
+    """
 
     name: str = "ISOLATOR"
     layer: str = "SLD_SYMBOLS"

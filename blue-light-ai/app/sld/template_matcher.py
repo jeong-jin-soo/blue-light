@@ -157,6 +157,15 @@ def find_similar_templates(spec: dict, limit: int = 3) -> list[dict]:
 
         absolute_path = str(TEMPLATES_BASE_DIR / row["file_path"])
 
+        # DWG 메타데이터 (detail_json.source/dwg_path/dxf_path)
+        source = ""
+        dwg_path = ""
+        dxf_path = ""
+        if isinstance(detail, dict):
+            source = detail.get("source", "")
+            dwg_path = detail.get("dwg_path", "")
+            dxf_path = detail.get("dxf_path", "")
+
         scored.append({
             "sld_template_seq": row["sld_template_seq"],
             "phase": row["phase"],
@@ -169,6 +178,9 @@ def find_similar_templates(spec: dict, limit: int = 3) -> list[dict]:
             "absolute_path": absolute_path,
             "detail": detail,
             "similarity_score": round(total, 4),
+            "source": source,
+            "dwg_path": dwg_path,
+            "dxf_path": dxf_path,
         })
 
     # 유사도 내림차순 정렬
@@ -203,30 +215,53 @@ def find_templates_by_spec(spec: dict, limit: int = 5) -> list[dict]:
     return find_similar_templates(spec, limit=limit)
 
 
-# ── PDF → 이미지 변환 (Gemini Vision용) ─────────────────
+# ── PDF/DXF → 이미지 변환 (Gemini Vision용) ──────────────
 
-def convert_pdf_to_image(pdf_path: str, dpi: int = 150) -> str | None:
+def convert_to_image(pdf_path: str, dpi: int = 150, dxf_path: str = "") -> str | None:
     """
-    PDF 첫 페이지를 PNG 이미지로 변환.
+    SLD 템플릿을 PNG 이미지로 변환.
+
+    PDF가 존재하면 PDF를 사용하고, PDF가 없고 DXF가 있으면 DXF fallback.
+    DWG 항목도 매칭 PDF가 반드시 존재하므로 대부분 PDF 경로를 사용.
 
     Args:
         pdf_path: PDF 파일 절대 경로.
         dpi: 해상도 (기본 150 — 속도/품질 균형).
+        dxf_path: DXF 파일 절대 경로 (fallback, optional).
 
     Returns:
         PNG 이미지 경로. 실패 시 None.
     """
+    # PDF 변환 시도
+    if pdf_path and os.path.exists(pdf_path):
+        result = _convert_pdf_to_image(pdf_path, dpi)
+        if result:
+            return result
+
+    # DXF fallback (향후 DXF-only 샘플 대비)
+    if dxf_path and os.path.exists(dxf_path):
+        result = _convert_dxf_to_image(dxf_path)
+        if result:
+            return result
+
+    if pdf_path:
+        logger.error(f"이미지 변환 실패: pdf={pdf_path}, dxf={dxf_path}")
+    return None
+
+
+def convert_pdf_to_image(pdf_path: str, dpi: int = 150) -> str | None:
+    """하위 호환용 alias. convert_to_image() 사용 권장."""
+    return convert_to_image(pdf_path, dpi=dpi)
+
+
+def _convert_pdf_to_image(pdf_path: str, dpi: int = 150) -> str | None:
+    """PDF 첫 페이지를 PNG 이미지로 변환."""
     try:
         import fitz  # PyMuPDF
     except ImportError:
         logger.error("PyMuPDF(fitz) 미설치: pip install PyMuPDF")
         return None
 
-    if not os.path.exists(pdf_path):
-        logger.error(f"PDF 파일 없음: {pdf_path}")
-        return None
-
-    # temp 디렉토리에 저장
     os.makedirs(settings.temp_file_dir, exist_ok=True)
     basename = Path(pdf_path).stem
     image_path = os.path.join(settings.temp_file_dir, f"template_{basename}.png")
@@ -248,6 +283,43 @@ def convert_pdf_to_image(pdf_path: str, dpi: int = 150) -> str | None:
 
     except Exception as e:
         logger.error(f"PDF→이미지 변환 실패: {e}")
+        return None
+
+
+def _convert_dxf_to_image(dxf_path: str) -> str | None:
+    """DXF → PNG 변환 (ezdxf + matplotlib). 향후 DXF-only 샘플 대비."""
+    try:
+        import ezdxf
+        from ezdxf.addons.drawing import Frontend, RenderContext
+        from ezdxf.addons.drawing.matplotlib import MatplotlibBackend
+        import matplotlib.pyplot as plt
+    except ImportError:
+        logger.error("DXF 이미지 변환 라이브러리 미설치 (ezdxf/matplotlib)")
+        return None
+
+    os.makedirs(settings.temp_file_dir, exist_ok=True)
+    basename = Path(dxf_path).stem
+    image_path = os.path.join(settings.temp_file_dir, f"template_{basename}.png")
+
+    if os.path.exists(image_path):
+        return image_path
+
+    try:
+        doc = ezdxf.readfile(dxf_path)
+        msp = doc.modelspace()
+        fig = plt.figure(figsize=(16, 12))
+        ax = fig.add_axes([0, 0, 1, 1])
+        ctx = RenderContext(doc)
+        out = MatplotlibBackend(ax)
+        Frontend(ctx, out).draw_layout(msp)
+        fig.savefig(image_path, dpi=150, bbox_inches="tight")
+        plt.close(fig)
+
+        logger.info(f"DXF→이미지 변환 완료: {image_path}")
+        return image_path
+
+    except Exception as e:
+        logger.error(f"DXF→이미지 변환 실패: {e}")
         return None
 
 

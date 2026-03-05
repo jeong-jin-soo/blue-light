@@ -13,6 +13,7 @@ import pytest
 
 from app.sld.sld_spec import (
     INCOMING_SPEC,
+    INCOMING_SPEC_3PHASE,
     KVA_TO_BREAKER_MAP,
     OUTGOING_SPEC,
     IncomingSpec,
@@ -95,13 +96,16 @@ class TestIncomingSpecTable:
             assert INCOMING_SPEC[rating].breaker_ka == 50
 
     def test_ct_threshold(self):
-        """CT metering required for kVA ≥ 45 (≈80A+ single-phase, all three-phase)."""
-        # No CT for small single-phase
+        """CT metering: all single-phase (32A-100A) use sp_meter (no CT).
+        DWG data confirms sp_meter for all ≤100A single-phase installations.
+        CT metering starts at 150A three-phase (in INCOMING_SPEC)."""
+        # No CT for all single-phase ratings (32A-100A)
         assert INCOMING_SPEC[32].requires_ct is False
         assert INCOMING_SPEC[40].requires_ct is False
         assert INCOMING_SPEC[63].requires_ct is False
-        # CT for larger installations
-        assert INCOMING_SPEC[80].requires_ct is True
+        assert INCOMING_SPEC[80].requires_ct is False
+        assert INCOMING_SPEC[100].requires_ct is False
+        # CT for three-phase large installations (150A+)
         assert INCOMING_SPEC[150].requires_ct is True
         assert INCOMING_SPEC[1600].requires_ct is True
 
@@ -169,11 +173,13 @@ class TestKvaLookup:
         assert spec.phase == "single_phase"
 
     def test_first_three_phase(self):
-        """24 kVA → 150A (first three-phase tier)."""
+        """24 kVA (no supply_type) → 40A three-phase TPN MCB.
+        (22.17 < 24 < 27.71, so hits 40A TPN tier)."""
         spec = lookup_incoming_by_kva(24)
-        assert spec.rating_a == 150
+        assert spec.rating_a == 40
         assert spec.phase == "three_phase"
-        assert spec.breaker_type == "MCCB"
+        assert spec.breaker_type == "MCB"
+        assert spec.poles == "TPN"
 
     def test_large_three_phase(self):
         """270 kVA → 400A three-phase MCCB (400A handles up to 277.1 kVA)."""
@@ -230,11 +236,16 @@ class TestFullSpec:
         assert set(result.keys()) == expected_keys
 
     def test_metering_auto_selection(self):
-        """<45kVA → sp_meter, ≥45kVA → ct_meter."""
+        """sp_meter for small installations, ct_meter for large (≥125A 3-phase)."""
         small = get_full_spec_from_kva(5)
         assert small["metering"] == "sp_meter"
 
-        large = get_full_spec_from_kva(50)
+        # 50 kVA → 80A three_phase TPN (no CT per DWG data)
+        medium = get_full_spec_from_kva(50)
+        assert medium["metering"] == "sp_meter"
+
+        # 100 kVA → 150A three_phase (CT metering required)
+        large = get_full_spec_from_kva(100)
         assert large["metering"] == "ct_meter"
 
 
@@ -263,12 +274,12 @@ class TestValidation:
         assert result.valid is False
         assert any("must be provided" in e for e in result.errors)
 
-    def test_undersized_breaker_errors(self):
-        """Breaker too small for kVA → error."""
+    def test_undersized_breaker_auto_corrects(self):
+        """Breaker too small for kVA → auto-corrected (not error)."""
         req = {"kva": 14, "breaker_rating": 32}  # 14 kVA needs 63A, not 32A
         result = validate_sld_requirements(req)
-        assert result.valid is False
-        assert any("undersized" in e for e in result.errors)
+        assert "breaker_rating" in result.corrections
+        assert result.corrections["breaker_rating"]["corrected"] == 63
 
     def test_oversized_breaker_warns(self):
         """Breaker larger than minimum → warning only."""
@@ -279,7 +290,7 @@ class TestValidation:
 
     def test_auto_correction_supply_type(self):
         """Missing supply_type auto-corrected from kVA."""
-        req = {"kva": 100}
+        req = {"kva": 110}  # > 103.9 kVA → 150A three_phase
         result = validate_sld_requirements(req)
         assert "supply_type" in result.corrections
         assert result.corrections["supply_type"]["corrected"] == "three_phase"
@@ -297,15 +308,17 @@ class TestValidation:
         result_small = validate_sld_requirements(req_small)
         assert result_small.corrections.get("metering", {}).get("corrected") == "sp_meter"
 
-        req_large = {"kva": 100}
+        # 110 kVA → 150A three_phase → ct_meter
+        req_large = {"kva": 110}
         result_large = validate_sld_requirements(req_large)
         assert result_large.corrections.get("metering", {}).get("corrected") == "ct_meter"
 
-    def test_insufficient_ka_errors(self):
-        """Fault rating below minimum → error."""
-        req = {"kva": 100, "breaker_rating": 150, "breaker_ka": 10}  # Needs 35kA
+    def test_insufficient_ka_auto_corrects(self):
+        """Fault rating below minimum → auto-corrected."""
+        req = {"kva": 110, "breaker_rating": 150, "breaker_ka": 10}  # Needs 35kA
         result = validate_sld_requirements(req)
-        assert any("insufficient" in e for e in result.errors)
+        assert "breaker_ka" in result.corrections
+        assert result.corrections["breaker_ka"]["corrected"] == 35
 
     def test_sub_breaker_exceeds_main_errors(self):
         """Sub-breaker larger than main breaker → error."""
@@ -328,12 +341,12 @@ class TestValidation:
 
     def test_apply_corrections(self):
         """apply_corrections() returns new dict with all fixes applied."""
-        req = {"kva": 100}
+        req = {"kva": 105}  # > 103.9 kVA → 200A three_phase (103.9 < 105 < 138.6)
         result = validate_sld_requirements(req)
         corrected = apply_corrections(req, result)
 
         assert corrected["supply_type"] == "three_phase"
-        assert corrected["breaker_rating"] == 150
+        assert corrected["breaker_rating"] == 200
         assert corrected["breaker_type"] == "MCCB"
         assert corrected["metering"] == "ct_meter"
         # Original unchanged
@@ -397,3 +410,86 @@ class TestThreePhaseToSinglePhaseDetection:
         }
         result = validate_sld_requirements(req)
         assert not any("NON-STANDARD" in w for w in result.warnings)
+
+
+# ── Three-Phase Small TPN Spec Tests ──────────────────────────────
+
+class TestIncomingSpec3Phase:
+    """Verify INCOMING_SPEC_3PHASE for three-phase small TPN ratings (DWG data)."""
+
+    def test_all_6_tiers_present(self):
+        expected = [32, 40, 63, 80, 100, 125]
+        assert sorted(INCOMING_SPEC_3PHASE.keys()) == expected
+
+    def test_all_three_phase(self):
+        for rating, spec in INCOMING_SPEC_3PHASE.items():
+            assert spec.phase == "three_phase"
+
+    def test_poles_are_tpn(self):
+        for rating, spec in INCOMING_SPEC_3PHASE.items():
+            assert spec.poles == "TPN"
+
+    def test_mcb_mccb_transition_at_125a(self):
+        """MCB for ≤100A, MCCB starts at 125A per DWG data."""
+        for rating in [32, 40, 63, 80, 100]:
+            assert INCOMING_SPEC_3PHASE[rating].breaker_type == "MCB"
+        assert INCOMING_SPEC_3PHASE[125].breaker_type == "MCCB"
+
+    def test_ct_metering_at_125a(self):
+        """No CT for 32A-100A TPN, CT starts at 125A."""
+        for rating in [32, 40, 63, 80, 100]:
+            assert INCOMING_SPEC_3PHASE[rating].requires_ct is False
+        assert INCOMING_SPEC_3PHASE[125].requires_ct is True
+
+    def test_ka_ratings(self):
+        """10kA for MCB (32-100A), 25kA for MCCB (125A)."""
+        for rating in [32, 40, 63, 80, 100]:
+            assert INCOMING_SPEC_3PHASE[rating].breaker_ka == 10
+        assert INCOMING_SPEC_3PHASE[125].breaker_ka == 25
+
+
+# ── Phase-aware kVA Lookup Tests ──────────────────────────────────
+
+class TestPhaseAwareKvaLookup:
+    """Test lookup_incoming_by_kva() with supply_type parameter."""
+
+    def test_three_phase_22kva_maps_to_32a_tpn(self):
+        """22 kVA + three_phase → 32A TPN MCB."""
+        spec = lookup_incoming_by_kva(22, supply_type="three_phase")
+        assert spec.rating_a == 32
+        assert spec.phase == "three_phase"
+        assert spec.poles == "TPN"
+        assert spec.breaker_type == "MCB"
+
+    def test_single_phase_22kva_maps_to_100a_dp(self):
+        """22 kVA + single_phase → 100A DP MCB."""
+        spec = lookup_incoming_by_kva(22, supply_type="single_phase")
+        assert spec.rating_a == 100
+        assert spec.phase == "single_phase"
+        assert spec.poles == "DP"
+
+    def test_three_phase_45kva_maps_to_63a_tpn(self):
+        """45 kVA + three_phase → 80A TPN (43.65 < 45 < 55.43)."""
+        spec = lookup_incoming_by_kva(45, supply_type="three_phase")
+        assert spec.rating_a == 80
+        assert spec.phase == "three_phase"
+
+    def test_three_phase_70kva_maps_to_125a_tpn(self):
+        """70 kVA + three_phase → 125A TPN MCCB (69.28 < 70 < 86.60)."""
+        spec = lookup_incoming_by_kva(70, supply_type="three_phase")
+        assert spec.rating_a == 125
+        assert spec.phase == "three_phase"
+        assert spec.breaker_type == "MCCB"
+
+    def test_backward_compat_no_supply_type(self):
+        """Without supply_type, existing behavior preserved for small kVA."""
+        spec = lookup_incoming_by_kva(5)
+        assert spec.rating_a == 32
+        assert spec.phase == "single_phase"
+
+    def test_get_full_spec_with_supply_type(self):
+        """get_full_spec_from_kva() passes supply_type correctly."""
+        result = get_full_spec_from_kva(45, supply_type="three_phase")
+        assert result["breaker_rating"] == 80
+        assert result["supply_type"] == "three_phase"
+        assert result["metering"] == "sp_meter"  # 80A TPN uses sp_meter

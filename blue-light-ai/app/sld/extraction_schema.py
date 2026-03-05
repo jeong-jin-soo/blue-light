@@ -155,13 +155,13 @@ Your task: Analyze the user's text or photo information and extract structured J
 
 ## Singapore Electrical Standards (SS 638:2018, CP 5:2018)
 - Single-phase: 230V, poles = DP/SPN, breaker ≤ 100A
-- Three-phase: 400V, poles = TPN/4P, breaker ≥ 150A
-- MCB: ≤ 63A, MCCB: 64–630A, ACB: > 630A
+- Three-phase: 400V, poles = TPN/4P, breaker ≥ 32A
+- MCB: ≤ 100A, MCCB: 125–630A, ACB: > 630A
 - Sub-circuit MCB fault rating: 6kA (Singapore standard)
 - Main breaker MCB fault rating: 10kA
 - MCCB fault rating: 35kA, ACB fault rating: 50kA
 - ELCB/RCCB: mandatory per SS 638
-- CT metering: required for ≥ 45kVA (≥ 80A single-phase, ≥ 150A three-phase)
+- CT metering: required for ≥ 125A three-phase (≥ 86kVA). Single-phase uses sp_meter at all ratings (32A-100A)
 - Cable types: PVC (small), PVC/PVC, XLPE/PVC (medium-large)
 
 ## Output JSON Schema

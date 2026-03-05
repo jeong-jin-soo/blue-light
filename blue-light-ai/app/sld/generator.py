@@ -222,19 +222,24 @@ class SldGenerator:
         layout_result = compute_layout(requirements, application_info=application_info)
 
         # Title block data (shared across all backends)
+        # Accept both camelCase (from backend API) and snake_case (from direct calls)
         title_block_kwargs = dict(
-            project_name=application_info.get("address", "Electrical Installation"),
-            address=application_info.get("address", ""),
+            project_name=application_info.get("project_title", "") or application_info.get("address", "Electrical Installation"),
+            address=application_info.get("client_address", "") or application_info.get("address", ""),
             postal_code=application_info.get("postalCode", ""),
             kva=requirements.get("kva", 0),
             voltage=requirements.get("voltage", 0),
-            supply_type=requirements.get("supply_type", ""),
-            lew_name=application_info.get("assignedLewName", ""),
-            lew_licence=application_info.get("assignedLewLicenceNo", ""),
-            lew_mobile=application_info.get("assignedLewMobile", ""),
+            supply_type=requirements.get("supply_type", "") or requirements.get("phase_config", ""),
+            lew_name=application_info.get("lew_name", "") or application_info.get("assignedLewName", ""),
+            lew_licence=application_info.get("lew_licence", "") or application_info.get("assignedLewLicenceNo", ""),
+            lew_mobile=application_info.get("lew_mobile", "") or application_info.get("assignedLewMobile", ""),
             sld_only_mode=application_info.get("sld_only_mode", False),
-            client_name=application_info.get("clientName", ""),
-            main_contractor=application_info.get("mainContractor", ""),
+            client_name=application_info.get("client_name", "") or application_info.get("clientName", ""),
+            main_contractor=application_info.get("contractor_name", "") or application_info.get("mainContractor", ""),
+            elec_contractor=application_info.get("elec_contractor", "") or "LicenseKaki",
+            elec_contractor_addr=application_info.get("elec_contractor_addr", "") or application_info.get("contractor_address", ""),
+            elec_contractor_tel=application_info.get("elec_contractor_tel", ""),
+            drawing_number=application_info.get("drawing_number", ""),
         )
 
         result = {}
@@ -323,18 +328,22 @@ class SldGenerator:
         layout_result = compute_layout(requirements, application_info=app_info)
 
         title_block_kwargs = dict(
-            project_name=app_info.get("address", "Electrical Installation"),
-            address=app_info.get("address", ""),
+            project_name=app_info.get("project_title", "") or app_info.get("address", "Electrical Installation"),
+            address=app_info.get("client_address", "") or app_info.get("address", ""),
             postal_code=app_info.get("postalCode", ""),
             kva=requirements.get("kva", 0),
             voltage=requirements.get("voltage", 0),
-            supply_type=requirements.get("supply_type", ""),
-            lew_name=app_info.get("assignedLewName", ""),
-            lew_licence=app_info.get("assignedLewLicenceNo", ""),
-            lew_mobile=app_info.get("assignedLewMobile", ""),
+            supply_type=requirements.get("supply_type", "") or requirements.get("phase_config", ""),
+            lew_name=app_info.get("lew_name", "") or app_info.get("assignedLewName", ""),
+            lew_licence=app_info.get("lew_licence", "") or app_info.get("assignedLewLicenceNo", ""),
+            lew_mobile=app_info.get("lew_mobile", "") or app_info.get("assignedLewMobile", ""),
             sld_only_mode=app_info.get("sld_only_mode", False),
-            client_name=app_info.get("clientName", ""),
-            main_contractor=app_info.get("mainContractor", ""),
+            client_name=app_info.get("client_name", "") or app_info.get("clientName", ""),
+            main_contractor=app_info.get("contractor_name", "") or app_info.get("mainContractor", ""),
+            elec_contractor=app_info.get("elec_contractor", "") or "LicenseKaki",
+            elec_contractor_addr=app_info.get("elec_contractor_addr", "") or app_info.get("contractor_address", ""),
+            elec_contractor_tel=app_info.get("elec_contractor_tel", ""),
+            drawing_number=app_info.get("drawing_number", ""),
         )
 
         dxf_bytes = None
@@ -408,11 +417,12 @@ class SldGenerator:
                 sig = f"{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
                 breaker_spec_groups.setdefault(sig, []).append(idx)
 
-        # For groups with 2+ identical specs, only the FIRST (leftmost) gets full label
+        # For groups with 5+ identical specs, only the FIRST (leftmost) gets full label
         # Rest get a "ditto" arrow pointing left toward the first
+        # Real LEW SLDs show full labels on most circuits — only use ditto for very large groups
         ditto_breaker_indices: set[int] = set()
         for sig, indices in breaker_spec_groups.items():
-            if len(indices) >= 2:
+            if len(indices) >= 5:
                 # Sort by x position (leftmost first)
                 sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
                 # All except the first are ditto
@@ -426,10 +436,11 @@ class SldGenerator:
             if comp.label_style == "breaker_block" and comp.cable_annotation:
                 cable_groups.setdefault(comp.cable_annotation, []).append(idx)
 
-        # For groups with 2+ identical cables, only the FIRST (leftmost) gets cable text
+        # For groups with 5+ identical cables, only the FIRST gets cable text
+        # Real LEW SLDs show cable specs on each circuit
         ditto_cable_indices: set[int] = set()
         for cable_text, indices in cable_groups.items():
-            if len(indices) >= 2:
+            if len(indices) >= 5:
                 sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
                 for i in sorted_indices[1:]:
                     ditto_cable_indices.add(i)
@@ -457,8 +468,9 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "BUSBAR":
-                # Busbar -- single bold line (heavier than connections)
-                backend.set_layer("SLD_SYMBOLS")
+                # Busbar -- single line, slightly bolder than connections
+                # Real LEW SLDs use a single thin line (0.72pt) for busbar
+                backend.set_layer("SLD_POWER_MAIN")
                 bus_start_x = layout_result.busbar_start_x
                 bus_end_x = layout_result.busbar_end_x
 
@@ -466,7 +478,7 @@ class SldGenerator:
                     backend.add_line(
                         (bus_start_x, layout_result.busbar_y),
                         (bus_end_x, layout_result.busbar_y),
-                        lineweight=120,  # 1.2mm — bold, distinct from connections (0.5mm)
+                        lineweight=50,  # 0.5mm — matches real LEW SLD busbar weight
                     )
                 else:
                     # Sub-busbar (for multi-row circuits)
@@ -474,7 +486,7 @@ class SldGenerator:
                     backend.add_line(
                         (comp.x, comp.y),
                         (comp.x + row_bus_width, comp.y),
-                        lineweight=100,  # 1.0mm for sub-busbars
+                        lineweight=50,  # 0.5mm for sub-busbars
                     )
 
                 # Busbar rating label (right side, above busbar)
@@ -492,8 +504,8 @@ class SldGenerator:
                 backend.set_layer("SLD_ANNOTATIONS")
                 backend.add_mtext(
                     comp.circuit_id,
-                    insert=(comp.x - 3, comp.y + 4),
-                    char_height=1.8,
+                    insert=(comp.x - 3, comp.y + 5),
+                    char_height=2.2,
                 )
                 count += 1
 
@@ -633,20 +645,18 @@ class SldGenerator:
 
         if abs(comp.rotation - 90.0) < 0.1:
             # Vertical text: breaker info to the RIGHT of the breaker, rotated 90 degrees
-            # Offset calibrated for real-proportion symbols (~4mm wide)
+            # Real LEW SLDs show: "B20A", "SPN", "MCB", "6kA" as separate vertical columns
             if comp.breaker_type_str in ("MCCB", "ACB"):
-                base_x = comp.x + 7  # MCCB/ACB slightly wider
+                base_x = comp.x + 12  # MCCB/ACB wider (8.4mm symbol)
             else:
-                base_x = comp.x + 6  # MCB standard offset
-            char_h = 1.8
-            line_gap = 3.5  # Fixed 3.5mm gap for consistent column spacing
+                base_x = comp.x + 10  # MCB (7.2mm symbol + gap)
+            char_h = 2.5  # Larger for readability (matches real samples)
+            line_gap = 4.0  # Column spacing between breaker spec items
 
             if is_ditto:
                 # Ditto: draw "←" arrow pointing left (toward the first with full label)
-                # Arrow drawn at the center of where the label block would be
                 arrow_x = base_x + 2
                 arrow_y = comp.y + 2
-                # Horizontal arrow line (pointing left, rotated 90 for vertical layout)
                 backend.add_mtext(
                     "←",
                     insert=(arrow_x, arrow_y),
@@ -663,13 +673,13 @@ class SldGenerator:
                         rotation=90.0,
                     )
 
-            # Inline cable annotation to the LEFT of conductor (vertical)
-            # Skip if cable is identical to a previous breaker (deduplication)
+            # Cable annotation to the LEFT of conductor (vertical)
+            # Real LEW SLDs show cable specs on each sub-circuit
             if comp.cable_annotation and not is_cable_ditto:
                 backend.add_mtext(
                     comp.cable_annotation,
-                    insert=(comp.x - 4, comp.y),
-                    char_height=1.6,
+                    insert=(comp.x - 6, comp.y),
+                    char_height=2.0,
                     rotation=90.0,
                 )
         else:
