@@ -427,3 +427,69 @@ def test_sub_circuits_count_matches(requirements: dict):
     assert actual == expected, (
         f"Expected {expected} sub-circuit breakers, got {actual}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 5. Cable Annotation Completeness
+# ---------------------------------------------------------------------------
+
+# Only metered cases have meter board cable annotations
+METERED_CASES = [
+    pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
+    pytest.param(THREE_PHASE_METERED, id="3ph_metered"),
+    pytest.param(THREE_PHASE_CT, id="3ph_ct"),
+    pytest.param(THREE_PHASE_MCCB, id="3ph_mccb"),
+]
+
+
+@pytest.mark.parametrize("requirements", METERED_CASES)
+def test_meter_board_has_cable_annotations(requirements: dict):
+    """Metered SLDs must have cable annotation labels on both sides of meter board.
+
+    Reference sample convention (SP PowerGrid):
+    - RIGHT side: tick mark + cable spec on incoming supply line
+    - LEFT side: tick mark + cable spec on outgoing line to DB
+
+    When incoming_cable is auto-determined (from INCOMING_SPEC), both annotations
+    must appear. Each annotation has a LABEL with 'sqmm' keyword.
+    """
+    result = compute_layout(requirements)
+
+    # Find cable annotation labels (contain 'sqmm' — a hallmark of cable specs)
+    cable_labels = [
+        c for c in result.components
+        if c.symbol_name == "LABEL" and "sqmm" in str(c.label).lower()
+    ]
+
+    # Must have at least 2 cable annotations for meter board (LEFT + RIGHT)
+    # (sub-circuit cable labels are additional)
+    assert len(cable_labels) >= 2, (
+        f"Expected ≥2 cable annotation labels (meter board LEFT + RIGHT), "
+        f"got {len(cable_labels)}: {[c.label for c in cable_labels]}"
+    )
+
+
+@pytest.mark.parametrize("requirements", METERED_CASES)
+def test_meter_board_has_tick_marks(requirements: dict):
+    """Metered SLDs must have tick marks on meter board cable lines.
+
+    Tick marks are short diagonal connection segments (length < 5mm)
+    crossing the cable lines at approximately 45°.
+    At least 2 tick marks expected: one on RIGHT (incoming), one on LEFT (outgoing).
+    """
+    result = compute_layout(requirements)
+
+    tick_marks = []
+    for c in result.connections:
+        p1, p2 = c
+        dx = abs(p2[0] - p1[0])
+        dy = abs(p2[1] - p1[1])
+        length = (dx ** 2 + dy ** 2) ** 0.5
+        # Tick marks: short (< 5mm), diagonal (both dx > 0 and dy > 0)
+        if length < 5 and dx > 0.5 and dy > 0.5:
+            tick_marks.append(c)
+
+    assert len(tick_marks) >= 2, (
+        f"Expected ≥2 tick marks on meter board cable lines, "
+        f"got {len(tick_marks)}"
+    )

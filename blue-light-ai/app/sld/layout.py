@@ -963,6 +963,39 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
         from app.sld.standards import get_fault_level
         ctx.breaker_fault_kA = get_fault_level(ctx.breaker_type, ctx.kva)
 
+    # Auto-determine incoming cable if not specified
+    # Uses INCOMING_SPEC / INCOMING_SPEC_3PHASE tables (same pattern as fault_kA)
+    if not ctx.incoming_cable and ctx.breaker_rating:
+        try:
+            import re as _re
+            from app.sld.sld_spec import INCOMING_SPEC, INCOMING_SPEC_3PHASE
+            spec_table = INCOMING_SPEC_3PHASE if supply_type == "three_phase" else INCOMING_SPEC
+            spec = spec_table.get(ctx.breaker_rating)
+            # Fallback: try the other table if rating not found
+            if spec is None:
+                spec = INCOMING_SPEC.get(ctx.breaker_rating)
+            if spec:
+                # Parse "4 X 1 CORE" → count=4, cores=1 / "1 X 4 CORE" → count=1, cores=4
+                _m = _re.match(r"(\d+)\s*X\s*(\d+)\s*CORE", spec.cable_cores)
+                _count = int(_m.group(1)) if _m else 1
+                _cores = int(_m.group(2)) if _m else 1
+                # For single-core cables: SLD convention shows main conductors only
+                # (CPC is specified separately as "+ Xsqmm CPC")
+                # SP: L + N = 2 main conductors / 3P: L1 + L2 + L3 + N = 4
+                if _cores == 1:
+                    _count = 2 if supply_type == "single_phase" else 4
+                ctx.incoming_cable = {
+                    "count": _count,
+                    "cores": _cores,
+                    "size_mm2": spec.cable_size.split(" + ")[0].replace("mmsq E", "").strip(),
+                    "type": spec.cable_type,
+                    "cpc_mm2": spec.cable_size.split(" + ")[1].replace("mmsq E", "").strip()
+                                if " + " in spec.cable_size else "",
+                    "cpc_type": spec.cable_type.split("/")[-1] if "/" in spec.cable_type else "PVC",
+                }
+        except Exception:
+            pass  # Graceful fallback — cable annotation simply won't appear
+
     ctx.meter_poles = "DP" if supply_type == "single_phase" else "TPN"
 
     # Main breaker characteristic (B/C/D) — IEC 60898-1 trip curve
@@ -1315,8 +1348,48 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
             ))
 
         # ====== ROUTING: Exit — straight up to MCCB ======
-        y_exit = mb_box_top + 8  # Comfortable gap between meter board box and DB box
+        # Outgoing cable annotation (meter board → DB) — LEFT side tick mark
+        outgoing_cable = ctx.incoming_cable
+        outgoing_cable_text = format_cable_spec(outgoing_cable, multiline=True)
+
+        if outgoing_cable_text:
+            y_exit = mb_box_top + 16  # Extra room for cable annotation
+        else:
+            y_exit = mb_box_top + 8   # Normal gap
         result.connections.append(((cx, mb_center_y), (cx, y_exit)))
+
+        # Cable annotation on outgoing vertical line (meter board → DB)
+        # Reference: tick mark on vertical wire + leader LEFT + cable spec text
+        if outgoing_cable_text:
+            # Tick mark position: midpoint of gap above meter board box
+            tick_y = (mb_box_top + y_exit) / 2
+            tick_size = 1.5
+            # Diagonal tick crossing vertical line (/ shape)
+            result.connections.append((
+                (cx - tick_size, tick_y - tick_size),
+                (cx + tick_size, tick_y + tick_size),
+            ))
+            # Leader line going LEFT from tick center
+            _leader_len = 3
+            result.connections.append((
+                (cx, tick_y),
+                (cx - _leader_len, tick_y),
+            ))
+            # Cable spec text — positioned to the LEFT of leader
+            # Text is LEFT-aligned (TOP_LEFT), so offset start position
+            # to the left by approximate text width
+            _label_ch = 2.8
+            _char_w = _label_ch * 0.6  # Approximate Helvetica char width
+            _lines = outgoing_cable_text.split("\\P")
+            _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
+            _text_width = _max_line_len * _char_w
+            _text_x = cx - _leader_len - 1 - _text_width
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=_text_x,
+                y=tick_y + _label_ch * 0.5,
+                label=outgoing_cable_text,
+            ))
 
         # ====== Dashed box ======
         result.dashed_connections.append(((mb_box_left, mb_box_bottom), (mb_box_right, mb_box_bottom)))
