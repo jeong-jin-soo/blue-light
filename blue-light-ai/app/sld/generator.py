@@ -407,36 +407,8 @@ class SldGenerator:
                     ditto_breaker_indices.add(sorted_indices[k])
                     ditto_prev_map[sorted_indices[k]] = sorted_indices[k - 1]
 
-        # Pre-scan: cable annotations — "bookend" convention
-        # Singapore LEW professional convention: cable annotations shown ONLY on
-        # the leftmost and rightmost sub-circuits (the two extremes of the busbar).
-        # This avoids overlap in dense layouts and matches reference DWGs.
-        # If an intermediate circuit has a UNIQUE cable spec not shown on either
-        # bookend, it also gets an annotation.
-        cable_breaker_indices: list[int] = []
-        for idx, comp in enumerate(layout_result.components):
-            if comp.label_style == "breaker_block" and comp.cable_annotation:
-                cable_breaker_indices.append(idx)
-
-        ditto_cable_indices: set[int] = set()
-        if cable_breaker_indices:
-            # Sort by x position (left to right)
-            sorted_cable = sorted(cable_breaker_indices, key=lambda i: layout_result.components[i].x)
-            leftmost_idx = sorted_cable[0]
-            rightmost_idx = sorted_cable[-1]
-            # Collect cable specs already shown on bookends
-            shown_cables: set[str] = {
-                layout_result.components[leftmost_idx].cable_annotation,
-                layout_result.components[rightmost_idx].cable_annotation,
-            }
-            for idx in sorted_cable:
-                if idx == leftmost_idx or idx == rightmost_idx:
-                    continue  # Bookends always show cable
-                cable = layout_result.components[idx].cable_annotation
-                if cable not in shown_cables:
-                    shown_cables.add(cable)  # Unique cable — show it
-                else:
-                    ditto_cable_indices.add(idx)  # Already shown — suppress
+        # Cable annotations are now handled by layout.py's shared leader line system
+        # (_add_cable_leader_lines) — no per-breaker cable text rendering needed.
 
         for comp_idx, comp in enumerate(layout_result.components):
             if comp.symbol_name == "LABEL":
@@ -582,11 +554,9 @@ class SldGenerator:
                     if comp.label_style == "breaker_block":
                         # LEW-style stacked breaker label block
                         is_ditto = comp_idx in ditto_breaker_indices
-                        is_cable_ditto = comp_idx in ditto_cable_indices
                         self._draw_breaker_block_label(
                             backend, comp,
                             is_ditto=is_ditto,
-                            is_cable_ditto=is_cable_ditto,
                         )
                     else:
                         # Default label rendering (for incoming chain components)
@@ -718,7 +688,6 @@ class SldGenerator:
         backend: DrawingBackend,
         comp: PlacedComponent,
         is_ditto: bool = False,
-        is_cable_ditto: bool = False,
     ) -> None:
         """
         Draw LEW-style breaker block label.
@@ -769,7 +738,7 @@ class SldGenerator:
                 label_top_y = comp.y + sym_h - 1  # Start 1mm below top of breaker
                 # Position LEFT of breaker: text starts here and extends rightward
                 # but stays to the left of the breaker symbol edge
-                base_x = comp.x - 12  # 12mm left of breaker left edge
+                base_x = comp.x - 6  # 6mm left of breaker left edge
                 for idx, line_text in enumerate(info_items):
                     backend.add_mtext(
                         line_text,
@@ -802,13 +771,9 @@ class SldGenerator:
                             char_height=char_h,
                         )
 
-                # Cable annotation — horizontal, to the LEFT of conductor
-                if comp.cable_annotation and not is_cable_ditto:
-                    backend.add_mtext(
-                        comp.cable_annotation,
-                        insert=(comp.x - 3, comp.y),
-                        char_height=1.3,
-                    )
+                # Cable annotation — now handled by layout.py as shared leader lines
+                # (horizontal leader + ticker marks + cable spec text at ends)
+                # Individual per-breaker cable text rendering is no longer used.
             else:
                 # Incoming chain breakers (original horizontal stacked logic)
                 block_text = "\\P".join(info_items)

@@ -140,6 +140,22 @@ class LayoutConfig:
     kwh_rect_w: float = 12.0         # KWH inner rectangle width (horizontal span)
     kwh_rect_h: float = 6.0          # KWH inner rectangle height (vertical span)
 
+    # Sub-circuit vertical offsets (derived from real LEW samples)
+    busbar_to_breaker_gap: float = 12.0   # Gap from busbar to sub-circuit breaker bottom
+    tail_length: float = 30.0             # Conductor tail above breaker top (fills page)
+    db_box_busbar_margin: float = 8.0     # DB box edge offset above busbar
+    db_box_tail_margin: float = 4.0       # DB box extends above breaker+stub by this
+    db_box_label_margin: float = 8.0      # DB box extends above tail for label area
+
+    # Cable leader line offsets
+    leader_margin_above_db: float = 10.0  # Leader line gap above DB box top
+    leader_extension: float = 10.0        # Horizontal extension beyond outermost conductor
+    leader_bend_height: float = 5.0       # Vertical L-bend height at leader end
+
+    # Earth bar offsets
+    earth_y_below_busbar: float = 25.0    # Earth bar Y below busbar
+    earth_x_from_db: float = 5.0          # Earth bar X right of DB box
+
     def __post_init__(self):
         """Sync symbol dimensions from real_symbol_paths.json (single source of truth)."""
         try:
@@ -898,10 +914,12 @@ def _add_cable_leader_lines(
     group_keys = list(cable_groups.keys())
     tick_size = 1.25  # Half-length of diagonal tick (matches meter board)
 
-    # Leader Y: 10mm above DB box top line
-    # DB box top ≈ busbar_y + 36 (busbar + 8 + mcb_h(13) + stub(3) + 4 + 8)
-    # = busbar_y + breaker_top_offset(28) + 8
-    leader_y = layout_result.busbar_y + 12 + config.mcb_h + config.stub_len + 18
+    # Leader Y: above DB box top line by config margin
+    # DB box top = busbar_y + db_box_busbar_margin + mcb_h + stub_len
+    #              + db_box_tail_margin + db_box_label_margin
+    db_box_top_offset = (config.db_box_busbar_margin + config.mcb_h + config.stub_len
+                         + config.db_box_tail_margin + config.db_box_label_margin)
+    leader_y = layout_result.busbar_y + db_box_top_offset + config.leader_margin_above_db
 
     for gi, (cable_spec, tap_xs) in enumerate(cable_groups.items()):
         tap_xs.sort()
@@ -912,8 +930,8 @@ def _add_cable_leader_lines(
         text_on_left = (gi == 0)
         text_on_right = (gi == len(group_keys) - 1) and gi > 0
 
-        leader_extension = 10.0  # mm beyond outermost conductor
-        bend_height = 5.0  # vertical bend at leader end (L-shape)
+        leader_extension = config.leader_extension
+        bend_height = config.leader_bend_height
 
         if text_on_left:
             leader_start_x = leftmost_x - leader_extension
@@ -940,7 +958,13 @@ def _add_cable_leader_lines(
 
         # L-shaped bend + cable spec text at leader end
         # Pattern: horizontal leader → vertical bend upward → cable spec text
-        cable_text = format_cable_spec(cable_spec)
+        cable_text = cable_spec
+        # Split long cable text into 2 lines to avoid exceeding drawing border
+        # Insert \\P (DXF line break) before "PVC CPC" or "CPC" suffix
+        import re
+        m = re.search(r'\s+(PVC\s+CPC|CPC)\s+IN\s+', cable_text)
+        if m:
+            cable_text = cable_text[:m.start()] + "\\P" + cable_text[m.start() + 1:]
         if text_on_left:
             # Vertical bend going UP from left end of leader
             bend_top_y = leader_y + bend_height
@@ -1939,8 +1963,9 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
 
     # -- 6a. DB Box (DASHED rectangle around distribution board per reference DWG) --
     # Encompasses: main breaker, ELCB/RCCB, busbar, and all sub-circuit breakers
-    db_box_end_y = busbar_y_row + 8 + config.mcb_h + config.stub_len + 4 + 8
-    # = busbar + gap(8) + breaker_height + stub + tail(4) + label(8) — compact
+    db_box_end_y = (busbar_y_row + config.db_box_busbar_margin
+                    + config.mcb_h + config.stub_len
+                    + config.db_box_tail_margin + config.db_box_label_margin)
     db_box_left = result.busbar_start_x - 10   # Extra margin for leftmost circuit labels
     db_box_right = result.busbar_end_x + 10    # Extra margin for rightmost circuit labels
     # Clamp to drawing bounds
@@ -1987,8 +2012,8 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     _earth_w = _earth_dims["width_mm"]   # 12
     _earth_h = _earth_dims["height_mm"]  # 10
 
-    earth_x = db_box_right + 5      # 5mm right of DB box
-    earth_y = result.busbar_y - 25   # Below busbar level
+    earth_x = db_box_right + config.earth_x_from_db
+    earth_y = result.busbar_y - config.earth_y_below_busbar
 
     # Earth conductor size annotation (calculate early for boundary check)
     earth_conductor_mm2 = requirements.get("earth_conductor_mm2", 0)
@@ -2017,7 +2042,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
         shift = earth_rightmost - (border_right - 3)
         earth_x = earth_x - shift
         # Maintain minimum 3mm gap from DB box
-        earth_x = max(earth_x, db_box_right + 3)
+        earth_x = max(earth_x, db_box_right + config.earth_x_from_db - 2)
 
     result.components.append(PlacedComponent(
         symbol_name="EARTH",
@@ -2269,7 +2294,7 @@ def _place_sub_circuits_upward(
             continue
 
         # Vertical line UP from busbar to breaker
-        sc_y = busbar_y + 12  # 12mm above busbar (past circuit ID box)
+        sc_y = busbar_y + config.busbar_to_breaker_gap  # Above busbar (past circuit ID box)
 
         # Vertical drop from busbar (upward)
         result.connections.append(((tap_x, busbar_y), (tap_x, sc_y)))
@@ -2356,7 +2381,7 @@ def _place_sub_circuits_upward(
 
         # Tail from breaker top (extending upward)
         breaker_top_y = sc_y + sc_cb_h + config.stub_len
-        tail_end_y = breaker_top_y + 30  # Long tail — fills page vertically
+        tail_end_y = breaker_top_y + config.tail_length  # Conductor tail above breaker
 
         # Connection from breaker top to tail end
         result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
