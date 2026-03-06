@@ -122,6 +122,7 @@ class LayoutConfig:
     min_x: float = 25               # Left margin 25mm (real samples ~25-35mm)
     max_x: float = 395              # Right margin 25mm
     min_y: float = 62               # Title block occupies bottom ~55mm
+    max_y: float = 285              # Top drawing border (297 - 10mm margin - 2mm buffer)
 
     # Symbol dimension references — auto-synced from real_symbol_paths.json
     # These are default fallback values; __post_init__ overwrites from JSON source
@@ -945,6 +946,16 @@ def _add_cable_leader_lines(
         for tap_x, cable_spec in row_entries:
             cable_groups.setdefault(cable_spec, []).append(tap_x)
 
+        # Estimate cable text height and clamp leader_y to keep text within top border
+        _CHAR_W_EST = 1.8  # Approximate char width for char_height 2.8
+        max_spec_len = max(len(s) for s in cable_groups.keys())
+        # After multiline split, longest line is roughly half + some margin
+        est_line_chars = max_spec_len // 2 + 5
+        est_text_h = est_line_chars * _CHAR_W_EST
+        max_leader_y = config.max_y - config.leader_bend_height - 1 - est_text_h
+        if leader_y > max_leader_y:
+            leader_y = max_leader_y
+
         group_keys = list(cable_groups.keys())
 
         for gi, (cable_spec, tap_xs) in enumerate(cable_groups.items()):
@@ -966,11 +977,11 @@ def _add_cable_leader_lines(
             bend_height = config.leader_bend_height
 
             if text_on_left:
-                leader_start_x = leftmost_x - leader_extension
+                leader_start_x = max(leftmost_x - leader_extension, config.min_x)
                 leader_end_x = rightmost_x
             else:
                 leader_start_x = leftmost_x
-                leader_end_x = rightmost_x + leader_extension
+                leader_end_x = min(rightmost_x + leader_extension, config.max_x)
 
             # Horizontal leader line
             layout_result.connections.append((
@@ -2076,11 +2087,26 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     result.symbols_used.add("EARTH")
 
     if earth_conductor_mm2:
+        conductor_label = f"1 x {earth_conductor_mm2}sqmm CU/GRN-YEL"
+        _CHAR_W_LABEL = 1.8  # Approximate char width at char_height 2.8
+        label_width = len(conductor_label) * _CHAR_W_LABEL
+        label_x = earth_x
+        # Ensure label doesn't exceed right drawing border (A3: 420 - 10mm margin)
+        border_right_abs = 410
+        if label_x + label_width > border_right_abs - 2:
+            # Try shifting label left (can overlap into DB box area since it's below)
+            label_x = border_right_abs - 2 - label_width
+            label_x = max(label_x, config.min_x)
+            # If still too wide, wrap to 2 lines at "CU/GRN-YEL" boundary
+            recalc_width = len(conductor_label) * _CHAR_W_LABEL
+            if label_x + recalc_width > border_right_abs - 2:
+                conductor_label = f"1 x {earth_conductor_mm2}sqmm\\PCU/GRN-YEL"
+                label_x = earth_x  # Reset x since text is now shorter per line
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=earth_x,
+            x=label_x,
             y=earth_y - 5,
-            label=f"1 x {earth_conductor_mm2}sqmm CU/GRN-YEL",
+            label=conductor_label,
         ))
 
     # Solid earth conductor -- from DB box right wall to earth bar (outside DB box)
