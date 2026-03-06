@@ -31,6 +31,15 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
   - `curl http://localhost:8100/api/version`
 - **개발서버**: `43.210.92.190:8100` (Docker 컨테이너 `bluelight-sld-agent`)
 
+### 배포 전 로컬 검증 필수
+- **반드시 로컬 PC에서 먼저 동작을 확인한 후 개발서버에 배포할 것**
+- AI Service 변경 시 로컬 검증 절차:
+  1. 로컬 AI 서비스 실행: `python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload`
+  2. 변경된 기능 테스트 (SLD 생성 등)
+  3. 출력 결과 확인 (PDF 다운로드, 브라우저 미리보기 등)
+  4. 정상 동작 확인 후에만 commit → push → 개발서버 배포
+- 문법 체크(`ast.parse`)만으로는 불충분 — 실제 기능 동작 확인 필수
+
 ## Key Conventions
 - 한국어 커밋 메시지 사용
 - Soft delete 패턴 (deleted_at, @SQLDelete + @SQLRestriction)

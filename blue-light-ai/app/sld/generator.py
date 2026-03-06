@@ -27,6 +27,7 @@ Outputs PDF (for EMA submission) and SVG (for web preview).
 
 import logging
 import math
+import re
 from pathlib import Path
 
 from app.sld.backend import DrawingBackend
@@ -53,6 +54,7 @@ from app.sld.real_symbols import (
     RealMCCB,
     RealRCCB,
     get_real_symbol,
+    get_symbol_dimensions,
 )
 from app.sld.svg_backend import SvgBackend
 from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
@@ -150,6 +152,24 @@ class SldGenerator:
         "PROTECTION_RELAY": "O/C E/F",
         "PT": "PT",
     }
+
+    @staticmethod
+    def _get_breaker_dims(breaker_type: str) -> tuple[float, float]:
+        """Get (width, height) for a breaker type from real_symbol_paths.json.
+
+        Maps breaker_type_str values to symbol registry keys and returns
+        calibrated dimensions.  Falls back to MCB if type is unknown.
+        """
+        _TYPE_MAP = {
+            "MCB": "MCB",
+            "MCCB": "MCCB",
+            "ACB": "ACB",
+            "RCCB": "RCCB",
+            "ELCB": "ELCB",
+        }
+        sym_key = _TYPE_MAP.get(breaker_type, "MCB")
+        dims = get_symbol_dimensions(sym_key)
+        return dims["width_mm"], dims["height_mm"]
 
     def generate(
         self,
@@ -355,15 +375,22 @@ class SldGenerator:
 
         # Pre-scan: identify duplicate breaker specs for label deduplication
         # Build spec signature → list of component indices (sorted left-to-right)
+        # KEY: include circuit_id PREFIX (S/P/H/SP) in the signature so that
+        # ditto groups reset when circuit category changes.
+        # Reference DWG: P1(B20A) labeled, P2-P4 ditto, H5(B20A) labeled again, H6 ditto
         breaker_spec_groups: dict[str, list[int]] = {}
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block":
-                sig = f"{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
+                # Extract category prefix from circuit_id (S, P, H, SP, L1S, L1P, etc.)
+                cid = comp.circuit_id or ""
+                prefix_match = re.match(r"([A-Z]+)", cid)
+                category_prefix = prefix_match.group(1) if prefix_match else "X"
+                sig = f"{category_prefix}|{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
                 breaker_spec_groups.setdefault(sig, []).append(idx)
 
         # For groups with 2+ identical specs, only the FIRST (leftmost) gets full label
-        # Rest are omitted (blank — no arrow, no label)
-        # Singapore LEW convention: "Only state B10A MCB 10KA one time"
+        # Rest show → ditto arrow
+        # Singapore LEW convention: label shown once per category group
         ditto_breaker_indices: set[int] = set()
         for sig, indices in breaker_spec_groups.items():
             if len(indices) >= 2:
@@ -374,16 +401,20 @@ class SldGenerator:
                     ditto_breaker_indices.add(i)
 
         # Pre-scan: identify duplicate cable annotations for deduplication
-        # Cable annotation → list of component indices (sorted left-to-right)
+        # Also scoped by circuit category prefix (same reset logic)
         cable_groups: dict[str, list[int]] = {}
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block" and comp.cable_annotation:
-                cable_groups.setdefault(comp.cable_annotation, []).append(idx)
+                cid = comp.circuit_id or ""
+                prefix_match = re.match(r"([A-Z]+)", cid)
+                category_prefix = prefix_match.group(1) if prefix_match else "X"
+                cable_key = f"{category_prefix}|{comp.cable_annotation}"
+                cable_groups.setdefault(cable_key, []).append(idx)
 
         # For groups with 2+ identical cables, only the FIRST gets cable text
-        # Singapore LEW convention: cable spec written once for identical circuits
+        # Singapore LEW convention: cable spec written once per category group
         ditto_cable_indices: set[int] = set()
-        for cable_text, indices in cable_groups.items():
+        for cable_key, indices in cable_groups.items():
             if len(indices) >= 2:
                 sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
                 for i in sorted_indices[1:]:
@@ -454,31 +485,24 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "DB_INFO_BOX":
-                # Dashed box with DB rating, approved load, and premises address
-                box_w = 80
-                box_h = 14  # Compact (was 18)
+                # DB rating and approved load labels inside the DB dashed box
+                # (outer dashed box is drawn by _place_db_box via dashed_connections)
                 bx = comp.x
-                by = comp.y - box_h  # Box extends downward from comp.y
+                by = comp.y
 
-                # Dashed box outline (4 sides)
-                _draw_dashed_line(backend, (bx, by), (bx + box_w, by), dash_len=2.5, gap_len=1.5)
-                _draw_dashed_line(backend, (bx + box_w, by), (bx + box_w, by + box_h), dash_len=2.5, gap_len=1.5)
-                _draw_dashed_line(backend, (bx + box_w, by + box_h), (bx, by + box_h), dash_len=2.5, gap_len=1.5)
-                _draw_dashed_line(backend, (bx, by + box_h), (bx, by), dash_len=2.5, gap_len=1.5)
-
-                # DB rating title (e.g., "100A DB")
                 backend.set_layer("SLD_ANNOTATIONS")
+                # DB rating title in bold/larger text (e.g., "40A DB")
                 backend.add_mtext(
                     comp.label,
-                    insert=(bx + 3, by + box_h - 2),
-                    char_height=2.5,  # Compact (was 3.0)
+                    insert=(bx + 3, by),
+                    char_height=3.0,  # Larger for emphasis (matches reference DWG)
                 )
                 # Approved load + premises (multi-line via \\P)
                 if comp.rating:
                     backend.add_mtext(
                         comp.rating,
-                        insert=(bx + 3, by + box_h - 5),  # Compact (was box_h - 7)
-                        char_height=1.8,  # Compact (was 2.0)
+                        insert=(bx + 3, by - 4),
+                        char_height=1.8,
                     )
                 count += 1
 
@@ -486,10 +510,21 @@ class SldGenerator:
                 # Symbol (breaker, meter, earth, isolator, CT, etc.)
                 symbol = self._get_symbol(comp.symbol_name)
                 if symbol:
+                    # Check for horizontal drawing mode (rotation=90 used for meter board)
+                    # NOTE: Sub-circuit breakers also have rotation=90.0 but for TEXT rotation,
+                    # NOT symbol orientation. Only meter board components (label_style != "breaker_block")
+                    # should use horizontal drawing.
+                    use_horizontal = (
+                        comp.rotation == 90.0
+                        and hasattr(symbol, 'draw_horizontal')
+                        and getattr(comp, 'label_style', '') != 'breaker_block'
+                    )
+
                     # For DXF backend: use native block INSERT when available
                     # (MCCB/RCCB blocks imported from reference DXF template)
+                    # Skip DXF block insertion for horizontal symbols (no rotated blocks)
                     dxf_block_used = False
-                    if isinstance(backend, DxfBackend):
+                    if not use_horizontal and isinstance(backend, DxfBackend):
                         dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
                         if dxf_block_name and backend.has_block(dxf_block_name):
                             scale = symbol.height / _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82)
@@ -499,7 +534,10 @@ class SldGenerator:
                             dxf_block_used = True
 
                     if not dxf_block_used:
-                        symbol.draw(backend, comp.x, comp.y)
+                        if use_horizontal:
+                            symbol.draw_horizontal(backend, comp.x, comp.y)
+                        else:
+                            symbol.draw(backend, comp.x, comp.y)
 
                     backend.set_layer("SLD_ANNOTATIONS")
 
@@ -523,14 +561,29 @@ class SldGenerator:
                             label_text = comp.label
 
                         if label_text:
-                            # Label to the right of the symbol
-                            label_offset_x = symbol.width + 3 if symbol else 8
-                            label_offset_y = symbol.height / 2 + 2 if symbol else 14
-                            backend.add_mtext(
-                                label_text,
-                                insert=(comp.x + label_offset_x, comp.y + label_offset_y),
-                                char_height=2.3,
-                            )
+                            if use_horizontal:
+                                # Horizontal symbol: label BELOW, centered on symbol
+                                # symbol.width = vertical extent when drawn horizontally
+                                # symbol.height = horizontal extent when drawn horizontally
+                                v_half = symbol.width / 2 if symbol else 4
+                                h_extent = symbol.height if symbol else 14
+                                label_y = comp.y - v_half - 1.5  # gap below symbol bottom
+                                # Center label horizontally on component body
+                                label_x = comp.x + h_extent / 2 - 5
+                                backend.add_mtext(
+                                    label_text,
+                                    insert=(label_x, label_y),
+                                    char_height=1.6,
+                                )
+                            else:
+                                # Label to the right of the symbol
+                                label_offset_x = symbol.width + 3 if symbol else 8
+                                label_offset_y = symbol.height / 2 + 2 if symbol else 14
+                                backend.add_mtext(
+                                    label_text,
+                                    insert=(comp.x + label_offset_x, comp.y + label_offset_y),
+                                    char_height=2.3,
+                                )
 
                         # Cable annotation (below symbol, to the right)
                         if comp.cable_annotation:
@@ -588,26 +641,31 @@ class SldGenerator:
             info_items.append(f"{comp.fault_kA}kA")  # e.g., "6kA"
 
         if abs(comp.rotation - 90.0) < 0.1:
-            # Vertical text: breaker info to the RIGHT of the breaker, rotated 90 degrees
-            # Real LEW SLDs show: "B20A", "SPN", "MCB", "6kA" as separate vertical columns
-            if comp.breaker_type_str in ("MCCB", "ACB"):
-                base_x = comp.x + 12  # MCCB/ACB wider (8.4mm symbol)
-            else:
-                base_x = comp.x + 10  # MCB (7.2mm symbol + gap)
-            char_h = 2.5  # Larger for readability (matches real samples)
-            line_gap = 4.0  # Column spacing between breaker spec items
+            # HORIZONTAL stacked text to the LEFT of breaker (matching reference DWG)
+            # Format: B10A / SPN / MCB / 6kA — each on its own horizontal line
+            sym_w, sym_h = self._get_breaker_dims(comp.breaker_type_str)
+            char_h = 2.0  # Compact horizontal text
+            line_gap = char_h + 0.5  # ~2.5mm line spacing
 
             if is_ditto:
-                # Ditto: skip label entirely (Singapore convention — spec stated once)
-                pass
+                # Ditto: draw → arrow (LEW convention — "same spec as above")
+                # Arrow positioned at breaker label area (left side)
+                arrow_cx = comp.x - 4          # Left of breaker symbol
+                arrow_cy = comp.y + sym_h / 2  # Vertically centered on breaker
+                _draw_ditto_arrow(backend, arrow_cx, arrow_cy)
             else:
-                # Full label: draw each info line as a separate column
+                # Labels stacked from TOP of breaker downward, to the LEFT
+                # In layout coords: higher Y = higher on screen
+                # So first item at highest Y (top), each subsequent lower
+                label_top_y = comp.y + sym_h - 1  # Start 1mm below top of breaker
+                # Position LEFT of breaker: text starts here and extends rightward
+                # but stays to the left of the breaker symbol edge
+                base_x = comp.x - 12  # 12mm left of breaker left edge
                 for idx, line_text in enumerate(info_items):
                     backend.add_mtext(
                         line_text,
-                        insert=(base_x + idx * line_gap, comp.y),
+                        insert=(base_x, label_top_y - idx * line_gap),
                         char_height=char_h,
-                        rotation=90.0,
                     )
 
             # Cable annotation to the LEFT of conductor (vertical)
@@ -615,14 +673,7 @@ class SldGenerator:
             # Singapore convention: cable text runs vertically alongside the outgoing wire
             if comp.cable_annotation and not is_cable_ditto:
                 # Calculate tail start position (above breaker symbol + stub)
-                if comp.breaker_type_str in ("RCCB", "ELCB"):
-                    _sym_h = 15.0
-                elif comp.breaker_type_str in ("MCCB",):
-                    _sym_h = 15.0
-                elif comp.breaker_type_str in ("ACB",):
-                    _sym_h = 17.0
-                else:  # MCB
-                    _sym_h = 13.0
+                _, _sym_h = self._get_breaker_dims(comp.breaker_type_str)
                 # Place cable text above the DB box boundary:
                 # breaker top = comp.y + sym_h + stub(3)
                 # DB box top ≈ comp.y + 24 (for MCB: busbar+12=comp.y, box extends +36-12=+24)
@@ -645,8 +696,10 @@ class SldGenerator:
                 line_gap = char_h + 0.8  # ~2.6mm per line
 
                 if is_ditto:
-                    # Ditto: skip label entirely (Singapore convention — spec stated once)
-                    pass
+                    # Ditto: draw → arrow (LEW convention — "same spec as above")
+                    arrow_cx = comp.x + 3
+                    arrow_cy = comp.y + 4
+                    _draw_ditto_arrow(backend, arrow_cx, arrow_cy)
                 else:
                     for idx, line_text in enumerate(info_items):
                         backend.add_mtext(
@@ -683,6 +736,9 @@ class SldGenerator:
         backend.set_layer("SLD_CONNECTIONS")
         for start, end in layout_result.connections:
             backend.add_line(start, end)
+        # Thick connections — heavier line weight (0.5mm) for outgoing cable tick marks
+        for start, end in layout_result.thick_connections:
+            backend.add_line(start, end, lineweight=50)
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw dashed connection lines (earth conductors, etc.)."""
@@ -1044,6 +1100,35 @@ def _draw_flow_arrow(
         insert=(x + 2, y + 2),
         char_height=2.5,
     )
+
+
+# -- Helper: Ditto arrow (→) for identical breaker specs --
+
+
+def _draw_ditto_arrow(
+    backend: DrawingBackend,
+    x: float,
+    y: float,
+    arrow_len: float = 6.0,
+) -> None:
+    """
+    Draw a ditto arrow → at the given position.
+
+    LEW convention: when multiple sub-circuits have identical breaker specs,
+    the first circuit shows full label (B10A / SPN / MCB / 6kA) and subsequent
+    circuits show a → arrow meaning "same as the labeled circuit."
+
+    Reference DWG: small horizontal arrow (→) positioned at the breaker label area.
+    """
+    backend.set_layer("SLD_ANNOTATIONS")
+    half = arrow_len / 2
+    head = 2.0  # Arrowhead length
+
+    # Arrow shaft (horizontal line)
+    backend.add_line((x - half, y), (x + half, y))
+    # Arrowhead (pointing right →)
+    backend.add_line((x + half, y), (x + half - head, y + 1.2))
+    backend.add_line((x + half, y), (x + half - head, y - 1.2))
 
 
 # -- Helper: AC supply symbol (~) --
