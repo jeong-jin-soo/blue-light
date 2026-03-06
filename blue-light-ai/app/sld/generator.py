@@ -215,8 +215,8 @@ class SldGenerator:
             lew_mobile=application_info.get("lew_mobile", "") or application_info.get("assignedLewMobile", ""),
             sld_only_mode=application_info.get("sld_only_mode", False),
             client_name=application_info.get("client_name", "") or application_info.get("clientName", ""),
-            main_contractor=application_info.get("contractor_name", "") or application_info.get("mainContractor", ""),
-            elec_contractor=application_info.get("elec_contractor", "") or "LicenseKaki",
+            main_contractor=application_info.get("contractor_name", "") or application_info.get("mainContractor", "") or application_info.get("main_contractor", ""),
+            elec_contractor=application_info.get("elec_contractor", "") or application_info.get("electrical_contractor", "") or "LicenseKaki",
             elec_contractor_addr=application_info.get("elec_contractor_addr", "") or application_info.get("contractor_address", ""),
             elec_contractor_tel=application_info.get("elec_contractor_tel", ""),
             drawing_number=application_info.get("drawing_number", ""),
@@ -299,7 +299,11 @@ class SldGenerator:
         Returns:
             Tuple of (pdf_bytes, svg_string, dxf_bytes_or_none).
         """
+        # Support title block data from both application_info (API) and
+        # requirements['title_block'] (direct/testing calls)
         app_info = application_info or {}
+        if not app_info and "title_block" in requirements:
+            app_info = requirements["title_block"]
         generator = SldGenerator()
 
         pdf = PdfBackend(output_path=None)  # in-memory buffer
@@ -308,7 +312,7 @@ class SldGenerator:
         layout_result = compute_layout(requirements, application_info=app_info)
 
         title_block_kwargs = dict(
-            project_name=app_info.get("project_title", "") or app_info.get("address", "Electrical Installation"),
+            project_name=app_info.get("project_title", "") or app_info.get("client_name", "") or app_info.get("address", "Electrical Installation"),
             address=app_info.get("client_address", "") or app_info.get("address", ""),
             postal_code=app_info.get("postalCode", ""),
             kva=requirements.get("kva", 0),
@@ -319,8 +323,8 @@ class SldGenerator:
             lew_mobile=app_info.get("lew_mobile", "") or app_info.get("assignedLewMobile", ""),
             sld_only_mode=app_info.get("sld_only_mode", False),
             client_name=app_info.get("client_name", "") or app_info.get("clientName", ""),
-            main_contractor=app_info.get("contractor_name", "") or app_info.get("mainContractor", ""),
-            elec_contractor=app_info.get("elec_contractor", "") or "LicenseKaki",
+            main_contractor=app_info.get("contractor_name", "") or app_info.get("mainContractor", "") or app_info.get("main_contractor", ""),
+            elec_contractor=app_info.get("elec_contractor", "") or app_info.get("electrical_contractor", "") or "LicenseKaki",
             elec_contractor_addr=app_info.get("elec_contractor_addr", "") or app_info.get("contractor_address", ""),
             elec_contractor_tel=app_info.get("elec_contractor_tel", ""),
             drawing_number=app_info.get("drawing_number", ""),
@@ -400,25 +404,36 @@ class SldGenerator:
                 for i in sorted_indices[1:]:
                     ditto_breaker_indices.add(i)
 
-        # Pre-scan: identify duplicate cable annotations for deduplication
-        # Also scoped by circuit category prefix (same reset logic)
-        cable_groups: dict[str, list[int]] = {}
+        # Pre-scan: cable annotations — "bookend" convention
+        # Singapore LEW professional convention: cable annotations shown ONLY on
+        # the leftmost and rightmost sub-circuits (the two extremes of the busbar).
+        # This avoids overlap in dense layouts and matches reference DWGs.
+        # If an intermediate circuit has a UNIQUE cable spec not shown on either
+        # bookend, it also gets an annotation.
+        cable_breaker_indices: list[int] = []
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block" and comp.cable_annotation:
-                cid = comp.circuit_id or ""
-                prefix_match = re.match(r"([A-Z]+)", cid)
-                category_prefix = prefix_match.group(1) if prefix_match else "X"
-                cable_key = f"{category_prefix}|{comp.cable_annotation}"
-                cable_groups.setdefault(cable_key, []).append(idx)
+                cable_breaker_indices.append(idx)
 
-        # For groups with 2+ identical cables, only the FIRST gets cable text
-        # Singapore LEW convention: cable spec written once per category group
         ditto_cable_indices: set[int] = set()
-        for cable_key, indices in cable_groups.items():
-            if len(indices) >= 2:
-                sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
-                for i in sorted_indices[1:]:
-                    ditto_cable_indices.add(i)
+        if cable_breaker_indices:
+            # Sort by x position (left to right)
+            sorted_cable = sorted(cable_breaker_indices, key=lambda i: layout_result.components[i].x)
+            leftmost_idx = sorted_cable[0]
+            rightmost_idx = sorted_cable[-1]
+            # Collect cable specs already shown on bookends
+            shown_cables: set[str] = {
+                layout_result.components[leftmost_idx].cable_annotation,
+                layout_result.components[rightmost_idx].cable_annotation,
+            }
+            for idx in sorted_cable:
+                if idx == leftmost_idx or idx == rightmost_idx:
+                    continue  # Bookends always show cable
+                cable = layout_result.components[idx].cable_annotation
+                if cable not in shown_cables:
+                    shown_cables.add(cable)  # Unique cable — show it
+                else:
+                    ditto_cable_indices.add(idx)  # Already shown — suppress
 
         for comp_idx, comp in enumerate(layout_result.components):
             if comp.symbol_name == "LABEL":

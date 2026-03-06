@@ -269,6 +269,8 @@ class _LayoutContext:
 
     # Tracking (set by sections, read by later sections)
     db_box_start_y: float = 0
+    db_info_label: str = ""      # e.g. "40A DB"
+    db_info_text: str = ""       # e.g. "APPROVED LOAD: 9.2KVA AT 230V"
 
     # Raw inputs (for sections that need full access)
     requirements: dict = field(default_factory=dict)
@@ -1508,7 +1510,7 @@ def _place_main_breaker(ctx: _LayoutContext) -> None:
         label=main_label,
         rating=main_rating,
     ))
-    y += cb_h + config.stub_len + 4  # stub + gap(4) — extra space to avoid label overlap with RCCB
+    y += cb_h + config.stub_len  # height + stub — continuous connection to next component
     result.connections.append(((cx, y), (cx, y + 3)))
     y += 3
     result.symbols_used.add(breaker_type)
@@ -1550,7 +1552,7 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         label=f"{elcb_rating}A {elcb_poles_str} {elcb_type_str}",
         rating=f"({elcb_ma}mA)",
     ))
-    y += elcb_h + config.stub_len + 4  # stub + gap(4) — extra space for label clearance
+    y += elcb_h + config.stub_len  # height + stub — continuous connection to next component
     result.connections.append(((cx, y), (cx, y + 3)))
     y += 3
     result.symbols_used.add(elcb_type_str)
@@ -1616,7 +1618,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         label=f"{breaker_rating}A DB",
         rating="",
     ))
-    # -- DB Info Box (dashed box below busbar with load info) --
+    # -- DB Info: compute text, defer placement to _place_db_box() --
     if kva:
         approved_kva = kva
     elif supply_type == "three_phase":
@@ -1628,31 +1630,16 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     if application_info:
         premises_addr = application_info.get("address", "")
 
-    db_info_box_w = 80
-    # When RCCB/ELCB is present, left-align to avoid overlap with RCCB label (extends right from cx)
-    if elcb_rating:
-        db_info_x = bus_start_x + 3  # Left-aligned inside busbar extent
-    else:
-        db_info_x = (bus_start_x + bus_end_x) / 2 - db_info_box_w / 2  # Centered on busbar
-
-    # Busbar rating label — positioned to the right of DB info box to avoid overlap
-    busbar_label_x = db_info_x + db_info_box_w + 3  # Right of DB info box
-    if busbar_label_x + 35 > config.max_x:
-        busbar_label_x = bus_end_x - 35  # Fallback to right side of busbar
-    # Match real LEW SLD format: "DB #B1-01 APPROVED LOAD 14.49KWA 230V"
     db_info_text = f"APPROVED LOAD: {approved_kva}KVA AT {voltage}V"
     if premises_addr:
         db_info_text += f"\\PLOCATED AT {premises_addr}"
 
-    result.components.append(PlacedComponent(
-        symbol_name="DB_INFO_BOX",
-        x=db_info_x,
-        y=y - 3,  # Positioned just below busbar
-        label=f"{breaker_rating}A DB",
-        rating=db_info_text,
-    ))
+    # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
+    ctx.db_info_label = f"{breaker_rating}A DB"
+    ctx.db_info_text = db_info_text
 
-    # Busbar rating label — positioned to the right of DB info box
+    # Busbar rating label — left-aligned below busbar (per reference DWG)
+    busbar_label_x = bus_start_x + config.busbar_margin
     result.components.append(PlacedComponent(
         symbol_name="LABEL",
         x=busbar_label_x,
@@ -1755,8 +1742,15 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_left, db_box_end_y)))
     result.dashed_connections.append(((db_box_right, db_box_start_y), (db_box_right, db_box_end_y)))
 
-    # "40A DB" + "APPROVED LOAD" labels are placed by _place_main_busbar() → DB_INFO_BOX
-    # No additional labels needed here
+    # "40A DB" + "APPROVED LOAD" labels — bottom-left inside DB box (per reference DWG)
+    if ctx.db_info_label:
+        result.components.append(PlacedComponent(
+            symbol_name="DB_INFO_BOX",
+            x=db_box_left + 3,
+            y=db_box_start_y + 8,  # Inside box, near bottom-left
+            label=ctx.db_info_label,
+            rating=ctx.db_info_text,
+        ))
 
     return db_box_right
 
@@ -2133,25 +2127,16 @@ def _place_sub_circuits_upward(
 
         # Circuit name label (vertical text, above the tail)
         # Circuit ID is already shown in the CIRCUIT_ID_BOX at the busbar tap
+        # Combine room/area name as suffix (reference DWG: "6 Nos 13A S/S/O — BEDROOM 1")
+        sc_room = str(circuit.get("room", "") or circuit.get("location", "") or circuit.get("area", "")).strip()
+        sc_display_name = sc_name
+        if sc_room:
+            # Append room as suffix with em dash separator
+            sc_display_name = f"{sc_name} — {sc_room}"
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=tap_x + 3,
             y=tail_end_y + 2,
-            label=sc_name,
+            label=sc_display_name,
             rotation=90.0,
         ))
-
-        # Room/area name label (reference DWG: "- BEDROOM 1", "- KITCHEN")
-        # Displayed as a separate vertical line to the right of circuit description
-        # Gap = char_height(2.8) + 1mm clearance ≈ 4mm from circuit name
-        sc_room = str(circuit.get("room", "") or circuit.get("location", "") or circuit.get("area", "")).strip()
-        if sc_room:
-            # Prefix with "- " per reference DWG convention
-            room_label = f"- {sc_room}" if not sc_room.startswith("-") else sc_room
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=tap_x + 7,  # 4mm right of circuit name (avoids overlap)
-                y=tail_end_y + 2,
-                label=room_label,
-                rotation=90.0,
-            ))
