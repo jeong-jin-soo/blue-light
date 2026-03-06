@@ -1361,11 +1361,12 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
 
         # Cable annotation on outgoing vertical line (meter board → DB)
         # Reference: tick mark on vertical wire + leader LEFT + cable spec text
-        # LEFT side outgoing tick: THICKER and LONGER than right side incoming tick
+        # LEFT side outgoing tick: THICKER than incoming tick (standard cable tick style)
+        # This thick tick style is the standard for all non-incoming cables
         if outgoing_cable_text:
             # Tick mark position: midpoint of gap above meter board box
             tick_y = (mb_box_top + y_exit) / 2
-            tick_size = 2.5  # Longer than incoming tick (1.5)
+            tick_size = 1.25  # Standard cable tick (half-length of diagonal)
             # Diagonal tick crossing vertical line (/ shape)
             # Use thick_connections for heavier line weight
             result.thick_connections.append((
