@@ -857,6 +857,122 @@ def _fit_busbar_to_groups(
             break
 
 
+def _add_cable_leader_lines(
+    layout_result: LayoutResult,
+    config: LayoutConfig,
+) -> None:
+    """Add cable spec leader lines AFTER resolve_overlaps.
+
+    Groups sub-circuits by cable_annotation, draws a shared horizontal leader
+    line with ticker marks at each conductor intersection, and places the cable
+    spec text at one end.  Uses final (post-resolve_overlaps) positions from
+    SubCircuitGroup.tap_x.
+
+    Reference DWG pattern:
+      left-most cable group  → text at left end of leader
+      right-most cable group → text at right end of leader
+    """
+    from collections import OrderedDict
+
+    groups, _ = _identify_groups(layout_result)
+    if not groups:
+        return
+
+    # Collect non-spare groups with cable annotation
+    cable_entries: list[tuple[float, str]] = []  # (tap_x, cable_spec)
+    for g in groups:
+        if g.is_spare or g.breaker_idx is None:
+            continue
+        comp = layout_result.components[g.breaker_idx]
+        if comp.cable_annotation:
+            cable_entries.append((g.tap_x, comp.cable_annotation))
+
+    if not cable_entries:
+        return
+
+    # Group by cable spec (preserving order of first occurrence)
+    cable_groups: OrderedDict[str, list[float]] = OrderedDict()
+    for tap_x, cable_spec in cable_entries:
+        cable_groups.setdefault(cable_spec, []).append(tap_x)
+
+    group_keys = list(cable_groups.keys())
+    tick_size = 1.25  # Half-length of diagonal tick (matches meter board)
+
+    # Leader Y: 10mm above DB box top line
+    # DB box top ≈ busbar_y + 36 (busbar + 8 + mcb_h(13) + stub(3) + 4 + 8)
+    # = busbar_y + breaker_top_offset(28) + 8
+    leader_y = layout_result.busbar_y + 12 + config.mcb_h + config.stub_len + 18
+
+    for gi, (cable_spec, tap_xs) in enumerate(cable_groups.items()):
+        tap_xs.sort()
+        leftmost_x = tap_xs[0]
+        rightmost_x = tap_xs[-1]
+
+        # Determine leader direction
+        text_on_left = (gi == 0)
+        text_on_right = (gi == len(group_keys) - 1) and gi > 0
+
+        leader_extension = 10.0  # mm beyond outermost conductor
+        bend_height = 5.0  # vertical bend at leader end (L-shape)
+
+        if text_on_left:
+            leader_start_x = leftmost_x - leader_extension
+            leader_end_x = rightmost_x
+        elif text_on_right:
+            leader_start_x = leftmost_x
+            leader_end_x = rightmost_x + leader_extension
+        else:
+            leader_start_x = leftmost_x - leader_extension
+            leader_end_x = rightmost_x
+
+        # Horizontal leader line
+        layout_result.connections.append((
+            (leader_start_x, leader_y),
+            (leader_end_x, leader_y),
+        ))
+
+        # Ticker marks at each conductor intersection
+        for tx in tap_xs:
+            layout_result.thick_connections.append((
+                (tx - tick_size, leader_y - tick_size),
+                (tx + tick_size, leader_y + tick_size),
+            ))
+
+        # L-shaped bend + cable spec text at leader end
+        # Pattern: horizontal leader → vertical bend upward → cable spec text
+        cable_text = format_cable_spec(cable_spec)
+        if text_on_left:
+            # Vertical bend going UP from left end of leader
+            bend_top_y = leader_y + bend_height
+            layout_result.connections.append((
+                (leader_start_x, leader_y),
+                (leader_start_x, bend_top_y),
+            ))
+            # Cable spec text starts from bend top, going up (rotation 90°)
+            layout_result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=leader_start_x - 3,
+                y=bend_top_y + 1,
+                label=cable_text,
+                rotation=90.0,
+            ))
+        else:
+            # Vertical bend going UP from right end of leader
+            bend_top_y = leader_y + bend_height
+            layout_result.connections.append((
+                (leader_end_x, leader_y),
+                (leader_end_x, bend_top_y),
+            ))
+            # Cable spec text starts from bend top, going up (rotation 90°)
+            layout_result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=leader_end_x + 3,
+                y=bend_top_y + 1,
+                label=cable_text,
+                rotation=90.0,
+            ))
+
+
 def resolve_overlaps(
     layout_result: LayoutResult,
     config: LayoutConfig | None = None,
@@ -997,6 +1113,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     _place_main_busbar(ctx)
     busbar_y_row = _place_sub_circuits_rows(ctx)
     resolve_overlaps(ctx.result, ctx.config)
+    _add_cable_leader_lines(ctx.result, ctx.config)
     db_box_right = _place_db_box(ctx, busbar_y_row)
     _place_earth_bar(ctx, db_box_right)
 
@@ -2243,7 +2360,6 @@ def _place_sub_circuits_upward(
 
         # Connection from breaker top to tail end
         result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
-        result.arrow_points.append((tap_x, tail_end_y))
 
         # Circuit name label (vertical text, above the tail)
         # Circuit ID is already shown in the CIRCUIT_ID_BOX at the busbar tap
@@ -2260,3 +2376,6 @@ def _place_sub_circuits_upward(
             label=sc_display_name,
             rotation=90.0,
         ))
+
+    # Cable leader lines are added AFTER resolve_overlaps (see _add_cable_leader_lines)
+    # because resolve_overlaps changes the sub-circuit tap_x positions.

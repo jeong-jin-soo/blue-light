@@ -777,22 +777,9 @@ class SldGenerator:
                         char_height=char_h,
                     )
 
-            # Cable annotation to the LEFT of conductor (vertical)
-            # Positioned on the TAIL section (above breaker, outside DB box)
-            # Singapore convention: cable text runs vertically alongside the outgoing wire
-            if comp.cable_annotation and not is_cable_ditto:
-                # Calculate tail start position (above breaker symbol + stub)
-                _, _sym_h = self._get_breaker_dims(comp.breaker_type_str)
-                # Place cable text above the DB box boundary:
-                # breaker top = comp.y + sym_h + stub(3)
-                # DB box top ≈ comp.y + 24 (for MCB: busbar+12=comp.y, box extends +36-12=+24)
-                cable_text_y = comp.y + _sym_h + 3.0 + 10.0  # tail start + 10mm offset
-                backend.add_mtext(
-                    comp.cable_annotation,
-                    insert=(comp.x - 6, cable_text_y),
-                    char_height=2.0,
-                    rotation=90.0,
-                )
+            # Cable annotation — now handled by layout.py as shared leader lines
+            # (horizontal leader + ticker marks + cable spec text at ends)
+            # Individual per-breaker cable text rendering is no longer used.
         else:
             # Horizontal text (all text upright, no rotation)
             if comp.label_style == "breaker_block":
