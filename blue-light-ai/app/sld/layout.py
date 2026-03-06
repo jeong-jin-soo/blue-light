@@ -518,7 +518,7 @@ def _identify_groups(
         if (comp.symbol_name == "LABEL"
                 and abs(comp.rotation - 90.0) < 0.1
                 and comp.label.strip().upper() == "SPARE"):
-            tap_x = comp.x - 3  # SPARE label placed at tap_x + 3
+            tap_x = comp.x  # SPARE label placed at tap_x
             g = SubCircuitGroup(tap_x=tap_x, spare_label_idx=i, is_spare=True)
             groups.append(g)
 
@@ -555,7 +555,7 @@ def _identify_groups(
                 g.circuit_id_idx = i
                 break
 
-    # Step 5: Match vertical circuit name LABELs (at tap_x + 3, rotation=90)
+    # Step 5: Match vertical circuit name LABELs (at tap_x, rotation=90)
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
             continue
@@ -564,7 +564,7 @@ def _identify_groups(
         for g in groups:
             if g.is_spare:
                 continue
-            if abs(comp.x - (g.tap_x + 3)) < 6.0 and g.name_label_idx is None:
+            if abs(comp.x - g.tap_x) < 6.0 and g.name_label_idx is None:
                 g.name_label_idx = i
                 break
 
@@ -763,13 +763,13 @@ def _rebuild_from_positions(
         if group.circuit_id_idx is not None:
             components[group.circuit_id_idx].x = new_tap_x
 
-        # Circuit name LABEL: set absolute position (tap_x + 3)
+        # Circuit name LABEL: set absolute position (at tap_x)
         if group.name_label_idx is not None:
-            components[group.name_label_idx].x = new_tap_x + 3
+            components[group.name_label_idx].x = new_tap_x
 
-        # SPARE LABEL: set absolute position (tap_x + 3)
+        # SPARE LABEL: set absolute position (at tap_x)
         if group.spare_label_idx is not None:
-            components[group.spare_label_idx].x = new_tap_x + 3
+            components[group.spare_label_idx].x = new_tap_x
 
         # Connections: set both endpoints x to new_tap_x (vertical wires)
         for conn_idx in group.connection_indices:
@@ -952,9 +952,15 @@ def _add_cable_leader_lines(
             leftmost_x = tap_xs[0]
             rightmost_x = tap_xs[-1]
 
-            # Determine leader direction
-            text_on_left = (gi == 0)
-            text_on_right = (gi == len(group_keys) - 1) and gi > 0
+            # Determine text placement direction
+            # First group → left, last group → right,
+            # middle groups → alternate (even index left, odd right)
+            if gi == 0:
+                text_on_left = True
+            elif gi == len(group_keys) - 1:
+                text_on_left = False
+            else:
+                text_on_left = (gi % 2 == 0)
 
             leader_extension = config.leader_extension
             bend_height = config.leader_bend_height
@@ -962,12 +968,9 @@ def _add_cable_leader_lines(
             if text_on_left:
                 leader_start_x = leftmost_x - leader_extension
                 leader_end_x = rightmost_x
-            elif text_on_right:
+            else:
                 leader_start_x = leftmost_x
                 leader_end_x = rightmost_x + leader_extension
-            else:
-                leader_start_x = leftmost_x - leader_extension
-                leader_end_x = rightmost_x
 
             # Horizontal leader line
             layout_result.connections.append((
@@ -1009,7 +1012,7 @@ def _add_cable_leader_lines(
                 ))
                 layout_result.components.append(PlacedComponent(
                     symbol_name="LABEL",
-                    x=leader_end_x + 3,
+                    x=leader_end_x,
                     y=bend_top_y + 1,
                     label=cable_text,
                     rotation=90.0,
@@ -2306,7 +2309,7 @@ def _place_sub_circuits_upward(
             # "SPARE" label (vertical text, above the tap)
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
-                x=tap_x + 3,
+                x=tap_x,
                 y=spare_top_y + 2,
                 label="SPARE",
                 rotation=90.0,
@@ -2416,7 +2419,7 @@ def _place_sub_circuits_upward(
             sc_display_name = f"{sc_name} — {sc_room}"
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=tap_x + 3,
+            x=tap_x,
             y=tail_end_y + 2,
             label=sc_display_name,
             rotation=90.0,
