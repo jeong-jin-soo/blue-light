@@ -393,16 +393,19 @@ class SldGenerator:
                 breaker_spec_groups.setdefault(sig, []).append(idx)
 
         # For groups with 2+ identical specs, only the FIRST (leftmost) gets full label
-        # Rest show → ditto arrow
+        # Rest use chain arrow pattern: arrow→arc→arrow→arc (connected)
         # Singapore LEW convention: label shown once per category group
         ditto_breaker_indices: set[int] = set()
+        # Map each ditto index → previous index in same group (for chain arrows)
+        ditto_prev_map: dict[int, int] = {}
         for sig, indices in breaker_spec_groups.items():
             if len(indices) >= 2:
                 # Sort by x position (leftmost first)
                 sorted_indices = sorted(indices, key=lambda i: layout_result.components[i].x)
                 # All except the first are ditto
-                for i in sorted_indices[1:]:
-                    ditto_breaker_indices.add(i)
+                for k in range(1, len(sorted_indices)):
+                    ditto_breaker_indices.add(sorted_indices[k])
+                    ditto_prev_map[sorted_indices[k]] = sorted_indices[k - 1]
 
         # Pre-scan: cable annotations — "bookend" convention
         # Singapore LEW professional convention: cable annotations shown ONLY on
@@ -549,10 +552,30 @@ class SldGenerator:
                             dxf_block_used = True
 
                     if not dxf_block_used:
+                        # Trip arrows only on labeled (non-ditto) sub-circuit MCBs above busbar.
+                        # MCBs below busbar (main breaker, meter board) and ditto circuits: no trip arrow.
+                        # Ditto MCBs get chain arrows (drawn below) instead of per-symbol trip arrows.
+                        is_sub_circuit_breaker = comp.label_style == "breaker_block"
+                        is_ditto = comp_idx in ditto_breaker_indices
+                        should_skip_trip = (
+                            not is_sub_circuit_breaker  # incoming chain MCBs (below busbar)
+                            or is_ditto                  # ditto sub-circuit MCBs (chain arrow instead)
+                        )
+                        trip_kwargs = {}
+                        if should_skip_trip and isinstance(symbol, RealCircuitBreaker):
+                            trip_kwargs["skip_trip_arrow"] = True
                         if use_horizontal:
-                            symbol.draw_horizontal(backend, comp.x, comp.y)
+                            symbol.draw_horizontal(backend, comp.x, comp.y, **trip_kwargs)
                         else:
-                            symbol.draw(backend, comp.x, comp.y)
+                            symbol.draw(backend, comp.x, comp.y, **trip_kwargs)
+
+                    # Chain arrow pattern: arrow→arc→arrow→arc (LEW convention)
+                    # For ditto MCBs, draw a connecting arrow from previous arc to current arc.
+                    # This replaces the separate "→" ditto arrow with a connected chain.
+                    if comp_idx in ditto_prev_map and isinstance(symbol, RealCircuitBreaker):
+                        prev_idx = ditto_prev_map[comp_idx]
+                        prev_comp = layout_result.components[prev_idx]
+                        self._draw_chain_arrow(backend, prev_comp, comp, symbol, use_horizontal)
 
                     backend.set_layer("SLD_ANNOTATIONS")
 
@@ -616,6 +639,80 @@ class SldGenerator:
 
         return count
 
+    def _draw_chain_arrow(
+        self,
+        backend: DrawingBackend,
+        prev_comp: PlacedComponent,
+        curr_comp: PlacedComponent,
+        symbol: RealCircuitBreaker,
+        use_horizontal: bool = False,
+    ) -> None:
+        """Draw a connecting chain arrow from previous MCB's arc to current MCB's arc.
+
+        LEW convention for identical breakers: instead of separate ditto arrows,
+        the arcs are connected by arrows in a chain pattern:
+          arrow→arc→arrow→arc→arrow→arc
+        Each connecting arrow's shaft starts at the previous arc surface and
+        its arrowhead touches the current arc surface.
+        """
+        w, h = symbol.width, symbol.height
+        ar = symbol._arc_r
+        sweep = (symbol._arc_end - symbol._arc_start) % 360
+        mid_angle_deg = symbol._arc_start + sweep / 2
+        mid_angle_rad = math.radians(mid_angle_deg)
+
+        backend.set_layer("SLD_SYMBOLS")
+
+        if use_horizontal:
+            # Horizontal layout: arcs are rotated 90° — connection goes vertically
+            # In horizontal draw, the arc center is at different coordinates
+            # For now, skip horizontal chain arrows (meter board rarely has ditto)
+            pass
+        else:
+            # Vertical layout — standard sub-circuit MCBs above busbar
+            # Arc center for each MCB
+            prev_cx = prev_comp.x + w / 2
+            prev_arc_cy = prev_comp.y + h / 2
+            curr_cx = curr_comp.x + w / 2
+            curr_arc_cy = curr_comp.y + h / 2
+
+            # Arc midpoint on each MCB (where the arrow touches the arc surface)
+            # Mid-angle ~0° = rightmost point of arc
+            cos_mid = math.cos(mid_angle_rad)
+            sin_mid = math.sin(mid_angle_rad)
+
+            prev_arc_mx = prev_cx + ar * cos_mid
+            prev_arc_my = prev_arc_cy + ar * sin_mid
+            curr_arc_mx = curr_cx + ar * cos_mid
+            curr_arc_my = curr_arc_cy + ar * sin_mid
+
+            # Draw shaft: line from previous arc midpoint to current arc midpoint
+            backend.add_line(
+                (prev_arc_mx, prev_arc_my),
+                (curr_arc_mx, curr_arc_my),
+            )
+
+            # Draw arrowhead at current arc midpoint (same style as trip arrow)
+            # Direction: from arc midpoint toward center (inward)
+            dx = curr_cx - curr_arc_mx
+            dy = curr_arc_cy - curr_arc_my
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist > 0:
+                dx /= dist
+                dy /= dist
+            head_len = 1.2
+            px, py = -dy, dx  # perpendicular
+            backend.add_line(
+                (curr_arc_mx, curr_arc_my),
+                (curr_arc_mx + dx * head_len + px * 0.6,
+                 curr_arc_my + dy * head_len + py * 0.6),
+            )
+            backend.add_line(
+                (curr_arc_mx, curr_arc_my),
+                (curr_arc_mx + dx * head_len - px * 0.6,
+                 curr_arc_my + dy * head_len - py * 0.6),
+            )
+
     def _draw_breaker_block_label(
         self,
         backend: DrawingBackend,
@@ -663,11 +760,8 @@ class SldGenerator:
             line_gap = char_h + 0.5  # ~2.5mm line spacing
 
             if is_ditto:
-                # Ditto: draw → arrow (LEW convention — "same spec as above")
-                # Arrow positioned at breaker label area (left side)
-                arrow_cx = comp.x - 4          # Left of breaker symbol
-                arrow_cy = comp.y + sym_h / 2  # Vertically centered on breaker
-                _draw_ditto_arrow(backend, arrow_cx, arrow_cy)
+                # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
+                pass
             else:
                 # Labels stacked from TOP of breaker downward, to the LEFT
                 # In layout coords: higher Y = higher on screen
@@ -711,10 +805,8 @@ class SldGenerator:
                 line_gap = char_h + 0.8  # ~2.6mm per line
 
                 if is_ditto:
-                    # Ditto: draw → arrow (LEW convention — "same spec as above")
-                    arrow_cx = comp.x + 3
-                    arrow_cy = comp.y + 4
-                    _draw_ditto_arrow(backend, arrow_cx, arrow_cy)
+                    # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
+                    pass
                 else:
                     for idx, line_text in enumerate(info_items):
                         backend.add_mtext(
@@ -1124,7 +1216,7 @@ def _draw_ditto_arrow(
     backend: DrawingBackend,
     x: float,
     y: float,
-    arrow_len: float = 6.0,
+    arrow_len: float = 12.0,
 ) -> None:
     """
     Draw a ditto arrow → at the given position.
@@ -1133,17 +1225,17 @@ def _draw_ditto_arrow(
     the first circuit shows full label (B10A / SPN / MCB / 6kA) and subsequent
     circuits show a → arrow meaning "same as the labeled circuit."
 
-    Reference DWG: small horizontal arrow (→) positioned at the breaker label area.
+    Reference DWG: prominent horizontal arrow (→) spanning the breaker label area.
     """
     backend.set_layer("SLD_ANNOTATIONS")
     half = arrow_len / 2
-    head = 2.0  # Arrowhead length
+    head = 2.5  # Arrowhead length
 
     # Arrow shaft (horizontal line)
     backend.add_line((x - half, y), (x + half, y))
     # Arrowhead (pointing right →)
-    backend.add_line((x + half, y), (x + half - head, y + 1.2))
-    backend.add_line((x + half, y), (x + half - head, y - 1.2))
+    backend.add_line((x + half, y), (x + half - head, y + 1.5))
+    backend.add_line((x + half, y), (x + half - head, y - 1.5))
 
 
 # -- Helper: AC supply symbol (~) --

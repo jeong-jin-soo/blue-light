@@ -94,7 +94,8 @@ class RealCircuitBreaker(BaseSymbol):
             "label_above": (self.width / 2, self.height + self._stub + 2),
         }
 
-    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float,
+             skip_trip_arrow: bool = False) -> None:
         w, h = self.width, self.height
         cx = x + w / 2
         ar = self._arc_r
@@ -121,6 +122,36 @@ class RealCircuitBreaker(BaseSymbol):
             end_angle=self._arc_end,
         )
 
+        # Trip mechanism arrow at arc midpoint (IEC 60617 — automatic release indicator)
+        # Arrow points TOWARD the arc — arrowhead tip touches arc surface
+        # Skipped for ditto circuits (chain arrow drawn by generator instead)
+        if not skip_trip_arrow:
+            sweep = (self._arc_end - self._arc_start) % 360
+            mid_angle_deg = self._arc_start + sweep / 2
+            mid_angle_rad = math.radians(mid_angle_deg)
+            arc_mx = cx + ar * math.cos(mid_angle_rad)
+            arc_my = arc_center_y + ar * math.sin(mid_angle_rad)
+            dx = cx - arc_mx
+            dy = arc_center_y - arc_my
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist > 0:
+                dx /= dist
+                dy /= dist
+            arrow_shaft = 6.0
+            start_x = arc_mx + dx * arrow_shaft
+            start_y = arc_my + dy * arrow_shaft
+            backend.add_line((start_x, start_y), (arc_mx, arc_my))
+            head_len = 1.2
+            px, py = -dy, dx
+            backend.add_line(
+                (arc_mx, arc_my),
+                (arc_mx + dx * head_len + px * 0.6, arc_my + dy * head_len + py * 0.6),
+            )
+            backend.add_line(
+                (arc_mx, arc_my),
+                (arc_mx + dx * head_len - px * 0.6, arc_my + dy * head_len - py * 0.6),
+            )
+
         # Connection lines (from contact outer edges to symbol bounds)
         backend.add_line((cx, contact_top_y + cr), (cx, y + h))
         backend.add_line((cx, y), (cx, contact_bottom_y - cr))
@@ -130,7 +161,8 @@ class RealCircuitBreaker(BaseSymbol):
         backend.add_line((cx, y + h), (cx, y + h + self._stub))
         backend.add_line((cx, y), (cx, y - self._stub))
 
-    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float,
+                         skip_trip_arrow: bool = False) -> None:
         """Draw circuit breaker rotated 90 degrees — connection points at LEFT and RIGHT.
 
         For horizontal meter board layout. The arc opens upward instead of rightward.
@@ -154,12 +186,43 @@ class RealCircuitBreaker(BaseSymbol):
 
         # Arc — rotated 90 degrees (subtract 90 from original angles)
         # Original: right-facing arc. Rotated: upward-facing arc
+        rot_start = self._arc_start + 90
+        rot_end = self._arc_end + 90
         backend.add_arc(
             center=(arc_center_x, cy),
             radius=ar,
-            start_angle=self._arc_start + 90,
-            end_angle=self._arc_end + 90,
+            start_angle=rot_start,
+            end_angle=rot_end,
         )
+
+        # Trip mechanism arrow at arc midpoint (IEC 60617 — rotated 90°)
+        # Skipped for ditto circuits (chain arrow drawn by generator instead)
+        if not skip_trip_arrow:
+            sweep = (rot_end - rot_start) % 360
+            mid_angle_deg = rot_start + sweep / 2
+            mid_angle_rad = math.radians(mid_angle_deg)
+            arc_mx = arc_center_x + ar * math.cos(mid_angle_rad)
+            arc_my = cy + ar * math.sin(mid_angle_rad)
+            dx = arc_center_x - arc_mx
+            dy = cy - arc_my
+            dist = math.sqrt(dx * dx + dy * dy)
+            if dist > 0:
+                dx /= dist
+                dy /= dist
+            arrow_shaft = 6.0
+            start_x = arc_mx + dx * arrow_shaft
+            start_y = arc_my + dy * arrow_shaft
+            backend.add_line((start_x, start_y), (arc_mx, arc_my))
+            head_len = 1.2
+            px, py = -dy, dx
+            backend.add_line(
+                (arc_mx, arc_my),
+                (arc_mx + dx * head_len + px * 0.6, arc_my + dy * head_len + py * 0.6),
+            )
+            backend.add_line(
+                (arc_mx, arc_my),
+                (arc_mx + dx * head_len - px * 0.6, arc_my + dy * head_len - py * 0.6),
+            )
 
         # Connection lines (from contact outer edges to symbol horizontal bounds)
         backend.add_line((contact_right_x + cr, cy), (x + h_extent, cy))
