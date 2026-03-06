@@ -792,6 +792,9 @@ class SldGenerator:
         backend.set_layer("SLD_CONNECTIONS")
         for start, end in layout_result.connections:
             backend.add_line(start, end)
+        # Thick connections — heavier line weight (0.5mm) for outgoing cable tick marks
+        for start, end in layout_result.thick_connections:
+            backend.add_line(start, end, lineweight=50)
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw dashed connection lines (earth conductors, etc.)."""

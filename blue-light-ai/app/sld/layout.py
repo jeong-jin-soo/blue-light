@@ -202,6 +202,7 @@ class LayoutResult:
 
     components: list[PlacedComponent] = field(default_factory=list)
     connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
+    thick_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     junction_dots: list[tuple[float, float]] = field(default_factory=list)
     solid_boxes: list[tuple[float, float, float, float]] = field(default_factory=list)
@@ -1317,9 +1318,9 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         if cable_text:
             # Tick mark position: midpoint of supply line
             tick_x = (mcb_right_x + supply_end_x) / 2
-            tick_size = 1.5  # Half-length of diagonal tick
+            tick_size = 1.5  # Half-length of diagonal tick (thinner, shorter)
             # Diagonal tick mark crossing the supply line (~45 degrees)
-            # Direction: bottom-left to top-right (/ shape)
+            # RIGHT side incoming: thinner tick (regular connections)
             result.connections.append((
                 (tick_x - tick_size, mb_center_y - tick_size),
                 (tick_x + tick_size, mb_center_y + tick_size),
@@ -1360,12 +1361,14 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
 
         # Cable annotation on outgoing vertical line (meter board → DB)
         # Reference: tick mark on vertical wire + leader LEFT + cable spec text
+        # LEFT side outgoing tick: THICKER and LONGER than right side incoming tick
         if outgoing_cable_text:
             # Tick mark position: midpoint of gap above meter board box
             tick_y = (mb_box_top + y_exit) / 2
-            tick_size = 1.5
+            tick_size = 2.5  # Longer than incoming tick (1.5)
             # Diagonal tick crossing vertical line (/ shape)
-            result.connections.append((
+            # Use thick_connections for heavier line weight
+            result.thick_connections.append((
                 (cx - tick_size, tick_y - tick_size),
                 (cx + tick_size, tick_y + tick_size),
             ))

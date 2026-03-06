@@ -480,13 +480,15 @@ def test_meter_board_has_tick_marks(requirements: dict):
     result = compute_layout(requirements)
 
     tick_marks = []
-    for c in result.connections:
+    # Check both regular and thick connections (outgoing tick uses thick_connections)
+    all_conns = list(result.connections) + list(result.thick_connections)
+    for c in all_conns:
         p1, p2 = c
         dx = abs(p2[0] - p1[0])
         dy = abs(p2[1] - p1[1])
         length = (dx ** 2 + dy ** 2) ** 0.5
-        # Tick marks: short (< 5mm), diagonal (both dx > 0 and dy > 0)
-        if length < 5 and dx > 0.5 and dy > 0.5:
+        # Tick marks: short (< 8mm), diagonal (both dx > 0 and dy > 0)
+        if length < 8 and dx > 0.5 and dy > 0.5:
             tick_marks.append(c)
 
     assert len(tick_marks) >= 2, (
