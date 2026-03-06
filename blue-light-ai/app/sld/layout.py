@@ -226,6 +226,7 @@ class LayoutResult:
     busbar_y: float = 0
     busbar_start_x: float = 0
     busbar_end_x: float = 0
+    busbar_y_per_row: list[float] = field(default_factory=list)  # Per-row busbar Y values
 
     # DB box dashed line indices (for updating after busbar changes)
     db_box_dashed_indices: list[int] = field(default_factory=list)
@@ -879,122 +880,140 @@ def _add_cable_leader_lines(
 ) -> None:
     """Add cable spec leader lines AFTER resolve_overlaps.
 
-    Groups sub-circuits by cable_annotation, draws a shared horizontal leader
-    line with ticker marks at each conductor intersection, and places the cable
-    spec text at one end.  Uses final (post-resolve_overlaps) positions from
-    SubCircuitGroup.tap_x.
+    Groups sub-circuits by cable_annotation per row, draws a shared horizontal
+    leader line with ticker marks at each conductor intersection, and places
+    the cable spec text at one end.  Uses final (post-resolve_overlaps)
+    positions from SubCircuitGroup.tap_x.
+
+    Multi-row support: each row gets its own leader lines at the correct Y.
 
     Reference DWG pattern:
       left-most cable group  → text at left end of leader
       right-most cable group → text at right end of leader
     """
+    import re
     from collections import OrderedDict
 
     groups, _ = _identify_groups(layout_result)
     if not groups:
         return
 
-    # Collect non-spare groups with cable annotation
-    cable_entries: list[tuple[float, str]] = []  # (tap_x, cable_spec)
+    # DB box top offset from any busbar Y
+    db_box_top_offset = (config.db_box_busbar_margin + config.mcb_h + config.stub_len
+                         + config.db_box_tail_margin + config.db_box_label_margin)
+
+    # Determine which row each group belongs to (by breaker Y proximity to busbar)
+    busbar_ys = layout_result.busbar_y_per_row or [layout_result.busbar_y]
+
+    def _find_row_busbar_y(comp_y: float) -> float:
+        """Find the busbar Y closest to this component's Y position."""
+        best = busbar_ys[0]
+        best_dist = abs(comp_y - best)
+        for by in busbar_ys[1:]:
+            d = abs(comp_y - by)
+            if d < best_dist:
+                best = by
+                best_dist = d
+        return best
+
+    # Collect non-spare groups with cable annotation, tagged by row busbar_y
+    cable_entries: list[tuple[float, float, str]] = []  # (row_busbar_y, tap_x, cable_spec)
     for g in groups:
         if g.is_spare or g.breaker_idx is None:
             continue
         comp = layout_result.components[g.breaker_idx]
         if comp.cable_annotation:
-            cable_entries.append((g.tap_x, comp.cable_annotation))
+            row_by = _find_row_busbar_y(comp.y)
+            cable_entries.append((row_by, g.tap_x, comp.cable_annotation))
 
     if not cable_entries:
         return
 
-    # Group by cable spec (preserving order of first occurrence)
-    cable_groups: OrderedDict[str, list[float]] = OrderedDict()
-    for tap_x, cable_spec in cable_entries:
-        cable_groups.setdefault(cable_spec, []).append(tap_x)
+    # Group entries by row, then by cable spec within each row
+    rows_map: OrderedDict[float, list[tuple[float, str]]] = OrderedDict()
+    for row_by, tap_x, cable_spec in cable_entries:
+        rows_map.setdefault(row_by, []).append((tap_x, cable_spec))
 
-    group_keys = list(cable_groups.keys())
     tick_size = 1.25  # Half-length of diagonal tick (matches meter board)
 
-    # Leader Y: above DB box top line by config margin
-    # DB box top = busbar_y + db_box_busbar_margin + mcb_h + stub_len
-    #              + db_box_tail_margin + db_box_label_margin
-    db_box_top_offset = (config.db_box_busbar_margin + config.mcb_h + config.stub_len
-                         + config.db_box_tail_margin + config.db_box_label_margin)
-    leader_y = layout_result.busbar_y + db_box_top_offset + config.leader_margin_above_db
+    for row_busbar_y, row_entries in rows_map.items():
+        # Leader Y for this row
+        leader_y = row_busbar_y + db_box_top_offset + config.leader_margin_above_db
 
-    for gi, (cable_spec, tap_xs) in enumerate(cable_groups.items()):
-        tap_xs.sort()
-        leftmost_x = tap_xs[0]
-        rightmost_x = tap_xs[-1]
+        # Group by cable spec within this row
+        cable_groups: OrderedDict[str, list[float]] = OrderedDict()
+        for tap_x, cable_spec in row_entries:
+            cable_groups.setdefault(cable_spec, []).append(tap_x)
 
-        # Determine leader direction
-        text_on_left = (gi == 0)
-        text_on_right = (gi == len(group_keys) - 1) and gi > 0
+        group_keys = list(cable_groups.keys())
 
-        leader_extension = config.leader_extension
-        bend_height = config.leader_bend_height
+        for gi, (cable_spec, tap_xs) in enumerate(cable_groups.items()):
+            tap_xs.sort()
+            leftmost_x = tap_xs[0]
+            rightmost_x = tap_xs[-1]
 
-        if text_on_left:
-            leader_start_x = leftmost_x - leader_extension
-            leader_end_x = rightmost_x
-        elif text_on_right:
-            leader_start_x = leftmost_x
-            leader_end_x = rightmost_x + leader_extension
-        else:
-            leader_start_x = leftmost_x - leader_extension
-            leader_end_x = rightmost_x
+            # Determine leader direction
+            text_on_left = (gi == 0)
+            text_on_right = (gi == len(group_keys) - 1) and gi > 0
 
-        # Horizontal leader line
-        layout_result.connections.append((
-            (leader_start_x, leader_y),
-            (leader_end_x, leader_y),
-        ))
+            leader_extension = config.leader_extension
+            bend_height = config.leader_bend_height
 
-        # Ticker marks at each conductor intersection
-        for tx in tap_xs:
-            layout_result.thick_connections.append((
-                (tx - tick_size, leader_y - tick_size),
-                (tx + tick_size, leader_y + tick_size),
-            ))
+            if text_on_left:
+                leader_start_x = leftmost_x - leader_extension
+                leader_end_x = rightmost_x
+            elif text_on_right:
+                leader_start_x = leftmost_x
+                leader_end_x = rightmost_x + leader_extension
+            else:
+                leader_start_x = leftmost_x - leader_extension
+                leader_end_x = rightmost_x
 
-        # L-shaped bend + cable spec text at leader end
-        # Pattern: horizontal leader → vertical bend upward → cable spec text
-        cable_text = cable_spec
-        # Split long cable text into 2 lines to avoid exceeding drawing border
-        # Insert \\P (DXF line break) before "PVC CPC" or "CPC" suffix
-        import re
-        m = re.search(r'\s+(PVC\s+CPC|CPC)\s+IN\s+', cable_text)
-        if m:
-            cable_text = cable_text[:m.start()] + "\\P" + cable_text[m.start() + 1:]
-        if text_on_left:
-            # Vertical bend going UP from left end of leader
-            bend_top_y = leader_y + bend_height
+            # Horizontal leader line
             layout_result.connections.append((
                 (leader_start_x, leader_y),
-                (leader_start_x, bend_top_y),
-            ))
-            # Cable spec text starts from bend top, going up (rotation 90°)
-            layout_result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=leader_start_x - 3,
-                y=bend_top_y + 1,
-                label=cable_text,
-                rotation=90.0,
-            ))
-        else:
-            # Vertical bend going UP from right end of leader
-            bend_top_y = leader_y + bend_height
-            layout_result.connections.append((
                 (leader_end_x, leader_y),
-                (leader_end_x, bend_top_y),
             ))
-            # Cable spec text starts from bend top, going up (rotation 90°)
-            layout_result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=leader_end_x + 3,
-                y=bend_top_y + 1,
-                label=cable_text,
-                rotation=90.0,
-            ))
+
+            # Ticker marks at each conductor intersection
+            for tx in tap_xs:
+                layout_result.thick_connections.append((
+                    (tx - tick_size, leader_y - tick_size),
+                    (tx + tick_size, leader_y + tick_size),
+                ))
+
+            # L-shaped bend + cable spec text at leader end
+            cable_text = cable_spec
+            # Split long cable text into 2 lines to avoid exceeding drawing border
+            m = re.search(r'\s+(PVC\s+CPC|CPC)\s+IN\s+', cable_text)
+            if m:
+                cable_text = cable_text[:m.start()] + "\\P" + cable_text[m.start() + 1:]
+            if text_on_left:
+                bend_top_y = leader_y + bend_height
+                layout_result.connections.append((
+                    (leader_start_x, leader_y),
+                    (leader_start_x, bend_top_y),
+                ))
+                layout_result.components.append(PlacedComponent(
+                    symbol_name="LABEL",
+                    x=leader_start_x - 3,
+                    y=bend_top_y + 1,
+                    label=cable_text,
+                    rotation=90.0,
+                ))
+            else:
+                bend_top_y = leader_y + bend_height
+                layout_result.connections.append((
+                    (leader_end_x, leader_y),
+                    (leader_end_x, bend_top_y),
+                ))
+                layout_result.components.append(PlacedComponent(
+                    symbol_name="LABEL",
+                    x=leader_end_x + 3,
+                    y=bend_top_y + 1,
+                    label=cable_text,
+                    rotation=90.0,
+                ))
 
 
 def resolve_overlaps(
@@ -1938,6 +1957,7 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             result.connections.append(((cx, y + 2), (cx, busbar_y_row)))
 
         sc_bus_start = row_bus_start
+        result.busbar_y_per_row.append(busbar_y_row)
 
         _place_sub_circuits_upward(
             result, row_circuits, row_idx, row_count,
