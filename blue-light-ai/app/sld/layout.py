@@ -539,13 +539,25 @@ def _identify_groups(
             vert_conn_x_count[x_val] = vert_conn_x_count.get(x_val, 0) + 1
 
     # incoming chain x = x with most connections that isn't a tap_x
+    # Guard: require at least 2× advantage over any single tap_x count
+    # to avoid misidentification when sub-circuits have many connections
     incoming_chain_x = 0.0
     max_count = 0
+    second_count = 0
     for x_val, count in vert_conn_x_count.items():
         is_tap = any(abs(x_val - g.tap_x) < _TOL for g in groups)
-        if not is_tap and count > max_count:
-            max_count = count
-            incoming_chain_x = x_val
+        if not is_tap:
+            if count > max_count:
+                second_count = max_count
+                max_count = count
+                incoming_chain_x = x_val
+            elif count > second_count:
+                second_count = count
+
+    # If the best non-tap x doesn't have a clear count advantage,
+    # fall back to the leftmost group's tap_x minus a typical offset
+    if max_count > 0 and max_count <= second_count:
+        incoming_chain_x = 0.0  # disable — no clear winner
 
     # Step 4: Match CIRCUIT_ID_BOX to groups
     for i, comp in enumerate(components):
@@ -2386,7 +2398,14 @@ def _place_sub_circuits_upward(
         # Load current calculation
         load_info = ""
         if sc_load_kw and sc_load_kw > 0:
-            current = round(sc_load_kw * 1000 / (400 * 1.732), 1)
+            # Single-phase (SPN/SP/DP): I = P / V (230V)
+            # Three-phase (TPN/4P): I = P / (V × √3) (400V × 1.732)
+            sc_poles_hint = str(circuit.get("breaker_poles", "")).upper()
+            is_three_phase = sc_poles_hint in ("TPN", "4P")
+            if is_three_phase:
+                current = round(sc_load_kw * 1000 / (400 * 1.732), 1)
+            else:
+                current = round(sc_load_kw * 1000 / 230, 1)
             load_info = f"{sc_load_kw}kW / {current}A"
 
         # Determine fault kA and breaker characteristic

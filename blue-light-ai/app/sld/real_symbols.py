@@ -255,8 +255,9 @@ class RealACB(RealCircuitBreaker):
         super().__init__("ACB")
         self._crossbar_extend = get_symbol_dimensions("ACB").get("crossbar_extend_mm", 1.0)
 
-    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
-        super().draw(backend, x, y)
+    def draw(self, backend: DrawingBackend, x: float, y: float,
+             skip_trip_arrow: bool = False) -> None:
+        super().draw(backend, x, y, skip_trip_arrow=skip_trip_arrow)
         # ACB distinctive: horizontal bar through center
         backend.set_layer(self.layer)
         cx = x + self.width / 2
