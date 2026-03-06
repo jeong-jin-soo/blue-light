@@ -2035,14 +2035,14 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             label=f"1 x {earth_conductor_mm2}sqmm CU/GRN-YEL",
         ))
 
-    # Solid earth conductor -- from busbar end to earth bar (outside DB box)
+    # Solid earth conductor -- from DB box right wall to earth bar (outside DB box)
     earth_cx = earth_x + _earth_w / 2  # Center of earth symbol
-    # Horizontal: busbar end → earth bar center X
-    result.connections.append(((result.busbar_end_x, result.busbar_y),
-                               (earth_cx, result.busbar_y)))
-    # Vertical: from busbar level down to earth bar top pin
-    result.connections.append(((earth_cx, result.busbar_y),
-                               (earth_cx, earth_y + _earth_h)))  # top pin at y + height
+    earth_top_pin_y = earth_y + _earth_h  # top pin at y + height
+    # Horizontal: DB box right wall → earth bar center X (at earth bar top pin level)
+    result.connections.append(((db_box_right, earth_top_pin_y),
+                               (earth_cx, earth_top_pin_y)))
+    # Junction dot at DB box right wall (connection point indicator)
+    result.junction_dots.append((db_box_right, earth_top_pin_y))
 
 
 # -- Helper functions --
