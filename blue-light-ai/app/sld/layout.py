@@ -1134,7 +1134,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
 
         # -- Horizontal layout parameters --
         comp_spacing = 25  # 25mm between component centers
-        _stub = 3          # Stub length for horizontal connections
+        _stub = config.stub_len  # Synced from real_symbol_paths.json (single source of truth)
         _mb_inset = 4      # Extra inset to push components away from spine (cx)
 
         # -- Component horizontal extents (symbol.height → h_extent when rotated 90°) --

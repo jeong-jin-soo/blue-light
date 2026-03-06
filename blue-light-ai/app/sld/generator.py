@@ -27,6 +27,7 @@ Outputs PDF (for EMA submission) and SVG (for web preview).
 
 import logging
 import math
+import re
 from pathlib import Path
 
 from app.sld.backend import DrawingBackend
@@ -53,6 +54,7 @@ from app.sld.real_symbols import (
     RealMCCB,
     RealRCCB,
     get_real_symbol,
+    get_symbol_dimensions,
 )
 from app.sld.svg_backend import SvgBackend
 from app.sld.symbols.breakers import ACB, MCB, MCCB, RCCB, ELCB, CircuitBreaker
@@ -190,6 +192,24 @@ class SldGenerator:
         "PROTECTION_RELAY": "O/C E/F",
         "PT": "PT",
     }
+
+    @staticmethod
+    def _get_breaker_dims(breaker_type: str) -> tuple[float, float]:
+        """Get (width, height) for a breaker type from real_symbol_paths.json.
+
+        Maps breaker_type_str values to symbol registry keys and returns
+        calibrated dimensions.  Falls back to MCB if type is unknown.
+        """
+        _TYPE_MAP = {
+            "MCB": "MCB",
+            "MCCB": "MCCB",
+            "ACB": "ACB",
+            "RCCB": "RCCB",
+            "ELCB": "ELCB",
+        }
+        sym_key = _TYPE_MAP.get(breaker_type, "MCB")
+        dims = get_symbol_dimensions(sym_key)
+        return dims["width_mm"], dims["height_mm"]
 
     def generate(
         self,
@@ -419,8 +439,7 @@ class SldGenerator:
             if comp.label_style == "breaker_block":
                 # Extract category prefix from circuit_id (S, P, H, SP, L1S, L1P, etc.)
                 cid = comp.circuit_id or ""
-                import re as _re
-                prefix_match = _re.match(r"([A-Z]+)", cid)
+                prefix_match = re.match(r"([A-Z]+)", cid)
                 category_prefix = prefix_match.group(1) if prefix_match else "X"
                 sig = f"{category_prefix}|{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
                 breaker_spec_groups.setdefault(sig, []).append(idx)
@@ -443,7 +462,7 @@ class SldGenerator:
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block" and comp.cable_annotation:
                 cid = comp.circuit_id or ""
-                prefix_match = _re.match(r"([A-Z]+)", cid)
+                prefix_match = re.match(r"([A-Z]+)", cid)
                 category_prefix = prefix_match.group(1) if prefix_match else "X"
                 cable_key = f"{category_prefix}|{comp.cable_annotation}"
                 cable_groups.setdefault(cable_key, []).append(idx)
@@ -680,15 +699,7 @@ class SldGenerator:
         if abs(comp.rotation - 90.0) < 0.1:
             # HORIZONTAL stacked text to the LEFT of breaker (matching reference DWG)
             # Format: B10A / SPN / MCB / 6kA — each on its own horizontal line
-            if comp.breaker_type_str in ("MCCB", "ACB"):
-                sym_w = 8.4 if comp.breaker_type_str == "MCCB" else 8.4
-                sym_h = 15.0 if comp.breaker_type_str == "MCCB" else 17.0
-            elif comp.breaker_type_str in ("RCCB", "ELCB"):
-                sym_w = 10.0
-                sym_h = 15.0
-            else:  # MCB
-                sym_w = 7.2
-                sym_h = 13.0
+            sym_w, sym_h = self._get_breaker_dims(comp.breaker_type_str)
             char_h = 2.0  # Compact horizontal text
             line_gap = char_h + 0.5  # ~2.5mm line spacing
 
@@ -718,14 +729,7 @@ class SldGenerator:
             # Singapore convention: cable text runs vertically alongside the outgoing wire
             if comp.cable_annotation and not is_cable_ditto:
                 # Calculate tail start position (above breaker symbol + stub)
-                if comp.breaker_type_str in ("RCCB", "ELCB"):
-                    _sym_h = 15.0
-                elif comp.breaker_type_str in ("MCCB",):
-                    _sym_h = 15.0
-                elif comp.breaker_type_str in ("ACB",):
-                    _sym_h = 17.0
-                else:  # MCB
-                    _sym_h = 13.0
+                _, _sym_h = self._get_breaker_dims(comp.breaker_type_str)
                 # Place cable text above the DB box boundary:
                 # breaker top = comp.y + sym_h + stub(3)
                 # DB box top ≈ comp.y + 24 (for MCB: busbar+12=comp.y, box extends +36-12=+24)
