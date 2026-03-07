@@ -16,6 +16,7 @@ from app.sld.layout import (
     LayoutResult,
     PlacedComponent,
     _compute_bounding_box,
+    _identify_groups,
     compute_layout,
 )
 
@@ -495,3 +496,47 @@ def test_meter_board_has_tick_marks(requirements: dict):
         f"Expected ≥2 tick marks on meter board cable lines, "
         f"got {len(tick_marks)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Test: _identify_groups() completeness
+# ---------------------------------------------------------------------------
+
+ALL_CONFIGS_FOR_GROUPS = [
+    SINGLE_PHASE_METERED,
+    THREE_PHASE_METERED,
+    THREE_PHASE_CT,
+    SINGLE_PHASE_LANDLORD,
+    THREE_PHASE_MCCB,
+]
+
+
+@pytest.mark.parametrize("requirements", ALL_CONFIGS_FOR_GROUPS,
+                         ids=["1ph_metered", "3ph_metered", "3ph_ct",
+                              "1ph_landlord", "3ph_mccb"])
+def test_all_circuit_ids_matched(requirements):
+    """Every CIRCUIT_ID_BOX component should be matched to a group."""
+    result = compute_layout(requirements)
+    groups, incoming_chain_x = _identify_groups(result)
+
+    cid_matched = {g.circuit_id_idx for g in groups if g.circuit_id_idx is not None}
+    all_cids = [
+        i for i, c in enumerate(result.components)
+        if c.symbol_name == "CIRCUIT_ID_BOX"
+    ]
+
+    unmatched = [i for i in all_cids if i not in cid_matched]
+    assert len(unmatched) == 0, (
+        f"{len(unmatched)} orphan CIRCUIT_ID_BOX(es): indices={unmatched}"
+    )
+
+
+@pytest.mark.parametrize("requirements", ALL_CONFIGS_FOR_GROUPS,
+                         ids=["1ph_metered_grp", "3ph_metered_grp", "3ph_ct_grp",
+                              "1ph_landlord_grp", "3ph_mccb_grp"])
+def test_groups_detected(requirements):
+    """_identify_groups should find at least one group for every config."""
+    result = compute_layout(requirements)
+    groups, incoming_chain_x = _identify_groups(result)
+    non_spare = [g for g in groups if not g.is_spare]
+    assert len(non_spare) > 0, "Should have at least one non-spare group"

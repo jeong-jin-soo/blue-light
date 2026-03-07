@@ -25,7 +25,10 @@ Key v6 changes from v5:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 
 # -- Cable formatting helper --
@@ -635,7 +638,77 @@ def _identify_groups(
                 g.arrow_point_idx = ai
                 break
 
+    # Diagnostic: detect unmatched (orphan) elements
+    _validate_group_completeness(groups, components, layout_result, incoming_chain_x)
+
     return groups, incoming_chain_x
+
+
+def _validate_group_completeness(
+    groups: list[SubCircuitGroup],
+    components: list[PlacedComponent],
+    layout_result: LayoutResult,
+    incoming_chain_x: float,
+) -> None:
+    """Diagnose orphan elements that were not matched to any group.
+
+    Pure diagnostic — no data mutation, logging only.
+    """
+    _TOL = 1.5
+
+    # Check CIRCUIT_ID_BOX matching
+    cid_matched = {g.circuit_id_idx for g in groups if g.circuit_id_idx is not None}
+    total_cids = 0
+    for i, comp in enumerate(components):
+        if comp.symbol_name == "CIRCUIT_ID_BOX":
+            total_cids += 1
+            if i not in cid_matched:
+                nearest = min(
+                    (abs(comp.x - g.tap_x) for g in groups), default=999.0
+                )
+                logger.warning(
+                    "Orphan CIRCUIT_ID_BOX[%d] x=%.1f, nearest_gap=%.1f (tol=%.1f)",
+                    i, comp.x, nearest, _TOL,
+                )
+
+    # Check junction_dot matching
+    jd_matched = {g.junction_dot_idx for g in groups if g.junction_dot_idx is not None}
+    total_jds = len(layout_result.junction_dots)
+    orphan_jds = 0
+    for di, (dx, dy) in enumerate(layout_result.junction_dots):
+        if di not in jd_matched and abs(dx - incoming_chain_x) >= _TOL:
+            orphan_jds += 1
+            logger.debug(
+                "Unmatched junction_dot[%d] x=%.1f y=%.1f", di, dx, dy,
+            )
+
+    # Check arrow_point matching
+    ap_matched = {g.arrow_point_idx for g in groups if g.arrow_point_idx is not None}
+    total_aps = len(layout_result.arrow_points)
+    orphan_aps = 0
+    for ai, (ax, ay) in enumerate(layout_result.arrow_points):
+        if ai not in ap_matched:
+            orphan_aps += 1
+            logger.debug(
+                "Unmatched arrow_point[%d] x=%.1f y=%.1f", ai, ax, ay,
+            )
+
+    # Summary
+    logger.debug(
+        "Group matching: %d groups, CID %d/%d matched, "
+        "jdots %d/%d matched, arrows %d/%d matched, incoming_x=%.1f",
+        len(groups),
+        len(cid_matched), total_cids,
+        len(jd_matched) - (1 if incoming_chain_x > 0 else 0), total_jds,
+        len(ap_matched), total_aps,
+        incoming_chain_x,
+    )
+    if orphan_jds > 0 or orphan_aps > 0:
+        logger.warning(
+            "Unmatched elements: %d junction_dots, %d arrow_points "
+            "(may affect resolve_overlaps accuracy)",
+            orphan_jds, orphan_aps,
+        )
 
 
 def _compute_group_width(
