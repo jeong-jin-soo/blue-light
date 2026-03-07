@@ -106,8 +106,9 @@ class LayoutConfig:
     # Component spacing calibrated from real LEW SLD samples
     # Real samples use generous spacing — diagram fills 70-80% of page
     vertical_spacing: float = 22      # Between components vertically (increased for clarity)
-    horizontal_spacing: float = 26    # Between sub-circuits (increased — real samples ~25-35mm per circuit column)
+    horizontal_spacing: float = 26    # Between sub-circuits (base — real samples ~25-35mm per circuit column)
     min_horizontal_spacing: float = 20  # Minimum spacing between sub-circuits
+    max_horizontal_spacing: float = 42  # Maximum spacing (prevents overly sparse layout)
     busbar_margin: float = 20         # Margin from edges of busbar (room for labels)
 
     # Sub-circuit row layout
@@ -121,6 +122,9 @@ class LayoutConfig:
     # Drawing boundaries (A3 landscape with margin + title block reserve)
     min_x: float = 25               # Left margin 25mm (real samples ~25-35mm)
     max_x: float = 395              # Right margin 25mm
+
+    # Cable schedule reserve — space kept free on right side for cable schedule table
+    cable_schedule_reserve: float = 120  # Reserve 120mm for cable schedule (0 = disabled)
     min_y: float = 62               # Title block occupies bottom ~55mm
     max_y: float = 285              # Top drawing border (297 - 10mm margin - 2mm buffer)
 
@@ -487,6 +491,26 @@ def _breaker_half_width(comp: PlacedComponent) -> float:
     return 4.2
 
 
+def _compute_dynamic_spacing(num_circuits: int, config: LayoutConfig) -> float:
+    """Compute horizontal spacing that expands to fill available width.
+
+    For fewer circuits, spacing increases (up to max_horizontal_spacing)
+    so the diagram fills the drawing area. For many circuits, spacing
+    decreases (down to min_horizontal_spacing).
+
+    Note: cable schedule reserve is handled by shifting cx in compute_layout(),
+    so the busbar naturally occupies a narrower zone.
+    """
+    effective_count = min(num_circuits, config.max_circuits_per_row)
+    if effective_count <= 1:
+        return config.horizontal_spacing
+
+    max_bus_width = config.max_x - config.min_x - 40  # ~330mm
+    ideal_spacing = (max_bus_width - 2 * config.busbar_margin) / effective_count
+    return max(config.min_horizontal_spacing,
+               min(ideal_spacing, config.max_horizontal_spacing))
+
+
 def _identify_groups(
     layout_result: LayoutResult,
 ) -> tuple[list[SubCircuitGroup], float]:
@@ -725,6 +749,19 @@ def _determine_final_positions(
         for i in range(1, n):
             cursor += right_exts[i - 1] + left_exts[i] + gap_befores[i]
             new_tap_xs.append(cursor)
+
+        # Distribute surplus space evenly between groups
+        # so sub-circuits fill the available busbar width
+        actual_span = new_tap_xs[-1] - new_tap_xs[0]
+        max_span = sc_bus_end - sc_bus_start - left_exts[0] - right_exts[-1]
+        surplus = max_span - actual_span
+        if surplus > 0 and n > 1:
+            # Cap per-gap bonus to max_horizontal_spacing limit
+            per_gap_bonus = surplus / (n - 1)
+            max_gap_bonus = config.max_horizontal_spacing - config.horizontal_spacing
+            per_gap_bonus = min(per_gap_bonus, max_gap_bonus)
+            for i in range(1, n):
+                new_tap_xs[i] += per_gap_bonus * i
 
     # Center BUSBAR on the incoming chain x, so the incoming supply
     # enters at the busbar center (don't move the incoming chain itself).
@@ -1160,7 +1197,19 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         config = LayoutConfig()
 
     result = LayoutResult()
-    cx = config.start_x
+
+    # Dynamic center: shift SLD left when circuit count is low,
+    # reserving right side for cable schedule table
+    sub_circuits = requirements.get("sub_circuits", [])
+    num_sc = len(sub_circuits) if sub_circuits else 0
+    reserve = config.cable_schedule_reserve
+    if reserve > 0 and num_sc <= 10:
+        # Center the SLD within [min_x .. max_x - reserve]
+        effective_right = config.max_x - reserve
+        cx = (config.min_x + effective_right) / 2
+    else:
+        cx = config.start_x
+
     # Start from BOTTOM -- above title block with clearance for supply label
     y = config.min_y + 15  # ~77mm (extra clearance for 3-line supply label)
 
@@ -1851,19 +1900,10 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
 
     # -- 5. Main Busbar --
     num_circuits = max(len(sub_circuits), 1)
+    effective_count = min(num_circuits, config.max_circuits_per_row)
 
-    h_spacing = config.horizontal_spacing
-    if num_circuits > config.max_circuits_per_row:
-        effective_count = config.max_circuits_per_row
-    else:
-        effective_count = num_circuits
-
-    max_bus_width = config.max_x - config.min_x - 40
+    h_spacing = _compute_dynamic_spacing(num_circuits, config)
     desired_width = effective_count * h_spacing + 2 * config.busbar_margin
-    if desired_width > max_bus_width:
-        h_spacing = max((max_bus_width - 2 * config.busbar_margin) / effective_count,
-                        config.min_horizontal_spacing)
-        desired_width = effective_count * h_spacing + 2 * config.busbar_margin
 
     bus_width = max(desired_width, 140)
     bus_start_x = cx - bus_width / 2
@@ -1939,17 +1979,7 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     circuit_ids = _assign_circuit_ids(sub_circuits, supply_type)
 
     num_circuits = max(len(sub_circuits), 1)
-    h_spacing = config.horizontal_spacing
-    if num_circuits > config.max_circuits_per_row:
-        effective_count = config.max_circuits_per_row
-    else:
-        effective_count = num_circuits
-
-    max_bus_width = config.max_x - config.min_x - 40
-    desired_width = effective_count * h_spacing + 2 * config.busbar_margin
-    if desired_width > max_bus_width:
-        h_spacing = max((max_bus_width - 2 * config.busbar_margin) / effective_count,
-                        config.min_horizontal_spacing)
+    h_spacing = _compute_dynamic_spacing(num_circuits, config)
 
     bus_start_x = result.busbar_start_x
     bus_end_x = result.busbar_end_x

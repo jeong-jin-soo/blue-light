@@ -836,33 +836,70 @@ class SldGenerator:
         layout_result: LayoutResult,
     ) -> None:
         """
-        Draw a cable schedule table with grid lines in the lower-left area.
-        Disabled by default in v6 (LEW-style uses inline annotations).
-        """
-        if not layout_result.render_cable_schedule:
-            return
+        Draw a cable schedule table in the right-side empty area.
 
+        Auto-enabled when sufficient space exists to the right of the DB box.
+        The table adapts its width to available space and supports all circuits
+        (no arbitrary row limit).
+        """
         sub_circuits = requirements.get("sub_circuits", [])
         if not sub_circuits:
             return
 
-        # Cable schedule position (bottom-left, above title block)
-        table_x = 15
-        table_y = 55  # Just above title block
-        row_height = 5.0
-        col_widths = [22, 55, 25, 25, 40]  # ID, Name, Breaker, Rating, Cable
-        total_width = sum(col_widths)
-        total_rows = min(len(sub_circuits) + 1, 9)  # +1 for header, max 8 data rows
+        # -- Determine available right-side space --
+        # Earth bar occupies: earth_x_from_db(5) + earth_width(12) + label(~25) ≈ 42mm
+        earth_clearance = 45
+        db_box_right = layout_result.busbar_end_x + 10  # DB box right edge
+        table_start_after = db_box_right + earth_clearance
+        right_border = 405  # A3 right margin (420 - 15)
+        available_width = right_border - table_start_after
+
+        # Need at least 80mm width for a useful table
+        min_table_width = 80
+        if available_width < min_table_width:
+            # Not enough space — skip cable schedule
+            return
+
+        # -- Table layout --
+        row_height = 4.5
+        total_rows = len(sub_circuits) + 1  # +1 for header (no row limit)
+        table_height = total_rows * row_height
+
+        # Position: right of earth bar area
+        table_x = table_start_after + 3
+        table_width = min(available_width - 6, 150)  # Cap at 150mm
+
+        # Vertical: align top with DB box top area
+        db_box_top = layout_result.db_box_end_y if hasattr(layout_result, 'db_box_end_y') else layout_result.busbar_y + 40
+        table_top = db_box_top
+        table_y = table_top - table_height  # Table bottom
+
+        # Ensure table stays above title block
+        if table_y < 62:
+            table_y = 62
+            table_height = table_top - table_y
+            max_data_rows = int(table_height / row_height) - 1
+            total_rows = max_data_rows + 1
+            table_height = total_rows * row_height
+
+        # Column widths — proportional to table width
+        # ID(12%), Name(35%), Breaker(15%), Rating(13%), Cable(25%)
+        col_widths = [
+            round(table_width * 0.12),
+            round(table_width * 0.35),
+            round(table_width * 0.15),
+            round(table_width * 0.13),
+        ]
+        col_widths.append(table_width - sum(col_widths))  # Cable gets remainder
 
         backend.set_layer("SLD_TITLE_BLOCK")
 
         # Table border
-        table_height = total_rows * row_height
         backend.add_lwpolyline(
             [
                 (table_x, table_y),
-                (table_x + total_width, table_y),
-                (table_x + total_width, table_y + table_height),
+                (table_x + table_width, table_y),
+                (table_x + table_width, table_y + table_height),
                 (table_x, table_y + table_height),
             ],
             close=True,
@@ -882,45 +919,60 @@ class SldGenerator:
             row_y_line = table_y + table_height - row * row_height
             backend.add_line(
                 (table_x, row_y_line),
-                (table_x + total_width, row_y_line),
+                (table_x + table_width, row_y_line),
             )
+
+        # Table title — "CABLE SCHEDULE" above the table
+        backend.add_mtext(
+            "CABLE SCHEDULE",
+            insert=(table_x, table_y + table_height + 3),
+            char_height=2.5,
+        )
 
         # Header text
         header_y = table_y + table_height - 1
-        headers = ["Circuit", "Description", "Breaker", "Rating", "Cable"]
+        headers = ["CKT", "DESCRIPTION", "TYPE", "RATING", "CABLE"]
         x_pos = table_x
-        backend.set_layer("SLD_TITLE_BLOCK")
         for idx, header in enumerate(headers):
             backend.add_mtext(
                 header,
-                insert=(x_pos + 2, header_y),
-                char_height=2.5,
+                insert=(x_pos + 1.5, header_y),
+                char_height=2.0,
             )
             x_pos += col_widths[idx]
 
         # Data rows
         backend.set_layer("SLD_ANNOTATIONS")
-        from app.sld.layout import _classify_circuit
+        from app.sld.layout import _assign_circuit_ids
 
+        supply_type = requirements.get("supply_type", "single_phase")
+        circuit_ids = _assign_circuit_ids(sub_circuits, supply_type)
+
+        max_data_rows = total_rows - 1
         for idx, circuit in enumerate(sub_circuits):
-            if idx >= total_rows - 1:
+            if idx >= max_data_rows:
                 break
 
             row_y = header_y - (idx + 1) * row_height
 
             sc_name = str(circuit.get("name", f"DB-{idx + 1}"))
-            circuit_id = _classify_circuit(sc_name, idx)
+            circuit_id = circuit_ids[idx] if idx < len(circuit_ids) else f"C{idx + 1}"
             breaker_type = str(circuit.get("breaker_type", "MCB"))
             breaker_rating = circuit.get("breaker_rating", 32)
-            cable = format_cable_spec(circuit.get("cable", "-"))
+            cable_full = format_cable_spec(circuit.get("cable", "-"))
+            # Abbreviate cable spec for table: remove " IN METAL TRUNKING" etc.
+            cable_short = (cable_full or "-")
+            for suffix in (" IN METAL TRUNKING", " IN CONDUIT", " IN CABLE TRAY",
+                           " IN TRUNKING"):
+                cable_short = cable_short.replace(suffix, "")
 
-            row_data = [circuit_id, sc_name, breaker_type, f"{breaker_rating}A", cable or "-"]
+            row_data = [circuit_id, sc_name, breaker_type, f"{breaker_rating}A", cable_short]
             x_pos = table_x
             for i, text in enumerate(row_data):
                 backend.add_mtext(
                     str(text),
-                    insert=(x_pos + 2, row_y),
-                    char_height=2.2,
+                    insert=(x_pos + 1.5, row_y),
+                    char_height=1.8,
                 )
                 x_pos += col_widths[i]
 
