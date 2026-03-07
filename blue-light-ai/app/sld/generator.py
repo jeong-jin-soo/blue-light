@@ -74,6 +74,84 @@ _DXF_BLOCK_HEIGHTS = {
     "DP ISOL": 430.63,  # From DXF block analysis
 }
 
+
+def _compute_block_heights_from_dxf(dxf_path: Path) -> dict[str, float]:
+    """Compute actual block bounding heights from a reference DXF file.
+
+    Reads block definitions and measures the Y-extent of each block's entities.
+    Returns empty dict on any failure (never crashes).
+    """
+    try:
+        import ezdxf
+    except ImportError:
+        return {}
+    try:
+        doc = ezdxf.readfile(str(dxf_path))
+    except Exception:
+        return {}
+    heights: dict[str, float] = {}
+    for block_name in _DXF_BLOCK_HEIGHTS:
+        if block_name not in doc.blocks:
+            continue
+        block = doc.blocks.get(block_name)
+        y_coords: list[float] = []
+        for entity in block:
+            try:
+                etype = entity.dxftype()
+                if etype == "CIRCLE":
+                    cy = entity.dxf.center.y
+                    r = entity.dxf.radius
+                    y_coords.extend([cy - r, cy + r])
+                elif etype == "LINE":
+                    y_coords.append(entity.dxf.start.y)
+                    y_coords.append(entity.dxf.end.y)
+                elif etype == "ARC":
+                    cy = entity.dxf.center.y
+                    r = entity.dxf.radius
+                    y_coords.extend([cy - r, cy + r])
+                elif etype in ("LWPOLYLINE", "POLYLINE"):
+                    for pt in entity.get_points():
+                        y_coords.append(pt[1])
+            except Exception:
+                continue
+        if y_coords:
+            heights[block_name] = max(y_coords) - min(y_coords)
+    return heights
+
+
+def _validate_block_heights() -> None:
+    """Log warning if hardcoded block heights diverge >1% from reference DXF.
+
+    Called once at module load. Never modifies ``_DXF_BLOCK_HEIGHTS`` —
+    only emits diagnostics so discrepancies are caught early.
+    """
+    if not _REFERENCE_DXF_PATH.exists():
+        return
+    measured = _compute_block_heights_from_dxf(_REFERENCE_DXF_PATH)
+    if not measured:
+        return
+    for name, hardcoded in _DXF_BLOCK_HEIGHTS.items():
+        actual = measured.get(name)
+        if actual is None:
+            logger.warning("Block '%s' not found in reference DXF for height validation", name)
+            continue
+        pct_diff = abs(actual - hardcoded) / hardcoded * 100
+        if pct_diff > 1.0:
+            logger.warning(
+                "Block height mismatch '%s': hardcoded=%.2f, measured=%.2f (%.1f%% diff)",
+                name, hardcoded, actual, pct_diff,
+            )
+        else:
+            logger.debug(
+                "Block height OK '%s': hardcoded=%.2f, measured=%.2f (%.1f%%)",
+                name, hardcoded, actual, pct_diff,
+            )
+
+
+# Validate hardcoded block heights against reference DXF at module load
+_validate_block_heights()
+
+
 # Map symbol type names to DXF block names
 _SYMBOL_TO_DXF_BLOCK = {
     "MCCB": "MCCB",

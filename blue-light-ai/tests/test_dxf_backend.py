@@ -210,6 +210,40 @@ class TestDxfBlockImport:
         assert dxf.has_block("MCCB") is False
 
 
+# ── TestDxfBlockHeightValidation ──────────────────────────────────
+
+
+class TestDxfBlockHeightValidation:
+    """Runtime validation of hardcoded _DXF_BLOCK_HEIGHTS."""
+
+    @pytest.mark.skipif(
+        not _REFERENCE_DXF_PATH.exists(),
+        reason="Reference DXF not found — skipping height validation tests",
+    )
+    def test_hardcoded_heights_match_reference(self):
+        """Hardcoded block heights match actual DXF block measurements within 1%."""
+        from app.sld.generator import _DXF_BLOCK_HEIGHTS, _compute_block_heights_from_dxf
+
+        measured = _compute_block_heights_from_dxf(_REFERENCE_DXF_PATH)
+        assert len(measured) > 0, "No blocks measured from reference DXF"
+
+        for name, hardcoded in _DXF_BLOCK_HEIGHTS.items():
+            actual = measured.get(name)
+            assert actual is not None, f"Block '{name}' not found in reference DXF"
+            pct_diff = abs(actual - hardcoded) / hardcoded * 100
+            assert pct_diff <= 1.0, (
+                f"Block '{name}': hardcoded={hardcoded:.2f}, "
+                f"measured={actual:.2f} ({pct_diff:.1f}% diff)"
+            )
+
+    def test_compute_block_heights_nonexistent_file(self):
+        """_compute_block_heights_from_dxf returns empty dict for missing file."""
+        from app.sld.generator import _compute_block_heights_from_dxf
+
+        result = _compute_block_heights_from_dxf(Path("/nonexistent/file.dxf"))
+        assert result == {}
+
+
 # ── TestDxfBackendOutput ─────────────────────────────────────────
 
 
