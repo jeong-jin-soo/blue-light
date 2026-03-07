@@ -27,7 +27,7 @@ from app.sld.layout import (
 
 SINGLE_PHASE_METERED = {
     "supply_type": "single_phase",
-    "kva": 40,
+    "kva": 9,  # 40A × 230V = 9.2 kVA (realistic for single-phase 40A)
     "voltage": 230,
     "main_breaker": {"type": "MCB", "rating": 40, "poles": "DP", "fault_kA": 10},
     "busbar_rating": 100,

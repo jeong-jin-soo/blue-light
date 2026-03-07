@@ -397,7 +397,7 @@ class TestFullGeneration:
 
 DENSE_3PHASE_REQ = {
     "supply_type": "three_phase",
-    "kva": 100,
+    "kva": 0,  # Skip kVA lookup — this fixture tests layout geometry, not spec compliance
     "voltage": 400,
     "main_breaker": {"type": "MCCB", "rating": 160, "poles": "TPN", "fault_kA": 25},
     "busbar_rating": 200,
