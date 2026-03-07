@@ -838,10 +838,12 @@ class SldGenerator:
         """
         Draw a cable schedule table in the right-side empty area.
 
-        Auto-enabled when sufficient space exists to the right of the DB box.
-        The table adapts its width to available space and supports all circuits
-        (no arbitrary row limit).
+        Disabled by default — cable specs are already shown inline on the SLD.
+        Set layout_result.render_cable_schedule = True to enable.
         """
+        if not layout_result.render_cable_schedule:
+            return
+
         sub_circuits = requirements.get("sub_circuits", [])
         if not sub_circuits:
             return

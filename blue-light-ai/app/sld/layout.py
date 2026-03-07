@@ -1197,18 +1197,7 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
         config = LayoutConfig()
 
     result = LayoutResult()
-
-    # Dynamic center: shift SLD left when circuit count is low,
-    # reserving right side for cable schedule table
-    sub_circuits = requirements.get("sub_circuits", [])
-    num_sc = len(sub_circuits) if sub_circuits else 0
-    reserve = config.cable_schedule_reserve
-    if reserve > 0 and num_sc <= 10:
-        # Center the SLD within [min_x .. max_x - reserve]
-        effective_right = config.max_x - reserve
-        cx = (config.min_x + effective_right) / 2
-    else:
-        cx = config.start_x
+    cx = config.start_x
 
     # Start from BOTTOM -- above title block with clearance for supply label
     y = config.min_y + 15  # ~77mm (extra clearance for 3-line supply label)
