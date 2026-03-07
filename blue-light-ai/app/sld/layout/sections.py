@@ -452,10 +452,18 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         supply_end_x = mcb_right_x + supply_ext
         result.connections.append(((mcb_right_x, mb_center_y), (supply_end_x, mb_center_y)))
 
-        # INCOMING label — reference format: "INCOMING FROM HDB ELECTRICAL RISER"
-        supply_label = ctx.requirements.get(
-            "incoming_label", SG_LOCALE.incoming.incoming_hdb
-        )
+        # INCOMING label — varies by supply source
+        # SP PowerGrid: "INCOMING FROM HDB ELECTRICAL RISER"
+        # Landlord: "FROM LANDLORD SUPPLY"
+        # Cable extension: "FROM POWER SUPPLY ON SITE"
+        if ctx.requirements.get("incoming_label"):
+            supply_label = ctx.requirements["incoming_label"]
+        elif ctx.is_cable_extension:
+            supply_label = SG_LOCALE.incoming.from_power_supply
+        elif ctx.supply_source == "landlord":
+            supply_label = SG_LOCALE.incoming.from_landlord
+        else:
+            supply_label = SG_LOCALE.incoming.incoming_hdb
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=supply_end_x + 3,
@@ -947,6 +955,11 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
         inc_cable = requirements.get("incoming_cable", {})
         if isinstance(inc_cable, dict):
             inc_size = inc_cable.get("size_mm2", 0)
+            # Ensure numeric type (user may pass "16" as string)
+            try:
+                inc_size = float(inc_size) if inc_size else 0
+            except (ValueError, TypeError):
+                inc_size = 0
         else:
             inc_size = 0
         if inc_size:

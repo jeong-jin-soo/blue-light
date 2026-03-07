@@ -525,7 +525,16 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     # Use corrected breaker_rating if it was auto-corrected in Step 4
     corrected_rating = result.corrections.get("breaker_rating", {}).get("corrected")
     effective_rating = corrected_rating or breaker_rating or (spec.rating_a if spec else 0)
-    effective_spec = INCOMING_SPEC.get(effective_rating, spec)
+    # Prefer 3-phase spec when supply_type is three_phase (avoids TPN→DP misfire)
+    effective_supply = (
+        result.corrections.get("supply_type", {}).get("corrected")
+        or supply_type
+        or (spec.phase if spec else "")
+    )
+    if effective_supply == "three_phase" and effective_rating in INCOMING_SPEC_3PHASE:
+        effective_spec = INCOMING_SPEC_3PHASE[effective_rating]
+    else:
+        effective_spec = INCOMING_SPEC.get(effective_rating, spec)
 
     if effective_spec and breaker_type:
         if breaker_type.upper() != effective_spec.breaker_type:
