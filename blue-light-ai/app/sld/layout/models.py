@@ -292,6 +292,12 @@ class _LayoutContext:
     db_info_label: str = ""      # e.g. "40A DB"
     db_info_text: str = ""       # e.g. "APPROVED LOAD: 9.2KVA AT 230V"
 
+    # Cable extension mode (no meter board / no isolator)
+    is_cable_extension: bool = False
+
+    # CT ratio (e.g., "200/5A")
+    ct_ratio: str = ""
+
     # Raw inputs (for sections that need full access)
     requirements: dict = field(default_factory=dict)
     application_info: dict = field(default_factory=dict)

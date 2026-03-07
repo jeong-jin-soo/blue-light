@@ -660,6 +660,13 @@ REAL_SYMBOL_MAP: dict[str, type] = {
     "FUSE": RealFuse,
 }
 
+# Register additional symbols from app.sld.symbols package
+try:
+    from app.sld.symbols.switches import BIConnector
+    REAL_SYMBOL_MAP["BI_CONNECTOR"] = BIConnector
+except ImportError:
+    pass
+
 
 def get_real_symbol(symbol_type: str) -> BaseSymbol:
     """Get a real-proportion symbol instance by type name."""

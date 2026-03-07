@@ -65,6 +65,10 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
 
     ctx.supply_type = supply_type
     ctx.supply_source = requirements.get("supply_source", "sp_powergrid")
+    ctx.is_cable_extension = requirements.get("is_cable_extension", False)
+    # Cable extension uses landlord supply path but with distinct labeling
+    if ctx.is_cable_extension and ctx.supply_source != "landlord":
+        ctx.supply_source = "landlord"
     ctx.kva = requirements.get("kva", 0)
     ctx.voltage = 400 if supply_type == "three_phase" else 230
     ctx.incoming_cable = requirements.get("incoming_cable", "")
@@ -157,6 +161,13 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
         if isinstance(ctx.elcb_config, dict) else "ELCB"
     )
 
+    # CT ratio parsing (e.g., "200/5A")
+    ct_config = requirements.get("ct", {})
+    if isinstance(ct_config, dict):
+        ctx.ct_ratio = ct_config.get("ratio", "")
+    elif isinstance(ct_config, str):
+        ctx.ct_ratio = ct_config
+
     # Sub-circuits and busbar rating (with defensive type checks)
     raw_circuits = requirements.get("sub_circuits", []) or requirements.get("circuits", [])
     if not isinstance(raw_circuits, list):
@@ -194,8 +205,11 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         ctx.y = y
         return
 
-    # --- Non-metered supply (landlord) only below ---
-    supply_label = SG_LOCALE.incoming.from_landlord
+    # --- Non-metered supply (landlord / cable extension) only below ---
+    if ctx.is_cable_extension:
+        supply_label = SG_LOCALE.incoming.from_power_supply
+    else:
+        supply_label = SG_LOCALE.incoming.from_landlord
     result.components.append(PlacedComponent(
         symbol_name="LABEL",
         x=cx - 80,
@@ -390,11 +404,12 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         if metering == "ct_meter":
             ct_mid_x = (iso_cx + kwh_cx) / 2
             ct_r = config.ct_size / 2
+            ct_label = f"CT {ctx.ct_ratio}" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
             result.components.append(PlacedComponent(
                 symbol_name="CT",
                 x=ct_mid_x - ct_r,
                 y=mb_center_y - ct_r,
-                label=SG_LOCALE.meter_board.ct_by_sp,
+                label=ct_label,
             ))
             result.symbols_used.add("CT")
 
@@ -578,7 +593,8 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
     isolator_label_extra = requirements.get("isolator_label", "")
 
     # Landlord supply: always include isolator (regardless of kVA)
-    if supply_source == "landlord":
+    # Exception: cable extension SLDs skip the isolator
+    if supply_source == "landlord" and not ctx.is_cable_extension:
         if not isolator_rating and breaker_rating:
             isolator_rating = breaker_rating  # Same rating as main breaker
         if not isolator_label_extra:
@@ -827,8 +843,24 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             ))
             result.busbar_start_x = min(result.busbar_start_x, row_bus_start)
             result.busbar_end_x = max(result.busbar_end_x, row_bus_end)
-            # Vertical connection between rows
-            result.connections.append(((cx, y + 2), (cx, busbar_y_row)))
+
+            # BI Connector between rows (replacing plain vertical line)
+            bi_w = 16   # BIConnector symbol width
+            bi_h = 10   # BIConnector symbol height
+            prev_busbar_y = result.busbar_y_per_row[row_idx - 1]
+            bi_y = (prev_busbar_y + busbar_y_row) / 2 - bi_h / 2
+
+            result.components.append(PlacedComponent(
+                symbol_name="BI_CONNECTOR",
+                x=cx - bi_w / 2,
+                y=bi_y,
+                label="BI CONN.",
+            ))
+            result.symbols_used.add("BI_CONNECTOR")
+
+            # Connection lines: prev busbar → BI top, BI bottom → new busbar
+            result.connections.append(((cx, prev_busbar_y + 2), (cx, bi_y)))
+            result.connections.append(((cx, bi_y + bi_h), (cx, busbar_y_row)))
 
         sc_bus_start = row_bus_start
         result.busbar_y_per_row.append(busbar_y_row)
