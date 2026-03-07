@@ -1224,7 +1224,97 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     db_box_right = _place_db_box(ctx, busbar_y_row)
     _place_earth_bar(ctx, db_box_right)
 
+    # Post-layout: center content vertically in drawing area
+    _center_vertically(ctx.result, ctx.config)
+
     return ctx.result
+
+
+def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
+    """Shift all content vertically to center it in the drawing area.
+
+    Measures the actual Y extent of all components (including vertical text
+    rendering height), connections, and dots, then applies a uniform vertical
+    shift to center the content between min_y and max_y.
+
+    Vertical text (rotation=90°) extends UPWARD from comp.y, so its top
+    extent = comp.y + len(text) * char_width_estimate.
+    """
+    _CHAR_W = 2.0  # Approximate character advance width (char_height 2.8 × 0.71)
+
+    # Collect all Y coordinates (including rendered text extents)
+    all_ys: list[float] = []
+    for comp in result.components:
+        all_ys.append(comp.y)
+        # Vertical text extends upward from comp.y
+        if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
+            # Handle \\P line breaks: only longest line contributes to Y extent
+            lines = comp.label.split("\\P")
+            max_line_len = max(len(line) for line in lines)
+            text_extent = max_line_len * _CHAR_W
+            all_ys.append(comp.y + text_extent)
+    for (sx, sy), (ex, ey) in result.connections:
+        all_ys.extend([sy, ey])
+    for (sx, sy), (ex, ey) in result.dashed_connections:
+        all_ys.extend([sy, ey])
+    for (sx, sy), (ex, ey) in result.thick_connections:
+        all_ys.extend([sy, ey])
+    for x1, y1, x2, y2 in result.solid_boxes:
+        all_ys.extend([y1, y2])
+    for dx, dy in result.junction_dots:
+        all_ys.append(dy)
+    for ax, ay in result.arrow_points:
+        all_ys.append(ay)
+
+    if not all_ys:
+        return
+
+    content_min_y = min(all_ys)
+    content_max_y = max(all_ys)
+    content_height = content_max_y - content_min_y
+
+    # Available vertical space (with margins)
+    margin = 5.0  # mm breathing room from edges
+    area_min = config.min_y + margin
+    area_max = config.max_y - margin
+    area_height = area_max - area_min
+
+    # Calculate shift to center (even if content exceeds area, try to minimize overflow)
+    current_center = (content_min_y + content_max_y) / 2
+    target_center = (area_min + area_max) / 2
+    shift = target_center - current_center
+
+    # Clamp shift: ensure no content exceeds drawing borders after shift
+    # Priority: prevent top overflow first (text extends upward), then bottom
+    if content_max_y + shift > config.max_y - 2:
+        shift = config.max_y - 2 - content_max_y
+    if content_min_y + shift < config.min_y + 2:
+        shift = config.min_y + 2 - content_min_y
+
+    if abs(shift) < 1.0:
+        return  # Already centered enough
+
+    # Apply vertical shift to all elements
+    for comp in result.components:
+        comp.y += shift
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
+        result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
+        result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
+        result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
+        result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
+    for i, (dx, dy) in enumerate(result.junction_dots):
+        result.junction_dots[i] = (dx, dy + shift)
+    for i, (ax, ay) in enumerate(result.arrow_points):
+        result.arrow_points[i] = (ax, ay + shift)
+
+    # Update stored Y references
+    result.busbar_y += shift
+    result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
+    result.db_box_start_y += shift
+    result.db_box_end_y += shift
 
 
 # -- Section methods for compute_layout() --
