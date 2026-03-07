@@ -540,3 +540,30 @@ def test_groups_detected(requirements):
     groups, incoming_chain_x = _identify_groups(result)
     non_spare = [g for g in groups if not g.is_spare]
     assert len(non_spare) > 0, "Should have at least one non-spare group"
+
+
+@pytest.mark.parametrize("requirements", ALL_CONFIGS_FOR_GROUPS,
+                         ids=["1ph_spine", "3ph_spine", "3ph_ct_spine",
+                              "1ph_landlord_spine", "3ph_mccb_spine"])
+def test_spine_x_stored(requirements):
+    """compute_layout should store spine_x in LayoutResult."""
+    result = compute_layout(requirements)
+    assert result.spine_x > 0, "spine_x should be stored by compute_layout"
+    assert result.spine_x == pytest.approx(210.0), (
+        f"spine_x should be config.start_x (210.0), got {result.spine_x}"
+    )
+
+
+@pytest.mark.parametrize("requirements", ALL_CONFIGS_FOR_GROUPS,
+                         ids=["1ph_icx", "3ph_icx", "3ph_ct_icx",
+                              "1ph_landlord_icx", "3ph_mccb_icx"])
+def test_incoming_chain_x_matches_spine(requirements):
+    """With spine_x set, incoming_chain_x should always be positive and match."""
+    result = compute_layout(requirements)
+    groups, incoming_chain_x = _identify_groups(result)
+    assert incoming_chain_x > 0, (
+        "incoming_chain_x should be positive when spine_x is set"
+    )
+    assert incoming_chain_x == pytest.approx(result.spine_x, abs=0.5), (
+        f"incoming_chain_x={incoming_chain_x} should match spine_x={result.spine_x}"
+    )

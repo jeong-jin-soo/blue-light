@@ -252,6 +252,10 @@ class LayoutResult:
     render_cable_schedule: bool = False
     render_legend: bool = False
 
+    # Incoming supply spine x-coordinate (set by compute_layout)
+    # Used by _identify_groups() for deterministic incoming chain detection
+    spine_x: float = 0.0
+
 
 from typing import Any
 
@@ -560,34 +564,56 @@ def _identify_groups(
     groups.sort(key=lambda g: g.tap_x)
     tap_xs_set = {g.tap_x for g in groups}
 
-    # Step 3: Determine incoming chain x (most common vertical connection x
-    # that is NOT a sub-circuit tap)
-    vert_conn_x_count: dict[float, int] = {}
-    for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
-        if abs(sx - ex) < 0.5:  # Vertical connection
-            x_val = round(sx, 1)
-            vert_conn_x_count[x_val] = vert_conn_x_count.get(x_val, 0) + 1
-
-    # incoming chain x = x with most connections that isn't a tap_x
-    # Guard: require at least 2× advantage over any single tap_x count
-    # to avoid misidentification when sub-circuits have many connections
+    # Step 3: Determine incoming chain x
+    # Primary: use spine_x from compute_layout() (deterministic, always correct)
+    # Fallback: heuristic histogram detection (legacy, for external callers)
     incoming_chain_x = 0.0
-    max_count = 0
-    second_count = 0
-    for x_val, count in vert_conn_x_count.items():
-        is_tap = any(abs(x_val - g.tap_x) < _TOL for g in groups)
-        if not is_tap:
-            if count > max_count:
-                second_count = max_count
-                max_count = count
-                incoming_chain_x = x_val
-            elif count > second_count:
-                second_count = count
 
-    # If the best non-tap x doesn't have a clear count advantage,
-    # fall back to the leftmost group's tap_x minus a typical offset
-    if max_count > 0 and max_count <= second_count:
-        incoming_chain_x = 0.0  # disable — no clear winner
+    if layout_result.spine_x > 0:
+        incoming_chain_x = layout_result.spine_x
+    else:
+        # Legacy: histogram-based detection for backward compatibility
+        vert_conn_x_count: dict[float, int] = {}
+        for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
+            if abs(sx - ex) < 0.5:  # Vertical connection
+                x_val = round(sx, 1)
+                vert_conn_x_count[x_val] = vert_conn_x_count.get(x_val, 0) + 1
+
+        max_count = 0
+        second_count = 0
+        for x_val, count in vert_conn_x_count.items():
+            is_tap = any(abs(x_val - g.tap_x) < _TOL for g in groups)
+            if not is_tap:
+                if count > max_count:
+                    second_count = max_count
+                    max_count = count
+                    incoming_chain_x = x_val
+                elif count > second_count:
+                    second_count = count
+
+        if max_count > 0 and max_count <= second_count:
+            incoming_chain_x = 0.0
+
+    # Transition validation: compare spine_x with histogram result
+    if layout_result.spine_x > 0 and incoming_chain_x > 0:
+        # Also run histogram for cross-check (debug only)
+        _histo_x = 0.0
+        _histo_count: dict[float, int] = {}
+        for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
+            if abs(sx - ex) < 0.5:
+                x_val = round(sx, 1)
+                _histo_count[x_val] = _histo_count.get(x_val, 0) + 1
+        _max_c = 0
+        for x_val, count in _histo_count.items():
+            is_tap = any(abs(x_val - g.tap_x) < _TOL for g in groups)
+            if not is_tap and count > _max_c:
+                _max_c = count
+                _histo_x = x_val
+        if _histo_x > 0 and abs(_histo_x - incoming_chain_x) > _TOL:
+            logger.warning(
+                "spine_x=%.1f differs from histogram_x=%.1f — using spine_x",
+                incoming_chain_x, _histo_x,
+            )
 
     # Step 4: Match CIRCUIT_ID_BOX to groups
     for i, comp in enumerate(components):
@@ -1299,6 +1325,9 @@ def compute_layout(requirements: dict, config: LayoutConfig | None = None, appli
     _add_cable_leader_lines(ctx.result, ctx.config)
     db_box_right = _place_db_box(ctx, busbar_y_row)
     _place_earth_bar(ctx, db_box_right)
+
+    # Store spine_x for deterministic incoming chain detection
+    ctx.result.spine_x = cx
 
     # Post-layout: center content vertically in drawing area
     _center_vertically(ctx.result, ctx.config)
