@@ -1020,3 +1020,74 @@ class TestRebuildPositions:
                 assert abs(label_x - tap_x) < 0.5, (
                     f"Name label x={label_x:.1f} != tap_x={tap_x:.1f}"
                 )
+
+
+# -- Test: SVG multiline rotated text --
+
+class TestSvgMultilineRotatedText:
+    """Verify SVG multiline text with rotation uses separate <text> elements."""
+
+    def test_rotated_multiline_uses_separate_elements(self):
+        """Rotated multiline text should emit one <text> per line, not <tspan dy>."""
+        import re
+        backend = SvgBackend()
+        backend.add_mtext(
+            "Line1\\PLine2\\PLine3",
+            insert=(100, 200),
+            char_height=3.0,
+            rotation=90.0,
+        )
+        svg = backend.get_svg_string()
+        # Should have 3 separate <text> elements (one per line)
+        text_tags = re.findall(r"<text\b", svg)
+        assert len(text_tags) >= 3, (
+            f"Expected 3 separate <text> elements for rotated multiline, got {len(text_tags)}"
+        )
+        # Should NOT contain <tspan dy> (rotated text avoids tspan offsets)
+        assert "tspan" not in svg or 'dy="' not in svg, (
+            "Rotated multiline text should not use <tspan dy> offsets"
+        )
+
+    def test_non_rotated_multiline_uses_tspan(self):
+        """Non-rotated multiline text should use <tspan dy> (existing behavior)."""
+        backend = SvgBackend()
+        backend.add_mtext(
+            "Line1\\PLine2",
+            insert=(100, 200),
+            char_height=3.0,
+            rotation=0.0,
+        )
+        svg = backend.get_svg_string()
+        assert '<tspan' in svg, "Non-rotated multiline should use <tspan>"
+        assert 'dy="' in svg, "Non-rotated multiline should use dy offsets"
+
+    def test_single_line_rotated_unchanged(self):
+        """Single-line rotated text should still use a single <text> element."""
+        import re
+        backend = SvgBackend()
+        backend.add_mtext(
+            "SingleLine",
+            insert=(100, 200),
+            char_height=3.0,
+            rotation=90.0,
+        )
+        svg = backend.get_svg_string()
+        text_tags = re.findall(r"<text\b", svg)
+        assert len(text_tags) == 1
+        assert 'transform="rotate(' in svg
+
+    def test_rotated_multiline_each_line_has_transform(self):
+        """Each line in rotated multiline text should have its own rotation."""
+        import re
+        backend = SvgBackend()
+        backend.add_mtext(
+            "L1\\PL2",
+            insert=(50, 100),
+            char_height=3.0,
+            rotation=90.0,
+        )
+        svg = backend.get_svg_string()
+        transforms = re.findall(r'transform="rotate\(', svg)
+        assert len(transforms) >= 2, (
+            "Each line should have its own rotation transform"
+        )

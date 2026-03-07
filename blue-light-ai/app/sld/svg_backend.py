@@ -226,11 +226,38 @@ class SvgBackend:
                 f'font-family="Arial, Helvetica, sans-serif" font-size="{char_height:.1f}" '
                 f'fill="{color}"{transform}>{escaped}</text>'
             )
+        elif abs(rotation) > 0.1:
+            # Rotated multiline: <tspan dy> offsets are applied in the
+            # rotated coordinate system, so dy shifts horizontally instead
+            # of vertically when rotation=90°.  Fix by emitting separate
+            # <text> elements with pre-rotated absolute coordinates.
+            rot_rad = math.radians(-rotation)
+            cos_r = math.cos(rot_rad)
+            sin_r = math.sin(rot_rad)
+            font_attr = (
+                f'font-family="Arial, Helvetica, sans-serif" '
+                f'font-size="{char_height:.1f}" fill="{color}"'
+            )
+            for i, line_text in enumerate(lines):
+                escaped = escape(line_text)
+                # Local offset along the unrotated Y axis
+                local_dy = i * line_spacing
+                # Rotate the offset vector (0, local_dy) by the text rotation
+                ox = -local_dy * sin_r
+                oy = local_dy * cos_r
+                lx = x + ox
+                ly = base_y + oy
+                self._elements.append(
+                    f'<text x="{lx:.2f}" y="{ly:.2f}" {font_attr} '
+                    f'transform="rotate({-rotation},{lx:.2f},{ly:.2f})">'
+                    f'{escaped}</text>'
+                )
         else:
+            # Non-rotated multiline: <tspan dy> works correctly
             parts = [
                 f'<text x="{x:.2f}" y="{base_y:.2f}" '
                 f'font-family="Arial, Helvetica, sans-serif" font-size="{char_height:.1f}" '
-                f'fill="{color}"{transform}>'
+                f'fill="{color}">'
             ]
             for i, line in enumerate(lines):
                 escaped = escape(line)
