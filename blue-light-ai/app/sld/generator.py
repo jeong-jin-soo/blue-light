@@ -56,6 +56,7 @@ from app.sld.real_symbols import (
     get_real_symbol,
     get_symbol_dimensions,
 )
+from app.sld.locale import SG_LOCALE
 from app.sld.svg_backend import SvgBackend
 from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
 
@@ -89,37 +90,26 @@ class SldGenerator:
     Generates complete SLD drawings in PDF format with SVG preview.
     """
 
-    # Full legend descriptions for all known symbols
+    # Full legend descriptions for all known symbols — sourced from locale module
+    _lg = SG_LOCALE.legend
     LEGEND_DESCRIPTIONS: dict[str, str] = {
-        "ACB": "Air Circuit Breaker",
-        "MCCB": "Moulded Case Circuit Breaker",
-        "MCB": "Miniature Circuit Breaker",
-        "ELCB": "Earth Leakage Circuit Breaker",
-        "RCCB": "Residual Current Circuit Breaker",
-        "KWH_METER": "kWh Meter (Energy Meter)",
-        "AMMETER": "Ammeter (Current Meter)",
-        "VOLTMETER": "Voltmeter (Voltage Meter)",
-        "EARTH": "Earth Bar / Ground Connection",
-        "ISOLATOR": "Isolator / Disconnect Switch",
-        "ISOLATOR_MACHINE": "Isolator for Machine",
-        "DOUBLE_POLE_SWITCH": "Double Pole Switch",
-        "TRANSFORMER": "Power Transformer",
-        "CT": "Current Transformer",
-        "FUSE": "Fuse",
-        "SPD": "Surge Protection Device",
-        "ATS": "Automatic Transfer Switch",
-        "BI_CONNECTOR": "BI Connector (Bus Isolator)",
-        "MOTOR": "Motor",
-        "GENERATOR": "Generator",
-        "BUSBAR": "Busbar (Main Distribution)",
-        "INDUSTRIAL_SOCKET": "Industrial Socket (CEE-Form)",
-        "TIMER": "Timer / Time Switch",
-        "TIMER_BYPASS": "Timer with Bypass Switch",
-        "SHUNT_TRIP": "Shunt Trip",
-        "INDICATOR_LIGHT": "Indicator Light",
-        "PROTECTION_RELAY": "Protection Relay (O/C E/F)",
-        "PT": "Potential Transformer (Voltage Transformer)",
+        "ACB": _lg.acb, "MCCB": _lg.mccb, "MCB": _lg.mcb,
+        "ELCB": _lg.elcb, "RCCB": _lg.rccb,
+        "KWH_METER": _lg.kwh_meter, "AMMETER": _lg.ammeter, "VOLTMETER": _lg.voltmeter,
+        "EARTH": _lg.earth, "ISOLATOR": _lg.isolator,
+        "ISOLATOR_MACHINE": _lg.isolator_machine,
+        "DOUBLE_POLE_SWITCH": _lg.double_pole_switch,
+        "TRANSFORMER": _lg.transformer, "CT": _lg.ct,
+        "FUSE": _lg.fuse, "SPD": _lg.spd, "ATS": _lg.ats,
+        "BI_CONNECTOR": _lg.bi_connector,
+        "MOTOR": _lg.motor, "GENERATOR": _lg.generator,
+        "BUSBAR": _lg.busbar,
+        "INDUSTRIAL_SOCKET": _lg.industrial_socket,
+        "TIMER": _lg.timer, "TIMER_BYPASS": _lg.timer_bypass,
+        "SHUNT_TRIP": _lg.shunt_trip, "INDICATOR_LIGHT": _lg.indicator_light,
+        "PROTECTION_RELAY": _lg.protection_relay, "PT": _lg.pt,
     }
+    del _lg  # Clean up temporary reference
 
     # Legend abbreviations (shorter form for display)
     LEGEND_ABBREVIATIONS: dict[str, str] = {
@@ -232,6 +222,8 @@ class SldGenerator:
             # Import native CAD symbol blocks from reference DXF template
             if _REFERENCE_DXF_PATH.exists():
                 dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
+            else:
+                logger.warning("Reference DXF not found: %s — DXF symbol blocks will be missing", _REFERENCE_DXF_PATH)
             pdf = PdfBackend(pdf_output_path)
             svg = SvgBackend()
             backends = [dxf, pdf, svg]
@@ -336,6 +328,8 @@ class SldGenerator:
             # Import native CAD symbol blocks from reference DXF template
             if _REFERENCE_DXF_PATH.exists():
                 dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
+            else:
+                logger.warning("Reference DXF not found: %s — DXF symbol blocks will be missing", _REFERENCE_DXF_PATH)
             backends = [dxf, pdf, svg]
         else:
             backends = [pdf, svg]
@@ -1016,7 +1010,7 @@ class SldGenerator:
 
         # Always include busbar if there's a busbar in the layout
         if "BUSBAR" not in layout_result.symbols_used:
-            legend_items.append(("Busbar", "Busbar (Main Distribution)", "BUSBAR"))
+            legend_items.append(("Busbar", SG_LOCALE.legend.busbar, "BUSBAR"))
 
         if not legend_items:
             return

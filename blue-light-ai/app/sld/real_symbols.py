@@ -22,7 +22,7 @@ import math
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from app.sld.symbols.base import BaseSymbol
+from app.sld.base_symbol import BaseSymbol
 
 if TYPE_CHECKING:
     from app.sld.backend import DrawingBackend
@@ -40,6 +40,11 @@ def _load_symbol_data() -> dict:
     """Load symbol dimensions from JSON file."""
     global _symbol_data
     if _symbol_data is None:
+        if not _SYMBOL_DATA_PATH.exists():
+            raise FileNotFoundError(
+                f"Symbol data file not found: {_SYMBOL_DATA_PATH} — "
+                "ensure data/templates/real_symbol_paths.json is present"
+            )
         with open(_SYMBOL_DATA_PATH) as f:
             _symbol_data = json.load(f)
     return _symbol_data

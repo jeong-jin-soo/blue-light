@@ -733,7 +733,7 @@ class TestConnectionAlignment:
                         and "spare" in (c.label or "").lower()
                         and abs(c.rotation - 90.0) < 0.1]
         for label in spare_labels:
-            spare_tap_x = label.x - 3  # LABEL at tap_x + 3
+            spare_tap_x = label.x  # LABEL placed at tap_x
             matching = [
                 (s, e) for s, e in result.connections
                 if abs(s[0] - spare_tap_x) < 0.5 or abs(e[0] - spare_tap_x) < 0.5
@@ -1008,7 +1008,7 @@ class TestRebuildPositions:
                 )
 
     def test_name_label_offset_from_tap(self):
-        """Circuit name labels should be at tap_x + 3 (vertical text offset)."""
+        """Circuit name labels should be at tap_x (vertical text at tap position)."""
         result = compute_layout(DENSE_3PHASE_REQ)
         groups, _ = _identify_groups(result)
         for g in groups:
@@ -1017,6 +1017,6 @@ class TestRebuildPositions:
                     result.components[g.breaker_idx]
                 )
                 label_x = result.components[g.name_label_idx].x
-                assert abs(label_x - (tap_x + 3)) < 0.5, (
-                    f"Name label x={label_x:.1f} != tap_x+3={tap_x + 3:.1f}"
+                assert abs(label_x - tap_x) < 0.5, (
+                    f"Name label x={label_x:.1f} != tap_x={tap_x:.1f}"
                 )

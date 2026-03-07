@@ -252,6 +252,8 @@ class LayoutResult:
 
 from typing import Any
 
+from app.sld.locale import SG_LOCALE, SldLocale
+
 
 @dataclass
 class _LayoutContext:
@@ -539,10 +541,11 @@ def _identify_groups(
             groups.append(g)
 
     # Step 2: Create groups from SPARE labels
+    _SPARE = SG_LOCALE.circuit.spare
     for i, comp in enumerate(components):
         if (comp.symbol_name == "LABEL"
                 and abs(comp.rotation - 90.0) < 0.1
-                and comp.label.strip().upper() == "SPARE"):
+                and comp.label.strip().upper() == _SPARE):
             tap_x = comp.x  # SPARE label placed at tap_x
             g = SubCircuitGroup(tap_x=tap_x, spare_label_idx=i, is_spare=True)
             groups.append(g)
@@ -596,7 +599,7 @@ def _identify_groups(
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
             continue
-        if comp.label.strip().upper() == "SPARE":
+        if comp.label.strip().upper() == _SPARE:
             continue  # Already handled as group anchor
         for g in groups:
             if g.is_spare:
@@ -1456,7 +1459,7 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         return
 
     # --- Non-metered supply (landlord) only below ---
-    supply_label = "FROM LANDLORD SUPPLY"
+    supply_label = SG_LOCALE.incoming.from_landlord
     result.components.append(PlacedComponent(
         symbol_name="LABEL",
         x=cx - 80,
@@ -1638,7 +1641,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
             x=iso_cx - iso_h_extent / 2,
             y=mb_center_y,
             label=f"{breaker_rating}A {meter_poles}",
-            rating="ISOLATOR",
+            rating=SG_LOCALE.meter_board.isolator,
             rotation=90.0,
         ))
         result.symbols_used.add("ISOLATOR")
@@ -1655,7 +1658,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
                 symbol_name="CT",
                 x=ct_mid_x - ct_r,
                 y=mb_center_y - ct_r,
-                label="CT BY SP",
+                label=SG_LOCALE.meter_board.ct_by_sp,
             ))
             result.symbols_used.add("CT")
 
@@ -1674,7 +1677,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
             symbol_name="LABEL",
             x=kwh_label_x,
             y=kwh_label_y,
-            label="KWH METER BY SP",
+            label=SG_LOCALE.meter_board.kwh_meter_by_sp,
         ))
 
         # ====== Connection: KWH right -> MCB left ======
@@ -1700,7 +1703,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
 
         # INCOMING label — reference format: "INCOMING FROM HDB ELECTRICAL RISER"
         supply_label = ctx.requirements.get(
-            "incoming_label", "INCOMING FROM HDB ELECTRICAL RISER"
+            "incoming_label", SG_LOCALE.incoming.incoming_hdb
         )
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
@@ -1806,14 +1809,14 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
             symbol_name="LABEL",
             x=mb_box_left + 1,
             y=mb_label_y,
-            label="METER BOARD",
+            label=SG_LOCALE.meter_board.meter_board,
         ))
         # "LOCATED AT METER COMPARTMENT" — below the box
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=(mb_box_left + mb_box_right) / 2 - 18,
             y=mb_box_bottom - 3,
-            label="LOCATED AT METER COMPARTMENT",
+            label=SG_LOCALE.meter_board.located_meter_compartment,
         ))
 
         y = y_exit
@@ -1843,7 +1846,7 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         if not isolator_rating and breaker_rating:
             isolator_rating = breaker_rating  # Same rating as main breaker
         if not isolator_label_extra:
-            isolator_label_extra = "LOCATED INSIDE UNIT"
+            isolator_label_extra = SG_LOCALE.meter_board.located_inside_unit
     elif not isolator_rating and metering == "ct_meter":
         if breaker_rating:
             isolator_rating = _next_standard_rating(breaker_rating)
@@ -1851,9 +1854,9 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
     if isolator_rating:
         result.connections.append(((cx, y), (cx, y + 2)))
         y += 2
-        iso_main_label = f"{isolator_rating}A {meter_poles} ISOLATOR"
+        iso_main_label = f"{isolator_rating}A {meter_poles} {SG_LOCALE.meter_board.isolator}"
         iso_rating_text = (
-            f"({isolator_label_extra})" if isolator_label_extra else "ISOLATOR"
+            f"({isolator_label_extra})" if isolator_label_extra else SG_LOCALE.meter_board.isolator
         )
         result.components.append(PlacedComponent(
             symbol_name="ISOLATOR",
@@ -2000,15 +2003,15 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     result.busbar_end_x = bus_end_x
 
     busbar_label = (
-        f"{busbar_rating}A COMB BUSBAR"
+        f"{busbar_rating}A {SG_LOCALE.circuit.comb_busbar}"
         if busbar_rating <= 500
-        else f"{busbar_rating}A BUSBAR"
+        else f"{busbar_rating}A {SG_LOCALE.circuit.busbar}"
     )
     result.components.append(PlacedComponent(
         symbol_name="BUSBAR",
         x=bus_start_x,
         y=y,
-        label=f"{breaker_rating}A DB",
+        label=f"{breaker_rating}A {SG_LOCALE.circuit.db}",
         rating="",
     ))
     # -- DB Info: compute text, defer placement to _place_db_box() --
@@ -2023,12 +2026,12 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     if application_info:
         premises_addr = application_info.get("address", "")
 
-    db_info_text = f"APPROVED LOAD: {approved_kva}KVA AT {voltage}V"
+    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva}KVA AT {voltage}V"
     if premises_addr:
         db_info_text += f"\\PLOCATED AT {premises_addr}"
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
-    ctx.db_info_label = f"{breaker_rating}A DB"
+    ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"
     ctx.db_info_text = db_info_text
 
     # Busbar rating label — left-aligned below busbar (per reference DWG)
@@ -2185,8 +2188,9 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     # -- Boundary check: ensure earth + labels fit within drawing border --
     _CHAR_W = 1.8  # Approximate character width in mm at char_height 2.3
     earth_label_right = earth_x + _earth_w + 3 + 2  # symbol + gap + "E" text width
+    _earth_cond = SG_LOCALE.circuit.earth_conductor
     if earth_conductor_mm2:
-        conductor_label = f"1 x {earth_conductor_mm2}sqmm CU/GRN-YEL"
+        conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
         conductor_label_right = earth_x + len(conductor_label) * _CHAR_W
         earth_rightmost = max(earth_label_right, conductor_label_right)
     else:
@@ -2208,7 +2212,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     result.symbols_used.add("EARTH")
 
     if earth_conductor_mm2:
-        conductor_label = f"1 x {earth_conductor_mm2}sqmm CU/GRN-YEL"
+        conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
         _CHAR_W_LABEL = 1.8  # Approximate char width at char_height 2.8
         label_width = len(conductor_label) * _CHAR_W_LABEL
         label_x = earth_x
@@ -2221,7 +2225,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             # If still too wide, wrap to 2 lines at "CU/GRN-YEL" boundary
             recalc_width = len(conductor_label) * _CHAR_W_LABEL
             if label_x + recalc_width > border_right_abs - 2:
-                conductor_label = f"1 x {earth_conductor_mm2}sqmm\\PCU/GRN-YEL"
+                conductor_label = f"1 x {earth_conductor_mm2}sqmm\\P{_earth_cond}"
                 label_x = earth_x  # Reset x since text is now shorter per line
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
@@ -2458,7 +2462,7 @@ def _place_sub_circuits_upward(
                 symbol_name="LABEL",
                 x=tap_x,
                 y=spare_top_y + 2,
-                label="SPARE",
+                label=SG_LOCALE.circuit.spare,
                 rotation=90.0,
             ))
             continue

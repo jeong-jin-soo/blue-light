@@ -245,15 +245,15 @@ class TestConnectionIntegrity:
     def test_connection_graph_bounded_components(self, layout_result: LayoutResult):
         """Connection graph components should be proportional to circuit count.
 
-        Each sub-circuit branch creates ~3-4 isolated graph segments
-        (arrow stub, tail extension, tick mark, etc.) because the busbar
-        is not represented as a connection edge.  Base overhead ~8
-        (meter board internals, spine, earth).
+        Each sub-circuit branch creates ~3-5 isolated graph segments
+        (arrow stub, tail extension, tick mark, conductor ticks, etc.)
+        because the busbar is not represented as a connection edge.
+        Base overhead ~8 (meter board internals, spine, earth).
 
-        Formula: max_components = 8 + 4 × sub_circuit_count
+        Formula: max_components = 8 + 5 × sub_circuit_count
         """
         n_breakers = len(_get_breaker_components(layout_result))
-        max_expected = 8 + 4 * max(n_breakers, 1)
+        max_expected = 8 + 5 * max(n_breakers, 1)
 
         adj = _build_adjacency(layout_result)
         n_components = _count_connected_components(adj)

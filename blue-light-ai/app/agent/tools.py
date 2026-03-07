@@ -340,12 +340,11 @@ def validate_sld_requirements(requirements: dict) -> str:
             )
 
     # 5b. ELCB/RCCB missing check — MANDATORY per SS 638
+    from app.sld.validation_messages import (
+        ELCB_MANDATORY, INCOMING_CABLE_NOT_SPECIFIED, METERING_NOT_SPECIFIED,
+    )
     if not elcb:
-        errors.append(
-            "SS 638: Earth leakage protection (ELCB/RCCB) is MANDATORY. "
-            "Add 'elcb' dict with 'rating', 'sensitivity_ma', 'poles'. "
-            "If user specified RCCB, include '\"type\": \"RCCB\"'."
-        )
+        errors.append(ELCB_MANDATORY)
 
     # 5c. Sub-circuit breaker_characteristic validation
     for i, sc in enumerate(sub_circuits):
@@ -358,15 +357,12 @@ def validate_sld_requirements(requirements: dict) -> str:
 
     # 6. Incoming cable should be specified
     if not requirements.get("incoming_cable"):
-        warnings.append(
-            "Incoming cable not specified — recommend specifying per SS 638 "
-            "Table 4D1A for the installation's kVA tier"
-        )
+        warnings.append(INCOMING_CABLE_NOT_SPECIFIED)
 
     # ── Optional but recommended ─────────────────────────
     supply_source = requirements.get("supply_source", "sp_powergrid")
     if not requirements.get("metering") and supply_source != "landlord":
-        warnings.append("metering not specified — will use standard SP kWh meter")
+        warnings.append(METERING_NOT_SPECIFIED)
 
     # ── Result ───────────────────────────────────────────
     is_valid = len(missing) == 0 and len(errors) == 0

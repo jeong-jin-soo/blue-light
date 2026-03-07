@@ -445,11 +445,9 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     breaker_ka = requirements.get("breaker_ka", 0)
 
     # ── 0. Basic required fields ──────────────────────────────────
+    from app.sld.validation_messages import MISSING_KVA_OR_BREAKER
     if not kva and not breaker_rating:
-        result.add_error(
-            "Either 'kva' or 'breaker_rating' must be provided. "
-            "Cannot determine installation specifications."
-        )
+        result.add_error(MISSING_KVA_OR_BREAKER)
         return result
 
     # ── 1. kVA → Spec lookup ──────────────────────────────────────

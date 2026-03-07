@@ -21,6 +21,8 @@ from __future__ import annotations
 from datetime import date
 from typing import TYPE_CHECKING
 
+from app.sld.locale import SG_LOCALE, SldLocale
+
 if TYPE_CHECKING:
     from app.sld.backend import DrawingBackend
 
@@ -63,7 +65,7 @@ def draw_border(backend: DrawingBackend, margin: float = 10) -> None:
     )
 
 
-def draw_title_block_frame(backend: DrawingBackend) -> None:
+def draw_title_block_frame(backend: DrawingBackend, locale: SldLocale = SG_LOCALE) -> None:
     """
     Draw the title block structure matching real LEW SLD format.
     Single-row layout with right-side 2x2 grid for CHECKED/DATE/DWG NO/REV.
@@ -95,17 +97,18 @@ def draw_title_block_frame(backend: DrawingBackend) -> None:
     lbl_h = 1.8   # Label font size (small, like real samples)
     lbl_y = ROW_TOP - 2.5  # Y offset from top for labels
 
-    backend.add_mtext("CLIENT / ADDRESS :", insert=(COL1 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext("MAIN CONTRACTOR :", insert=(COL2 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext("ELECTRICAL CONTRACTOR :", insert=(COL3 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext("DRAWING TITLE :", insert=(COL4 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext("LEW :", insert=(COL5 + 2, lbl_y), char_height=lbl_h)
+    tb = locale.title_block
+    backend.add_mtext(tb.client_address, insert=(COL1 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.main_contractor, insert=(COL2 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.electrical_contractor, insert=(COL3 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.drawing_title, insert=(COL4 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.lew, insert=(COL5 + 2, lbl_y), char_height=lbl_h)
 
     # Right 2x2 grid labels
-    backend.add_mtext("CHECKED :", insert=(COL6 + 2, ROW_TOP - 2.5), char_height=lbl_h)
-    backend.add_mtext("DATE :", insert=(COL6_MID + 2, ROW_TOP - 2.5), char_height=lbl_h)
-    backend.add_mtext("DRAWING NO. :", insert=(COL6 + 2, ROW_MID - 2.5), char_height=lbl_h)
-    backend.add_mtext("REV :", insert=(COL6_MID + 2, ROW_MID - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.checked, insert=(COL6 + 2, ROW_TOP - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.date, insert=(COL6_MID + 2, ROW_TOP - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.drawing_no, insert=(COL6 + 2, ROW_MID - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.rev, insert=(COL6_MID + 2, ROW_MID - 2.5), char_height=lbl_h)
 
 
 def fill_title_block_data(
@@ -128,6 +131,7 @@ def fill_title_block_data(
     elec_contractor_addr: str = "",
     contractor_address: str = "",
     elec_contractor_tel: str = "",
+    locale: SldLocale = SG_LOCALE,
     **kwargs,
 ) -> None:
     """
@@ -182,8 +186,9 @@ def fill_title_block_data(
         backend.add_mtext(ec_text, insert=(COL3 + 3, data_y - line_sp - 1), char_height=2.0)
 
     # -- Cell 4: DRAWING TITLE --
+    tb = locale.title_block
     backend.add_mtext(
-        "SINGLE LINE DIAGRAM\\P(SLD)",
+        tb.sld_title,
         insert=(COL4 + 3, data_y + 1),
         char_height=3.5,
     )
@@ -191,15 +196,15 @@ def fill_title_block_data(
     # -- Cell 5: LEW --
     if sld_only_mode:
         backend.add_mtext(
-            "(To be filled by LEW)", insert=(COL5 + 3, data_y), char_height=data_h,
+            tb.to_be_filled, insert=(COL5 + 3, data_y), char_height=data_h,
         )
         backend.add_mtext(
-            "EMA Licence No. : ____________",
+            f"{tb.ema_licence}____________",
             insert=(COL5 + 3, data_y - line_sp),
             char_height=2.0,
         )
         backend.add_mtext(
-            "Mobile Number. : ____________",
+            f"{tb.mobile_number}____________",
             insert=(COL5 + 3, data_y - line_sp * 2),
             char_height=2.0,
         )
@@ -208,13 +213,13 @@ def fill_title_block_data(
             backend.add_mtext(lew_name, insert=(COL5 + 3, data_y), char_height=data_h_lg)
         if lew_licence:
             backend.add_mtext(
-                f"EMA Licence No. : {lew_licence_display}",
+                f"{tb.ema_licence}{lew_licence_display}",
                 insert=(COL5 + 3, data_y - line_sp - 1),
                 char_height=2.0,
             )
         if lew_mobile:
             backend.add_mtext(
-                f"Mobile Number. : {lew_mobile}",
+                f"{tb.mobile_number}{lew_mobile}",
                 insert=(COL5 + 3, data_y - line_sp * 2 - 1),
                 char_height=2.0,
             )
@@ -244,8 +249,8 @@ def fill_title_block_data(
     )
 
     # -- SCALE & SHEET (inside DWG NO cell, small text at bottom) --
-    backend.add_mtext("SCALE : NTS", insert=(COL6 + 3, ROW_BOT + 2), char_height=1.6)
-    backend.add_mtext("SHEET : 1 OF 1", insert=(COL6_MID + 3, ROW_BOT + 2), char_height=1.6)
+    backend.add_mtext(tb.scale_nts, insert=(COL6 + 3, ROW_BOT + 2), char_height=1.6)
+    backend.add_mtext(tb.sheet_1of1, insert=(COL6_MID + 3, ROW_BOT + 2), char_height=1.6)
 
 
 def _split_address(address: str, postal_code: str) -> list[str]:

@@ -172,56 +172,50 @@ class TestSymbolMapIntegration:
     """Test SYMBOL_MAP registration."""
 
     def test_all_symbols_in_map(self):
-        """All known symbol types should be in SYMBOL_MAP."""
-        from app.sld.generator import SldGenerator
-        gen = SldGenerator()
+        """All known symbol types should be in REAL_SYMBOL_MAP."""
+        from app.sld.real_symbols import REAL_SYMBOL_MAP
 
         expected_keys = {
             "ACB", "MCCB", "MCB", "RCCB", "ELCB",
-            "TRANSFORMER", "CT",
-            "KWH_METER", "AMMETER", "VOLTMETER",
-            "MOTOR", "GENERATOR",
-            "ISOLATOR", "ISOLATOR_MACHINE", "DOUBLE_POLE_SWITCH",
-            "ATS", "BI_CONNECTOR",
-            "FUSE", "EARTH", "SPD",
-            "INDUSTRIAL_SOCKET", "TIMER_BYPASS",
-            "SHUNT_TRIP", "INDICATOR_LIGHT",
+            "CT",
+            "KWH_METER",
+            "ISOLATOR",
+            "FUSE", "EARTH",
         }
 
         for key in expected_keys:
-            assert key in gen.SYMBOL_MAP, f"{key} not in SYMBOL_MAP"
+            assert key in REAL_SYMBOL_MAP, f"{key} not in REAL_SYMBOL_MAP"
 
     def test_symbol_map_instantiation(self):
-        """All SYMBOL_MAP entries should be instantiable."""
-        from app.sld.generator import SldGenerator
-        gen = SldGenerator()
+        """All REAL_SYMBOL_MAP entries should be instantiable."""
+        from app.sld.real_symbols import REAL_SYMBOL_MAP
 
-        for key, cls in gen.SYMBOL_MAP.items():
+        for key, cls in REAL_SYMBOL_MAP.items():
             try:
                 instance = cls()
                 assert isinstance(instance, BaseSymbol), f"{key} is not a BaseSymbol"
             except TypeError:
-                # Some symbols might need arguments (like IndicatorLight)
+                # Some symbols might need arguments
                 pass
 
     def test_legend_descriptions_match_map(self):
-        """Every SYMBOL_MAP key should have a legend description."""
+        """Every REAL_SYMBOL_MAP key should have a legend description."""
         from app.sld.generator import SldGenerator
-        gen = SldGenerator()
+        from app.sld.real_symbols import REAL_SYMBOL_MAP
 
-        for key in gen.SYMBOL_MAP:
-            assert key in gen.LEGEND_DESCRIPTIONS, (
-                f"SYMBOL_MAP key '{key}' missing from LEGEND_DESCRIPTIONS"
+        for key in REAL_SYMBOL_MAP:
+            assert key in SldGenerator.LEGEND_DESCRIPTIONS, (
+                f"REAL_SYMBOL_MAP key '{key}' missing from LEGEND_DESCRIPTIONS"
             )
 
     def test_legend_abbreviations_match_map(self):
-        """Every SYMBOL_MAP key should have a legend abbreviation."""
+        """Every REAL_SYMBOL_MAP key should have a legend abbreviation."""
         from app.sld.generator import SldGenerator
-        gen = SldGenerator()
+        from app.sld.real_symbols import REAL_SYMBOL_MAP
 
-        for key in gen.SYMBOL_MAP:
-            assert key in gen.LEGEND_ABBREVIATIONS, (
-                f"SYMBOL_MAP key '{key}' missing from LEGEND_ABBREVIATIONS"
+        for key in REAL_SYMBOL_MAP:
+            assert key in SldGenerator.LEGEND_ABBREVIATIONS, (
+                f"REAL_SYMBOL_MAP key '{key}' missing from LEGEND_ABBREVIATIONS"
             )
 
 
