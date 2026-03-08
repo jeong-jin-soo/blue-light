@@ -502,22 +502,22 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         ))
 
         # Cable annotation with tick mark + leader line (matching reference)
-        # Pattern:  ──╱──  tick mark on the supply line
-        #             |    leader line going down from tick center
-        #             └── cable spec text
+        # Reference pattern:  ──╱──  tick mark on the supply line
+        #                       |    leader line going down
+        #                  ─────┘    shelf going LEFT
+        #   cable spec text          text to the LEFT
         incoming_cable = ctx.incoming_cable
         cable_text = format_cable_spec(incoming_cable, multiline=True)
         if cable_text:
-            # Tick mark position: midpoint of supply line
-            tick_x = (mcb_right_x + supply_end_x) / 2
-            tick_size = 1.5  # Half-length of diagonal tick (thinner, shorter)
+            # Tick mark position: offset from MCB exit
+            tick_x = mcb_right_x + 10
+            tick_size = 1.5  # Half-length of diagonal tick
             # Diagonal tick mark crossing the supply line (~45 degrees)
-            # RIGHT side incoming: thinner tick (regular connections)
             result.connections.append((
                 (tick_x - tick_size, mb_center_y - tick_size),
                 (tick_x + tick_size, mb_center_y + tick_size),
             ))
-            # Leader line going DOWN from tick center (on supply line)
+            # Leader line going DOWN from tick center
             leader_len = 10
             leader_bottom_y = mb_center_y - leader_len
             result.connections.append((
@@ -531,7 +531,6 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
                 (tick_x + shelf_len, leader_bottom_y),
             ))
             # Cable spec text at end of shelf
-            # mtext insert = top-left; center first line on shelf
             _label_ch = 2.8
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
@@ -624,8 +623,8 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
             _mb_earth_w = _mb_earth_dims["width_mm"]   # 12
             _mb_earth_h = _mb_earth_dims["height_mm"]  # 10
 
-            # Earth center X: offset to the right of the box
-            _mb_earth_h_offset = 5  # horizontal offset from box right wall
+            # Earth center X: outside the box right wall
+            _mb_earth_h_offset = 4  # 4mm offset from box right wall
             mb_earth_cx = mb_box_right + _mb_earth_h_offset
             mb_earth_x = mb_earth_cx - _mb_earth_w / 2
 

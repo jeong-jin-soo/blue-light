@@ -92,12 +92,12 @@ class LayoutConfig:
     # Real samples use generous spacing — diagram fills 70-80% of page
     vertical_spacing: float = 22      # Between components vertically (increased for clarity)
     horizontal_spacing: float = 26    # Between sub-circuits (base — real samples ~25-35mm per circuit column)
-    min_horizontal_spacing: float = 17  # Minimum spacing (tight fit for 18 circuits per row)
+    min_horizontal_spacing: float = 10  # Minimum spacing (ref ~12mm for 26 circuits)
     max_horizontal_spacing: float = 42  # Maximum spacing (prevents overly sparse layout)
-    busbar_margin: float = 20         # Margin from edges of busbar (room for labels)
+    busbar_margin: float = 10         # Margin from edges of busbar (room for labels)
 
     # Sub-circuit row layout
-    max_circuits_per_row: int = 18    # Matches DXF reference (18 per row for 3-phase TPN boards)
+    max_circuits_per_row: int = 30    # Single busbar row (reference: 26 circuits on 1 busbar)
     row_spacing: float = 40           # Vertical spacing between sub-circuit rows (reduced for 18/row fit)
 
     # Starting position

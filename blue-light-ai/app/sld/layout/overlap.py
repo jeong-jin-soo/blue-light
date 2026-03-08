@@ -405,6 +405,7 @@ def _identify_groups(
 
     # Step 6: Match vertical connections to groups (exclude incoming chain)
     # Y-proximity: use connection's minimum Y vs group's row_busbar_y
+    main_busbar_y = layout_result.busbar_y
     for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
         if abs(sx - ex) > 0.5:
             continue  # Not vertical
@@ -412,6 +413,14 @@ def _identify_groups(
         # Skip incoming chain connections
         if abs(conn_x - incoming_chain_x) < _TOL:
             continue
+        # Skip connections outside circuit column zone
+        # (above busbar = incoming supply area, below DB box = meter board area)
+        conn_max_y = max(sy, ey)
+        conn_min_y_raw = min(sy, ey)
+        if conn_max_y < main_busbar_y - 5:
+            continue  # above incoming supply
+        if conn_min_y_raw > main_busbar_y + 60:
+            continue  # below DB box (meter board earth, etc.)
         conn_min_y = min(sy, ey)
         for g in groups:
             if abs(conn_x - g.tap_x) < _TOL:
@@ -423,6 +432,9 @@ def _identify_groups(
 
     # Step 7: Match junction_dots to groups (with Y-proximity)
     for di, (dx, dy) in enumerate(layout_result.junction_dots):
+        # Skip dots outside circuit zone (meter board earth, etc.)
+        if dy < main_busbar_y - 5 or dy > main_busbar_y + 60:
+            continue
         for g in groups:
             if abs(dx - g.tap_x) < _TOL and g.junction_dot_idx is None:
                 # Y-proximity: junction dot is at busbar_y

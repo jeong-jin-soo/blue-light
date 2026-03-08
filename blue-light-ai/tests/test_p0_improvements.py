@@ -90,8 +90,8 @@ class TestBIConnectorMultiRow:
     """Multi-row SLD should use BI_CONNECTOR between busbar rows."""
 
     def test_bi_connector_multirow(self):
-        """19+ circuits (multi-row with max_circuits_per_row=18) must include BI_CONNECTOR."""
-        req = _base_requirements(num_circuits=19)
+        """31+ circuits (multi-row with max_circuits_per_row=30) must include BI_CONNECTOR."""
+        req = _base_requirements(num_circuits=31)
         result = compute_layout(req, skip_validation=True)
         bi_connectors = [c for c in result.components if c.symbol_name == "BI_CONNECTOR"]
         assert len(bi_connectors) >= 1, (
@@ -99,8 +99,8 @@ class TestBIConnectorMultiRow:
         )
 
     def test_bi_connector_not_single_row(self):
-        """16 circuits (single row) must NOT include BI_CONNECTOR."""
-        req = _base_requirements(num_circuits=16)
+        """26 circuits (single row) must NOT include BI_CONNECTOR."""
+        req = _base_requirements(num_circuits=26)
         result = compute_layout(req, skip_validation=True)
         bi_connectors = [c for c in result.components if c.symbol_name == "BI_CONNECTOR"]
         assert len(bi_connectors) == 0, (
@@ -109,7 +109,7 @@ class TestBIConnectorMultiRow:
 
     def test_bi_connector_symbols_used(self):
         """Multi-row layout should register BI_CONNECTOR in symbols_used."""
-        req = _base_requirements(num_circuits=19)
+        req = _base_requirements(num_circuits=31)
         result = compute_layout(req, skip_validation=True)
         assert "BI_CONNECTOR" in result.symbols_used, (
             f"Expected BI_CONNECTOR in symbols_used, got: {result.symbols_used}"
@@ -117,7 +117,7 @@ class TestBIConnectorMultiRow:
 
     def test_bi_connector_position_between_busbars(self):
         """BI_CONNECTOR Y position should be between the two busbar rows."""
-        req = _base_requirements(num_circuits=20)
+        req = _base_requirements(num_circuits=31)
         result = compute_layout(req, skip_validation=True)
         bi_connectors = [c for c in result.components if c.symbol_name == "BI_CONNECTOR"]
         assert len(bi_connectors) >= 1
