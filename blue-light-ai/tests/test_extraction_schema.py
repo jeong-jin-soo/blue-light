@@ -306,8 +306,11 @@ class TestParseAndValidate:
         )
         assert has_3phase_warning, f"Expected 3-Phase warning, got warnings: {warnings}"
 
-    def test_undersized_breaker_auto_correction(self):
-        """Undersized breaker triggers auto-correction (not error)."""
+    def test_undersized_breaker_warns_only(self):
+        """Undersized standard breaker → warning only (no auto-correction).
+
+        SG team decision (2026-03-08): user/LEW responsible for kVA.
+        """
         undersized = {
             "incoming": {
                 "kva": 200,
@@ -319,9 +322,10 @@ class TestParseAndValidate:
         }
         result = parse_and_validate(undersized)
         corrections = result["validation"].get("corrections", {})
-        # 200 kVA → needs 300A, but specified 150A → auto-corrected
-        has_correction = "breaker_rating" in corrections
-        assert has_correction, f"Expected breaker_rating correction, got: {corrections}"
+        warnings = result["validation"].get("warnings", [])
+        # 200 kVA → spec says 300A, but 150A is standard → warn only
+        assert "breaker_rating" not in corrections
+        assert any("undersized" in w.lower() or "may be undersized" in w.lower() for w in warnings)
 
     def test_missing_kva_and_breaker_error(self):
         """Missing both kVA and breaker_rating → error."""

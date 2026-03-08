@@ -45,7 +45,7 @@ public class SldOrderChatController {
                 id, userSeq, request.getMessage().substring(0, Math.min(request.getMessage().length(), 50)));
 
         SseEmitter emitter = new SseEmitter(600_000L);  // 10분 (Gemini API 호출 시 긴 대기 가능)
-        sldOrderAgentService.chatStream(id, userSeq, request.getMessage(), emitter);
+        sldOrderAgentService.chatStream(id, userSeq, request.getMessage(), request.getAttachedFileSeq(), emitter);
 
         return emitter;
     }

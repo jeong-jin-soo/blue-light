@@ -13,7 +13,7 @@ interface SldOrderChatState {
   isToolCompleted: boolean;
 
   // Actions
-  sendMessage: (sldOrderSeq: number, content: string) => Promise<void>;
+  sendMessage: (sldOrderSeq: number, content: string, attachedFileSeq?: number) => Promise<void>;
   loadHistory: (sldOrderSeq: number) => Promise<void>;
   resetChat: (sldOrderSeq: number) => Promise<void>;
   clearState: () => void;
@@ -32,7 +32,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
   activeToolDescription: null,
   isToolCompleted: false,
 
-  sendMessage: async (sldOrderSeq: number, content: string) => {
+  sendMessage: async (sldOrderSeq: number, content: string, attachedFileSeq?: number) => {
     // Show user message immediately
     const userMsg: SldChatMessage = {
       sldChatMessageSeq: --messageSeq,
@@ -161,7 +161,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
             };
           });
         },
-      });
+      }, attachedFileSeq);
     } catch {
       set((s) => ({
         messages: [

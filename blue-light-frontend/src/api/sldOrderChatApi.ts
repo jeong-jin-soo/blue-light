@@ -21,15 +21,21 @@ export const sldOrderStreamChat = async (
   sldOrderSeq: number,
   message: string,
   callbacks: SldOrderStreamCallbacks,
+  attachedFileSeq?: number,
 ): Promise<void> => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
+
+  const body: Record<string, unknown> = { message };
+  if (attachedFileSeq) {
+    body.attachedFileSeq = attachedFileSeq;
+  }
 
   const response = await fetch(
     `${baseUrl}/sld-manager/orders/${sldOrderSeq}/sld-chat/stream`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify(body),
       credentials: 'include',
     },
   );

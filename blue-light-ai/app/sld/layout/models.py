@@ -57,20 +57,16 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
         cpc_type = cable_input.get("cpc_type", "PVC")
         method = cable_input.get("method", "")
         if size:
-            # Singapore LEW standard: "2 x 1C 25sqmm PVC/PVC + 10sqmm PVC CPC IN METAL TRUNKING"
+            # Singapore LEW standard: "4x16mm²/1C PVC/PVC CABLE + 16mm² CPC IN METAL TRUNKING"
             if count and int(count) > 1:
-                base = f"{count} x {cores}C {size}sqmm {cable_type}"
+                base = f"{count}x{size}mm²/{cores}C {cable_type} CABLE"
             else:
-                base = f"{cores}C {size}sqmm {cable_type}"
+                base = f"{cores}C {size}mm² {cable_type} CABLE"
             if cpc:
-                base += f" + {cpc}sqmm"
-                cpc_suffix = f"{cpc_type} CPC" if cpc_type else "CPC"
+                sep = " +\\P" if multiline else " + "
+                base += f"{sep}{cpc}mm² CPC"
                 if method:
-                    cpc_suffix += f" IN {method}"
-                if multiline:
-                    base += f"\\P{cpc_suffix}"
-                else:
-                    base += f" {cpc_suffix}"
+                    base += f" IN {method}"
             elif method:
                 base += f" IN {method}"
             return base

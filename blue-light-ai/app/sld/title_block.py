@@ -160,7 +160,9 @@ def fill_title_block_data(
 
     # -- Cell 1: CLIENT / ADDRESS --
     client_text = client_name or project_name
-    backend.add_mtext(client_text, insert=(COL1 + 3, data_y), char_height=data_h_lg)
+    # Auto-shrink long text to fit cell width (COL1→COL2 = 80mm, padding 6mm)
+    c1_h = _fit_font_size(client_text, cell_width=74, max_height=data_h_lg)
+    backend.add_mtext(client_text, insert=(COL1 + 3, data_y), char_height=c1_h)
 
     if address:
         # Split address into multi-line for readability (real samples show 3-4 lines)
@@ -170,10 +172,14 @@ def fill_title_block_data(
 
     # -- Cell 2: MAIN CONTRACTOR --
     if main_contractor:
-        backend.add_mtext(main_contractor, insert=(COL2 + 3, data_y), char_height=data_h_lg)
+        # Auto-shrink for cell width (COL2→COL3 = 60mm, padding 6mm)
+        c2_h = _fit_font_size(main_contractor, cell_width=54, max_height=data_h_lg)
+        backend.add_mtext(main_contractor, insert=(COL2 + 3, data_y), char_height=c2_h)
 
     # -- Cell 3: ELECTRICAL CONTRACTOR --
-    backend.add_mtext(elec_contractor, insert=(COL3 + 3, data_y), char_height=data_h_lg)
+    # Auto-shrink for cell width (COL3→COL4 = 72mm, padding 6mm)
+    c3_h = _fit_font_size(elec_contractor, cell_width=66, max_height=data_h_lg)
+    backend.add_mtext(elec_contractor, insert=(COL3 + 3, data_y), char_height=c3_h)
     ec_lines = []
     if elec_contractor_addr:
         # Split contractor address into multi-line
@@ -251,6 +257,30 @@ def fill_title_block_data(
     # -- SCALE & SHEET (inside DWG NO cell, small text at bottom) --
     backend.add_mtext(tb.scale_nts, insert=(COL6 + 3, ROW_BOT + 2), char_height=1.6)
     backend.add_mtext(tb.sheet_1of1, insert=(COL6_MID + 3, ROW_BOT + 2), char_height=1.6)
+
+
+def _fit_font_size(text: str, cell_width: float, max_height: float, min_height: float = 1.8) -> float:
+    """Auto-shrink font size so text fits within cell width.
+
+    Estimates text width as len(text) * char_height * 0.6 (approximate for
+    typical engineering drawing fonts). Returns max_height if text fits,
+    otherwise shrinks down to min_height.
+
+    Args:
+        text: The text string to measure.
+        cell_width: Available cell width in mm.
+        max_height: Preferred (maximum) font height.
+        min_height: Minimum readable font height.
+    """
+    if not text:
+        return max_height
+    # Approximate: each character occupies ~0.6 * char_height in width
+    est_width = len(text) * max_height * 0.6
+    if est_width <= cell_width:
+        return max_height
+    # Shrink proportionally, clamped to min_height
+    shrunk = cell_width / (len(text) * 0.6)
+    return max(min_height, shrunk)
 
 
 def _split_address(address: str, postal_code: str) -> list[str]:

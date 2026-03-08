@@ -283,6 +283,7 @@ async def process_message(
     application_info: dict | None = None,
     system_prompt: str | None = None,
     api_key: str | None = None,
+    attached_file: dict | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Process a user message through the LangGraph agent.
@@ -291,6 +292,8 @@ async def process_message(
     Args:
         application_info: Application details from Spring Boot (kVA, address, etc.)
         api_key: Gemini API key from Spring Boot (DB-managed).
+        attached_file: Optional attached file dict with keys:
+            filename, content_base64, mime_type.
     """
     agent = await get_agent()
     tracker = ProgressTracker(thread_id, application_seq)
@@ -311,6 +314,55 @@ async def process_message(
 
     # 시작 알림
     yield tracker.update("initializing")
+
+    # ── 첨부 파일 처리: Gemini AI로 해석하여 에이전트 컨텍스트에 주입
+    if attached_file and attached_file.get("content_base64") and attached_file.get("filename"):
+        yield {"type": "status", "content": "Analyzing attached file..."}
+        try:
+            from app.sld.schedule_parser import extract_schedule_from_file, format_extracted_schedule
+
+            file_bytes = base64.b64decode(attached_file["content_base64"])
+            filename = attached_file["filename"]
+
+            extraction_result = await extract_schedule_from_file(
+                file_bytes=file_bytes,
+                filename=filename,
+                api_key=api_key,
+            )
+
+            if extraction_result.get("success"):
+                # 추출 결과를 사용자 메시지에 컨텍스트로 추가
+                schedule_text = format_extracted_schedule(extraction_result)
+                enhanced_message = (
+                    f"{message}\n\n"
+                    f"---\n"
+                    f"The user attached a circuit schedule file ({filename}). "
+                    f"Below is the AI-extracted data from the file:\n\n"
+                    f"{schedule_text}"
+                )
+                input_state["messages"] = [HumanMessage(content=enhanced_message)]
+                input_state["attached_file_data"] = extraction_result
+
+                circuit_count = len(extraction_result.get("extracted_data", {}).get("outgoing_circuits", []))
+                yield {
+                    "type": "file_analyzed",
+                    "filename": filename,
+                    "file_type": extraction_result.get("file_type", "unknown"),
+                    "circuit_count": circuit_count,
+                    "warnings": extraction_result.get("warnings", []),
+                }
+                logger.info(
+                    "Attached file analyzed: %s (%s, %d circuits)",
+                    filename, extraction_result.get("file_type"), circuit_count,
+                )
+            else:
+                error_msg = extraction_result.get("error", "Unknown error")
+                yield {"type": "file_error", "filename": filename, "error": error_msg}
+                logger.warning("Attached file analysis failed: %s — %s", filename, error_msg)
+
+        except Exception as e:
+            logger.error("Failed to process attached file: %s", e, exc_info=True)
+            yield {"type": "file_error", "filename": attached_file.get("filename", "?"), "error": str(e)}
 
     # Retry logic: on 503/429 from primary model, fall back to gemini-2.5-flash
     max_retries = 3

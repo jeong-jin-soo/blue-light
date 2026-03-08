@@ -42,5 +42,10 @@ public enum FileType {
     /**
      * 신청자 스케치 (SLD 요청 참고용)
      */
-    SKETCH_SLD
+    SKETCH_SLD,
+
+    /**
+     * 회로 스케줄 파일 (Excel/CSV/이미지 — AI 채팅 첨부용)
+     */
+    CIRCUIT_SCHEDULE
 }

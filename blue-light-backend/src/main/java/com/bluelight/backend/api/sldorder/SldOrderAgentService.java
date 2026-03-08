@@ -64,7 +64,7 @@ public class SldOrderAgentService {
      * WebClient subscribe()의 비동기 콜백은 트랜잭션 범위 밖에서 실행되므로,
      * 동기 DB 작업과 비동기 스트리밍을 분리하여 각각 별도 트랜잭션으로 처리.
      */
-    public void chatStream(Long sldOrderSeq, Long userSeq, String message, SseEmitter emitter) {
+    public void chatStream(Long sldOrderSeq, Long userSeq, String message, Long attachedFileSeq, SseEmitter emitter) {
         // AI SLD 생성 토글 확인
         if (!systemAdminService.isSldAiGenerationEnabled()) {
             throw new BusinessException(
@@ -106,6 +106,49 @@ public class SldOrderAgentService {
         String apiKey = geminiConfig.getApiKey();
         if (apiKey != null && !apiKey.isBlank()) {
             requestBody.put("api_key", apiKey);
+        }
+
+        // 첨부 파일 처리: fileSeq → 바이트 읽기 → base64 → Python 서비스에 전달
+        if (attachedFileSeq != null) {
+            try {
+                FileEntity fileEntity = fileRepository.findById(attachedFileSeq)
+                        .orElseThrow(() -> new BusinessException(
+                                "Attached file not found", HttpStatus.NOT_FOUND, "FILE_NOT_FOUND"));
+
+                org.springframework.core.io.Resource resource =
+                        fileStorageService.loadAsResource(fileEntity.getFileUrl());
+                byte[] fileBytes = resource.getInputStream().readAllBytes();
+                String base64Content = java.util.Base64.getEncoder().encodeToString(fileBytes);
+
+                // MIME type 추정
+                String mimeType = java.net.URLConnection.guessContentTypeFromName(
+                        fileEntity.getOriginalFilename());
+                if (mimeType == null) {
+                    String ext = fileEntity.getOriginalFilename().toLowerCase();
+                    if (ext.endsWith(".xlsx")) {
+                        mimeType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                    } else if (ext.endsWith(".xls")) {
+                        mimeType = "application/vnd.ms-excel";
+                    } else if (ext.endsWith(".csv")) {
+                        mimeType = "text/csv";
+                    } else {
+                        mimeType = "application/octet-stream";
+                    }
+                }
+
+                requestBody.put("attached_file", Map.of(
+                        "filename", fileEntity.getOriginalFilename(),
+                        "content_base64", base64Content,
+                        "mime_type", mimeType
+                ));
+                log.info("Attached file prepared for AI: fileSeq={}, filename={}, size={}, mime={}",
+                        attachedFileSeq, fileEntity.getOriginalFilename(), fileBytes.length, mimeType);
+            } catch (BusinessException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("Failed to read attached file: fileSeq={}", attachedFileSeq, e);
+                // 파일 읽기 실패해도 채팅은 계속 진행 (파일 없이)
+            }
         }
 
         StringBuilder fullResponse = new StringBuilder();

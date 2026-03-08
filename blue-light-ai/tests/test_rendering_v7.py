@@ -349,10 +349,18 @@ class TestLayoutCorrectness:
         assert len(breaker_comps) == 3
 
     def test_earth_bar_present(self):
-        """Earth bar should always be present in the layout."""
+        """Earth bar should always be present in the layout.
+
+        3-phase: 2 EARTH symbols (meter board + DB earth bar)
+        1-phase: 1 EARTH symbol (DB earth bar only)
+        """
         result = compute_layout(BASIC_3PHASE_REQ)
         earth_comps = _get_components_by_type(result, "EARTH")
-        assert len(earth_comps) == 1
+        assert len(earth_comps) == 2  # meter board earth + DB earth bar
+
+        result_1p = compute_layout(BASIC_1PHASE_REQ)
+        earth_comps_1p = _get_components_by_type(result_1p, "EARTH")
+        assert len(earth_comps_1p) == 1  # DB earth bar only
 
 
 # -- Test: Full generation --

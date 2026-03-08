@@ -204,9 +204,13 @@ class TestKvaLookup:
         spec = lookup_incoming_by_kva(1100)
         assert spec.rating_a == 1600
 
-    def test_exceeds_max_raises(self):
-        with pytest.raises(ValueError, match="exceeds maximum"):
-            lookup_incoming_by_kva(1200)
+    def test_exceeds_max_returns_largest(self):
+        """kVA exceeding max returns the largest available spec (no error).
+
+        SG team decision (2026-03-08): no strict kVA limit, user/LEW responsibility.
+        """
+        spec = lookup_incoming_by_kva(1200)
+        assert spec.rating_a == 1600  # Largest available
 
     def test_exact_boundary_values(self):
         """Test exact boundary kVA values."""
@@ -274,12 +278,16 @@ class TestValidation:
         assert result.valid is False
         assert any("must be provided" in e for e in result.errors)
 
-    def test_undersized_breaker_auto_corrects(self):
-        """Breaker too small for kVA → auto-corrected (not error)."""
-        req = {"kva": 14, "breaker_rating": 32}  # 14 kVA needs 63A, not 32A
+    def test_undersized_breaker_warns_only(self):
+        """Standard breaker smaller than kVA minimum → warning only (no auto-correct).
+
+        SG team decision (2026-03-08): user/LEW responsible for kVA.
+        Diversity factor may justify a smaller breaker than kVA suggests.
+        """
+        req = {"kva": 14, "breaker_rating": 32}  # 14 kVA → spec says 63A, but 32A is standard
         result = validate_sld_requirements(req)
-        assert "breaker_rating" in result.corrections
-        assert result.corrections["breaker_rating"]["corrected"] == 63
+        assert "breaker_rating" not in result.corrections  # No auto-correction
+        assert any("undersized" in w.lower() or "may be undersized" in w.lower() for w in result.warnings)
 
     def test_oversized_breaker_warns(self):
         """Breaker larger than minimum → warning only."""

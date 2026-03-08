@@ -32,3 +32,6 @@ pymupdf>=1.27.0
 
 # MySQL (SLD 템플릿 DB 연동)
 pymysql>=1.1.0
+
+# Excel parsing (circuit schedule upload)
+openpyxl>=3.1.0

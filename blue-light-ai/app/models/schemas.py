@@ -24,6 +24,11 @@ class ChatRequest(BaseModel):
         None,
         description="Gemini API key from DB (passed by Spring Boot)",
     )
+    attached_file: dict | None = Field(
+        None,
+        description="Attached file for circuit schedule extraction: "
+        '{"filename": "xxx.xlsx", "content_base64": "...", "mime_type": "..."}',
+    )
 
 
 class ChatResponse(BaseModel):

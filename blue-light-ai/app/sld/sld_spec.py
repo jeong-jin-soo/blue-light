@@ -53,6 +53,7 @@ class IncomingSpec:
     earth_prot_types: list[str]  # ["RCCB", "ELR", "EFR"]
     requires_ct: bool            # True if kVA >= 45 (CT metering)
     requires_isolator: bool      # True if kVA >= 45
+    method: str = ""             # Installation method: "METAL TRUNKING", "CONDUIT", etc.
 
 
 # Ranges where specific attributes change (from Excel "Table form"):
@@ -168,40 +169,40 @@ _INCOMING_RATINGS_ASC = sorted(INCOMING_SPEC.keys())
 
 INCOMING_SPEC_3PHASE: dict[int, IncomingSpec] = {
     32: IncomingSpec(
-        rating_a=32, cable_size="10", cable_cores="4 X 1 CORE",
+        rating_a=32, cable_size="10 + 10mmsq E", cable_cores="4 X 1 CORE",
         cable_type="PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
         phase="three_phase", earth_prot_types=["RCCB"],
-        requires_ct=False, requires_isolator=False,
+        requires_ct=False, requires_isolator=False, method="METAL TRUNKING",
     ),
     40: IncomingSpec(
-        rating_a=40, cable_size="16", cable_cores="4 X 1 CORE",
+        rating_a=40, cable_size="16 + 16mmsq E", cable_cores="4 X 1 CORE",
         cable_type="PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
         phase="three_phase", earth_prot_types=["RCCB"],
-        requires_ct=False, requires_isolator=False,
+        requires_ct=False, requires_isolator=False, method="METAL TRUNKING",
     ),
     63: IncomingSpec(
-        rating_a=63, cable_size="16", cable_cores="4 X 1 CORE",
+        rating_a=63, cable_size="16 + 16mmsq E", cable_cores="4 X 1 CORE",
         cable_type="PVC/PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
         phase="three_phase", earth_prot_types=["RCCB"],
-        requires_ct=False, requires_isolator=False,
+        requires_ct=False, requires_isolator=False, method="METAL TRUNKING",
     ),
     80: IncomingSpec(
-        rating_a=80, cable_size="35", cable_cores="4 X 1 CORE",
+        rating_a=80, cable_size="35 + 16mmsq E", cable_cores="4 X 1 CORE",
         cable_type="PVC/PVC", poles="TPN", breaker_type="MCB", breaker_ka=10,
         phase="three_phase", earth_prot_types=["RCCB"],
-        requires_ct=False, requires_isolator=False,
+        requires_ct=False, requires_isolator=False, method="METAL TRUNKING",
     ),
     100: IncomingSpec(
-        rating_a=100, cable_size="50", cable_cores="4 X 1 CORE",
+        rating_a=100, cable_size="50 + 25mmsq E", cable_cores="4 X 1 CORE",
         cable_type="XLPE", poles="TPN", breaker_type="MCB", breaker_ka=10,
         phase="three_phase", earth_prot_types=["RCCB"],
-        requires_ct=False, requires_isolator=False,
+        requires_ct=False, requires_isolator=False, method="METAL TRUNKING",
     ),
     125: IncomingSpec(
-        rating_a=125, cable_size="50", cable_cores="4 X 1 CORE",
+        rating_a=125, cable_size="50 + 25mmsq E", cable_cores="4 X 1 CORE",
         cable_type="XLPE/PVC", poles="TPN", breaker_type="MCCB", breaker_ka=25,
         phase="three_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
-        requires_ct=True, requires_isolator=True,
+        requires_ct=True, requires_isolator=True, method="METAL TRUNKING",
     ),
 }
 
@@ -315,6 +316,17 @@ def lookup_incoming_by_kva(kva: float, supply_type: str = "") -> IncomingSpec:
                 return INCOMING_SPEC_3PHASE[rating_a]
             return INCOMING_SPEC[rating_a]
 
+    # kVA exceeds all standard tiers — return the largest available spec
+    # (SG team decision 2026-03-08: no strict limit, user/LEW responsibility)
+    # Find the last entry matching supply_type (or last overall)
+    for max_kva, rating_a, phase in reversed(KVA_TO_BREAKER_MAP):
+        if supply_type and phase != supply_type:
+            continue
+        if phase == "three_phase" and rating_a in INCOMING_SPEC_3PHASE:
+            return INCOMING_SPEC_3PHASE[rating_a]
+        return INCOMING_SPEC[rating_a]
+
+    # Absolute fallback (should never reach here)
     raise ValueError(
         f"kVA value {kva} exceeds maximum supported rating. "
         f"Max supported: ~1108 kVA (1600A ACB). "
@@ -456,8 +468,9 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
         try:
             spec = lookup_incoming_by_kva(kva, supply_type=supply_type)
         except ValueError as e:
-            result.add_error(str(e))
-            return result
+            # SG team decision (2026-03-08): kVA exceeding range → warning only
+            # User/LEW takes responsibility for non-standard kVA values
+            result.add_warning(str(e))
 
     # ── 2. 3-Phase incoming to Single Phase DB detection ──────────
     if _detect_3phase_to_single_phase_db(requirements):
@@ -487,12 +500,13 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
         )
 
     # ── 4. Validate / auto-correct breaker_rating ─────────────────
+    # SG team decision (2026-03-08): user/LEW responsible for kVA.
+    # If user explicitly provides a standard breaker_rating, trust it
+    # (warn only, don't auto-correct). Only auto-correct non-standard ratings.
     if spec and breaker_rating:
         if breaker_rating != spec.rating_a:
-            # Check if user's rating is reasonable (within one tier)
-            tier_idx = _INCOMING_RATINGS_ASC.index(spec.rating_a) \
-                if spec.rating_a in _INCOMING_RATINGS_ASC else -1
-            user_in_table = breaker_rating in INCOMING_SPEC
+            user_in_table = (breaker_rating in INCOMING_SPEC
+                             or breaker_rating in INCOMING_SPEC_3PHASE)
 
             if user_in_table and breaker_rating > spec.rating_a:
                 # User specified a larger breaker — allowed (oversized)
@@ -502,12 +516,12 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
                     f"This is acceptable but may be over-specified."
                 )
             elif user_in_table and breaker_rating < spec.rating_a:
-                # User specified a smaller breaker — auto-correct to minimum
-                result.add_correction(
-                    "breaker_rating",
-                    breaker_rating, spec.rating_a,
-                    f"Undersized {breaker_rating}A for {kva} kVA. "
-                    f"Auto-corrected to {spec.rating_a}A.",
+                # User specified a smaller standard breaker — warn only
+                # (user/LEW responsibility: diversity factor may apply)
+                result.add_warning(
+                    f"Main breaker {breaker_rating}A may be undersized for "
+                    f"{kva} kVA (standard minimum: {spec.rating_a}A). "
+                    f"Ensure diversity factor or approved load justifies this rating."
                 )
             elif not user_in_table:
                 result.add_correction(
@@ -599,7 +613,13 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
 
     # ── 9. Validate metering type ─────────────────────────────────
     metering = requirements.get("metering", "")
-    if effective_spec:
+    supply_source = requirements.get("supply_source", "")
+    # Landlord supply: metering is optional (landlord provides metering)
+    # Only auto-determine metering for SP PowerGrid or when not specified
+    if supply_source == "landlord" and not metering:
+        # Landlord supply — no metering auto-correction needed
+        pass
+    elif effective_spec:
         if effective_spec.requires_ct:
             if metering and metering != "ct_meter":
                 result.add_correction(

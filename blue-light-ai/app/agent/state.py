@@ -41,3 +41,6 @@ class SldAgentState(TypedDict):
 
     # Template matching — reference image path for Gemini Vision
     template_image_path: str | None
+
+    # Attached file extraction result (from schedule_parser)
+    attached_file_data: dict | None

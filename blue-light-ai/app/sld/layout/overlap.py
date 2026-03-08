@@ -74,7 +74,7 @@ _SYMBOL_DIMS: dict[str, tuple[float, float]] = {
     "ISOLATOR": (8, 14),
     "KWH_METER": (14, 10),
     "CT": (12, 12),
-    "EARTH": (12, 10),
+    "EARTH": (8, 6.7),
     "CIRCUIT_ID_BOX": (8, 5),
     "DB_INFO_BOX": (80, 18),
     "FLOW_ARROW_UP": (8, 10),
@@ -197,6 +197,8 @@ class SubCircuitGroup:
     left_extent: float = 12.5            # Distance from tap_x to BB left edge (mm)
     right_extent: float = 12.5           # Distance from tap_x to BB right edge (mm)
     gap_before: float = 0.0              # Extra gap (mm) before this group (category break)
+    row_idx: int = 0                     # Row index (0-based, for multi-row layouts)
+    row_busbar_y: float = 0.0            # Busbar Y of this circuit's row
 
 
 def _breaker_half_width(comp: PlacedComponent) -> float:
@@ -243,10 +245,14 @@ def _identify_groups(
 
     Each breaker_block or SPARE label anchors a group. Associated
     CIRCUIT_ID_BOX, circuit name LABEL, and vertical connections are
-    matched by proximity to the group's tap_x.
+    matched by proximity to the group's tap_x AND row (Y-proximity).
+
+    Multi-row awareness: groups are assigned to rows using busbar_y_per_row,
+    and element matching checks Y-proximity to prevent cross-row mismatches
+    when circuits from different rows share similar X positions.
 
     Returns:
-        groups: list of SubCircuitGroup sorted by tap_x ascending
+        groups: list of SubCircuitGroup sorted by (row_idx, tap_x) ascending
         incoming_chain_x: x-coordinate of the incoming supply chain
     """
     components = layout_result.components
@@ -275,8 +281,46 @@ def _identify_groups(
     if not groups:
         return [], 0.0
 
-    # Sort by tap_x
-    groups.sort(key=lambda g: g.tap_x)
+    # Step 2b: Assign row_idx and row_busbar_y to each group
+    # Uses busbar_y_per_row to determine which row each circuit belongs to.
+    # This is critical for multi-row layouts where circuits from different
+    # rows share similar X positions — without row awareness, connection
+    # matching would assign connections to the wrong group.
+    busbar_ys = layout_result.busbar_y_per_row or [layout_result.busbar_y]
+
+    # Dynamic Y tolerance: connections extend up to ~30mm above breaker,
+    # which is ~28mm above busbar. Must be less than row_spacing to prevent
+    # cross-row matching. Use 70% of row_spacing, minimum 30mm.
+    if len(busbar_ys) >= 2:
+        min_row_gap = min(
+            abs(busbar_ys[i + 1] - busbar_ys[i])
+            for i in range(len(busbar_ys) - 1)
+        )
+        _Y_TOL = max(min_row_gap * 0.7, 30.0)
+    else:
+        _Y_TOL = 999.0  # Single row — no Y filtering needed
+
+    for g in groups:
+        if g.breaker_idx is not None:
+            comp_y = components[g.breaker_idx].y
+        elif g.spare_label_idx is not None:
+            comp_y = components[g.spare_label_idx].y
+        else:
+            comp_y = busbar_ys[0]
+
+        # Find nearest busbar_y (breaker_y ≈ busbar_y + busbar_to_breaker_gap)
+        best_row = 0
+        best_dist = float("inf")
+        for ri, by in enumerate(busbar_ys):
+            dist = abs(comp_y - by)
+            if dist < best_dist:
+                best_dist = dist
+                best_row = ri
+        g.row_idx = best_row
+        g.row_busbar_y = busbar_ys[best_row]
+
+    # Sort by (row_idx, tap_x) — keeps rows together for per-row processing
+    groups.sort(key=lambda g: (g.row_idx, g.tap_x))
     tap_xs_set = {g.tap_x for g in groups}
 
     # Step 3: Determine incoming chain x
@@ -311,7 +355,6 @@ def _identify_groups(
 
     # Transition validation: compare spine_x with histogram result
     if layout_result.spine_x > 0 and incoming_chain_x > 0:
-        # Also run histogram for cross-check (debug only)
         _histo_x = 0.0
         _histo_count: dict[float, int] = {}
         for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
@@ -330,12 +373,15 @@ def _identify_groups(
                 incoming_chain_x, _histo_x,
             )
 
-    # Step 4: Match CIRCUIT_ID_BOX to groups
+    # Step 4: Match CIRCUIT_ID_BOX to groups (with Y-proximity)
     for i, comp in enumerate(components):
         if comp.symbol_name != "CIRCUIT_ID_BOX":
             continue
         for g in groups:
             if abs(comp.x - g.tap_x) < _TOL and g.circuit_id_idx is None:
+                # Y-proximity: CIRCUIT_ID_BOX is at busbar_y + 2
+                if abs(comp.y - g.row_busbar_y) > _Y_TOL:
+                    continue
                 g.circuit_id_idx = i
                 break
 
@@ -349,10 +395,16 @@ def _identify_groups(
             if g.is_spare:
                 continue
             if abs(comp.x - g.tap_x) < 6.0 and g.name_label_idx is None:
+                # Y-proximity: name label is above breaker tail
+                if g.breaker_idx is not None:
+                    breaker_y = components[g.breaker_idx].y
+                    if abs(comp.y - breaker_y) > _Y_TOL + 30:  # label is further above
+                        continue
                 g.name_label_idx = i
                 break
 
     # Step 6: Match vertical connections to groups (exclude incoming chain)
+    # Y-proximity: use connection's minimum Y vs group's row_busbar_y
     for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
         if abs(sx - ex) > 0.5:
             continue  # Not vertical
@@ -360,22 +412,34 @@ def _identify_groups(
         # Skip incoming chain connections
         if abs(conn_x - incoming_chain_x) < _TOL:
             continue
+        conn_min_y = min(sy, ey)
         for g in groups:
             if abs(conn_x - g.tap_x) < _TOL:
+                # Y-proximity: connection min_y should be near group's busbar_y
+                if abs(conn_min_y - g.row_busbar_y) > _Y_TOL:
+                    continue
                 g.connection_indices.append(ci)
                 break
 
-    # Step 7: Match junction_dots to groups
+    # Step 7: Match junction_dots to groups (with Y-proximity)
     for di, (dx, dy) in enumerate(layout_result.junction_dots):
         for g in groups:
             if abs(dx - g.tap_x) < _TOL and g.junction_dot_idx is None:
+                # Y-proximity: junction dot is at busbar_y
+                if abs(dy - g.row_busbar_y) > _Y_TOL:
+                    continue
                 g.junction_dot_idx = di
                 break
 
-    # Step 8: Match arrow_points to groups
+    # Step 8: Match arrow_points to groups (with Y-proximity)
     for ai, (ax, ay) in enumerate(layout_result.arrow_points):
         for g in groups:
             if abs(ax - g.tap_x) < _TOL and g.arrow_point_idx is None:
+                # Y-proximity: arrow point is above breaker
+                if g.breaker_idx is not None:
+                    breaker_y = components[g.breaker_idx].y
+                    if abs(ay - breaker_y) > _Y_TOL + 30:
+                        continue
                 g.arrow_point_idx = ai
                 break
 
@@ -900,11 +964,16 @@ def resolve_overlaps(
     """
     Post-layout overlap resolution using determine-then-rebuild approach.
 
-    Pipeline:
+    Multi-row aware: each row's sub-circuits are positioned independently
+    to prevent cross-row interference. This ensures circuits from Row 1
+    and Row 2 don't compete for the same X positions.
+
+    Pipeline (per row):
       1. _identify_groups()          — classify components/connections by sub-circuit
       2. _compute_group_width()      — bounding box based minimum widths
       3. _determine_final_positions() — single-pass left-to-right with bounds fit
       4. _rebuild_from_positions()    — index-based absolute repositioning
+    Then across all rows:
       5. _fit_busbar_to_groups() — extent-aware busbar fitting (extend or shrink)
 
     Guarantees:
@@ -917,68 +986,128 @@ def resolve_overlaps(
     if config is None:
         config = LayoutConfig()
 
-    # Step 1: Identify sub-circuit groups
+    # Step 1: Identify sub-circuit groups (row-aware matching)
     groups, incoming_chain_x = _identify_groups(layout_result)
 
     if not groups:
         return layout_result
 
-    # Step 1b: Detect category group breaks (S→P, P→H, etc.) for extra spacing
+    # Split groups by row for independent processing
+    rows_map: dict[int, list[SubCircuitGroup]] = {}
+    for g in groups:
+        rows_map.setdefault(g.row_idx, []).append(g)
+
     _GROUP_GAP = 3.0  # Extra mm between circuit category groups (compact)
-    if len(groups) > 1:
-        prev_prefix = ""
-        for gi, g in enumerate(groups):
-            cid = ""
+    _DITTO_EXTENT = 5.5  # mm — symbol half-width (3.6) + small margin
+
+    all_final_groups: list[SubCircuitGroup] = []
+    all_final_tap_xs: list[float] = []
+
+    for row_idx in sorted(rows_map.keys()):
+        row_groups = rows_map[row_idx]
+
+        # Step 1b: Detect category group breaks (S→P, P→H, etc.)
+        if len(row_groups) > 1:
+            prev_prefix = ""
+            for gi, g in enumerate(row_groups):
+                cid = ""
+                if g.breaker_idx is not None:
+                    comp = layout_result.components[g.breaker_idx]
+                    cid = comp.circuit_id or ""
+                cur_match = re.match(r"[A-Za-z]+", cid)
+                cur_prefix = cur_match.group() if cur_match else ""
+                if gi > 0 and cur_prefix and prev_prefix and cur_prefix != prev_prefix:
+                    g.gap_before = _GROUP_GAP
+                prev_prefix = cur_prefix
+
+        # Step 1c: Detect ditto groups (identical breaker specs within same category)
+        breaker_spec_sigs: dict[str, list[int]] = {}
+        for gi, g in enumerate(row_groups):
             if g.breaker_idx is not None:
                 comp = layout_result.components[g.breaker_idx]
                 cid = comp.circuit_id or ""
-            cur_match = re.match(r"[A-Za-z]+", cid)
-            cur_prefix = cur_match.group() if cur_match else ""
-            if gi > 0 and cur_prefix and prev_prefix and cur_prefix != prev_prefix:
-                g.gap_before = _GROUP_GAP
-            prev_prefix = cur_prefix
+                pfx_match = re.match(r"[A-Za-z]+", cid)
+                pfx = pfx_match.group() if pfx_match else "X"
+                sig = (f"{pfx}|{comp.breaker_characteristic}|{comp.rating}"
+                       f"|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}")
+                breaker_spec_sigs.setdefault(sig, []).append(gi)
+        for sig, gindices in breaker_spec_sigs.items():
+            if len(gindices) >= 2:
+                for k in range(1, len(gindices)):
+                    row_groups[gindices[k]].is_ditto = True
 
-    # Step 1c: Detect ditto groups (identical breaker specs within same category)
-    # Ditto MCBs have no breaker labels → compact horizontal extent
-    _DITTO_EXTENT = 5.5  # mm — symbol half-width (3.6) + small margin
-    breaker_spec_sigs: dict[str, list[int]] = {}  # spec signature → group indices
-    for gi, g in enumerate(groups):
-        if g.breaker_idx is not None:
-            comp = layout_result.components[g.breaker_idx]
-            cid = comp.circuit_id or ""
-            pfx_match = re.match(r"[A-Za-z]+", cid)
-            pfx = pfx_match.group() if pfx_match else "X"
-            sig = f"{pfx}|{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
-            breaker_spec_sigs.setdefault(sig, []).append(gi)
-    for sig, gindices in breaker_spec_sigs.items():
-        if len(gindices) >= 2:
-            for k in range(1, len(gindices)):
-                groups[gindices[k]].is_ditto = True
+        # Step 2: Compute minimum widths per group
+        for g in row_groups:
+            g.min_width = _compute_group_width(g, layout_result.components)
 
-    # Step 2: Compute minimum widths per group
-    for g in groups:
-        g.min_width = _compute_group_width(g, layout_result.components)
+        # Step 2b: Override extents for ditto groups (no labels → compact)
+        for g in row_groups:
+            if g.is_ditto:
+                g.left_extent = _DITTO_EXTENT
+                g.right_extent = _DITTO_EXTENT
+                g.min_width = g.left_extent + g.right_extent
 
-    # Step 2b: Override extents for ditto groups (no labels → compact)
-    for g in groups:
-        if g.is_ditto:
-            g.left_extent = _DITTO_EXTENT
-            g.right_extent = _DITTO_EXTENT
-            g.min_width = g.left_extent + g.right_extent
+        # Step 3: Determine final tap positions for this row
+        new_tap_xs = _determine_final_positions(
+            row_groups, layout_result.components, layout_result, config,
+            incoming_chain_x=incoming_chain_x,
+        )
 
-    # Step 3: Determine final tap positions
-    new_tap_xs = _determine_final_positions(
-        groups, layout_result.components, layout_result, config,
-        incoming_chain_x=incoming_chain_x,
-    )
+        # Step 4: Rebuild positions for this row
+        _rebuild_from_positions(row_groups, new_tap_xs, layout_result)
 
-    # Step 4: Rebuild all positions (index-based, no coordinate matching)
-    _rebuild_from_positions(groups, new_tap_xs, layout_result)
+        # Collect for busbar fitting
+        for g, new_x in zip(row_groups, new_tap_xs):
+            all_final_groups.append(g)
+            all_final_tap_xs.append(new_x)
 
-    # Step 5: Fit busbar to actual span (extend or shrink)
-    _fit_busbar_to_groups(
-        groups, new_tap_xs, layout_result, layout_result.components, config,
-        incoming_chain_x=incoming_chain_x,
-    )
+    # Step 5: Fit busbar to ALL rows combined (extend or shrink)
+    if all_final_groups:
+        # Sort by final tap_x for correct leftmost/rightmost extent
+        sorted_pairs = sorted(
+            zip(all_final_tap_xs, all_final_groups),
+            key=lambda p: p[0],
+        )
+        sorted_tap_xs = [p[0] for p in sorted_pairs]
+        sorted_groups = [p[1] for p in sorted_pairs]
+
+        _fit_busbar_to_groups(
+            sorted_groups, sorted_tap_xs, layout_result,
+            layout_result.components, config,
+            incoming_chain_x=incoming_chain_x,
+        )
+
+        # Step 5b: Update secondary busbar positions (row 2+)
+        # After per-row repositioning, secondary busbars may not cover all circuits
+        busbar_ys = layout_result.busbar_y_per_row or []
+        for row_idx in sorted(rows_map.keys()):
+            if row_idx == 0:
+                continue  # Main busbar already handled by _fit_busbar_to_groups
+            row_groups = rows_map[row_idx]
+            row_tap_xs = [
+                new_x for g, new_x
+                in zip(all_final_groups, all_final_tap_xs)
+                if g.row_idx == row_idx
+            ]
+            if not row_tap_xs:
+                continue
+            row_left = min(row_tap_xs) - row_groups[0].left_extent - 2
+            row_right = max(row_tap_xs) + row_groups[-1].right_extent + 2
+            # Ensure incoming chain x is covered
+            if incoming_chain_x:
+                row_left = min(row_left, incoming_chain_x - 2)
+                row_right = max(row_right, incoming_chain_x + 2)
+            row_left = max(row_left, config.min_x)
+            row_right = min(row_right, config.max_x)
+
+            # Find and update this row's BUSBAR component
+            if row_idx < len(busbar_ys):
+                row_by = busbar_ys[row_idx]
+                for comp in layout_result.components:
+                    if (comp.symbol_name == "BUSBAR"
+                            and not comp.label
+                            and abs(comp.y - row_by) < 3):
+                        comp.x = row_left
+                        break
 
     return layout_result

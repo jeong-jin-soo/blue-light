@@ -132,10 +132,10 @@ def _get_circuit_poles(circuit: dict, supply_type: str) -> str:
             return "SPN"
         if "three" in phase_lower or "3" in phase_lower:
             return "TPN"
-    # Default based on supply type
-    if supply_type == "three_phase":
-        return "TPN"
-    # Single-phase default: SPN (matching professional LEW reference DWG)
+    # Sub-circuits are ALWAYS single-pole (SPN) regardless of supply type.
+    # In a 3-phase TPN DB, each sub-circuit connects to ONE phase.
+    # TPN is only for the main breaker, not sub-circuit MCBs.
+    # (Confirmed by SG LEW reference DWG: sub-circuits show SPN/SP even in TPN DB)
     return "SPN"
 
 
@@ -347,12 +347,20 @@ def _place_sub_circuits_upward(
 
         # Circuit name label (vertical text, above the tail)
         # Circuit ID is already shown in the CIRCUIT_ID_BOX at the busbar tap
-        # Combine room/area name as suffix (reference DWG: "6 Nos 13A S/S/O — BEDROOM 1")
+        # Build display label: load description + room info (reference DWG pattern)
+        # e.g., "2 Nos 13A TWIN S/S/O — BEDROOM 1"
+        sc_load_desc = str(circuit.get("load", "") or circuit.get("load_description", "")).strip()
         sc_room = str(circuit.get("room", "") or circuit.get("location", "") or circuit.get("area", "")).strip()
-        sc_display_name = sc_name
+
+        # Priority: load description > circuit name
+        # Reference DWG shows load descriptions (e.g., "1 Nos LIGHTS") above circuits
+        if sc_load_desc and sc_load_desc.lower() != "spare":
+            sc_display_name = sc_load_desc
+        else:
+            sc_display_name = sc_name
         if sc_room:
             # Append room as suffix with em dash separator
-            sc_display_name = f"{sc_name} — {sc_room}"
+            sc_display_name = f"{sc_display_name} — {sc_room}"
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=tap_x,

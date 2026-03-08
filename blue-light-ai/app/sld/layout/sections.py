@@ -131,11 +131,12 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
                     "cpc_mm2": spec.cable_size.split(" + ")[1].replace("mmsq E", "").strip()
                                 if " + " in spec.cable_size else "",
                     "cpc_type": spec.cable_type.split("/")[-1] if "/" in spec.cable_type else "PVC",
+                    "method": spec.method,
                 }
         except Exception:
             pass  # Graceful fallback — cable annotation simply won't appear
 
-    ctx.meter_poles = "DP" if supply_type == "single_phase" else "TPN"
+    ctx.meter_poles = "DP" if supply_type == "single_phase" else "4P"
 
     # Main breaker characteristic (B/C/D) — IEC 60898-1 trip curve
     # Accept multiple key names: breaker_characteristic, characteristic, breaker_char, char
@@ -173,6 +174,18 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
     if not isinstance(raw_circuits, list):
         logger.warning("sub_circuits is not a list (%s), using empty list", type(raw_circuits).__name__)
         raw_circuits = []
+
+    # Layer 1+2: Normalize inputs and resolve domain defaults
+    premises_type = ""
+    if application_info and isinstance(application_info, dict):
+        premises_type = str(application_info.get("premises_type", "")).strip()
+    try:
+        from app.sld.circuit_normalizer import normalize_circuit
+        from app.sld.circuit_types import resolve_circuit
+        raw_circuits = [resolve_circuit(normalize_circuit(dict(sc)), premises_type) for sc in raw_circuits]
+    except Exception as exc:
+        logger.warning("Circuit normalization failed, using raw input: %s", exc)
+
     ctx.sub_circuits = raw_circuits
 
     ctx.busbar_rating = requirements.get("busbar_rating", 0)
@@ -206,8 +219,13 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         return
 
     # --- Non-metered supply (landlord / cable extension) only below ---
-    if ctx.is_cable_extension:
+    # Priority: user-specified label > cable extension > supply_label_type > default
+    if ctx.requirements.get("incoming_label"):
+        supply_label = ctx.requirements["incoming_label"]
+    elif ctx.is_cable_extension:
         supply_label = SG_LOCALE.incoming.from_power_supply
+    elif ctx.requirements.get("supply_label_type") == "supply":
+        supply_label = SG_LOCALE.incoming.from_landlord_supply
     else:
         supply_label = SG_LOCALE.incoming.from_landlord
     result.components.append(PlacedComponent(
@@ -422,13 +440,20 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         ))
         result.symbols_used.add("KWH_METER")
 
-        # ====== "KWH METER BY SP" label — above symbols, inside box ======
+        # ====== KWH meter label — above symbols, inside box ======
+        # Priority: 1) input kwh_label  2) supply_source default  3) fallback
+        _kwh_label = ctx.requirements.get("kwh_label")
+        if not _kwh_label:
+            if ctx.supply_source == "landlord":
+                _kwh_label = SG_LOCALE.meter_board.kwh_meter_pg
+            else:
+                _kwh_label = SG_LOCALE.meter_board.kwh_meter_by_sp
         kwh_label_x = (iso_cx + mcb_cx) / 2 - 10
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=kwh_label_x,
             y=kwh_label_y,
-            label=SG_LOCALE.meter_board.kwh_meter_by_sp,
+            label=_kwh_label,
         ))
 
         # ====== Connection: KWH right -> MCB left ======
@@ -436,12 +461,16 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         result.connections.append(((kwh_right_x, mb_center_y), (mcb_left_x, mb_center_y)))
 
         # ====== Place MCB on RIGHT ======
+        # MCB uses electrical function notation (TPN/DP), not physical poles (4P/2P)
+        _mcb_poles = ctx.breaker_poles  # "TPN" (3φ) or "DP" (1φ)
+        _mcb_char = ctx.main_breaker_char or "B"
+        _mcb_ka = ctx.breaker_fault_kA or 10
         result.components.append(PlacedComponent(
             symbol_name="CB_MCB",
             x=mcb_cx - mcb_h_extent / 2,
             y=mb_center_y,
-            label=f"{breaker_rating}A {meter_poles} MCB",
-            rating="10kA TYPE C",
+            label=f"{breaker_rating}A {_mcb_poles} MCB",
+            rating=f"TYPE {_mcb_char} {_mcb_ka}kA",
             rotation=90.0,
         ))
         result.symbols_used.add("MCB")
@@ -578,6 +607,55 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
             label=SG_LOCALE.meter_board.located_meter_compartment,
         ))
 
+        # ====== Earth symbol at meter board — 3-phase only ======
+        # Reference SLDs: 3-phase meter boards (63A TPN SLD 8, 40A TPN SLD 1)
+        # have earth/grounding symbol; single-phase (32A DB) does not.
+        #
+        # ㄱ-shape connection from box right wall:
+        #   box right wall ──●── horizontal ──┐
+        #                                      │ vertical
+        #                                     ═══
+        #                                      ══
+        #                                       =  E
+        if ctx.supply_type != "single_phase":
+            from app.sld.real_symbols import get_symbol_dimensions
+            _mb_earth_dims = get_symbol_dimensions("EARTH")
+            _mb_earth_w = _mb_earth_dims["width_mm"]   # 12
+            _mb_earth_h = _mb_earth_dims["height_mm"]  # 10
+
+            # Earth center X: offset to the right of the box
+            _mb_earth_h_offset = 5  # horizontal offset from box right wall
+            mb_earth_cx = mb_box_right + _mb_earth_h_offset
+            mb_earth_x = mb_earth_cx - _mb_earth_w / 2
+
+            # Earth Y: below the box bottom
+            _mb_earth_v_gap = config.earth_x_from_db / 2  # 2.5mm vertical gap
+            mb_earth_top_pin_y = mb_box_bottom - _mb_earth_v_gap
+            mb_earth_y = mb_earth_top_pin_y - _mb_earth_h
+
+            # ㄱ connection: horizontal from box wall, then vertical down
+            _mb_earth_junction_y = mb_box_bottom + 3  # 3mm above box bottom
+            # 1) Horizontal: box right wall → earth center X
+            result.connections.append((
+                (mb_box_right, _mb_earth_junction_y),
+                (mb_earth_cx, _mb_earth_junction_y),
+            ))
+            # 2) Vertical: corner → earth top pin
+            result.connections.append((
+                (mb_earth_cx, _mb_earth_junction_y),
+                (mb_earth_cx, mb_earth_top_pin_y),
+            ))
+            # Junction dot at box right wall
+            result.junction_dots.append((mb_box_right, _mb_earth_junction_y))
+
+            result.components.append(PlacedComponent(
+                symbol_name="EARTH",
+                x=mb_earth_x,
+                y=mb_earth_y,
+                label="E",
+            ))
+            result.symbols_used.add("EARTH")
+
         y = y_exit
 
     ctx.y = y
@@ -600,13 +678,19 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
     isolator_rating = requirements.get("isolator_rating", 0)
     isolator_label_extra = requirements.get("isolator_label", "")
 
-    # Landlord supply: always include isolator (regardless of kVA)
+    # Landlord supply: include isolator only when requires_isolator is True (125A+)
     # Exception: cable extension SLDs skip the isolator
-    if supply_source == "landlord" and not ctx.is_cable_extension:
+    _requires_iso = requirements.get("requires_isolator", False)
+    if supply_source == "landlord" and not ctx.is_cable_extension and _requires_iso:
         if not isolator_rating and breaker_rating:
             isolator_rating = breaker_rating  # Same rating as main breaker
         if not isolator_label_extra:
-            isolator_label_extra = SG_LOCALE.meter_board.located_inside_unit
+            # Include unit number if available (e.g., "LOCATED INSIDE UNIT #01-36")
+            unit_number = ""
+            if ctx.application_info:
+                unit_number = str(ctx.application_info.get("unit_number", "")).strip()
+            base_label = SG_LOCALE.meter_board.located_inside_unit
+            isolator_label_extra = f"{base_label} {unit_number}" if unit_number else base_label
     elif not isolator_rating and metering == "ct_meter":
         if breaker_rating:
             isolator_rating = _next_standard_rating(breaker_rating)
@@ -782,13 +866,16 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     else:
         approved_kva = round(breaker_rating * voltage / 1000, 1)
 
-    premises_addr = ""
+    # Location text: prefer unit_number for concise label, fallback to address
+    unit_number = ""
     if application_info:
-        premises_addr = application_info.get("address", "")
+        unit_number = str(application_info.get("unit_number", "")).strip()
 
     db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva}KVA AT {voltage}V"
-    if premises_addr:
-        db_info_text += f"\\PLOCATED AT {premises_addr}"
+    if unit_number:
+        db_info_text += f"\\P({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
+    elif application_info and application_info.get("address"):
+        db_info_text += f"\\PLOCATED AT {application_info['address']}"
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
     ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"

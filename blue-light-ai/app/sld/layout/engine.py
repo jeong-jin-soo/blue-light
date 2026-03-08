@@ -51,10 +51,12 @@ def _validate_and_correct(requirements: dict) -> dict:
     spec_input = {
         "kva": requirements.get("kva", 0),
         "supply_type": requirements.get("supply_type", ""),
+        "supply_source": requirements.get("supply_source", ""),
         "breaker_rating": breaker_rating,
         "breaker_type": main_breaker.get("type", ""),
         "breaker_poles": main_breaker.get("poles", ""),
         "breaker_ka": main_breaker.get("fault_kA", 0),
+        "metering": requirements.get("metering", ""),
         "circuits": [
             {
                 "name": sc.get("name", ""),
@@ -162,13 +164,14 @@ def compute_layout(
     _place_elcb(ctx)
     _place_main_busbar(ctx)
     busbar_y_row = _place_sub_circuits_rows(ctx)
+
+    # Store spine_x BEFORE resolve_overlaps for deterministic incoming chain detection
+    ctx.result.spine_x = cx
+
     resolve_overlaps(ctx.result, ctx.config)
     _add_cable_leader_lines(ctx.result, ctx.config)
     db_box_right = _place_db_box(ctx, busbar_y_row)
     _place_earth_bar(ctx, db_box_right)
-
-    # Store spine_x for deterministic incoming chain detection
-    ctx.result.spine_x = cx
 
     # Post-layout: center content vertically in drawing area
     _center_vertically(ctx.result, ctx.config)

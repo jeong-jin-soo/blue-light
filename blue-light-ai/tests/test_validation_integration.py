@@ -55,19 +55,25 @@ VALID_THREE_PHASE = {
 class TestValidationErrors:
     """compute_layout should raise ValueError for hard validation errors."""
 
-    def test_kva_exceeds_max_single_phase(self):
-        """Single-phase kVA exceeding 23 kVA (100A max) should raise ValueError."""
+    def test_kva_exceeds_max_single_phase_no_error(self):
+        """Single-phase kVA exceeding 23 kVA should NOT raise — uses largest spec.
+
+        SG team decision (2026-03-08): no strict kVA limit, user/LEW responsibility.
+        """
         req = dict(VALID_SINGLE_PHASE)
         req["kva"] = 50  # Exceeds max single-phase (23 kVA for 100A)
-        with pytest.raises(ValueError, match="kVA value 50 exceeds maximum"):
-            compute_layout(req)
+        result = compute_layout(req)
+        assert result is not None  # Should succeed, not raise
 
-    def test_kva_exceeds_max_three_phase(self):
-        """Three-phase kVA exceeding ~1108 kVA should raise ValueError."""
+    def test_kva_exceeds_max_three_phase_no_error(self):
+        """Three-phase kVA exceeding ~1108 kVA should NOT raise — uses largest spec.
+
+        SG team decision (2026-03-08): no strict kVA limit, user/LEW responsibility.
+        """
         req = dict(VALID_THREE_PHASE)
         req["kva"] = 2000  # Exceeds max three-phase (1108 kVA for 1600A)
-        with pytest.raises(ValueError, match="kVA value 2000 exceeds maximum"):
-            compute_layout(req)
+        result = compute_layout(req)
+        assert result is not None  # Should succeed, not raise
 
 
 # ---------------------------------------------------------------------------

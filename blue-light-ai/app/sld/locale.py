@@ -41,6 +41,7 @@ class MeterBoardLabels:
     located_meter_compartment: str = "LOCATED AT METER COMPARTMENT"
     located_inside_unit: str = "LOCATED INSIDE UNIT"
     kwh_meter_by_sp: str = "KWH METER BY SP"
+    kwh_meter_pg: str = "PG KWH METER"
     ct_by_sp: str = "CT BY SP"
     isolator: str = "ISOLATOR"
 
@@ -49,7 +50,8 @@ class MeterBoardLabels:
 class IncomingLabels:
     """Incoming supply area labels."""
     incoming_hdb: str = "INCOMING FROM HDB ELECTRICAL RISER"
-    from_landlord: str = "FROM LANDLORD SUPPLY"
+    from_landlord: str = "FROM LANDLORD RISER"
+    from_landlord_supply: str = "FROM LANDLORD SUPPLY"
     from_power_supply: str = "FROM POWER SUPPLY ON SITE"
     approved_load: str = "APPROVED LOAD"
 

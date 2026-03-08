@@ -96,8 +96,8 @@
     "description": "Double Pole Switch"
   },
   "EARTH": {
-    "width_mm": 12.0,
-    "height_mm": 10.0,
+    "width_mm": 8.0,
+    "height_mm": 6.7,
     "line_count": 3,
     "description": "Earth / Ground Symbol (3 decreasing horizontal lines)"
   },

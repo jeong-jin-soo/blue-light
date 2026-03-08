@@ -266,6 +266,13 @@ class SldGenerator:
             f"backend={backend_type}"
         )
 
+        # Normalize application_info keys (drawing_no→drawing_number, contractor split)
+        try:
+            from app.sld.circuit_normalizer import normalize_application_info
+            application_info = normalize_application_info(application_info)
+        except Exception as exc:
+            logger.warning("application_info normalization failed: %s", exc)
+
         # Compute layout (pure coordinate computation -- backend-independent)
         layout_result = compute_layout(requirements, application_info=application_info)
 
