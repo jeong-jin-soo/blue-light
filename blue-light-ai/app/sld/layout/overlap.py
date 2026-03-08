@@ -969,6 +969,92 @@ def _add_cable_leader_lines(
                 ))
 
 
+def _get_circuit_id(group: SubCircuitGroup, components: list) -> str:
+    """Get the circuit ID string (e.g., 'L1S', 'L2P1') from a group."""
+    if group.circuit_id_idx is not None:
+        cid = components[group.circuit_id_idx].circuit_id or ""
+        return cid.strip()
+    return ""
+
+
+def _parse_phase_prefix(circuit_id: str) -> tuple[str, str]:
+    """Parse circuit ID into (phase, suffix). E.g., 'L1P3' → ('L1', 'P3')."""
+    import re
+    m = re.match(r"^(L[123])(.*)", circuit_id, re.IGNORECASE)
+    if m:
+        return m.group(1).upper(), m.group(2)
+    return ("", circuit_id)
+
+
+def _build_phase_groups(
+    circuits: list[tuple[SubCircuitGroup, float]],
+    components: list,
+) -> list[list[tuple[SubCircuitGroup, float]]]:
+    """Build 3-phase fan-out groups from consecutive circuits based on circuit ID.
+
+    Scans left-to-right and groups consecutive L1/L2/L3 circuits that share the
+    same suffix. Within a large same-suffix cluster (e.g., L1S L2S L3S L2S L3S),
+    splits into sub-groups at phase sequence resets (phase_num <= prev_phase_num).
+
+    Supports:
+    - Triplets: L1X, L2X, L3X (3 circuits)
+    - Pairs: L1X, L2X or L2X, L3X (2 circuits)
+    - Singles: L1X alone (no fan-out, skipped)
+    ISOLATORs and non-phase circuits break the grouping.
+    """
+    groups: list[list[tuple[SubCircuitGroup, float]]] = []
+    i = 0
+    n = len(circuits)
+
+    while i < n:
+        g, by = circuits[i]
+        cid = _get_circuit_id(g, components)
+        phase, suffix = _parse_phase_prefix(cid)
+
+        if not phase:
+            # Not a phase circuit (ISOLATOR, etc.) → skip
+            i += 1
+            continue
+
+        # Collect consecutive circuits with same suffix
+        cluster: list[tuple[SubCircuitGroup, float, str]] = [(g, by, phase)]
+        j = i + 1
+        while j < n:
+            g2, by2 = circuits[j]
+            cid2 = _get_circuit_id(g2, components)
+            phase2, suffix2 = _parse_phase_prefix(cid2)
+            if phase2 and suffix2 == suffix:
+                cluster.append((g2, by2, phase2))
+                j += 1
+            else:
+                break
+
+        # Split cluster into sub-groups at phase sequence resets.
+        # A new sub-group starts when phase_num <= previous phase_num.
+        # E.g., L1,L2,L3,L2,L3 → [L1,L2,L3] + [L2,L3]
+        def _phase_num(ph: str) -> int:
+            return int(ph[1]) if len(ph) >= 2 and ph[1].isdigit() else 0
+
+        sub: list[tuple[SubCircuitGroup, float, str]] = [cluster[0]]
+        for k in range(1, len(cluster)):
+            cur_num = _phase_num(cluster[k][2])
+            prev_num = _phase_num(cluster[k - 1][2])
+            if cur_num <= prev_num:
+                # Phase reset — flush current sub-group
+                if len(sub) >= 2:
+                    groups.append([(c[0], c[1]) for c in sub])
+                sub = [cluster[k]]
+            else:
+                sub.append(cluster[k])
+        # Flush last sub-group
+        if len(sub) >= 2:
+            groups.append([(c[0], c[1]) for c in sub])
+
+        i = j if j > i + 1 else i + 1
+
+    return groups
+
+
 def _add_phase_fanout(
     layout_result: LayoutResult,
     config: LayoutConfig,
@@ -976,19 +1062,15 @@ def _add_phase_fanout(
 ) -> None:
     """Add 3-phase fan-out lines at busbar (post-resolve_overlaps).
 
-    For 3-phase boards, groups every 3 non-spare circuits into a triplet
-    **per row** (never mixing circuits from different rows).
-    Only the CENTER circuit touches the busbar. LEFT and RIGHT circuits
-    are connected via diagonal lines from the center's busbar junction.
+    Groups circuits by circuit ID phase prefix (L1/L2/L3) and shared suffix.
+    Supports triplets (L1X/L2X/L3X), pairs (L1X/L2X, L2X/L3X), and singles.
 
-    Reference DXF pattern (63A TPN SLD 14):
-        |     |     |     ← vertical lines (to breakers)
-        |    /|\\    |
-        |   / | \\   |    ← diagonals fan out ABOVE busbar
-        |  /  |  \\  |
-      ━━━━━━(●)━━━━━━━━  ← busbar (only center has junction)
-
-    Left/right verticals start at the intermediate point (not busbar).
+    Reference pattern (63A TPN SLD 14):
+        Triplet:        Pair:
+        |    /|\\          /|
+        |   / | \\        / |
+        |  /  |  \\      /  |
+      ━━━━━━(●)━━━━━━  ━(●)━━━━
     """
     if supply_type != "three_phase":
         return
@@ -998,6 +1080,7 @@ def _add_phase_fanout(
         return
 
     busbar_ys = layout_result.busbar_y_per_row or [layout_result.busbar_y]
+    components = layout_result.components
 
     # --- Group non-spare circuits PER ROW to prevent cross-row mixing ---
     rows: dict[int, list[tuple[SubCircuitGroup, float]]] = {}
@@ -1009,7 +1092,6 @@ def _add_phase_fanout(
             by = g.row_busbar_y if g.row_busbar_y else busbar_ys[0]
             rows.setdefault(row_idx, []).append((g, by))
 
-    # DXF reference: fan_height / circuit_spacing ≈ 193 / 727 ≈ 0.27
     _FAN_HEIGHT = 7.0  # mm above busbar where diagonals meet side verticals
 
     connections = layout_result.connections
@@ -1018,33 +1100,42 @@ def _add_phase_fanout(
         non_spare = rows[row_idx]
         # non_spare is already sorted by tap_x (from _identify_groups sort)
 
-        for i in range(0, len(non_spare) - 2, 3):
-            left_g, left_by = non_spare[i]
-            center_g, center_by = non_spare[i + 1]
-            right_g, right_by = non_spare[i + 2]
+        phase_groups = _build_phase_groups(non_spare, components)
 
-            by = center_by  # busbar Y
+        for pg in phase_groups:
+            if len(pg) == 3:
+                # Triplet: LEFT / CENTER / RIGHT
+                left_g, _ = pg[0]
+                center_g, center_by = pg[1]
+                right_g, _ = pg[2]
+                by = center_by
+            elif len(pg) == 2:
+                # Pair: first is center, second is side
+                center_g, center_by = pg[0]
+                side_g, _ = pg[1]
+                by = center_by
+            else:
+                continue  # Single or unexpected — no fan-out
+
             intermediate_y = by + _FAN_HEIGHT
-
-            left_x = left_g.tap_x
             center_x = center_g.tap_x
-            right_x = right_g.tap_x
 
-            # --- Modify left/right: truncate vertical to start at intermediate_y ---
-            for side_g in (left_g, right_g):
-                for ci in side_g.connection_indices:
+            if len(pg) == 3:
+                sides = [left_g, right_g]
+            else:
+                sides = [side_g]
+
+            for s_g in sides:
+                for ci in s_g.connection_indices:
                     (sx, sy), (ex, ey) = connections[ci]
-                    # Find the busbar→breaker vertical (starts at busbar_y)
                     if abs(sy - by) < 1.0 and abs(sx - ex) < 0.5:
                         connections[ci] = ((sx, intermediate_y), (ex, ey))
 
-                # Move junction dot to center's busbar position
-                if side_g.junction_dot_idx is not None:
-                    layout_result.junction_dots[side_g.junction_dot_idx] = (center_x, by)
+                if s_g.junction_dot_idx is not None:
+                    layout_result.junction_dots[s_g.junction_dot_idx] = (center_x, by)
 
-            # --- Add diagonal lines from center busbar junction ---
-            connections.append(((center_x, by), (left_x, intermediate_y)))
-            connections.append(((center_x, by), (right_x, intermediate_y)))
+                # Diagonal from center busbar junction to side intermediate
+                connections.append(((center_x, by), (s_g.tap_x, intermediate_y)))
 
 
 def resolve_overlaps(

@@ -73,6 +73,12 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     """
     Pre-assign circuit IDs based on Singapore SLD conventions.
 
+    If a circuit name already contains a valid phase prefix (L1/L2/L3 for
+    three-phase, or S/P/H prefix for single-phase), it is used as-is.
+    This allows users/AI to provide explicit circuit IDs that control
+    fan-out grouping on the busbar.
+
+    Auto-generated IDs (when name is NOT a valid circuit ID):
     Single-phase: S1, S2 (lighting), P1, P2 (power), H1, H2 (heater),
                   ISOL 1 (isolator), SP1, SP2 (spare)
     Three-phase: L1S1, L2S1, L3S1 (lighting round-robin),
@@ -89,10 +95,18 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     """
     ids: list[str] = []
 
-    # First pass: categorize circuits
+    # Patterns for recognizing user-provided circuit IDs
+    _PHASE_ID_RE = re.compile(r"^L[123]\w+", re.IGNORECASE)  # L1S, L2P1, etc.
+    _ISOL_ID_RE = re.compile(r"^ISOL\s*\d+", re.IGNORECASE)  # ISOL 1, ISOL2
+    _SPARE_ID_RE = re.compile(r"^SP\d+$", re.IGNORECASE)      # SP1, SP2
+
+    # First pass: categorize circuits and detect user-provided IDs
     categories: list[str] = []
+    user_ids: list[str | None] = []  # Non-None if name is already a valid ID
+
     for circuit in sub_circuits:
-        name_lower = (str(circuit.get("name", "") or circuit.get("circuit_name", "")) or "").lower()
+        name_raw = str(circuit.get("name", "") or circuit.get("circuit_name", "")) or ""
+        name_lower = name_raw.lower()
         breaker_type = str(circuit.get("breaker_type", "") or "").upper()
         # Check nested breaker dict too
         breaker_dict = circuit.get("breaker", {})
@@ -101,14 +115,28 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
 
         if "spare" in name_lower:
             categories.append("spare")
+            user_ids.append(None)
         elif breaker_type == "ISOLATOR" or "isol" in name_lower:
             categories.append("isolator")
+            # Use name as ID if it matches ISOL pattern
+            if _ISOL_ID_RE.match(name_raw.strip()):
+                user_ids.append(name_raw.strip())
+            else:
+                user_ids.append(None)
+        elif _PHASE_ID_RE.match(name_raw.strip()):
+            # Name already IS a phase-prefixed circuit ID (e.g., L1S, L2P1)
+            # Use it directly — this controls fan-out grouping
+            categories.append("user_id")
+            user_ids.append(name_raw.strip())
         elif any(kw in name_lower for kw in ("light", "lamp", "led")):
             categories.append("lighting")
+            user_ids.append(None)
         elif any(kw in name_lower for kw in ("heater", "water heater", "instant heater", "storage heater")):
             categories.append("heater")
+            user_ids.append(None)
         else:
             categories.append("power")
+            user_ids.append(None)
 
     # Second pass: assign IDs with per-category counters
     # Note: Heater (H) and Power (P) share the SAME numeric counter.
@@ -119,7 +147,12 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     isol_idx = 0  # isolator counter
     sp_idx = 0    # spare counter
 
-    for cat in categories:
+    for i, cat in enumerate(categories):
+        # If user already provided a valid circuit ID, use it directly
+        if user_ids[i] is not None:
+            ids.append(user_ids[i])
+            continue
+
         if supply_type == "single_phase":
             if cat == "spare":
                 sp_idx += 1
