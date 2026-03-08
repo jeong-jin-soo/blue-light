@@ -59,7 +59,7 @@ class IncomingLabels:
 @dataclass(frozen=True)
 class CircuitLabels:
     """Circuit and DB box labels."""
-    comb_busbar: str = "COMB BUSBAR"
+    comb_busbar: str = "COMB BAR"
     busbar: str = "BUSBAR"
     db: str = "DB"
     spare: str = "SPARE"

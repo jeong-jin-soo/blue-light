@@ -418,8 +418,9 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         kwh_left_x = kwh_cx - kwh_h_extent / 2 - _stub
         result.connections.append(((iso_right_x, mb_center_y), (kwh_left_x, mb_center_y)))
 
-        # ====== CT metering (between ISO and KWH) — only for ct_meter ======
-        if metering == "ct_meter":
+        # ====== CT metering (between ISO and KWH) — only for ct_meter + non-landlord ======
+        # Landlord supply: CT is provided by SP, not shown on SLD
+        if metering == "ct_meter" and ctx.supply_source != "landlord":
             ct_mid_x = (iso_cx + kwh_cx) / 2
             ct_r = config.ct_size / 2
             ct_label = f"CT {ctx.ct_ratio}" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
@@ -691,7 +692,8 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
                 unit_number = str(ctx.application_info.get("unit_number", "")).strip()
             base_label = SG_LOCALE.meter_board.located_inside_unit
             isolator_label_extra = f"{base_label} {unit_number}" if unit_number else base_label
-    elif not isolator_rating and metering == "ct_meter":
+    elif not isolator_rating and metering == "ct_meter" and supply_source != "landlord":
+        # Non-landlord ct_meter: unit isolator sized to next standard rating
         if breaker_rating:
             isolator_rating = _next_standard_rating(breaker_rating)
 

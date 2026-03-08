@@ -268,7 +268,8 @@ class TestConnectionIntegrity:
         """Connections should be horizontal, vertical, or short diagonals.
 
         Long diagonal connections (>5mm) are likely layout bugs — wires
-        in SLD drawings are always axis-aligned except for tick marks.
+        in SLD drawings are always axis-aligned except for tick marks
+        and 3-phase fan-out diagonals (dy≈7.0mm from busbar to intermediate).
         """
         for i, (start, end) in enumerate(layout_result.connections):
             dx = abs(start[0] - end[0])
@@ -277,7 +278,10 @@ class TestConnectionIntegrity:
             is_horizontal = dy < 0.01
             is_vertical = dx < 0.01
             is_short_diagonal = (dx**2 + dy**2) ** 0.5 < 5.0
-            assert is_horizontal or is_vertical or is_short_diagonal, (
+            # 3-phase fan-out: diagonals from busbar junction to side circuits
+            # dy ≈ _FAN_HEIGHT (7.0mm), dx ≈ circuit spacing (15-40mm)
+            is_fanout = 5.0 < dy < 10.0 and dx < 50.0
+            assert is_horizontal or is_vertical or is_short_diagonal or is_fanout, (
                 f"Connection #{i} is a long diagonal ({dx:.1f}×{dy:.1f}mm): "
                 f"{start} → {end}"
             )

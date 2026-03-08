@@ -957,6 +957,84 @@ def _add_cable_leader_lines(
                 ))
 
 
+def _add_phase_fanout(
+    layout_result: LayoutResult,
+    config: LayoutConfig,
+    supply_type: str,
+) -> None:
+    """Add 3-phase fan-out lines at busbar (post-resolve_overlaps).
+
+    For 3-phase boards, groups every 3 non-spare circuits into a triplet
+    **per row** (never mixing circuits from different rows).
+    Only the CENTER circuit touches the busbar. LEFT and RIGHT circuits
+    are connected via diagonal lines from the center's busbar junction.
+
+    Reference DXF pattern (63A TPN SLD 14):
+        |     |     |     ← vertical lines (to breakers)
+        |    /|\\    |
+        |   / | \\   |    ← diagonals fan out ABOVE busbar
+        |  /  |  \\  |
+      ━━━━━━(●)━━━━━━━━  ← busbar (only center has junction)
+
+    Left/right verticals start at the intermediate point (not busbar).
+    """
+    if supply_type != "three_phase":
+        return
+
+    groups, _ = _identify_groups(layout_result)
+    if not groups:
+        return
+
+    busbar_ys = layout_result.busbar_y_per_row or [layout_result.busbar_y]
+
+    # --- Group non-spare circuits PER ROW to prevent cross-row mixing ---
+    rows: dict[int, list[tuple[SubCircuitGroup, float]]] = {}
+    for g in groups:
+        if g.is_spare:
+            continue
+        if g.breaker_idx is not None:
+            row_idx = g.row_idx
+            by = g.row_busbar_y if g.row_busbar_y else busbar_ys[0]
+            rows.setdefault(row_idx, []).append((g, by))
+
+    # DXF reference: fan_height / circuit_spacing ≈ 193 / 727 ≈ 0.27
+    _FAN_HEIGHT = 7.0  # mm above busbar where diagonals meet side verticals
+
+    connections = layout_result.connections
+
+    for row_idx in sorted(rows.keys()):
+        non_spare = rows[row_idx]
+        # non_spare is already sorted by tap_x (from _identify_groups sort)
+
+        for i in range(0, len(non_spare) - 2, 3):
+            left_g, left_by = non_spare[i]
+            center_g, center_by = non_spare[i + 1]
+            right_g, right_by = non_spare[i + 2]
+
+            by = center_by  # busbar Y
+            intermediate_y = by + _FAN_HEIGHT
+
+            left_x = left_g.tap_x
+            center_x = center_g.tap_x
+            right_x = right_g.tap_x
+
+            # --- Modify left/right: truncate vertical to start at intermediate_y ---
+            for side_g in (left_g, right_g):
+                for ci in side_g.connection_indices:
+                    (sx, sy), (ex, ey) = connections[ci]
+                    # Find the busbar→breaker vertical (starts at busbar_y)
+                    if abs(sy - by) < 1.0 and abs(sx - ex) < 0.5:
+                        connections[ci] = ((sx, intermediate_y), (ex, ey))
+
+                # Move junction dot to center's busbar position
+                if side_g.junction_dot_idx is not None:
+                    layout_result.junction_dots[side_g.junction_dot_idx] = (center_x, by)
+
+            # --- Add diagonal lines from center busbar junction ---
+            connections.append(((center_x, by), (left_x, intermediate_y)))
+            connections.append(((center_x, by), (right_x, intermediate_y)))
+
+
 def resolve_overlaps(
     layout_result: LayoutResult,
     config: LayoutConfig | None = None,

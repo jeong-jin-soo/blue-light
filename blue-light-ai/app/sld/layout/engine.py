@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 
 from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
-from app.sld.layout.overlap import _add_cable_leader_lines, resolve_overlaps
+from app.sld.layout.overlap import _add_cable_leader_lines, _add_phase_fanout, resolve_overlaps
 from app.sld.layout.sections import (
     _parse_requirements,
     _place_db_box,
@@ -169,6 +169,7 @@ def compute_layout(
     ctx.result.spine_x = cx
 
     resolve_overlaps(ctx.result, ctx.config)
+    _add_phase_fanout(ctx.result, ctx.config, ctx.requirements.get("supply_type", ""))
     _add_cable_leader_lines(ctx.result, ctx.config)
     db_box_right = _place_db_box(ctx, busbar_y_row)
     _place_earth_bar(ctx, db_box_right)

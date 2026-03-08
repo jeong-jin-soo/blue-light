@@ -92,13 +92,13 @@ class LayoutConfig:
     # Real samples use generous spacing — diagram fills 70-80% of page
     vertical_spacing: float = 22      # Between components vertically (increased for clarity)
     horizontal_spacing: float = 26    # Between sub-circuits (base — real samples ~25-35mm per circuit column)
-    min_horizontal_spacing: float = 20  # Minimum spacing between sub-circuits
+    min_horizontal_spacing: float = 17  # Minimum spacing (tight fit for 18 circuits per row)
     max_horizontal_spacing: float = 42  # Maximum spacing (prevents overly sparse layout)
     busbar_margin: float = 20         # Margin from edges of busbar (room for labels)
 
     # Sub-circuit row layout
-    max_circuits_per_row: int = 14    # Fewer per row for better readability
-    row_spacing: float = 50           # Vertical spacing between sub-circuit rows
+    max_circuits_per_row: int = 18    # Matches DXF reference (18 per row for 3-phase TPN boards)
+    row_spacing: float = 40           # Vertical spacing between sub-circuit rows (reduced for 18/row fit)
 
     # Starting position
     start_x: float = 210             # Center of drawing
@@ -132,7 +132,7 @@ class LayoutConfig:
 
     # Sub-circuit vertical offsets (derived from real LEW samples)
     busbar_to_breaker_gap: float = 12.0   # Gap from busbar to sub-circuit breaker bottom
-    tail_length: float = 30.0             # Conductor tail above breaker top (fills page)
+    tail_length: float = 8.0              # Conductor tail above breaker — short to fit multi-row
     db_box_busbar_margin: float = 8.0     # DB box edge offset above busbar
     db_box_tail_margin: float = 4.0       # DB box extends above breaker+stub by this
     db_box_label_margin: float = 8.0      # DB box extends above tail for label area

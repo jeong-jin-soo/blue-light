@@ -26,6 +26,30 @@ from app.sld.locale import SG_LOCALE
 logger = logging.getLogger(__name__)
 
 
+def _wrap_label(text: str, max_chars: int = 30) -> str:
+    """Wrap a long label into multiline using \\P separators.
+
+    Splits at word boundaries to keep each line under max_chars.
+    For rotated (90°) vertical text, each \\P line reduces the
+    vertical extent at the cost of a small horizontal offset.
+    """
+    if len(text) <= max_chars or "\\P" in text:
+        return text  # Already short or pre-wrapped
+
+    words = text.split()
+    lines: list[str] = []
+    current_line = ""
+    for word in words:
+        if current_line and len(current_line) + 1 + len(word) > max_chars:
+            lines.append(current_line)
+            current_line = word
+        else:
+            current_line = f"{current_line} {word}" if current_line else word
+    if current_line:
+        lines.append(current_line)
+    return "\\P".join(lines)
+
+
 def _split_into_rows(sub_circuits: list[dict], max_per_row: int) -> list[list[dict]]:
     """Split sub-circuits into rows of max_per_row each."""
     if not sub_circuits:
@@ -50,12 +74,18 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     Pre-assign circuit IDs based on Singapore SLD conventions.
 
     Single-phase: S1, S2 (lighting), P1, P2 (power), H1, H2 (heater),
-                  SP1, SP2 (spare)
+                  ISOL 1 (isolator), SP1, SP2 (spare)
     Three-phase: L1S1, L2S1, L3S1 (lighting round-robin),
-                 L1P1, L2P1, L3P1 (power round-robin), SP1, SP2 (spare)
+                 L1P1, L2P1, L3P1 (power round-robin),
+                 ISOL 1, ISOL 2 (isolator — own counter),
+                 SP1, SP2 (spare)
 
     Heater circuits (water heater, instant heater, storage heater) use "H" prefix
     per Singapore LEW convention (reference DWG: H5, H6 for heater points).
+
+    ISOLATOR circuits use "ISOL N" per DXF reference (63A TPN SLD 14).
+    They do NOT participate in the L-phase round-robin counter.
+    Detection: breaker_type == "ISOLATOR" or name contains "isol".
     """
     ids: list[str] = []
 
@@ -63,8 +93,16 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     categories: list[str] = []
     for circuit in sub_circuits:
         name_lower = (str(circuit.get("name", "") or circuit.get("circuit_name", "")) or "").lower()
+        breaker_type = str(circuit.get("breaker_type", "") or "").upper()
+        # Check nested breaker dict too
+        breaker_dict = circuit.get("breaker", {})
+        if isinstance(breaker_dict, dict) and not breaker_type:
+            breaker_type = str(breaker_dict.get("type", "")).upper()
+
         if "spare" in name_lower:
             categories.append("spare")
+        elif breaker_type == "ISOLATOR" or "isol" in name_lower:
+            categories.append("isolator")
         elif any(kw in name_lower for kw in ("light", "lamp", "led")):
             categories.append("lighting")
         elif any(kw in name_lower for kw in ("heater", "water heater", "instant heater", "storage heater")):
@@ -75,15 +113,20 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     # Second pass: assign IDs with per-category counters
     # Note: Heater (H) and Power (P) share the SAME numeric counter.
     # Reference DWG: P1, P2, P3, P4, H5, H6 — heater continues from power count.
-    s_idx = 0    # lighting counter
-    ph_idx = 0   # power + heater shared counter
-    sp_idx = 0   # spare counter
+    # ISOLATOR has its own counter (ISOL 1, ISOL 2, ...) per DXF reference.
+    s_idx = 0     # lighting counter
+    ph_idx = 0    # power + heater shared counter
+    isol_idx = 0  # isolator counter
+    sp_idx = 0    # spare counter
 
     for cat in categories:
         if supply_type == "single_phase":
             if cat == "spare":
                 sp_idx += 1
                 ids.append(f"SP{sp_idx}")
+            elif cat == "isolator":
+                isol_idx += 1
+                ids.append(f"ISOL {isol_idx}")
             elif cat == "lighting":
                 s_idx += 1
                 ids.append(f"S{s_idx}")
@@ -97,6 +140,9 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
             if cat == "spare":
                 sp_idx += 1
                 ids.append(f"SP{sp_idx}")
+            elif cat == "isolator":
+                isol_idx += 1
+                ids.append(f"ISOL {isol_idx}")
             elif cat == "lighting":
                 phase = (s_idx % 3) + 1
                 num = (s_idx // 3) + 1
@@ -246,6 +292,17 @@ def _place_sub_circuits_upward(
             ))
             continue
 
+        # Determine poles early (needed for conductor count tick marks and breaker)
+        sc_breaker_poles_raw = circuit.get("breaker_poles")
+        if sc_breaker_poles_raw:
+            sc_poles_from_data = str(sc_breaker_poles_raw)
+            if sc_poles_from_data.isdigit():
+                sc_poles = {1: "SP", 2: "DP", 3: "TPN", 4: "4P"}.get(int(sc_poles_from_data), "SP")
+            else:
+                sc_poles = sc_poles_from_data
+        else:
+            sc_poles = _get_circuit_poles(circuit, supply_type)
+
         # Vertical line UP from busbar to breaker
         sc_y = busbar_y + config.busbar_to_breaker_gap  # Above busbar (past circuit ID box)
 
@@ -291,8 +348,7 @@ def _place_sub_circuits_upward(
         if sc_load_kw and sc_load_kw > 0:
             # Single-phase (SPN/SP/DP): I = P / V (230V)
             # Three-phase (TPN/4P): I = P / (V × √3) (400V × 1.732)
-            sc_poles_hint = str(circuit.get("breaker_poles", "")).upper()
-            is_three_phase = sc_poles_hint in ("TPN", "4P")
+            is_three_phase = sc_poles in ("TPN", "4P")
             if is_three_phase:
                 current = round(sc_load_kw * 1000 / (400 * 1.732), 1)
             else:
@@ -305,18 +361,6 @@ def _place_sub_circuits_upward(
             circuit.get("breaker_characteristic", "")
             or circuit.get("breaker_char", "")
         ).upper()
-
-        # Determine poles from circuit data or supply type
-        # Single-phase sub-circuits: SPN (Single Pole + Neutral)
-        sc_breaker_poles_raw = circuit.get("breaker_poles")
-        if sc_breaker_poles_raw:
-            sc_poles_from_data = str(sc_breaker_poles_raw)
-            if sc_poles_from_data.isdigit():
-                sc_poles = {1: "SP", 2: "DP", 3: "TPN", 4: "4P"}.get(int(sc_poles_from_data), "SP")
-            else:
-                sc_poles = sc_poles_from_data
-        else:
-            sc_poles = _get_circuit_poles(circuit, supply_type)
 
         cb_sym = f"CB_{sc_breaker_type}"
         result.components.append(PlacedComponent(
@@ -361,6 +405,13 @@ def _place_sub_circuits_upward(
         if sc_room:
             # Append room as suffix with em dash separator
             sc_display_name = f"{sc_display_name} — {sc_room}"
+        # Wrap long labels into multiline (\\P) to fit vertical space
+        # Dynamically compute max_chars based on available height above label
+        _CHAR_ADVANCE = 1.7  # approx mm per character for char_height 2.8
+        label_y = tail_end_y + 2
+        avail_h = config.max_y - label_y
+        dyn_max = max(15, int(avail_h / _CHAR_ADVANCE))
+        sc_display_name = _wrap_label(sc_display_name, max_chars=dyn_max)
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=tap_x,

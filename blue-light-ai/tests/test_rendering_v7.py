@@ -761,6 +761,10 @@ class TestConnectionAlignment:
                 # Skip horizontal connections (e.g., earth bar horizontal run)
                 if abs(start[1] - end[1]) < 0.5:
                     continue
+                # Skip 3-phase fan-out diagonals (dy ≈ 7mm = _FAN_HEIGHT)
+                dy = abs(start[1] - end[1])
+                if 5.0 < dy < 10.0:
+                    continue
                 # Vertical connections should have same x at both ends
                 assert abs(start[0] - end[0]) < 0.5, (
                     f"Busbar tap connection not vertical: "

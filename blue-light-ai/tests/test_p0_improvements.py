@@ -73,9 +73,10 @@ class TestCableExtension:
         )
 
     def test_landlord_still_has_isolator(self):
-        """Regular landlord supply (not cable extension) must still have ISOLATOR."""
+        """Regular landlord supply with requires_isolator must have ISOLATOR."""
         req = _base_requirements()
         req["supply_source"] = "landlord"
+        req["requires_isolator"] = True
         result = compute_layout(req, skip_validation=True)
         isolators = [c for c in result.components if c.symbol_name == "ISOLATOR"]
         assert len(isolators) > 0, "Regular landlord supply should have ISOLATOR"
@@ -89,8 +90,8 @@ class TestBIConnectorMultiRow:
     """Multi-row SLD should use BI_CONNECTOR between busbar rows."""
 
     def test_bi_connector_multirow(self):
-        """15+ circuits (multi-row) must include BI_CONNECTOR component."""
-        req = _base_requirements(num_circuits=15)
+        """19+ circuits (multi-row with max_circuits_per_row=18) must include BI_CONNECTOR."""
+        req = _base_requirements(num_circuits=19)
         result = compute_layout(req, skip_validation=True)
         bi_connectors = [c for c in result.components if c.symbol_name == "BI_CONNECTOR"]
         assert len(bi_connectors) >= 1, (
@@ -98,8 +99,8 @@ class TestBIConnectorMultiRow:
         )
 
     def test_bi_connector_not_single_row(self):
-        """10 circuits (single row) must NOT include BI_CONNECTOR."""
-        req = _base_requirements(num_circuits=10)
+        """16 circuits (single row) must NOT include BI_CONNECTOR."""
+        req = _base_requirements(num_circuits=16)
         result = compute_layout(req, skip_validation=True)
         bi_connectors = [c for c in result.components if c.symbol_name == "BI_CONNECTOR"]
         assert len(bi_connectors) == 0, (
@@ -108,7 +109,7 @@ class TestBIConnectorMultiRow:
 
     def test_bi_connector_symbols_used(self):
         """Multi-row layout should register BI_CONNECTOR in symbols_used."""
-        req = _base_requirements(num_circuits=15)
+        req = _base_requirements(num_circuits=19)
         result = compute_layout(req, skip_validation=True)
         assert "BI_CONNECTOR" in result.symbols_used, (
             f"Expected BI_CONNECTOR in symbols_used, got: {result.symbols_used}"

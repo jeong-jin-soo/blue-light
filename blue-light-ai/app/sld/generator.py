@@ -464,6 +464,9 @@ class SldGenerator:
         breaker_spec_groups: dict[str, list[int]] = {}
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block":
+                # ISOLATOR circuits: excluded from ditto grouping (no breaker label at all)
+                if (comp.breaker_type_str or "").upper() == "ISOLATOR":
+                    continue
                 # Extract category prefix from circuit_id (S, P, H, SP, L1S, L1P, etc.)
                 cid = comp.circuit_id or ""
                 prefix_match = re.match(r"([A-Z]+)", cid)
@@ -632,11 +635,14 @@ class SldGenerator:
 
                     if comp.label_style == "breaker_block":
                         # LEW-style stacked breaker label block
+                        # ISOLATOR circuits: no breaker label per DXF reference
+                        is_isolator = (comp.breaker_type_str or "").upper() == "ISOLATOR"
                         is_ditto = comp_idx in ditto_breaker_indices
-                        self._draw_breaker_block_label(
-                            backend, comp,
-                            is_ditto=is_ditto,
-                        )
+                        if not is_isolator:
+                            self._draw_breaker_block_label(
+                                backend, comp,
+                                is_ditto=is_ditto,
+                            )
                     else:
                         # Default label rendering (for incoming chain components)
                         label_text = ""
