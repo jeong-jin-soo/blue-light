@@ -26,27 +26,37 @@ from app.sld.locale import SG_LOCALE
 logger = logging.getLogger(__name__)
 
 
-def _wrap_label(text: str, max_chars: int = 30) -> str:
-    """Wrap a long label into multiline using \\P separators.
+def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
+    """Wrap a long label into max_lines lines using \\P separators.
 
-    Splits at word boundaries to keep each line under max_chars.
-    For rotated (90°) vertical text, each \\P line reduces the
-    vertical extent at the cost of a small horizontal offset.
+    Splits at word boundaries. If the text exceeds max_lines when wrapped
+    at max_chars, recalculates line width to fit all content in max_lines.
     """
     if len(text) <= max_chars or "\\P" in text:
         return text  # Already short or pre-wrapped
 
     words = text.split()
-    lines: list[str] = []
-    current_line = ""
-    for word in words:
-        if current_line and len(current_line) + 1 + len(word) > max_chars:
-            lines.append(current_line)
-            current_line = word
-        else:
-            current_line = f"{current_line} {word}" if current_line else word
-    if current_line:
-        lines.append(current_line)
+
+    def _split_words(limit: int) -> list[str]:
+        lines: list[str] = []
+        cur = ""
+        for w in words:
+            if cur and len(cur) + 1 + len(w) > limit:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = f"{cur} {w}" if cur else w
+        if cur:
+            lines.append(cur)
+        return lines
+
+    lines = _split_words(max_chars)
+
+    # If more than max_lines, recalculate with wider line width to fit all text
+    if len(lines) > max_lines:
+        target = len(text) // max_lines + 1
+        lines = _split_words(target)
+
     return "\\P".join(lines)
 
 
@@ -503,7 +513,10 @@ def _place_sub_circuits_upward(
             or circuit.get("breaker_char", "")
         ).upper()
 
-        cb_sym = f"CB_{sc_breaker_type}"
+        # ISOLATOR circuits also get an MCB symbol at the busbar
+        # (the DP ISOL device box is drawn separately at conductor top)
+        _render_breaker_type = "MCB" if sc_breaker_type == "ISOLATOR" else sc_breaker_type
+        cb_sym = f"CB_{_render_breaker_type}"
         result.components.append(PlacedComponent(
             symbol_name=cb_sym,
             x=tap_x - sc_cb_w / 2,
@@ -544,14 +557,8 @@ def _place_sub_circuits_upward(
         _isol_extra = _ISOL_DEVICE_BOX_H if sc_breaker_type == "ISOLATOR" else 0.0
         conductor_top_y = tail_end_y + _isol_extra
 
-        # ISOLATOR: no breaker symbol drawn, so merge busbar→tail into one line
-        # (replace the busbar→sc_y stub with a single busbar→tail_end_y line)
-        if sc_breaker_type == "ISOLATOR":
-            # Remove the short stub (busbar→sc_y) added above, replace with full line
-            result.connections[-1] = ((tap_x, busbar_y), (tap_x, tail_end_y))
-        else:
-            # Normal breakers: conductor from breaker top to tail end
-            result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
+        # Conductor from breaker top to tail end (all circuit types including ISOLATOR)
+        result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
 
         # Circuit name label (vertical text, above the tail / device box)
         # Circuit ID is already shown in the CIRCUIT_ID_BOX at the busbar tap

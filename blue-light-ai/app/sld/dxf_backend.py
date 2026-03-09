@@ -147,6 +147,7 @@ class DxfBackend:
         insert: tuple[float, float],
         char_height: float = 3.0,
         rotation: float = 0.0,
+        center_across: bool = False,
     ) -> None:
         """
         Draw multiline text using MTEXT entity.
@@ -156,6 +157,10 @@ class DxfBackend:
             insert: Position (x, y) in mm — top-left anchor.
             char_height: Character height in mm.
             rotation: Text rotation in degrees CCW.
+            center_across: If True, center text block across the rotation axis
+                (MIDDLE_LEFT attachment). For rotation=90° with 1 line,
+                the line center aligns with insert_x. For 2 lines, the
+                midpoint between lines aligns with insert_x.
         """
         if not isinstance(text, str):
             text = str(text)
@@ -166,7 +171,8 @@ class DxfBackend:
         mtext.dxf.insert = insert
         mtext.dxf.char_height = char_height
         mtext.dxf.style = _TEXT_STYLE
-        mtext.dxf.attachment_point = 1  # TOP_LEFT
+        # MIDDLE_LEFT (4) centers the text block across the rotation axis
+        mtext.dxf.attachment_point = 4 if center_across else 1
 
         if abs(rotation) > 0.1:
             mtext.dxf.rotation = rotation

@@ -198,6 +198,7 @@ class PdfBackend:
         insert: tuple[float, float],
         char_height: float = 3.0,
         rotation: float = 0.0,
+        center_across: bool = False,
     ) -> None:
         """
         Draw multiline text with optional rotation.
@@ -209,6 +210,8 @@ class PdfBackend:
 
         Args:
             rotation: Degrees CCW. 90 = vertical text (bottom-to-top).
+            center_across: If True, center text block perpendicular to text
+                direction (matches DXF MIDDLE_LEFT attachment_point).
         """
         c = self._canvas
         font_size = char_height * mm  # Convert mm to points
@@ -232,11 +235,21 @@ class PdfBackend:
             c.translate(x_pt, y_pt)
             c.rotate(rotation)
 
-            # Draw lines at local origin
-            local_y = -font_size  # First line offset
+            ls_pt = line_spacing * mm
+            if center_across:
+                # Center text block across rotation axis (MIDDLE_LEFT equivalent).
+                # Total block extent in local_y: from first baseline-font_size to
+                # last baseline. N lines: first at -fs, last at -fs-(N-1)*ls.
+                # Block spans [-fs, -(N-1)*ls] with size = fs + (N-1)*ls.
+                # Center offset = block_size/2 from -fs → start at -fs + block/2.
+                n = len(lines)
+                block = font_size + (n - 1) * ls_pt
+                local_y = -font_size + block / 2
+            else:
+                local_y = -font_size  # TOP_LEFT: first line offset
             for line in lines:
                 c.drawString(0, local_y, line)
-                local_y -= line_spacing * mm
+                local_y -= ls_pt
         else:
             # Non-rotated (fast path)
             y_draw = y_pt - font_size

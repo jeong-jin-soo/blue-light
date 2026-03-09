@@ -90,6 +90,7 @@ class DrawingBackend(Protocol):
         insert: tuple[float, float],
         char_height: float = 3.0,
         rotation: float = 0.0,
+        center_across: bool = False,
     ) -> None:
         """
         Draw multiline text.

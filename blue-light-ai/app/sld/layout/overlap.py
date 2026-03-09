@@ -380,6 +380,16 @@ def _identify_groups(
                 g.circuit_id_idx = i
                 break
 
+    # Step 4b: Set is_spare flag from circuit_id (SP prefix → SPARE circuit)
+    # This is needed because Step 2 is disabled — SPARE circuits are now
+    # captured by Step 1 (breaker_block) but need is_spare for downstream
+    # logic (cable leader line exclusion, width calculation, etc.)
+    for g in groups:
+        if g.circuit_id_idx is not None:
+            cid = (components[g.circuit_id_idx].circuit_id or "").upper()
+            if cid.startswith("SP"):
+                g.is_spare = True
+
     # Step 5: Match vertical circuit name LABELs (at tap_x, rotation=90)
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
@@ -878,8 +888,12 @@ def _add_cable_leader_lines(
 
     # Collect non-spare groups with cable annotation, tagged by row busbar_y
     cable_entries: list[tuple[float, float, str]] = []  # (row_busbar_y, tap_x, cable_spec)
+    spare_tap_xs: list[float] = []  # SPARE circuit positions (for leader boundary)
     for g in groups:
-        if g.is_spare or g.breaker_idx is None:
+        if g.is_spare:
+            spare_tap_xs.append(g.tap_x)
+            continue
+        if g.breaker_idx is None:
             continue
         comp = layout_result.components[g.breaker_idx]
         if comp.cable_annotation:
@@ -922,25 +936,49 @@ def _add_cable_leader_lines(
             leftmost_x = tap_xs[0]
             rightmost_x = tap_xs[-1]
 
-            # Determine text placement direction
-            # First group → left, last group → right,
-            # middle groups → alternate (even index left, odd right)
-            if gi == 0:
-                text_on_left = True
-            elif gi == len(group_keys) - 1:
-                text_on_left = False
-            else:
-                text_on_left = (gi % 2 == 0)
-
             leader_extension = config.leader_extension
             bend_height = config.leader_bend_height
 
+            # Compute safe extension limits (don't extend into SPARE or adjacent groups)
+            _safe_left = config.min_x
+            _safe_right = config.max_x
+            # Clamp to SPARE positions (leave gap for SPARE labels)
+            _SPARE_GAP = 5.0  # mm gap before SPARE circuit
+            for sx in spare_tap_xs:
+                if sx < leftmost_x:
+                    _safe_left = max(_safe_left, sx + _SPARE_GAP)
+                if sx > rightmost_x:
+                    _safe_right = min(_safe_right, sx - _SPARE_GAP)
+            # Clamp to adjacent cable group boundaries
+            all_group_ranges = [(min(txs), max(txs)) for txs in cable_groups.values()]
+            for gj, (g_min, g_max) in enumerate(all_group_ranges):
+                if gj == gi:
+                    continue
+                if g_max < leftmost_x:
+                    _safe_left = max(_safe_left, g_max + 2.0)
+                if g_min > rightmost_x:
+                    _safe_right = min(_safe_right, g_min - 2.0)
+
+            # Determine text placement direction
+            # Multi-group: alternate left/right (first→left, second→right, ...)
+            # Single group: use side with more safe space
+            effective_left = leftmost_x - _safe_left
+            effective_right = _safe_right - rightmost_x
+            if len(group_keys) == 1:
+                text_on_left = effective_left >= effective_right
+            else:
+                text_on_left = (gi % 2 == 0)  # 0→left, 1→right, 2→left, ...
+
+            # Extend leader into safe space; when tight, use half the available gap
+            # to separate cable text from both circuit labels and SPARE labels
             if text_on_left:
-                leader_start_x = max(leftmost_x - leader_extension, config.min_x)
+                ext = min(leader_extension, effective_left)
+                leader_start_x = leftmost_x - ext
                 leader_end_x = rightmost_x
             else:
+                ext = min(leader_extension, effective_right)
                 leader_start_x = leftmost_x
-                leader_end_x = min(rightmost_x + leader_extension, config.max_x)
+                leader_end_x = rightmost_x + ext
 
             # Horizontal leader line
             layout_result.connections.append((

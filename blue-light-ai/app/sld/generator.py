@@ -467,8 +467,6 @@ class SldGenerator:
         _breaker_block_entries: list[tuple[int, object]] = []
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block":
-                if (comp.breaker_type_str or "").upper() == "ISOLATOR":
-                    continue
                 _breaker_block_entries.append((idx, comp))
         _breaker_block_entries.sort(key=lambda t: t[1].x)
 
@@ -508,13 +506,16 @@ class SldGenerator:
 
         for comp_idx, comp in enumerate(layout_result.components):
             if comp.symbol_name == "LABEL":
-                # Text-only component
+                # Text-only component — center_across aligns text block
+                # center on conductor (1 line: centered, 2 lines: midpoint)
                 backend.set_layer("SLD_ANNOTATIONS")
+                _label_ch = 2.8
                 backend.add_mtext(
                     comp.label,
                     insert=(comp.x, comp.y),
-                    char_height=2.8,
+                    char_height=_label_ch,
                     rotation=comp.rotation,
+                    center_across=True,
                 )
                 count += 1
 
@@ -594,16 +595,6 @@ class SldGenerator:
                 count += 1
 
             else:
-                # ISOLATOR sub-circuits: skip breaker symbol entirely
-                # (device box is drawn post-resolve in _add_isolator_device_symbols)
-                is_isolator_subcircuit = (
-                    comp.label_style == "breaker_block"
-                    and (comp.breaker_type_str or "").upper() == "ISOLATOR"
-                )
-                if is_isolator_subcircuit:
-                    count += 1
-                    continue
-
                 # Symbol (breaker, meter, earth, CT, etc.)
                 symbol = self._get_symbol(comp.symbol_name)
                 if symbol:
@@ -660,7 +651,8 @@ class SldGenerator:
 
                     if comp.label_style == "breaker_block":
                         # LEW-style stacked breaker label block
-                        # ISOLATOR circuits: no breaker label per DXF reference
+                        # ISOLATOR circuits: MCB symbol drawn but no breaker label
+                        # (reference DWG shows only DP ISOL device box + description)
                         is_isolator = (comp.breaker_type_str or "").upper() == "ISOLATOR"
                         is_ditto = comp_idx in ditto_breaker_indices
                         if not is_isolator:
@@ -827,7 +819,9 @@ class SldGenerator:
         if comp.poles:
             info_items.append(comp.poles)  # e.g., "SPN"
         if comp.breaker_type_str:
-            info_items.append(comp.breaker_type_str)  # e.g., "MCB" (no characteristic suffix)
+            # ISOLATOR circuits render MCB symbol at busbar — label shows "MCB"
+            _display_type = "MCB" if comp.breaker_type_str.upper() == "ISOLATOR" else comp.breaker_type_str
+            info_items.append(_display_type)
         if comp.fault_kA:
             info_items.append(f"{comp.fault_kA}kA")  # e.g., "6kA"
 
