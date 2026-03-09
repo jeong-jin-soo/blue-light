@@ -380,14 +380,13 @@ def _identify_groups(
                 g.circuit_id_idx = i
                 break
 
-    # Step 4b: Set is_spare flag from circuit_id (SP prefix → SPARE circuit)
-    # This is needed because Step 2 is disabled — SPARE circuits are now
-    # captured by Step 1 (breaker_block) but need is_spare for downstream
-    # logic (cable leader line exclusion, width calculation, etc.)
+    # Step 4b: Set is_spare flag from breaker label (circuit name == "SPARE")
+    # In 3-phase layouts, SPARE circuit IDs follow phase rotation (L2S3, L3P6)
+    # instead of SP1/SP2, so we detect SPARE by the circuit name, not the ID.
     for g in groups:
-        if g.circuit_id_idx is not None:
-            cid = (components[g.circuit_id_idx].circuit_id or "").upper()
-            if cid.startswith("SP"):
+        if g.breaker_idx is not None:
+            label = (components[g.breaker_idx].label or "").upper()
+            if label == "SPARE":
                 g.is_spare = True
 
     # Step 5: Match vertical circuit name LABELs (at tap_x, rotation=90)

@@ -322,8 +322,48 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
                 ids.append(f"P{ph_idx}")
         else:  # three_phase — round-robin phase distribution
             if cat == "spare":
-                sp_idx += 1
-                ids.append(f"SP{sp_idx}")
+                # SPARE must follow the phase rotation of its section
+                # (LEW guide: SPAREs occupy busbar phase positions, not separate SP IDs)
+                # Determine which section this SPARE belongs to by looking at
+                # the nearest preceding non-spare/non-isolator category
+                prev_section = "power"  # default
+                for j in range(i - 1, -1, -1):
+                    if categories[j] in ("lighting", "power", "heater"):
+                        prev_section = categories[j]
+                        break
+                    if categories[j] == "user_id" and user_ids[j]:
+                        # Infer section from circuit ID: L1S→lighting, L1P→power
+                        _uid = user_ids[j].upper()
+                        if re.match(r"^L[123]S", _uid):
+                            prev_section = "lighting"
+                        else:
+                            prev_section = "power"
+                        break
+
+                # Find next available phase slot by analyzing already-assigned IDs
+                # (handles both user-provided and auto-generated IDs correctly)
+                sec_char = "S" if prev_section == "lighting" else "P"
+                _sec_re = re.compile(r"^L([123])" + sec_char + r"(\d+)$", re.IGNORECASE)
+                present = set()  # (phase, num) tuples
+                for j in range(len(ids)):
+                    m = _sec_re.match(ids[j])
+                    if m:
+                        present.add((int(m.group(1)), int(m.group(2))))
+                max_num = max((n for _, n in present), default=1)
+                # Fill missing phases for max_num first, then next number
+                assigned = False
+                for n in range(max_num, max_num + 10):
+                    for p in [1, 2, 3]:
+                        if (p, n) not in present:
+                            ids.append(f"L{p}{sec_char}{n}")
+                            present.add((p, n))  # track for next SPARE
+                            assigned = True
+                            break
+                    if assigned:
+                        break
+                if not assigned:
+                    # Fallback (should not happen)
+                    ids.append(f"L1{sec_char}{max_num + 1}")
             elif cat == "isolator":
                 isol_idx += 1
                 ids.append(f"ISOL {isol_idx}")
