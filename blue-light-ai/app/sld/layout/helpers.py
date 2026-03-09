@@ -423,12 +423,14 @@ def _place_sub_circuits_upward(
         else:
             circuit_id = f"C{global_idx + 1}"
 
-        # Circuit ID box at busbar tap point (small rectangle with ID text)
+        # Circuit ID label at busbar tap point (vertical text, matching reference DWG)
+        # Positioned above fan-out zone (_FAN_HEIGHT=2.5mm) to avoid overlap
         result.components.append(PlacedComponent(
             symbol_name="CIRCUIT_ID_BOX",
             x=tap_x,
-            y=busbar_y + 2,
+            y=busbar_y + 3.5,
             circuit_id=circuit_id,
+            rotation=90.0,
         ))
 
         # Determine poles early (needed for conductor count tick marks and breaker)

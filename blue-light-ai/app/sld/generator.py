@@ -561,12 +561,13 @@ class SldGenerator:
                 count += 1
 
             elif comp.symbol_name == "CIRCUIT_ID_BOX":
-                # Circuit ID text at busbar tap point (no box)
+                # Circuit ID text at busbar tap point (vertical, matching reference DWG)
                 backend.set_layer("SLD_ANNOTATIONS")
                 backend.add_mtext(
                     comp.circuit_id,
-                    insert=(comp.x - 3, comp.y + 5),
+                    insert=(comp.x + 1.5, comp.y),
                     char_height=2.2,
+                    rotation=90.0,
                 )
                 count += 1
 

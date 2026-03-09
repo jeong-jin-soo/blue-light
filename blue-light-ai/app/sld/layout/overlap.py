@@ -97,10 +97,10 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
     if name == "BUSBAR":
         return None
 
-    # Special: CIRCUIT_ID_BOX — plain text label centered on tap_x (no box)
+    # Special: CIRCUIT_ID_BOX — vertical text at tap_x (rotation=90°)
     if name == "CIRCUIT_ID_BOX":
-        text_w = len(comp.circuit_id or "") * _CHAR_W + 2
-        return BoundingBox(x=comp.x - text_w / 2, y=comp.y, width=text_w, height=3)
+        text_h = len(comp.circuit_id or "") * _CHAR_W + 2  # text length → height
+        return BoundingBox(x=comp.x - 1.5, y=comp.y, width=3, height=text_h)
 
     # Special: DB_INFO_BOX extends downward from comp.y
     if name == "DB_INFO_BOX":
@@ -1151,7 +1151,7 @@ def _add_phase_fanout(
             by = g.row_busbar_y if g.row_busbar_y else busbar_ys[0]
             rows.setdefault(row_idx, []).append((g, by))
 
-    _FAN_HEIGHT = 7.0  # mm above busbar where diagonals meet side verticals
+    _FAN_HEIGHT = 2.5  # mm above busbar where diagonals meet side verticals
 
     connections = layout_result.connections
 
