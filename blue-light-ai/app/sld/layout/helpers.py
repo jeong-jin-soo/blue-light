@@ -26,6 +26,49 @@ from app.sld.locale import SG_LOCALE
 logger = logging.getLogger(__name__)
 
 
+def _normalize_load_quantity(text: str) -> str:
+    """Normalize quantity prefix per Singapore LEW convention.
+
+    Rules (LEW guide Rule 2):
+    - Singular: "1 no." (e.g., "1 no. 20A DP isolator")
+    - Plural:   "2 nos." (e.g., "2 nos. 13A twin S/S/O")
+    - If quantity is missing, assume 1 unit and prepend "1 no."
+
+    Examples:
+        "4 Nos 13A TWIN S/S/O"  → "4 nos. 13A TWIN S/S/O"
+        "1 Nos LIGHTS"          → "1 no. LIGHTS"
+        "20A DP ISOLATOR"       → "1 no. 20A DP ISOLATOR"
+        "SPARE"                 → "SPARE" (unchanged)
+    """
+    if not text or text.upper() == "SPARE":
+        return text
+
+    # Pattern: number + optional unit word (Nos/No/nos/no/pcs/units etc.)
+    m = re.match(
+        r"^(\d+)\s*(nos?\.?|units?|pcs?|sets?)\s+(.+)$",
+        text, re.IGNORECASE,
+    )
+    if m:
+        qty = int(m.group(1))
+        rest = m.group(3)
+        unit = "no." if qty == 1 else "nos."
+        return f"{qty} {unit} {rest}"
+
+    # Number at start without unit word (e.g., "2 LIGHTS")
+    m2 = re.match(r"^(\d+)\s+(.+)$", text)
+    if m2:
+        qty = int(m2.group(1))
+        rest = m2.group(2)
+        # Don't treat cable-like patterns as quantities (e.g., "2 x 1C ...")
+        if rest.lower().startswith("x "):
+            return text
+        unit = "no." if qty == 1 else "nos."
+        return f"{qty} {unit} {rest}"
+
+    # No quantity at all — prepend "1 no."
+    return f"1 no. {text}"
+
+
 def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
     """Wrap a long label into max_lines lines using \\P separators.
 
@@ -568,11 +611,14 @@ def _place_sub_circuits_upward(
         sc_room = str(circuit.get("room", "") or circuit.get("location", "") or circuit.get("area", "")).strip()
 
         # Priority: load description > circuit name
-        # Reference DWG shows load descriptions (e.g., "1 Nos LIGHTS") above circuits
+        # Reference DWG shows load descriptions (e.g., "1 no. LIGHTS") above circuits
         if sc_load_desc and sc_load_desc.lower() != "spare":
             sc_display_name = sc_load_desc
         else:
             sc_display_name = sc_name
+        # Normalize quantity prefix (LEW guide Rule 2):
+        # "4 Nos ..." → "4 nos. ...", missing qty → "1 no. ..."
+        sc_display_name = _normalize_load_quantity(sc_display_name)
         if sc_room:
             # Append room as suffix with em dash separator
             sc_display_name = f"{sc_display_name} — {sc_room}"
