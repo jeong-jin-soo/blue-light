@@ -663,7 +663,14 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
 
 
 def _place_unit_isolator(ctx: _LayoutContext) -> None:
-    """Place unit isolator (for ct_meter, landlord supply, or explicitly specified)."""
+    """Place unit isolator (for ct_meter, landlord supply, or explicitly specified).
+
+    IMPORTANT: When metering is set (meter board is drawn), the meter board
+    already includes an internal ISOLATOR symbol. Adding a second unit
+    isolator on the vertical cable would duplicate it. Skip in that case.
+    Reference: 63A TPN SLD 14 — meter board has 63A 4P ISOLATOR inside,
+    no extra isolator on the cable to DB box.
+    """
     result = ctx.result
     config = ctx.config
     cx = ctx.cx
@@ -675,6 +682,12 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
     requirements = ctx.requirements
 
     # -- 3. Unit Isolator (for ct_meter, landlord supply, or explicitly specified) --
+    # When meter board is drawn (metering is set), it already contains an
+    # internal ISOLATOR. Do NOT add a second one on the cable above.
+    if metering:
+        ctx.y = y
+        return
+
     _iso_w = 8.0  # Isolator symbol width (from real_symbols) — needed for centering
     isolator_rating = requirements.get("isolator_rating", 0)
     isolator_label_extra = requirements.get("isolator_label", "")
