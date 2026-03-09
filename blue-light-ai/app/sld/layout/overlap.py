@@ -394,11 +394,9 @@ def _identify_groups(
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
             continue
-        # SPARE labels are now matched as regular name labels (no longer
-        # handled as group anchors since Step 2 is disabled).
+        # Match ALL groups including SPARE — so _rebuild_from_positions can
+        # update the LABEL x-coordinate when tap_x shifts.
         for g in groups:
-            if g.is_spare:
-                continue
             if abs(comp.x - g.tap_x) < 6.0 and g.name_label_idx is None:
                 # Y-proximity: name label is above breaker tail
                 if g.breaker_idx is not None:
