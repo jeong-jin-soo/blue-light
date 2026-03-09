@@ -526,12 +526,35 @@ def _place_sub_circuits_upward(
 
         # Tail from breaker top (extending upward)
         breaker_top_y = sc_y + sc_cb_h + config.stub_len
-        tail_end_y = breaker_top_y + config.tail_length  # Conductor tail above breaker
+        # Dynamic tail: extend conductor past cable leader line so ticker marks
+        # intersect a visible conductor line (reference DWG pattern).
+        # Leader Y (from busbar) = db_box_top_offset + leader_margin_above_db
+        _leader_y_from_busbar = (config.db_box_busbar_margin + config.mcb_h
+                                 + config.stub_len + config.db_box_tail_margin
+                                 + config.db_box_label_margin
+                                 + config.leader_margin_above_db)
+        _breaker_top_from_busbar = (config.busbar_to_breaker_gap + sc_cb_h
+                                    + config.stub_len)
+        _needed_tail = _leader_y_from_busbar - _breaker_top_from_busbar + 5  # 5mm past leader
+        effective_tail = max(config.tail_length, _needed_tail)
+        tail_end_y = breaker_top_y + effective_tail
 
-        # Connection from breaker top to tail end
-        result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
+        # ISOLATOR circuits: reserve space for device box above conductor
+        # (DP ISOL symbol: 4.5mm square + L-stub, drawn post-resolve)
+        _ISOL_DEVICE_BOX_H = 3.8  # mm — device box height
+        _isol_extra = _ISOL_DEVICE_BOX_H if sc_breaker_type == "ISOLATOR" else 0.0
+        conductor_top_y = tail_end_y + _isol_extra
 
-        # Circuit name label (vertical text, above the tail)
+        # ISOLATOR: no breaker symbol drawn, so merge busbar→tail into one line
+        # (replace the busbar→sc_y stub with a single busbar→tail_end_y line)
+        if sc_breaker_type == "ISOLATOR":
+            # Remove the short stub (busbar→sc_y) added above, replace with full line
+            result.connections[-1] = ((tap_x, busbar_y), (tap_x, tail_end_y))
+        else:
+            # Normal breakers: conductor from breaker top to tail end
+            result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
+
+        # Circuit name label (vertical text, above the tail / device box)
         # Circuit ID is already shown in the CIRCUIT_ID_BOX at the busbar tap
         # Build display label: load description + room info (reference DWG pattern)
         # e.g., "2 Nos 13A TWIN S/S/O — BEDROOM 1"
@@ -547,17 +570,19 @@ def _place_sub_circuits_upward(
         if sc_room:
             # Append room as suffix with em dash separator
             sc_display_name = f"{sc_display_name} — {sc_room}"
-        # Wrap long labels into multiline (\\P) to fit vertical space
-        # Dynamically compute max_chars based on available height above label
+        # Wrap long labels into multiline (\\P) to fit vertical space.
+        # Prefer 2-line labels (max 25 chars/line) for compact, readable layout;
+        # clamp further if label would exceed drawing border.
         _CHAR_ADVANCE = 1.7  # approx mm per character for char_height 2.8
-        label_y = tail_end_y + 2
+        _PREFERRED_MAX_CHARS = 25  # Prefer 2-line wrapping for long labels
+        label_y = conductor_top_y + 2
         avail_h = config.max_y - label_y
-        dyn_max = max(15, int(avail_h / _CHAR_ADVANCE))
+        dyn_max = max(15, min(_PREFERRED_MAX_CHARS, int(avail_h / _CHAR_ADVANCE)))
         sc_display_name = _wrap_label(sc_display_name, max_chars=dyn_max)
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=tap_x,
-            y=tail_end_y + 2,
+            y=conductor_top_y + 2,
             label=sc_display_name,
             rotation=90.0,
         ))

@@ -11,10 +11,79 @@ Contains all dataclasses used by the layout engine:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# -- Cable string normalizer (parse → canonical re-format) --
+
+_UNIT_PAT = r'(?:mm[²2]|sqmm|mmsq)'
+
+_CABLE_MAIN_RE = re.compile(
+    r'^\s*'
+    r'(?:(\d+)\s*x\s*)?'                       # group 1: count (optional)
+    r'(\d+)\s*C\s+'                             # group 2: cores
+    r'([\d.]+)\s*' + _UNIT_PAT + r'\s+'         # group 3: size + unit
+    r'([\w/]+?)'                                # group 4: cable type (non-greedy)
+    r'(?:\s+CABLE)?'                            # optional CABLE keyword
+    r'\s*$',
+    re.IGNORECASE,
+)
+
+_CPC_RE = re.compile(
+    r'^\s*'
+    r'([\d.]+)\s*' + _UNIT_PAT + r'\s*'         # group 1: CPC size + unit
+    r'(?:(PVC|XLPE)\s+)?'                        # group 2: CPC type (optional)
+    r'CPC'                                       # CPC keyword
+    r'(?:\s+IN\s+(.+?))?'                        # group 3: method (optional)
+    r'\s*$',
+    re.IGNORECASE,
+)
+
+
+def _parse_cable_string(s: str) -> dict | None:
+    """Parse cable spec string into dict for canonical re-formatting.
+
+    Handles common Singapore LEW cable formats:
+        "2 x 1C 1.5mm² PVC + 1.5mm² CPC"
+        "2 x 1C 1.5sqmm PVC + 1.5sqmm PVC CPC IN TRUNKING/CONDUIT"
+        "1C 2.5sqmm PVC/PVC + 2.5sqmm PVC CPC IN METAL TRUNKING"
+
+    Returns None for non-standard formats (caller returns string as-is).
+    """
+    # Split on '+' to separate main cable from CPC section
+    parts = s.split('+', 1)
+    main_part = parts[0].strip()
+    cpc_part = parts[1].strip() if len(parts) > 1 else ""
+
+    # Strip DXF multiline marker (\P) from CPC part
+    cpc_part = re.sub(r'^\\P\s*', '', cpc_part)
+
+    m = _CABLE_MAIN_RE.match(main_part)
+    if not m:
+        return None
+
+    result: dict = {
+        'size_mm2': m.group(3),
+        'cores': int(m.group(2)),
+        'type': m.group(4),
+    }
+    if m.group(1):
+        result['count'] = int(m.group(1))
+
+    if cpc_part:
+        cm = _CPC_RE.match(cpc_part)
+        if cm:
+            result['cpc_mm2'] = cm.group(1)
+            if cm.group(2):
+                result['cpc_type'] = cm.group(2).upper()
+            if cm.group(3):
+                result['method'] = cm.group(3).strip()
+
+    return result
 
 
 # -- Cable formatting helper --
@@ -30,12 +99,16 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
         [{count} x] {cores}C {size}sqmm {type} + {cpc}sqmm
         {cpc_type} CPC IN {method}
 
+    String inputs are parsed and re-formatted to canonical form so that
+    identical cables from different sources (Excel, template DB, dict)
+    produce the same output string — required for cable leader line grouping.
+
     Args:
         cable_input: str, dict, or None
         multiline: if True, split CPC info to second line (\\P) for incoming cables
 
     Handles:
-    - str: returned as-is
+    - str: parsed → canonical format (falls back to as-is if unparseable)
     - dict: formatted from keys {cores, type, size_mm2, cpc_mm2, cpc_type, method, count}
     - None/empty: returns empty string
     """
@@ -43,6 +116,9 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
         return ""
 
     if isinstance(cable_input, str):
+        parsed = _parse_cable_string(cable_input)
+        if parsed:
+            return format_cable_spec(parsed, multiline=multiline)
         return cable_input
 
     if isinstance(cable_input, dict):
@@ -57,14 +133,15 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
         cpc_type = cable_input.get("cpc_type", "PVC")
         method = cable_input.get("method", "")
         if size:
-            # Singapore LEW standard: "4x16mm²/1C PVC/PVC CABLE + 16mm² CPC IN METAL TRUNKING"
+            # Singapore LEW DWG standard:
+            #   "2 x 1C 1.5sqmm PVC/PVC + 1.5sqmm PVC CPC IN METAL TRUNKING"
             if count and int(count) > 1:
-                base = f"{count}x{size}mm²/{cores}C {cable_type} CABLE"
+                base = f"{count} x {cores}C {size}sqmm {cable_type}"
             else:
-                base = f"{cores}C {size}mm² {cable_type} CABLE"
+                base = f"{cores}C {size}sqmm {cable_type}"
             if cpc:
                 sep = " +\\P" if multiline else " + "
-                base += f"{sep}{cpc}mm² CPC"
+                base += f"{sep}{cpc}sqmm {cpc_type} CPC"
                 if method:
                     base += f" IN {method}"
             elif method:
@@ -132,7 +209,7 @@ class LayoutConfig:
 
     # Sub-circuit vertical offsets (derived from real LEW samples)
     busbar_to_breaker_gap: float = 12.0   # Gap from busbar to sub-circuit breaker bottom
-    tail_length: float = 8.0              # Conductor tail above breaker — short to fit multi-row
+    tail_length: float = 8.0              # Conductor tail minimum — dynamically extended past leader line
     db_box_busbar_margin: float = 8.0     # DB box edge offset above busbar
     db_box_tail_margin: float = 4.0       # DB box extends above breaker+stub by this
     db_box_label_margin: float = 8.0      # DB box extends above tail for label area

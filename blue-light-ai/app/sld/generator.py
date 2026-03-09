@@ -579,7 +579,17 @@ class SldGenerator:
                 count += 1
 
             else:
-                # Symbol (breaker, meter, earth, isolator, CT, etc.)
+                # ISOLATOR sub-circuits: skip breaker symbol entirely
+                # (device box is drawn post-resolve in _add_isolator_device_symbols)
+                is_isolator_subcircuit = (
+                    comp.label_style == "breaker_block"
+                    and (comp.breaker_type_str or "").upper() == "ISOLATOR"
+                )
+                if is_isolator_subcircuit:
+                    count += 1
+                    continue
+
+                # Symbol (breaker, meter, earth, CT, etc.)
                 symbol = self._get_symbol(comp.symbol_name)
                 if symbol:
                     # Check for horizontal drawing mode (rotation=90 used for meter board)
