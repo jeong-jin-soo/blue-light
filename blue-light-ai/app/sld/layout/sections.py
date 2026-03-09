@@ -887,14 +887,18 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         unit_number = str(application_info.get("unit_number", "")).strip()
 
     db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva}KVA AT {voltage}V"
+
+    # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
+    db_location_text = ""
     if unit_number:
-        db_info_text += f"\\P({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
+        db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
     elif application_info and application_info.get("address"):
-        db_info_text += f"\\PLOCATED AT {application_info['address']}"
+        db_location_text = f"(LOCATED AT {application_info['address']})"
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
     ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"
     ctx.db_info_text = db_info_text
+    ctx.db_location_text = db_location_text
 
     # Busbar rating label — left-aligned below busbar (per reference DWG)
     busbar_label_x = bus_start_x + 3  # 3mm from busbar left edge
@@ -1034,6 +1038,15 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
             y=text_anchor_y + 8,  # Fixed to original position, not expanded box bottom
             label=ctx.db_info_label,
             rating=ctx.db_info_text,
+        ))
+
+    # Unit location text — BELOW the DB box (outside), per LEW guide Rule 9
+    if ctx.db_location_text:
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=db_box_left + 6,
+            y=db_box_start_y - 3,  # 3mm below DB box bottom edge
+            label=ctx.db_location_text,
         ))
 
     return db_box_right

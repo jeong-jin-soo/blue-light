@@ -364,6 +364,7 @@ class _LayoutContext:
     db_box_start_y: float = 0
     db_info_label: str = ""      # e.g. "40A DB"
     db_info_text: str = ""       # e.g. "APPROVED LOAD: 9.2KVA AT 230V"
+    db_location_text: str = ""   # e.g. "LOCATED AT BLK 824 ..." (below DB box)
 
     # Cable extension mode (no meter board / no isolator)
     is_cable_extension: bool = False
