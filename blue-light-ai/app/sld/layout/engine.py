@@ -174,7 +174,7 @@ def compute_layout(
     ctx.result.spine_x = cx
 
     resolve_overlaps(ctx.result, ctx.config)
-    _add_phase_fanout(ctx.result, ctx.config, ctx.requirements.get("supply_type", ""))
+    _add_phase_fanout(ctx.result, ctx.config, ctx.supply_type)
     _add_cable_leader_lines(ctx.result, ctx.config)
     _add_isolator_device_symbols(ctx.result, ctx.config)
     db_box_right = _place_db_box(ctx, busbar_y_row)

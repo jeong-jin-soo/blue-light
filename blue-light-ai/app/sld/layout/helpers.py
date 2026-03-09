@@ -131,8 +131,12 @@ def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list
     result: list[dict] = []
     for section in sections:
         result.extend(section)
-        # Remove trailing user-specified spares to recount
-        # (they'll be replaced by auto-padding if needed)
+        # Find last non-spare circuit's breaker specs for auto-SPARE inheritance
+        _last_non_spare: dict = {}
+        for c in reversed(section):
+            if not _is_spare(c):
+                _last_non_spare = c
+                break
         non_spare_count = sum(1 for c in section if not _is_spare(c))
         user_spare_count = sum(1 for c in section if _is_spare(c))
         total = non_spare_count + user_spare_count
@@ -140,7 +144,16 @@ def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list
         if remainder != 0:
             pad_count = 3 - remainder
             for _ in range(pad_count):
-                result.append({"name": "SPARE", "_auto_spare": True})
+                # Auto-SPAREs inherit breaker specs from last non-spare circuit
+                # so they join the same ditto group and don't show a separate
+                # breaker annotation (e.g., "32A" default).
+                auto_spare: dict = {"name": "SPARE", "_auto_spare": True}
+                for key in ("breaker_type", "breaker_rating", "breaker_poles",
+                            "fault_kA", "breaker_characteristic", "cable",
+                            "cable_size", "cable_type", "cable_cores"):
+                    if key in _last_non_spare:
+                        auto_spare[key] = _last_non_spare[key]
+                result.append(auto_spare)
 
     return result
 
@@ -417,22 +430,6 @@ def _place_sub_circuits_upward(
             y=busbar_y + 2,
             circuit_id=circuit_id,
         ))
-
-        # -- Spare circuit: no breaker, just empty tap + "SPARE" label --
-        if "spare" in sc_name.lower():
-            # Short vertical line from busbar (upward, past circuit ID box)
-            spare_top_y = busbar_y + 15
-            result.connections.append(((tap_x, busbar_y), (tap_x, spare_top_y)))
-            result.junction_dots.append((tap_x, busbar_y))
-            # "SPARE" label (vertical text, above the tap)
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=tap_x,
-                y=spare_top_y + 2,
-                label=SG_LOCALE.circuit.spare,
-                rotation=90.0,
-            ))
-            continue
 
         # Determine poles early (needed for conductor count tick marks and breaker)
         sc_breaker_poles_raw = circuit.get("breaker_poles")

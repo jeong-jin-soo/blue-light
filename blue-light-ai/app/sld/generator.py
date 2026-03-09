@@ -462,17 +462,31 @@ class SldGenerator:
         # ditto groups reset when circuit category changes.
         # Reference DWG: P1(B20A) labeled, P2-P4 ditto, H5(B20A) labeled again, H6 ditto
         breaker_spec_groups: dict[str, list[int]] = {}
+        # Sort breaker_block components by x position (left→right) so SPARE
+        # circuits correctly inherit the category prefix of their section.
+        _breaker_block_entries: list[tuple[int, object]] = []
         for idx, comp in enumerate(layout_result.components):
             if comp.label_style == "breaker_block":
-                # ISOLATOR circuits: excluded from ditto grouping (no breaker label at all)
                 if (comp.breaker_type_str or "").upper() == "ISOLATOR":
                     continue
-                # Extract category prefix from circuit_id (S, P, H, SP, L1S, L1P, etc.)
-                cid = comp.circuit_id or ""
-                prefix_match = re.match(r"([A-Z]+)", cid)
-                category_prefix = prefix_match.group(1) if prefix_match else "X"
-                sig = f"{category_prefix}|{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
-                breaker_spec_groups.setdefault(sig, []).append(idx)
+                _breaker_block_entries.append((idx, comp))
+        _breaker_block_entries.sort(key=lambda t: t[1].x)
+
+        _last_section_prefix = "X"
+        for idx, comp in _breaker_block_entries:
+            # Extract category prefix from circuit_id (S, P, H, SP, L1S, L1P, etc.)
+            cid = comp.circuit_id or ""
+            prefix_match = re.match(r"([A-Z]+)", cid)
+            category_prefix = prefix_match.group(1) if prefix_match else "X"
+            # SPARE circuits (circuit_id "SP1", "SP2", ...): inherit the
+            # category prefix from the preceding section so they join the
+            # same ditto group instead of creating a separate one.
+            if category_prefix == "SP":
+                category_prefix = _last_section_prefix
+            else:
+                _last_section_prefix = category_prefix
+            sig = f"{category_prefix}|{comp.breaker_characteristic}|{comp.rating}|{comp.poles}|{comp.breaker_type_str}|{comp.fault_kA}"
+            breaker_spec_groups.setdefault(sig, []).append(idx)
 
         # For groups with 2+ identical specs, only the FIRST (leftmost) gets full label
         # Rest use chain arrow pattern: arrow→arc→arrow→arc (connected)

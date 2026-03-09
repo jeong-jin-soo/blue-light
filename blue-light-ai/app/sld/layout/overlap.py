@@ -268,15 +268,10 @@ def _identify_groups(
             g = SubCircuitGroup(tap_x=tap_x, breaker_idx=i)
             groups.append(g)
 
-    # Step 2: Create groups from SPARE labels
+    # Step 2: DISABLED — all SPARE circuits now render with MCB (breaker_block)
+    # and are captured by Step 1. The old SPARE-label-only fallback is no longer
+    # needed. Keeping Step 2 caused duplicate groups and 3-phase triplet corruption.
     _SPARE = SG_LOCALE.circuit.spare
-    for i, comp in enumerate(components):
-        if (comp.symbol_name == "LABEL"
-                and abs(comp.rotation - 90.0) < 0.1
-                and comp.label.strip().upper() == _SPARE):
-            tap_x = comp.x  # SPARE label placed at tap_x
-            g = SubCircuitGroup(tap_x=tap_x, spare_label_idx=i, is_spare=True)
-            groups.append(g)
 
     if not groups:
         return [], 0.0
@@ -389,8 +384,8 @@ def _identify_groups(
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
             continue
-        if comp.label.strip().upper() == _SPARE:
-            continue  # Already handled as group anchor
+        # SPARE labels are now matched as regular name labels (no longer
+        # handled as group anchors since Step 2 is disabled).
         for g in groups:
             if g.is_spare:
                 continue
