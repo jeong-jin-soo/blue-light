@@ -69,6 +69,82 @@ def _next_standard_rating(current: int) -> int:
     return standard[-1]
 
 
+def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list[dict]:
+    """Auto-pad SPARE circuits to complete 3-phase triplets.
+
+    In a TPN distribution board, every busbar position is allocated to a
+    specific phase (L1, L2, L3).  Circuits are grouped in consecutive
+    triplets.  When the last group in a section doesn't fill all 3
+    positions, the remaining positions become SPARE.
+
+    Reference: 63A TPN SLD 14 — 27-way DB (9 lighting + 18 power).
+
+    Section detection: detects boundary when breaker rating changes
+    (e.g., 10A→20A) or circuit category changes (lighting→power/isolator).
+
+    Only applies to three_phase supply; single_phase returns as-is.
+    """
+    if supply_type != "three_phase" or not sub_circuits:
+        return sub_circuits
+
+    # --- Detect section boundaries ---
+    # A section boundary occurs when the "type" changes:
+    #   lighting → non-lighting, or non-lighting → lighting
+    def _is_lighting(c: dict) -> bool:
+        name = str(c.get("name", "") or c.get("circuit_name", "")).lower()
+        cid = str(c.get("circuit_id", "")).upper()
+        if "spare" in name:
+            return False  # User-added spare — don't classify
+        # Explicit circuit_id with S prefix = lighting
+        if re.match(r"^L[123]S", cid):
+            return True
+        return any(kw in name for kw in ("light", "lamp", "led"))
+
+    def _is_spare(c: dict) -> bool:
+        name = str(c.get("name", "") or c.get("circuit_name", "")).lower()
+        return "spare" in name
+
+    # Split into sections: consecutive runs of same type (lighting vs non-lighting)
+    # User-specified SPAREs at section boundaries are preserved.
+    sections: list[list[dict]] = []
+    current_section: list[dict] = []
+    current_is_lighting: bool | None = None
+
+    for c in sub_circuits:
+        if _is_spare(c):
+            # Spare belongs to whichever section it's adjacent to
+            current_section.append(c)
+            continue
+        c_lighting = _is_lighting(c)
+        if current_is_lighting is None:
+            current_is_lighting = c_lighting
+        if c_lighting != current_is_lighting:
+            # Section boundary — flush
+            sections.append(current_section)
+            current_section = []
+            current_is_lighting = c_lighting
+        current_section.append(c)
+    if current_section:
+        sections.append(current_section)
+
+    # Pad each section to multiple of 3
+    result: list[dict] = []
+    for section in sections:
+        result.extend(section)
+        # Remove trailing user-specified spares to recount
+        # (they'll be replaced by auto-padding if needed)
+        non_spare_count = sum(1 for c in section if not _is_spare(c))
+        user_spare_count = sum(1 for c in section if _is_spare(c))
+        total = non_spare_count + user_spare_count
+        remainder = total % 3
+        if remainder != 0:
+            pad_count = 3 - remainder
+            for _ in range(pad_count):
+                result.append({"name": "SPARE", "_auto_spare": True})
+
+    return result
+
+
 def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]:
     """
     Pre-assign circuit IDs based on Singapore SLD conventions.
@@ -105,6 +181,9 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     user_ids: list[str | None] = []  # Non-None if name is already a valid ID
 
     for circuit in sub_circuits:
+        # Explicit circuit ID from schedule upload (e.g., "L1S1", "ISOL1")
+        explicit_cid = str(circuit.get("circuit_id", "") or "").strip()
+
         name_raw = str(circuit.get("name", "") or circuit.get("circuit_name", "")) or ""
         name_lower = name_raw.lower()
         breaker_type = str(circuit.get("breaker_type", "") or "").upper()
@@ -118,11 +197,17 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
             user_ids.append(None)
         elif breaker_type == "ISOLATOR" or "isol" in name_lower:
             categories.append("isolator")
-            # Use name as ID if it matches ISOL pattern
-            if _ISOL_ID_RE.match(name_raw.strip()):
+            # Explicit circuit_id takes priority, then name
+            if explicit_cid and _ISOL_ID_RE.match(explicit_cid):
+                user_ids.append(explicit_cid)
+            elif _ISOL_ID_RE.match(name_raw.strip()):
                 user_ids.append(name_raw.strip())
             else:
                 user_ids.append(None)
+        elif explicit_cid and _PHASE_ID_RE.match(explicit_cid):
+            # Explicit circuit ID from schedule (e.g., L1S1, L2P3)
+            categories.append("user_id")
+            user_ids.append(explicit_cid)
         elif _PHASE_ID_RE.match(name_raw.strip()):
             # Name already IS a phase-prefixed circuit ID (e.g., L1S, L2P1)
             # Use it directly — this controls fan-out grouping
@@ -260,10 +345,34 @@ def _place_sub_circuits_upward(
     """Place a row of sub-circuits branching UPWARD from busbar with vertical labels."""
     bus_width = bus_end_x - bus_start_x
 
-    # -- Detect category group boundaries (S→P, P→H, etc.) for extra spacing --
-    group_gap = 6.0  # Extra mm between circuit category groups
-    group_breaks: list[int] = []  # Indices where a new category starts
-    if circuit_ids and len(circuit_ids) > 1:
+    # -- Detect SECTION boundaries for extra spacing --
+    # Only insert a gap at major section transitions (e.g., Lighting→Power).
+    # In a TPN DB, ISOL and SPARE are part of the same triplet as adjacent
+    # circuits, so individual prefix changes (L→ISOL, L→SP) must NOT
+    # trigger a gap.  Section boundary = triplet boundary where the
+    # underlying category changes (S-prefix circuits → P-prefix circuits).
+    group_gap = 6.0  # Extra mm between major sections
+    group_breaks: list[int] = []  # Indices where a new section starts
+    if circuit_ids and len(circuit_ids) >= 6 and supply_type == "three_phase":
+        # Determine the dominant category of each triplet
+        def _triplet_category(start_idx: int) -> str:
+            """Return 'S', 'P', or '' for a triplet starting at start_idx."""
+            for k in range(start_idx, min(start_idx + 3, len(circuit_ids))):
+                cid = circuit_ids[k].upper()
+                m = re.match(r"^L[123]([A-Z])", cid)
+                if m:
+                    return m.group(1)  # 'S' or 'P'
+            return ""
+
+        prev_cat = _triplet_category(0)
+        for t in range(3, len(circuit_ids), 3):
+            cur_cat = _triplet_category(t)
+            if cur_cat and prev_cat and cur_cat != prev_cat:
+                group_breaks.append(t)
+            if cur_cat:
+                prev_cat = cur_cat
+    elif circuit_ids and len(circuit_ids) > 1:
+        # Fallback for single-phase or short lists: original prefix-based detection
         prev_prefix = re.match(r"[A-Za-z]+", circuit_ids[0])
         prev_prefix = prev_prefix.group() if prev_prefix else ""
         for ci in range(1, len(circuit_ids)):

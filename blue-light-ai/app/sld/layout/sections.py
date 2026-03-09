@@ -27,6 +27,7 @@ from app.sld.layout.helpers import (
     _assign_circuit_ids,
     _get_circuit_poles,
     _next_standard_rating,
+    _pad_spares_for_triplets,
     _place_sub_circuits_upward,
     _split_into_rows,
 )
@@ -905,6 +906,10 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     sub_circuits = ctx.sub_circuits
 
     # -- 6. Sub-circuits (branching UPWARD) --
+    # Auto-pad SPAREs to complete 3-phase triplets (before ID assignment)
+    sub_circuits = _pad_spares_for_triplets(sub_circuits, supply_type)
+    ctx.sub_circuits = sub_circuits  # Update context for downstream use
+
     # Pre-assign circuit IDs (S/P for single-phase, L1P1/L2P1 for 3-phase)
     circuit_ids = _assign_circuit_ids(sub_circuits, supply_type)
 

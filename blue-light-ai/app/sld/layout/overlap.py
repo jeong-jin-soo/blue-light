@@ -669,10 +669,35 @@ def _determine_final_positions(
         if abs(offset) > 0.1:
             new_tap_xs = [t + offset for t in new_tap_xs]
 
-    # Clamp all positions to drawing bounds
+    # Fit all positions within drawing bounds while preserving relative spacing.
+    # Individual clamping (max/min per position) destroys uniform spacing in
+    # 3-phase TPN layouts. Instead, shift the entire group together or, if the
+    # span exceeds the available width, apply proportional compression.
     min_tap = config.min_x + _BOUND_MARGIN
     max_tap = config.max_x - _BOUND_MARGIN
-    new_tap_xs = [max(min_tap, min(t, max_tap)) for t in new_tap_xs]
+
+    if len(new_tap_xs) > 1:
+        cur_min = min(new_tap_xs)
+        cur_max = max(new_tap_xs)
+        cur_span = cur_max - cur_min
+        avail_span = max_tap - min_tap
+
+        if cur_span <= avail_span:
+            # Span fits — shift together to stay within bounds
+            if cur_min < min_tap:
+                shift = min_tap - cur_min
+                new_tap_xs = [t + shift for t in new_tap_xs]
+            elif cur_max > max_tap:
+                shift = cur_max - max_tap
+                new_tap_xs = [t - shift for t in new_tap_xs]
+        else:
+            # Span too wide — proportional compression around center
+            center = (cur_min + cur_max) / 2
+            target_center = (min_tap + max_tap) / 2
+            scale = avail_span / cur_span
+            new_tap_xs = [target_center + (t - center) * scale for t in new_tap_xs]
+    elif new_tap_xs:
+        new_tap_xs = [max(min_tap, min(new_tap_xs[0], max_tap))]
 
     return new_tap_xs
 
@@ -990,67 +1015,25 @@ def _build_phase_groups(
     circuits: list[tuple[SubCircuitGroup, float]],
     components: list,
 ) -> list[list[tuple[SubCircuitGroup, float]]]:
-    """Build 3-phase fan-out groups from consecutive circuits based on circuit ID.
+    """Build 3-phase fan-out groups using position-based triplet grouping.
 
-    Scans left-to-right and groups consecutive L1/L2/L3 circuits that share the
-    same suffix. Within a large same-suffix cluster (e.g., L1S L2S L3S L2S L3S),
-    splits into sub-groups at phase sequence resets (phase_num <= prev_phase_num).
+    In a TPN distribution board, every 3 consecutive busbar positions form
+    one physical triplet connected to L1/L2/L3 phases of the comb bar.
+    ALL circuit types participate: regular MCB, ISOLATOR, and SPARE.
 
-    Supports:
-    - Triplets: L1X, L2X, L3X (3 circuits)
-    - Pairs: L1X, L2X or L2X, L3X (2 circuits)
-    - Singles: L1X alone (no fan-out, skipped)
-    ISOLATORs and non-phase circuits break the grouping.
+    Reference: 63A TPN SLD 14 — 27-way DB:
+      Lighting: [L1S1,L2S1,L3S1] [L1S2,L2S2,L3S2] [L1S3,SPARE,SPARE]
+      Power:    [L1P1,L2P1,L3P1] [ISOL1,L2P2,L3P2] [L1P3,L2P3,ISOL2]
+                [L1P4,L2P4,ISOL3] [L1P5,L2P5,L3P5] [L1P6,SPARE,SPARE]
+
+    Returns groups of 2 or 3 circuits (singles are skipped — no fan-out needed).
     """
     groups: list[list[tuple[SubCircuitGroup, float]]] = []
-    i = 0
-    n = len(circuits)
 
-    while i < n:
-        g, by = circuits[i]
-        cid = _get_circuit_id(g, components)
-        phase, suffix = _parse_phase_prefix(cid)
-
-        if not phase:
-            # Not a phase circuit (ISOLATOR, etc.) → skip
-            i += 1
-            continue
-
-        # Collect consecutive circuits with same suffix
-        cluster: list[tuple[SubCircuitGroup, float, str]] = [(g, by, phase)]
-        j = i + 1
-        while j < n:
-            g2, by2 = circuits[j]
-            cid2 = _get_circuit_id(g2, components)
-            phase2, suffix2 = _parse_phase_prefix(cid2)
-            if phase2 and suffix2 == suffix:
-                cluster.append((g2, by2, phase2))
-                j += 1
-            else:
-                break
-
-        # Split cluster into sub-groups at phase sequence resets.
-        # A new sub-group starts when phase_num <= previous phase_num.
-        # E.g., L1,L2,L3,L2,L3 → [L1,L2,L3] + [L2,L3]
-        def _phase_num(ph: str) -> int:
-            return int(ph[1]) if len(ph) >= 2 and ph[1].isdigit() else 0
-
-        sub: list[tuple[SubCircuitGroup, float, str]] = [cluster[0]]
-        for k in range(1, len(cluster)):
-            cur_num = _phase_num(cluster[k][2])
-            prev_num = _phase_num(cluster[k - 1][2])
-            if cur_num <= prev_num:
-                # Phase reset — flush current sub-group
-                if len(sub) >= 2:
-                    groups.append([(c[0], c[1]) for c in sub])
-                sub = [cluster[k]]
-            else:
-                sub.append(cluster[k])
-        # Flush last sub-group
-        if len(sub) >= 2:
-            groups.append([(c[0], c[1]) for c in sub])
-
-        i = j if j > i + 1 else i + 1
+    for i in range(0, len(circuits), 3):
+        chunk = circuits[i:i + 3]
+        if len(chunk) >= 2:
+            groups.append(chunk)
 
     return groups
 
@@ -1062,8 +1045,9 @@ def _add_phase_fanout(
 ) -> None:
     """Add 3-phase fan-out lines at busbar (post-resolve_overlaps).
 
-    Groups circuits by circuit ID phase prefix (L1/L2/L3) and shared suffix.
-    Supports triplets (L1X/L2X/L3X), pairs (L1X/L2X, L2X/L3X), and singles.
+    Position-based triplet grouping: every 3 consecutive busbar positions
+    form one fan-out group. ALL circuit types participate (MCB, ISOLATOR,
+    SPARE) since they all occupy physical positions on the comb bar.
 
     Reference pattern (63A TPN SLD 14):
         Triplet:        Pair:
@@ -1082,12 +1066,11 @@ def _add_phase_fanout(
     busbar_ys = layout_result.busbar_y_per_row or [layout_result.busbar_y]
     components = layout_result.components
 
-    # --- Group non-spare circuits PER ROW to prevent cross-row mixing ---
+    # --- Group ALL circuits (including SPARE and ISOL) PER ROW ---
     rows: dict[int, list[tuple[SubCircuitGroup, float]]] = {}
     for g in groups:
-        if g.is_spare:
-            continue
-        if g.breaker_idx is not None:
+        # Include all circuits: breaker circuits AND spares
+        if g.breaker_idx is not None or g.is_spare:
             row_idx = g.row_idx
             by = g.row_busbar_y if g.row_busbar_y else busbar_ys[0]
             rows.setdefault(row_idx, []).append((g, by))
@@ -1097,10 +1080,10 @@ def _add_phase_fanout(
     connections = layout_result.connections
 
     for row_idx in sorted(rows.keys()):
-        non_spare = rows[row_idx]
-        # non_spare is already sorted by tap_x (from _identify_groups sort)
+        all_circuits = rows[row_idx]
+        # all_circuits is sorted by tap_x (from _identify_groups sort)
 
-        phase_groups = _build_phase_groups(non_spare, components)
+        phase_groups = _build_phase_groups(all_circuits, components)
 
         for pg in phase_groups:
             if len(pg) == 3:
@@ -1227,6 +1210,52 @@ def resolve_overlaps(
                 g.left_extent = _DITTO_EXTENT
                 g.right_extent = _DITTO_EXTENT
                 g.min_width = g.left_extent + g.right_extent
+
+        # Step 2c: 3-phase uniform spacing normalization
+        # In a TPN DB, ALL busbar positions form 3-phase triplets with
+        # uniform spacing.  Override the per-prefix gap detection (Step 1b)
+        # and per-type width differences (SPARE=15mm vs MCB=19mm) so that
+        # every circuit occupies the same horizontal space.
+        # Only add extra gap at the section boundary (Lighting→Power).
+        _phase_id_count = sum(
+            1 for g in row_groups
+            if g.breaker_idx is not None
+            and re.match(r"^L[123]", layout_result.components[g.breaker_idx].circuit_id or "")
+        )
+        if _phase_id_count >= 6:
+            # Clear all prefix-based gaps from Step 1b
+            for g in row_groups:
+                g.gap_before = 0.0
+
+            # Add gap only at section boundaries (S→P) at triplet boundaries
+            _SECTION_GAP = 6.0
+
+            def _triplet_section(start_gi: int) -> str:
+                """Return 'S', 'P', or '' for a triplet starting at start_gi."""
+                for k in range(start_gi, min(start_gi + 3, len(row_groups))):
+                    rg = row_groups[k]
+                    if rg.breaker_idx is not None:
+                        cid = layout_result.components[rg.breaker_idx].circuit_id or ""
+                        m = re.match(r"^L[123]([A-Z])", cid)
+                        if m:
+                            return m.group(1)  # 'S' or 'P'
+                return ""
+
+            prev_sec = _triplet_section(0)
+            for t in range(3, len(row_groups), 3):
+                cur_sec = _triplet_section(t)
+                if cur_sec and prev_sec and cur_sec != prev_sec:
+                    row_groups[t].gap_before = _SECTION_GAP
+                if cur_sec:
+                    prev_sec = cur_sec
+
+            # Normalize all widths to maximum for uniform spacing
+            max_left = max(g.left_extent for g in row_groups)
+            max_right = max(g.right_extent for g in row_groups)
+            for g in row_groups:
+                g.left_extent = max_left
+                g.right_extent = max_right
+                g.min_width = max_left + max_right
 
         # Step 3: Determine final tap positions for this row
         new_tap_xs = _determine_final_positions(

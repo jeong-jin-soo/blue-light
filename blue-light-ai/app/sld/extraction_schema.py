@@ -599,6 +599,11 @@ def normalize_to_generation_format(
         sc: dict[str, Any] = {}
         sc["name"] = oc.description or ""
 
+        # Preserve explicit circuit ID from schedule upload (e.g., "L1S1", "ISOL1")
+        # so _assign_circuit_ids() can use it for correct phase grouping
+        if oc.id:
+            sc["circuit_id"] = oc.id
+
         if oc.breaker:
             sc["breaker_type"] = oc.breaker.type or "MCB"
             sc["breaker_rating"] = oc.breaker.rating_a or 0
