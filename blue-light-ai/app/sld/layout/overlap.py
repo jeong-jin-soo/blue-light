@@ -1087,15 +1087,32 @@ def _parse_phase_prefix(circuit_id: str) -> tuple[str, str]:
     return ("", circuit_id)
 
 
+def _extract_section_code(circuit_id: str) -> str:
+    """Extract section code from circuit ID.
+
+    Examples:
+        'L1S1' → 'S',  'L2P3' → 'P',  'ISOL1' → '',  'SP1' → ''
+    """
+    import re
+    m = re.match(r"^L[123]([A-Z])", circuit_id, re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
+    return ""
+
+
 def _build_phase_groups(
     circuits: list[tuple[SubCircuitGroup, float]],
     components: list,
 ) -> list[list[tuple[SubCircuitGroup, float]]]:
-    """Build 3-phase fan-out groups using position-based triplet grouping.
+    """Build 3-phase fan-out groups respecting section boundaries.
 
     In a TPN distribution board, every 3 consecutive busbar positions form
     one physical triplet connected to L1/L2/L3 phases of the comb bar.
     ALL circuit types participate: regular MCB, ISOLATOR, and SPARE.
+
+    Section boundaries (e.g., Lighting→Power) are detected from circuit IDs
+    (L1S1→section 'S', L1P1→section 'P'). Triplets never span sections.
+    SPARE and ISOLATOR circuits inherit the section of the preceding circuit.
 
     Reference: 63A TPN SLD 14 — 27-way DB:
       Lighting: [L1S1,L2S1,L3S1] [L1S2,L2S2,L3S2] [L1S3,SPARE,SPARE]
@@ -1104,12 +1121,45 @@ def _build_phase_groups(
 
     Returns groups of 2 or 3 circuits (singles are skipped — no fan-out needed).
     """
-    groups: list[list[tuple[SubCircuitGroup, float]]] = []
+    # --- 1. Assign section code to each circuit ---
+    section_codes: list[str] = []
+    last_section = ""
+    for (g, _by) in circuits:
+        cid = _get_circuit_id(g, components)
+        sec = _extract_section_code(cid)
+        if sec:
+            last_section = sec
+        # SPARE / ISOL inherit previous section
+        section_codes.append(last_section)
 
-    for i in range(0, len(circuits), 3):
-        chunk = circuits[i:i + 3]
-        if len(chunk) >= 2:
-            groups.append(chunk)
+    # --- 2. Split at section boundaries ---
+    sections: list[list[tuple[SubCircuitGroup, float]]] = []
+    current_section: list[tuple[SubCircuitGroup, float]] = []
+    current_code = section_codes[0] if section_codes else ""
+
+    for idx, item in enumerate(circuits):
+        code = section_codes[idx]
+        if code != current_code and current_section:
+            sections.append(current_section)
+            current_section = []
+            current_code = code
+        current_section.append(item)
+    if current_section:
+        sections.append(current_section)
+
+    # --- 3. Chunk each section into triplets ---
+    groups: list[list[tuple[SubCircuitGroup, float]]] = []
+    for section in sections:
+        for i in range(0, len(section), 3):
+            chunk = section[i:i + 3]
+            if len(chunk) >= 2:
+                groups.append(chunk)
+        if len(section) % 3 != 0:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Section has %d circuits (not multiple of 3) — "
+                "incomplete triplet at section end", len(section),
+            )
 
     return groups
 
