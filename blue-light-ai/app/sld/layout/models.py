@@ -371,6 +371,9 @@ class LayoutResult:
     # Used by _identify_groups() for deterministic incoming chain detection
     spine_x: float = 0.0
 
+    # Junction dot indices relocated by phase fanout (excluded from orphan validation)
+    fanout_relocated_dots: set[int] = field(default_factory=set)
+
 
 from app.sld.locale import SG_LOCALE, SldLocale
 

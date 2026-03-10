@@ -492,8 +492,11 @@ def _match_elements_to_groups(
                 g.connection_indices.append(ci)
                 break
 
-    # Match junction_dots
+    # Match junction_dots (skip fanout-relocated dots — they share center position)
+    fanout_dots = layout_result.fanout_relocated_dots
     for di, (dx, dy) in enumerate(layout_result.junction_dots):
+        if di in fanout_dots:
+            continue
         if dy < main_busbar_y - 5 or dy > main_busbar_y + 60:
             continue
         for g in groups:
@@ -569,16 +572,23 @@ def _validate_group_completeness(
                     i, comp.x, nearest, _TOL,
                 )
 
-    # Check junction_dot matching
+    # Check junction_dot matching (same Y-range filter as _match_elements_to_groups)
     jd_matched = {g.junction_dot_idx for g in groups if g.junction_dot_idx is not None}
+    fanout_dots = layout_result.fanout_relocated_dots
+    main_busbar_y = layout_result.busbar_y
     total_jds = len(layout_result.junction_dots)
     orphan_jds = 0
     for di, (dx, dy) in enumerate(layout_result.junction_dots):
-        if di not in jd_matched and abs(dx - incoming_chain_x) >= _TOL:
-            orphan_jds += 1
-            logger.debug(
-                "Unmatched junction_dot[%d] x=%.1f y=%.1f", di, dx, dy,
-            )
+        if di in jd_matched or di in fanout_dots:
+            continue  # Matched or relocated by phase fanout
+        if abs(dx - incoming_chain_x) < _TOL:
+            continue  # Incoming chain dot
+        if dy < main_busbar_y - 5 or dy > main_busbar_y + 60:
+            continue  # Outside sub-circuit zone (structural dot)
+        orphan_jds += 1
+        logger.debug(
+            "Unmatched junction_dot[%d] x=%.1f y=%.1f", di, dx, dy,
+        )
 
     # Check arrow_point matching
     ap_matched = {g.arrow_point_idx for g in groups if g.arrow_point_idx is not None}
@@ -1441,6 +1451,7 @@ def _add_phase_fanout(
 
                 if s_g.junction_dot_idx is not None:
                     layout_result.junction_dots[s_g.junction_dot_idx] = (center_x, by)
+                    layout_result.fanout_relocated_dots.add(s_g.junction_dot_idx)
 
                 # Diagonal from center busbar junction to side intermediate
                 connections.append(((center_x, by), (s_g.tap_x, intermediate_y)))
