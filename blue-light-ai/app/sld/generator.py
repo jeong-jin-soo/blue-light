@@ -12,8 +12,8 @@ Creates a complete Single Line Diagram matching real LEW (Licensed Electrical Wo
 Components drawn:
 - Incoming supply (3-phase / single-phase with L1/L2/L3/N labels)
 - Current flow direction arrow (pointing upward)
-- Isolator (for >= 45kVA installations)
-- CT metering (for >= 45kVA installations)
+- Isolator (for installations requiring CT metering, typically ≥125A 3-phase)
+- CT metering (for ≥125A 3-phase / ≥150A single-phase)
 - SP kWh Metering
 - Main breaker (with circuit ID, kA fault rating, pole configuration)
 - Main busbar (double-line professional representation)

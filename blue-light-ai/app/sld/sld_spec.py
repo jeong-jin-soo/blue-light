@@ -554,32 +554,51 @@ def _validate_fault_rating(
     effective_spec: IncomingSpec | None,
     breaker_ka: int,
     effective_rating: int,
+    breaker_type: str,
     result: ValidationResult,
 ) -> None:
     """Validate / auto-correct breaker_ka fault rating (Step 6).
 
+    When user provides a valid breaker type (preserved by Step 5), use
+    that type's minimum kA instead of the spec's default type kA.
     Auto-corrects insufficient fault ratings. Warns on over-specified values.
     """
-    if effective_spec and breaker_ka:
-        if breaker_ka < effective_spec.breaker_ka:
-            # Auto-correct insufficient fault rating instead of blocking
+    if not effective_spec:
+        return
+
+    # SS 638 minimum kA per breaker type
+    _MIN_KA_BY_TYPE = {"MCB": 10, "MCCB": 25, "ACB": 50}
+
+    # Use user's type kA minimum if type was preserved (not corrected)
+    user_type = breaker_type.upper() if breaker_type else ""
+    type_was_corrected = "breaker_type" in result.corrections
+
+    if user_type in _MIN_KA_BY_TYPE and not type_was_corrected:
+        expected_ka = _MIN_KA_BY_TYPE[user_type]
+        type_label = user_type
+    else:
+        expected_ka = effective_spec.breaker_ka
+        type_label = effective_spec.breaker_type
+
+    if breaker_ka:
+        if breaker_ka < expected_ka:
             result.add_correction(
                 "breaker_ka",
-                breaker_ka, effective_spec.breaker_ka,
+                breaker_ka, expected_ka,
                 f"Fault rating {breaker_ka}kA insufficient for "
-                f"{effective_spec.breaker_type} at {effective_rating}A. "
-                f"Auto-corrected to {effective_spec.breaker_ka}kA.",
+                f"{type_label} at {effective_rating}A. "
+                f"Auto-corrected to {expected_ka}kA.",
             )
-        elif breaker_ka > effective_spec.breaker_ka:
+        elif breaker_ka > expected_ka:
             result.add_warning(
                 f"Fault rating {breaker_ka}kA exceeds standard "
-                f"{effective_spec.breaker_ka}kA for {effective_rating}A "
-                f"{effective_spec.breaker_type}. Acceptable but verify necessity."
+                f"{expected_ka}kA for {effective_rating}A "
+                f"{type_label}. Acceptable but verify necessity."
             )
-    elif effective_spec and not breaker_ka:
+    else:
         result.add_correction(
-            "breaker_ka", 0, effective_spec.breaker_ka,
-            f"Auto-determined: {effective_spec.breaker_type} → {effective_spec.breaker_ka}kA",
+            "breaker_ka", 0, expected_ka,
+            f"Auto-determined: {type_label} → {expected_ka}kA",
         )
 
 
@@ -592,18 +611,37 @@ def _validate_poles(
 ) -> None:
     """Validate / auto-correct breaker poles (Step 7).
 
-    Checks pole configuration against spec. Skips correction for the
-    non-standard 3-phase incoming to single-phase DB configuration.
+    Checks pole configuration against spec. Skips correction for:
+    - 3-phase incoming to single-phase DB configuration
+    - Compatible pole configs for same phase system (SPN↔DP, TPN↔4P)
     """
+    # Compatible pole groups within the same phase system
+    _SINGLE_PHASE_POLES = {"SPN", "DP"}
+    _THREE_PHASE_POLES = {"TPN", "4P"}
+
     if effective_spec and breaker_poles:
         expected_poles = effective_spec.poles
         if breaker_poles.upper() != expected_poles:
-            if not _detect_3phase_to_single_phase_db(requirements):
-                result.add_correction(
-                    "breaker_poles",
-                    breaker_poles, expected_poles,
-                    f"{effective_rating}A {effective_spec.phase} → {expected_poles}",
+            if _detect_3phase_to_single_phase_db(requirements):
+                pass  # Handled elsewhere
+            else:
+                user_upper = breaker_poles.upper()
+                same_phase_group = (
+                    (user_upper in _SINGLE_PHASE_POLES and expected_poles in _SINGLE_PHASE_POLES)
+                    or (user_upper in _THREE_PHASE_POLES and expected_poles in _THREE_PHASE_POLES)
                 )
+                if same_phase_group:
+                    result.add_warning(
+                        f"Poles '{breaker_poles}' differs from standard "
+                        f"'{expected_poles}' for {effective_rating}A. "
+                        f"User-specified value retained."
+                    )
+                else:
+                    result.add_correction(
+                        "breaker_poles",
+                        breaker_poles, expected_poles,
+                        f"{effective_rating}A {effective_spec.phase} → {expected_poles}",
+                    )
     elif effective_spec and not breaker_poles:
         result.add_correction(
             "breaker_poles", "", effective_spec.poles,
@@ -635,12 +673,12 @@ def _validate_metering(
             result.add_correction(
                 "metering",
                 metering, "ct_meter",
-                f"{effective_rating}A (≥45kVA equivalent) requires CT metering",
+                f"{effective_rating}A requires CT metering",
             )
         elif not metering:
             result.add_correction(
                 "metering", "", "ct_meter",
-                f"Auto-determined: ≥45kVA → CT metering",
+                f"Auto-determined: {effective_rating}A (CT metering required)",
             )
     else:
         if not metering:
@@ -764,7 +802,7 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     effective_spec = _get_effective_spec(result, breaker_rating, spec, supply_type)
     effective_rating = _get_effective_rating(result, breaker_rating, spec)
     _validate_breaker_type(effective_spec, breaker_type, effective_rating, result)
-    _validate_fault_rating(effective_spec, breaker_ka, effective_rating, result)
+    _validate_fault_rating(effective_spec, breaker_ka, effective_rating, breaker_type, result)
     _validate_poles(effective_spec, breaker_poles, effective_rating, requirements, result)
     # ── 8. Cable size auto-correction ─────────────────────────────
     cable_size = requirements.get("cable_size", "")

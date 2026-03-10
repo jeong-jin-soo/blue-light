@@ -653,3 +653,70 @@ class TestTopLevelKeyFallback:
         mb = result.get("main_breaker", {})
         # main_breaker.rating=40 should take priority over top-level 63
         assert mb.get("rating") == 40
+
+
+# ── A2: User-type-aware kA / poles validation ────────────────────
+
+class TestUserTypeAwareValidation:
+    """kA and poles validation should respect user-provided breaker type."""
+
+    def test_mccb_ka_corrected_to_25_not_10(self):
+        """MCCB with insufficient kA → corrected to 25kA (MCCB min), not 10kA."""
+        result = validate_sld_requirements({
+            "kva": 69.28, "supply_type": "three_phase",
+            "breaker_rating": 100, "breaker_type": "MCCB",
+            "breaker_poles": "TPN", "breaker_ka": 5,
+        })
+        ka = result.corrections.get("breaker_ka", {})
+        assert ka.get("corrected") == 25
+        assert "MCCB" in ka.get("reason", "")
+
+    def test_mccb_ka_auto_determined_as_25(self):
+        """MCCB without kA → auto-filled to 25kA (MCCB min)."""
+        result = validate_sld_requirements({
+            "kva": 69.28, "supply_type": "three_phase",
+            "breaker_rating": 100, "breaker_type": "MCCB",
+            "breaker_poles": "TPN",
+        })
+        ka = result.corrections.get("breaker_ka", {})
+        assert ka.get("corrected") == 25
+        assert "MCCB" in ka.get("reason", "")
+
+    def test_mccb_25ka_no_correction_no_warning(self):
+        """MCCB with 25kA (exact min) → no correction, no kA warning."""
+        result = validate_sld_requirements({
+            "kva": 69.28, "supply_type": "three_phase",
+            "breaker_rating": 100, "breaker_type": "MCCB",
+            "breaker_poles": "TPN", "breaker_ka": 25,
+        })
+        assert "breaker_ka" not in result.corrections
+        assert not any("kA" in w and "exceeds" in w for w in result.warnings)
+
+    def test_mcb_10ka_standard_no_correction(self):
+        """MCB with 10kA (standard) → no correction."""
+        result = validate_sld_requirements({
+            "kva": 69.28, "supply_type": "three_phase",
+            "breaker_rating": 100, "breaker_type": "MCB",
+            "breaker_poles": "TPN", "breaker_ka": 10,
+        })
+        assert "breaker_ka" not in result.corrections
+
+    def test_4p_warns_not_corrects_for_three_phase(self):
+        """4P for 3-phase (spec: TPN) → warn only, not corrected."""
+        result = validate_sld_requirements({
+            "kva": 69.28, "supply_type": "three_phase",
+            "breaker_rating": 63, "breaker_type": "ELCB",
+            "breaker_poles": "4P", "breaker_ka": 10,
+        })
+        assert "breaker_poles" not in result.corrections
+        assert any("4P" in w and "retained" in w for w in result.warnings)
+
+    def test_dp_for_single_phase_warns_when_spec_is_spn(self):
+        """DP for single-phase (spec: DP) → no correction needed (same group)."""
+        result = validate_sld_requirements({
+            "kva": 14, "supply_type": "single_phase",
+            "breaker_rating": 63, "breaker_type": "MCB",
+            "breaker_poles": "DP", "breaker_ka": 10,
+        })
+        # DP matches spec DP → no correction at all
+        assert "breaker_poles" not in result.corrections
