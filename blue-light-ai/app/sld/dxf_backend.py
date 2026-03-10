@@ -22,6 +22,8 @@ import ezdxf
 from ezdxf import units
 from ezdxf.enums import TextEntityAlignment
 
+from app.sld.page_config import A3_LANDSCAPE, PageConfig
+
 logger = logging.getLogger(__name__)
 
 # A3 landscape dimensions in mm
@@ -50,7 +52,8 @@ class DxfBackend:
     No coordinate transformation needed — DXF native system matches our convention.
     """
 
-    def __init__(self):
+    def __init__(self, page_config: PageConfig | None = None):
+        self._page_config = page_config or A3_LANDSCAPE
         self._doc = ezdxf.new("R2013")  # AutoCAD 2013 format for broad compatibility
         self._doc.units = units.MM
         self._msp = self._doc.modelspace()
@@ -322,9 +325,9 @@ class DxfBackend:
         import fitz  # PyMuPDF
 
         ctx = RenderContext(self._doc)
-        # A3 landscape: 420mm x 297mm → points (1mm = 2.8346pt)
-        page_width_pt = _PAGE_WIDTH * 2.8346
-        page_height_pt = _PAGE_HEIGHT * 2.8346
+        # Page dimensions → points (1mm = 2.8346pt)
+        page_width_pt = self._page_config.page_width * 2.8346
+        page_height_pt = self._page_config.page_height * 2.8346
 
         pdf_doc = fitz.open()
         page = pdf_doc.new_page(width=page_width_pt, height=page_height_pt)

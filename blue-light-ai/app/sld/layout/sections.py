@@ -332,9 +332,9 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
 
     Returns a _MeterBoardGeom with all coordinates needed for placement.
     """
-    comp_spacing = 25
+    comp_spacing = config.meter_board_comp_spacing
     _stub = config.stub_len
-    _mb_inset = 4
+    _mb_inset = config.meter_board_inset
 
     # Horizontal extents (symbol.height → h_extent when rotated 90°)
     iso_h_extent = config.isolator_h
@@ -367,7 +367,7 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
     mcb_right_x = mcb_cx + mcb_h_extent / 2 + _stub
 
     # Vertical bands — above center
-    _gap = 1.5
+    _gap = config.meter_board_gap
     kwh_label_y = mb_center_y + max_v_half + _gap + _anno_label_ch
     mb_box_top = kwh_label_y + _gap
 
@@ -1071,7 +1071,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
         label_width = len(conductor_label) * _CHAR_W_LABEL
         label_x = earth_x
         # Ensure label doesn't exceed right drawing border (A3: 420 - 10mm margin)
-        border_right_abs = 410
+        border_right_abs = config.max_x + 15  # 395 + 15 = 410 for A3
         if label_x + label_width > border_right_abs - 2:
             # Try shifting label left (can overlap into DB box area since it's below)
             label_x = border_right_abs - 2 - label_width

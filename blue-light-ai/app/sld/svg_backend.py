@@ -14,6 +14,8 @@ from __future__ import annotations
 import math
 from xml.sax.saxutils import escape
 
+from app.sld.page_config import PageConfig
+
 
 # A3 landscape dimensions in mm
 _PAGE_WIDTH = 420.0
@@ -51,7 +53,11 @@ class SvgBackend:
         self,
         page_width: float = _PAGE_WIDTH,
         page_height: float = _PAGE_HEIGHT,
+        page_config: PageConfig | None = None,
     ):
+        if page_config is not None:
+            page_width = page_config.page_width
+            page_height = page_config.page_height
         self._page_width = page_width
         self._page_height = page_height
         self._elements: list[str] = []

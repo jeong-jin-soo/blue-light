@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 
 from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
+from app.sld.page_config import PageConfig
 from app.sld.layout.overlap import (
     _add_cable_leader_lines,
     _add_isolator_device_symbols,
@@ -111,6 +112,7 @@ def compute_layout(
     config: LayoutConfig | None = None,
     application_info: dict | None = None,
     *,
+    page_config: PageConfig | None = None,
     skip_validation: bool = False,
 ) -> LayoutResult:
     """
@@ -140,7 +142,7 @@ def compute_layout(
         ValueError: If validation finds hard errors (e.g., missing kVA + breaker rating).
     """
     if config is None:
-        config = LayoutConfig()
+        config = LayoutConfig.from_page_config(page_config) if page_config else LayoutConfig()
 
     # -- Input validation gate (defense in depth) --
     if not skip_validation:

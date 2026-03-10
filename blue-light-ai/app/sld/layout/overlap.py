@@ -155,6 +155,8 @@ def _get_symbol_dims() -> dict[str, tuple[float, float]]:
 
     return _SYMBOL_DIMS
 
+# Text measurement constants — defaults mirrored in LayoutConfig
+# (char_width_estimate, label_char_height) for centralised overrides.
 _CHAR_W = 1.8    # Approximate mm per character
 _LABEL_CHAR_H = 2.8  # Default label char height (mm)
 
@@ -610,13 +612,14 @@ def _validate_group_completeness(
 def _compute_group_width(
     group: SubCircuitGroup,
     components: list[PlacedComponent],
+    config: LayoutConfig | None = None,
 ) -> float:
     """
     Compute minimum horizontal space (mm) for a sub-circuit group.
 
     Also sets group.left_extent and group.right_extent for asymmetric spacing.
     """
-    _MARGIN = 2.0  # mm inter-group safety margin per side
+    _MARGIN = config.overlap_margin if config else 2.0
 
     if group.is_spare:
         group.left_extent = 7.5
@@ -744,7 +747,7 @@ def _determine_final_positions(
     if not groups:
         return []
 
-    _MARGIN = 10.0  # busbar end margin
+    _MARGIN = config.busbar_end_margin  # busbar end margin
 
     sc_bus_start = layout_result.busbar_start_x + _MARGIN
     sc_bus_end = layout_result.busbar_end_x - _MARGIN
@@ -886,7 +889,7 @@ def _fit_busbar_to_groups(
     if not new_tap_xs:
         return
 
-    _MARGIN = 2.0  # mm padding beyond outermost element edge
+    _MARGIN = config.overlap_margin  # mm padding beyond outermost element edge
 
     # Use group extents (already accounts for ditto/non-ditto)
     leftmost_extent = groups[0].left_extent if groups else 10.0
@@ -936,7 +939,7 @@ def _fit_busbar_to_groups(
             break
 
     # Update DB box dashed connections to match new busbar
-    _DB_BOX_MARGIN = 12.0  # enough to cover RCCB + Earth symbol
+    _DB_BOX_MARGIN = config.db_box_overlap_margin  # enough to cover RCCB + Earth symbol
     new_db_left = max(needed_start - _DB_BOX_MARGIN, config.min_x + 2)
     new_db_right = min(needed_end + _DB_BOX_MARGIN, config.max_x - 2)
 
@@ -1138,7 +1141,7 @@ def _add_cable_leader_lines(
             cable_groups.setdefault(cable_spec, []).append(tap_x)
 
         # Estimate cable text height and clamp leader_y to keep text within top border
-        _CHAR_W_EST = 1.8
+        _CHAR_W_EST = 1.8  # mirrored in LayoutConfig.char_width_estimate
         max_spec_len = max(len(s) for s in cable_groups.keys())
         est_line_chars = max_spec_len // 2 + 5
         est_text_h = est_line_chars * _CHAR_W_EST
@@ -1446,6 +1449,7 @@ def _add_phase_fanout(
 def _normalize_row_spacing(
     row_groups: list[SubCircuitGroup],
     components: list[PlacedComponent],
+    config: LayoutConfig | None = None,
 ) -> None:
     """Normalize per-row spacing: category gaps, ditto detection, width computation.
 
@@ -1459,8 +1463,8 @@ def _normalize_row_spacing(
     Mutates row_groups in-place: sets gap_before, is_ditto, min_width,
     left_extent, right_extent.
     """
-    _GROUP_GAP = 3.0    # Extra mm between circuit category groups
-    _DITTO_EXTENT = 5.5  # mm — symbol half-width (3.6) + margin
+    _GROUP_GAP = config.overlap_group_gap if config else 3.0
+    _DITTO_EXTENT = config.overlap_ditto_extent if config else 5.5
 
     # Step 1b: Detect category group breaks (S→P, P→H, etc.)
     if len(row_groups) > 1:
@@ -1494,7 +1498,7 @@ def _normalize_row_spacing(
 
     # Step 2: Compute minimum widths per group
     for g in row_groups:
-        g.min_width = _compute_group_width(g, components)
+        g.min_width = _compute_group_width(g, components, config)
 
     # Step 2b: Override extents for ditto groups (no labels → compact)
     for g in row_groups:
@@ -1653,7 +1657,7 @@ def resolve_overlaps(
         row_groups = rows_map[row_idx]
 
         # Steps 1b + 1c + 2 + 2b + 2c: category gaps, ditto, widths, 3-phase normalization
-        _normalize_row_spacing(row_groups, layout_result.components)
+        _normalize_row_spacing(row_groups, layout_result.components, config)
 
         # Step 3: Determine final tap positions for this row
         new_tap_xs = _determine_final_positions(

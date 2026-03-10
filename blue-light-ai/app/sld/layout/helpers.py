@@ -526,7 +526,7 @@ def _compute_tap_x(
 ) -> float:
     """Compute busbar tap X position for circuit at index i."""
     bus_width = bus_end_x - bus_start_x
-    group_gap = 6.0
+    group_gap = config.circuit_group_gap
     num_breaks = len(group_breaks)
 
     if row_count == 1:
@@ -633,8 +633,8 @@ def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, co
     if sc_room:
         sc_display_name = f"{sc_display_name} — {sc_room}"
 
-    _CHAR_ADVANCE = 1.7
-    _PREFERRED_MAX_CHARS = 25
+    _CHAR_ADVANCE = config.char_advance
+    _PREFERRED_MAX_CHARS = config.preferred_max_label_chars
     label_y = conductor_top_y + 2
     avail_h = config.max_y - label_y
     dyn_max = max(15, min(_PREFERRED_MAX_CHARS, int(avail_h / _CHAR_ADVANCE)))

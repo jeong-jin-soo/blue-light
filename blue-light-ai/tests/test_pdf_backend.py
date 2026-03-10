@@ -11,7 +11,10 @@ from pathlib import Path
 
 import pytest
 
+from reportlab.lib.units import mm
+
 from app.sld.pdf_backend import PdfBackend
+from app.sld.page_config import A3_LANDSCAPE, PageConfig
 
 
 # ── TestPdfBackendBasics ─────────────────────────────────────────
@@ -45,6 +48,30 @@ class TestPdfBackendBasics:
         for layer in ["SLD_SYMBOLS", "SLD_CONNECTIONS", "SLD_POWER_MAIN",
                        "SLD_ANNOTATIONS", "SLD_TITLE_BLOCK"]:
             pdf.set_layer(layer)  # Should not raise
+
+
+# ── TestPdfBackendPageConfig ─────────────────────────────────────
+
+
+class TestPdfBackendPageConfig:
+    """Page configuration support."""
+
+    def test_default_page_size_matches_a3(self):
+        """Default PdfBackend page size matches A3 landscape (420mm x 297mm)."""
+        pdf = PdfBackend()
+        width, height = pdf._page_size
+        assert width == pytest.approx(420.0 * mm, abs=0.1)
+        assert height == pytest.approx(297.0 * mm, abs=0.1)
+        assert pdf._page_config is A3_LANDSCAPE
+
+    def test_custom_page_config_changes_size(self):
+        """Custom PageConfig changes the page size accordingly."""
+        custom = PageConfig(page_width=594.0, page_height=420.0)  # A2 landscape
+        pdf = PdfBackend(page_config=custom)
+        width, height = pdf._page_size
+        assert width == pytest.approx(594.0 * mm, abs=0.1)
+        assert height == pytest.approx(420.0 * mm, abs=0.1)
+        assert pdf._page_config is custom
 
 
 # ── TestPdfBackendDrawing ────────────────────────────────────────

@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from app.sld.dxf_backend import DxfBackend
+from app.sld.page_config import A3_LANDSCAPE, PageConfig
 
 # Reference DXF path (same as generator.py)
 _REFERENCE_DXF_PATH = (
@@ -62,6 +63,28 @@ class TestDxfBackendBasics:
         dxf.add_line((0, 0), (10, 10))
         entities = list(dxf.doc.modelspace())
         assert entities[-1].dxf.layer == "SLD_CONNECTIONS"
+
+
+# ── TestDxfBackendPageConfig ─────────────────────────────────────
+
+
+class TestDxfBackendPageConfig:
+    """Page configuration support."""
+
+    def test_default_page_config_is_a3(self):
+        """Default DxfBackend uses A3 landscape page config."""
+        dxf = DxfBackend()
+        assert dxf._page_config is A3_LANDSCAPE
+        assert dxf._page_config.page_width == 420.0
+        assert dxf._page_config.page_height == 297.0
+
+    def test_custom_page_config_stored(self):
+        """Custom PageConfig is stored and used."""
+        custom = PageConfig(page_width=594.0, page_height=420.0)  # A2 landscape
+        dxf = DxfBackend(page_config=custom)
+        assert dxf._page_config is custom
+        assert dxf._page_config.page_width == 594.0
+        assert dxf._page_config.page_height == 420.0
 
 
 # ── TestDxfBackendDrawing ────────────────────────────────────────

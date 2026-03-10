@@ -13,7 +13,10 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.sld.page_config import PageConfig
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +225,63 @@ class LayoutConfig:
     # Earth bar offsets
     earth_y_below_busbar: float = 25.0    # Earth bar Y below busbar
     earth_x_from_db: float = 5.0          # Earth bar X right of DB box
+
+    # -- Consolidated text measurement constants (D1) --
+    char_width_estimate: float = 1.8      # mm per char for bounding box estimation
+    label_char_height: float = 2.8        # Default label text height (mm)
+    char_advance: float = 1.7             # Vertical char advance for label wrapping
+    preferred_max_label_chars: int = 25   # Preferred max chars before line wrapping
+
+    # -- Meter board constants (D2) --
+    meter_board_comp_spacing: float = 25.0  # Horizontal spacing between MB components
+    meter_board_inset: float = 4.0          # Inset margin for meter board box
+    meter_board_gap: float = 1.5            # Gap between MB and box top
+
+    # -- Overlap resolution constants (D2) --
+    overlap_group_gap: float = 3.0        # Gap between sub-circuit groups
+    overlap_ditto_extent: float = 5.5     # Width for "ditto" (identical spec) circuits
+    circuit_group_gap: float = 6.0        # Gap between circuit groups in helpers
+
+    # -- Matching tolerances / margins (D3) --
+    position_tolerance: float = 1.5       # X-axis matching tolerance
+    overlap_margin: float = 2.0           # Margin in bounding box computation
+    busbar_end_margin: float = 10.0       # Margin at busbar ends for final positions
+    db_box_overlap_margin: float = 12.0   # DB box margin in overlap resolution
+
+    @classmethod
+    def from_page_config(
+        cls,
+        page_config: PageConfig | None = None,
+        **overrides: Any,
+    ) -> LayoutConfig:
+        """Create LayoutConfig with page-boundary fields derived from PageConfig.
+
+        Spacing and symbol dimensions remain at calibrated defaults.
+        Only boundary-related fields (drawing_width/height, min/max_x/y,
+        start_x/y) are derived from the page geometry.
+
+        When called with no arguments, the result is identical to ``LayoutConfig()``
+        for every boundary field (A3 landscape defaults).
+        """
+        from app.sld.page_config import A3_LANDSCAPE as _A3
+
+        pc = page_config or _A3
+        tb_top = pc.margin + pc.title_block_height  # 42 for A3
+
+        derived: dict[str, Any] = {
+            "drawing_width": pc.page_width - 2 * pc.margin - 20,   # 380 for A3
+            "drawing_height": pc.page_height - pc.margin - tb_top - 5,  # 240 for A3
+            "min_x": pc.margin + 15,                    # 25 for A3
+            "max_x": pc.page_width - pc.margin - 15,    # 395 for A3
+            "min_y": tb_top + 20,                       # 62 for A3
+            "max_y": pc.page_height - pc.margin - 2,    # 285 for A3
+            "start_x": pc.page_width / 2,              # 210 for A3
+            "start_y": pc.page_height - pc.margin - 7,  # 280 for A3
+        }
+        # Overrides take precedence over derived values
+        derived.update(overrides)
+
+        return cls(**derived)
 
     def __post_init__(self):
         """Sync symbol dimensions from real_symbol_paths.json (single source of truth)."""

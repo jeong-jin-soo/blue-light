@@ -21,6 +21,8 @@ from reportlab.lib.pagesizes import A3, landscape
 from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 
+from app.sld.page_config import A3_LANDSCAPE, PageConfig
+
 
 # Layer -> color mapping (all black, matching real LEW SLD samples)
 _LAYER_COLORS: dict[str, tuple[float, float, float]] = {
@@ -50,13 +52,16 @@ class PdfBackend:
     Internally converts to points for ReportLab.
     """
 
-    def __init__(self, output_path: str | None = None):
+    def __init__(self, output_path: str | None = None, page_config: PageConfig | None = None):
         """
         Args:
             output_path: File path for the PDF. If None, writes to in-memory buffer.
+            page_config: Page dimensions. Defaults to A3 landscape.
         """
         self._output_path = output_path
-        self._page_size = landscape(A3)  # (1190.55pt, 841.89pt) = (420mm, 297mm)
+        pc = page_config or A3_LANDSCAPE
+        self._page_config = pc
+        self._page_size = (pc.page_width * mm, pc.page_height * mm)
 
         if output_path:
             self._canvas = Canvas(output_path, pagesize=self._page_size)

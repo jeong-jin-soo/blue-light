@@ -56,8 +56,9 @@ from app.sld.real_symbols import (
     get_symbol_dimensions,
 )
 from app.sld.locale import SG_LOCALE
+from app.sld.page_config import PageConfig
 from app.sld.svg_backend import SvgBackend
-from app.sld.title_block import draw_border, draw_title_block_frame, fill_title_block_data
+from app.sld.title_block import TitleBlockConfig, draw_border, draw_title_block_frame, fill_title_block_data
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +195,7 @@ class SldGenerator:
         pdf_output_path: str,
         svg_output_path: str | None = None,
         backend_type: str = "dxf",
+        page_config: PageConfig | None = None,
     ) -> dict:
         """
         Generate the SLD drawing.
@@ -222,7 +224,10 @@ class SldGenerator:
             logger.warning("application_info normalization failed: %s", exc)
 
         # Compute layout (pure coordinate computation -- backend-independent)
-        layout_result = compute_layout(requirements, application_info=application_info)
+        pc = page_config
+        tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
+        layout_result = compute_layout(requirements, application_info=application_info,
+                                       page_config=pc)
 
         # Title block data (shared across all backends)
         # Accept both camelCase (from backend API) and snake_case (from direct calls)
@@ -251,28 +256,28 @@ class SldGenerator:
         # Create backends
         if backend_type == "dxf":
             # DXF backend (primary CAD output) + ReportLab PDF (EMA submission) + SVG (preview)
-            dxf = DxfBackend()
+            dxf = DxfBackend(page_config=pc)
             # Import native CAD symbol blocks from reference DXF template
             if _REFERENCE_DXF_PATH.exists():
                 dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
             else:
                 logger.warning("Reference DXF not found: %s — DXF symbol blocks will be missing", _REFERENCE_DXF_PATH)
-            pdf = PdfBackend(pdf_output_path)
-            svg = SvgBackend()
+            pdf = PdfBackend(pdf_output_path, page_config=pc)
+            svg = SvgBackend(page_config=pc)
             backends = [dxf, pdf, svg]
 
             dxf_path = pdf_output_path.replace(".pdf", ".dxf")
         else:
             # Legacy: ReportLab PDF + SVG only
-            pdf = PdfBackend(pdf_output_path)
-            svg = SvgBackend()
+            pdf = PdfBackend(pdf_output_path, page_config=pc)
+            svg = SvgBackend(page_config=pc)
             backends = [pdf, svg]
 
         # Draw to all backends simultaneously
         component_count = 0
         for backend in backends:
-            draw_border(backend)
-            draw_title_block_frame(backend)
+            draw_border(backend, page_config=pc)
+            draw_title_block_frame(backend, tb_config=tb_config)
 
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
@@ -281,7 +286,7 @@ class SldGenerator:
             self._draw_arrow_points(backend, layout_result)
             self._draw_solid_boxes(backend, layout_result)
 
-            fill_title_block_data(backend, **title_block_kwargs)
+            fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
 
         # Save outputs
         pdf.save()
@@ -309,6 +314,7 @@ class SldGenerator:
         requirements: dict,
         application_info: dict | None = None,
         backend_type: str = "dxf",
+        page_config: PageConfig | None = None,
     ) -> tuple[bytes, str, bytes | None]:
         """
         Generate SLD as PDF bytes in memory (no file I/O).
@@ -327,11 +333,14 @@ class SldGenerator:
         if not app_info and "title_block" in requirements:
             app_info = requirements["title_block"]
         generator = SldGenerator()
+        pc = page_config
+        tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
 
-        pdf = PdfBackend(output_path=None)  # in-memory buffer
-        svg = SvgBackend()
+        pdf = PdfBackend(output_path=None, page_config=pc)  # in-memory buffer
+        svg = SvgBackend(page_config=pc)
 
-        layout_result = compute_layout(requirements, application_info=app_info)
+        layout_result = compute_layout(requirements, application_info=app_info,
+                                       page_config=pc)
 
         title_block_kwargs = dict(
             project_name=app_info.get("project_title", "") or app_info.get("client_name", "") or app_info.get("address", "Electrical Installation"),
@@ -354,7 +363,7 @@ class SldGenerator:
 
         dxf_bytes = None
         if backend_type == "dxf":
-            dxf = DxfBackend()
+            dxf = DxfBackend(page_config=pc)
             # Import native CAD symbol blocks from reference DXF template
             if _REFERENCE_DXF_PATH.exists():
                 dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
@@ -365,8 +374,8 @@ class SldGenerator:
             backends = [pdf, svg]
 
         for backend in backends:
-            draw_border(backend)
-            draw_title_block_frame(backend)
+            draw_border(backend, page_config=pc)
+            draw_title_block_frame(backend, tb_config=tb_config)
 
             generator._draw_components(backend, layout_result)
             generator._draw_connections(backend, layout_result)
@@ -375,7 +384,7 @@ class SldGenerator:
             generator._draw_arrow_points(backend, layout_result)
             generator._draw_solid_boxes(backend, layout_result)
 
-            fill_title_block_data(backend, **title_block_kwargs)
+            fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
 
         if backend_type == "dxf":
             dxf_bytes = dxf.get_bytes()

@@ -18,13 +18,67 @@ The title block is split into two phases:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date
 from typing import TYPE_CHECKING
 
 from app.sld.locale import SG_LOCALE, SldLocale
+from app.sld.page_config import A3_LANDSCAPE, PageConfig
 
 if TYPE_CHECKING:
     from app.sld.backend import DrawingBackend
+
+
+# =============================================
+# TitleBlockConfig — computed geometry from PageConfig
+# =============================================
+
+@dataclass(frozen=True)
+class TitleBlockConfig:
+    """Computed title block geometry from PageConfig.
+
+    Column proportions from real LEW SLD samples: 80:60:72:68:72:48 = 400mm total.
+    """
+
+    left: float
+    right: float
+    bottom: float
+    top: float
+    col1: float
+    col2: float
+    col3: float
+    col4: float
+    col5: float
+    col6: float
+    col6_mid: float
+    row_top: float
+    row_mid: float
+    row_bot: float
+
+    @classmethod
+    def from_page_config(cls, pc: PageConfig | None = None) -> "TitleBlockConfig":
+        pc = pc or A3_LANDSCAPE
+        left = pc.margin
+        right = pc.page_width - pc.margin
+        bottom = pc.margin
+        top = bottom + pc.title_block_height
+        w = right - left  # 400 for A3
+        return cls(
+            left=left, right=right, bottom=bottom, top=top,
+            col1=left,
+            col2=left + w * 0.200,     # 80/400
+            col3=left + w * 0.350,     # (80+60)/400
+            col4=left + w * 0.530,     # (80+60+72)/400
+            col5=left + w * 0.700,     # (80+60+72+68)/400
+            col6=left + w * 0.880,     # (80+60+72+68+72)/400
+            col6_mid=left + w * 0.940,  # (80+60+72+68+72+24)/400
+            row_top=top,
+            row_mid=(top + bottom) // 2 + 1,
+            row_bot=bottom,
+        )
+
+
+_DEFAULT_TB = TitleBlockConfig.from_page_config(A3_LANDSCAPE)
 
 
 # =============================================
@@ -54,40 +108,47 @@ ROW_MID = (TB_TOP + TB_BOTTOM) // 2 + 1  # ~28  Horizontal split in COL6 area
 ROW_BOT = TB_BOTTOM        # 10
 
 
-def draw_border(backend: DrawingBackend, margin: float = 10) -> None:
+def draw_border(backend: DrawingBackend, margin: float = 10, page_config: PageConfig | None = None) -> None:
     """Draw the drawing border rectangle."""
-    w = 420 - margin
-    h = 297 - margin
+    pc = page_config or A3_LANDSCAPE
+    w = pc.page_width - pc.margin
+    h = pc.page_height - pc.margin
     backend.set_layer("SLD_TITLE_BLOCK")
     backend.add_lwpolyline(
-        [(margin, margin), (w, margin), (w, h), (margin, h)],
+        [(pc.margin, pc.margin), (w, pc.margin), (w, h), (pc.margin, h)],
         close=True,
     )
 
 
-def draw_title_block_frame(backend: DrawingBackend, locale: SldLocale = SG_LOCALE) -> None:
+def draw_title_block_frame(
+    backend: DrawingBackend,
+    locale: SldLocale = SG_LOCALE,
+    tb_config: TitleBlockConfig | None = None,
+) -> None:
     """
     Draw the title block structure matching real LEW SLD format.
     Single-row layout with right-side 2x2 grid for CHECKED/DATE/DWG NO/REV.
     """
+    tbc = tb_config or _DEFAULT_TB
+
     backend.set_layer("SLD_TITLE_BLOCK")
 
     # -- Outer box --
     backend.add_lwpolyline(
-        [(TB_LEFT, TB_BOTTOM), (TB_RIGHT, TB_BOTTOM), (TB_RIGHT, TB_TOP), (TB_LEFT, TB_TOP)],
+        [(tbc.left, tbc.bottom), (tbc.right, tbc.bottom), (tbc.right, tbc.top), (tbc.left, tbc.top)],
         close=True,
     )
 
     # -- Vertical dividers (full height) --
-    backend.add_line((COL2, TB_TOP), (COL2, TB_BOTTOM))   # After CLIENT
-    backend.add_line((COL3, TB_TOP), (COL3, TB_BOTTOM))   # After MAIN CONTRACTOR
-    backend.add_line((COL4, TB_TOP), (COL4, TB_BOTTOM))   # After ELEC. CONTRACTOR
-    backend.add_line((COL5, TB_TOP), (COL5, TB_BOTTOM))   # After DRAWING TITLE
-    backend.add_line((COL6, TB_TOP), (COL6, TB_BOTTOM))   # After LEW
+    backend.add_line((tbc.col2, tbc.top), (tbc.col2, tbc.bottom))   # After CLIENT
+    backend.add_line((tbc.col3, tbc.top), (tbc.col3, tbc.bottom))   # After MAIN CONTRACTOR
+    backend.add_line((tbc.col4, tbc.top), (tbc.col4, tbc.bottom))   # After ELEC. CONTRACTOR
+    backend.add_line((tbc.col5, tbc.top), (tbc.col5, tbc.bottom))   # After DRAWING TITLE
+    backend.add_line((tbc.col6, tbc.top), (tbc.col6, tbc.bottom))   # After LEW
 
     # -- Right 2x2 grid (CHECKED/DATE top, DWG NO/REV bottom) --
-    backend.add_line((COL6, ROW_MID), (TB_RIGHT, ROW_MID))         # Horizontal split
-    backend.add_line((COL6_MID, TB_TOP), (COL6_MID, TB_BOTTOM))    # Vertical split
+    backend.add_line((tbc.col6, tbc.row_mid), (tbc.right, tbc.row_mid))         # Horizontal split
+    backend.add_line((tbc.col6_mid, tbc.top), (tbc.col6_mid, tbc.bottom))    # Vertical split
 
     # ==========================================
     # FIELD LABELS (small header text)
@@ -95,20 +156,20 @@ def draw_title_block_frame(backend: DrawingBackend, locale: SldLocale = SG_LOCAL
     backend.set_layer("SLD_ANNOTATIONS")
 
     lbl_h = 1.8   # Label font size (small, like real samples)
-    lbl_y = ROW_TOP - 2.5  # Y offset from top for labels
+    lbl_y = tbc.row_top - 2.5  # Y offset from top for labels
 
     tb = locale.title_block
-    backend.add_mtext(tb.client_address, insert=(COL1 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext(tb.main_contractor, insert=(COL2 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext(tb.electrical_contractor, insert=(COL3 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext(tb.drawing_title, insert=(COL4 + 2, lbl_y), char_height=lbl_h)
-    backend.add_mtext(tb.lew, insert=(COL5 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.client_address, insert=(tbc.col1 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.main_contractor, insert=(tbc.col2 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.electrical_contractor, insert=(tbc.col3 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.drawing_title, insert=(tbc.col4 + 2, lbl_y), char_height=lbl_h)
+    backend.add_mtext(tb.lew, insert=(tbc.col5 + 2, lbl_y), char_height=lbl_h)
 
     # Right 2x2 grid labels
-    backend.add_mtext(tb.checked, insert=(COL6 + 2, ROW_TOP - 2.5), char_height=lbl_h)
-    backend.add_mtext(tb.date, insert=(COL6_MID + 2, ROW_TOP - 2.5), char_height=lbl_h)
-    backend.add_mtext(tb.drawing_no, insert=(COL6 + 2, ROW_MID - 2.5), char_height=lbl_h)
-    backend.add_mtext(tb.rev, insert=(COL6_MID + 2, ROW_MID - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.checked, insert=(tbc.col6 + 2, tbc.row_top - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.date, insert=(tbc.col6_mid + 2, tbc.row_top - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.drawing_no, insert=(tbc.col6 + 2, tbc.row_mid - 2.5), char_height=lbl_h)
+    backend.add_mtext(tb.rev, insert=(tbc.col6_mid + 2, tbc.row_mid - 2.5), char_height=lbl_h)
 
 
 def fill_title_block_data(
@@ -132,6 +193,7 @@ def fill_title_block_data(
     contractor_address: str = "",
     elec_contractor_tel: str = "",
     locale: SldLocale = SG_LOCALE,
+    tb_config: TitleBlockConfig | None = None,
     **kwargs,
 ) -> None:
     """
@@ -140,6 +202,8 @@ def fill_title_block_data(
 
     Address fields support multi-line via \\P separator (DXF/PDF line break).
     """
+    tbc = tb_config or _DEFAULT_TB
+
     if not elec_contractor_addr and contractor_address:
         elec_contractor_addr = contractor_address
 
@@ -153,33 +217,33 @@ def fill_title_block_data(
 
     backend.set_layer("SLD_ANNOTATIONS")
 
-    data_y = ROW_TOP - 7      # Start Y for data text (below label)
+    data_y = tbc.row_top - 7      # Start Y for data text (below label)
     data_h = 2.5              # Data font size
     data_h_lg = 3.0           # Large data font (company names, drawing title)
     line_sp = 3.2             # Line spacing for multi-line text
 
     # -- Cell 1: CLIENT / ADDRESS --
     client_text = client_name or project_name
-    # Auto-shrink long text to fit cell width (COL1→COL2 = 80mm, padding 6mm)
+    # Auto-shrink long text to fit cell width (COL1->COL2 = 80mm, padding 6mm)
     c1_h = _fit_font_size(client_text, cell_width=74, max_height=data_h_lg)
-    backend.add_mtext(client_text, insert=(COL1 + 3, data_y), char_height=c1_h)
+    backend.add_mtext(client_text, insert=(tbc.col1 + 3, data_y), char_height=c1_h)
 
     if address:
         # Split address into multi-line for readability (real samples show 3-4 lines)
         addr_lines = _split_address(address, postal_code)
         addr_text = "\\P".join(addr_lines)
-        backend.add_mtext(addr_text, insert=(COL1 + 3, data_y - line_sp - 1), char_height=2.0)
+        backend.add_mtext(addr_text, insert=(tbc.col1 + 3, data_y - line_sp - 1), char_height=2.0)
 
     # -- Cell 2: MAIN CONTRACTOR --
     if main_contractor:
-        # Auto-shrink for cell width (COL2→COL3 = 60mm, padding 6mm)
+        # Auto-shrink for cell width (COL2->COL3 = 60mm, padding 6mm)
         c2_h = _fit_font_size(main_contractor, cell_width=54, max_height=data_h_lg)
-        backend.add_mtext(main_contractor, insert=(COL2 + 3, data_y), char_height=c2_h)
+        backend.add_mtext(main_contractor, insert=(tbc.col2 + 3, data_y), char_height=c2_h)
 
     # -- Cell 3: ELECTRICAL CONTRACTOR --
-    # Auto-shrink for cell width (COL3→COL4 = 72mm, padding 6mm)
+    # Auto-shrink for cell width (COL3->COL4 = 72mm, padding 6mm)
     c3_h = _fit_font_size(elec_contractor, cell_width=66, max_height=data_h_lg)
-    backend.add_mtext(elec_contractor, insert=(COL3 + 3, data_y), char_height=c3_h)
+    backend.add_mtext(elec_contractor, insert=(tbc.col3 + 3, data_y), char_height=c3_h)
     ec_lines = []
     if elec_contractor_addr:
         # Split contractor address into multi-line
@@ -189,44 +253,44 @@ def fill_title_block_data(
         ec_lines.append(f"TEL: {elec_contractor_tel}")
     if ec_lines:
         ec_text = "\\P".join(ec_lines)
-        backend.add_mtext(ec_text, insert=(COL3 + 3, data_y - line_sp - 1), char_height=2.0)
+        backend.add_mtext(ec_text, insert=(tbc.col3 + 3, data_y - line_sp - 1), char_height=2.0)
 
     # -- Cell 4: DRAWING TITLE --
     tb = locale.title_block
     backend.add_mtext(
         tb.sld_title,
-        insert=(COL4 + 3, data_y + 1),
+        insert=(tbc.col4 + 3, data_y + 1),
         char_height=3.5,
     )
 
     # -- Cell 5: LEW --
     if sld_only_mode:
         backend.add_mtext(
-            tb.to_be_filled, insert=(COL5 + 3, data_y), char_height=data_h,
+            tb.to_be_filled, insert=(tbc.col5 + 3, data_y), char_height=data_h,
         )
         backend.add_mtext(
             f"{tb.ema_licence}____________",
-            insert=(COL5 + 3, data_y - line_sp),
+            insert=(tbc.col5 + 3, data_y - line_sp),
             char_height=2.0,
         )
         backend.add_mtext(
             f"{tb.mobile_number}____________",
-            insert=(COL5 + 3, data_y - line_sp * 2),
+            insert=(tbc.col5 + 3, data_y - line_sp * 2),
             char_height=2.0,
         )
     else:
         if lew_name:
-            backend.add_mtext(lew_name, insert=(COL5 + 3, data_y), char_height=data_h_lg)
+            backend.add_mtext(lew_name, insert=(tbc.col5 + 3, data_y), char_height=data_h_lg)
         if lew_licence:
             backend.add_mtext(
                 f"{tb.ema_licence}{lew_licence_display}",
-                insert=(COL5 + 3, data_y - line_sp - 1),
+                insert=(tbc.col5 + 3, data_y - line_sp - 1),
                 char_height=2.0,
             )
         if lew_mobile:
             backend.add_mtext(
                 f"{tb.mobile_number}{lew_mobile}",
-                insert=(COL5 + 3, data_y - line_sp * 2 - 1),
+                insert=(tbc.col5 + 3, data_y - line_sp * 2 - 1),
                 char_height=2.0,
             )
 
@@ -236,27 +300,27 @@ def fill_title_block_data(
     # -- Cell 7: DATE (top-right of 2x2) --
     backend.add_mtext(
         date.today().strftime("%d %b %Y").upper(),
-        insert=(COL6_MID + 3, ROW_TOP - 9),
+        insert=(tbc.col6_mid + 3, tbc.row_top - 9),
         char_height=2.5,
     )
 
     # -- Cell 8: DRAWING NO (bottom-left of 2x2) --
     backend.add_mtext(
         drawing_number,
-        insert=(COL6 + 3, ROW_MID - 6),
+        insert=(tbc.col6 + 3, tbc.row_mid - 6),
         char_height=2.5,
     )
 
     # -- Cell 9: REV (bottom-right of 2x2) --
     backend.add_mtext(
         revision,
-        insert=(COL6_MID + 8, ROW_MID - 6),
+        insert=(tbc.col6_mid + 8, tbc.row_mid - 6),
         char_height=3.5,
     )
 
     # -- SCALE & SHEET (inside DWG NO cell, small text at bottom) --
-    backend.add_mtext(tb.scale_nts, insert=(COL6 + 3, ROW_BOT + 2), char_height=1.6)
-    backend.add_mtext(tb.sheet_1of1, insert=(COL6_MID + 3, ROW_BOT + 2), char_height=1.6)
+    backend.add_mtext(tb.scale_nts, insert=(tbc.col6 + 3, tbc.row_bot + 2), char_height=1.6)
+    backend.add_mtext(tb.sheet_1of1, insert=(tbc.col6_mid + 3, tbc.row_bot + 2), char_height=1.6)
 
 
 def _fit_font_size(text: str, cell_width: float, max_height: float, min_height: float = 1.8) -> float:
