@@ -51,7 +51,11 @@ def _validate_and_correct(requirements: dict) -> dict:
     main_breaker = requirements.get("main_breaker", {})
     if not isinstance(main_breaker, dict):
         main_breaker = {}
-    breaker_rating = main_breaker.get("rating", 0) or main_breaker.get("rating_A", 0)
+    breaker_rating = (
+        main_breaker.get("rating", 0)
+        or main_breaker.get("rating_A", 0)
+        or requirements.get("breaker_rating", 0)  # top-level fallback
+    )
     sub_circuits = requirements.get("sub_circuits", []) or requirements.get("circuits", [])
 
     spec_input = {
@@ -59,9 +63,13 @@ def _validate_and_correct(requirements: dict) -> dict:
         "supply_type": requirements.get("supply_type", ""),
         "supply_source": requirements.get("supply_source", ""),
         "breaker_rating": breaker_rating,
-        "breaker_type": main_breaker.get("type", ""),
-        "breaker_poles": main_breaker.get("poles", ""),
-        "breaker_ka": main_breaker.get("fault_kA", 0),
+        "breaker_type": main_breaker.get("type", "") or requirements.get("breaker_type", ""),
+        "breaker_poles": main_breaker.get("poles", "") or requirements.get("breaker_poles", ""),
+        "breaker_ka": (
+            main_breaker.get("fault_kA", 0)
+            or requirements.get("breaker_ka", 0)
+            or requirements.get("fault_kA", 0)
+        ),
         "metering": requirements.get("metering", ""),
         "circuits": [
             {
@@ -85,12 +93,18 @@ def _validate_and_correct(requirements: dict) -> dict:
     for w in result.warnings:
         logger.warning("SLD validation: %s", w)
 
-    # Apply corrections to a copy of requirements
-    if result.corrections:
-        corrected_spec = apply_corrections(spec_input, result)
-        requirements = dict(requirements)  # Shallow copy
-        mb = dict(main_breaker)  # Copy main_breaker too
+    # Apply corrections + ensure validated values propagate to main_breaker
+    corrected_spec = apply_corrections(spec_input, result) if result.corrections else spec_input
+    requirements = dict(requirements)  # Shallow copy
+    mb = dict(main_breaker)  # Copy main_breaker too
 
+    # Ensure main_breaker dict has validated values (from corrections or user input)
+    mb.setdefault("rating", 0)
+    mb.setdefault("type", "")
+    mb.setdefault("fault_kA", 0)
+    mb.setdefault("poles", "")
+
+    if result.corrections:
         if "breaker_rating" in result.corrections:
             mb["rating"] = corrected_spec["breaker_rating"]
             if "rating_A" in mb:
@@ -102,7 +116,17 @@ def _validate_and_correct(requirements: dict) -> dict:
         if "breaker_poles" in result.corrections:
             mb["poles"] = corrected_spec["breaker_poles"]
 
-        requirements["main_breaker"] = mb
+    # Fill from validated spec_input for fields not already set in main_breaker
+    if not mb["rating"] and corrected_spec.get("breaker_rating"):
+        mb["rating"] = corrected_spec["breaker_rating"]
+    if not mb["type"] and corrected_spec.get("breaker_type"):
+        mb["type"] = corrected_spec["breaker_type"]
+    if not mb["fault_kA"] and corrected_spec.get("breaker_ka"):
+        mb["fault_kA"] = corrected_spec["breaker_ka"]
+    if not mb["poles"] and corrected_spec.get("breaker_poles"):
+        mb["poles"] = corrected_spec["breaker_poles"]
+
+    requirements["main_breaker"] = mb
 
     return requirements
 

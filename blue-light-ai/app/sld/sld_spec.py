@@ -521,17 +521,28 @@ def _validate_breaker_type(
 ) -> None:
     """Validate / auto-correct breaker_type (Step 5).
 
-    Checks that the user-provided breaker type matches the spec for the
-    effective rating. Auto-corrects mismatches or missing values.
+    If user explicitly provides a valid breaker type (MCB/MCCB/ACB/RCCB/ELCB),
+    trust it and warn only — don't auto-correct. Only auto-correct invalid
+    types or fill in missing values.
     """
+    _VALID_BREAKER_TYPES = {"MCB", "MCCB", "ACB", "RCCB", "ELCB"}
     if effective_spec and breaker_type:
         if breaker_type.upper() != effective_spec.breaker_type:
-            result.add_correction(
-                "breaker_type",
-                breaker_type, effective_spec.breaker_type,
-                f"{effective_rating}A requires {effective_spec.breaker_type} "
-                f"(not {breaker_type})",
-            )
+            if breaker_type.upper() in _VALID_BREAKER_TYPES:
+                # User explicitly chose a valid type — respect it, warn only
+                result.add_warning(
+                    f"Main breaker type '{breaker_type}' differs from standard "
+                    f"'{effective_spec.breaker_type}' for {effective_rating}A. "
+                    f"User-specified value retained."
+                )
+            else:
+                # Invalid type — auto-correct
+                result.add_correction(
+                    "breaker_type",
+                    breaker_type, effective_spec.breaker_type,
+                    f"Invalid breaker type '{breaker_type}'. "
+                    f"Corrected to {effective_spec.breaker_type} for {effective_rating}A.",
+                )
     elif effective_spec and not breaker_type:
         result.add_correction(
             "breaker_type", "", effective_spec.breaker_type,
@@ -635,7 +646,7 @@ def _validate_metering(
         if not metering:
             result.add_correction(
                 "metering", "", "sp_meter",
-                f"Auto-determined: <45kVA → SP meter (direct metering)",
+                f"Auto-determined: {effective_rating}A (direct metering, CT not required)",
             )
 
 

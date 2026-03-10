@@ -306,12 +306,35 @@ class TestValidation:
         assert "supply_type" in result.corrections
         assert result.corrections["supply_type"]["corrected"] == "three_phase"
 
-    def test_auto_correction_breaker_type(self):
-        """Wrong breaker type auto-corrected."""
-        req = {"kva": 200, "breaker_type": "MCB"}  # 200kVA → 300A → MCCB
+    def test_valid_breaker_type_mismatch_warns_not_corrects(self):
+        """Valid breaker type that differs from spec → warn only, not corrected."""
+        req = {"kva": 200, "breaker_type": "MCB"}  # 200kVA → 300A → spec says MCCB
+        result = validate_sld_requirements(req)
+        # MCB is a valid type → should NOT be auto-corrected
+        assert "breaker_type" not in result.corrections
+        # But should have a warning
+        assert any("differs from standard" in w for w in result.warnings)
+
+    def test_invalid_breaker_type_auto_corrected(self):
+        """Invalid breaker type → auto-corrected to spec value."""
+        req = {"kva": 200, "breaker_type": "XYZ"}  # Invalid type
         result = validate_sld_requirements(req)
         assert "breaker_type" in result.corrections
         assert result.corrections["breaker_type"]["corrected"] == "MCCB"
+
+    def test_user_mccb_for_100a_preserved(self):
+        """User explicitly specifies MCCB for 100A (spec says MCB) → preserved."""
+        req = {
+            "kva": 69.28,
+            "supply_type": "three_phase",
+            "breaker_rating": 100,
+            "breaker_type": "MCCB",
+            "breaker_poles": "TPN",
+            "breaker_ka": 25,
+        }
+        result = validate_sld_requirements(req)
+        assert "breaker_type" not in result.corrections
+        assert any("MCCB" in w and "retained" in w for w in result.warnings)
 
     def test_auto_correction_metering(self):
         """Metering auto-determined based on kVA."""
@@ -323,6 +346,18 @@ class TestValidation:
         req_large = {"kva": 110}
         result_large = validate_sld_requirements(req_large)
         assert result_large.corrections.get("metering", {}).get("corrected") == "ct_meter"
+
+    def test_metering_message_accuracy(self):
+        """SP meter message should reference rating, not misleading kVA threshold."""
+        req = {"kva": 69.28, "supply_type": "three_phase"}
+        result = validate_sld_requirements(req)
+        metering_correction = result.corrections.get("metering", {})
+        assert metering_correction.get("corrected") == "sp_meter"
+        reason = metering_correction.get("reason", "")
+        # Should NOT contain misleading "<45kVA" text
+        assert "<45kVA" not in reason
+        # Should contain actual rating info
+        assert "100A" in reason
 
     def test_insufficient_ka_auto_corrects(self):
         """Fault rating below minimum → auto-corrected."""
@@ -575,3 +610,46 @@ class TestValidateMetering:
         # No metering correction should be applied for landlord supply
         assert "metering" not in result.corrections
         assert len(result.warnings) == 0
+
+
+# ── Top-Level Key Fallback (engine.py) ───────────────────────────
+
+class TestTopLevelKeyFallback:
+    """Test that _validate_and_correct reads top-level breaker keys as fallback."""
+
+    def test_top_level_breaker_rating_used(self):
+        """Top-level breaker_rating used when main_breaker dict absent."""
+        from app.sld.layout.engine import _validate_and_correct
+
+        req = {
+            "kva": 14,
+            "supply_type": "single_phase",
+            "breaker_rating": 40,
+            "breaker_type": "MCB",
+            "breaker_poles": "DP",
+            "sub_circuits": [
+                {"name": "Light", "breaker_rating": 10, "breaker_type": "MCB"},
+            ],
+        }
+        result = _validate_and_correct(req)
+        mb = result.get("main_breaker", {})
+        # 40A is a standard rating → should be preserved (not overwritten to 63A)
+        assert mb.get("rating") == 40 or result.get("breaker_rating") == 40
+
+    def test_main_breaker_dict_takes_priority(self):
+        """main_breaker dict takes priority over top-level keys."""
+        from app.sld.layout.engine import _validate_and_correct
+
+        req = {
+            "kva": 14,
+            "supply_type": "single_phase",
+            "breaker_rating": 63,  # top-level
+            "main_breaker": {"rating": 40, "type": "MCB", "poles": "DP"},
+            "sub_circuits": [
+                {"name": "Light", "breaker_rating": 10, "breaker_type": "MCB"},
+            ],
+        }
+        result = _validate_and_correct(req)
+        mb = result.get("main_breaker", {})
+        # main_breaker.rating=40 should take priority over top-level 63
+        assert mb.get("rating") == 40

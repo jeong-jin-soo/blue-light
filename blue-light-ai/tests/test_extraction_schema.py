@@ -601,7 +601,7 @@ class TestE2ESampleData:
 
         With INCOMING_SPEC_3PHASE, 69.28 kVA + three_phase maps to 100A TPN MCB.
         The sample data specifies 100A MCCB TPN, so:
-        - breaker_type auto-corrected: MCCB → MCB (100A should be MCB)
+        - breaker_type: MCCB is a valid type → warn only, NOT corrected (user value retained)
         - breaker_rating 100A is correct (no correction needed)
         - poles TPN is correct (no correction needed)
         """
@@ -613,19 +613,23 @@ class TestE2ESampleData:
         assert extracted["incoming"]["phase"] == "three_phase"
         assert len(extracted["outgoing_circuits"]) == 3
 
-        # Validation should auto-correct MCCB → MCB (100A is MCB range)
+        # MCCB is a valid type → should NOT be auto-corrected (warn only)
         corrections = result["validation"]["corrections"]
-        has_type_correction = "breaker_type" in corrections
-        assert has_type_correction, f"Expected breaker_type correction (MCCB→MCB), got: {corrections}"
-        assert corrections["breaker_type"]["corrected"] == "MCB"
+        assert "breaker_type" not in corrections, (
+            "MCCB is a valid type — should not be auto-corrected"
+        )
         # breaker_rating 100A matches spec — no rating correction needed
         assert "breaker_rating" not in corrections
 
-        # Generation-ready format should reflect extracted + corrections
+        # Should have a warning about type mismatch
+        warnings = result["validation"]["warnings"]
+        assert any("differs from standard" in w for w in warnings)
+
+        # Generation-ready format should retain user's MCCB
         gen = result["generation_ready"]
         assert gen["supply_type"] == "three_phase"
         assert gen["kva"] == 69.28
-        assert gen["main_breaker"]["type"] == "MCB"
+        assert gen["main_breaker"]["type"] == "MCCB"  # User value retained
         assert gen["main_breaker"]["rating"] == 100
         assert len(gen["sub_circuits"]) == 3
         assert gen["elcb"]["rating"] == 100
