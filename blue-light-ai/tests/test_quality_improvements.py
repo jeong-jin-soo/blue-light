@@ -400,7 +400,11 @@ class TestEndToEndNormalization:
     """Test that the full pipeline works: raw input → normalized → resolved → layout."""
 
     def test_nested_breaker_produces_correct_layout(self):
-        """Nested breaker input should produce correct MCB ratings in layout."""
+        """Nested breaker input should produce correct MCB ratings in layout.
+
+        TPN (3-phase) layouts pad with SPARE circuits for triplet alignment,
+        so actual breaker count >= input count.
+        """
         from app.sld.layout.engine import compute_layout
         req = {
             "kva": 43,
@@ -418,9 +422,10 @@ class TestEndToEndNormalization:
             ],
         }
         result = compute_layout(req)
-        # Find sub-circuit breakers (CB_MCB, CB_MCCB, etc.)
+        # Find non-spare sub-circuit breakers
         sub_breakers = [c for c in result.components
-                        if c.symbol_name.startswith("CB_") and c.circuit_id]
+                        if c.symbol_name.startswith("CB_") and c.circuit_id
+                        and "spare" not in (c.label or "").lower()]
         assert len(sub_breakers) == 2
         ratings = sorted(int(c.rating.replace("A", "")) for c in sub_breakers if c.rating)
         assert 10 in ratings  # Lighting should be 10A
@@ -439,6 +444,8 @@ class TestEndToEndNormalization:
             ],
         }
         result = compute_layout(req)
+        # Filter out SPARE breakers from the count (3-phase triplet padding)
         sub_breakers = [c for c in result.components
-                        if c.symbol_name.startswith("CB_") and c.circuit_id]
+                        if c.symbol_name.startswith("CB_") and c.circuit_id
+                        and "spare" not in (c.label or "").lower()]
         assert len(sub_breakers) == 2

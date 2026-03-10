@@ -198,25 +198,7 @@ class TestSymbolMapIntegration:
                 # Some symbols might need arguments
                 pass
 
-    def test_legend_descriptions_match_map(self):
-        """Every REAL_SYMBOL_MAP key should have a legend description."""
-        from app.sld.generator import SldGenerator
-        from app.sld.real_symbols import REAL_SYMBOL_MAP
-
-        for key in REAL_SYMBOL_MAP:
-            assert key in SldGenerator.LEGEND_DESCRIPTIONS, (
-                f"REAL_SYMBOL_MAP key '{key}' missing from LEGEND_DESCRIPTIONS"
-            )
-
-    def test_legend_abbreviations_match_map(self):
-        """Every REAL_SYMBOL_MAP key should have a legend abbreviation."""
-        from app.sld.generator import SldGenerator
-        from app.sld.real_symbols import REAL_SYMBOL_MAP
-
-        for key in REAL_SYMBOL_MAP:
-            assert key in SldGenerator.LEGEND_ABBREVIATIONS, (
-                f"REAL_SYMBOL_MAP key '{key}' missing from LEGEND_ABBREVIATIONS"
-            )
+    # Legend tests removed — LEGEND_DESCRIPTIONS/ABBREVIATIONS deleted (legacy code)
 
 
 class TestSpecificSymbols:

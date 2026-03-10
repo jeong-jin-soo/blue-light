@@ -1,12 +1,51 @@
 """
 SLD Layout overlap resolution system.
 
-Contains the 5-step overlap resolution pipeline:
-1. _identify_groups()           — classify components/connections by sub-circuit
-2. _compute_group_width()       — bounding box based minimum widths
-3. _determine_final_positions() — single-pass left-to-right with bounds fit
-4. _rebuild_from_positions()    — index-based absolute repositioning
-5. _fit_busbar_to_groups()      — extent-aware busbar fitting
+Pipeline Architecture
+=====================
+compute_layout() (engine.py) calls resolve_overlaps() AFTER all sections are
+placed (steps 1-8 in engine.py).  resolve_overlaps() executes a 5-step
+pipeline **per row** of sub-circuits:
+
+  Step 1: _identify_groups(layout_result)
+    INPUT:  LayoutResult with all components/connections placed
+    OUTPUT: list[SubCircuitGroup] with tap_x, breaker_idx, circuit_id_idx,
+            name_label_idx, connection_indices, junction_dot_idx set
+    DEPS:   Requires spine_x set by compute_layout()
+            Requires busbar_y_per_row for multi-row Y-proximity filtering
+    INVARIANT: groups sorted by (row_idx, tap_x) ascending
+
+  Step 2: _compute_group_width(group, components)
+    INPUT:  SubCircuitGroup with breaker_idx or spare_label_idx set
+    OUTPUT: group.min_width, group.left_extent, group.right_extent set
+    DEPS:   Requires _compute_bounding_box() to read symbol dimensions
+    INVARIANT: left_extent + right_extent == min_width
+
+  Step 3: _determine_final_positions(groups, components, layout_result, config)
+    INPUT:  groups with left_extent/right_extent/gap_before set
+    OUTPUT: list[float] new_tap_xs (final X positions)
+    DEPS:   May modify layout_result.busbar_start_x / busbar_end_x
+    INVARIANT: new_tap_xs preserves group ordering from Step 1
+
+  Step 4: _rebuild_from_positions(groups, new_tap_xs, layout_result)
+    INPUT:  groups with stored indices, new_tap_xs from Step 3
+    OUTPUT: layout_result.components/connections/dots mutated in-place
+    DEPS:   Indices from Step 1 must still be valid (no list insertions/deletions
+            between Step 1 and Step 4)
+    INVARIANT: delta_x = new_tap_x - original_tap_x applied uniformly to all
+               elements in a group
+
+  Step 5: _fit_busbar_to_groups(groups, new_tap_xs, layout_result, ...)
+    INPUT:  final groups and positions from Steps 3-4
+    OUTPUT: busbar_start_x / busbar_end_x adjusted, BUSBAR/LABEL/DB box updated
+    DEPS:   db_box_dashed_indices must be valid
+
+Correctness Invariants
+  - No list insertions/deletions between Step 1 and Step 4 (index stability)
+  - Steps 1-4 are per-row; Step 5 is cross-row
+  - incoming_chain_x connections are never moved (they belong to the spine)
+  - Post-resolve operations (_add_phase_fanout, _add_cable_leader_lines,
+    _add_isolator_device_symbols) run AFTER resolve_overlaps completes
 
 Also includes:
 - BoundingBox: AABB for overlap detection
@@ -237,55 +276,29 @@ def _compute_dynamic_spacing(num_circuits: int, config: LayoutConfig) -> float:
                min(ideal_spacing, config.max_horizontal_spacing))
 
 
-def _identify_groups(
-    layout_result: LayoutResult,
-) -> tuple[list[SubCircuitGroup], float]:
-    """
-    Identify sub-circuit groups by scanning components and connections.
-
-    Each breaker_block or SPARE label anchors a group. Associated
-    CIRCUIT_ID_BOX, circuit name LABEL, and vertical connections are
-    matched by proximity to the group's tap_x AND row (Y-proximity).
-
-    Multi-row awareness: groups are assigned to rows using busbar_y_per_row,
-    and element matching checks Y-proximity to prevent cross-row mismatches
-    when circuits from different rows share similar X positions.
-
-    Returns:
-        groups: list of SubCircuitGroup sorted by (row_idx, tap_x) ascending
-        incoming_chain_x: x-coordinate of the incoming supply chain
-    """
-    components = layout_result.components
-    connections = layout_result.connections
-    _TOL = 1.5  # coordinate matching tolerance (mm)
-
+def _create_groups_from_breakers(
+    components: list[PlacedComponent],
+) -> list[SubCircuitGroup]:
+    """Create initial groups from breaker_block components (pure)."""
     groups: list[SubCircuitGroup] = []
-
-    # Step 1: Create groups from breaker_block components
     for i, comp in enumerate(components):
         if comp.label_style == "breaker_block" and comp.symbol_name.startswith("CB_"):
             tap_x = comp.x + _breaker_half_width(comp)
-            g = SubCircuitGroup(tap_x=tap_x, breaker_idx=i)
-            groups.append(g)
+            groups.append(SubCircuitGroup(tap_x=tap_x, breaker_idx=i))
+    return groups
 
-    # Step 2: DISABLED — all SPARE circuits now render with MCB (breaker_block)
-    # and are captured by Step 1. The old SPARE-label-only fallback is no longer
-    # needed. Keeping Step 2 caused duplicate groups and 3-phase triplet corruption.
-    _SPARE = SG_LOCALE.circuit.spare
 
-    if not groups:
-        return [], 0.0
+def _assign_rows_to_groups(
+    groups: list[SubCircuitGroup],
+    components: list[PlacedComponent],
+    layout_result: LayoutResult,
+) -> float:
+    """Assign row_idx/row_busbar_y to each group and compute Y tolerance.
 
-    # Step 2b: Assign row_idx and row_busbar_y to each group
-    # Uses busbar_y_per_row to determine which row each circuit belongs to.
-    # This is critical for multi-row layouts where circuits from different
-    # rows share similar X positions — without row awareness, connection
-    # matching would assign connections to the wrong group.
+    Returns _Y_TOL (Y-axis tolerance for element matching).
+    """
     busbar_ys = layout_result.busbar_y_per_row or [layout_result.busbar_y]
 
-    # Dynamic Y tolerance: connections extend up to ~30mm above breaker,
-    # which is ~28mm above busbar. Must be less than row_spacing to prevent
-    # cross-row matching. Use 70% of row_spacing, minimum 30mm.
     if len(busbar_ys) >= 2:
         min_row_gap = min(
             abs(busbar_ys[i + 1] - busbar_ys[i])
@@ -293,7 +306,7 @@ def _identify_groups(
         )
         _Y_TOL = max(min_row_gap * 0.7, 30.0)
     else:
-        _Y_TOL = 999.0  # Single row — no Y filtering needed
+        _Y_TOL = 999.0
 
     for g in groups:
         if g.breaker_idx is not None:
@@ -303,7 +316,6 @@ def _identify_groups(
         else:
             comp_y = busbar_ys[0]
 
-        # Find nearest busbar_y (breaker_y ≈ busbar_y + busbar_to_breaker_gap)
         best_row = 0
         best_dist = float("inf")
         for ri, by in enumerate(busbar_ys):
@@ -314,25 +326,31 @@ def _identify_groups(
         g.row_idx = best_row
         g.row_busbar_y = busbar_ys[best_row]
 
-    # Sort by (row_idx, tap_x) — keeps rows together for per-row processing
     groups.sort(key=lambda g: (g.row_idx, g.tap_x))
-    tap_xs_set = {g.tap_x for g in groups}
+    return _Y_TOL
 
-    # Step 3: Determine incoming chain x
-    # Primary: use spine_x from compute_layout() (deterministic, always correct)
-    # Fallback: heuristic histogram detection (legacy, for external callers)
-    incoming_chain_x = 0.0
+
+def _detect_incoming_chain_x(
+    layout_result: LayoutResult,
+    groups: list[SubCircuitGroup],
+) -> float:
+    """Detect the incoming supply chain X coordinate.
+
+    Primary: uses spine_x from compute_layout().
+    Fallback: histogram-based detection for backward compatibility.
+    """
+    _TOL = 1.5
 
     if layout_result.spine_x > 0:
         incoming_chain_x = layout_result.spine_x
     else:
-        # Legacy: histogram-based detection for backward compatibility
         vert_conn_x_count: dict[float, int] = {}
-        for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
-            if abs(sx - ex) < 0.5:  # Vertical connection
+        for (sx, sy), (ex, ey) in layout_result.connections:
+            if abs(sx - ex) < 0.5:
                 x_val = round(sx, 1)
                 vert_conn_x_count[x_val] = vert_conn_x_count.get(x_val, 0) + 1
 
+        incoming_chain_x = 0.0
         max_count = 0
         second_count = 0
         for x_val, count in vert_conn_x_count.items():
@@ -344,18 +362,17 @@ def _identify_groups(
                     incoming_chain_x = x_val
                 elif count > second_count:
                     second_count = count
-
         if max_count > 0 and max_count <= second_count:
             incoming_chain_x = 0.0
 
-    # Transition validation: compare spine_x with histogram result
+    # Transition validation
     if layout_result.spine_x > 0 and incoming_chain_x > 0:
-        _histo_x = 0.0
         _histo_count: dict[float, int] = {}
-        for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
+        for (sx, sy), (ex, ey) in layout_result.connections:
             if abs(sx - ex) < 0.5:
                 x_val = round(sx, 1)
                 _histo_count[x_val] = _histo_count.get(x_val, 0) + 1
+        _histo_x = 0.0
         _max_c = 0
         for x_val, count in _histo_count.items():
             is_tap = any(abs(x_val - g.tap_x) < _TOL for g in groups)
@@ -368,88 +385,89 @@ def _identify_groups(
                 incoming_chain_x, _histo_x,
             )
 
-    # Step 4: Match CIRCUIT_ID_BOX to groups (with Y-proximity)
+    return incoming_chain_x
+
+
+def _match_elements_to_groups(
+    groups: list[SubCircuitGroup],
+    layout_result: LayoutResult,
+    incoming_chain_x: float,
+    _Y_TOL: float,
+) -> None:
+    """Match CIRCUIT_ID_BOX, LABELs, connections, dots, and arrows to groups.
+
+    Mutates groups in-place, setting circuit_id_idx, name_label_idx,
+    connection_indices, junction_dot_idx, arrow_point_idx, and is_spare.
+    """
+    components = layout_result.components
+    connections = layout_result.connections
+    _TOL = 1.5
+    main_busbar_y = layout_result.busbar_y
+
+    # Match CIRCUIT_ID_BOX
     for i, comp in enumerate(components):
         if comp.symbol_name != "CIRCUIT_ID_BOX":
             continue
         for g in groups:
             if abs(comp.x - g.tap_x) < _TOL and g.circuit_id_idx is None:
-                # Y-proximity: CIRCUIT_ID_BOX is at busbar_y + 2
                 if abs(comp.y - g.row_busbar_y) > _Y_TOL:
                     continue
                 g.circuit_id_idx = i
                 break
 
-    # Step 4b: Set is_spare flag from breaker label (circuit name == "SPARE")
-    # In 3-phase layouts, SPARE circuit IDs follow phase rotation (L2S3, L3P6)
-    # instead of SP1/SP2, so we detect SPARE by the circuit name, not the ID.
+    # Set is_spare flag
     for g in groups:
         if g.breaker_idx is not None:
             label = (components[g.breaker_idx].label or "").upper()
             if label == "SPARE":
                 g.is_spare = True
 
-    # Step 5: Match vertical circuit name LABELs (at tap_x, rotation=90)
+    # Match vertical name LABELs (rotation=90)
     for i, comp in enumerate(components):
         if not (comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1):
             continue
-        # Match ALL groups including SPARE — so _rebuild_from_positions can
-        # update the LABEL x-coordinate when tap_x shifts.
         for g in groups:
             if abs(comp.x - g.tap_x) < 6.0 and g.name_label_idx is None:
-                # Y-proximity: name label is above breaker tail
                 if g.breaker_idx is not None:
                     breaker_y = components[g.breaker_idx].y
-                    if abs(comp.y - breaker_y) > _Y_TOL + 30:  # label is further above
+                    if abs(comp.y - breaker_y) > _Y_TOL + 30:
                         continue
                 g.name_label_idx = i
                 break
 
-    # Step 6: Match vertical connections to groups (exclude incoming chain)
-    # Y-proximity: use connection's minimum Y vs group's row_busbar_y
-    main_busbar_y = layout_result.busbar_y
+    # Match vertical connections (exclude incoming chain and out-of-zone)
     for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
         if abs(sx - ex) > 0.5:
-            continue  # Not vertical
+            continue
         conn_x = sx
-        # Skip incoming chain connections
         if abs(conn_x - incoming_chain_x) < _TOL:
             continue
-        # Skip connections outside circuit column zone
-        # (above busbar = incoming supply area, below DB box = meter board area)
         conn_max_y = max(sy, ey)
-        conn_min_y_raw = min(sy, ey)
-        if conn_max_y < main_busbar_y - 5:
-            continue  # above incoming supply
-        if conn_min_y_raw > main_busbar_y + 60:
-            continue  # below DB box (meter board earth, etc.)
         conn_min_y = min(sy, ey)
+        if conn_max_y < main_busbar_y - 5 or conn_min_y > main_busbar_y + 60:
+            continue
         for g in groups:
             if abs(conn_x - g.tap_x) < _TOL:
-                # Y-proximity: connection min_y should be near group's busbar_y
                 if abs(conn_min_y - g.row_busbar_y) > _Y_TOL:
                     continue
                 g.connection_indices.append(ci)
                 break
 
-    # Step 7: Match junction_dots to groups (with Y-proximity)
+    # Match junction_dots
     for di, (dx, dy) in enumerate(layout_result.junction_dots):
-        # Skip dots outside circuit zone (meter board earth, etc.)
         if dy < main_busbar_y - 5 or dy > main_busbar_y + 60:
             continue
         for g in groups:
             if abs(dx - g.tap_x) < _TOL and g.junction_dot_idx is None:
-                # Y-proximity: junction dot is at busbar_y
                 if abs(dy - g.row_busbar_y) > _Y_TOL:
                     continue
                 g.junction_dot_idx = di
                 break
 
-    # Step 8: Match arrow_points to groups (with Y-proximity)
+    # Match arrow_points
     for ai, (ax, ay) in enumerate(layout_result.arrow_points):
         for g in groups:
             if abs(ax - g.tap_x) < _TOL and g.arrow_point_idx is None:
-                # Y-proximity: arrow point is above breaker
                 if g.breaker_idx is not None:
                     breaker_y = components[g.breaker_idx].y
                     if abs(ay - breaker_y) > _Y_TOL + 30:
@@ -457,9 +475,31 @@ def _identify_groups(
                 g.arrow_point_idx = ai
                 break
 
-    # Diagnostic: detect unmatched (orphan) elements
-    _validate_group_completeness(groups, components, layout_result, incoming_chain_x)
 
+def _identify_groups(
+    layout_result: LayoutResult,
+) -> tuple[list[SubCircuitGroup], float]:
+    """Identify sub-circuit groups by scanning components and connections.
+
+    Delegates to 4 sub-functions:
+      1. _create_groups_from_breakers — create initial groups
+      2. _assign_rows_to_groups — assign row_idx, sort by (row_idx, tap_x)
+      3. _detect_incoming_chain_x — find spine X coordinate
+      4. _match_elements_to_groups — match IDs, labels, connections, dots
+
+    Returns:
+        groups: list of SubCircuitGroup sorted by (row_idx, tap_x) ascending
+        incoming_chain_x: x-coordinate of the incoming supply chain
+    """
+    groups = _create_groups_from_breakers(layout_result.components)
+    if not groups:
+        return [], 0.0
+
+    _Y_TOL = _assign_rows_to_groups(groups, layout_result.components, layout_result)
+    incoming_chain_x = _detect_incoming_chain_x(layout_result, groups)
+    _match_elements_to_groups(groups, layout_result, incoming_chain_x, _Y_TOL)
+
+    _validate_group_completeness(groups, layout_result.components, layout_result, incoming_chain_x)
     return groups, incoming_chain_x
 
 
@@ -814,9 +854,11 @@ def _fit_busbar_to_groups(
                 break
 
     # Update busbar rating LABEL position — left-aligned below busbar
+    # Match both "XA BUSBAR" (>500A) and "XA COMB BAR" (≤500A)
     for comp in components:
+        label_upper = (comp.label or "").upper()
         if (comp.symbol_name == "LABEL"
-                and "BUSBAR" in (comp.label or "").upper()
+                and ("BUSBAR" in label_upper or "COMB BAR" in label_upper)
                 and abs(comp.rotation) < 0.1):
             comp.x = layout_result.busbar_start_x + 3
             break
@@ -1307,6 +1349,12 @@ def resolve_overlaps(
       - All tap points remain within the busbar extent
       - Incoming chain connections are never moved
       - Deterministic: same input → same output
+
+    INVARIANT: No list insertions or deletions to layout_result.components,
+    connections, junction_dots, or arrow_points between Step 1 (_identify_groups)
+    and Step 4 (_rebuild_from_positions). Step 1 stores integer indices into
+    these lists, and Step 4 uses those indices to apply position deltas.
+    Insertions or deletions would invalidate the stored indices.
     """
     if config is None:
         config = LayoutConfig()

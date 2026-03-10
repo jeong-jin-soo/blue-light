@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import NamedTuple
 
 from app.sld.layout.helpers import (
     _assign_circuit_ids,
@@ -277,385 +278,316 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
     ctx.y = y
 
 
+class _MeterBoardGeom(NamedTuple):
+    """Computed geometry for horizontal meter board layout."""
+    # Component centers (horizontal)
+    iso_cx: float
+    kwh_cx: float
+    mcb_cx: float
+    mb_center_y: float
+    # Horizontal extents (rotated 90°: symbol height → horizontal)
+    iso_h_extent: float
+    kwh_h_extent: float
+    mcb_h_extent: float
+    # Pin X positions
+    iso_left_x: float
+    iso_right_x: float
+    mcb_left_x: float
+    mcb_right_x: float
+    # Box boundaries
+    mb_box_left: float
+    mb_box_right: float
+    mb_box_top: float
+    mb_box_bottom: float
+    # Label Y positions
+    kwh_label_y: float
+    mb_label_y: float
+    # Stub length
+    stub: float
+
+
+def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _MeterBoardGeom:
+    """Compute all meter board geometry from config and position (pure function).
+
+    Returns a _MeterBoardGeom with all coordinates needed for placement.
+    """
+    comp_spacing = 25
+    _stub = config.stub_len
+    _mb_inset = 4
+
+    # Horizontal extents (symbol.height → h_extent when rotated 90°)
+    iso_h_extent = config.isolator_h
+    kwh_h_extent = config.kwh_rect_w
+    mcb_h_extent = config.mcb_h
+
+    # Vertical half-extents (symbol.width/2 → v_half when rotated 90°)
+    iso_v_half = config.isolator_w / 2
+    kwh_v_half = config.kwh_rect_h / 2
+    mcb_v_half = config.mcb_w / 2
+    max_v_half = max(iso_v_half, kwh_v_half, mcb_v_half)
+
+    # Text sizes (must match generator.py)
+    _comp_label_ch = 1.6
+    _comp_label_lsp = 1.4
+    _comp_label_lines = 2
+    _comp_label_h = _comp_label_ch * _comp_label_lsp * _comp_label_lines
+    _anno_label_ch = 2.8
+
+    # Component centers
+    iso_cx = cx + iso_h_extent / 2 + _stub + _mb_inset
+    kwh_cx = iso_cx + comp_spacing
+    mcb_cx = iso_cx + 2 * comp_spacing
+    mb_center_y = y + 8
+
+    # Pin positions
+    iso_left_x = cx + _mb_inset
+    iso_right_x = iso_cx + iso_h_extent / 2 + _stub
+    mcb_left_x = mcb_cx - mcb_h_extent / 2 - _stub
+    mcb_right_x = mcb_cx + mcb_h_extent / 2 + _stub
+
+    # Vertical bands — above center
+    _gap = 1.5
+    kwh_label_y = mb_center_y + max_v_half + _gap + _anno_label_ch
+    mb_box_top = kwh_label_y + _gap
+
+    # Vertical bands — below center
+    comp_label_y = mb_center_y - max_v_half - _gap
+    comp_label_bot = comp_label_y - _comp_label_h
+    mb_label_y = comp_label_bot - 2
+    mb_label_bot = mb_label_y - _anno_label_ch
+    mb_box_bottom = mb_label_bot - 1
+
+    # Box horizontal extent
+    iso_body_left = iso_cx - iso_h_extent / 2
+    mb_box_left = iso_body_left - 4
+    mb_box_right = mcb_right_x + 4
+
+    return _MeterBoardGeom(
+        iso_cx=iso_cx, kwh_cx=kwh_cx, mcb_cx=mcb_cx,
+        mb_center_y=mb_center_y,
+        iso_h_extent=iso_h_extent, kwh_h_extent=kwh_h_extent, mcb_h_extent=mcb_h_extent,
+        iso_left_x=iso_left_x, iso_right_x=iso_right_x,
+        mcb_left_x=mcb_left_x, mcb_right_x=mcb_right_x,
+        mb_box_left=mb_box_left, mb_box_right=mb_box_right,
+        mb_box_top=mb_box_top, mb_box_bottom=mb_box_bottom,
+        kwh_label_y=kwh_label_y, mb_label_y=mb_label_y,
+        stub=_stub,
+    )
+
+
+def _place_meter_board_symbols(
+    ctx: _LayoutContext, g: _MeterBoardGeom,
+) -> None:
+    """Place ISO, CT, KWH, MCB symbols and inter-component wiring."""
+    result = ctx.result
+
+    # Spine → ISO routing
+    if g.iso_left_x > ctx.cx:
+        result.connections.append(((ctx.cx, g.mb_center_y), (g.iso_left_x, g.mb_center_y)))
+
+    # ISOLATOR (left)
+    result.components.append(PlacedComponent(
+        symbol_name="ISOLATOR",
+        x=g.iso_cx - g.iso_h_extent / 2,
+        y=g.mb_center_y,
+        label=f"{ctx.breaker_rating}A {ctx.meter_poles}",
+        rating=SG_LOCALE.meter_board.isolator,
+        rotation=90.0,
+    ))
+    result.symbols_used.add("ISOLATOR")
+
+    # ISO → KWH wiring
+    kwh_left_x = g.kwh_cx - g.kwh_h_extent / 2 - g.stub
+    result.connections.append(((g.iso_right_x, g.mb_center_y), (kwh_left_x, g.mb_center_y)))
+
+    # CT (between ISO and KWH) — ct_meter + non-landlord only
+    if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
+        ct_mid_x = (g.iso_cx + g.kwh_cx) / 2
+        ct_r = ctx.config.ct_size / 2
+        ct_label = f"CT {ctx.ct_ratio}" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
+        result.components.append(PlacedComponent(
+            symbol_name="CT", x=ct_mid_x - ct_r, y=g.mb_center_y - ct_r, label=ct_label,
+        ))
+        result.symbols_used.add("CT")
+
+    # KWH METER (center)
+    result.components.append(PlacedComponent(
+        symbol_name="KWH_METER", x=g.kwh_cx, y=g.mb_center_y, rotation=90.0,
+    ))
+    result.symbols_used.add("KWH_METER")
+
+    # KWH label (above symbols, inside box)
+    _kwh_label = ctx.requirements.get("kwh_label")
+    if not _kwh_label:
+        if ctx.supply_source == "landlord":
+            _kwh_label = SG_LOCALE.meter_board.kwh_meter_pg
+        else:
+            _kwh_label = SG_LOCALE.meter_board.kwh_meter_by_sp
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL",
+        x=(g.iso_cx + g.mcb_cx) / 2 - 10,
+        y=g.kwh_label_y,
+        label=_kwh_label,
+    ))
+
+    # KWH → MCB wiring
+    kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2 + g.stub
+    result.connections.append(((kwh_right_x, g.mb_center_y), (g.mcb_left_x, g.mb_center_y)))
+
+    # MCB (right)
+    _mcb_poles = ctx.breaker_poles
+    _mcb_char = ctx.main_breaker_char or "B"
+    _mcb_ka = ctx.breaker_fault_kA or 10
+    result.components.append(PlacedComponent(
+        symbol_name="CB_MCB",
+        x=g.mcb_cx - g.mcb_h_extent / 2,
+        y=g.mb_center_y,
+        label=f"{ctx.breaker_rating}A {_mcb_poles} MCB",
+        rating=f"TYPE {_mcb_char} {_mcb_ka}kA",
+        rotation=90.0,
+    ))
+    result.symbols_used.add("MCB")
+
+
+def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
+    """Add horizontal supply entry line, incoming label, and cable tick annotation."""
+    result = ctx.result
+
+    # Supply entry line from MCB rightward
+    supply_end_x = g.mcb_right_x + 20
+    result.connections.append(((g.mcb_right_x, g.mb_center_y), (supply_end_x, g.mb_center_y)))
+
+    # Incoming label
+    if ctx.requirements.get("incoming_label"):
+        supply_label = ctx.requirements["incoming_label"]
+    elif ctx.is_cable_extension:
+        supply_label = SG_LOCALE.incoming.from_power_supply
+    elif ctx.supply_source == "landlord":
+        supply_label = SG_LOCALE.incoming.from_landlord
+    else:
+        supply_label = SG_LOCALE.incoming.incoming_hdb
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL", x=supply_end_x + 3, y=g.mb_center_y + 3, label=supply_label,
+    ))
+
+    # Incoming cable tick + leader line
+    cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
+    if cable_text:
+        tick_x = g.mcb_right_x + 10
+        tick_size = 1.5
+        result.connections.append((
+            (tick_x - tick_size, g.mb_center_y - tick_size),
+            (tick_x + tick_size, g.mb_center_y + tick_size),
+        ))
+        leader_bottom_y = g.mb_center_y - 10
+        result.connections.append(((tick_x, g.mb_center_y), (tick_x, leader_bottom_y)))
+        shelf_len = 3
+        result.connections.append(((tick_x, leader_bottom_y), (tick_x + shelf_len, leader_bottom_y)))
+        _label_ch = 2.8
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=tick_x + shelf_len + 1,
+            y=leader_bottom_y + _label_ch * 0.5,
+            label=cable_text,
+        ))
+
+
+def _add_outgoing_cable_tick(
+    ctx: _LayoutContext, g: _MeterBoardGeom, y_exit: float,
+) -> None:
+    """Add outgoing cable tick mark and annotation on vertical exit line."""
+    result = ctx.result
+    cx = ctx.cx
+    outgoing_cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
+    if not outgoing_cable_text:
+        return
+
+    tick_y = (g.mb_box_top + y_exit) / 2
+    tick_size = 1.25
+    result.thick_connections.append((
+        (cx - tick_size, tick_y - tick_size),
+        (cx + tick_size, tick_y + tick_size),
+    ))
+    _leader_len = 3
+    result.connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
+
+    _label_ch = 2.8
+    _char_w = _label_ch * 0.6
+    _lines = outgoing_cable_text.split("\\P")
+    _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
+    _text_width = _max_line_len * _char_w
+    _text_x = cx - _leader_len - 1 - _text_width
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL", x=_text_x, y=tick_y + _label_ch * 0.5, label=outgoing_cable_text,
+    ))
+
+
+def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
+    """Draw dashed box, labels, and earth symbol (3-phase only)."""
+    result = ctx.result
+    config = ctx.config
+
+    # Dashed box
+    result.dashed_connections.append(((g.mb_box_left, g.mb_box_bottom), (g.mb_box_right, g.mb_box_bottom)))
+    result.dashed_connections.append(((g.mb_box_left, g.mb_box_top), (g.mb_box_right, g.mb_box_top)))
+    result.dashed_connections.append(((g.mb_box_left, g.mb_box_bottom), (g.mb_box_left, g.mb_box_top)))
+    result.dashed_connections.append(((g.mb_box_right, g.mb_box_bottom), (g.mb_box_right, g.mb_box_top)))
+
+    # "METER BOARD" label inside box
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL", x=g.mb_box_left + 1, y=g.mb_label_y,
+        label=SG_LOCALE.meter_board.meter_board,
+    ))
+    # "LOCATED AT METER COMPARTMENT" below box
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL",
+        x=(g.mb_box_left + g.mb_box_right) / 2 - 18,
+        y=g.mb_box_bottom - 3,
+        label=SG_LOCALE.meter_board.located_meter_compartment,
+    ))
+
+    # Earth symbol — 3-phase only
+    if ctx.supply_type != "single_phase":
+        from app.sld.real_symbols import get_symbol_dimensions
+        dims = get_symbol_dimensions("EARTH")
+        ew, eh = dims["width_mm"], dims["height_mm"]
+        earth_cx = g.mb_box_right + 4
+        earth_x = earth_cx - ew / 2
+        earth_top_pin_y = g.mb_box_bottom - config.earth_x_from_db / 2
+        earth_y = earth_top_pin_y - eh
+        junction_y = g.mb_box_bottom + 3
+
+        result.connections.append(((g.mb_box_right, junction_y), (earth_cx, junction_y)))
+        result.connections.append(((earth_cx, junction_y), (earth_cx, earth_top_pin_y)))
+        result.junction_dots.append((g.mb_box_right, junction_y))
+        result.components.append(PlacedComponent(
+            symbol_name="EARTH", x=earth_x, y=earth_y, label="E",
+        ))
+        result.symbols_used.add("EARTH")
+
+
 def _place_meter_board(ctx: _LayoutContext) -> None:
     """Place meter board section HORIZONTALLY: [ISO]--[KWH]--[MCB] on same Y line.
 
-    Horizontal layout matching professional LEW drawings:
-    - All three components on the SAME horizontal line (same Y center)
-    - Isolator on the LEFT, KWH in CENTER, MCB on the RIGHT
-    - Connected by horizontal line segments between each component
-    - Dashed box around the whole meter board
-    - "METER BOARD / LOCATED AT / METER COMPARTMENT" label below the box
-
-    Routing from the main vertical spine (cx):
-    - From (cx, y) down-left to Isolator input (left side)
-    - Through Isolator -> horizontal to KWH -> horizontal to MCB
-    - From MCB output (right side) up-right back to cx
-    - Continue up from cx
-
-    Layout diagram:
-                cx
-                |
-      +---------+  <- MCB output routes back to cx
-      |         |
-      [ISO]--[KWH]--[MCB]    <- horizontal meter board
-      |         |
-      +---------+  <- cx routes to ISO input
-                |
-           (from below)
+    Horizontal layout matching professional LEW drawings.
+    Delegates to sub-functions for geometry computation, symbol placement,
+    cable annotations, and box/earth drawing.
     """
-    result = ctx.result
-    config = ctx.config
-    cx = ctx.cx
     y = ctx.y
-    metering = ctx.metering
-    breaker_rating = ctx.breaker_rating
-    meter_poles = ctx.meter_poles
 
-    # -- 2. Meter Board Section (SP PowerGrid standard) --
-    # Contains: Meter Isolator + [CT for ct_meter] + KWH Meter + Meter MCB TYPE C
-    # Located at the building's meter compartment
-    # Skipped for landlord supply (no SP metering required)
+    if ctx.metering:
+        g = _compute_meter_board_geom(ctx.config, ctx.cx, y)
 
-    if metering:
-        # ================================================================
-        # METER BOARD — Horizontal layout: [ISO]--[KWH]--[MCB]
-        #
-        # PRINCIPLE: NO element may overlap another.
-        # Vertical bands are calculated explicitly, bottom-up:
-        #
-        #   Band 7: ---- box top line ----          mb_box_top
-        #   Band 6: "KWH METER BY SP" label         kwh_label_y (text top)
-        #   Band 5: (gap 1.5mm)
-        #   Band 4: Symbol tops (ISO ±4.0)           mb_center_y + iso_v_half
-        #   Band 3: === SYMBOLS at mb_center_y ===   mb_center_y
-        #   Band 2: Symbol bottoms                   mb_center_y - iso_v_half
-        #   Band 1: (gap 1.5mm)
-        #   Band 0: Component labels (2 lines)       comp_label_y (text top)
-        #   ---- (gap 2mm) ----
-        #   "METER BOARD" label                      mb_label_y (text top)
-        #   ---- (gap 1mm) ----
-        #   ---- box bottom line ----               mb_box_bottom
-        # ================================================================
+        _place_meter_board_symbols(ctx, g)
+        _add_incoming_supply_line(ctx, g)
 
-        # -- Horizontal layout parameters --
-        comp_spacing = 25  # 25mm between component centers
-        _stub = config.stub_len  # Synced from real_symbol_paths.json (single source of truth)
-        _mb_inset = 4      # Extra inset to push components away from spine (cx)
+        # Vertical exit line from spine
+        outgoing_cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
+        y_exit = g.mb_box_top + (16 if outgoing_cable_text else 8)
+        ctx.result.connections.append(((ctx.cx, g.mb_center_y), (ctx.cx, y_exit)))
 
-        # -- Component horizontal extents (symbol.height → h_extent when rotated 90°) --
-        iso_h_extent = config.isolator_h       # from JSON: ISOLATOR.height_mm
-        kwh_h_extent = config.kwh_rect_w       # from JSON: KWH rect width (horizontal span)
-        mcb_h_extent = config.mcb_h            # from JSON: MCB.height_mm
-
-        # -- Component vertical half-extents (symbol.width/2 → v_half when rotated 90°) --
-        iso_v_half = config.isolator_w / 2     # from JSON: ISOLATOR.width_mm / 2
-        kwh_v_half = config.kwh_rect_h / 2     # from JSON: KWH rect height / 2
-        mcb_v_half = config.mcb_w / 2          # from JSON: MCB.width_mm / 2
-        max_v_half = max(iso_v_half, kwh_v_half, mcb_v_half)
-
-        # -- Text sizes (must match generator.py) --
-        _comp_label_ch = 1.6     # Horizontal component label char_height
-        _comp_label_lines = 2    # Most labels are 2 lines (e.g. "40A DP\nISOLATOR")
-        _comp_label_lsp = 1.4    # Line spacing factor
-        _comp_label_h = _comp_label_ch * _comp_label_lsp * _comp_label_lines  # ~4.5mm
-        _anno_label_ch = 2.8     # LABEL component char_height (generator.py)
-
-        # -- Component centers (horizontal positions) --
-        iso_cx = cx + iso_h_extent / 2 + _stub + _mb_inset  # Pushed right for box padding
-        kwh_cx = iso_cx + comp_spacing             # KWH in center
-        mcb_cx = iso_cx + 2 * comp_spacing         # MCB on the right
-
-        # -- Vertical center --
-        mb_center_y = y + 8
-
-        # -- X pin positions --
-        iso_left_x = cx + _mb_inset  # ISO left pin (shifted right by inset)
-        iso_right_x = iso_cx + iso_h_extent / 2 + _stub
-        mcb_left_x = mcb_cx - mcb_h_extent / 2 - _stub
-        mcb_right_x = mcb_cx + mcb_h_extent / 2 + _stub
-
-        # ================================================================
-        # VERTICAL BAND CALCULATION (no overlaps guaranteed)
-        # ================================================================
-
-        # ABOVE center: symbol top → gap → KWH label → gap → box top
-        _gap = 1.5
-        kwh_label_y = mb_center_y + max_v_half + _gap + _anno_label_ch  # text TOP
-        mb_box_top = kwh_label_y + _gap
-
-        # BELOW center: symbol bottom → gap → comp labels → gap → MB label → gap → box bottom
-        comp_label_y = mb_center_y - max_v_half - _gap   # text TOP (extends down)
-        comp_label_bot = comp_label_y - _comp_label_h     # text BOTTOM
-        mb_label_y = comp_label_bot - 2                   # "METER BOARD" text TOP (2mm gap)
-        mb_label_bot = mb_label_y - _anno_label_ch        # text BOTTOM
-        mb_box_bottom = mb_label_bot - 1                  # 1mm padding below
-
-        # -- Box horizontal extent (wraps components only, not spine at cx) --
-        iso_body_left = iso_cx - iso_h_extent / 2  # ISO body left edge
-        mb_box_left = iso_body_left - 4            # 4mm padding left of ISO body
-        mb_box_right = mcb_right_x + 4             # 4mm padding right of MCB
-
-        # ====== ROUTING: Spine connection at meter board level ======
-        # Non-metered (landlord): entry from below connects to spine
-        if not ctx.metering:
-            result.connections.append(((cx, y), (cx, mb_center_y)))
-        # Horizontal branch from spine to ISO left pin (if gap exists)
-        if iso_left_x > cx:
-            result.connections.append(((cx, mb_center_y), (iso_left_x, mb_center_y)))
-
-        # ====== Place ISOLATOR on LEFT ======
-        result.components.append(PlacedComponent(
-            symbol_name="ISOLATOR",
-            x=iso_cx - iso_h_extent / 2,
-            y=mb_center_y,
-            label=f"{breaker_rating}A {meter_poles}",
-            rating=SG_LOCALE.meter_board.isolator,
-            rotation=90.0,
-        ))
-        result.symbols_used.add("ISOLATOR")
-
-        # ====== Connection: ISO right -> KWH left ======
-        kwh_left_x = kwh_cx - kwh_h_extent / 2 - _stub
-        result.connections.append(((iso_right_x, mb_center_y), (kwh_left_x, mb_center_y)))
-
-        # ====== CT metering (between ISO and KWH) — only for ct_meter + non-landlord ======
-        # Landlord supply: CT is provided by SP, not shown on SLD
-        if metering == "ct_meter" and ctx.supply_source != "landlord":
-            ct_mid_x = (iso_cx + kwh_cx) / 2
-            ct_r = config.ct_size / 2
-            ct_label = f"CT {ctx.ct_ratio}" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
-            result.components.append(PlacedComponent(
-                symbol_name="CT",
-                x=ct_mid_x - ct_r,
-                y=mb_center_y - ct_r,
-                label=ct_label,
-            ))
-            result.symbols_used.add("CT")
-
-        # ====== Place KWH METER in CENTER ======
-        result.components.append(PlacedComponent(
-            symbol_name="KWH_METER",
-            x=kwh_cx,
-            y=mb_center_y,
-            rotation=90.0,
-        ))
-        result.symbols_used.add("KWH_METER")
-
-        # ====== KWH meter label — above symbols, inside box ======
-        # Priority: 1) input kwh_label  2) supply_source default  3) fallback
-        _kwh_label = ctx.requirements.get("kwh_label")
-        if not _kwh_label:
-            if ctx.supply_source == "landlord":
-                _kwh_label = SG_LOCALE.meter_board.kwh_meter_pg
-            else:
-                _kwh_label = SG_LOCALE.meter_board.kwh_meter_by_sp
-        kwh_label_x = (iso_cx + mcb_cx) / 2 - 10
-        result.components.append(PlacedComponent(
-            symbol_name="LABEL",
-            x=kwh_label_x,
-            y=kwh_label_y,
-            label=_kwh_label,
-        ))
-
-        # ====== Connection: KWH right -> MCB left ======
-        kwh_right_x = kwh_cx + kwh_h_extent / 2 + _stub
-        result.connections.append(((kwh_right_x, mb_center_y), (mcb_left_x, mb_center_y)))
-
-        # ====== Place MCB on RIGHT ======
-        # MCB uses electrical function notation (TPN/DP), not physical poles (4P/2P)
-        _mcb_poles = ctx.breaker_poles  # "TPN" (3φ) or "DP" (1φ)
-        _mcb_char = ctx.main_breaker_char or "B"
-        _mcb_ka = ctx.breaker_fault_kA or 10
-        result.components.append(PlacedComponent(
-            symbol_name="CB_MCB",
-            x=mcb_cx - mcb_h_extent / 2,
-            y=mb_center_y,
-            label=f"{breaker_rating}A {_mcb_poles} MCB",
-            rating=f"TYPE {_mcb_char} {_mcb_ka}kA",
-            rotation=90.0,
-        ))
-        result.symbols_used.add("MCB")
-
-        # ====== ROUTING: Supply entry from RIGHT ======
-        # Horizontal supply line from MCB to entry point
-        supply_ext = 20
-        supply_end_x = mcb_right_x + supply_ext
-        result.connections.append(((mcb_right_x, mb_center_y), (supply_end_x, mb_center_y)))
-
-        # INCOMING label — varies by supply source
-        # SP PowerGrid: "INCOMING FROM HDB ELECTRICAL RISER"
-        # Landlord: "FROM LANDLORD SUPPLY"
-        # Cable extension: "FROM POWER SUPPLY ON SITE"
-        if ctx.requirements.get("incoming_label"):
-            supply_label = ctx.requirements["incoming_label"]
-        elif ctx.is_cable_extension:
-            supply_label = SG_LOCALE.incoming.from_power_supply
-        elif ctx.supply_source == "landlord":
-            supply_label = SG_LOCALE.incoming.from_landlord
-        else:
-            supply_label = SG_LOCALE.incoming.incoming_hdb
-        result.components.append(PlacedComponent(
-            symbol_name="LABEL",
-            x=supply_end_x + 3,
-            y=mb_center_y + 3,
-            label=supply_label,
-        ))
-
-        # Cable annotation with tick mark + leader line (matching reference)
-        # Reference pattern:  ──╱──  tick mark on the supply line
-        #                       |    leader line going down
-        #                  ─────┘    shelf going LEFT
-        #   cable spec text          text to the LEFT
-        incoming_cable = ctx.incoming_cable
-        cable_text = format_cable_spec(incoming_cable, multiline=True)
-        if cable_text:
-            # Tick mark position: offset from MCB exit
-            tick_x = mcb_right_x + 10
-            tick_size = 1.5  # Half-length of diagonal tick
-            # Diagonal tick mark crossing the supply line (~45 degrees)
-            result.connections.append((
-                (tick_x - tick_size, mb_center_y - tick_size),
-                (tick_x + tick_size, mb_center_y + tick_size),
-            ))
-            # Leader line going DOWN from tick center
-            leader_len = 10
-            leader_bottom_y = mb_center_y - leader_len
-            result.connections.append((
-                (tick_x, mb_center_y),
-                (tick_x, leader_bottom_y),
-            ))
-            # Horizontal shelf to the right
-            shelf_len = 3
-            result.connections.append((
-                (tick_x, leader_bottom_y),
-                (tick_x + shelf_len, leader_bottom_y),
-            ))
-            # Cable spec text at end of shelf
-            _label_ch = 2.8
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=tick_x + shelf_len + 1,
-                y=leader_bottom_y + _label_ch * 0.5,
-                label=cable_text,
-            ))
-
-        # ====== ROUTING: Exit — straight up to MCCB ======
-        # Outgoing cable annotation (meter board → DB) — LEFT side tick mark
-        outgoing_cable = ctx.incoming_cable
-        outgoing_cable_text = format_cable_spec(outgoing_cable, multiline=True)
-
-        if outgoing_cable_text:
-            y_exit = mb_box_top + 16  # Extra room for cable annotation
-        else:
-            y_exit = mb_box_top + 8   # Normal gap
-        result.connections.append(((cx, mb_center_y), (cx, y_exit)))
-
-        # Cable annotation on outgoing vertical line (meter board → DB)
-        # Reference: tick mark on vertical wire + leader LEFT + cable spec text
-        # LEFT side outgoing tick: THICKER than incoming tick (standard cable tick style)
-        # This thick tick style is the standard for all non-incoming cables
-        if outgoing_cable_text:
-            # Tick mark position: midpoint of gap above meter board box
-            tick_y = (mb_box_top + y_exit) / 2
-            tick_size = 1.25  # Standard cable tick (half-length of diagonal)
-            # Diagonal tick crossing vertical line (/ shape)
-            # Use thick_connections for heavier line weight
-            result.thick_connections.append((
-                (cx - tick_size, tick_y - tick_size),
-                (cx + tick_size, tick_y + tick_size),
-            ))
-            # Leader line going LEFT from tick center
-            _leader_len = 3
-            result.connections.append((
-                (cx, tick_y),
-                (cx - _leader_len, tick_y),
-            ))
-            # Cable spec text — positioned to the LEFT of leader
-            # Text is LEFT-aligned (TOP_LEFT), so offset start position
-            # to the left by approximate text width
-            _label_ch = 2.8
-            _char_w = _label_ch * 0.6  # Approximate Helvetica char width
-            _lines = outgoing_cable_text.split("\\P")
-            _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
-            _text_width = _max_line_len * _char_w
-            _text_x = cx - _leader_len - 1 - _text_width
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=_text_x,
-                y=tick_y + _label_ch * 0.5,
-                label=outgoing_cable_text,
-            ))
-
-        # ====== Dashed box ======
-        result.dashed_connections.append(((mb_box_left, mb_box_bottom), (mb_box_right, mb_box_bottom)))
-        result.dashed_connections.append(((mb_box_left, mb_box_top), (mb_box_right, mb_box_top)))
-        result.dashed_connections.append(((mb_box_left, mb_box_bottom), (mb_box_left, mb_box_top)))
-        result.dashed_connections.append(((mb_box_right, mb_box_bottom), (mb_box_right, mb_box_top)))
-
-        # ====== "METER BOARD" label — inside box, bottom-left ======
-        result.components.append(PlacedComponent(
-            symbol_name="LABEL",
-            x=mb_box_left + 1,
-            y=mb_label_y,
-            label=SG_LOCALE.meter_board.meter_board,
-        ))
-        # "LOCATED AT METER COMPARTMENT" — below the box
-        result.components.append(PlacedComponent(
-            symbol_name="LABEL",
-            x=(mb_box_left + mb_box_right) / 2 - 18,
-            y=mb_box_bottom - 3,
-            label=SG_LOCALE.meter_board.located_meter_compartment,
-        ))
-
-        # ====== Earth symbol at meter board — 3-phase only ======
-        # Reference SLDs: 3-phase meter boards (63A TPN SLD 8, 40A TPN SLD 1)
-        # have earth/grounding symbol; single-phase (32A DB) does not.
-        #
-        # ㄱ-shape connection from box right wall:
-        #   box right wall ──●── horizontal ──┐
-        #                                      │ vertical
-        #                                     ═══
-        #                                      ══
-        #                                       =  E
-        if ctx.supply_type != "single_phase":
-            from app.sld.real_symbols import get_symbol_dimensions
-            _mb_earth_dims = get_symbol_dimensions("EARTH")
-            _mb_earth_w = _mb_earth_dims["width_mm"]   # 12
-            _mb_earth_h = _mb_earth_dims["height_mm"]  # 10
-
-            # Earth center X: outside the box right wall
-            _mb_earth_h_offset = 4  # 4mm offset from box right wall
-            mb_earth_cx = mb_box_right + _mb_earth_h_offset
-            mb_earth_x = mb_earth_cx - _mb_earth_w / 2
-
-            # Earth Y: below the box bottom
-            _mb_earth_v_gap = config.earth_x_from_db / 2  # 2.5mm vertical gap
-            mb_earth_top_pin_y = mb_box_bottom - _mb_earth_v_gap
-            mb_earth_y = mb_earth_top_pin_y - _mb_earth_h
-
-            # ㄱ connection: horizontal from box wall, then vertical down
-            _mb_earth_junction_y = mb_box_bottom + 3  # 3mm above box bottom
-            # 1) Horizontal: box right wall → earth center X
-            result.connections.append((
-                (mb_box_right, _mb_earth_junction_y),
-                (mb_earth_cx, _mb_earth_junction_y),
-            ))
-            # 2) Vertical: corner → earth top pin
-            result.connections.append((
-                (mb_earth_cx, _mb_earth_junction_y),
-                (mb_earth_cx, mb_earth_top_pin_y),
-            ))
-            # Junction dot at box right wall
-            result.junction_dots.append((mb_box_right, _mb_earth_junction_y))
-
-            result.components.append(PlacedComponent(
-                symbol_name="EARTH",
-                x=mb_earth_x,
-                y=mb_earth_y,
-                label="E",
-            ))
-            result.symbols_used.add("EARTH")
+        _add_outgoing_cable_tick(ctx, g, y_exit)
+        _add_meter_board_box_and_earth(ctx, g)
 
         y = y_exit
 

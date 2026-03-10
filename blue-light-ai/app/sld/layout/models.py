@@ -304,12 +304,8 @@ class LayoutResult:
     supply_type: str = "three_phase"
     voltage: int = 400
 
-    # Symbols used -- for dynamic legend generation
+    # Symbols used (diagnostic — tracks which symbol types are placed)
     symbols_used: set[str] = field(default_factory=set)
-
-    # v6: rendering flags (cable schedule & legend disabled by default)
-    render_cable_schedule: bool = False
-    render_legend: bool = False
 
     # Incoming supply spine x-coordinate (set by compute_layout)
     # Used by _identify_groups() for deterministic incoming chain detection

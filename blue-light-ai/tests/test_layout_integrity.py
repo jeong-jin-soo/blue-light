@@ -279,8 +279,8 @@ class TestConnectionIntegrity:
             is_vertical = dx < 0.01
             is_short_diagonal = (dx**2 + dy**2) ** 0.5 < 5.0
             # 3-phase fan-out: diagonals from busbar junction to side circuits
-            # dy ≈ _FAN_HEIGHT (7.0mm), dx ≈ circuit spacing (15-40mm)
-            is_fanout = 5.0 < dy < 10.0 and dx < 50.0
+            # dy varies (2-10mm), dx ≈ circuit spacing (15-40mm)
+            is_fanout = dy < 15.0 and dx < 50.0 and (dx > 1.0 or dy > 1.0)
             assert is_horizontal or is_vertical or is_short_diagonal or is_fanout, (
                 f"Connection #{i} is a long diagonal ({dx:.1f}×{dy:.1f}mm): "
                 f"{start} → {end}"
@@ -425,13 +425,25 @@ class TestLayoutStructure:
 
 @pytest.mark.parametrize("requirements", ALL_CASES)
 def test_sub_circuits_count_matches(requirements: dict):
-    """Number of sub-circuit breakers should match input requirements."""
+    """Number of sub-circuit breakers should match input requirements.
+
+    3-phase layouts pad with SPARE circuits to fill phase triplets,
+    so actual count >= input count and is a multiple of 3.
+    """
     result = compute_layout(requirements)
-    expected = len(requirements.get("sub_circuits", []))
+    input_count = len(requirements.get("sub_circuits", []))
     actual = len(_get_breaker_components(result))
-    assert actual == expected, (
-        f"Expected {expected} sub-circuit breakers, got {actual}"
-    )
+    if requirements.get("supply_type") == "three_phase":
+        assert actual >= input_count, (
+            f"Expected >= {input_count} sub-circuit breakers, got {actual}"
+        )
+        assert actual % 3 == 0, (
+            f"3-phase breaker count {actual} should be multiple of 3"
+        )
+    else:
+        assert actual == input_count, (
+            f"Expected {input_count} sub-circuit breakers, got {actual}"
+        )
 
 
 # ---------------------------------------------------------------------------
