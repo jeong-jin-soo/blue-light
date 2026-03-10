@@ -58,10 +58,15 @@ def _validate_and_correct(requirements: dict) -> dict:
     )
     sub_circuits = requirements.get("sub_circuits", []) or requirements.get("circuits", [])
 
+    # Cable extension uses landlord supply path for validation
+    supply_source = requirements.get("supply_source", "")
+    if requirements.get("is_cable_extension") and supply_source != "landlord":
+        supply_source = "landlord"
+
     spec_input = {
         "kva": requirements.get("kva", 0),
         "supply_type": requirements.get("supply_type", ""),
-        "supply_source": requirements.get("supply_source", ""),
+        "supply_source": supply_source,
         "breaker_rating": breaker_rating,
         "breaker_type": main_breaker.get("type", "") or requirements.get("breaker_type", ""),
         "breaker_poles": main_breaker.get("poles", "") or requirements.get("breaker_poles", ""),
@@ -115,6 +120,9 @@ def _validate_and_correct(requirements: dict) -> dict:
             mb["fault_kA"] = corrected_spec["breaker_ka"]
         if "breaker_poles" in result.corrections:
             mb["poles"] = corrected_spec["breaker_poles"]
+        # Propagate metering correction to requirements
+        if "metering" in result.corrections:
+            requirements["metering"] = corrected_spec["metering"]
 
     # Fill from validated spec_input for fields not already set in main_breaker
     if not mb["rating"] and corrected_spec.get("breaker_rating"):
@@ -125,6 +133,10 @@ def _validate_and_correct(requirements: dict) -> dict:
         mb["fault_kA"] = corrected_spec["breaker_ka"]
     if not mb["poles"] and corrected_spec.get("breaker_poles"):
         mb["poles"] = corrected_spec["breaker_poles"]
+
+    # Fill metering from validated spec if not already set
+    if not requirements.get("metering") and corrected_spec.get("metering"):
+        requirements["metering"] = corrected_spec["metering"]
 
     requirements["main_breaker"] = mb
 

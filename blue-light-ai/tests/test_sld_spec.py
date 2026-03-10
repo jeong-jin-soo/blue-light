@@ -654,6 +654,60 @@ class TestTopLevelKeyFallback:
         # main_breaker.rating=40 should take priority over top-level 63
         assert mb.get("rating") == 40
 
+    def test_metering_correction_propagated_to_requirements(self):
+        """Metering auto-correction ('' → 'sp_meter') should propagate back."""
+        from app.sld.layout.engine import _validate_and_correct
+
+        req = {
+            "kva": 14,
+            "supply_type": "single_phase",
+            "main_breaker": {"rating": 63, "type": "MCB", "poles": "DP", "fault_kA": 10},
+            "sub_circuits": [
+                {"name": "Light", "breaker_rating": 10, "breaker_type": "MCB"},
+            ],
+        }
+        # No metering key → should be auto-corrected to "sp_meter"
+        result = _validate_and_correct(req)
+        assert result.get("metering") == "sp_meter", (
+            "Metering correction should propagate to requirements dict"
+        )
+
+    def test_metering_not_forced_for_landlord(self):
+        """Landlord supply should NOT auto-set metering."""
+        from app.sld.layout.engine import _validate_and_correct
+
+        req = {
+            "kva": 14,
+            "supply_type": "single_phase",
+            "supply_source": "landlord",
+            "main_breaker": {"rating": 63, "type": "MCB", "poles": "DP", "fault_kA": 10},
+            "sub_circuits": [
+                {"name": "Light", "breaker_rating": 10, "breaker_type": "MCB"},
+            ],
+        }
+        result = _validate_and_correct(req)
+        assert not result.get("metering"), (
+            "Landlord supply should not auto-set metering"
+        )
+
+    def test_metering_not_forced_for_cable_extension(self):
+        """Cable extension (is_cable_extension=True) should NOT auto-set metering."""
+        from app.sld.layout.engine import _validate_and_correct
+
+        req = {
+            "kva": 14,
+            "supply_type": "single_phase",
+            "is_cable_extension": True,
+            "main_breaker": {"rating": 63, "type": "MCB", "poles": "DP", "fault_kA": 10},
+            "sub_circuits": [
+                {"name": "Light", "breaker_rating": 10, "breaker_type": "MCB"},
+            ],
+        }
+        result = _validate_and_correct(req)
+        assert not result.get("metering"), (
+            "Cable extension should not auto-set metering (treated as landlord)"
+        )
+
 
 # ── A2: User-type-aware kA / poles validation ────────────────────
 

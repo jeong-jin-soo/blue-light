@@ -34,6 +34,8 @@ def _normalize_svg(svg: str) -> str:
     svg = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s\"'<]*", "TIMESTAMP", svg)
     # Remove epoch timestamps (e.g., 1710000000)
     svg = re.sub(r"\b1[67]\d{8}\b", "EPOCH", svg)
+    # Remove human-readable dates in title block (e.g., "10 MAR 2026")
+    svg = re.sub(r"\d{1,2} [A-Z]{3} \d{4}", "DATE", svg)
     # Normalize floating point precision (avoid 0.0000001 vs 0.0 diffs)
     svg = re.sub(r"(\d+\.\d{4})\d+", r"\1", svg)
     return svg
