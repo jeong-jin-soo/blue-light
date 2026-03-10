@@ -86,7 +86,8 @@ def _compute_block_heights_from_dxf(dxf_path: Path) -> dict[str, float]:
         return {}
     try:
         doc = ezdxf.readfile(str(dxf_path))
-    except Exception:
+    except Exception as exc:
+        logger.debug("DXF reference file read failed (%s): %s", dxf_path, exc)
         return {}
     heights: dict[str, float] = {}
     for block_name in _DXF_BLOCK_HEIGHTS:
@@ -111,7 +112,8 @@ def _compute_block_heights_from_dxf(dxf_path: Path) -> dict[str, float]:
                 elif etype in ("LWPOLYLINE", "POLYLINE"):
                     for pt in entity.get_points():
                         y_coords.append(pt[1])
-            except Exception:
+            except Exception as exc:
+                logger.debug("DXF entity parse skipped in block %s: %s", block_name, exc)
                 continue
         if y_coords:
             heights[block_name] = max(y_coords) - min(y_coords)

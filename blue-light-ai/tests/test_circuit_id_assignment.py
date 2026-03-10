@@ -9,11 +9,17 @@ Covers:
 - User-provided circuit_id override (pass-through)
 - ISOLATOR has separate counter (ISOL 1, ISOL 2)
 - Mixed user + auto IDs without counter collision
+- _categorize_circuit sub-function unit tests
+- _assign_spare_phase_slot sub-function unit tests
 """
 
 import pytest
 
-from app.sld.layout.helpers import _assign_circuit_ids
+from app.sld.layout.helpers import (
+    _assign_circuit_ids,
+    _assign_spare_phase_slot,
+    _categorize_circuit,
+)
 
 
 def _make_circuit(name: str, breaker_type: str = "MCB", circuit_id: str = "") -> dict:
@@ -177,3 +183,80 @@ class TestOutputLength:
         """Empty input returns empty output."""
         assert _assign_circuit_ids([], "single_phase") == []
         assert _assign_circuit_ids([], "three_phase") == []
+
+
+# =============================================
+# _categorize_circuit sub-function tests
+# =============================================
+
+class TestCategorizeCircuit:
+    """Unit tests for the extracted _categorize_circuit sub-function."""
+
+    def test_categorize_spare(self):
+        """name="SPARE" → ("spare", None)."""
+        cat, uid = _categorize_circuit({"name": "SPARE"})
+        assert cat == "spare"
+        assert uid is None
+
+    def test_categorize_isolator_by_type(self):
+        """breaker_type="ISOLATOR" → ("isolator", None)."""
+        cat, uid = _categorize_circuit({"name": "AIRCON", "breaker_type": "ISOLATOR"})
+        assert cat == "isolator"
+        assert uid is None
+
+    def test_categorize_user_id(self):
+        """circuit_id="L1S1" → ("user_id", "L1S1")."""
+        cat, uid = _categorize_circuit({"name": "Lights", "circuit_id": "L1S1"})
+        assert cat == "user_id"
+        assert uid == "L1S1"
+
+    def test_categorize_lighting(self):
+        """name contains "LED" or "LIGHT" → ("lighting", None)."""
+        for name in ("LED Downlight", "Lights A", "Lamp Post"):
+            cat, uid = _categorize_circuit({"name": name})
+            assert cat == "lighting", f"Expected lighting for name={name!r}"
+            assert uid is None
+
+    def test_categorize_power_default(self):
+        """name="Socket" → ("power", None) — default category."""
+        cat, uid = _categorize_circuit({"name": "Socket"})
+        assert cat == "power"
+        assert uid is None
+
+    def test_categorize_heater(self):
+        """name containing 'heater' → ("heater", None)."""
+        cat, uid = _categorize_circuit({"name": "Water Heater"})
+        assert cat == "heater"
+        assert uid is None
+
+
+# =============================================
+# _assign_spare_phase_slot sub-function tests
+# =============================================
+
+class TestAssignSparePhaseSlot:
+    """Unit tests for the extracted _assign_spare_phase_slot sub-function."""
+
+    def test_spare_phase_slot_fills_gap(self):
+        """L1S1,L2S1 present → SPARE gets L3S1 (fills gap in triplet)."""
+        ids = ["L1S1", "L2S1"]
+        categories = ["lighting", "lighting", "spare"]
+        user_ids = [None, None, None]
+        result = _assign_spare_phase_slot(ids, categories, user_ids, index=2)
+        assert result == "L3S1"
+
+    def test_spare_phase_slot_power_section(self):
+        """SPARE after power section fills power phase gap."""
+        ids = ["L1P1", "L2P1"]
+        categories = ["power", "power", "spare"]
+        user_ids = [None, None, None]
+        result = _assign_spare_phase_slot(ids, categories, user_ids, index=2)
+        assert result == "L3P1"
+
+    def test_spare_phase_slot_after_full_triplet(self):
+        """SPARE after complete triplet starts next number."""
+        ids = ["L1S1", "L2S1", "L3S1"]
+        categories = ["lighting", "lighting", "lighting", "spare"]
+        user_ids = [None, None, None, None]
+        result = _assign_spare_phase_slot(ids, categories, user_ids, index=3)
+        assert result == "L1S2"

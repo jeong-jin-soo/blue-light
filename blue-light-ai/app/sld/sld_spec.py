@@ -426,83 +426,60 @@ def _detect_3phase_to_single_phase_db(requirements: dict) -> bool:
     return False
 
 
-def validate_sld_requirements(requirements: dict) -> ValidationResult:
-    """
-    Validate and enrich Gemini-extracted SLD requirements JSON.
+def _get_effective_spec(
+    result: ValidationResult,
+    breaker_rating: int,
+    spec: IncomingSpec | None,
+    supply_type: str,
+) -> IncomingSpec | None:
+    """Determine the effective IncomingSpec for downstream validation steps.
 
-    Checks the JSON data against the official specification tables
-    and auto-corrects values where possible.
-
-    Expected requirements keys:
-        kva: float               — Total load in kVA
-        supply_type: str         — "single_phase" or "three_phase"
-        breaker_rating: int      — Main breaker rating (A)
-        breaker_type: str        — "MCB", "MCCB", "ACB"
-        breaker_poles: str       — "DP", "TPN", "4P"
-        breaker_ka: int          — Fault rating (kA)
-        cable_size: str          — Incoming cable size
-        circuits: list[dict]     — Sub-circuits with breaker info
-        metering: str            — "sp_meter" or "ct_meter"
-        ... (other fields passed through)
+    Consolidates the repeated effective spec lookup logic. Uses the corrected
+    breaker_rating (from Step 4) if available, then resolves the correct spec
+    table entry based on supply_type (prefers 3-phase TPN when applicable).
 
     Returns:
-        ValidationResult with errors, warnings, and auto-corrections.
+        The resolved IncomingSpec, or None if no spec can be determined.
     """
-    result = ValidationResult()
-    kva = requirements.get("kva", 0)
-    supply_type = requirements.get("supply_type", "")
-    breaker_rating = requirements.get("breaker_rating", 0)
-    breaker_type = requirements.get("breaker_type", "")
-    breaker_poles = requirements.get("breaker_poles", requirements.get("poles", ""))
-    breaker_ka = requirements.get("breaker_ka", 0)
+    corrected_rating = result.corrections.get("breaker_rating", {}).get("corrected")
+    effective_rating = corrected_rating or breaker_rating or (spec.rating_a if spec else 0)
+    # Prefer 3-phase spec when supply_type is three_phase (avoids TPN→DP misfire)
+    effective_supply = (
+        result.corrections.get("supply_type", {}).get("corrected")
+        or supply_type
+        or (spec.phase if spec else "")
+    )
+    if effective_supply == "three_phase" and effective_rating in INCOMING_SPEC_3PHASE:
+        return INCOMING_SPEC_3PHASE[effective_rating]
+    return INCOMING_SPEC.get(effective_rating, spec)
 
-    # ── 0. Basic required fields ──────────────────────────────────
-    from app.sld.validation_messages import MISSING_KVA_OR_BREAKER
-    if not kva and not breaker_rating:
-        result.add_error(MISSING_KVA_OR_BREAKER)
-        return result
 
-    # ── 1. kVA → Spec lookup ──────────────────────────────────────
-    spec: IncomingSpec | None = None
-    if kva:
-        try:
-            spec = lookup_incoming_by_kva(kva, supply_type=supply_type)
-        except ValueError as e:
-            # SG team decision (2026-03-08): kVA exceeding range → warning only
-            # User/LEW takes responsibility for non-standard kVA values
-            result.add_warning(str(e))
+def _get_effective_rating(
+    result: ValidationResult,
+    breaker_rating: int,
+    spec: IncomingSpec | None,
+) -> int:
+    """Determine the effective breaker rating for downstream validation.
 
-    # ── 2. 3-Phase incoming to Single Phase DB detection ──────────
-    if _detect_3phase_to_single_phase_db(requirements):
-        result.add_warning(
-            "⚠️ NON-STANDARD CONFIGURATION DETECTED: "
-            "3-Phase incoming tap to Single Phase DB. "
-            "This is only allowed if the building owner and building LEW "
-            "have explicitly approved this arrangement. "
-            "Ensure proper documentation and approval before proceeding."
-        )
-        # Don't auto-correct phase — this is an intentional non-standard setup
-        # But still validate other parameters against the specified breaker rating
+    Uses the corrected breaker_rating (from Step 4) if available,
+    otherwise falls back to user-provided or spec-derived rating.
+    """
+    corrected_rating = result.corrections.get("breaker_rating", {}).get("corrected")
+    return corrected_rating or breaker_rating or (spec.rating_a if spec else 0)
 
-    # ── 3. Validate / auto-correct supply_type ────────────────────
-    if spec and supply_type:
-        if supply_type != spec.phase and not _detect_3phase_to_single_phase_db(requirements):
-            result.add_correction(
-                "supply_type",
-                supply_type, spec.phase,
-                f"kVA={kva} maps to {spec.rating_a}A which is {spec.phase}",
-            )
 
-    if spec and not supply_type:
-        result.add_correction(
-            "supply_type", "", spec.phase,
-            f"Auto-determined from kVA={kva} → {spec.phase}",
-        )
+def _validate_breaker_rating(
+    spec: IncomingSpec | None,
+    breaker_rating: int,
+    kva: float,
+    result: ValidationResult,
+) -> None:
+    """Validate / auto-correct breaker_rating (Step 4).
 
-    # ── 4. Validate / auto-correct breaker_rating ─────────────────
-    # SG team decision (2026-03-08): user/LEW responsible for kVA.
-    # If user explicitly provides a standard breaker_rating, trust it
-    # (warn only, don't auto-correct). Only auto-correct non-standard ratings.
+    SG team decision (2026-03-08): user/LEW responsible for kVA.
+    If user explicitly provides a standard breaker_rating, trust it
+    (warn only, don't auto-correct). Only auto-correct non-standard ratings.
+    """
     if spec and breaker_rating:
         if breaker_rating != spec.rating_a:
             user_in_table = (breaker_rating in INCOMING_SPEC
@@ -535,21 +512,18 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             f"Auto-determined from kVA={kva}",
         )
 
-    # ── 5. Validate / auto-correct breaker_type ───────────────────
-    # Use corrected breaker_rating if it was auto-corrected in Step 4
-    corrected_rating = result.corrections.get("breaker_rating", {}).get("corrected")
-    effective_rating = corrected_rating or breaker_rating or (spec.rating_a if spec else 0)
-    # Prefer 3-phase spec when supply_type is three_phase (avoids TPN→DP misfire)
-    effective_supply = (
-        result.corrections.get("supply_type", {}).get("corrected")
-        or supply_type
-        or (spec.phase if spec else "")
-    )
-    if effective_supply == "three_phase" and effective_rating in INCOMING_SPEC_3PHASE:
-        effective_spec = INCOMING_SPEC_3PHASE[effective_rating]
-    else:
-        effective_spec = INCOMING_SPEC.get(effective_rating, spec)
 
+def _validate_breaker_type(
+    effective_spec: IncomingSpec | None,
+    breaker_type: str,
+    effective_rating: int,
+    result: ValidationResult,
+) -> None:
+    """Validate / auto-correct breaker_type (Step 5).
+
+    Checks that the user-provided breaker type matches the spec for the
+    effective rating. Auto-corrects mismatches or missing values.
+    """
     if effective_spec and breaker_type:
         if breaker_type.upper() != effective_spec.breaker_type:
             result.add_correction(
@@ -564,7 +538,17 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             f"Auto-determined: {effective_rating}A → {effective_spec.breaker_type}",
         )
 
-    # ── 6. Validate / auto-correct breaker_ka ─────────────────────
+
+def _validate_fault_rating(
+    effective_spec: IncomingSpec | None,
+    breaker_ka: int,
+    effective_rating: int,
+    result: ValidationResult,
+) -> None:
+    """Validate / auto-correct breaker_ka fault rating (Step 6).
+
+    Auto-corrects insufficient fault ratings. Warns on over-specified values.
+    """
     if effective_spec and breaker_ka:
         if breaker_ka < effective_spec.breaker_ka:
             # Auto-correct insufficient fault rating instead of blocking
@@ -587,7 +571,19 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             f"Auto-determined: {effective_spec.breaker_type} → {effective_spec.breaker_ka}kA",
         )
 
-    # ── 7. Validate / auto-correct poles ──────────────────────────
+
+def _validate_poles(
+    effective_spec: IncomingSpec | None,
+    breaker_poles: str,
+    effective_rating: int,
+    requirements: dict,
+    result: ValidationResult,
+) -> None:
+    """Validate / auto-correct breaker poles (Step 7).
+
+    Checks pole configuration against spec. Skips correction for the
+    non-standard 3-phase incoming to single-phase DB configuration.
+    """
     if effective_spec and breaker_poles:
         expected_poles = effective_spec.poles
         if breaker_poles.upper() != expected_poles:
@@ -603,44 +599,56 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             f"Auto-determined: {effective_spec.phase} → {effective_spec.poles}",
         )
 
-    # ── 8. Validate / auto-correct cable size ─────────────────────
-    cable_size = requirements.get("cable_size", "")
-    if effective_spec and not cable_size:
-        result.add_correction(
-            "cable_size", "", effective_spec.cable_size,
-            f"Auto-determined: {effective_rating}A → {effective_spec.cable_size}",
-        )
 
-    # ── 9. Validate metering type ─────────────────────────────────
-    metering = requirements.get("metering", "")
-    supply_source = requirements.get("supply_source", "")
+def _validate_metering(
+    effective_spec: IncomingSpec | None,
+    metering: str,
+    supply_source: str,
+    effective_rating: int,
+    result: ValidationResult,
+) -> None:
+    """Validate / auto-correct metering type (Step 9).
+
+    Landlord supply skips metering auto-correction. Otherwise determines
+    CT metering (requires_ct) or SP meter based on the effective spec.
+    """
     # Landlord supply: metering is optional (landlord provides metering)
     # Only auto-determine metering for SP PowerGrid or when not specified
     if supply_source == "landlord" and not metering:
         # Landlord supply — no metering auto-correction needed
-        pass
-    elif effective_spec:
-        if effective_spec.requires_ct:
-            if metering and metering != "ct_meter":
-                result.add_correction(
-                    "metering",
-                    metering, "ct_meter",
-                    f"{effective_rating}A (≥45kVA equivalent) requires CT metering",
-                )
-            elif not metering:
-                result.add_correction(
-                    "metering", "", "ct_meter",
-                    f"Auto-determined: ≥45kVA → CT metering",
-                )
-        else:
-            if not metering:
-                result.add_correction(
-                    "metering", "", "sp_meter",
-                    f"Auto-determined: <45kVA → SP meter (direct metering)",
-                )
+        return
+    if not effective_spec:
+        return
+    if effective_spec.requires_ct:
+        if metering and metering != "ct_meter":
+            result.add_correction(
+                "metering",
+                metering, "ct_meter",
+                f"{effective_rating}A (≥45kVA equivalent) requires CT metering",
+            )
+        elif not metering:
+            result.add_correction(
+                "metering", "", "ct_meter",
+                f"Auto-determined: ≥45kVA → CT metering",
+            )
+    else:
+        if not metering:
+            result.add_correction(
+                "metering", "", "sp_meter",
+                f"Auto-determined: <45kVA → SP meter (direct metering)",
+            )
 
-    # ── 10. Validate sub-circuits ─────────────────────────────────
-    circuits = requirements.get("circuits", [])
+
+def _validate_sub_circuits(
+    circuits: list[dict],
+    effective_rating: int,
+    result: ValidationResult,
+) -> None:
+    """Validate sub-circuit breaker ratings and cable sizes (Step 10).
+
+    Checks each sub-circuit's cable size against the minimum required
+    and ensures no sub-breaker exceeds the main breaker rating.
+    """
     for i, circuit in enumerate(circuits):
         ckt_rating = circuit.get("breaker_rating", circuit.get("rating", 0))
         ckt_cable = circuit.get("cable_size", 0)
@@ -664,7 +672,9 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
                     f"main breaker {effective_rating}A."
                 )
 
-    # ── 11. Log summary ───────────────────────────────────────────
+
+def _log_validation_summary(result: ValidationResult) -> None:
+    """Log validation summary: errors, warnings, corrections (Step 11)."""
     if result.errors:
         logger.warning(
             "SLD validation failed with %d error(s): %s",
@@ -681,6 +691,81 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             len(result.corrections),
         )
 
+
+def validate_sld_requirements(requirements: dict) -> ValidationResult:
+    """
+    Validate and enrich Gemini-extracted SLD requirements JSON.
+
+    Checks the JSON data against the official specification tables
+    and auto-corrects values where possible. Delegates each validation
+    step to a dedicated sub-function.
+
+    Returns:
+        ValidationResult with errors, warnings, and auto-corrections.
+    """
+    result = ValidationResult()
+    kva = requirements.get("kva", 0)
+    supply_type = requirements.get("supply_type", "")
+    breaker_rating = requirements.get("breaker_rating", 0)
+    breaker_type = requirements.get("breaker_type", "")
+    breaker_poles = requirements.get("breaker_poles", requirements.get("poles", ""))
+    breaker_ka = requirements.get("breaker_ka", 0)
+
+    # ── 0. Basic required fields ──────────────────────────────────
+    from app.sld.validation_messages import MISSING_KVA_OR_BREAKER
+    if not kva and not breaker_rating:
+        result.add_error(MISSING_KVA_OR_BREAKER)
+        return result
+
+    # ── 1. kVA → Spec lookup ──────────────────────────────────────
+    spec: IncomingSpec | None = None
+    if kva:
+        try:
+            spec = lookup_incoming_by_kva(kva, supply_type=supply_type)
+        except ValueError as e:
+            result.add_warning(str(e))
+
+    # ── 2. 3-Phase incoming to Single Phase DB detection ──────────
+    if _detect_3phase_to_single_phase_db(requirements):
+        result.add_warning(
+            "⚠️ NON-STANDARD CONFIGURATION DETECTED: "
+            "3-Phase incoming tap to Single Phase DB. "
+            "This is only allowed if the building owner and building LEW "
+            "have explicitly approved this arrangement. "
+            "Ensure proper documentation and approval before proceeding."
+        )
+
+    # ── 3. Validate / auto-correct supply_type ────────────────────
+    if spec and supply_type:
+        if supply_type != spec.phase and not _detect_3phase_to_single_phase_db(requirements):
+            result.add_correction(
+                "supply_type", supply_type, spec.phase,
+                f"kVA={kva} maps to {spec.rating_a}A which is {spec.phase}",
+            )
+    if spec and not supply_type:
+        result.add_correction(
+            "supply_type", "", spec.phase,
+            f"Auto-determined from kVA={kva} → {spec.phase}",
+        )
+
+    # ── Steps 4–10: delegated to sub-functions ────────────────────
+    _validate_breaker_rating(spec, breaker_rating, kva, result)
+    effective_spec = _get_effective_spec(result, breaker_rating, spec, supply_type)
+    effective_rating = _get_effective_rating(result, breaker_rating, spec)
+    _validate_breaker_type(effective_spec, breaker_type, effective_rating, result)
+    _validate_fault_rating(effective_spec, breaker_ka, effective_rating, result)
+    _validate_poles(effective_spec, breaker_poles, effective_rating, requirements, result)
+    # ── 8. Cable size auto-correction ─────────────────────────────
+    cable_size = requirements.get("cable_size", "")
+    if effective_spec and not cable_size:
+        result.add_correction(
+            "cable_size", "", effective_spec.cable_size,
+            f"Auto-determined: {effective_rating}A → {effective_spec.cable_size}",
+        )
+    _validate_metering(effective_spec, requirements.get("metering", ""),
+                       requirements.get("supply_source", ""), effective_rating, result)
+    _validate_sub_circuits(requirements.get("circuits", []), effective_rating, result)
+    _log_validation_summary(result)
     return result
 
 

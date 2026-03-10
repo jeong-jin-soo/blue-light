@@ -254,8 +254,8 @@ class LayoutConfig:
             # CT
             ct = get_symbol_dimensions("CT")
             self.ct_size = ct["width_mm"]
-        except Exception:
-            pass  # Use default fallback values if JSON unavailable
+        except Exception as exc:
+            logger.warning("Symbol dimension load from JSON failed, using defaults: %s", exc)
 
 
 @dataclass

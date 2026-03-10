@@ -18,6 +18,9 @@ from app.sld.sld_spec import (
     OUTGOING_SPEC,
     IncomingSpec,
     ValidationResult,
+    _get_effective_spec,
+    _validate_metering,
+    _validate_sub_circuits,
     apply_corrections,
     get_full_spec_from_kva,
     lookup_incoming_by_kva,
@@ -501,3 +504,74 @@ class TestPhaseAwareKvaLookup:
         assert result["breaker_rating"] == 80
         assert result["supply_type"] == "three_phase"
         assert result["metering"] == "sp_meter"  # 80A TPN uses sp_meter
+
+
+# ── Sub-function Unit Tests ──────────────────────────────────────
+
+class TestGetEffectiveSpec:
+    """Test _get_effective_spec() helper for effective spec resolution."""
+
+    def test_get_effective_spec_with_correction(self):
+        """When breaker_rating was corrected in Step 4, effective spec uses corrected rating.
+
+        Scenario: user gives non-standard 45A rating, spec says 63A.
+        The corrected rating (63A) should drive the effective spec lookup.
+        """
+        result = ValidationResult()
+        # Simulate Step 4 correction: 45A → 63A
+        result.add_correction(
+            "breaker_rating", 45, 63,
+            "Non-standard rating. Corrected to 63A.",
+        )
+        spec = INCOMING_SPEC[63]  # 63A single-phase (the kVA-based spec)
+
+        effective = _get_effective_spec(result, breaker_rating=45, spec=spec, supply_type="single_phase")
+        assert effective is not None
+        assert effective.rating_a == 63
+        assert effective.breaker_type == "MCB"
+        assert effective.poles == "DP"
+
+
+class TestValidateSubCircuits:
+    """Test _validate_sub_circuits() for sub-breaker validation."""
+
+    def test_validate_sub_circuits_exceeds_main(self):
+        """Sub-circuit breaker_rating > main breaker → error.
+
+        When a 100A sub-breaker is used with a 63A main breaker,
+        the sub-circuit should produce an error.
+        """
+        result = ValidationResult()
+        circuits = [
+            {"breaker_rating": 32, "cable_size": 6},   # OK
+            {"breaker_rating": 100, "cable_size": 35},  # Exceeds 63A main
+        ]
+        _validate_sub_circuits(circuits, effective_rating=63, result=result)
+
+        assert result.valid is False
+        assert len(result.errors) == 1
+        assert "exceeds main" in result.errors[0]
+        assert "Circuit 2" in result.errors[0]
+
+
+class TestValidateMetering:
+    """Test _validate_metering() for metering type validation."""
+
+    def test_validate_metering_landlord_skip(self):
+        """Landlord supply with no metering → no auto-correction.
+
+        When supply_source is 'landlord' and metering is empty,
+        the function should NOT auto-determine metering type.
+        """
+        result = ValidationResult()
+        effective_spec = INCOMING_SPEC[150]  # 150A, requires_ct=True
+        _validate_metering(
+            effective_spec,
+            metering="",
+            supply_source="landlord",
+            effective_rating=150,
+            result=result,
+        )
+        # No metering correction should be applied for landlord supply
+        assert "metering" not in result.corrections
+        assert len(result.warnings) == 0

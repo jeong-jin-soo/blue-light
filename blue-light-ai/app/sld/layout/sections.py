@@ -45,16 +45,8 @@ from app.sld.locale import SG_LOCALE
 logger = logging.getLogger(__name__)
 
 
-def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_info: dict | None) -> None:
-    """Parse and normalize all requirement inputs into ctx fields.
-
-    Includes defensive type checks for robustness against malformed input.
-    """
-    # -- Defensive type checks --
-    if not isinstance(requirements, dict):
-        logger.warning("requirements is not a dict (%s), using empty dict", type(requirements).__name__)
-        requirements = {}
-
+def _parse_supply_config(ctx: _LayoutContext, requirements: dict) -> None:
+    """Supply type, landlord, cable extension 파싱."""
     # -- Normalize input keys (handle alternative key names from agent) --
     supply_type = (requirements.get("supply_type")
                    or requirements.get("system_type")
@@ -78,7 +70,11 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
     ctx.result.supply_type = supply_type
     ctx.result.voltage = ctx.voltage
 
-    # -- Read main breaker info early (needed for meter board components) --
+
+def _parse_main_breaker(ctx: _LayoutContext, requirements: dict) -> None:
+    """Main breaker rating, type, poles, kA, characteristic 추출."""
+    supply_type = ctx.supply_type
+
     main_breaker = requirements.get("main_breaker", {})
     ctx.breaker_type = str(main_breaker.get("type", "MCCB")).upper()
     ctx.breaker_rating = main_breaker.get("rating", 0) or main_breaker.get("rating_A", 0)
@@ -105,8 +101,46 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
         from app.sld.standards import get_fault_level
         ctx.breaker_fault_kA = get_fault_level(ctx.breaker_type, ctx.kva)
 
-    # Auto-determine incoming cable if not specified
-    # Uses INCOMING_SPEC / INCOMING_SPEC_3PHASE tables (same pattern as fault_kA)
+    ctx.meter_poles = "DP" if supply_type == "single_phase" else "4P"
+
+    # Main breaker characteristic (B/C/D) — IEC 60898-1 trip curve
+    # Accept multiple key names: breaker_characteristic, characteristic, breaker_char, char
+    ctx.main_breaker_char = str(
+        main_breaker.get("breaker_characteristic", "")
+        or main_breaker.get("characteristic", "")
+        or main_breaker.get("breaker_char", "")
+        or main_breaker.get("char", "")
+    ).upper()
+
+    # Metering type
+    if ctx.supply_source == "landlord":
+        ctx.metering = requirements.get("metering", None)
+    else:
+        ctx.metering = requirements.get("metering", "sp_meter")
+
+
+def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
+    """ELCB 설정 파싱 (dict/non-dict 처리)."""
+    ctx.elcb_config = requirements.get("elcb", {})
+    ctx.elcb_rating = ctx.elcb_config.get("rating", 0) if isinstance(ctx.elcb_config, dict) else 0
+    ctx.elcb_ma = ctx.elcb_config.get("sensitivity_ma", 30) if isinstance(ctx.elcb_config, dict) else 30
+    ctx.elcb_type_str = (
+        ctx.elcb_config.get("type", "ELCB").upper()
+        if isinstance(ctx.elcb_config, dict) else "ELCB"
+    )
+
+    # CT ratio parsing (e.g., "200/5A")
+    ct_config = requirements.get("ct", {})
+    if isinstance(ct_config, dict):
+        ctx.ct_ratio = ct_config.get("ratio", "")
+    elif isinstance(ct_config, str):
+        ctx.ct_ratio = ct_config
+
+
+def _parse_incoming_cable(ctx: _LayoutContext, requirements: dict) -> None:
+    """Auto-cable generation logic (INCOMING_SPEC 테이블 참조)."""
+    supply_type = ctx.supply_type
+
     if not ctx.incoming_cable and ctx.breaker_rating:
         try:
             from app.sld.sld_spec import INCOMING_SPEC, INCOMING_SPEC_3PHASE
@@ -135,43 +169,12 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
                     "cpc_type": spec.cable_type.split("/")[-1] if "/" in spec.cable_type else "PVC",
                     "method": spec.method,
                 }
-        except Exception:
-            pass  # Graceful fallback — cable annotation simply won't appear
+        except Exception as exc:
+            logger.warning("Incoming cable spec lookup failed: %s", exc)
 
-    ctx.meter_poles = "DP" if supply_type == "single_phase" else "4P"
 
-    # Main breaker characteristic (B/C/D) — IEC 60898-1 trip curve
-    # Accept multiple key names: breaker_characteristic, characteristic, breaker_char, char
-    ctx.main_breaker_char = str(
-        main_breaker.get("breaker_characteristic", "")
-        or main_breaker.get("characteristic", "")
-        or main_breaker.get("breaker_char", "")
-        or main_breaker.get("char", "")
-    ).upper()
-
-    # Metering type
-    if ctx.supply_source == "landlord":
-        ctx.metering = requirements.get("metering", None)
-    else:
-        ctx.metering = requirements.get("metering", "sp_meter")
-
-    # Read ELCB config early (needed for inline placement before busbar)
-    ctx.elcb_config = requirements.get("elcb", {})
-    ctx.elcb_rating = ctx.elcb_config.get("rating", 0) if isinstance(ctx.elcb_config, dict) else 0
-    ctx.elcb_ma = ctx.elcb_config.get("sensitivity_ma", 30) if isinstance(ctx.elcb_config, dict) else 30
-    ctx.elcb_type_str = (
-        ctx.elcb_config.get("type", "ELCB").upper()
-        if isinstance(ctx.elcb_config, dict) else "ELCB"
-    )
-
-    # CT ratio parsing (e.g., "200/5A")
-    ct_config = requirements.get("ct", {})
-    if isinstance(ct_config, dict):
-        ctx.ct_ratio = ct_config.get("ratio", "")
-    elif isinstance(ct_config, str):
-        ctx.ct_ratio = ct_config
-
-    # Sub-circuits and busbar rating (with defensive type checks)
+def _parse_sub_circuits(ctx: _LayoutContext, requirements: dict, application_info: dict | None) -> None:
+    """Sub-circuit 리스트 파싱 + busbar rating 결정."""
     raw_circuits = requirements.get("sub_circuits", []) or requirements.get("circuits", [])
     if not isinstance(raw_circuits, list):
         logger.warning("sub_circuits is not a list (%s), using empty list", type(raw_circuits).__name__)
@@ -194,6 +197,24 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
     if not ctx.busbar_rating:
         # Per SG standard: minimum 100A COMB BUSBAR for installations ≤ 100A
         ctx.busbar_rating = max(100, ctx.breaker_rating)
+
+
+def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_info: dict | None) -> None:
+    """Parse and normalize all requirement inputs into ctx fields.
+
+    Orchestrator that delegates to sub-functions for each parsing step.
+    Includes defensive type checks for robustness against malformed input.
+    """
+    # -- Defensive type checks --
+    if not isinstance(requirements, dict):
+        logger.warning("requirements is not a dict (%s), using empty dict", type(requirements).__name__)
+        requirements = {}
+
+    _parse_supply_config(ctx, requirements)
+    _parse_main_breaker(ctx, requirements)
+    _parse_elcb_config(ctx, requirements)
+    _parse_incoming_cable(ctx, requirements)
+    _parse_sub_circuits(ctx, requirements, application_info)
 
 
 def _place_incoming_supply(ctx: _LayoutContext) -> None:
@@ -1009,7 +1030,8 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             # Ensure numeric type (user may pass "16" as string)
             try:
                 inc_size = float(inc_size) if inc_size else 0
-            except (ValueError, TypeError):
+            except (ValueError, TypeError) as exc:
+                logger.debug("Cable size float conversion failed: %r → %s", inc_size, exc)
                 inc_size = 0
         else:
             inc_size = 0

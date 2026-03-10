@@ -114,12 +114,19 @@ def _split_into_rows(sub_circuits: list[dict], max_per_row: int) -> list[list[di
 
 
 def _next_standard_rating(current: int) -> int:
-    """Get the next standard breaker rating above the given value."""
-    standard = [16, 20, 25, 32, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000]
-    for r in standard:
+    """Get the next standard breaker rating above the given value.
+
+    Uses the authoritative list from ``standards.py`` which covers
+    6 A – 3200 A (26 ratings).  Previously this function used a local
+    list that capped at 1000 A, silently returning an incorrect value
+    for large installations (MCCB/ACB > 1000 A).
+    """
+    from app.sld.standards import STANDARD_BREAKER_RATINGS
+
+    for r in STANDARD_BREAKER_RATINGS:
         if r >= current:
             return r
-    return standard[-1]
+    return STANDARD_BREAKER_RATINGS[-1]
 
 
 def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list[dict]:
@@ -211,28 +218,137 @@ def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list
     return result
 
 
-def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]:
-    """Pre-assign circuit IDs based on Singapore SLD conventions.
+# ---------------------------------------------------------------------------
+# Circuit ID assignment — regex patterns (module-level for reuse)
+# ---------------------------------------------------------------------------
+_PHASE_ID_RE = re.compile(r"^L[123]\w+", re.IGNORECASE)  # L1S, L2P1, etc.
+_ISOL_ID_RE = re.compile(r"^ISOL\s*\d+", re.IGNORECASE)  # ISOL 1, ISOL2
+_SPARE_ID_RE = re.compile(r"^SP\d+$", re.IGNORECASE)      # SP1, SP2
 
-    Two-pass algorithm:
-      Pass 1 — Categorize each circuit as lighting/power/heater/isolator/spare/user_id.
-               Detect user-provided explicit IDs (circuit_id field or name matching L1S/ISOL pattern).
-      Pass 2 — Assign IDs using per-category counters.
+
+def _categorize_circuit(circuit: dict) -> tuple[str, str | None]:
+    """Categorize a single circuit for ID assignment.
 
     Category detection priority:
       1. Name contains "spare" → spare
       2. breaker_type == "ISOLATOR" or name contains "isol" → isolator
-      3. Explicit circuit_id matches L[123]... pattern → user_id (pass-through)
-      4. Name matches L[123]... pattern → user_id (pass-through)
+      3. Explicit circuit_id matches L[123]... pattern → user_id
+      4. Name matches L[123]... pattern → user_id
       5. Name contains "light"/"lamp"/"led" → lighting
       6. Name contains "heater" → heater
       7. Default → power
+
+    Returns:
+        (category, user_id) — category is one of
+        "lighting"|"power"|"heater"|"isolator"|"spare"|"user_id".
+        user_id is non-None only when the circuit already has a valid ID.
+    """
+    # Explicit circuit ID from schedule upload (e.g., "L1S1", "ISOL1")
+    explicit_cid = str(circuit.get("circuit_id", "") or "").strip()
+
+    name_raw = str(circuit.get("name", "") or circuit.get("circuit_name", "")) or ""
+    name_lower = name_raw.lower()
+    breaker_type = str(circuit.get("breaker_type", "") or "").upper()
+    # Check nested breaker dict too
+    breaker_dict = circuit.get("breaker", {})
+    if isinstance(breaker_dict, dict) and not breaker_type:
+        breaker_type = str(breaker_dict.get("type", "")).upper()
+
+    if "spare" in name_lower:
+        return ("spare", None)
+
+    if breaker_type == "ISOLATOR" or "isol" in name_lower:
+        # Explicit circuit_id takes priority, then name
+        if explicit_cid and _ISOL_ID_RE.match(explicit_cid):
+            return ("isolator", explicit_cid)
+        if _ISOL_ID_RE.match(name_raw.strip()):
+            return ("isolator", name_raw.strip())
+        return ("isolator", None)
+
+    if explicit_cid and _PHASE_ID_RE.match(explicit_cid):
+        return ("user_id", explicit_cid)
+
+    if _PHASE_ID_RE.match(name_raw.strip()):
+        return ("user_id", name_raw.strip())
+
+    if any(kw in name_lower for kw in ("light", "lamp", "led")):
+        return ("lighting", None)
+
+    if any(kw in name_lower for kw in ("heater", "water heater", "instant heater", "storage heater")):
+        return ("heater", None)
+
+    return ("power", None)
+
+
+def _infer_section_from_backward_scan(
+    circuit_idx: int,
+    categories: list[str],
+    user_ids: list[str | None],
+) -> str:
+    """Look backward from *circuit_idx* to infer the section letter.
+
+    Scans preceding circuits for the nearest non-spare/non-isolator category
+    (or user_id with recognizable phase prefix) and returns the corresponding
+    section type: "lighting" or "power" (default).
+    """
+    for j in range(circuit_idx - 1, -1, -1):
+        if categories[j] in ("lighting", "power", "heater"):
+            return categories[j]
+        if categories[j] == "user_id" and user_ids[j]:
+            # circuit ID 에서 섹션 추론: L1S→lighting, L1P→power
+            _uid = user_ids[j].upper()
+            if re.match(r"^L[123]S", _uid):
+                return "lighting"
+            return "power"
+    return "power"  # default
+
+
+def _assign_spare_phase_slot(
+    ids: list[str],
+    categories: list[str],
+    user_ids: list[str | None],
+    index: int,
+) -> str:
+    """Determine the phase slot for a SPARE circuit in three-phase mode.
+
+    Analyses already-assigned IDs to find the next available (phase, num) slot
+    in the preceding section (lighting → S, power/heater → P).
+    Fills gaps in L1/L2/L3 pattern before advancing to the next number.
+    """
+    prev_section = _infer_section_from_backward_scan(index, categories, user_ids)
+    sec_char = "S" if prev_section == "lighting" else "P"
+    _sec_re = re.compile(r"^L([123])" + sec_char + r"(\d+)$", re.IGNORECASE)
+
+    present: set[tuple[int, int]] = set()  # (phase, num) tuples
+    for existing_id in ids:
+        m = _sec_re.match(existing_id)
+        if m:
+            present.add((int(m.group(1)), int(m.group(2))))
+
+    max_num = max((n for _, n in present), default=1)
+
+    # Fill missing phases for max_num first, then next number
+    for n in range(max_num, max_num + 10):
+        for p in [1, 2, 3]:
+            if (p, n) not in present:
+                return f"L{p}{sec_char}{n}"
+
+    # Fallback (should not happen)
+    return f"L1{sec_char}{max_num + 1}"
+
+
+def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]:
+    """Pre-assign circuit IDs based on Singapore SLD conventions.
+
+    Two-pass algorithm:
+      Pass 1 — Categorize each circuit via ``_categorize_circuit``.
+      Pass 2 — Assign IDs using per-category counters.
 
     Counter rules:
       - Single-phase: S (lighting), P (power), H (heater) — P and H share a counter
       - Three-phase: L{1-3}S (lighting round-robin), L{1-3}P (power round-robin), H (heater)
       - ISOLATOR: own counter → "ISOL 1", "ISOL 2"
-      - SPARE: in 3-phase, fills next available phase slot in the preceding section
+      - SPARE: in 3-phase, fills next available phase slot via ``_assign_spare_phase_slot``
 
     Args:
         sub_circuits: list of circuit dicts (keys: name, circuit_id, breaker_type)
@@ -243,57 +359,14 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
     """
     ids: list[str] = []
 
-    # Patterns for recognizing user-provided circuit IDs
-    _PHASE_ID_RE = re.compile(r"^L[123]\w+", re.IGNORECASE)  # L1S, L2P1, etc.
-    _ISOL_ID_RE = re.compile(r"^ISOL\s*\d+", re.IGNORECASE)  # ISOL 1, ISOL2
-    _SPARE_ID_RE = re.compile(r"^SP\d+$", re.IGNORECASE)      # SP1, SP2
-
     # First pass: categorize circuits and detect user-provided IDs
     categories: list[str] = []
-    user_ids: list[str | None] = []  # Non-None if name is already a valid ID
+    user_ids: list[str | None] = []
 
     for circuit in sub_circuits:
-        # Explicit circuit ID from schedule upload (e.g., "L1S1", "ISOL1")
-        explicit_cid = str(circuit.get("circuit_id", "") or "").strip()
-
-        name_raw = str(circuit.get("name", "") or circuit.get("circuit_name", "")) or ""
-        name_lower = name_raw.lower()
-        breaker_type = str(circuit.get("breaker_type", "") or "").upper()
-        # Check nested breaker dict too
-        breaker_dict = circuit.get("breaker", {})
-        if isinstance(breaker_dict, dict) and not breaker_type:
-            breaker_type = str(breaker_dict.get("type", "")).upper()
-
-        if "spare" in name_lower:
-            categories.append("spare")
-            user_ids.append(None)
-        elif breaker_type == "ISOLATOR" or "isol" in name_lower:
-            categories.append("isolator")
-            # Explicit circuit_id takes priority, then name
-            if explicit_cid and _ISOL_ID_RE.match(explicit_cid):
-                user_ids.append(explicit_cid)
-            elif _ISOL_ID_RE.match(name_raw.strip()):
-                user_ids.append(name_raw.strip())
-            else:
-                user_ids.append(None)
-        elif explicit_cid and _PHASE_ID_RE.match(explicit_cid):
-            # Explicit circuit ID from schedule (e.g., L1S1, L2P3)
-            categories.append("user_id")
-            user_ids.append(explicit_cid)
-        elif _PHASE_ID_RE.match(name_raw.strip()):
-            # Name already IS a phase-prefixed circuit ID (e.g., L1S, L2P1)
-            # Use it directly — this controls fan-out grouping
-            categories.append("user_id")
-            user_ids.append(name_raw.strip())
-        elif any(kw in name_lower for kw in ("light", "lamp", "led")):
-            categories.append("lighting")
-            user_ids.append(None)
-        elif any(kw in name_lower for kw in ("heater", "water heater", "instant heater", "storage heater")):
-            categories.append("heater")
-            user_ids.append(None)
-        else:
-            categories.append("power")
-            user_ids.append(None)
+        cat, uid = _categorize_circuit(circuit)
+        categories.append(cat)
+        user_ids.append(uid)
 
     # Second pass: assign IDs with per-category counters
     # Note: Heater (H) and Power (P) share the SAME numeric counter.
@@ -328,48 +401,8 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
                 ids.append(f"P{ph_idx}")
         else:  # three_phase — round-robin phase distribution
             if cat == "spare":
-                # SPARE must follow the phase rotation of its section
-                # (LEW guide: SPAREs occupy busbar phase positions, not separate SP IDs)
-                # Determine which section this SPARE belongs to by looking at
-                # the nearest preceding non-spare/non-isolator category
-                prev_section = "power"  # default
-                for j in range(i - 1, -1, -1):
-                    if categories[j] in ("lighting", "power", "heater"):
-                        prev_section = categories[j]
-                        break
-                    if categories[j] == "user_id" and user_ids[j]:
-                        # Infer section from circuit ID: L1S→lighting, L1P→power
-                        _uid = user_ids[j].upper()
-                        if re.match(r"^L[123]S", _uid):
-                            prev_section = "lighting"
-                        else:
-                            prev_section = "power"
-                        break
-
-                # Find next available phase slot by analyzing already-assigned IDs
-                # (handles both user-provided and auto-generated IDs correctly)
-                sec_char = "S" if prev_section == "lighting" else "P"
-                _sec_re = re.compile(r"^L([123])" + sec_char + r"(\d+)$", re.IGNORECASE)
-                present = set()  # (phase, num) tuples
-                for j in range(len(ids)):
-                    m = _sec_re.match(ids[j])
-                    if m:
-                        present.add((int(m.group(1)), int(m.group(2))))
-                max_num = max((n for _, n in present), default=1)
-                # Fill missing phases for max_num first, then next number
-                assigned = False
-                for n in range(max_num, max_num + 10):
-                    for p in [1, 2, 3]:
-                        if (p, n) not in present:
-                            ids.append(f"L{p}{sec_char}{n}")
-                            present.add((p, n))  # track for next SPARE
-                            assigned = True
-                            break
-                    if assigned:
-                        break
-                if not assigned:
-                    # Fallback (should not happen)
-                    ids.append(f"L1{sec_char}{max_num + 1}")
+                spare_id = _assign_spare_phase_slot(ids, categories, user_ids, i)
+                ids.append(spare_id)
             elif cat == "isolator":
                 isol_idx += 1
                 ids.append(f"ISOL {isol_idx}")
