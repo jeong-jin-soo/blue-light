@@ -5,6 +5,7 @@ import { useSldChatStore } from '../../../stores/sldChatStore';
 import { useToastStore } from '../../../stores/toastStore';
 import { acceptSld } from '../../../api/sldChatApi';
 import { getSldAiGeneration } from '../../../api/systemAdminApi';
+import axiosClient from '../../../api/axiosClient';
 import fileApi from '../../../api/fileApi';
 import type { FileInfo, SldRequest } from '../../../types';
 
@@ -24,8 +25,11 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
   const [showReplaceDialog, setShowReplaceDialog] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{ name: string; fileSeq: number } | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const toast = useToastStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
     messages,
@@ -63,14 +67,45 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     }
   }, [messages, isLoading, activeToolName]);
 
+  // 파일 첨부
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be under 10MB.');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // LEW/Admin은 관리자용 엔드포인트 사용 (/api/admin/applications/:id/files)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileType', 'CIRCUIT_SCHEDULE');
+      const resp = await axiosClient.post(`/admin/applications/${applicationSeq}/files`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      const result = resp.data;
+      setAttachedFile({ name: file.name, fileSeq: result.fileSeq });
+    } catch {
+      toast.error('Failed to upload file. Please try again.');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [applicationSeq]);
+
   // 메시지 전송
   const handleSend = useCallback(async () => {
     const trimmed = inputValue.trim();
     if (!trimmed || isLoading || isStreaming) return;
 
+    const fileSeq = attachedFile?.fileSeq;
     setInputValue('');
-    await sendMessage(applicationSeq, trimmed);
-  }, [inputValue, isLoading, isStreaming, applicationSeq, sendMessage]);
+    setAttachedFile(null);
+    await sendMessage(applicationSeq, trimmed, fileSeq);
+  }, [inputValue, isLoading, isStreaming, applicationSeq, sendMessage, attachedFile]);
 
   // Enter 키 전송
   const handleKeyDown = useCallback(
@@ -179,6 +214,9 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
                 <p className="text-xs text-gray-300 mt-1">
                   The AI will ask about your electrical requirements.
                 </p>
+                <p className="text-xs text-gray-300 mt-0.5">
+                  You can attach a circuit schedule file (Excel, CSV, or image) using the 📎 button.
+                </p>
               </div>
             )}
 
@@ -247,7 +285,45 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
 
           {/* Input area */}
           <div className="border-t border-gray-200 px-3 py-2">
+            {/* Attached file indicator */}
+            {attachedFile && (
+              <div className="flex items-center gap-2 mb-1.5 px-1">
+                <span className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded flex items-center gap-1">
+                  <span>📎</span>
+                  {attachedFile.name}
+                  <button
+                    onClick={() => setAttachedFile(null)}
+                    className="ml-1 text-blue-400 hover:text-blue-600"
+                    title="Remove attachment"
+                  >
+                    ✕
+                  </button>
+                </span>
+              </div>
+            )}
             <div className="flex gap-2">
+              {/* File attachment button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv,.jpg,.jpeg,.png,.pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || isStreaming || isUploading}
+                className="self-end p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Attach circuit schedule file (Excel, CSV, Image, PDF)"
+              >
+                {isUploading ? (
+                  <span className="animate-spin inline-block">⚙️</span>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                )}
+              </button>
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}

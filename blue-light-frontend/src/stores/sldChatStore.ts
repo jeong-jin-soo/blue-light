@@ -16,7 +16,7 @@ interface SldChatState {
   progressMessage: string | null;
 
   // Actions
-  sendMessage: (applicationId: number, content: string) => Promise<void>;
+  sendMessage: (applicationId: number, content: string, attachedFileSeq?: number) => Promise<void>;
   loadHistory: (applicationId: number) => Promise<void>;
   resetChat: (applicationId: number) => Promise<void>;
   clearState: () => void;
@@ -37,7 +37,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
   progressStage: null,
   progressMessage: null,
 
-  sendMessage: async (applicationId: number, content: string) => {
+  sendMessage: async (applicationId: number, content: string, attachedFileSeq?: number) => {
     // 사용자 메시지 즉시 표시
     const userMsg: SldChatMessage = {
       sldChatMessageSeq: --messageSeq, // 임시 음수 ID
@@ -184,7 +184,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
             };
           });
         },
-      });
+      }, attachedFileSeq);
     } catch {
       set((s) => ({
         messages: [

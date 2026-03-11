@@ -36,7 +36,8 @@ public class FileService {
             ".pdf", ".jpg", ".jpeg", ".png",
             ".dwg", ".dxf", ".dgn",           // CAD drawing formats (ELISE SLD)
             ".tif", ".tiff", ".gif",           // Image formats (ELISE SLD)
-            ".zip"                             // Archive (ELISE SLD bundle)
+            ".zip",                            // Archive (ELISE SLD bundle)
+            ".xlsx", ".xls", ".csv"            // Circuit schedule (Excel, CSV)
     );
 
     /**
@@ -184,7 +185,7 @@ public class FileService {
         String extension = filename.substring(filename.lastIndexOf(".")).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
             throw new BusinessException(
-                    "File type not allowed. Accepted: PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP",
+                    "File type not allowed. Accepted: PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP, XLSX, XLS, CSV",
                     HttpStatus.BAD_REQUEST,
                     "INVALID_FILE_TYPE"
             );
