@@ -1,9 +1,31 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useChatStore } from '../../stores/chatStore';
 import type { ChatMessage } from '../../types';
+
+/**
+ * 챗봇 CTA 버튼 화이트리스트
+ * - 시스템 프롬프트에서 Gemini에게 이 링크만 사용하도록 안내
+ * - 프론트엔드에서 이 목록에 없는 링크는 버튼이 아닌 일반 텍스트로 표시
+ */
+const ACTION_LINK_WHITELIST: Record<string, { label?: string; requiresAuth?: boolean }> = {
+  '/applications/new': { label: 'Apply EMA Licence', requiresAuth: true },
+  '/signup': { label: 'Create Account' },
+  '/login': { label: 'Log In' },
+  '/sld-orders/new': { label: 'Order SLD', requiresAuth: true },
+  '/privacy': { label: 'Privacy Policy' },
+  '/disclaimer': { label: 'Disclaimer' },
+};
+
+/** Check if a URL is an allowed internal action link */
+function isWhitelistedAction(href: string | undefined): boolean {
+  if (!href) return false;
+  // Strip trailing slash and query params for matching
+  const clean = href.split('?')[0].replace(/\/$/, '');
+  return clean in ACTION_LINK_WHITELIST;
+}
 
 /**
  * 채팅 윈도우 — 메시지 목록, 입력, 추천 질문
@@ -281,11 +303,30 @@ function MessageBubble({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                a: ({ href, children }) => (
-                  <a href={href} target="_blank" rel="noopener noreferrer">
-                    {children}
-                  </a>
-                ),
+                a: ({ href, children }) => {
+                  // Whitelisted internal action links → render as CTA buttons
+                  if (isWhitelistedAction(href)) {
+                    return (
+                      <a
+                        href={href}
+                        className="inline-flex items-center gap-1.5 mt-1.5 mb-0.5 px-3 py-1.5
+                                   text-xs font-medium text-white bg-primary rounded-lg
+                                   hover:bg-primary-hover transition-colors no-underline"
+                      >
+                        {children}
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                        </svg>
+                      </a>
+                    );
+                  }
+                  // External or non-whitelisted links → open in new tab
+                  return (
+                    <a href={href} target="_blank" rel="noopener noreferrer">
+                      {children}
+                    </a>
+                  );
+                },
               }}
             >
               {message.content}
