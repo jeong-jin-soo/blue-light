@@ -307,6 +307,12 @@ class SldGenerator:
             "component_count": component_count,
             "pdf_path": pdf_output_path,
         })
+
+        # Include overflow metrics if detected
+        if layout_result.overflow_metrics:
+            result["overflow_metrics"] = layout_result.overflow_metrics.to_dict()
+            result["layout_warnings"] = layout_result.overflow_metrics.warnings
+
         return result
 
     @staticmethod

@@ -595,7 +595,7 @@ def generate_sld(
             from app.sld.template_cache import remove
             remove(app_seq)
 
-        return json.dumps({
+        response = {
             "success": True,
             "file_id": file_id,
             "component_count": component_count,
@@ -603,7 +603,21 @@ def generate_sld(
             "message": f"SLD generated successfully ({track_info}, {component_count} components). "
                        "The SVG preview is now displayed in the preview panel on the right. "
                        "The user can review it there. Do NOT include or describe any SVG code in your response.",
-        }, ensure_ascii=False)
+        }
+
+        # Add layout warnings if overflow or compression was detected
+        layout_warnings = result.get("layout_warnings", []) if isinstance(result, dict) else []
+        if layout_warnings:
+            response["layout_warnings"] = layout_warnings
+            response["message"] += (
+                f" WARNING: {len(layout_warnings)} layout issue(s) detected. "
+                "Some content may be compressed or extend beyond page boundaries."
+            )
+        overflow_metrics = result.get("overflow_metrics") if isinstance(result, dict) else None
+        if overflow_metrics:
+            response["overflow_metrics"] = overflow_metrics
+
+        return json.dumps(response, ensure_ascii=False)
 
     except Exception as e:
         logger.error(f"SLD generation failed: {e}", exc_info=True)

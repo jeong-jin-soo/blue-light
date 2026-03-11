@@ -14,6 +14,7 @@ from app.sld.layout.helpers import _assign_circuit_ids
 from app.sld.layout.models import (
     LayoutConfig,
     LayoutResult,
+    OverflowMetrics,
     PlacedComponent,
     _LayoutContext,
     format_cable_spec,
@@ -33,6 +34,7 @@ __all__ = [
     # models
     "LayoutConfig",
     "LayoutResult",
+    "OverflowMetrics",
     "PlacedComponent",
     "_LayoutContext",
     "format_cable_spec",

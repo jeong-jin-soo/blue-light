@@ -16,6 +16,7 @@ from app.sld.layout.overlap import (
     _add_cable_leader_lines,
     _add_isolator_device_symbols,
     _add_phase_fanout,
+    _compute_dynamic_spacing,
     resolve_overlaps,
 )
 from app.sld.layout.sections import (
@@ -221,6 +222,9 @@ def compute_layout(
     # Post-layout: center content vertically in drawing area
     _center_vertically(ctx.result, ctx.config)
 
+    # Post-layout: detect overflow beyond drawing boundaries
+    _detect_overflow(ctx.result, ctx.config)
+
     return ctx.result
 
 
@@ -309,3 +313,105 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
     result.db_box_start_y += shift
     result.db_box_end_y += shift
+
+
+def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
+    """Detect and report content overflow beyond drawing boundaries.
+
+    Scans all layout elements to measure actual content extents,
+    compares against config boundaries, and populates
+    result.overflow_metrics with overflow amounts and warnings.
+
+    Called AFTER _center_vertically() so measurements reflect the final state.
+    """
+    from app.sld.layout.models import OverflowMetrics
+
+    metrics = OverflowMetrics()
+    _CHAR_W = 2.0  # Approximate character advance width (matches _center_vertically)
+
+    all_xs: list[float] = []
+    all_ys: list[float] = []
+
+    for comp in result.components:
+        all_xs.append(comp.x)
+        all_ys.append(comp.y)
+        # Vertical text extends upward from comp.y
+        if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
+            lines = comp.label.split("\\P")
+            max_line_len = max(len(line) for line in lines)
+            all_ys.append(comp.y + max_line_len * _CHAR_W)
+
+    for collection in (result.connections, result.dashed_connections, result.thick_connections):
+        for (sx, sy), (ex, ey) in collection:
+            all_xs.extend([sx, ex])
+            all_ys.extend([sy, ey])
+    for x1, y1, x2, y2 in result.solid_boxes:
+        all_xs.extend([x1, x2])
+        all_ys.extend([y1, y2])
+    for dx, dy in result.junction_dots:
+        all_xs.append(dx)
+        all_ys.append(dy)
+    for ax, ay in result.arrow_points:
+        all_xs.append(ax)
+        all_ys.append(ay)
+
+    if not all_xs or not all_ys:
+        result.overflow_metrics = metrics
+        return
+
+    metrics.content_min_x = min(all_xs)
+    metrics.content_max_x = max(all_xs)
+    metrics.content_min_y = min(all_ys)
+    metrics.content_max_y = max(all_ys)
+
+    # Compute overflow in each direction
+    metrics.overflow_left = max(0.0, config.min_x - metrics.content_min_x)
+    metrics.overflow_right = max(0.0, metrics.content_max_x - config.max_x)
+    metrics.overflow_bottom = max(0.0, config.min_y - metrics.content_min_y)
+    metrics.overflow_top = max(0.0, metrics.content_max_y - config.max_y)
+
+    # Measure sub-circuit spacing from tap positions on busbar
+    tap_xs = sorted(set(
+        comp.x for comp in result.components
+        if comp.symbol_name.startswith("CB_")
+    ))
+    if len(tap_xs) >= 2:
+        spacings = [tap_xs[i + 1] - tap_xs[i] for i in range(len(tap_xs) - 1)]
+        metrics.actual_min_spacing = min(spacings)
+        metrics.circuit_count = len(tap_xs)
+        metrics.ideal_spacing = _compute_dynamic_spacing(len(tap_xs), config)
+        if metrics.ideal_spacing > 0 and metrics.actual_min_spacing < metrics.ideal_spacing * 0.95:
+            metrics.horizontal_compression_ratio = (
+                metrics.actual_min_spacing / metrics.ideal_spacing
+            )
+
+    # Generate warnings
+    if metrics.overflow_left > 0.5 or metrics.overflow_right > 0.5:
+        metrics.warnings.append(
+            f"Horizontal overflow: content extends "
+            f"{metrics.overflow_left:.1f}mm left, {metrics.overflow_right:.1f}mm right "
+            f"beyond drawing boundary"
+        )
+    if metrics.overflow_top > 0.5 or metrics.overflow_bottom > 0.5:
+        metrics.warnings.append(
+            f"Vertical overflow: content extends "
+            f"{metrics.overflow_top:.1f}mm top, {metrics.overflow_bottom:.1f}mm bottom "
+            f"beyond drawing boundary"
+        )
+    if metrics.is_compressed:
+        metrics.warnings.append(
+            f"Circuit spacing compressed to {metrics.horizontal_compression_ratio:.0%} "
+            f"of ideal ({metrics.actual_min_spacing:.1f}mm vs {metrics.ideal_spacing:.1f}mm). "
+            f"Consider reducing circuit count or using multi-row layout."
+        )
+    if metrics.actual_min_spacing > 0 and metrics.actual_min_spacing < 8.0:
+        metrics.warnings.append(
+            f"Minimum circuit spacing is {metrics.actual_min_spacing:.1f}mm "
+            f"(below 8mm readability threshold). Labels may overlap in print."
+        )
+
+    result.overflow_metrics = metrics
+
+    # Log warnings
+    for w in metrics.warnings:
+        logger.warning("Layout overflow: %s", w)

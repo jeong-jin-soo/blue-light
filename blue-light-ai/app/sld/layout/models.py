@@ -374,6 +374,91 @@ class LayoutResult:
     # Junction dot indices relocated by phase fanout (excluded from orphan validation)
     fanout_relocated_dots: set[int] = field(default_factory=set)
 
+    # Overflow detection metrics (populated by _detect_overflow after centering)
+    overflow_metrics: "OverflowMetrics | None" = None
+
+
+@dataclass
+class OverflowMetrics:
+    """Post-layout overflow detection metrics.
+
+    Measures how well the SLD content fits within the drawing area.
+    All distances in mm. Populated by _detect_overflow() after _center_vertically().
+    """
+
+    # Content extents (actual min/max of all layout elements)
+    content_min_x: float = 0.0
+    content_max_x: float = 0.0
+    content_min_y: float = 0.0
+    content_max_y: float = 0.0
+
+    # Overflow amounts (positive = overflow beyond boundary, 0 = no overflow)
+    overflow_left: float = 0.0
+    overflow_right: float = 0.0
+    overflow_top: float = 0.0
+    overflow_bottom: float = 0.0
+
+    # Circuit spacing metrics
+    circuit_count: int = 0
+    actual_min_spacing: float = 0.0
+    ideal_spacing: float = 0.0
+    horizontal_compression_ratio: float = 1.0
+
+    # Warnings generated
+    warnings: list[str] = field(default_factory=list)
+
+    @property
+    def has_overflow(self) -> bool:
+        """True if content exceeds any drawing boundary by more than 0.5mm."""
+        return (
+            self.overflow_left > 0.5
+            or self.overflow_right > 0.5
+            or self.overflow_top > 0.5
+            or self.overflow_bottom > 0.5
+        )
+
+    @property
+    def is_compressed(self) -> bool:
+        """True if horizontal compression was applied (ratio < 95%)."""
+        return self.horizontal_compression_ratio < 0.95
+
+    @property
+    def quality_score(self) -> float:
+        """Layout quality score 0.0–1.0 (1.0 = perfect fit)."""
+        if self.has_overflow:
+            total_overflow = (
+                self.overflow_left + self.overflow_right
+                + self.overflow_top + self.overflow_bottom
+            )
+            return max(0.0, 1.0 - total_overflow / 50.0)
+        if self.is_compressed:
+            return max(0.5, self.horizontal_compression_ratio)
+        return 1.0
+
+    def to_dict(self) -> dict:
+        """Serialize to dict for API response."""
+        d: dict = {
+            "has_overflow": self.has_overflow,
+            "quality_score": round(self.quality_score, 2),
+        }
+        if self.warnings:
+            d["layout_warnings"] = self.warnings
+        if self.has_overflow:
+            d["overflow"] = {
+                "left": round(self.overflow_left, 1),
+                "right": round(self.overflow_right, 1),
+                "top": round(self.overflow_top, 1),
+                "bottom": round(self.overflow_bottom, 1),
+            }
+        if self.is_compressed:
+            d["compression"] = {
+                "ratio": round(self.horizontal_compression_ratio, 2),
+                "circuit_count": self.circuit_count,
+                "actual_min_spacing_mm": round(self.actual_min_spacing, 1),
+                "ideal_spacing_mm": round(self.ideal_spacing, 1),
+            }
+        return d
+
 
 from app.sld.locale import SG_LOCALE, SldLocale
 
