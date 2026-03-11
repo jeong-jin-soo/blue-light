@@ -26,27 +26,22 @@ from app.sld.locale import SG_LOCALE
 logger = logging.getLogger(__name__)
 
 
-def _normalize_load_quantity(text: str) -> str:
-    """Normalize quantity prefix per Singapore LEW convention.
+def _normalize_single_quantity(text: str) -> str:
+    """Normalize quantity prefix for a single item (no '+' separator).
 
     Rules (LEW guide Rule 2):
     - Singular: "1 no." (e.g., "1 no. 20A DP isolator")
     - Plural:   "2 nos." (e.g., "2 nos. 13A twin S/S/O")
     - If quantity is missing, assume 1 unit and prepend "1 no."
-
-    Examples:
-        "4 Nos 13A TWIN S/S/O"  → "4 nos. 13A TWIN S/S/O"
-        "1 Nos LIGHTS"          → "1 no. LIGHTS"
-        "20A DP ISOLATOR"       → "1 no. 20A DP ISOLATOR"
-        "SPARE"                 → "SPARE" (unchanged)
     """
-    if not text or text.upper() == "SPARE":
-        return text
+    part = text.strip()
+    if not part or part.upper() == "SPARE":
+        return part
 
     # Pattern: number + optional unit word (Nos/No/nos/no/pcs/units etc.)
     m = re.match(
         r"^(\d+)\s*(nos?\.?|units?|pcs?|sets?)\s+(.+)$",
-        text, re.IGNORECASE,
+        part, re.IGNORECASE,
     )
     if m:
         qty = int(m.group(1))
@@ -55,18 +50,46 @@ def _normalize_load_quantity(text: str) -> str:
         return f"{qty} {unit} {rest}"
 
     # Number at start without unit word (e.g., "2 LIGHTS")
-    m2 = re.match(r"^(\d+)\s+(.+)$", text)
+    m2 = re.match(r"^(\d+)\s+(.+)$", part)
     if m2:
         qty = int(m2.group(1))
         rest = m2.group(2)
         # Don't treat cable-like patterns as quantities (e.g., "2 x 1C ...")
         if rest.lower().startswith("x "):
-            return text
+            return part
         unit = "no." if qty == 1 else "nos."
         return f"{qty} {unit} {rest}"
 
     # No quantity at all — prepend "1 no."
-    return f"1 no. {text}"
+    return f"1 no. {part}"
+
+
+def _normalize_load_quantity(text: str) -> str:
+    """Normalize quantity prefix per Singapore LEW convention.
+
+    Handles multi-item descriptions separated by '+'.
+    Each part is normalized independently so that every line starts
+    with a quantity for visual alignment (LEW Rule 8).
+
+    Examples:
+        "4 Nos 13A TWIN S/S/O"  → "4 nos. 13A TWIN S/S/O"
+        "1 Nos LIGHTS"          → "1 no. LIGHTS"
+        "20A DP ISOLATOR"       → "1 no. 20A DP ISOLATOR"
+        "SPARE"                 → "SPARE" (unchanged)
+        "2 Nos 13A TWIN S/S/O + 1 No EXIT LIGHT"
+            → "2 nos. 13A TWIN S/S/O\\P1 no. EXIT LIGHT"
+    """
+    if not text or text.upper() == "SPARE":
+        return text
+
+    # Split on '+' separator for multi-item descriptions
+    if "+" in text:
+        parts = [p.strip() for p in text.split("+")]
+        normalized = [_normalize_single_quantity(p) for p in parts if p]
+        # Join with \\P (DXF/SVG line break) so each item starts on its own line
+        return "\\P".join(normalized)
+
+    return _normalize_single_quantity(text)
 
 
 def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
