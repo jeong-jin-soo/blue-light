@@ -1,8 +1,13 @@
 """
 SVG snapshot regression tests for SLD generation.
 
-Generates SVG output for 5 representative configurations and compares
+Generates SVG output for 11 representative configurations and compares
 against golden files. Differences indicate visual regressions.
+
+Coverage:
+- Single-phase: direct metering, SP meter, landlord (no meter)
+- Three-phase: direct metering, CT metering, landlord, ISOLATOR,
+  ELCB/RCCB, ditto marks, cable extension, many circuits (27)
 
 Usage:
     pytest tests/test_svg_snapshots.py -v           # Compare against golden files
@@ -135,12 +140,143 @@ THREE_PHASE_ISOLATOR = {
     ],
 }
 
+# =========================================================================
+# Additional configurations (C4: expanded snapshot coverage)
+# =========================================================================
+
+SINGLE_PHASE_LANDLORD_2CKT = {
+    "supply_type": "single_phase",
+    "kva": 9,
+    "voltage": 230,
+    "supply_source": "landlord",
+    "main_breaker": {"type": "MCB", "rating": 40, "poles": "DP", "fault_kA": 10},
+    "busbar_rating": 100,
+    "elcb": {"rating": 40, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"},
+    "sub_circuits": [
+        {"name": "Lighting", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2C 1.5sqmm PVC/PVC"},
+        {"name": "Power", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2C 4.0sqmm PVC/PVC"},
+    ],
+}
+
+SINGLE_PHASE_SP_METER_3CKT = {
+    "supply_type": "single_phase",
+    "kva": 14,
+    "voltage": 230,
+    "main_breaker": {"type": "MCB", "rating": 63, "poles": "DP", "fault_kA": 10},
+    "busbar_rating": 100,
+    "metering": "sp_meter",
+    "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"},
+    "sub_circuits": [
+        {"name": "Lighting", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2C 1.5sqmm PVC/PVC"},
+        {"name": "13A S/S/O", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2C 4.0sqmm PVC/PVC"},
+        {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20},
+    ],
+}
+
+THREE_PHASE_ELCB_6CKT = {
+    "supply_type": "three_phase",
+    "kva": 45,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+    "busbar_rating": 200,
+    "metering": "sp_meter",
+    "elcb": {"rating": 63, "sensitivity_ma": 100, "poles": 4, "type": "ELCB"},
+    "sub_circuits": [
+        {"name": "Lighting 1", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC"},
+        {"name": "Lighting 2", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC"},
+        {"name": "Lighting 3", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC"},
+        {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC"},
+        {"name": "Power 2", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC"},
+        {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20},
+    ],
+}
+
+CABLE_EXTENSION_3PHASE_6CKT = {
+    "supply_type": "three_phase",
+    "kva": 45,
+    "voltage": 400,
+    "is_cable_extension": True,
+    "main_breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+    "busbar_rating": 200,
+    "sub_circuits": [
+        {"name": "Lights", "breaker_type": "MCB", "breaker_rating": 10},
+        {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+        {"name": "Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+        {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 32},
+        {"name": "Aircon 2", "breaker_type": "MCB", "breaker_rating": 32},
+        {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20},
+    ],
+}
+
+THREE_PHASE_DITTO_9CKT = {
+    "supply_type": "three_phase",
+    "kva": 45,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+    "busbar_rating": 200,
+    "metering": "direct",
+    "sub_circuits": [
+        # 3 identical lighting circuits → ditto marks expected
+        {"name": "Lighting", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN PVC CONDUIT"},
+        {"name": "Lighting", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN PVC CONDUIT"},
+        {"name": "Lighting", "breaker_type": "MCB", "breaker_rating": 10,
+         "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN PVC CONDUIT"},
+        # 3 identical power circuits → ditto marks expected
+        {"name": "13A S/S/O", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN PVC CONDUIT"},
+        {"name": "13A S/S/O", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN PVC CONDUIT"},
+        {"name": "13A S/S/O", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN PVC CONDUIT"},
+        # 3 mixed circuits → no ditto (different specs)
+        {"name": "Water Heater", "breaker_type": "MCB", "breaker_rating": 32,
+         "cable": "2 x 1C 6sqmm PVC + 4sqmm CPC IN PVC CONDUIT"},
+        {"name": "Aircon", "breaker_type": "MCB", "breaker_rating": 20,
+         "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN PVC CONDUIT"},
+        {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20},
+    ],
+}
+
+THREE_PHASE_MANY_27CKT = {
+    "supply_type": "three_phase",
+    "kva": 60,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+    "busbar_rating": 200,
+    "metering": "ct_meter",
+    "ct_ratio": "200/5A",
+    "sub_circuits": [
+        {"name": f"Circuit {i+1}", "breaker_type": "MCB",
+         "breaker_rating": 20, "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC"}
+        for i in range(27)
+    ],
+}
+
 SNAPSHOT_CONFIGS = [
+    # Original 5
     ("single_phase_metered_3ckt", SINGLE_PHASE_3CKT),
     ("three_phase_metered_6ckt", THREE_PHASE_6CKT),
     ("three_phase_ct_9ckt", THREE_PHASE_CT_9CKT),
     ("three_phase_landlord_12ckt", THREE_PHASE_LANDLORD_12CKT),
     ("three_phase_isolator", THREE_PHASE_ISOLATOR),
+    # C4: 6 additional scenarios
+    ("single_phase_landlord_2ckt", SINGLE_PHASE_LANDLORD_2CKT),
+    ("single_phase_sp_meter_3ckt", SINGLE_PHASE_SP_METER_3CKT),
+    ("three_phase_elcb_6ckt", THREE_PHASE_ELCB_6CKT),
+    ("cable_extension_3phase_6ckt", CABLE_EXTENSION_3PHASE_6CKT),
+    ("three_phase_ditto_9ckt", THREE_PHASE_DITTO_9CKT),
+    ("three_phase_many_27ckt", THREE_PHASE_MANY_27CKT),
 ]
 
 

@@ -377,6 +377,10 @@ class LayoutResult:
     # Overflow detection metrics (populated by _detect_overflow after centering)
     overflow_metrics: "OverflowMetrics | None" = None
 
+    # Multi-DB tracking
+    db_count: int = 1  # Number of distribution boards (1=single, 2+=multi)
+    db_box_ranges: list[dict] = field(default_factory=list)  # Per-DB: {start_y, end_y, left, right}
+
 
 @dataclass
 class OverflowMetrics:
@@ -519,3 +523,8 @@ class _LayoutContext:
     # Raw inputs (for sections that need full access)
     requirements: dict = field(default_factory=dict)
     application_info: dict = field(default_factory=dict)
+
+    # Multi-DB tracking
+    distribution_boards: list[dict] = field(default_factory=list)  # Input DB array
+    current_db_idx: int = -1  # Current DB being placed (-1=main/single)
+    db_spine_xs: list[float] = field(default_factory=list)  # Per-DB spine X positions

@@ -182,12 +182,12 @@
   <line x1="359.30" y1="115.13" x2="358.09" y2="115.72" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="359.30" y1="115.13" x2="358.11" y2="114.52" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="356.80" y="82.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,356.80,80.61)">SPARE</text>
-  <text x="56.20" y="83.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,56.20,83.85)">2C 1.5sqmm PVC + 1.5sqmm</text>
-  <text x="60.12" y="83.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,60.12,83.85)">PVC CPC IN METAL TRUNKING</text>
-  <text x="331.60" y="83.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,331.60,83.85)">2C 2.5sqmm PVC + 2.5sqmm</text>
-  <text x="335.52" y="83.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,335.52,83.85)">PVC CPC IN METAL TRUNKING</text>
-  <text x="273.40" y="83.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,273.40,83.85)">2C 6.0sqmm PVC + 6.0sqmm</text>
-  <text x="277.32" y="83.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,277.32,83.85)">PVC CPC IN METAL TRUNKING</text>
+  <text x="56.20" y="84.41" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,56.20,84.41)">2C 1.5sqmm PVC + 1.5sqmm</text>
+  <text x="60.12" y="84.41" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,60.12,84.41)">PVC CPC IN METAL TRUNKING</text>
+  <text x="331.60" y="84.41" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,331.60,84.41)">2C 2.5sqmm PVC + 2.5sqmm</text>
+  <text x="335.52" y="84.41" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,335.52,84.41)">PVC CPC IN METAL TRUNKING</text>
+  <text x="273.40" y="84.41" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,273.40,84.41)">2C 6.0sqmm PVC + 6.0sqmm</text>
+  <text x="277.32" y="84.41" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,277.32,84.41)">PVC CPC IN METAL TRUNKING</text>
   <text x="50.60" y="150.01" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">100A DB</text>
   <text x="50.60" y="153.05" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 69KVA AT 400V</text>
   <line x1="384.40" y1="151.91" x2="384.40" y2="154.59" stroke="#000000" stroke-width="0.25" fill="none" />

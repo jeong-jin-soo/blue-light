@@ -245,6 +245,16 @@ class SvgBackend:
                 f'font-family="Arial, Helvetica, sans-serif" '
                 f'font-size="{char_height:.1f}" fill="{color}"'
             )
+            # center_across: shift start so text block is centered
+            # perpendicular to the text direction (MIDDLE_LEFT equivalent).
+            # Block height = char_height + (n-1)*line_spacing.
+            # Center offset = block/2 - char_height (shift from top-left).
+            n = len(lines)
+            if center_across and n > 1:
+                block = char_height + (n - 1) * line_spacing
+                perp_shift = block / 2 - char_height
+                # Apply perpendicular shift (unrotated Y direction → SVG +Y)
+                base_y += perp_shift
             for i, line_text in enumerate(lines):
                 escaped = escape(line_text)
                 # Local offset along the unrotated Y axis

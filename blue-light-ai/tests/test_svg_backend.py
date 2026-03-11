@@ -295,6 +295,26 @@ class TestAddMtext:
         # Rotated multiline emits separate <text> elements
         assert len(svg._elements) == 3
 
+    def test_rotated_multiline_center_across(self):
+        """center_across shifts rotated multiline text block perpendicular to text direction."""
+        svg1 = SvgBackend(page_height=100.0)
+        svg1.add_mtext("A\\PB\\PC", insert=(10, 50), rotation=90.0, center_across=False)
+
+        svg2 = SvgBackend(page_height=100.0)
+        svg2.add_mtext("A\\PB\\PC", insert=(10, 50), rotation=90.0, center_across=True)
+
+        # Both emit 3 elements
+        assert len(svg1._elements) == 3
+        assert len(svg2._elements) == 3
+
+        # center_across should shift the Y positions compared to default
+        # Extract Y positions from the first element of each
+        import re
+        y_default = float(re.search(r'y="([\d.]+)"', svg1._elements[0]).group(1))
+        y_centered = float(re.search(r'y="([\d.]+)"', svg2._elements[0]).group(1))
+        # center_across adjusts Y position — they should differ
+        assert y_default != y_centered, "center_across should shift Y position"
+
     def test_non_string_input(self):
         svg = SvgBackend(page_height=100.0)
         svg.add_mtext(12345, insert=(10, 50))

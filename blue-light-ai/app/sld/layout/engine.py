@@ -204,10 +204,24 @@ def compute_layout(
     _place_incoming_supply(ctx)
     _place_meter_board(ctx)
     _place_unit_isolator(ctx)
-    _place_main_breaker(ctx)
-    _place_elcb(ctx)
-    _place_main_busbar(ctx)
-    busbar_y_row = _place_sub_circuits_rows(ctx)
+
+    dbs = requirements.get("distribution_boards")
+    is_multi_db = dbs and len(dbs) > 1
+
+    if is_multi_db:
+        # ── Multi-DB path ──
+        ctx.distribution_boards = dbs
+        result.db_count = len(dbs)
+        _place_main_breaker(ctx)
+        _place_elcb(ctx)
+        _place_main_busbar(ctx)
+        busbar_y_row = _place_sub_dbs(ctx, dbs)
+    else:
+        # ── Single-DB path (backward compatible) ──
+        _place_main_breaker(ctx)
+        _place_elcb(ctx)
+        _place_main_busbar(ctx)
+        busbar_y_row = _place_sub_circuits_rows(ctx)
 
     # Store spine_x BEFORE resolve_overlaps for deterministic incoming chain detection
     ctx.result.spine_x = cx
@@ -216,7 +230,12 @@ def compute_layout(
     _add_phase_fanout(ctx.result, ctx.config, ctx.supply_type)
     _add_cable_leader_lines(ctx.result, ctx.config)
     _add_isolator_device_symbols(ctx.result, ctx.config)
-    db_box_right = _place_db_box(ctx, busbar_y_row)
+
+    if is_multi_db:
+        db_box_right = _place_multi_db_boxes(ctx, dbs, busbar_y_row)
+    else:
+        db_box_right = _place_db_box(ctx, busbar_y_row)
+
     _place_earth_bar(ctx, db_box_right)
 
     # Post-layout: center content vertically in drawing area
@@ -313,6 +332,245 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
     result.db_box_start_y += shift
     result.db_box_end_y += shift
+
+
+def _place_sub_dbs(ctx: _LayoutContext, dbs: list[dict]) -> float:
+    """Place multiple Sub-DBs branching from the main busbar.
+
+    Each Sub-DB gets:
+    - A BI_CONNECTOR from the main busbar
+    - Its own main breaker, optional ELCB, busbar, and sub-circuits
+    - Its own DB box (placed later by _place_multi_db_boxes)
+
+    DBs are placed side-by-side horizontally above the main busbar.
+
+    Returns the topmost busbar Y (for DB box sizing).
+    """
+    from app.sld.layout.models import PlacedComponent
+    from app.sld.layout.sections import (
+        _place_elcb,
+        _place_main_breaker,
+        _place_main_busbar,
+        _place_sub_circuits_rows,
+    )
+
+    result = ctx.result
+    config = ctx.config
+    main_busbar_y = result.busbar_y
+    num_dbs = len(dbs)
+
+    # ── Compute horizontal layout for each sub-DB ──
+    db_circuit_counts = []
+    for db in dbs:
+        n_circuits = len(db.get("sub_circuits", []))
+        # 3-phase: circuits will be padded to triplets
+        if ctx.supply_type == "three_phase" and n_circuits % 3 != 0:
+            n_circuits += 3 - (n_circuits % 3)
+        db_circuit_counts.append(max(n_circuits, 3))
+
+    # Calculate width per DB
+    db_widths = []
+    for n in db_circuit_counts:
+        spacing = _compute_dynamic_spacing(n, config)
+        width = n * spacing + 2 * config.busbar_margin + 20  # +margin for labels
+        db_widths.append(max(width, 80))  # minimum DB width
+
+    total_width = sum(db_widths) + (num_dbs - 1) * 30  # 30mm gap between DBs
+    start_x = ctx.cx - total_width / 2
+
+    # Calculate center X for each DB
+    db_cx_positions: list[float] = []
+    x_cursor = start_x
+    for w in db_widths:
+        db_cx_positions.append(x_cursor + w / 2)
+        x_cursor += w + 30
+
+    # ── Place each Sub-DB ──
+    topmost_busbar_y = main_busbar_y
+    bi_h = 10  # BI_CONNECTOR symbol height
+    bi_w = 16  # BI_CONNECTOR symbol width
+
+    for db_idx, (db, db_cx) in enumerate(zip(dbs, db_cx_positions)):
+        # Connection from main busbar to BI_CONNECTOR
+        bi_y = main_busbar_y + 5  # 5mm above main busbar
+        result.connections.append(((db_cx, main_busbar_y), (db_cx, bi_y)))
+
+        # BI_CONNECTOR symbol
+        result.components.append(PlacedComponent(
+            symbol_name="BI_CONNECTOR",
+            x=db_cx - bi_w / 2,
+            y=bi_y,
+            label="BI CONN.",
+        ))
+        result.symbols_used.add("BI_CONNECTOR")
+
+        # Connection from BI_CONNECTOR to sub-DB breaker
+        sub_start_y = bi_y + bi_h
+        result.connections.append(((db_cx, sub_start_y), (db_cx, sub_start_y + 3)))
+        sub_start_y += 3
+
+        # ── Save context state and override for this sub-DB ──
+        saved = {
+            "cx": ctx.cx, "y": ctx.y,
+            "breaker_type": ctx.breaker_type,
+            "breaker_rating": ctx.breaker_rating,
+            "breaker_poles": ctx.breaker_poles,
+            "breaker_fault_kA": ctx.breaker_fault_kA,
+            "main_breaker_char": ctx.main_breaker_char,
+            "elcb_config": ctx.elcb_config,
+            "elcb_rating": ctx.elcb_rating,
+            "elcb_ma": ctx.elcb_ma,
+            "elcb_type_str": ctx.elcb_type_str,
+            "sub_circuits": ctx.sub_circuits,
+            "busbar_rating": ctx.busbar_rating,
+            "db_info_label": ctx.db_info_label,
+            "db_info_text": ctx.db_info_text,
+            "db_box_start_y": ctx.db_box_start_y,
+            "busbar_y": result.busbar_y,
+            "busbar_start_x": result.busbar_start_x,
+            "busbar_end_x": result.busbar_end_x,
+        }
+
+        # Apply sub-DB requirements
+        ctx.cx = db_cx
+        ctx.y = sub_start_y
+        ctx.current_db_idx = db_idx
+        ctx.db_spine_xs.append(db_cx)
+
+        # Parse sub-DB breaker
+        sub_breaker = db.get("breaker", db.get("main_breaker", {}))
+        ctx.breaker_type = sub_breaker.get("type", "MCB")
+        ctx.breaker_rating = sub_breaker.get("rating", 63)
+        ctx.breaker_poles = sub_breaker.get("poles", "TPN")
+        ctx.breaker_fault_kA = sub_breaker.get("fault_kA", 10)
+        ctx.main_breaker_char = sub_breaker.get("breaker_characteristic", "")
+
+        # Parse sub-DB ELCB
+        sub_elcb = db.get("elcb", {})
+        if sub_elcb:
+            ctx.elcb_config = sub_elcb
+            ctx.elcb_rating = sub_elcb.get("rating", 0)
+            ctx.elcb_ma = sub_elcb.get("sensitivity_ma", 30)
+            ctx.elcb_type_str = sub_elcb.get("type", "ELCB")
+        else:
+            ctx.elcb_config = {}
+            ctx.elcb_rating = 0
+
+        # Parse sub-DB circuits
+        ctx.sub_circuits = db.get("sub_circuits", [])
+        ctx.busbar_rating = db.get("busbar_rating", 100)
+
+        # Place sub-DB components
+        _place_main_breaker(ctx)
+        _place_elcb(ctx)
+        _place_main_busbar(ctx)
+        sub_busbar_y = _place_sub_circuits_rows(ctx)
+
+        topmost_busbar_y = max(topmost_busbar_y, sub_busbar_y)
+
+        # Store DB box range for later
+        result.db_box_ranges.append({
+            "db_idx": db_idx,
+            "name": db.get("name", f"Sub-DB {db_idx + 1}"),
+            "db_box_start_y": ctx.db_box_start_y,
+            "busbar_y_row": sub_busbar_y,
+            "cx": db_cx,
+            "busbar_start_x": result.busbar_start_x,
+            "busbar_end_x": result.busbar_end_x,
+            "breaker_rating": ctx.breaker_rating,
+            "db_info_label": ctx.db_info_label,
+            "db_info_text": ctx.db_info_text,
+        })
+
+        # ── Restore context state ──
+        ctx.cx = saved["cx"]
+        ctx.y = saved["y"]
+        ctx.breaker_type = saved["breaker_type"]
+        ctx.breaker_rating = saved["breaker_rating"]
+        ctx.breaker_poles = saved["breaker_poles"]
+        ctx.breaker_fault_kA = saved["breaker_fault_kA"]
+        ctx.main_breaker_char = saved["main_breaker_char"]
+        ctx.elcb_config = saved["elcb_config"]
+        ctx.elcb_rating = saved["elcb_rating"]
+        ctx.elcb_ma = saved["elcb_ma"]
+        ctx.elcb_type_str = saved["elcb_type_str"]
+        ctx.sub_circuits = saved["sub_circuits"]
+        ctx.busbar_rating = saved["busbar_rating"]
+        ctx.db_info_label = saved["db_info_label"]
+        ctx.db_info_text = saved["db_info_text"]
+        ctx.db_box_start_y = saved["db_box_start_y"]
+        result.busbar_y = saved["busbar_y"]
+        result.busbar_start_x = saved["busbar_start_x"]
+        result.busbar_end_x = saved["busbar_end_x"]
+
+    ctx.current_db_idx = -1
+    return topmost_busbar_y
+
+
+def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
+                          topmost_busbar_y: float) -> float:
+    """Place dashed DB boxes for each sub-DB. Returns rightmost DB box edge."""
+    from app.sld.layout.models import PlacedComponent
+
+    result = ctx.result
+    config = ctx.config
+    rightmost_x = 0.0
+
+    for db_range in result.db_box_ranges:
+        db_idx = db_range["db_idx"]
+        start_y = db_range["db_box_start_y"]
+        busbar_y_row = db_range["busbar_y_row"]
+        db_cx = db_range["cx"]
+        bus_start_x = db_range["busbar_start_x"]
+        bus_end_x = db_range["busbar_end_x"]
+        breaker_rating = db_range["breaker_rating"]
+        db_name = db_range["name"]
+
+        # DB box extents
+        db_info_text = db_range.get("db_info_text", "")
+        db_info_lines = db_info_text.count("\\P") + 1 if db_info_text else 0
+        db_info_height = 5 + db_info_lines * 3
+        box_start_y = start_y - db_info_height
+
+        box_end_y = (busbar_y_row + config.db_box_busbar_margin
+                     + config.mcb_h + config.stub_len
+                     + config.db_box_tail_margin + config.db_box_label_margin)
+
+        box_left = bus_start_x - 10
+        box_right = bus_end_x + 10
+
+        # Clamp to drawing bounds
+        box_left = max(box_left, config.min_x + 1)
+        box_right = min(box_right, config.max_x - 1)
+
+        # Four dashed lines (bottom, top, left, right)
+        result.dashed_connections.append(((box_left, box_start_y), (box_right, box_start_y)))
+        result.dashed_connections.append(((box_left, box_end_y), (box_right, box_end_y)))
+        result.dashed_connections.append(((box_left, box_start_y), (box_left, box_end_y)))
+        result.dashed_connections.append(((box_right, box_start_y), (box_right, box_end_y)))
+
+        # DB info label
+        db_info_label = db_range.get("db_info_label", f"{breaker_rating}A DB")
+        result.components.append(PlacedComponent(
+            symbol_name="DB_INFO_BOX",
+            x=box_left + 3,
+            y=start_y + 8,
+            label=db_info_label,
+            rating=db_info_text,
+        ))
+
+        # DB name label below box
+        if db_name:
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=db_cx - len(db_name) * 1.2,
+                y=box_start_y - 4,
+                label=db_name,
+            ))
+
+        rightmost_x = max(rightmost_x, box_right)
+
+    return rightmost_x
 
 
 def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:

@@ -96,10 +96,10 @@
   <line x1="250.70" y1="119.23" x2="249.49" y2="119.82" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="250.70" y1="119.23" x2="249.51" y2="118.62" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="248.20" y="86.95" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,248.20,84.71)">SPARE</text>
-  <text x="163.90" y="87.95" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,163.90,87.95)">2C 1.5sqmm PVC + 1.5sqmm</text>
-  <text x="167.82" y="87.95" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,167.82,87.95)">PVC CPC IN METAL TRUNKING</text>
-  <text x="225.10" y="87.95" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,225.10,87.95)">2C 2.5sqmm PVC + 2.5sqmm</text>
-  <text x="229.02" y="87.95" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,229.02,87.95)">PVC CPC IN METAL TRUNKING</text>
+  <text x="163.90" y="88.51" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,163.90,88.51)">2C 1.5sqmm PVC + 1.5sqmm</text>
+  <text x="167.82" y="88.51" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,167.82,88.51)">PVC CPC IN METAL TRUNKING</text>
+  <text x="225.10" y="88.51" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,225.10,88.51)">2C 2.5sqmm PVC + 2.5sqmm</text>
+  <text x="229.02" y="88.51" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,229.02,88.51)">PVC CPC IN METAL TRUNKING</text>
   <text x="158.30" y="152.11" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
   <text x="158.30" y="155.15" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 14KVA AT 230V</text>
   <line x1="276.70" y1="156.01" x2="276.70" y2="158.69" stroke="#000000" stroke-width="0.25" fill="none" />
