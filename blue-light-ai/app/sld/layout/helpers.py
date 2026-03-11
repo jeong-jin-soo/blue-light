@@ -391,6 +391,18 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
         categories.append(cat)
         user_ids.append(uid)
 
+    # Normalize isolator circuits: force breaker_type/poles regardless of
+    # what the schedule file (Excel/Gemini) specified.  Without this, an
+    # Excel row like "ISOL1 | 20A DP isolator | 20A SPN MCB …" would keep
+    # breaker_type="MCB" and render with a full MCB label instead of the
+    # isolator symbol.
+    for i, cat in enumerate(categories):
+        if cat == "isolator":
+            sub_circuits[i]["breaker_type"] = "ISOLATOR"
+            sub_circuits[i].setdefault("breaker_poles", "DP")
+            if sub_circuits[i].get("breaker_poles", "").upper() == "SPN":
+                sub_circuits[i]["breaker_poles"] = "DP"
+
     # Second pass: assign IDs with per-category counters
     # Note: Heater (H) and Power (P) share the SAME numeric counter.
     # Reference DWG: P1, P2, P3, P4, H5, H6 — heater continues from power count.
