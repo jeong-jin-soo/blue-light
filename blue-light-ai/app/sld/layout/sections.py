@@ -30,6 +30,7 @@ from app.sld.layout.helpers import (
     _next_standard_rating,
     _pad_spares_for_triplets,
     _place_sub_circuits_upward,
+    _should_use_triplets,
     _split_into_rows,
 )
 from app.sld.layout.models import (
@@ -113,8 +114,11 @@ def _parse_main_breaker(ctx: _LayoutContext, requirements: dict) -> None:
     ).upper()
 
     # Metering type
+    # Landlord supply has no SP meter — only an isolator inside the unit.
+    # Even if requirements specify "sp_meter" for landlord, discard it.
     if ctx.supply_source == "landlord":
-        ctx.metering = requirements.get("metering", None)
+        metering_val = requirements.get("metering", None)
+        ctx.metering = None if metering_val == "sp_meter" else metering_val
     else:
         ctx.metering = requirements.get("metering", "sp_meter")
 
@@ -135,6 +139,20 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
         ctx.ct_ratio = ct_config.get("ratio", "")
     elif isinstance(ct_config, str):
         ctx.ct_ratio = ct_config
+
+    # CT metering section details (from metering_config or metering dict)
+    metering_cfg = requirements.get("metering_config", {})
+    if not isinstance(metering_cfg, dict):
+        metering_cfg = {}
+    ctx.protection_ct_ratio = metering_cfg.get("protection_ct_ratio", ctx.ct_ratio)
+    ctx.metering_ct_class = metering_cfg.get("metering_ct_class", "CL1 5VA")
+    ctx.protection_ct_class = metering_cfg.get("protection_ct_class", "5P10 20VA")
+    ctx.has_ammeter = metering_cfg.get("has_ammeter", True)
+    ctx.has_voltmeter = metering_cfg.get("has_voltmeter", True)
+    ctx.has_elr = metering_cfg.get("has_elr", True)
+    ctx.elr_spec = metering_cfg.get("elr_spec", "")
+    ctx.voltmeter_range = metering_cfg.get("voltmeter_range", "")
+    ctx.ammeter_range = metering_cfg.get("ammeter_range", "")
 
 
 def _parse_incoming_cable(ctx: _LayoutContext, requirements: dict) -> None:
@@ -216,6 +234,13 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
     _parse_incoming_cable(ctx, requirements)
     _parse_sub_circuits(ctx, requirements, application_info)
 
+    # Board name: from distribution_boards[0] or requirements top-level
+    dbs = requirements.get("distribution_boards")
+    if dbs and isinstance(dbs, list) and len(dbs) >= 1:
+        ctx.board_name = dbs[0].get("name", "")
+    if not ctx.board_name:
+        ctx.board_name = requirements.get("db_name", "")
+
 
 def _place_incoming_supply(ctx: _LayoutContext) -> None:
     """Place incoming supply label, AC symbol, phase lines, and cable annotation.
@@ -235,9 +260,11 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
     voltage = ctx.voltage
     metering = ctx.metering
 
-    # For metered supply, _place_meter_board() handles everything.
+    # For SP metered supply, _place_meter_board() handles everything.
     # No AC symbol, phase lines, or labels needed at the bottom.
-    if metering:
+    # CT metered supply still needs the incoming section (supply label + cable)
+    # because CT metering is placed inside the DB box, not at the bottom.
+    if metering and metering != "ct_meter":
         ctx.y = y
         return
 
@@ -251,50 +278,99 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         supply_label = SG_LOCALE.incoming.from_landlord_supply
     else:
         supply_label = SG_LOCALE.incoming.from_landlord
-    result.components.append(PlacedComponent(
-        symbol_name="LABEL",
-        x=cx - 80,
-        y=y + 8,
-        label=supply_label,
-    ))
 
-    # AC supply symbol "~" (wave sign at bottom — Singapore LEW convention)
-    result.components.append(PlacedComponent(
-        symbol_name="FLOW_ARROW_UP",
-        x=cx,
-        y=y - 3,
-    ))
-
-    # Phase lines with labels (at bottom, pointing upward) — compact layout
-    ph_half = 3
-    if supply_type == "three_phase":
-        spacing = 4
-        for offset, label in [(-spacing*1.5, "L1"), (-spacing*0.5, "L2"),
-                               (spacing*0.5, "L3"), (spacing*1.5, "N")]:
-            result.connections.append(((cx + offset, y - ph_half), (cx + offset, y + ph_half)))
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=cx + offset - 2,
-                y=y - ph_half - 3,
-                label=label,
-            ))
-        result.connections.append(((cx - spacing * 1.5, y + ph_half), (cx + spacing * 1.5, y + ph_half)))
-        result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
-    else:
-        result.connections.append(((cx, y - ph_half), (cx, y + ph_half)))
-        result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
-    y += ph_half + 4
-
-    # Incoming cable annotation
-    incoming_cable = ctx.incoming_cable
-    cable_text = format_cable_spec(incoming_cable)
-    if cable_text:
+    if supply_source == "landlord":
+        # ── Landlord supply: label RIGHT + cable tick marks (reference style) ──
+        # Supply label at bottom-right with horizontal tick from spine
+        _h_tick_len = 5
+        result.connections.append(((cx, y), (cx + _h_tick_len, y)))
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=cx + 12,
-            y=y - 3,
-            label=cable_text,
+            x=cx + _h_tick_len + 2,
+            y=y + 1.5,
+            label=supply_label,
         ))
+
+        # Vertical cable segment (extended for tick mark clearance)
+        _seg_h = 14
+        result.connections.append(((cx, y), (cx, y + _seg_h)))
+
+        # Cable tick mark + annotation to the LEFT (reference: incoming cable = left side)
+        incoming_cable = ctx.incoming_cable
+        cable_text = format_cable_spec(incoming_cable, multiline=True)
+        if cable_text:
+            tick_y = y + _seg_h * 0.65
+            tick_size = 1.25
+            result.thick_connections.append((
+                (cx - tick_size, tick_y - tick_size),
+                (cx + tick_size, tick_y + tick_size),
+            ))
+            _leader_len = ctx.config.cable_leader_len
+            result.connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
+            # Right-align text to left of leader end (clamped to drawing boundary)
+            # For multiline text (\P separator), use longest line for width calculation
+            _label_ch = 2.3
+            _char_w = _label_ch * 0.6
+            _lines = cable_text.split("\\P")
+            _longest = max(len(ln) for ln in _lines)
+            _text_w = _longest * _char_w
+            _text_gap = ctx.config.cable_leader_text_gap
+            _text_x = cx - _leader_len - _text_gap - _text_w
+            _text_x = max(_text_x, ctx.config.min_x + 2)  # clamp to left boundary
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=_text_x,
+                y=tick_y + 1.5,
+                label=cable_text,
+            ))
+
+        y += _seg_h
+    else:
+        # ── SP / cable extension: label LEFT + AC symbol + phase lines ──
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=cx - 80,
+            y=y + 8,
+            label=supply_label,
+        ))
+
+        # AC supply symbol "~" (wave sign at bottom — Singapore LEW convention)
+        result.components.append(PlacedComponent(
+            symbol_name="FLOW_ARROW_UP",
+            x=cx,
+            y=y - 3,
+        ))
+
+        # Phase lines with labels (at bottom, pointing upward) — compact layout
+        ph_half = 3
+        if supply_type == "three_phase":
+            spacing = 4
+            for offset, label in [(-spacing*1.5, "L1"), (-spacing*0.5, "L2"),
+                                   (spacing*0.5, "L3"), (spacing*1.5, "N")]:
+                result.connections.append(((cx + offset, y - ph_half), (cx + offset, y + ph_half)))
+                result.components.append(PlacedComponent(
+                    symbol_name="LABEL",
+                    x=cx + offset - 2,
+                    y=y - ph_half - 3,
+                    label=label,
+                ))
+            result.connections.append(((cx - spacing * 1.5, y + ph_half), (cx + spacing * 1.5, y + ph_half)))
+            result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
+        else:
+            result.connections.append(((cx, y - ph_half), (cx, y + ph_half)))
+            result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
+        y += ph_half + 4
+
+        # Cable annotation (no tick mark for SP supply)
+        incoming_cable = ctx.incoming_cable
+        cable_text = format_cable_spec(incoming_cable)
+        if cable_text:
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=cx + 12,
+                y=y - 3,
+                label=cable_text,
+            ))
 
     ctx.y = y
 
@@ -537,7 +613,8 @@ def _add_outgoing_cable_tick(
     _lines = outgoing_cable_text.split("\\P")
     _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
     _text_width = _max_line_len * _char_w
-    _text_x = cx - _leader_len - 1 - _text_width
+    _text_gap = ctx.config.cable_leader_text_gap
+    _text_x = cx - _leader_len - _text_gap - _text_width
     result.components.append(PlacedComponent(
         symbol_name="LABEL", x=_text_x, y=tick_y + _label_ch * 0.5, label=outgoing_cable_text,
     ))
@@ -615,6 +692,228 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
     ctx.y = y
 
 
+# ---------------------------------------------------------------------------
+# CT Metering Section — Vertical layout for ≥125A 3-phase installations
+# ---------------------------------------------------------------------------
+
+def _place_ct_metering_section(ctx: _LayoutContext) -> None:
+    """Place vertical CT metering section (≥125A 3-phase, non-landlord).
+
+    Reference layout (bottom → top in Y-up coordinates):
+      BI Connector → Metering CT (CL1) →
+        [ASS+Ammeter LEFT, VSS+Voltmeter RIGHT, KWH+2A MCB RIGHT]
+      → Protection CT (5P10) → [ELR LEFT]
+
+    Components on the main vertical spine:
+      BI_CONNECTOR, CT (metering), CT (protection)
+    Horizontal branches from spine:
+      LEFT: ASS→Ammeter, ELR
+      RIGHT: VSS→Voltmeter, KWH+2A MCB
+    """
+    result = ctx.result
+    config = ctx.config
+    cx = ctx.cx
+    y = ctx.y
+
+    ct_ratio = ctx.ct_ratio  # may be empty — "CT BY SP" label used when empty
+    metering_ct_class = ctx.metering_ct_class or "CL1 5VA"
+    protection_ct_ratio = ctx.protection_ct_ratio or ct_ratio
+    protection_ct_class = ctx.protection_ct_class or "5P10 20VA"
+
+    # Symbol dimensions (from JSON)
+    from app.sld.real_symbols import get_symbol_dimensions
+    bi_dims = get_symbol_dimensions("BI_CONNECTOR")
+    ct_dims = get_symbol_dimensions("CT")
+    bi_w, bi_h = bi_dims["width_mm"], bi_dims["height_mm"]
+    bi_stub = bi_dims["stub_mm"]
+    ct_w, ct_h = ct_dims["width_mm"], ct_dims["height_mm"]
+    ct_stub = ct_dims["stub_mm"]
+
+    # Spacing constants (compact layout — minimized for A3 with many circuits)
+    bi_to_ct_gap = 1.0       # gap between BI connector top and metering CT bottom
+    ct_to_branch_gap = 3.0   # gap from CT center to first branch
+    branch_spacing = 10.0    # vertical spacing between branches
+    branch_arm_len = 15.0    # horizontal arm from spine to first component
+    branch_gap = 3.0         # gap between components on a branch
+    metering_to_prot_gap = 3.0    # gap between metering CT top and protection CT bottom
+    prot_to_exit_gap = 0.5   # minimal gap — keeps connection non-zero for validation
+
+    # --- BI Connector (on spine) ---
+    # No entry stub — the caller's gap already connects to this point.
+    bi_x = cx - bi_w / 2
+    result.components.append(PlacedComponent(
+        symbol_name="BI_CONNECTOR", x=bi_x, y=y, label="BI CONNECTOR",
+    ))
+    result.symbols_used.add("BI_CONNECTOR")
+    y += bi_h
+
+    # --- Connection: BI → Metering CT ---
+    result.connections.append(((cx, y + bi_stub), (cx, y + bi_stub + bi_to_ct_gap)))
+    y += bi_stub + bi_to_ct_gap
+
+    # --- Metering CT (on spine) ---
+    if ct_ratio:
+        ct_label = f"CT {ct_ratio}\\P({metering_ct_class})"
+    else:
+        ct_label = SG_LOCALE.meter_board.ct_by_sp
+    result.components.append(PlacedComponent(
+        symbol_name="CT", x=cx - ct_w / 2, y=y, label=ct_label,
+    ))
+    result.symbols_used.add("CT")
+    metering_ct_center_y = y + ct_h / 2
+    y += ct_h
+
+    # --- Branches from Metering CT ---
+    # Branches are placed at Y offsets from the metering CT center.
+    # Each branch is a horizontal arm going LEFT or RIGHT with components.
+
+    branch_y = metering_ct_center_y  # start branches from CT center level
+
+    # Branch 1 (LEFT): ASS → Ammeter
+    if ctx.has_ammeter:
+        _branch_y = branch_y + ct_to_branch_gap
+        _place_metering_branch(
+            result, cx, _branch_y, direction="left",
+            components=[
+                ("SELECTOR_SWITCH", "ASS", 8.0),
+                ("AMMETER", ctx.ammeter_range or "0-500A", 7.6),
+            ],
+            arm_len=branch_arm_len,
+            gap=branch_gap,
+        )
+        # Junction dot at spine
+        result.junction_dots.append((cx, _branch_y))
+
+    # Branch 2 (RIGHT): VSS → Voltmeter
+    if ctx.has_voltmeter:
+        _branch_y = branch_y
+        _place_metering_branch(
+            result, cx, _branch_y, direction="right",
+            components=[
+                ("SELECTOR_SWITCH", "VSS", 8.0),
+                ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
+            ],
+            arm_len=branch_arm_len,
+            gap=branch_gap,
+        )
+        # Junction dot at spine
+        result.junction_dots.append((cx, _branch_y))
+
+    # Branch 3 (RIGHT): 2A MCB → KWH Meter
+    _kwh_branch_y = branch_y - ct_to_branch_gap
+    _kwh_label = "SPPG kWh METER" if ctx.supply_source != "landlord" else "kWh METER"
+    _place_metering_branch(
+        result, cx, _kwh_branch_y, direction="right",
+        components=[
+            ("CB_MCB", "2A SPN MCB", config.mcb_w),
+            ("KWH_METER", _kwh_label, 14.0),
+        ],
+        arm_len=branch_arm_len,
+        gap=branch_gap,
+    )
+    result.junction_dots.append((cx, _kwh_branch_y))
+    result.symbols_used.update({"MCB", "KWH_METER"})
+
+    # Advance y past the branches (use the highest branch point)
+    highest_branch = branch_y + ct_to_branch_gap + 5  # ammeter branch + some padding
+    y = max(y, highest_branch)
+
+    # --- Connection: Metering CT → Protection CT ---
+    y += metering_to_prot_gap
+    result.connections.append(((cx, metering_ct_center_y + ct_h / 2 + ct_stub),
+                                (cx, y - ct_stub)))
+
+    # --- Protection CT (on spine) ---
+    if ctx.has_elr:
+        if protection_ct_ratio:
+            prot_ct_label = f"CT {protection_ct_ratio}\\P({protection_ct_class})"
+        else:
+            prot_ct_label = f"CT\\P({protection_ct_class})"
+        result.components.append(PlacedComponent(
+            symbol_name="CT", x=cx - ct_w / 2, y=y, label=prot_ct_label,
+        ))
+        prot_ct_center_y = y + ct_h / 2
+        y += ct_h
+
+        # Branch from Protection CT (LEFT): ELR
+        elr_label = "ELR"
+        if ctx.elr_spec:
+            elr_label = f"ELR\\P{ctx.elr_spec}"
+        _place_metering_branch(
+            result, cx, prot_ct_center_y, direction="left",
+            components=[
+                ("ELR", elr_label, 20.0),
+            ],
+            arm_len=branch_arm_len,
+            gap=branch_gap,
+        )
+        result.junction_dots.append((cx, prot_ct_center_y))
+        result.symbols_used.add("ELR")
+
+        # Advance past protection CT
+        y += ct_stub + prot_to_exit_gap
+        result.connections.append(((cx, prot_ct_center_y + ct_h / 2 + ct_stub),
+                                    (cx, y)))
+    else:
+        # No protection CT — just advance with a connection
+        result.connections.append(((cx, y - ct_stub), (cx, y + prot_to_exit_gap)))
+        y += prot_to_exit_gap
+
+    ctx.y = y
+
+
+def _place_metering_branch(
+    result: LayoutResult, cx: float, branch_y: float,
+    direction: str,
+    components: list[tuple[str, str, float]],
+    arm_len: float = 15.0,
+    gap: float = 3.0,
+) -> None:
+    """Place a horizontal branch from the main spine.
+
+    Args:
+        result: LayoutResult to add components/connections to.
+        cx: spine X coordinate.
+        branch_y: Y coordinate of the branch.
+        direction: 'left' or 'right'.
+        components: list of (symbol_name, label, width_mm) tuples.
+        arm_len: length of the initial arm from spine to first component.
+        gap: gap between components on the branch.
+    """
+    sign = -1 if direction == "left" else 1
+    x = cx
+
+    # Initial arm from spine
+    x_next = x + sign * arm_len
+    result.connections.append(((x, branch_y), (x_next, branch_y)))
+    x = x_next
+
+    for i, (symbol_name, label, w) in enumerate(components):
+        # Place symbol (horizontal orientation)
+        if sign > 0:  # right
+            comp_x = x
+        else:  # left: symbol extends leftward
+            comp_x = x - w
+
+        result.components.append(PlacedComponent(
+            symbol_name=symbol_name,
+            x=comp_x,
+            y=branch_y,
+            label=label,
+            rotation=90.0,
+        ))
+        result.symbols_used.add(symbol_name.replace("CB_", ""))
+
+        # Advance past this component
+        x = x + sign * w
+
+        # Gap to next component (if not last)
+        if i < len(components) - 1:
+            x_next = x + sign * gap
+            result.connections.append(((x, branch_y), (x_next, branch_y)))
+            x = x_next
+
+
 def _place_unit_isolator(ctx: _LayoutContext) -> None:
     """Place unit isolator (for ct_meter, landlord supply, or explicitly specified).
 
@@ -645,19 +944,14 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
     isolator_rating = requirements.get("isolator_rating", 0)
     isolator_label_extra = requirements.get("isolator_label", "")
 
-    # Landlord supply: include isolator only when requires_isolator is True (125A+)
+    # Landlord supply: ALWAYS needs unit isolator (building riser → unit disconnect)
     # Exception: cable extension SLDs skip the isolator
-    _requires_iso = requirements.get("requires_isolator", False)
-    if supply_source == "landlord" and not ctx.is_cable_extension and _requires_iso:
+    if supply_source == "landlord" and not ctx.is_cable_extension:
         if not isolator_rating and breaker_rating:
             isolator_rating = breaker_rating  # Same rating as main breaker
         if not isolator_label_extra:
-            # Include unit number if available (e.g., "LOCATED INSIDE UNIT #01-36")
-            unit_number = ""
-            if ctx.application_info:
-                unit_number = str(ctx.application_info.get("unit_number", "")).strip()
-            base_label = SG_LOCALE.meter_board.located_inside_unit
-            isolator_label_extra = f"{base_label} {unit_number}" if unit_number else base_label
+            # Unit number is shown on the DB box label, not on the isolator
+            isolator_label_extra = SG_LOCALE.meter_board.located_inside_unit
     elif not isolator_rating and metering == "ct_meter" and supply_source != "landlord":
         # Non-landlord ct_meter: unit isolator sized to next standard rating
         if breaker_rating:
@@ -670,23 +964,86 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         iso_rating_text = (
             f"({isolator_label_extra})" if isolator_label_extra else SG_LOCALE.meter_board.isolator
         )
-        result.components.append(PlacedComponent(
-            symbol_name="ISOLATOR",
-            x=cx - _iso_w / 2,  # Center horizontally using width (not height!)
-            y=y,
-            label=iso_main_label,
-            rating=iso_rating_text,
-        ))
+
+        if supply_source == "landlord":
+            # E: Landlord — enclosed isolator with labels to the LEFT (reference style)
+            result.components.append(PlacedComponent(
+                symbol_name="ISOLATOR",
+                x=cx - _iso_w / 2,
+                y=y,
+                label="",   # labels placed separately to the left
+                rating="",
+                enclosed=True,  # IEC enclosed isolator (standalone unit with housing)
+            ))
+            # Position label text right-aligned to the left of enclosure box
+            _label_ch = 2.3
+            _char_w = _label_ch * 0.6
+            _combined = f"{iso_main_label}\\P{iso_rating_text}"
+            _lines = _combined.split("\\P")
+            _longest = max(len(ln) for ln in _lines)
+            _text_w = _longest * _char_w
+            # Gap measured from enclosure box outer edge (pad=1.5 same as RealIsolator.draw)
+            _enclosure_pad = 1.5
+            _text_x = cx - _iso_w / 2 - _enclosure_pad - config.isolator_label_gap - _text_w
+            _text_y = y + config.isolator_h * 0.55
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=_text_x,
+                y=_text_y,
+                label=_combined,
+            ))
+        else:
+            # Default: labels to the RIGHT (via symbol's built-in rendering)
+            result.components.append(PlacedComponent(
+                symbol_name="ISOLATOR",
+                x=cx - _iso_w / 2,
+                y=y,
+                label=iso_main_label,
+                rating=iso_rating_text,
+            ))
+
         y += config.isolator_h + 2
         result.connections.append(((cx, y), (cx, y + 2)))
         y += 2
         result.symbols_used.add("ISOLATOR")
 
+        # Outgoing cable annotation with tick mark (after isolator → DB)
+        outgoing_cable = requirements.get("outgoing_cable", "")
+        out_cable_text = format_cable_spec(outgoing_cable, multiline=True) if outgoing_cable else ""
+        if out_cable_text:
+            # Position tick between isolator enclosure box top and DB box bottom.
+            # Place tick between isolator box top and DB box bottom.
+            # Position at 2/3 from isolator (closer to DB box / higher up)
+            # to leave vertical space for the location text below the DB box.
+            _enclosure_pad = 1.5  # same as RealIsolator.draw()
+            _db_info_height = 9  # title(4mm) + 1 info line(3mm) + bottom pad(2mm)
+            _iso_box_top = y - (4 - _enclosure_pad)
+            _db_box_bottom = y + config.isolator_to_db_gap - 1 - _db_info_height
+            tick_y = _iso_box_top + (_db_box_bottom - _iso_box_top) * 0.67
+            tick_size = 1.25
+            result.thick_connections.append((
+                (cx - tick_size, tick_y - tick_size),
+                (cx + tick_size, tick_y + tick_size),
+            ))
+            _leader_len = config.cable_leader_len
+            result.connections.append(((cx, tick_y), (cx + _leader_len, tick_y)))
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=cx + _leader_len + config.cable_leader_text_gap,
+                y=tick_y + 1.5,
+                label=out_cable_text,
+            ))
+
     ctx.y = y
 
 
-def _place_main_breaker(ctx: _LayoutContext) -> None:
-    """Place main circuit breaker and set db_box_start_y."""
+def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
+    """Place main circuit breaker and set db_box_start_y.
+
+    Args:
+        skip_gap: If True, skip the isolator-to-DB gap (already added by caller,
+                  e.g. when CT metering section is placed before the breaker).
+    """
     result = ctx.result
     config = ctx.config
     cx = ctx.cx
@@ -698,10 +1055,12 @@ def _place_main_breaker(ctx: _LayoutContext) -> None:
     main_breaker_char = ctx.main_breaker_char
 
     # -- 4. Main Circuit Breaker --
-    # Add gap so outgoing cable annotation (tick mark + text) from meter board
-    # stays OUTSIDE (below) the DB dashed box
-    result.connections.append(((cx, y), (cx, y + 10)))
-    y += 10
+    # Add gap so outgoing cable annotation (tick mark + text) from isolator/meter board
+    # stays OUTSIDE (below) the DB dashed box.
+    if not skip_gap:
+        _gap = config.isolator_to_db_gap
+        result.connections.append(((cx, y), (cx, y + _gap)))
+        y += _gap
     ctx.db_box_start_y = y - 1  # Track DB box bottom (below main breaker, above cable annotation)
 
     if breaker_type == "ACB":
@@ -712,24 +1071,20 @@ def _place_main_breaker(ctx: _LayoutContext) -> None:
         cb_w, cb_h = config.breaker_w, config.breaker_h
 
     cb_symbol = f"CB_{breaker_type}"
-    # Singapore SLD format:
-    #   Line 1: "63A DP MCB"  (rating + poles + type)
-    #   Line 2: "TYPE B 10kA" (characteristic + fault level)
-    main_label = f"{breaker_rating}A {breaker_poles} {breaker_type}"
+    # Singapore SLD format (single line, matching reference):
+    #   "100A TPN MCCB (35KA)" or "63A DP MCB (TYPE B 10KA)"
     if main_breaker_char:
-        main_rating = f"TYPE {main_breaker_char} {breaker_fault_kA}kA"
+        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} (TYPE {main_breaker_char} {breaker_fault_kA}KA)"
     else:
-        main_rating = f"{breaker_fault_kA}kA"
+        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} ({breaker_fault_kA}KA)"
     result.components.append(PlacedComponent(
         symbol_name=cb_symbol,
         x=cx - cb_w / 2,
         y=y,
         label=main_label,
-        rating=main_rating,
     ))
-    y += cb_h + config.stub_len  # height + stub — continuous connection to next component
-    result.connections.append(((cx, y), (cx, y + 3)))
-    y += 3
+    y += cb_h + config.stub_len  # height + stub — symbol draws stub beyond height
+    # No extra connection gap — symbol stubs of adjacent components overlap for continuity
     result.symbols_used.add(breaker_type)
 
     ctx.y = y
@@ -766,12 +1121,10 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         symbol_name=elcb_symbol,
         x=cx - elcb_w / 2,
         y=y,
-        label=f"{elcb_rating}A {elcb_poles_str} {elcb_type_str}",
-        rating=f"({elcb_ma}mA)",
+        label=f"{elcb_rating}A {elcb_poles_str} {elcb_type_str} ({elcb_ma}mA)",
     ))
-    y += elcb_h + config.stub_len  # height + stub — continuous connection to next component
-    result.connections.append(((cx, y), (cx, y + 3)))
-    y += 3
+    y += elcb_h + config.stub_len  # height + stub — symbol draws stub beyond height
+    # No extra connection gap — symbol stubs of adjacent components overlap for continuity
     result.symbols_used.add(elcb_type_str)
 
     ctx.y = y
@@ -796,19 +1149,37 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     num_circuits = max(len(sub_circuits), 1)
     effective_count = min(num_circuits, config.max_circuits_per_row)
 
-    h_spacing = _compute_dynamic_spacing(num_circuits, config)
+    h_spacing = _compute_dynamic_spacing(
+        num_circuits, config,
+        available_width=ctx.constrained_width,
+    )
     desired_width = effective_count * h_spacing + 2 * config.busbar_margin
 
-    bus_width = max(desired_width, 140)
+    # In constrained mode (multi-DB), don't enforce a 140mm minimum
+    min_bus_width = 40 if ctx.constrained_width else 140
+    bus_width = max(desired_width, min_bus_width)
     bus_start_x = cx - bus_width / 2
     bus_end_x = cx + bus_width / 2
 
-    if bus_start_x < config.min_x:
-        bus_start_x = config.min_x
-        bus_end_x = bus_start_x + bus_width
-    if bus_end_x > config.max_x:
-        bus_end_x = config.max_x
-        bus_start_x = bus_end_x - bus_width
+    # ── Region constraint: strict clamping to active_region ──
+    # This is the critical fix for multi-DB: each DB's busbar MUST stay
+    # within its allocated region to prevent cross-DB overlap.
+    if ctx.active_region:
+        region = ctx.active_region
+        bus_start_x = max(bus_start_x, region.min_x)
+        bus_end_x = min(bus_end_x, region.max_x)
+        # If busbar is narrower than minimum, center within region
+        if bus_end_x - bus_start_x < min_bus_width:
+            bus_start_x = max(region.min_x, region.cx - min_bus_width / 2)
+            bus_end_x = min(region.max_x, region.cx + min_bus_width / 2)
+    else:
+        # Page-level clamping (single-DB backward compat)
+        if bus_start_x < config.min_x:
+            bus_start_x = config.min_x
+            bus_end_x = bus_start_x + bus_width
+        if bus_end_x > config.max_x:
+            bus_end_x = config.max_x
+            bus_start_x = bus_end_x - bus_width
 
     result.busbar_y = y
     result.busbar_start_x = bus_start_x
@@ -827,7 +1198,9 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         rating="",
     ))
     # -- DB Info: compute text, defer placement to _place_db_box() --
+    # Reference format: "APPROVED LOAD: 69.282 kVA" (raw value, space + kVA, no voltage)
     if kva:
+        # User-specified kVA: use as-is (e.g., 69.282)
         approved_kva = kva
     elif supply_type == "three_phase":
         approved_kva = round(breaker_rating * voltage * 1.732 / 1000, 1)
@@ -838,8 +1211,14 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     unit_number = ""
     if application_info:
         unit_number = str(application_info.get("unit_number", "")).strip()
+        # Auto-extract unit number from address if not explicitly provided
+        if not unit_number and application_info.get("address"):
+            _addr = application_info["address"]
+            _m = re.search(r"#\d{2,}-\d{2,}", _addr)
+            if _m:
+                unit_number = _m.group(0)
 
-    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva}KVA AT {voltage}V"
+    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} kVA"
 
     # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
     db_location_text = ""
@@ -875,21 +1254,87 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     supply_type = ctx.supply_type
     sub_circuits = ctx.sub_circuits
 
+    # Detect phase arrangement before triplet-specific processing.
+    # Must run BEFORE padding/ID assignment since those depend on the result.
+    # Skip re-detection when caller already set use_triplets=False (e.g. PG boards
+    # where each group is single-phase and triplets never apply).
+    if ctx.use_triplets:
+        ctx.use_triplets = _should_use_triplets(sub_circuits, supply_type)
+
     # -- 6. Sub-circuits (branching UPWARD) --
     # Auto-pad SPAREs to complete 3-phase triplets (before ID assignment)
-    sub_circuits = _pad_spares_for_triplets(sub_circuits, supply_type)
+    sub_circuits = _pad_spares_for_triplets(sub_circuits, supply_type, use_triplets=ctx.use_triplets)
     ctx.sub_circuits = sub_circuits  # Update context for downstream use
 
     # Pre-assign circuit IDs (S/P for single-phase, L1P1/L2P1 for 3-phase)
-    circuit_ids = _assign_circuit_ids(sub_circuits, supply_type)
+    circuit_ids = _assign_circuit_ids(sub_circuits, supply_type, use_triplets=ctx.use_triplets)
 
     num_circuits = max(len(sub_circuits), 1)
-    h_spacing = _compute_dynamic_spacing(num_circuits, config)
 
     bus_start_x = result.busbar_start_x
     bus_end_x = result.busbar_end_x
 
-    rows = _split_into_rows(sub_circuits, config.max_circuits_per_row)
+    # ── Region-aware row splitting ──
+    # When constrained to a region (multi-DB or protection group), compute
+    # max circuits per row based on available width. The region already
+    # represents the usable area (margins were accounted for during allocation).
+    #
+    # Row-splitting threshold: circuits_per_row × TARGET_SPACING ≤ region_width
+    # TARGET_SPACING is the comfortable inter-circuit spacing (12mm).
+    # If that doesn't fit, try MIN_SPACING (8mm) before going multi-row.
+    TARGET_SPACING = 12.0  # mm — comfortable label spacing
+    MIN_SPACING = 8.0      # mm — minimum readable spacing
+    effective_max_per_row = config.max_circuits_per_row
+
+    if ctx.active_region or ctx.constrained_width:
+        avail = ctx.active_region.width if ctx.active_region else ctx.constrained_width
+        # Region already has margins built in — use nearly full width.
+        # Only subtract a tiny margin (2mm per side) for busbar end caps.
+        usable = avail - 4  # 2mm per side for busbar end caps
+
+        # Can all circuits fit at target spacing?
+        if num_circuits * TARGET_SPACING <= usable:
+            max_per_row = num_circuits  # Fits in one row at comfortable spacing
+        elif num_circuits * MIN_SPACING <= usable:
+            max_per_row = num_circuits  # Fits in one row at minimum spacing
+        else:
+            # Need multi-row: compute max per row at minimum readable spacing
+            max_per_row = max(3, int(usable / MIN_SPACING))
+
+        # Use un-rounded value for multi-row decision (triplet rounding can
+        # drop a fit: 16 circuits at 8mm fits 160mm, but rounding 16→15
+        # triggers multi-row unnecessarily).
+        can_fit_single_row = num_circuits <= max_per_row
+
+        # Round down to triplets for 3-phase interleaved (for split sizing only)
+        if ctx.use_triplets and supply_type == "three_phase" and max_per_row % 3 != 0:
+            max_per_row = max(3, (max_per_row // 3) * 3)
+        effective_max_per_row = min(effective_max_per_row, max_per_row)
+
+        # If all circuits fit without triplet rounding, force single row
+        if can_fit_single_row:
+            effective_max_per_row = max(effective_max_per_row, num_circuits)
+
+        # Balanced split: distribute circuits evenly across rows
+        if num_circuits > effective_max_per_row:
+            num_rows = (num_circuits + effective_max_per_row - 1) // effective_max_per_row
+            balanced = (num_circuits + num_rows - 1) // num_rows
+            if ctx.use_triplets and supply_type == "three_phase" and balanced % 3 != 0:
+                balanced = ((balanced + 2) // 3) * 3
+            effective_max_per_row = max(3, balanced)
+
+    rows = _split_into_rows(sub_circuits, effective_max_per_row)
+
+    # Use region width for spacing computation (more accurate than constrained_width)
+    spacing_avail = None
+    if ctx.active_region:
+        spacing_avail = ctx.active_region.width
+    elif ctx.constrained_width:
+        spacing_avail = ctx.constrained_width
+    h_spacing = _compute_dynamic_spacing(
+        min(num_circuits, effective_max_per_row), config,
+        available_width=spacing_avail,
+    )
 
     busbar_y_row = y  # Default for single-row case
 
@@ -904,6 +1349,11 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             row_bus_width = row_count * h_spacing + 2 * config.busbar_margin
             row_bus_start = cx - row_bus_width / 2
             row_bus_end = cx + row_bus_width / 2
+
+            # Region constraint: clamp secondary busbars to active region
+            if ctx.active_region:
+                row_bus_start = max(row_bus_start, ctx.active_region.min_x)
+                row_bus_end = min(row_bus_end, ctx.active_region.max_x)
 
             result.components.append(PlacedComponent(
                 symbol_name="BUSBAR",
@@ -936,10 +1386,14 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
         sc_bus_start = row_bus_start
         result.busbar_y_per_row.append(busbar_y_row)
 
+        # Store per-row busbar extents for region-aware overlap resolution
+        result.busbar_x_per_row[busbar_y_row] = (row_bus_start, row_bus_end)
+
         _place_sub_circuits_upward(
             result, row_circuits, row_idx, row_count,
             busbar_y_row, sc_bus_start, row_bus_end,
             h_spacing, config, sub_circuits, supply_type, circuit_ids,
+            use_triplets=ctx.use_triplets,
         )
 
     return busbar_y_row
@@ -953,9 +1407,9 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     text_anchor_y = ctx.db_box_start_y
 
     # Expand DB box bottom to accommodate DB info text below the main breaker.
-    # Text layout (top→bottom): "40A DB" (char 3.0→~4mm) + gap(1) + info lines (char 1.8→~3mm each)
+    # Text layout (top→bottom): board name (char 3.0→~4mm) + gap(1) + info lines (char 1.8→~3mm each) + bottom pad
     db_info_lines = ctx.db_info_text.count("\\P") + 1 if ctx.db_info_text else 0
-    db_info_height = 5 + db_info_lines * 3  # title(5mm) + each info line(3mm)
+    db_info_height = 4 + db_info_lines * 3 + 2  # title(4mm) + info lines(3mm each) + bottom pad(2mm)
     db_box_start_y = text_anchor_y - db_info_height
 
     # -- 6a. DB Box (DASHED rectangle around distribution board per reference DWG) --
@@ -982,14 +1436,15 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     result.dashed_connections.append(((db_box_right, db_box_start_y), (db_box_right, db_box_end_y)))
     result.db_box_dashed_indices = [base_idx, base_idx + 1, base_idx + 2, base_idx + 3]
 
-    # "40A DB" + "APPROVED LOAD" labels — bottom-left inside DB box (per reference DWG)
-    # Text anchored to ORIGINAL main breaker position so it stays above the expanded box bottom
-    if ctx.db_info_label:
+    # DB info: board name (e.g., "MSB") inside box, bottom-left (per reference DWG)
+    # Reference style: text near bottom dashed line — MSB label then APPROVED LOAD below
+    db_display_label = ctx.board_name if ctx.board_name else ctx.db_info_label
+    if db_display_label:
         result.components.append(PlacedComponent(
             symbol_name="DB_INFO_BOX",
             x=db_box_left + 3,
-            y=text_anchor_y + 8,  # Fixed to original position, not expanded box bottom
-            label=ctx.db_info_label,
+            y=text_anchor_y - 1,  # Just below separator line (inside info area)
+            label=db_display_label,
             rating=ctx.db_info_text,
         ))
 
@@ -998,7 +1453,7 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=db_box_left + 6,
-            y=db_box_start_y - 3,  # 3mm below DB box bottom edge
+            y=db_box_start_y - 5,  # 5mm below DB box bottom (clearance for cable tick text)
             label=ctx.db_location_text,
         ))
 

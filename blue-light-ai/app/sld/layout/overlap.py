@@ -295,12 +295,23 @@ def _breaker_half_width(comp: PlacedComponent) -> float:
     return 4.2
 
 
-def _compute_dynamic_spacing(num_circuits: int, config: LayoutConfig) -> float:
+def _compute_dynamic_spacing(
+    num_circuits: int,
+    config: LayoutConfig,
+    available_width: float | None = None,
+) -> float:
     """Compute horizontal spacing that expands to fill available width.
 
     For fewer circuits, spacing increases (up to max_horizontal_spacing)
     so the diagram fills the drawing area. For many circuits, spacing
     decreases (down to min_horizontal_spacing).
+
+    Args:
+        num_circuits: Number of circuits to space.
+        config: Layout config.
+        available_width: If provided, constrains spacing to fit within this
+            width (mm) instead of using the full page width.  Used by
+            multi-DB / protection-group layouts.
 
     Note: cable schedule reserve is handled by shifting cx in compute_layout(),
     so the busbar naturally occupies a narrower zone.
@@ -309,10 +320,19 @@ def _compute_dynamic_spacing(num_circuits: int, config: LayoutConfig) -> float:
     if effective_count <= 1:
         return config.horizontal_spacing
 
-    max_bus_width = config.max_x - config.min_x - 40  # ~330mm
+    if available_width is not None:
+        max_bus_width = available_width
+    else:
+        max_bus_width = config.max_x - config.min_x - 40  # ~330mm
     ideal_spacing = (max_bus_width - 2 * config.busbar_margin) / effective_count
-    return max(config.min_horizontal_spacing,
-               min(ideal_spacing, config.max_horizontal_spacing))
+    # In constrained mode (multi-DB), allow tighter spacing to fit within allocation.
+    # PG sub-busbars (< 80mm) keep aggressive 3mm floor for per-phase groups.
+    # DB-level busbars (>= 80mm) use 6mm floor to ensure breaker label readability.
+    if available_width is not None:
+        min_spacing = 3.0 if available_width < 80 else 6.0
+    else:
+        min_spacing = config.min_horizontal_spacing
+    return max(min_spacing, min(ideal_spacing, config.max_horizontal_spacing))
 
 
 def _create_groups_from_breakers(
@@ -738,6 +758,7 @@ def _determine_final_positions(
     layout_result: LayoutResult,
     config: LayoutConfig,
     incoming_chain_x: float = 0.0,
+    row_busbar_extent: tuple[float, float] | None = None,
 ) -> list[float]:
     """
     Single-pass left-to-right layout of sub-circuit groups.
@@ -746,6 +767,11 @@ def _determine_final_positions(
     computed minimum widths. Fits within drawing bounds, expanding
     the busbar if necessary. Centers groups on the busbar span
     that includes the incoming supply chain connection.
+
+    Args:
+        row_busbar_extent: If provided, (start_x, end_x) busbar extent for
+            this specific row. Used by multi-DB to constrain each DB's
+            circuits to their own busbar, not the main busbar.
 
     Delegates to:
       - _expand_busbar_if_needed() — grow busbar when circuits need more space
@@ -757,10 +783,20 @@ def _determine_final_positions(
     if not groups:
         return []
 
-    _MARGIN = config.busbar_end_margin  # busbar end margin
+    _MARGIN = config.busbar_end_margin  # busbar end margin (default 10mm)
 
-    sc_bus_start = layout_result.busbar_start_x + _MARGIN
-    sc_bus_end = layout_result.busbar_end_x - _MARGIN
+    # Use per-row busbar extent if available (multi-DB), else global busbar
+    if row_busbar_extent:
+        region_w = row_busbar_extent[1] - row_busbar_extent[0]
+        # Adaptive margins: reduce for small regions (PG sub-busbars)
+        # Default 10mm margins eat 20mm from a 55mm PG region (36%)!
+        # Use proportional margins: min 2mm, max config value
+        _MARGIN = min(_MARGIN, max(2.0, region_w * 0.05))
+        sc_bus_start = row_busbar_extent[0] + _MARGIN
+        sc_bus_end = row_busbar_extent[1] - _MARGIN
+    else:
+        sc_bus_start = layout_result.busbar_start_x + _MARGIN
+        sc_bus_end = layout_result.busbar_end_x - _MARGIN
 
     # Compute total needed span using asymmetric extents
     n = len(groups)
@@ -775,20 +811,32 @@ def _determine_final_positions(
 
     available = sc_bus_end - sc_bus_start
 
-    # Expand busbar if needed
-    if total_needed > available:
+    # Expand busbar if needed (skip for region-constrained layouts)
+    if total_needed > available and not row_busbar_extent:
         sc_bus_start, sc_bus_end = _expand_busbar_if_needed(
             total_needed, layout_result, config, sc_bus_start, sc_bus_end, _MARGIN,
         )
         available = sc_bus_end - sc_bus_start
 
-    # If still too tight after expansion, apply proportional compression
+    # If still too tight after expansion, apply proportional compression.
+    # For region-constrained layouts, use gentler compression that preserves
+    # minimum readable spacing and truncates text labels rather than crushing.
     if total_needed > available and total_needed > 0:
-        scale = available / total_needed
-        left_exts = [e * scale for e in left_exts]
-        right_exts = [e * scale for e in right_exts]
-        left_exts = [max(e, 6.0) for e in left_exts]
-        right_exts = [max(e, 6.0) for e in right_exts]
+        if row_busbar_extent:
+            # Region-constrained: compress extents but keep minimum spacing.
+            # The region is fixed so we shrink label extents to fit.
+            scale = available / total_needed
+            min_ext = 3.0  # minimum extent (mm) — allows text truncation
+            left_exts = [max(e * scale, min_ext) for e in left_exts]
+            right_exts = [max(e * scale, min_ext) for e in right_exts]
+            # Also reduce gap_befores proportionally
+            gap_befores = [g * scale for g in gap_befores]
+        else:
+            scale = available / total_needed
+            left_exts = [e * scale for e in left_exts]
+            right_exts = [e * scale for e in right_exts]
+            left_exts = [max(e, 6.0) for e in left_exts]
+            right_exts = [max(e, 6.0) for e in right_exts]
 
     # Place groups left-to-right using asymmetric extents
     new_tap_xs: list[float] = []
@@ -978,11 +1026,19 @@ def _compute_safe_leader_bounds(
     cable_groups: OrderedDict[str, list[float]],
     gi: int,
     config: LayoutConfig,
+    *,
+    groups: list[SubCircuitGroup] | None = None,
+    components: list[PlacedComponent] | None = None,
 ) -> tuple[float, float]:
     """Compute safe horizontal bounds for cable leader line extension.
 
-    Considers SPARE circuit positions and adjacent cable group boundaries
-    to prevent leader lines from overlapping with other labels.
+    Considers SPARE circuit positions, adjacent cable group boundaries,
+    and circuit name label bounding boxes to prevent leader lines from
+    overlapping with other labels.
+
+    Args:
+        groups: If provided, also checks circuit name label bounding boxes.
+        components: Required when groups is provided.
 
     Returns:
         (safe_left, safe_right) — horizontal bounds for leader extension.
@@ -999,16 +1055,58 @@ def _compute_safe_leader_bounds(
             safe_right = min(safe_right, sx - _SPARE_GAP)
 
     # Clamp to adjacent cable group boundaries
+    # Margin accounts for cable text extending beyond leader endpoint:
+    # text offset (3mm) + text half_width (~2.8mm) + clearance (0.2mm) = 6mm
+    _CABLE_TEXT_MARGIN = 6.0
     all_group_ranges = [(min(txs), max(txs)) for txs in cable_groups.values()]
     for gj, (g_min, g_max) in enumerate(all_group_ranges):
         if gj == gi:
             continue
         if g_max < leftmost_x:
-            safe_left = max(safe_left, g_max + 2.0)
+            safe_left = max(safe_left, g_max + _CABLE_TEXT_MARGIN)
         if g_min > rightmost_x:
-            safe_right = min(safe_right, g_min - 2.0)
+            safe_right = min(safe_right, g_min - _CABLE_TEXT_MARGIN)
+
+    # Clamp to circuit name label bounding boxes (rotated 90° vertical text)
+    # Cable text half_w estimate for 2-line text (most cable specs split into 2 lines)
+    if groups and components:
+        _CABLE_TEXT_HALF_W = config.label_char_height  # 2.8mm for 2-line text
+        _LABEL_GAP = _CABLE_TEXT_HALF_W + 1.5  # 4.3mm total clearance
+        for g in groups:
+            if g.name_label_idx is None:
+                continue
+            label_comp = components[g.name_label_idx]
+            # 90° rotated label: horizontal extent = num_lines × char_height
+            label_lines = (label_comp.label or "").split("\\P")
+            num_lines = max(len(label_lines), 1)
+            label_half_w = num_lines * config.label_char_height / 2
+            label_x_min = label_comp.x - label_half_w
+            label_x_max = label_comp.x + label_half_w
+
+            # Labels to the left of the cable group constrain safe_left
+            # Use _CABLE_TEXT_HALF_W to account for cable text reaching beyond endpoint
+            if label_x_max < leftmost_x + _CABLE_TEXT_HALF_W:
+                safe_left = max(safe_left, label_x_max + _LABEL_GAP)
+            # Labels to the right constrain safe_right
+            if label_x_min > rightmost_x - _CABLE_TEXT_HALF_W:
+                safe_right = min(safe_right, label_x_min - _LABEL_GAP)
 
     return safe_left, safe_right
+
+
+def _estimate_cable_text_num_lines(cable_spec: str) -> int:
+    """Estimate number of lines cable text will occupy after line splitting.
+
+    Mirrors the splitting logic in _draw_cable_leader_group():
+    - Contains "CPC IN" or "PVC CPC IN" → 2 lines
+    - Longer than 35 chars with " + " → 2 lines
+    - Otherwise → 1 line
+    """
+    if re.search(r'\s+(PVC\s+CPC|CPC)\s+IN\s+', cable_spec, re.IGNORECASE):
+        return 2
+    if len(cable_spec) > 35 and " + " in cable_spec:
+        return 2
+    return 1
 
 
 def _draw_cable_leader_group(
@@ -1042,9 +1140,12 @@ def _draw_cable_leader_group(
 
     # Split long cable text into 2 lines to avoid exceeding drawing border
     cable_text = cable_spec
-    m = re.search(r'\s+(PVC\s+CPC|CPC)\s+IN\s+', cable_text)
+    m = re.search(r'\s+(PVC\s+CPC|CPC)\s+IN\s+', cable_text, re.IGNORECASE)
     if m:
         cable_text = cable_text[:m.start()] + "\\P" + cable_text[m.start() + 1:]
+    elif len(cable_text) > 35 and " + " in cable_text:
+        # Fallback: split at '+' for long cable specs without "CPC IN" pattern
+        cable_text = cable_text.replace(" + ", " +\\P", 1)
 
     # L-shaped bend + cable spec text at leader end
     bend_top_y = leader_y + bend_height
@@ -1161,14 +1262,53 @@ def _add_cable_leader_lines(
 
         group_keys = list(cable_groups.keys())
 
+        # Build circuit name label bounding boxes for collision detection
+        # (X range only; at same Y zone, vertical ranges always overlap for 90° text)
+        # Store (x_min, x_max, center_x) to allow filtering own-group names
+        name_label_bbs: list[tuple[float, float, float]] = []
+        for g in groups:
+            if g.name_label_idx is None or g.is_spare:
+                continue
+            comp = layout_result.components[g.name_label_idx]
+            n_lines = max(len((comp.label or "").split("\\P")), 1)
+            hw = n_lines * config.label_char_height / 2
+            name_label_bbs.append((comp.x - hw, comp.x + hw, comp.x))
+
+        # Track placed cable text bounding boxes for sequential collision avoidance
+        placed_cable_bbs: list[tuple[float, float, float]] = []  # (x_min, x_max, y)
+
+        def _has_collision(
+            bb: tuple[float, float], y: float,
+            own_tap_xs: list[float] | None = None,
+        ) -> bool:
+            """Check if cable text BB collides with EXTERNAL name labels or placed cable texts.
+
+            own_tap_xs: tap positions of the current cable group — names at these
+            positions are excluded (cable leader passes over its own group's names,
+            so moderate overlap is expected and acceptable).
+            """
+            _MARGIN = 0.5  # extra clearance to catch near-misses
+            for nx_min, nx_max, nx_center in name_label_bbs:
+                # Skip names that belong to the current cable group
+                if own_tap_xs and any(abs(nx_center - tx) < 0.5 for tx in own_tap_xs):
+                    continue
+                if bb[1] > nx_min - _MARGIN and bb[0] < nx_max + _MARGIN:
+                    return True
+            for px_min, px_max, py in placed_cable_bbs:
+                if abs(py - y) < 8.0:  # same Y zone (within 8mm)
+                    if bb[1] > px_min - _MARGIN and bb[0] < px_max + _MARGIN:
+                        return True
+            return False
+
         for gi, (cable_spec, tap_xs) in enumerate(cable_groups.items()):
             tap_xs.sort()
             leftmost_x = tap_xs[0]
             rightmost_x = tap_xs[-1]
 
-            # Compute safe extension limits
+            # Compute safe extension limits (with circuit name label collision check)
             safe_left, safe_right = _compute_safe_leader_bounds(
                 leftmost_x, rightmost_x, spare_tap_xs, cable_groups, gi, config,
+                groups=groups, components=layout_result.components,
             )
 
             # Determine text placement direction
@@ -1190,9 +1330,72 @@ def _add_cable_leader_lines(
                 leader_start_x = leftmost_x
                 leader_end_x = rightmost_x + ext
 
+            effective_leader_y = leader_y
+
+            # --- BB-based collision detection + correction ---
+            cable_num_lines = _estimate_cable_text_num_lines(cable_spec)
+            cable_hw = cable_num_lines * config.label_char_height / 2
+            text_x = (leader_start_x - 3) if text_on_left else leader_end_x
+            cable_bb = (text_x - cable_hw, text_x + cable_hw)
+
+            collision = _has_collision(cable_bb, effective_leader_y, own_tap_xs=tap_xs)
+
+            if collision:
+                # Attempt 1: flip text direction
+                alt_on_left = not text_on_left
+                if alt_on_left:
+                    alt_ext = min(leader_extension, effective_left)
+                    alt_start = leftmost_x - alt_ext
+                    alt_text_x = alt_start - 3
+                else:
+                    alt_ext = min(leader_extension, effective_right)
+                    alt_end = rightmost_x + alt_ext
+                    alt_text_x = alt_end
+                alt_bb = (alt_text_x - cable_hw, alt_text_x + cable_hw)
+
+                if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs):
+                    # Flip resolved the collision
+                    text_on_left = alt_on_left
+                    if text_on_left:
+                        leader_start_x = leftmost_x - alt_ext
+                        leader_end_x = rightmost_x
+                    else:
+                        leader_start_x = leftmost_x
+                        leader_end_x = rightmost_x + alt_ext
+                    cable_bb = alt_bb
+                else:
+                    # Attempt 2: Y stagger (+4mm)
+                    stagger_y = min(effective_leader_y + 4.0, max_leader_y)
+                    # Try original direction with stagger
+                    if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs):
+                        effective_leader_y = stagger_y
+                    # Try flipped direction with stagger
+                    elif not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs):
+                        effective_leader_y = stagger_y
+                        text_on_left = alt_on_left
+                        if text_on_left:
+                            leader_start_x = leftmost_x - alt_ext
+                            leader_end_x = rightmost_x
+                        else:
+                            leader_start_x = leftmost_x
+                            leader_end_x = rightmost_x + alt_ext
+                        cable_bb = alt_bb
+                    else:
+                        # Best-effort: apply stagger even if not fully resolved
+                        effective_leader_y = stagger_y
+
+            # Clamp to drawing bounds
+            if effective_leader_y > max_leader_y:
+                effective_leader_y = max_leader_y
+
+            # Register final cable text BB for subsequent collision checks
+            final_text_x = (leader_start_x - 3) if text_on_left else leader_end_x
+            final_bb = (final_text_x - cable_hw, final_text_x + cable_hw)
+            placed_cable_bbs.append((final_bb[0], final_bb[1], effective_leader_y))
+
             # Draw this cable group's leader lines
             _draw_cable_leader_group(
-                tap_xs, cable_spec, leader_y, text_on_left,
+                tap_xs, cable_spec, effective_leader_y, text_on_left,
                 leader_start_x, leader_end_x,
                 config.leader_bend_height, tick_size, layout_result,
             )
@@ -1393,6 +1596,8 @@ def _add_phase_fanout(
     """
     if supply_type != "three_phase":
         return
+    if not layout_result.use_triplets:
+        return
 
     groups, _ = _identify_groups(layout_result)
     if not groups:
@@ -1461,6 +1666,7 @@ def _normalize_row_spacing(
     row_groups: list[SubCircuitGroup],
     components: list[PlacedComponent],
     config: LayoutConfig | None = None,
+    region_width: float | None = None,
 ) -> None:
     """Normalize per-row spacing: category gaps, ditto detection, width computation.
 
@@ -1470,6 +1676,11 @@ def _normalize_row_spacing(
       2  — Compute minimum width per group via bounding boxes
       2b — Override ditto group extents to compact width
       2c — 3-phase uniform spacing normalization (TPN DBs)
+
+    Args:
+        region_width: If provided, cap Step 2c extents so groups fit within
+            this horizontal span. Used for multi-DB region-constrained layouts
+            to prevent text extent inflation from causing extreme compression.
 
     Mutates row_groups in-place: sets gap_before, is_ditto, min_width,
     left_extent, right_extent.
@@ -1514,8 +1725,13 @@ def _normalize_row_spacing(
     # Step 2b: Override extents for ditto groups (no labels → compact)
     for g in row_groups:
         if g.is_ditto:
-            g.left_extent = _DITTO_EXTENT
-            g.right_extent = _DITTO_EXTENT
+            effective_ditto = _DITTO_EXTENT
+            if region_width is not None:
+                # In constrained regions: ditto minimum 4mm to keep chain arrows visible
+                per_group_avail = region_width / max(len(row_groups), 1)
+                effective_ditto = max(4.0, min(_DITTO_EXTENT, per_group_avail / 2))
+            g.left_extent = effective_ditto
+            g.right_extent = effective_ditto
             g.min_width = g.left_extent + g.right_extent
 
     # Step 2c: 3-phase uniform spacing normalization
@@ -1524,41 +1740,72 @@ def _normalize_row_spacing(
     # and per-type width differences (SPARE=15mm vs MCB=19mm) so that
     # every circuit occupies the same horizontal space.
     # Only add extra gap at the section boundary (Lighting→Power).
-    _phase_id_count = sum(
-        1 for g in row_groups
-        if g.breaker_idx is not None
-        and re.match(r"^L[123]", components[g.breaker_idx].circuit_id or "")
-    )
-    if _phase_id_count >= 6:
+    _phase_id_count = 0
+    _phase_digits: set[str] = set()
+    for g in row_groups:
+        if g.breaker_idx is not None:
+            cid = components[g.breaker_idx].circuit_id or ""
+            m = re.match(r"^L([123])", cid)
+            if m:
+                _phase_id_count += 1
+                _phase_digits.add(m.group(1))
+    _is_interleaved = _phase_id_count >= 6 and len(_phase_digits) >= 2
+    _needs_uniform = _phase_id_count >= 6  # uniform spacing for all L[123]* groups
+    if _needs_uniform:
         # Clear all prefix-based gaps from Step 1b
         for g in row_groups:
             g.gap_before = 0.0
 
-        # Add gap only at section boundaries (S→P) at triplet boundaries
-        _SECTION_GAP = 6.0
+        # Add gap only at section boundaries (S→P) at triplet boundaries.
+        # Only for interleaved boards (L1/L2/L3 alternating), NOT for
+        # single-phase PG groups (all same L-prefix, e.g. all L1*).
+        if _is_interleaved:
+            _SECTION_GAP = 6.0
 
-        def _triplet_section(start_gi: int) -> str:
-            """Return 'S', 'P', or '' for a triplet starting at start_gi."""
-            for k in range(start_gi, min(start_gi + 3, len(row_groups))):
-                rg = row_groups[k]
-                if rg.breaker_idx is not None:
-                    cid = components[rg.breaker_idx].circuit_id or ""
-                    m = re.match(r"^L[123]([A-Z])", cid)
-                    if m:
-                        return m.group(1)  # 'S' or 'P'
-            return ""
+            def _triplet_section(start_gi: int) -> str:
+                """Return 'S', 'P', or '' for a triplet starting at start_gi."""
+                for k in range(start_gi, min(start_gi + 3, len(row_groups))):
+                    rg = row_groups[k]
+                    if rg.breaker_idx is not None:
+                        cid = components[rg.breaker_idx].circuit_id or ""
+                        m = re.match(r"^L[123]([A-Z])", cid)
+                        if m:
+                            return m.group(1)  # 'S' or 'P'
+                return ""
 
-        prev_sec = _triplet_section(0)
-        for t in range(3, len(row_groups), 3):
-            cur_sec = _triplet_section(t)
-            if cur_sec and prev_sec and cur_sec != prev_sec:
-                row_groups[t].gap_before = _SECTION_GAP
-            if cur_sec:
-                prev_sec = cur_sec
+            prev_sec = _triplet_section(0)
+            for t in range(3, len(row_groups), 3):
+                cur_sec = _triplet_section(t)
+                if cur_sec and prev_sec and cur_sec != prev_sec:
+                    row_groups[t].gap_before = _SECTION_GAP
+                if cur_sec:
+                    prev_sec = cur_sec
 
         # Normalize all widths to maximum for uniform spacing
         max_left = max(g.left_extent for g in row_groups)
         max_right = max(g.right_extent for g in row_groups)
+
+        # Cap extents for region-constrained layouts to prevent text extent
+        # inflation from causing extreme compression in multi-DB layouts.
+        # Without capping, a single non-ditto group's full label extent
+        # (~28mm right) is applied to ALL groups, requiring 12×33mm=396mm
+        # but only ~170mm is available — leading to 0.7mm spacing.
+        if region_width is not None:
+            n = len(row_groups)
+            # Adaptive margin: small regions (PGs) get smaller margins
+            end_margin = min(10.0, max(2.0, region_width * 0.05))
+            usable = region_width - 2 * end_margin
+            # Also reserve room for gap_before (section boundaries, etc.)
+            total_gaps = sum(g.gap_before for g in row_groups)
+            usable_for_groups = usable - total_gaps
+            target_per_group = usable_for_groups / max(n, 1)
+            half_target = target_per_group / 2
+            max_left = min(max_left, half_target)
+            max_right = min(max_right, half_target)
+            # Ensure at least 3mm each side for minimal symbol clearance
+            max_left = max(max_left, 3.0)
+            max_right = max(max_right, 3.0)
+
         for g in row_groups:
             g.left_extent = max_left
             g.right_extent = max_right
@@ -1664,28 +1911,109 @@ def resolve_overlaps(
     all_final_groups: list[SubCircuitGroup] = []
     all_final_tap_xs: list[float] = []
 
+    # ── Multi-DB region-aware path ──
+    # When layout_regions exist, circuits from different DBs share the same
+    # busbar Y but have different X regions. Split groups by X-region to
+    # process each DB's circuits independently.
+    regions = layout_result.layout_regions
+
     for row_idx in sorted(rows_map.keys()):
         row_groups = rows_map[row_idx]
 
-        # Steps 1b + 1c + 2 + 2b + 2c: category gaps, ditto, widths, 3-phase normalization
-        _normalize_row_spacing(row_groups, layout_result.components, config)
+        if regions:
+            # Split this row's groups by which region they belong to
+            region_buckets: dict[int, list[SubCircuitGroup]] = {}
+            unassigned: list[SubCircuitGroup] = []
+            for g in row_groups:
+                assigned = False
+                for ri, region in enumerate(regions):
+                    if region.min_x - 5 <= g.tap_x <= region.max_x + 5:
+                        region_buckets.setdefault(ri, []).append(g)
+                        assigned = True
+                        break
+                if not assigned:
+                    unassigned.append(g)
 
-        # Step 3: Determine final tap positions for this row
-        new_tap_xs = _determine_final_positions(
-            row_groups, layout_result.components, layout_result, config,
-            incoming_chain_x=incoming_chain_x,
-        )
+            # Process each region's groups independently
+            for ri in sorted(region_buckets.keys()):
+                r_groups = region_buckets[ri]
+                region = regions[ri]
+                _normalize_row_spacing(
+                    r_groups, layout_result.components, config,
+                    region_width=region.width,
+                )
 
-        # Step 4: Rebuild positions for this row
-        _rebuild_from_positions(row_groups, new_tap_xs, layout_result)
+                row_busbar_extent = (region.min_x, region.max_x)
+                new_tap_xs = _determine_final_positions(
+                    r_groups, layout_result.components, layout_result, config,
+                    incoming_chain_x=incoming_chain_x if ri == 0 else 0.0,
+                    row_busbar_extent=row_busbar_extent,
+                )
 
-        # Collect for busbar fitting
-        for g, new_x in zip(row_groups, new_tap_xs):
-            all_final_groups.append(g)
-            all_final_tap_xs.append(new_x)
+                # Multi-DB region clamping: ensure all positions stay within
+                # the strict region bounds. If _determine_final_positions
+                # produced positions outside the region (due to centering or
+                # bound fitting), clamp them proportionally.
+                _MARGIN_R = min(config.busbar_end_margin, max(2.0, region.width * 0.05))
+                r_min = region.min_x + _MARGIN_R
+                r_max = region.max_x - _MARGIN_R
+                if new_tap_xs and len(new_tap_xs) > 1:
+                    t_min = min(new_tap_xs)
+                    t_max = max(new_tap_xs)
+                    if t_min < r_min or t_max > r_max:
+                        cur_span = t_max - t_min
+                        avail_span = r_max - r_min
+                        if cur_span > avail_span and cur_span > 0:
+                            center = (r_min + r_max) / 2
+                            scale_f = avail_span / cur_span * 0.95
+                            old_center = (t_min + t_max) / 2
+                            new_tap_xs = [center + (t - old_center) * scale_f
+                                          for t in new_tap_xs]
+                        elif t_min < r_min:
+                            shift = r_min - t_min
+                            new_tap_xs = [t + shift for t in new_tap_xs]
+                        elif t_max > r_max:
+                            shift = t_max - r_max
+                            new_tap_xs = [t - shift for t in new_tap_xs]
 
-    # Step 5: Fit busbar to ALL rows combined (extend or shrink)
-    if all_final_groups:
+                _rebuild_from_positions(r_groups, new_tap_xs, layout_result)
+                for g, new_x in zip(r_groups, new_tap_xs):
+                    all_final_groups.append(g)
+                    all_final_tap_xs.append(new_x)
+
+            # Process unassigned groups with global busbar
+            if unassigned:
+                _normalize_row_spacing(unassigned, layout_result.components, config)
+                new_tap_xs = _determine_final_positions(
+                    unassigned, layout_result.components, layout_result, config,
+                    incoming_chain_x=incoming_chain_x,
+                )
+                _rebuild_from_positions(unassigned, new_tap_xs, layout_result)
+                for g, new_x in zip(unassigned, new_tap_xs):
+                    all_final_groups.append(g)
+                    all_final_tap_xs.append(new_x)
+        else:
+            # ── Single-DB path (backward compatible) ──
+            _normalize_row_spacing(row_groups, layout_result.components, config)
+
+            row_busbar_extent: tuple[float, float] | None = None
+            if layout_result.busbar_x_per_row:
+                if row_idx < len(layout_result.busbar_y_per_row):
+                    row_busbar_y = layout_result.busbar_y_per_row[row_idx]
+                    row_busbar_extent = layout_result.busbar_x_per_row.get(row_busbar_y)
+
+            new_tap_xs = _determine_final_positions(
+                row_groups, layout_result.components, layout_result, config,
+                incoming_chain_x=incoming_chain_x,
+                row_busbar_extent=row_busbar_extent,
+            )
+            _rebuild_from_positions(row_groups, new_tap_xs, layout_result)
+            for g, new_x in zip(row_groups, new_tap_xs):
+                all_final_groups.append(g)
+                all_final_tap_xs.append(new_x)
+
+    # Step 5: Fit busbar — skip for multi-DB (each region handles its own busbar)
+    if all_final_groups and not regions:
         # Sort by final tap_x for correct leftmost/rightmost extent
         sorted_pairs = sorted(
             zip(all_final_tap_xs, all_final_groups),

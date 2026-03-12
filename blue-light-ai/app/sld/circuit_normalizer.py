@@ -22,6 +22,27 @@ import re
 logger = logging.getLogger(__name__)
 
 
+# -- Phase name normalization (R/Y/B → L1/L2/L3) --
+
+_PHASE_ALIAS: dict[str, str] = {
+    "R": "L1", "RED": "L1",
+    "Y": "L2", "YEL": "L2", "YELLOW": "L2",
+    "B": "L3", "BLU": "L3", "BLUE": "L3",
+    "L1": "L1", "L2": "L2", "L3": "L3",
+}
+
+
+def normalize_phase_name(phase: str) -> str:
+    """Normalize Singapore phase naming conventions to L1/L2/L3.
+
+    Handles: R/Y/B (traditional), RED/YELLOW/BLUE, L1/L2/L3 (IEC).
+    Returns the input unchanged if not a recognized phase alias.
+    """
+    if not phase:
+        return phase
+    return _PHASE_ALIAS.get(phase.upper().strip(), phase)
+
+
 def normalize_circuit(raw: dict) -> dict:
     """Normalize a single sub-circuit dict to flat keys.
 
@@ -90,6 +111,11 @@ def normalize_circuit(raw: dict) -> dict:
 
     # -- 5. Normalize breaker_type default --
     raw.setdefault("breaker_type", "MCB")
+
+    # -- 6. Normalize phase name (R/Y/B → L1/L2/L3) --
+    phase = raw.get("phase")
+    if isinstance(phase, str) and phase:
+        raw["phase"] = normalize_phase_name(phase)
 
     return raw
 

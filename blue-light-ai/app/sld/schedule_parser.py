@@ -42,15 +42,23 @@ Look for these fields (may appear as key-value pairs or in a header section):
 - Metering type (CT meter, SP meter, KWH meter)
 - CT ratio (if applicable)
 
-### 2. Circuit Schedule / Sub-circuits Table
+### 2. Multiple Distribution Boards (Multi-DB)
+If the file has multiple sheets/tabs or sections representing separate distribution boards (e.g., MSB + DB2, Lighting DB + Power DB):
+- Each board has its own breaker, ELCB, busbar, and sub-circuits
+- Use `distribution_boards` array instead of `outgoing_circuits`
+- Look for "Protection Group" columns — these indicate per-phase RCCB grouping within a DB
+
+### 3. Circuit Schedule / Sub-circuits Table
 Extract EVERY row from the circuit table:
 - Circuit ID/name (e.g., L1P1, S1, P3, ISOL 1, Spare)
 - Load description (e.g., "8 Nos Lighting Points", "6 Nos 13A Twin S/S/O", "1 no. 20A DP isolator")
 - Breaker specification (type, rating, poles, fault kA, characteristic)
 - Cable specification (size, type, cores, CPC, installation method)
 - Room/location (if specified)
+- Phase assignment (L1/L2/L3 or R/Y/B)
+- Protection group (if present — e.g., "RCCB L1", "RCCB L2", "RCCB L3")
 
-### 3. Client / Project Information (if present)
+### 4. Client / Project Information (if present)
 - Client name, address, unit number
 - Drawing number, contractor info
 
@@ -63,8 +71,18 @@ Extract EVERY row from the circuit table:
 - ELCB/RCCB: mandatory per SS 638
 - Common cable: "2 x 1C 2.5mm² PVC + 2.5mm² CPC in G.I. conduit / metal trunking"
 
+## Supply Source & Metering Rules
+- supply_source: "sp_powergrid" (SP PowerGrid direct supply) or "landlord" (building riser / landlord supply)
+- **Landlord supply** (supply from building riser): NO SP metering. Set metering to null.
+  - Landlord installations have their own isolator inside the unit, NOT an SP meter board.
+  - Keywords: "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
+- **SP PowerGrid supply** (direct SP supply): metering is "sp_meter" (residential) or "ct_meter" (≥125A three-phase).
+  - Keywords: "INCOMING FROM HDB", "SP POWERGRID", "FROM SP"
+- If supply source is unclear, default to "sp_powergrid".
+
 ## Output JSON Schema
 
+### Single-DB format (when file has only one board):
 ```json
 {
   "incoming": {
@@ -99,6 +117,10 @@ Extract EVERY row from the circuit table:
     "metering": {
       "type": "<ct_meter|sp_meter or null>",
       "ct_ratio": "<string e.g. '100/5A' or null>"
+    },
+    "outgoing_cable": {
+      "size_mm2": "<string or null>",
+      "description": "<full cable text from isolator to DB, if different from incoming cable, or null>"
     }
   },
   "outgoing_circuits": [
@@ -114,7 +136,8 @@ Extract EVERY row from the circuit table:
       },
       "cable": "<full cable spec string or null>",
       "room": "<room/location or null>",
-      "load_type": "<lighting|power|aircon|spare|isolator|heater|motor|other or null>"
+      "load_type": "<lighting|power|aircon|spare|isolator|heater|motor|other or null>",
+      "phase": "<L1|L2|L3 or null>"
     }
   ],
   "client_info": {
@@ -123,6 +146,75 @@ Extract EVERY row from the circuit table:
     "unit_number": "<unit number or null>",
     "drawing_no": "<drawing number or null>"
   }
+}
+```
+
+### Multi-DB format (when file has multiple boards/sheets):
+```json
+{
+  "incoming": {
+    "kva": <float or null>,
+    "phase": "<single_phase|three_phase or null>",
+    "voltage": <230|400 or null>,
+    "supply_source": "<sp_powergrid|landlord|null>",
+    "main_breaker": { ... },
+    "cable": { ... },
+    "metering": { ... },
+    "outgoing_cable": { ... }
+  },
+  "distribution_boards": [
+    {
+      "name": "<board name e.g. MSB, DB2, Lighting DB>",
+      "breaker": {
+        "type": "<MCB|MCCB or null>",
+        "rating_a": <int or null>,
+        "poles": "<SPN|DP|TPN|4P or null>",
+        "ka_rating": <int or null>,
+        "characteristic": "<B|C|D or null>"
+      },
+      "elcb": {
+        "type": "<ELCB|RCCB or null>",
+        "rating_a": <int or null>,
+        "poles": <2|4 or null>,
+        "sensitivity_ma": <30|100|300 or null>
+      },
+      "busbar": {
+        "rating_a": <int or null>,
+        "type": "<COMB|COPPER or null>"
+      },
+      "protection_groups": [
+        {
+          "phase": "<L1|L2|L3>",
+          "rccb": {
+            "type": "RCCB",
+            "rating_a": <int>,
+            "poles": <2|4>,
+            "sensitivity_ma": <30|100|300>
+          },
+          "circuits": [
+            {
+              "id": "<circuit ID>",
+              "description": "<load description>",
+              "breaker": { ... },
+              "cable": "<cable spec or null>",
+              "load_type": "<load type>"
+            }
+          ]
+        }
+      ],
+      "outgoing_circuits": [
+        {
+          "id": "<circuit ID>",
+          "description": "<load description>",
+          "breaker": { ... },
+          "cable": "<cable spec or null>",
+          "load_type": "<load type>",
+          "phase": "<L1|L2|L3 or null>"
+        }
+      ]
+    }
+  ],
+  "client_info": { ... }
 }
 ```
 
@@ -143,7 +235,12 @@ Extract EVERY row from the circuit table:
    - everything else → "other"
 7. If kVA is not stated but can be calculated from breaker rating × voltage, calculate it.
 8. Preserve the original circuit ordering from the file.
-9. Output ONLY valid JSON — no markdown, no explanation, no code fences."""
+9. Output ONLY valid JSON — no markdown, no explanation, no code fences.
+10. **Multi-DB detection**: If the file has multiple sheets/tabs each representing a distribution board, OR has separate sections for different boards, use `distribution_boards` array. Otherwise use flat `outgoing_circuits`.
+11. **Protection groups**: If a board has a "Protection Group" column (e.g., "RCCB L1", "RCCB L2", "RCCB L3"), group those circuits into `protection_groups` array with per-phase RCCB details. Circuits without protection groups go into the board's `outgoing_circuits`.
+12. **Phase normalization**: Always normalize phase names to L1/L2/L3. Convert R→L1, Y→L2, B→L3, RED→L1, YELLOW→L2, BLUE→L3.
+13. **Metering**: For landlord supply (supply_source="landlord"), metering MUST be null. Only SP PowerGrid direct supplies have SP meters.
+14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations."""
 
 
 # ── File Type Detection ─────────────────────────────

@@ -24,7 +24,7 @@ import json
 import logging
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.sld.sld_spec import (
     ValidationResult,
@@ -85,6 +85,15 @@ class MeteringSpec(BaseModel):
     has_indicator_lights: Optional[bool] = Field(None, description="L1/L2/L3 indicator lights")
     has_elr: Optional[bool] = Field(None, description="ELR (Earth Leakage Relay)")
     has_shunt_trip: Optional[bool] = Field(None, description="Shunt Trip device")
+    # CT metering section details (vertical layout for ≥125A 3-phase)
+    protection_ct_ratio: Optional[str] = Field(None, description="Protection CT ratio e.g. '100/5A'")
+    protection_ct_class: Optional[str] = Field(None, description="Protection CT class e.g. '5P10 20VA'")
+    metering_ct_class: Optional[str] = Field(None, description="Metering CT class e.g. 'CL1 5VA'")
+    has_ammeter: Optional[bool] = Field(True, description="Ammeter with selector switch (ASS)")
+    has_voltmeter: Optional[bool] = Field(True, description="Voltmeter with selector switch (VSS)")
+    elr_spec: Optional[str] = Field(None, description="ELR specification e.g. '0-3A 0.2sec'")
+    voltmeter_range: Optional[str] = Field(None, description="Voltmeter range e.g. '0-500V'")
+    ammeter_range: Optional[str] = Field(None, description="Ammeter range e.g. '0-500A'")
 
 
 class IncomingData(BaseModel):
@@ -92,12 +101,16 @@ class IncomingData(BaseModel):
     kva: Optional[float] = Field(None, description="Total load capacity in kVA")
     phase: Optional[str] = Field(None, description="single_phase or three_phase")
     voltage: Optional[int] = Field(None, description="Supply voltage (230 or 400)")
+    supply_source: Optional[str] = Field(None, description="sp_powergrid or landlord")
     main_breaker: Optional[BreakerSpec] = Field(None, description="[A] Main Breaker")
     cable: Optional[CableSpec] = Field(None, description="[B] Incoming Cable")
     elcb: Optional[ElcbSpec] = Field(None, description="[G] ELCB/RCCB")
     busbar: Optional[BusbarSpec] = Field(None, description="[H] Busbar")
     metering: Optional[MeteringSpec] = Field(None, description="[F] Metering Section")
     earth_protection: Optional[bool] = Field(None, description="[E] Earth Protection present")
+    outgoing_cable: Optional[CableSpec] = Field(
+        None, description="Cable from isolator to DB (if different from incoming cable)"
+    )
 
 
 class OutgoingCircuit(BaseModel):
@@ -114,6 +127,7 @@ class OutgoingCircuit(BaseModel):
         None,
         description="Load category: lighting / power / aircon / spare / motor / other",
     )
+    phase: Optional[str] = Field(None, description="Phase assignment: L1 / L2 / L3")
 
 
 class ClientInfo(BaseModel):
@@ -126,11 +140,69 @@ class ClientInfo(BaseModel):
     main_contractor: Optional[str] = Field(None, description="Main contractor name")
 
 
+class ProtectionGroupData(BaseModel):
+    """Per-phase RCCB protection group (e.g., RCCB L1 with its circuits)."""
+    phase: Optional[str] = Field(None, description="Phase: L1 / L2 / L3")
+    rccb: Optional[ElcbSpec] = Field(None, description="Per-phase RCCB specification")
+    circuits: Optional[list[OutgoingCircuit]] = Field(
+        default=None, description="Circuits protected by this RCCB"
+    )
+
+    @model_validator(mode="after")
+    def _coerce_nulls_to_lists(self) -> "ProtectionGroupData":
+        """Gemini sometimes returns null instead of []; coerce to empty list."""
+        if self.circuits is None:
+            self.circuits = []
+        return self
+
+
+class DistributionBoardData(BaseModel):
+    """A single distribution board in a multi-DB installation."""
+    name: Optional[str] = Field(None, description="Board name: MSB, DB2, Lighting DB, etc.")
+    fed_from: Optional[str] = Field(
+        None,
+        description="Name of parent board that feeds this DB (e.g., 'MSB'). None = root board.",
+    )
+    breaker: Optional[BreakerSpec] = Field(None, description="Board main breaker")
+    elcb: Optional[ElcbSpec] = Field(None, description="Board-level ELCB/RCCB (if any)")
+    busbar: Optional[BusbarSpec] = Field(None, description="Board busbar")
+    protection_groups: Optional[list[ProtectionGroupData]] = Field(
+        default=None,
+        description="Per-phase RCCB groups (e.g., L1/L2/L3 each with own RCCB)",
+    )
+    outgoing_circuits: Optional[list[OutgoingCircuit]] = Field(
+        default=None,
+        description="Circuits not in a protection group",
+    )
+
+    @model_validator(mode="after")
+    def _coerce_nulls_to_lists(self) -> "DistributionBoardData":
+        """Gemini sometimes returns null instead of []; coerce to empty list."""
+        if self.protection_groups is None:
+            self.protection_groups = []
+        if self.outgoing_circuits is None:
+            self.outgoing_circuits = []
+        return self
+
+
 class SldExtractedData(BaseModel):
     """Complete SLD extraction output schema."""
     incoming: Optional[IncomingData] = None
-    outgoing_circuits: list[OutgoingCircuit] = Field(default_factory=list)
+    outgoing_circuits: Optional[list[OutgoingCircuit]] = Field(default=None)
+    distribution_boards: Optional[list[DistributionBoardData]] = Field(
+        default=None,
+        description="Multi-DB: list of distribution boards (empty = single-DB mode)",
+    )
     client_info: Optional[ClientInfo] = None
+
+    @model_validator(mode="after")
+    def _coerce_nulls_to_lists(self) -> "SldExtractedData":
+        """Gemini sometimes returns null instead of []; coerce to empty list."""
+        if self.outgoing_circuits is None:
+            self.outgoing_circuits = []
+        if self.distribution_boards is None:
+            self.distribution_boards = []
+        return self
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -330,6 +402,106 @@ SLD_OUTPUT_JSON_SCHEMA = {
                     "cable": {"type": ["string", "null"]},
                     "qty": {"type": ["integer", "null"]},
                     "load_type": {"type": ["string", "null"]},
+                    "phase": {"type": ["string", "null"]},
+                },
+            },
+        },
+        "distribution_boards": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": ["string", "null"]},
+                    "fed_from": {"type": ["string", "null"]},
+                    "breaker": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": ["string", "null"]},
+                            "rating_a": {"type": ["integer", "null"]},
+                            "poles": {"type": ["string", "null"]},
+                            "ka_rating": {"type": ["integer", "null"]},
+                            "characteristic": {"type": ["string", "null"]},
+                        },
+                    },
+                    "elcb": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": ["string", "null"]},
+                            "rating_a": {"type": ["integer", "null"]},
+                            "poles": {"type": ["integer", "null"]},
+                            "sensitivity_ma": {"type": ["integer", "null"]},
+                        },
+                    },
+                    "busbar": {
+                        "type": "object",
+                        "properties": {
+                            "rating_a": {"type": ["integer", "null"]},
+                            "type": {"type": ["string", "null"]},
+                        },
+                    },
+                    "protection_groups": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "phase": {"type": ["string", "null"]},
+                                "rccb": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {"type": ["string", "null"]},
+                                        "rating_a": {"type": ["integer", "null"]},
+                                        "poles": {"type": ["integer", "null"]},
+                                        "sensitivity_ma": {"type": ["integer", "null"]},
+                                    },
+                                },
+                                "circuits": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {"type": ["string", "null"]},
+                                            "description": {"type": ["string", "null"]},
+                                            "breaker": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "type": {"type": ["string", "null"]},
+                                                    "rating_a": {"type": ["integer", "null"]},
+                                                    "poles": {"type": ["string", "null"]},
+                                                    "ka_rating": {"type": ["integer", "null"]},
+                                                    "characteristic": {"type": ["string", "null"]},
+                                                },
+                                            },
+                                            "cable": {"type": ["string", "null"]},
+                                            "load_type": {"type": ["string", "null"]},
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                    "outgoing_circuits": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": ["string", "null"]},
+                                "description": {"type": ["string", "null"]},
+                                "breaker": {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {"type": ["string", "null"]},
+                                        "rating_a": {"type": ["integer", "null"]},
+                                        "poles": {"type": ["string", "null"]},
+                                        "ka_rating": {"type": ["integer", "null"]},
+                                        "characteristic": {"type": ["string", "null"]},
+                                    },
+                                },
+                                "cable": {"type": ["string", "null"]},
+                                "load_type": {"type": ["string", "null"]},
+                                "phase": {"type": ["string", "null"]},
+                            },
+                        },
+                    },
                 },
             },
         },
@@ -517,6 +689,10 @@ def normalize_to_generation_format(
         # kVA
         requirements["kva"] = inc.kva or 0
 
+        # Supply source (landlord vs sp_powergrid)
+        if inc.supply_source:
+            requirements["supply_source"] = inc.supply_source
+
         # Main breaker
         mb = inc.main_breaker
         if mb:
@@ -580,9 +756,14 @@ def normalize_to_generation_format(
         requirements["earth_protection"] = inc.earth_protection if inc.earth_protection is not None else True
 
         # Metering
+        # Landlord supply has no SP metering — only an isolator inside the unit.
+        # If AI incorrectly extracted sp_meter for landlord, discard it.
+        is_landlord = requirements.get("supply_source") == "landlord"
         metering_type = (corrected or {}).get("metering") or ""
         if not metering_type and inc.metering and inc.metering.type:
             metering_type = inc.metering.type
+        if is_landlord and metering_type == "sp_meter":
+            metering_type = ""  # Landlord supply: no SP meter board
         if metering_type:
             requirements["metering"] = metering_type
 
@@ -593,14 +774,168 @@ def normalize_to_generation_format(
             cable_size = corrected["cable_size"]
             requirements["incoming_cable"] = f"Cable size: {cable_size}"
 
-    # Sub-circuits
-    sub_circuits = []
-    for oc in extracted.outgoing_circuits:
+        # Outgoing cable (post-isolator, e.g. landlord supply with different cable to DB)
+        if inc.outgoing_cable and inc.outgoing_cable.description:
+            requirements["outgoing_cable"] = inc.outgoing_cable.description
+
+    # -- Multi-DB path --
+    if extracted.distribution_boards:
+        from app.sld.circuit_normalizer import normalize_phase_name
+
+        db_list = []
+        for db_data in extracted.distribution_boards:
+            db_req: dict[str, Any] = {}
+            if db_data.name:
+                db_req["name"] = db_data.name
+            if db_data.fed_from:
+                db_req["fed_from"] = db_data.fed_from
+
+            # DB breaker
+            if db_data.breaker:
+                db_req["breaker"] = {
+                    "type": db_data.breaker.type or "MCB",
+                    "rating": db_data.breaker.rating_a or 0,
+                    "poles": db_data.breaker.poles or "",
+                    "fault_kA": db_data.breaker.ka_rating or 10,
+                }
+                if db_data.breaker.characteristic:
+                    db_req["breaker"]["breaker_characteristic"] = db_data.breaker.characteristic
+
+            # DB ELCB
+            if db_data.elcb:
+                db_elcb: dict[str, Any] = {}
+                if db_data.elcb.rating_a is not None:
+                    db_elcb["rating"] = db_data.elcb.rating_a
+                if db_data.elcb.sensitivity_ma is not None:
+                    db_elcb["sensitivity_ma"] = db_data.elcb.sensitivity_ma
+                if db_data.elcb.poles is not None:
+                    db_elcb["poles"] = db_data.elcb.poles
+                if db_data.elcb.type:
+                    db_elcb["type"] = db_data.elcb.type
+                db_req["elcb"] = db_elcb
+
+            # DB busbar
+            if db_data.busbar and db_data.busbar.rating_a:
+                db_req["busbar_rating"] = db_data.busbar.rating_a
+
+            # Protection groups (per-phase RCCB)
+            if db_data.protection_groups:
+                pg_list = []
+                for pg in db_data.protection_groups:
+                    pg_req: dict[str, Any] = {
+                        "phase": normalize_phase_name(pg.phase or ""),
+                    }
+                    if pg.rccb:
+                        pg_req["rccb"] = {
+                            "type": pg.rccb.type or "RCCB",
+                            "rating": pg.rccb.rating_a or 0,
+                            "sensitivity_ma": pg.rccb.sensitivity_ma or 30,
+                            "poles": pg.rccb.poles or 2,
+                        }
+                    pg_req["circuits"] = _convert_circuits(pg.circuits)
+                    pg_list.append(pg_req)
+                db_req["protection_groups"] = pg_list
+
+            # DB outgoing circuits (not in protection groups)
+            if db_data.outgoing_circuits:
+                db_req["sub_circuits"] = _convert_circuits(db_data.outgoing_circuits)
+
+            db_list.append(db_req)
+
+        requirements["distribution_boards"] = db_list
+        requirements["db_topology"] = _build_db_hierarchy(db_list)
+        return requirements
+
+    # -- Single-DB path (backward compatible) --
+    sub_circuits = _convert_circuits(extracted.outgoing_circuits)
+    requirements["sub_circuits"] = sub_circuits
+
+    return requirements
+
+
+def _build_db_hierarchy(db_list: list[dict[str, Any]]) -> str:
+    """Detect feeder circuits and build parent→child hierarchy.
+
+    Scans each DB's sub_circuits for feeder patterns (e.g., "Feeder to DB2").
+    When found, marks the feeder circuit with _is_feeder=True and sets the
+    child DB's fed_from to the parent name.
+
+    Returns "hierarchical" if at least one parent→child relationship is found,
+    "parallel" otherwise.
+    """
+    import re
+
+    db_names = {db.get("name", "").upper(): db.get("name", "") for db in db_list if db.get("name")}
+
+    hierarchy_found = False
+
+    for db in db_list:
+        parent_name = db.get("name", "")
+        circuits = db.get("sub_circuits", [])
+        for ckt in circuits:
+            desc = (ckt.get("name", "") or ckt.get("description", "") or "").upper()
+
+            # Pattern matching for feeder circuits
+            matched_child = None
+
+            # Pattern 1: "Feeder to DB2", "FEEDER TO DB 2"
+            m = re.search(r"FEEDER\s+TO\s+(.+)", desc)
+            if m:
+                child_name_raw = m.group(1).strip()
+                # Try exact match first, then fuzzy
+                for db_key, db_original in db_names.items():
+                    if db_key != parent_name.upper() and (
+                        child_name_raw.upper() == db_key
+                        or child_name_raw.upper().replace(" ", "") == db_key.replace(" ", "")
+                    ):
+                        matched_child = db_original
+                        break
+
+            # Pattern 2: circuit description contains another DB name (e.g., "DB2", "DB 2")
+            if not matched_child:
+                for db_key, db_original in db_names.items():
+                    if db_key == parent_name.upper():
+                        continue
+                    # Check if DB name appears in description
+                    pattern = re.escape(db_key)
+                    # Also match with/without space: "DB2" matches "DB 2"
+                    pattern_nospace = re.escape(db_key.replace(" ", ""))
+                    desc_nospace = desc.replace(" ", "")
+                    if re.search(pattern, desc) or (
+                        len(pattern_nospace) >= 3 and re.search(pattern_nospace, desc_nospace)
+                    ):
+                        matched_child = db_original
+                        break
+
+            if matched_child:
+                ckt["_is_feeder"] = True
+                ckt["_feeds_db"] = matched_child
+                # Set fed_from on the child DB
+                for child_db in db_list:
+                    if child_db.get("name") == matched_child and not child_db.get("fed_from"):
+                        child_db["fed_from"] = parent_name
+                        hierarchy_found = True
+
+    # Also check if Gemini already set fed_from
+    if not hierarchy_found:
+        for db in db_list:
+            if db.get("fed_from"):
+                hierarchy_found = True
+                break
+
+    return "hierarchical" if hierarchy_found else "parallel"
+
+
+def _convert_circuits(circuits: list) -> list[dict[str, Any]]:
+    """Convert a list of OutgoingCircuit Pydantic models to flat dicts."""
+    from app.sld.circuit_normalizer import normalize_phase_name
+
+    result: list[dict[str, Any]] = []
+    for oc in circuits:
         sc: dict[str, Any] = {}
         sc["name"] = oc.description or ""
 
         # Preserve explicit circuit ID from schedule upload (e.g., "L1S1", "ISOL1")
-        # so _assign_circuit_ids() can use it for correct phase grouping
         if oc.id:
             sc["circuit_id"] = oc.id
 
@@ -609,7 +944,7 @@ def normalize_to_generation_format(
             sc["breaker_rating"] = oc.breaker.rating_a or 0
             if oc.breaker.characteristic:
                 sc["breaker_characteristic"] = oc.breaker.characteristic
-            sc["fault_kA"] = oc.breaker.ka_rating or 6  # Default 6kA for sub-circuits
+            sc["fault_kA"] = oc.breaker.ka_rating or 6
         else:
             sc["breaker_type"] = "MCB"
             sc["breaker_rating"] = 0
@@ -620,11 +955,12 @@ def normalize_to_generation_format(
         if oc.qty:
             sc["name"] = f"{oc.description or ''} ({oc.qty} nos)"
 
-        sub_circuits.append(sc)
+        # Phase normalization (R/Y/B → L1/L2/L3)
+        if hasattr(oc, "phase") and oc.phase:
+            sc["phase"] = normalize_phase_name(oc.phase)
 
-    requirements["sub_circuits"] = sub_circuits
-
-    return requirements
+        result.append(sc)
+    return result
 
 
 async def extract_sld_from_text(user_input: str) -> dict:

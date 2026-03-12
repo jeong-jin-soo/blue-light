@@ -425,6 +425,7 @@ class SldGenerator:
             (idx, comp)
             for idx, comp in enumerate(layout_result.components)
             if comp.label_style == "breaker_block"
+            and not comp.no_ditto  # Protection group RCCBs always show full labels
         ]
         entries.sort(key=lambda t: t[1].x)
 
@@ -540,6 +541,9 @@ class SldGenerator:
             trip_kwargs = {}
             if should_skip_trip and isinstance(symbol, RealCircuitBreaker):
                 trip_kwargs["skip_trip_arrow"] = True
+            # Enclosed isolator (landlord unit isolator with enclosure box)
+            if comp.enclosed and isinstance(symbol, RealIsolator):
+                trip_kwargs["enclosed"] = True
             if use_horizontal:
                 symbol.draw_horizontal(backend, comp.x, comp.y, **trip_kwargs)
             else:
@@ -821,10 +825,13 @@ class SldGenerator:
             backend.add_line(start, end, lineweight=50)
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
-        """Draw dashed connection lines (earth conductors, etc.)."""
+        """Draw dashed connection lines (DB box boundary per reference DWG).
+
+        Reference uses IEC CENTER linetype: long dash + short dash alternating.
+        """
         backend.set_layer("SLD_CONNECTIONS")
         for start, end in layout_result.dashed_connections:
-            _draw_dashed_line(backend, start, end, dash_len=3.0, gap_len=2.0)
+            _draw_center_line(backend, start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
 
     def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw filled junction dots at busbar tap points."""
@@ -969,3 +976,41 @@ def _draw_dashed_line(
         seg_end = (start[0] + ux * seg_end_pos, start[1] + uy * seg_end_pos)
         backend.add_line(seg_start, seg_end)
         pos += segment_len
+
+
+def _draw_center_line(
+    backend: DrawingBackend,
+    start: tuple[float, float],
+    end: tuple[float, float],
+    long_dash: float = 8.0,
+    short_dash: float = 1.5,
+    gap: float = 2.0,
+) -> None:
+    """Draw an IEC CENTER linetype: long dash, gap, short dash, gap, repeat.
+
+    Reference DWG uses this pattern for DB box boundaries.
+    """
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    length = math.sqrt(dx * dx + dy * dy)
+
+    if length < 0.1:
+        return
+
+    ux, uy = dx / length, dy / length
+    # Pattern: [long_dash, gap, short_dash, gap]
+    pattern = [long_dash, gap, short_dash, gap]
+    cycle_len = sum(pattern)
+
+    pos = 0.0
+    step_idx = 0
+    while pos < length:
+        seg_len = pattern[step_idx % 4]
+        is_dash = (step_idx % 2 == 0)  # even indices = dash, odd = gap
+        if is_dash:
+            seg_start = (start[0] + ux * pos, start[1] + uy * pos)
+            seg_end_pos = min(pos + seg_len, length)
+            seg_end = (start[0] + ux * seg_end_pos, start[1] + uy * seg_end_pos)
+            backend.add_line(seg_start, seg_end)
+        pos += seg_len
+        step_idx += 1

@@ -81,19 +81,19 @@
   },
   "ISOLATOR": {
     "width_mm": 8.0,
-    "height_mm": 14.0,
+    "height_mm": 10.0,
     "blade_length_mm": 10.0,
-    "contact_radius_mm": 0.5,
+    "contact_radius_mm": 0.55,
     "stub_mm": 3.0,
-    "description": "Isolator / Disconnect Switch — DP ISOL block: rectangle + L-stem"
+    "description": "Isolator / Disconnect Switch — contact separation 6mm (matching MCCB 2×arc_r)"
   },
   "DOUBLE_POLE_SWITCH": {
     "width_mm": 8.0,
-    "height_mm": 14.0,
+    "height_mm": 10.0,
     "blade_length_mm": 10.0,
-    "contact_radius_mm": 0.5,
+    "contact_radius_mm": 0.55,
     "stub_mm": 3.0,
-    "description": "Double Pole Switch"
+    "description": "Double Pole Switch — contact separation 6mm (matching MCCB)"
   },
   "EARTH": {
     "width_mm": 8.0,
@@ -108,5 +108,38 @@
     "rect_height_mm": 10.0,
     "stub_mm": 3.0,
     "description": "Fuse (filled rectangle on conductor)"
+  },
+  "BI_CONNECTOR": {
+    "width_mm": 10.0,
+    "height_mm": 8.0,
+    "stub_mm": 2.0,
+    "description": "BI Connector — rectangular block (IEC busbar interconnect). Compact version for A3 layout."
+  },
+  "AMMETER": {
+    "radius_mm": 3.8,
+    "stub_mm": 3.0,
+    "letter": "A",
+    "description": "Ammeter — circle with letter A (IEC 60617). DXF: r=3.81mm"
+  },
+  "VOLTMETER": {
+    "radius_mm": 3.8,
+    "stub_mm": 3.0,
+    "letter": "V",
+    "description": "Voltmeter — circle with letter V (IEC 60617). DXF: r=3.81mm"
+  },
+  "SELECTOR_SWITCH": {
+    "width_mm": 6.0,
+    "height_mm": 8.0,
+    "arc_radius_mm": 0.85,
+    "arc_start_deg": 304,
+    "arc_end_deg": 56,
+    "stub_mm": 3.0,
+    "description": "Selector Switch (ASS/VSS) — two opposing arcs (IEC 60617). DXF: r=0.85mm, 304°→56°"
+  },
+  "ELR": {
+    "width_mm": 20.0,
+    "height_mm": 11.0,
+    "stub_mm": 3.0,
+    "description": "Earth Leakage Relay — rectangular device block. DXF: 20.1×11.1mm (scale 33.26)"
   }
 }

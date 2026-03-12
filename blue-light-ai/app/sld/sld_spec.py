@@ -661,10 +661,13 @@ def _validate_metering(
     Landlord supply skips metering auto-correction. Otherwise determines
     CT metering (requires_ct) or SP meter based on the effective spec.
     """
-    # Landlord supply: metering is optional (landlord provides metering)
-    # Only auto-determine metering for SP PowerGrid or when not specified
-    if supply_source == "landlord" and not metering:
-        # Landlord supply — no metering auto-correction needed
+    # Landlord supply: no SP metering — only an isolator inside the unit.
+    if supply_source == "landlord":
+        if metering == "sp_meter":
+            result.add_correction(
+                "metering", "sp_meter", "",
+                "Landlord supply has no SP meter board — removed sp_meter",
+            )
         return
     if not effective_spec:
         return

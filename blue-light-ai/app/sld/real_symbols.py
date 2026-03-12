@@ -512,22 +512,52 @@ class RealIsolator(BaseSymbol):
             "label_right": (self.width + 2, self.height / 2),
         }
 
-    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float,
+             enclosed: bool = False) -> None:
         cx = x + self.width / 2
         h = self.height
+        cr = self._contact_r
 
         backend.set_layer(self.layer)
 
-        # Bottom fixed contact (circle)
-        backend.add_circle((cx, y + 1), radius=self._contact_r)
+        # Contact separation matches MCCB (2 × arc_radius = 6mm)
+        contact_sep = 6.0
+        center_y = y + h / 2
+        contact_top_y = center_y + contact_sep / 2
+        contact_bottom_y = center_y - contact_sep / 2
 
-        # Moving blade (angled line from bottom contact upward to the right)
-        blade_top_x = cx + self._blade * 0.3
-        blade_top_y = y + h - 1
-        backend.add_line((cx, y + 1 + self._contact_r), (blade_top_x, blade_top_y))
+        # Enclosure box — IEC symbol for enclosed isolator (standalone unit)
+        # Used for landlord supply where isolator has its own housing
+        if enclosed:
+            pad = 1.5  # padding around switch symbol
+            box_x = cx - self.width / 2 - pad
+            box_y = y - pad
+            box_w = self.width + pad * 2
+            box_h = h + pad * 2
+            backend.add_lwpolyline([
+                (box_x, box_y),
+                (box_x + box_w, box_y),
+                (box_x + box_w, box_y + box_h),
+                (box_x, box_y + box_h),
+            ], close=True)
 
-        # Top fixed contact (short horizontal line = open gap indicator)
-        backend.add_line((cx - 0.5, y + h - 1), (cx + 0.5, y + h - 1))
+        # Top fixed contact (circle) — near busbar / DB box (high Y side)
+        backend.add_circle((cx, contact_top_y), radius=cr)
+
+        # Moving blade (angled line from top contact downward to the right)
+        blade_offset = contact_sep * 0.5  # horizontal offset for disconnect angle
+        backend.add_line(
+            (cx, contact_top_y - cr),
+            (cx + blade_offset, contact_bottom_y),
+        )
+
+        # Bottom fixed contact (circle) — near supply (low Y side)
+        # IEC standard: both contacts of an isolator are shown as open circles
+        backend.add_circle((cx, contact_bottom_y), radius=cr)
+
+        # Connection lines (contact edges to symbol bounds — same as MCCB)
+        backend.add_line((cx, contact_top_y + cr), (cx, y + h))
+        backend.add_line((cx, y), (cx, contact_bottom_y - cr))
 
         # Stubs
         backend.set_layer("SLD_CONNECTIONS")
@@ -542,27 +572,331 @@ class RealIsolator(BaseSymbol):
         - Right pin at (x + h_extent + stub, cy)
         where h_extent is the original height used as the horizontal span.
         """
-        # In horizontal mode: original height becomes horizontal span, original width becomes vertical span
         h_extent = self.height  # horizontal span (was vertical height)
         cy = y  # vertical center line
+        cr = self._contact_r
 
         backend.set_layer(self.layer)
 
+        # Contact separation matches MCCB (2 × arc_radius = 6mm)
+        contact_sep = 6.0
+        center_x = x + h_extent / 2
+        contact_left_x = center_x - contact_sep / 2
+        contact_right_x = center_x + contact_sep / 2
+
         # Left fixed contact (circle) — was bottom
-        backend.add_circle((x + 1, cy), radius=self._contact_r)
+        backend.add_circle((contact_left_x, cy), radius=cr)
 
         # Moving blade (angled line from left contact rightward and upward)
-        blade_tip_x = x + h_extent - 1
-        blade_tip_y = cy + self._blade * 0.3
-        backend.add_line((x + 1 + self._contact_r, cy), (blade_tip_x, blade_tip_y))
+        blade_offset = contact_sep * 0.5  # vertical offset for disconnect angle
+        backend.add_line(
+            (contact_left_x + cr, cy),
+            (contact_right_x, cy + blade_offset),
+        )
 
-        # Right fixed contact (short vertical line = open gap indicator) — was top
-        backend.add_line((x + h_extent - 1, cy - 0.5), (x + h_extent - 1, cy + 0.5))
+        # Right fixed contact (circle) — IEC standard: both contacts as open circles
+        backend.add_circle((contact_right_x, cy), radius=cr)
+
+        # Connection lines (contact edges to symbol bounds — same as MCCB)
+        backend.add_line((contact_right_x + cr, cy), (x + h_extent, cy))  # right
+        backend.add_line((x, cy), (contact_left_x - cr, cy))  # left
 
         # Stubs (horizontal)
         backend.set_layer("SLD_CONNECTIONS")
         backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))  # right stub
         backend.add_line((x, cy), (x - self._stub, cy))  # left stub
+
+
+class RealBIConnector(BaseSymbol):
+    """BI Connector at real proportions (rectangular block on conductor).
+
+    DXF reference: 12.9×11.9mm rectangular block.
+    Vertical mode: sits on main conductor, stubs top/bottom.
+    """
+
+    name: str = "BI_CONNECTOR"
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self):
+        dims = get_symbol_dimensions("BI_CONNECTOR")
+        self.width = dims["width_mm"]
+        self.height = dims["height_mm"]
+        self._stub = dims["stub_mm"]
+
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height + self._stub),
+            "bottom": (cx, -self._stub),
+        }
+        self.anchors = {
+            "label_right": (self.width + 2, self.height / 2),
+        }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+
+        backend.set_layer(self.layer)
+        # Rectangular block
+        backend.add_lwpolyline(
+            [(x, y), (x + self.width, y),
+             (x + self.width, y + self.height), (x, y + self.height)],
+            close=True,
+        )
+
+        # Connection stubs (vertical)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
+        backend.add_line((cx, y), (cx, y - self._stub))
+
+
+class RealMeter(BaseSymbol):
+    """Ammeter / Voltmeter at real proportions (circle with letter).
+
+    DXF reference: r=3.81mm circle with "A" or "V" centered.
+    Parameterized by letter to share implementation.
+    Horizontal mode: used on branches with left/right connections.
+    """
+
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self, letter: str = "A"):
+        self._letter = letter
+        self.name = "AMMETER" if letter == "A" else "VOLTMETER"
+        key = self.name
+        dims = get_symbol_dimensions(key)
+        self._radius = dims["radius_mm"]
+        self._stub = dims["stub_mm"]
+        diameter = self._radius * 2
+        self.width = diameter
+        self.height = diameter
+
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height / 2 + self._radius + self._stub),
+            "bottom": (cx, self.height / 2 - self._radius - self._stub),
+        }
+        self.anchors = {
+            "label_right": (self.width + 2, self.height / 2),
+        }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw vertically — connections top/bottom."""
+        cx = x + self.width / 2
+        cy = y + self.height / 2
+        r = self._radius
+
+        backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=r)
+
+        # Letter centered inside circle
+        backend.set_layer("SLD_ANNOTATIONS")
+        ch = r * 1.2  # char height proportional to radius
+        backend.add_mtext(self._letter, insert=(cx - ch * 0.3, cy + ch * 0.4), char_height=ch)
+
+        # Connection stubs (vertical)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, cy + r), (cx, cy + r + self._stub))
+        backend.add_line((cx, cy - r), (cx, cy - r - self._stub))
+
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw horizontally — connections left/right.
+
+        x: leftmost point of the horizontal extent (circle left edge - stub)
+        y: vertical center line of the branch.
+        """
+        r = self._radius
+        # Center of circle: stub + radius from left edge
+        cx = x + self._stub + r
+        cy = y
+
+        backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=r)
+
+        # Letter centered inside circle
+        backend.set_layer("SLD_ANNOTATIONS")
+        ch = r * 1.2
+        backend.add_mtext(self._letter, insert=(cx - ch * 0.3, cy + ch * 0.4), char_height=ch)
+
+        # Connection stubs (horizontal)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx - r, cy), (cx - r - self._stub, cy))  # left stub
+        backend.add_line((cx + r, cy), (cx + r + self._stub, cy))  # right stub
+
+
+class RealSelectorSwitch(BaseSymbol):
+    """Selector Switch (ASS/VSS) at real proportions.
+
+    DXF reference: two opposing arcs, r=0.85mm, sweep 304°→56°.
+    IEC 60617 symbol for ammeter/voltmeter selector switch.
+    Horizontal mode: used on branches with left/right connections.
+    """
+
+    name: str = "SELECTOR_SWITCH"
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self):
+        dims = get_symbol_dimensions("SELECTOR_SWITCH")
+        self.width = dims["width_mm"]
+        self.height = dims["height_mm"]
+        self._arc_r = dims["arc_radius_mm"]
+        self._arc_start = dims["arc_start_deg"]
+        self._arc_end = dims["arc_end_deg"]
+        self._stub = dims["stub_mm"]
+
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height + self._stub),
+            "bottom": (cx, -self._stub),
+        }
+        self.anchors = {
+            "label_right": (self.width + 2, self.height / 2),
+        }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw vertically — connections top/bottom."""
+        cx = x + self.width / 2
+        cy = y + self.height / 2
+        r = self._arc_r
+        gap = 1.5  # gap between the two arc centers
+
+        backend.set_layer(self.layer)
+
+        # Top arc (opening upward)
+        backend.add_arc(
+            center=(cx, cy + gap / 2),
+            radius=r,
+            start_angle=self._arc_start,
+            end_angle=self._arc_end,
+        )
+        # Bottom arc (opening downward — mirrored)
+        backend.add_arc(
+            center=(cx, cy - gap / 2),
+            radius=r,
+            start_angle=(self._arc_start + 180) % 360,
+            end_angle=(self._arc_end + 180) % 360,
+        )
+
+        # Vertical connection lines through the switch
+        backend.add_line((cx, y), (cx, cy - gap / 2 - r))
+        backend.add_line((cx, cy + gap / 2 + r), (cx, y + self.height))
+
+        # Connection stubs
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
+        backend.add_line((cx, y), (cx, y - self._stub))
+
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw horizontally — connections left/right.
+
+        x: leftmost point of the horizontal extent
+        y: vertical center line of the branch.
+        """
+        h_extent = self.height  # use height as horizontal span
+        cx = x + h_extent / 2
+        cy = y
+        r = self._arc_r
+        gap = 1.5
+
+        backend.set_layer(self.layer)
+
+        # Left arc (opening left)
+        backend.add_arc(
+            center=(cx - gap / 2, cy),
+            radius=r,
+            start_angle=self._arc_start + 90,
+            end_angle=self._arc_end + 90,
+        )
+        # Right arc (opening right — mirrored)
+        backend.add_arc(
+            center=(cx + gap / 2, cy),
+            radius=r,
+            start_angle=(self._arc_start + 90 + 180) % 360,
+            end_angle=(self._arc_end + 90 + 180) % 360,
+        )
+
+        # Horizontal connection lines through the switch
+        backend.add_line((x, cy), (cx - gap / 2 - r, cy))
+        backend.add_line((cx + gap / 2 + r, cy), (x + h_extent, cy))
+
+        # Connection stubs (horizontal)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
+        backend.add_line((x, cy), (x - self._stub, cy))
+
+
+class RealELR(BaseSymbol):
+    """Earth Leakage Relay at real proportions (rectangular device block).
+
+    DXF reference: 20.1×11.1mm rectangle with "ELR" text.
+    Horizontal mode: used on branch from protection CT.
+    """
+
+    name: str = "ELR"
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self):
+        dims = get_symbol_dimensions("ELR")
+        self.width = dims["width_mm"]
+        self.height = dims["height_mm"]
+        self._stub = dims["stub_mm"]
+
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height + self._stub),
+            "bottom": (cx, -self._stub),
+        }
+        self.anchors = {
+            "label_right": (self.width + 2, self.height / 2),
+        }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw vertically — connections top/bottom."""
+        cx = x + self.width / 2
+
+        backend.set_layer(self.layer)
+        backend.add_lwpolyline(
+            [(x, y), (x + self.width, y),
+             (x + self.width, y + self.height), (x, y + self.height)],
+            close=True,
+        )
+
+        # "ELR" text centered
+        backend.set_layer("SLD_ANNOTATIONS")
+        ch = 3.0
+        backend.add_mtext("ELR", insert=(cx - ch * 0.9, y + self.height / 2 + ch * 0.4), char_height=ch)
+
+        # Connection stubs (vertical)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
+        backend.add_line((cx, y), (cx, y - self._stub))
+
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw horizontally — connections left/right.
+
+        x: leftmost point of the horizontal extent
+        y: vertical center line of the branch.
+        """
+        h_extent = self.width   # use width as horizontal span
+        v_extent = self.height  # use height as vertical extent
+        cy = y
+
+        backend.set_layer(self.layer)
+        backend.add_lwpolyline(
+            [(x, cy - v_extent / 2), (x + h_extent, cy - v_extent / 2),
+             (x + h_extent, cy + v_extent / 2), (x, cy + v_extent / 2)],
+            close=True,
+        )
+
+        # "ELR" text centered
+        backend.set_layer("SLD_ANNOTATIONS")
+        ch = 3.0
+        mid_x = x + h_extent / 2
+        backend.add_mtext("ELR", insert=(mid_x - ch * 0.9, cy + ch * 0.4), char_height=ch)
+
+        # Connection stubs (horizontal)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
+        backend.add_line((x, cy), (x - self._stub, cy))
 
 
 class RealEarth(BaseSymbol):
@@ -647,7 +981,7 @@ class RealFuse(BaseSymbol):
 # Symbol registry — maps type names to real-proportion symbol classes
 # ---------------------------------------------------------------------------
 
-REAL_SYMBOL_MAP: dict[str, type] = {
+REAL_SYMBOL_MAP: dict[str, type | object] = {
     "MCB": RealMCB,
     "MCCB": RealMCCB,
     "ACB": RealACB,
@@ -658,18 +992,23 @@ REAL_SYMBOL_MAP: dict[str, type] = {
     "ISOLATOR": RealIsolator,
     "EARTH": RealEarth,
     "FUSE": RealFuse,
+    "BI_CONNECTOR": RealBIConnector,
+    "SELECTOR_SWITCH": RealSelectorSwitch,
+    "ELR": RealELR,
 }
 
-# Register additional symbols from app.sld.symbols package
-try:
-    from app.sld.symbols.switches import BIConnector
-    REAL_SYMBOL_MAP["BI_CONNECTOR"] = BIConnector
-except ImportError:
-    pass
+# Meter symbols are instances (parameterized by letter), not classes
+_METER_INSTANCES: dict[str, BaseSymbol] = {
+    "AMMETER": RealMeter("A"),
+    "VOLTMETER": RealMeter("V"),
+}
 
 
 def get_real_symbol(symbol_type: str) -> BaseSymbol:
     """Get a real-proportion symbol instance by type name."""
+    # Meter symbols are pre-built instances (parameterized by letter)
+    if symbol_type in _METER_INSTANCES:
+        return _METER_INSTANCES[symbol_type]
     if symbol_type in REAL_SYMBOL_MAP:
         return REAL_SYMBOL_MAP[symbol_type]()
     # Fallback: check CB_ prefix

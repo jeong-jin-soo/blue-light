@@ -91,6 +91,26 @@ def _parse_cable_string(s: str) -> dict | None:
 
 # -- Cable formatting helper --
 
+def _cable_smart_case(s: str) -> str:
+    """Uppercase cable text but keep measurement units lowercase.
+
+    Singapore LEW reference convention:
+        "4 x 50mm² PVC/PVC CABLE + 50mm² CPC IN METAL TRUNKING"
+        ───────── lowercase ──────  ─── UPPERCASE words ───────
+    Units (sqmm, mm², x between numbers) stay lowercase;
+    words (PVC, CABLE, CPC, IN, METAL TRUNKING, CONDUIT) are uppercased.
+    """
+    s = s.upper()
+    # "50SQMM" → "50sqmm"
+    s = re.sub(r'(\d)SQMM', r'\1sqmm', s)
+    # "50MM²" → "50mm²"  (also MM2 → mm²)
+    s = re.sub(r'(\d)MM²', r'\1mm²', s)
+    s = re.sub(r'(\d)MM2\b', r'\1mm²', s)
+    # "4 X 1C" → "4 x 1C"  (multiplier x between digits)
+    s = re.sub(r'(\d)\s*X\s+(\d)', r'\1 x \2', s)
+    return s
+
+
 def format_cable_spec(cable_input, multiline: bool = False) -> str:
     """
     Format cable specification into Singapore SLD standard format.
@@ -101,6 +121,10 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
     Format breakdown:
         [{count} x] {cores}C {size}sqmm {type} + {cpc}sqmm
         {cpc_type} CPC IN {method}
+
+    Case convention (from reference drawings):
+        - Units stay lowercase: sqmm, mm², x (multiplier)
+        - Words are uppercase: PVC, CABLE, CPC, IN, METAL TRUNKING
 
     String inputs are parsed and re-formatted to canonical form so that
     identical cables from different sources (Excel, template DB, dict)
@@ -122,7 +146,11 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
         parsed = _parse_cable_string(cable_input)
         if parsed:
             return format_cable_spec(parsed, multiline=multiline)
-        return cable_input
+        result = _cable_smart_case(cable_input)
+        # Apply multiline split at "+" boundary even for unparseable strings
+        if multiline and " + " in result:
+            result = result.replace(" + ", " +\\P", 1)
+        return result
 
     if isinstance(cable_input, dict):
         count = cable_input.get("count", cable_input.get("runs", 1))
@@ -136,23 +164,26 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
         cpc_type = cable_input.get("cpc_type", "PVC")
         method = cable_input.get("method", "")
         if size:
-            # Singapore LEW DWG standard:
+            # Singapore LEW DWG standard (units lowercase, words uppercase):
             #   "2 x 1C 1.5sqmm PVC/PVC + 1.5sqmm PVC CPC IN METAL TRUNKING"
             if count and int(count) > 1:
-                base = f"{count} x {cores}C {size}sqmm {cable_type}"
+                base = f"{count} x {cores}C {size}sqmm {cable_type.upper()}"
             else:
-                base = f"{cores}C {size}sqmm {cable_type}"
+                base = f"{cores}C {size}sqmm {cable_type.upper()}"
             if cpc:
                 sep = " +\\P" if multiline else " + "
-                base += f"{sep}{cpc}sqmm {cpc_type} CPC"
+                base += f"{sep}{cpc}sqmm {cpc_type.upper()} CPC"
                 if method:
-                    base += f" IN {method}"
+                    base += f" IN {method.upper()}"
             elif method:
-                base += f" IN {method}"
+                base += f" IN {method.upper()}"
             return base
-        return f"{cores}C {cable_type}"
+        return f"{cores}C {cable_type.upper()}"
 
-    return str(cable_input)
+    result = _cable_smart_case(str(cable_input))
+    if multiline and " + " in result:
+        result = result.replace(" + ", " +\\P", 1)
+    return result
 
 
 # -- Data classes --
@@ -203,7 +234,7 @@ class LayoutConfig:
     rccb_h: float = 15.0            # RCCB/ELCB height
     meter_size: float = 14.0         # kWh meter overall size
     isolator_w: float = 8.0          # Isolator width
-    isolator_h: float = 14.0         # Isolator height
+    isolator_h: float = 10.0         # Isolator height (contact sep 6mm matching MCCB)
     ct_size: float = 12.0            # CT diameter
     stub_len: float = 3.0            # Connection stub length
     # KWH meter rectangle dimensions (for horizontal meter board layout)
@@ -221,6 +252,14 @@ class LayoutConfig:
     leader_margin_above_db: float = 10.0  # Leader line gap above DB box top
     leader_extension: float = 10.0        # Horizontal extension beyond outermost conductor
     leader_bend_height: float = 5.0       # Vertical L-bend height at leader end
+
+    # -- Isolator section spacing --
+    isolator_to_db_gap: float = 14.0      # Gap from isolator section end to main breaker (was 18)
+    isolator_label_gap: float = 5.0       # Gap between isolator enclosure box edge and label text
+
+    # -- Cable annotation constants --
+    cable_leader_len: float = 9.0         # Cable tick leader line length (was hardcoded 3mm)
+    cable_leader_text_gap: float = 3.0    # Gap between leader line end and cable text (was 1mm)
 
     # Earth bar offsets
     earth_y_below_busbar: float = 25.0    # Earth bar Y below busbar
@@ -337,6 +376,8 @@ class PlacedComponent:
     fault_kA: int = 0            # e.g., 6, 10, 25
     label_style: str = "default" # "default" | "breaker_block"
     breaker_characteristic: str = ""  # e.g., "B", "C", "D" (IEC 60898-1 trip curve)
+    no_ditto: bool = False  # True = always show full label (e.g., per-phase RCCB in protection groups)
+    enclosed: bool = False  # True = draw enclosure box around symbol (e.g., landlord unit isolator)
 
 
 @dataclass
@@ -364,6 +405,10 @@ class LayoutResult:
     supply_type: str = "three_phase"
     voltage: int = 400
 
+    # Triplet rendering flag (per-board, propagated for post-processing).
+    # False = phase-grouped layout; skip fan-out, triplet padding, row rounding.
+    use_triplets: bool = True
+
     # Symbols used (diagnostic — tracks which symbol types are placed)
     symbols_used: set[str] = field(default_factory=set)
 
@@ -380,6 +425,17 @@ class LayoutResult:
     # Multi-DB tracking
     db_count: int = 1  # Number of distribution boards (1=single, 2+=multi)
     db_box_ranges: list[dict] = field(default_factory=list)  # Per-DB: {start_y, end_y, left, right}
+
+    # Per-row busbar extents for multi-DB overlap resolution.
+    # Maps busbar Y coordinate → (start_x, end_x) so that resolve_overlaps
+    # can constrain each row's circuits to the correct busbar extent.
+    busbar_x_per_row: dict[float, tuple[float, float]] = field(default_factory=dict)
+
+    # Layout regions for multi-DB overlap resolution.
+    # When set, resolve_overlaps splits groups by X region and processes
+    # each region independently. This prevents circuits from one DB
+    # being repositioned across another DB's region.
+    layout_regions: list["LayoutRegion"] = field(default_factory=list)
 
 
 @dataclass
@@ -467,6 +523,119 @@ class OverflowMetrics:
 from app.sld.locale import SG_LOCALE, SldLocale
 
 
+# -- Layout Planning dataclasses (pre-computation before placement) --
+
+@dataclass
+class LayoutRegion:
+    """Strict horizontal bounding region for a distribution board.
+
+    Computed by _plan_layout() BEFORE any component placement.
+    All placement functions MUST constrain output to [min_x, max_x].
+
+    Design rationale (Walker/Reingold-Tilford + Flexbox hybrid):
+    - Bottom-up measurement: leaf nodes (circuits) → groups → DBs → total
+    - Top-down allocation: total → DBs → groups → circuits
+    - Each DB gets a non-overlapping horizontal strip
+    - Y coordinates flow naturally (top-to-bottom) and don't need strict bounds
+
+    Backward compatibility: When active_region is None (single-DB), all
+    placement functions use full page width as before.
+    """
+    min_x: float
+    max_x: float
+    name: str = ""
+
+    @property
+    def width(self) -> float:
+        return self.max_x - self.min_x
+
+    @property
+    def cx(self) -> float:
+        return (self.min_x + self.max_x) / 2
+
+
+@dataclass
+class ProtectionGroupPlan:
+    """Pre-computed dimensions for a single per-phase RCCB group.
+
+    Used by _plan_layout() to estimate horizontal space for DB2-style
+    boards where each phase (L1/L2/L3) has its own RCCB + busbar + circuits.
+    """
+    phase: str                    # "L1" / "L2" / "L3"
+    rccb: dict = field(default_factory=dict)  # {rating, sensitivity_ma, poles, type}
+    circuit_count: int = 0
+    estimated_width: float = 0.0  # circuits × spacing (mm)
+    busbar_rating: int = 0
+
+
+@dataclass
+class DBPlan:
+    """Pre-computed dimensions for a single Distribution Board.
+
+    Estimated before sequential placement so that global layout
+    can allocate horizontal regions and detect A3 overflow early.
+    """
+    name: str = ""
+    circuit_count: int = 0
+    estimated_width: float = 0.0   # total DB horizontal span (mm)
+    estimated_height: float = 0.0  # total DB vertical span (mm)
+    has_elcb: bool = False
+    protection_groups: list[ProtectionGroupPlan] = field(default_factory=list)
+    num_rows: int = 1              # number of circuit rows (multi-row when region too narrow)
+    circuits_per_row: int = 0      # max circuits in widest row
+
+
+@dataclass
+class LayoutPlan:
+    """Global SLD layout plan computed before sequential placement.
+
+    Analogous to CSS box model / TeX first-pass: measures all DBs,
+    allocates horizontal regions, and determines if scaling is needed
+    to fit within A3 drawing area.
+
+    When ctx.plan is None, the engine uses the existing single-DB path
+    (100% backward compatible).
+    """
+    total_width: float = 0.0           # all DBs combined width (mm)
+    total_height: float = 0.0          # incoming → topmost sub-circuit (mm)
+    db_plans: list[DBPlan] = field(default_factory=list)
+    main_section_height: float = 0.0   # incoming ~ main busbar height (mm)
+    scale_factor: float = 1.0          # <1.0 if A3 width exceeded
+    db_cx_positions: list[float] = field(default_factory=list)  # center X per DB
+    db_regions: list[LayoutRegion] = field(default_factory=list)  # strict X bounds per DB
+
+    # Hierarchical topology fields
+    topology: str = "parallel"         # "parallel" or "hierarchical"
+    root_db_idx: int = 0               # index of root board (fed_from=None)
+    incoming_cx: float = 0.0           # cx for incoming section (root board center)
+
+
+@dataclass
+class BoardResult:
+    """Independent layout result for a single distribution board.
+
+    Coordinates are in page space (render_board sets cx=region.cx, so
+    section functions already output in page coordinates).
+    For single-DB backward compatibility, this is a simple wrapper.
+    """
+    layout: LayoutResult
+    board_spec: dict = field(default_factory=dict)
+    board_idx: int = 0
+    board_name: str = ""
+    effective_supply_type: str = ""
+    spine_x: float = 0.0
+    region: "LayoutRegion | None" = None
+    busbar_y: float = 0.0
+    busbar_start_x: float = 0.0
+    busbar_end_x: float = 0.0
+    db_box_start_y: float = 0.0
+    topmost_busbar_y: float = 0.0
+    db_info_label: str = ""
+    db_info_text: str = ""
+    db_location_text: str = ""
+    breaker_rating: int = 0
+
+
 @dataclass
 class _LayoutContext:
     """Shared mutable context passed between layout section methods.
@@ -510,6 +679,7 @@ class _LayoutContext:
 
     # Tracking (set by sections, read by later sections)
     db_box_start_y: float = 0
+    board_name: str = ""         # e.g. "MSB", "DB1" — displayed inside DB box
     db_info_label: str = ""      # e.g. "40A DB"
     db_info_text: str = ""       # e.g. "APPROVED LOAD: 9.2KVA AT 230V"
     db_location_text: str = ""   # e.g. "LOCATED AT BLK 824 ..." (below DB box)
@@ -520,6 +690,17 @@ class _LayoutContext:
     # CT ratio (e.g., "200/5A")
     ct_ratio: str = ""
 
+    # CT metering section details (vertical layout for ≥125A 3-phase)
+    protection_ct_ratio: str = ""
+    protection_ct_class: str = ""
+    metering_ct_class: str = ""
+    has_ammeter: bool = True
+    has_voltmeter: bool = True
+    has_elr: bool = True
+    elr_spec: str = ""
+    voltmeter_range: str = ""
+    ammeter_range: str = ""
+
     # Raw inputs (for sections that need full access)
     requirements: dict = field(default_factory=dict)
     application_info: dict = field(default_factory=dict)
@@ -528,3 +709,23 @@ class _LayoutContext:
     distribution_boards: list[dict] = field(default_factory=list)  # Input DB array
     current_db_idx: int = -1  # Current DB being placed (-1=main/single)
     db_spine_xs: list[float] = field(default_factory=list)  # Per-DB spine X positions
+
+    # Layout plan (None = single-DB backward-compatible path)
+    plan: LayoutPlan | None = None
+
+    # Per-DB constrained width (mm).  When set, _compute_dynamic_spacing()
+    # and _place_main_busbar() use this instead of full page width.
+    # Set per-board by render_board() via region.width.
+    constrained_width: float | None = None
+
+    # Active layout region (strict X bounds for current DB).
+    # When set, all placement functions MUST constrain output to this region.
+    # None = full page width (single-DB backward-compatible path).
+    active_region: LayoutRegion | None = None
+
+    # DB topology: "parallel" (default, all DBs branch from shared main busbar)
+    # or "hierarchical" (root DB has incoming, child DBs fed from root via feeder).
+    db_topology: str = "parallel"
+
+    # Phase arrangement: False = phase-grouped, skip triplet rendering.
+    use_triplets: bool = True

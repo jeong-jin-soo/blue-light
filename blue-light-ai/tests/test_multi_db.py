@@ -349,14 +349,14 @@ class TestMultiDbSubCircuits:
         assert len(info_boxes) >= 2
 
     def test_db_name_labels_present(self):
-        """Each sub-DB name should appear as a label."""
+        """Each sub-DB name should appear inside DB_INFO_BOX (reference: board name inside box)."""
         result = compute_layout(MULTI_DB_2_BOARDS)
-        labels = [c for c in result.components if c.symbol_name == "LABEL"]
-        label_texts = [c.label for c in labels]
-        assert any("Lighting DB" in t for t in label_texts), \
-            f"'Lighting DB' label not found. Labels: {label_texts}"
-        assert any("Power DB" in t for t in label_texts), \
-            f"'Power DB' label not found. Labels: {label_texts}"
+        info_boxes = [c for c in result.components if c.symbol_name == "DB_INFO_BOX"]
+        info_labels = [c.label for c in info_boxes]
+        assert any("Lighting DB" in t for t in info_labels), \
+            f"'Lighting DB' not found in DB_INFO_BOX. Labels: {info_labels}"
+        assert any("Power DB" in t for t in info_labels), \
+            f"'Power DB' not found in DB_INFO_BOX. Labels: {info_labels}"
 
 
 # ---------------------------------------------------------------------------
@@ -374,3 +374,549 @@ class TestContextRestoration:
         expected_cx = (config.min_x + config.max_x) / 2
         assert abs(result.spine_x - expected_cx) < 1.0, \
             f"spine_x={result.spine_x}, expected ~{expected_cx}"
+
+
+# ---------------------------------------------------------------------------
+# Protection Groups (per-phase RCCB) tests
+# ---------------------------------------------------------------------------
+
+MULTI_DB_WITH_PROTECTION_GROUPS = {
+    "supply_type": "three_phase",
+    "kva": 100,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 35},
+    "metering": "ct_meter",
+    "distribution_boards": [
+        {
+            "name": "MSB",
+            "breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            "busbar_rating": 100,
+            "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4},
+            "sub_circuits": [
+                {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Light 3", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                {"name": "Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+                {"name": "Power 3", "breaker_type": "MCB", "breaker_rating": 20},
+            ],
+        },
+        {
+            "name": "DB2",
+            "breaker": {"type": "MCB", "rating": 40, "poles": "TPN", "fault_kA": 6},
+            "busbar_rating": 80,
+            "protection_groups": [
+                {
+                    "phase": "L1",
+                    "rccb": {"type": "RCCB", "rating": 40, "sensitivity_ma": 30, "poles": 2},
+                    "circuits": [
+                        {"name": "L1 Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L1 Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L1 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "phase": "L2",
+                    "rccb": {"type": "RCCB", "rating": 40, "sensitivity_ma": 30, "poles": 2},
+                    "circuits": [
+                        {"name": "L2 Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L2 Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L2 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "phase": "L3",
+                    "rccb": {"type": "RCCB", "rating": 40, "sensitivity_ma": 30, "poles": 2},
+                    "circuits": [
+                        {"name": "L3 Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L3 Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L3 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+            ],
+        },
+    ],
+}
+
+
+class TestProtectionGroups:
+    """Tests for per-phase RCCB protection group layout."""
+
+    def test_protection_groups_produces_result(self):
+        """Multi-DB with protection_groups should produce a valid layout."""
+        result = compute_layout(MULTI_DB_WITH_PROTECTION_GROUPS)
+        assert result.db_count == 2
+        assert len(result.components) > 0
+
+    def test_protection_groups_has_rccb_symbols(self):
+        """DB2 with 3 protection groups should produce 3 RCCB symbols."""
+        result = compute_layout(MULTI_DB_WITH_PROTECTION_GROUPS)
+        rccb_count = sum(
+            1 for c in result.components
+            if c.symbol_name == "RCCB" and "40A" in c.rating
+        )
+        assert rccb_count >= 3, \
+            f"Expected >=3 per-phase RCCBs, found {rccb_count}"
+
+    def test_protection_groups_all_circuits_placed(self):
+        """All circuits from protection groups should be placed as breakers."""
+        result = compute_layout(MULTI_DB_WITH_PROTECTION_GROUPS)
+        # MSB: 6 circuits + DB2: 9 circuits = 15 sub-circuit breakers
+        # (padded to triplets: 6 + 9 = 15, already multiples of 3)
+        sub_breakers = [
+            c for c in result.components
+            if c.symbol_name.startswith("CB_")
+        ]
+        # At least 15 sub-circuit breakers (may have spares padded)
+        assert len(sub_breakers) >= 15, \
+            f"Expected >=15 sub-circuit breakers, found {len(sub_breakers)}"
+
+    def test_protection_groups_backward_compat(self):
+        """Single-DB input should not be affected by protection group support."""
+        result = compute_layout(SINGLE_PHASE_3CKT)
+        assert result.db_count == 1
+
+    def test_multi_db_no_pgroups_still_works(self):
+        """Multi-DB without protection_groups should work as before."""
+        result = compute_layout(MULTI_DB_2_BOARDS)
+        assert result.db_count == 2
+        rccb_per_phase = [
+            c for c in result.components
+            if c.symbol_name == "RCCB" and "40A" in (c.rating or "")
+        ]
+        # No per-phase RCCBs in basic multi-DB
+        assert len(rccb_per_phase) == 0
+
+
+# ---------------------------------------------------------------------------
+# Layout Plan tests
+# ---------------------------------------------------------------------------
+
+class TestLayoutPlan:
+    """Tests for _plan_layout() pre-computation."""
+
+    def test_plan_created_for_multi_db(self):
+        """Multi-DB should create a LayoutPlan."""
+        from app.sld.layout.engine import _plan_layout
+        from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
+        config = LayoutConfig()
+        ctx = _LayoutContext(
+            result=LayoutResult(), config=config, cx=config.start_x, y=80,
+            supply_type="three_phase",
+        )
+        dbs = MULTI_DB_2_BOARDS["distribution_boards"]
+        plan = _plan_layout(ctx, dbs)
+        assert len(plan.db_plans) == 2
+        assert len(plan.db_cx_positions) == 2
+        assert plan.scale_factor > 0
+        assert plan.total_width > 0
+
+    def test_plan_cx_positions_ordered(self):
+        """DB center positions should be left-to-right ordered."""
+        from app.sld.layout.engine import _plan_layout
+        from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
+        config = LayoutConfig()
+        ctx = _LayoutContext(
+            result=LayoutResult(), config=config, cx=config.start_x, y=80,
+            supply_type="three_phase",
+        )
+        dbs = MULTI_DB_2_BOARDS["distribution_boards"]
+        plan = _plan_layout(ctx, dbs)
+        for i in range(len(plan.db_cx_positions) - 1):
+            assert plan.db_cx_positions[i] < plan.db_cx_positions[i + 1]
+
+    def test_plan_with_protection_groups(self):
+        """Plan should account for protection group circuits in width."""
+        from app.sld.layout.engine import _plan_layout
+        from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
+        config = LayoutConfig()
+        ctx = _LayoutContext(
+            result=LayoutResult(), config=config, cx=config.start_x, y=80,
+            supply_type="three_phase",
+        )
+        dbs = MULTI_DB_WITH_PROTECTION_GROUPS["distribution_boards"]
+        plan = _plan_layout(ctx, dbs)
+        assert len(plan.db_plans) == 2
+        # DB2 has 3 protection groups
+        db2_plan = plan.db_plans[1]
+        assert len(db2_plan.protection_groups) == 3
+        assert db2_plan.protection_groups[0].phase == "L1"
+        assert db2_plan.protection_groups[1].phase == "L2"
+        assert db2_plan.protection_groups[2].phase == "L3"
+
+    def test_plan_not_created_for_single_db(self):
+        """Single-DB should not create a LayoutPlan."""
+        result = compute_layout(SINGLE_PHASE_3CKT)
+        # Can't directly check ctx.plan, but verify single-DB behavior is unchanged
+        assert result.db_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Hierarchical Multi-DB fixtures
+# ---------------------------------------------------------------------------
+
+MULTI_DB_HIERARCHICAL = {
+    "supply_type": "three_phase",
+    "kva": 69,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+    "metering": "ct_meter",
+    "busbar_rating": 100,
+    "db_topology": "hierarchical",
+    "distribution_boards": [
+        {
+            "name": "MSB",
+            "fed_from": None,
+            "breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4},
+            "busbar_rating": 100,
+            "sub_circuits": [
+                {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10,
+                 "cable": "2C 1.5sqmm PVC"},
+                {"name": "Light 2", "breaker_type": "MCB", "breaker_rating": 10,
+                 "cable": "2C 1.5sqmm PVC"},
+                {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20,
+                 "cable": "2C 2.5sqmm PVC"},
+                {"name": "Power 2", "breaker_type": "MCB", "breaker_rating": 20,
+                 "cable": "2C 2.5sqmm PVC"},
+                {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 32,
+                 "cable": "2C 6sqmm PVC"},
+                {"name": "Spare", "breaker_type": "MCB", "breaker_rating": 20,
+                 "cable": "2C 2.5sqmm PVC"},
+                # Feeder circuit to DB2
+                {"name": "Feeder to DB2", "breaker_type": "MCB", "breaker_rating": 63,
+                 "breaker_poles": "TPN", "cable": "4C 16sqmm PVC",
+                 "_is_feeder": True, "_feeds_db": "DB2"},
+            ],
+        },
+        {
+            "name": "DB2",
+            "fed_from": "MSB",
+            "breaker": {"type": "MCB", "rating": 40, "poles": "TPN", "fault_kA": 6},
+            "busbar_rating": 80,
+            "protection_groups": [
+                {
+                    "phase": "L1",
+                    "rccb": {"type": "RCCB", "rating": 40, "sensitivity_ma": 30, "poles": 2},
+                    "circuits": [
+                        {"name": "L1 Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L1 Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L1 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "phase": "L2",
+                    "rccb": {"type": "RCCB", "rating": 40, "sensitivity_ma": 30, "poles": 2},
+                    "circuits": [
+                        {"name": "L2 Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L2 Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L2 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "phase": "L3",
+                    "rccb": {"type": "RCCB", "rating": 40, "sensitivity_ma": 30, "poles": 2},
+                    "circuits": [
+                        {"name": "L3 Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L3 Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L3 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+            ],
+        },
+    ],
+}
+
+# Same data but WITHOUT feeder/fed_from — should stay parallel
+MULTI_DB_NO_FEEDER = {
+    "supply_type": "three_phase",
+    "kva": 69,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+    "metering": "ct_meter",
+    "busbar_rating": 100,
+    "distribution_boards": [
+        {
+            "name": "MSB",
+            "breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            "busbar_rating": 100,
+            "sub_circuits": [
+                {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 32},
+            ],
+        },
+        {
+            "name": "DB2",
+            "breaker": {"type": "MCB", "rating": 40, "poles": "TPN"},
+            "busbar_rating": 80,
+            "sub_circuits": [
+                {"name": "Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Power A", "breaker_type": "MCB", "breaker_rating": 20},
+                {"name": "Spare", "breaker_type": "MCB", "breaker_rating": 10},
+            ],
+        },
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
+# Hierarchical Layout tests
+# ---------------------------------------------------------------------------
+
+class TestHierarchicalLayout:
+    """Tests for hierarchical (MSB→feeder→DB2) topology layout."""
+
+    def test_hierarchical_produces_valid_result(self):
+        """Hierarchical multi-DB should produce a valid layout."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        assert result.db_count == 2
+        assert len(result.components) > 0
+        assert len(result.connections) > 0
+
+    def test_incoming_under_root_board(self):
+        """Incoming supply components (meter, isolator) should be within MSB region."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        # Find meter component as incoming section marker
+        meters = [c for c in result.components if c.symbol_name == "KWH_METER"]
+        assert len(meters) >= 1, "KWH_METER not found"
+        meter_x = meters[0].x
+        # Find root board region (MSB)
+        msb_regions = [r for r in result.layout_regions
+                       if hasattr(r, 'name') and r.name == "MSB"
+                       or isinstance(r, dict) and r.get("name") == "MSB"]
+        assert len(msb_regions) >= 1, f"MSB region not found. Regions: {result.layout_regions}"
+        region = msb_regions[0]
+        msb_min_x = region.min_x if hasattr(region, 'min_x') else region["min_x"]
+        msb_max_x = region.max_x if hasattr(region, 'max_x') else region["max_x"]
+        # Meter X should be within MSB region (with margin for meter board width)
+        assert msb_min_x - 15 <= meter_x <= msb_max_x + 15, \
+            f"Meter X={meter_x} not within MSB region [{msb_min_x}, {msb_max_x}]"
+
+    def test_root_busbar_in_msb_region(self):
+        """Root (MSB) busbar should be within the MSB region, not at page center."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        from app.sld.layout.models import LayoutConfig
+        config = LayoutConfig()
+        page_cx = (config.min_x + config.max_x) / 2  # ~210
+        # Find MSB region
+        msb_regions = [r for r in result.layout_regions
+                       if hasattr(r, 'name') and r.name == "MSB"
+                       or isinstance(r, dict) and r.get("name") == "MSB"]
+        assert len(msb_regions) >= 1
+        region = msb_regions[0]
+        msb_min_x = region.min_x if hasattr(region, 'min_x') else region["min_x"]
+        msb_max_x = region.max_x if hasattr(region, 'max_x') else region["max_x"]
+        msb_cx = (msb_min_x + msb_max_x) / 2
+        # MSB region center should differ from page center (hierarchical shifts it)
+        # In hierarchical mode, MSB is one of multiple regions, not page-centered
+        assert msb_max_x < page_cx + 50, \
+            f"MSB region max_x={msb_max_x} should not span far past page center {page_cx}"
+
+    def test_feeder_circuit_on_root_busbar(self):
+        """Root busbar should have a feeder tap point for child DB."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        # The feeder circuit should produce a breaker (CB_MCB) on root busbar
+        all_breakers = [c for c in result.components if c.symbol_name.startswith("CB_")]
+        # MSB: 6 normal circuits + 1 feeder = 7 breakers on root busbar area
+        # DB2: 9 circuits under protection groups
+        # + main breaker + DB2 breaker = total should be well above 16
+        assert len(all_breakers) >= 16, \
+            f"Expected >=16 total breakers, got {len(all_breakers)}"
+
+    def test_child_board_has_bi_connector(self):
+        """DB2 (child board) should have a BI_CONNECTOR."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        bi_count = sum(1 for c in result.components if c.symbol_name == "BI_CONNECTOR")
+        # At least 1 for DB2 (child), possibly 2 (one for root too)
+        assert bi_count >= 1, "No BI_CONNECTOR found for child board"
+
+    def test_child_board_has_own_busbar(self):
+        """DB2 should have its own busbar components."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        # Should have multiple BUSBAR components (root + child)
+        busbar_count = sum(1 for c in result.components if c.symbol_name == "BUSBAR")
+        assert busbar_count >= 2, \
+            f"Expected >=2 BUSBAR components (root + child), got {busbar_count}"
+
+    def test_all_circuits_placed(self):
+        """All circuits from both boards should be placed as breakers."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        cb_count = sum(1 for c in result.components if c.symbol_name.startswith("CB_"))
+        # MSB: 6 normal + 1 feeder = 7 sub-circuit breakers
+        # DB2: 9 circuits in protection groups
+        # + 1 main breaker (MCCB) + 1 DB2 breaker (MCB) = minimum 18
+        assert cb_count >= 18, \
+            f"Expected >=18 total breakers (7 MSB + 9 DB2 + 2 main), got {cb_count}"
+
+    def test_child_board_has_rccb_symbols(self):
+        """DB2 with 3 protection groups should have 3 RCCB symbols."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        rccb_count = sum(1 for c in result.components if c.symbol_name == "RCCB")
+        assert rccb_count >= 3, \
+            f"Expected >=3 RCCBs for DB2 protection groups, got {rccb_count}"
+
+    def test_backward_compat_parallel(self):
+        """Existing parallel multi-DB fixture should still produce same result."""
+        result = compute_layout(MULTI_DB_2_BOARDS)
+        assert result.db_count == 2
+        # No hierarchical layout regions (topology is parallel)
+        # Just verify it still works
+        assert len(result.components) > 0
+        assert len(result.db_box_ranges) == 2
+
+    def test_db_name_labels_present(self):
+        """Both MSB and DB2 names should appear as labels or info boxes."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        labels = [c for c in result.components if c.symbol_name == "LABEL"]
+        label_texts = [c.label for c in labels if c.label]
+        info_boxes = [c for c in result.components if c.symbol_name == "DB_INFO_BOX"]
+        info_labels = [c.label for c in info_boxes if c.label]
+        all_texts = label_texts + info_labels
+        assert any("MSB" in t for t in all_texts), \
+            f"'MSB' not found in labels/info_boxes. All: {all_texts}"
+        assert any("DB2" in t for t in all_texts), \
+            f"'DB2' not found in labels/info_boxes. All: {all_texts}"
+
+    def test_overflow_metrics_acceptable(self):
+        """Hierarchical layout should have reasonable overflow metrics."""
+        result = compute_layout(MULTI_DB_HIERARCHICAL)
+        m = result.overflow_metrics
+        assert m is not None
+        assert 0.0 <= m.quality_score <= 1.0
+        # Allow some overflow but not catastrophic
+        assert m.overflow_left < 20, f"Left overflow too large: {m.overflow_left}mm"
+        assert m.overflow_right < 20, f"Right overflow too large: {m.overflow_right}mm"
+
+
+# ---------------------------------------------------------------------------
+# Feeder Detection tests
+# ---------------------------------------------------------------------------
+
+class TestFeederDetection:
+    """Tests for _build_db_hierarchy() feeder circuit detection."""
+
+    def test_detect_feeder_by_description(self):
+        """'Feeder to DB2' pattern should be detected and hierarchy set."""
+        from app.sld.extraction_schema import _build_db_hierarchy
+        db_list = [
+            {
+                "name": "MSB",
+                "sub_circuits": [
+                    {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                    {"name": "Feeder to DB2", "breaker_type": "MCB", "breaker_rating": 63},
+                ],
+            },
+            {
+                "name": "DB2",
+                "sub_circuits": [
+                    {"name": "Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                ],
+            },
+        ]
+        topology = _build_db_hierarchy(db_list)
+        assert topology == "hierarchical"
+        # Feeder circuit should be marked
+        feeder = db_list[0]["sub_circuits"][1]
+        assert feeder.get("_is_feeder") is True
+        assert feeder.get("_feeds_db") == "DB2"
+        # Child DB should have fed_from set
+        assert db_list[1].get("fed_from") == "MSB"
+
+    def test_detect_feeder_case_insensitive(self):
+        """Feeder detection should be case-insensitive."""
+        from app.sld.extraction_schema import _build_db_hierarchy
+        db_list = [
+            {
+                "name": "MSB",
+                "sub_circuits": [
+                    {"name": "1 NO. FEEDER TO DB2", "breaker_type": "MCB", "breaker_rating": 63},
+                ],
+            },
+            {
+                "name": "DB2",
+                "sub_circuits": [],
+            },
+        ]
+        topology = _build_db_hierarchy(db_list)
+        assert topology == "hierarchical"
+        assert db_list[1].get("fed_from") == "MSB"
+
+    def test_detect_feeder_by_db_name_in_description(self):
+        """Circuit description containing another DB name should detect hierarchy."""
+        from app.sld.extraction_schema import _build_db_hierarchy
+        db_list = [
+            {
+                "name": "Main Board",
+                "sub_circuits": [
+                    {"name": "Supply to Sub DB", "breaker_type": "MCB", "breaker_rating": 63},
+                ],
+            },
+            {
+                "name": "Sub DB",
+                "sub_circuits": [],
+            },
+        ]
+        topology = _build_db_hierarchy(db_list)
+        assert topology == "hierarchical"
+        assert db_list[1].get("fed_from") == "Main Board"
+
+    def test_no_feeder_stays_parallel(self):
+        """Without feeder circuits, topology should be 'parallel'."""
+        from app.sld.extraction_schema import _build_db_hierarchy
+        db_list = [
+            {
+                "name": "DB1",
+                "sub_circuits": [
+                    {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                ],
+            },
+            {
+                "name": "DB2",
+                "sub_circuits": [
+                    {"name": "Light A", "breaker_type": "MCB", "breaker_rating": 10},
+                ],
+            },
+        ]
+        topology = _build_db_hierarchy(db_list)
+        assert topology == "parallel"
+        assert db_list[0].get("fed_from") is None
+        assert db_list[1].get("fed_from") is None
+
+    def test_gemini_fed_from_passthrough(self):
+        """If fed_from is already set (by Gemini), it should be respected."""
+        from app.sld.extraction_schema import _build_db_hierarchy
+        db_list = [
+            {
+                "name": "MSB",
+                "sub_circuits": [
+                    {"name": "Some circuit", "breaker_type": "MCB", "breaker_rating": 20},
+                ],
+            },
+            {
+                "name": "DB2",
+                "fed_from": "MSB",  # Pre-set by Gemini
+                "sub_circuits": [],
+            },
+        ]
+        topology = _build_db_hierarchy(db_list)
+        assert topology == "hierarchical"
+        assert db_list[1]["fed_from"] == "MSB"
+
+    def test_no_self_reference(self):
+        """A DB should not detect its own name as a feeder target."""
+        from app.sld.extraction_schema import _build_db_hierarchy
+        db_list = [
+            {
+                "name": "MSB",
+                "sub_circuits": [
+                    {"name": "MSB internal", "breaker_type": "MCB", "breaker_rating": 20},
+                ],
+            },
+            {
+                "name": "DB2",
+                "sub_circuits": [],
+            },
+        ]
+        topology = _build_db_hierarchy(db_list)
+        assert topology == "parallel"

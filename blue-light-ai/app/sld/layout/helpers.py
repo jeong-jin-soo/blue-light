@@ -152,7 +152,60 @@ def _next_standard_rating(current: int) -> int:
     return STANDARD_BREAKER_RATINGS[-1]
 
 
-def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list[dict]:
+def _should_use_triplets(sub_circuits: list[dict], supply_type: str) -> bool:
+    """Determine if circuits should render as 3-phase triplet fan-outs.
+
+    Two arrangement patterns exist in 3-phase SLD:
+
+    * **Interleaved** (returns ``True``):
+      Circuits alternate L1→L2→L3→L1→L2→L3 — needs fan-out grouping.
+      Example: 63A TPN DB with L1S1, L2S1, L3S1, L1P1, …
+
+    * **Phase-grouped** (returns ``False``):
+      All L1 circuits together, then L2, then L3 — independent circuits.
+      Example: I2R-ETR-NLB MSB with RL1, RL2, RL3, RS1, YL1, YS1, …
+
+    Detection heuristic: count phase transitions in circuit input order.
+    Interleaved has ~(N-1)×⅔ transitions; phase-grouped has ≤2.
+    """
+    if supply_type != "three_phase":
+        return False
+
+    # Extract phase from each non-spare, non-feeder circuit
+    phases: list[str] = []
+    for c in sub_circuits:
+        name = (c.get("name") or "").lower()
+        if "spare" in name or c.get("_is_feeder") or c.get("_auto_spare"):
+            continue
+        phase = c.get("phase", "")
+        if phase:
+            phases.append(phase)
+
+    if len(phases) < 3:
+        return True  # Not enough data → default to current behavior (triplets)
+
+    # Count transitions between different phases
+    transitions = 0
+    for i in range(1, len(phases)):
+        if phases[i] != phases[i - 1]:
+            transitions += 1
+
+    unique_phases = len(set(phases))
+    if unique_phases <= 1:
+        return False  # All same phase → no triplets
+
+    # Phase-grouped: at most (unique_phases - 1) transitions
+    # e.g., L1×5, L2×4, L3×4 → 2 transitions for 3 unique phases
+    # Interleaved: L1,L2,L3,L1,L2,L3... → ~(N-1) transitions
+    return transitions > unique_phases - 1
+
+
+def _pad_spares_for_triplets(
+    sub_circuits: list[dict],
+    supply_type: str,
+    *,
+    use_triplets: bool = True,
+) -> list[dict]:
     """Auto-pad SPARE circuits to complete 3-phase triplets.
 
     In a TPN distribution board, every busbar position is allocated to a
@@ -165,10 +218,18 @@ def _pad_spares_for_triplets(sub_circuits: list[dict], supply_type: str) -> list
     Section detection: detects boundary when breaker rating changes
     (e.g., 10A→20A) or circuit category changes (lighting→power/isolator).
 
-    Only applies to three_phase supply; single_phase returns as-is.
+    Only applies to three_phase interleaved supply; skipped for
+    single_phase and phase-grouped layouts.
     """
-    if supply_type != "three_phase" or not sub_circuits:
+    if supply_type != "three_phase" or not sub_circuits or not use_triplets:
         return sub_circuits
+
+    # Skip ALL padding for multi-DB sub-board circuits.  Multi-DB sub-boards
+    # (MSB, DB2, etc.) keep their original circuit count — triplet padding
+    # adds unnecessary SPAREs that compress spacing and don't match reference
+    # LEW drawings (e.g., MSB with 16 circuits stays 16, not padded to 18).
+    if sub_circuits and sub_circuits[0].get("_skip_section_pad"):
+        return list(sub_circuits)
 
     # --- Detect section boundaries ---
     # A section boundary occurs when the "type" changes:
@@ -360,7 +421,12 @@ def _assign_spare_phase_slot(
     return f"L1{sec_char}{max_num + 1}"
 
 
-def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]:
+def _assign_circuit_ids(
+    sub_circuits: list[dict],
+    supply_type: str,
+    *,
+    use_triplets: bool = True,
+) -> list[str]:
     """Pre-assign circuit IDs based on Singapore SLD conventions.
 
     Two-pass algorithm:
@@ -369,13 +435,15 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
 
     Counter rules:
       - Single-phase: S (lighting), P (power), H (heater) — P and H share a counter
-      - Three-phase: L{1-3}S (lighting round-robin), L{1-3}P (power round-robin), H (heater)
+      - Three-phase interleaved: L{1-3}S (lighting round-robin), L{1-3}P (power round-robin)
+      - Three-phase phase-grouped (use_triplets=False): preserve original circuit_ids
       - ISOLATOR: own counter → "ISOL 1", "ISOL 2"
-      - SPARE: in 3-phase, fills next available phase slot via ``_assign_spare_phase_slot``
+      - SPARE: in 3-phase interleaved, fills next available phase slot
 
     Args:
         sub_circuits: list of circuit dicts (keys: name, circuit_id, breaker_type)
         supply_type: "single_phase" or "three_phase"
+        use_triplets: if False, preserve original IDs instead of round-robin
 
     Returns:
         list of circuit ID strings, one per input circuit
@@ -402,6 +470,41 @@ def _assign_circuit_ids(sub_circuits: list[dict], supply_type: str) -> list[str]
             sub_circuits[i].setdefault("breaker_poles", "DP")
             if sub_circuits[i].get("breaker_poles", "").upper() == "SPN":
                 sub_circuits[i]["breaker_poles"] = "DP"
+
+    # ── Phase-grouped path: preserve original circuit IDs, no round-robin ──
+    # When circuits are arranged by phase (all L1 then L2 then L3) rather than
+    # interleaved (L1,L2,L3,L1,...), keep the original IDs from the extraction
+    # (e.g., RL1, RS1, YL1) instead of overwriting with L1S1, L2S1 round-robin.
+    if supply_type == "three_phase" and not use_triplets:
+        _s_idx = 0
+        _ph_idx = 0
+        _isol_idx = 0
+        _sp_idx = 0
+        for i, cat in enumerate(categories):
+            if user_ids[i] is not None:
+                ids.append(user_ids[i])
+                continue
+            cid = sub_circuits[i].get("circuit_id", "").strip()
+            if cid:
+                ids.append(cid)  # Preserve original (RL1, YS1, BISO3, etc.)
+                continue
+            # Fallback: generate single-phase style sequential IDs
+            if cat == "spare":
+                _sp_idx += 1
+                ids.append(f"SP{_sp_idx}")
+            elif cat == "isolator":
+                _isol_idx += 1
+                ids.append(f"ISOL {_isol_idx}")
+            elif cat == "lighting":
+                _s_idx += 1
+                ids.append(f"S{_s_idx}")
+            elif cat == "heater":
+                _ph_idx += 1
+                ids.append(f"H{_ph_idx}")
+            else:  # power
+                _ph_idx += 1
+                ids.append(f"P{_ph_idx}")
+        return ids
 
     # Second pass: assign IDs with per-category counters
     # Note: Heater (H) and Power (P) share the SAME numeric counter.
@@ -511,18 +614,35 @@ def _get_circuit_fault_kA(breaker_type: str, circuit: dict | None = None) -> int
 def _detect_section_breaks(
     circuit_ids: list[str] | None,
     supply_type: str,
+    *,
+    use_triplets: bool = True,
+    sub_circuits: list[dict] | None = None,
 ) -> list[int]:
     """Detect section boundary indices for extra spacing between groups.
 
     Returns list of circuit indices where a new section starts.
-    In 3-phase TPN DBs, boundaries are detected at triplet level
-    (e.g., Lighting→Power transition). For single-phase, boundaries
-    are detected at prefix change (e.g., S→P).
+
+    Three modes:
+    * 3-phase interleaved: boundaries at triplet-level S→P transitions
+    * 3-phase phase-grouped: boundaries at phase transitions (L1→L2, L2→L3)
+    * Single-phase: boundaries at prefix change (S→P)
     """
     if not circuit_ids or len(circuit_ids) <= 1:
         return []
 
     breaks: list[int] = []
+
+    # Phase-grouped 3-phase: add breaks at phase transitions
+    if supply_type == "three_phase" and not use_triplets and sub_circuits:
+        prev_phase = ""
+        for i in range(len(circuit_ids)):
+            cur_phase = sub_circuits[i].get("phase", "") if i < len(sub_circuits) else ""
+            if cur_phase and prev_phase and cur_phase != prev_phase:
+                breaks.append(i)
+            if cur_phase:
+                prev_phase = cur_phase
+        return breaks
+
     if len(circuit_ids) >= 6 and supply_type == "three_phase":
         def _triplet_category(start_idx: int) -> str:
             for k in range(start_idx, min(start_idx + 3, len(circuit_ids))):
@@ -689,9 +809,14 @@ def _place_sub_circuits_upward(
     all_circuits: list[dict],
     supply_type: str = "three_phase",
     circuit_ids: list[str] | None = None,
+    use_triplets: bool = True,
 ) -> None:
     """Place a row of sub-circuits branching UPWARD from busbar with vertical labels."""
-    group_breaks = _detect_section_breaks(circuit_ids, supply_type)
+    group_breaks = _detect_section_breaks(
+        circuit_ids, supply_type,
+        use_triplets=use_triplets,
+        sub_circuits=all_circuits,
+    )
 
     for i, circuit in enumerate(row_circuits):
         global_idx = row_idx * config.max_circuits_per_row + i
