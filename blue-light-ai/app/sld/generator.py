@@ -587,23 +587,50 @@ class SldGenerator:
 
         if label_text:
             if use_horizontal:
-                v_half = symbol.width / 2 if symbol else 4
-                h_extent = symbol.height if symbol else 14
-                # Center label above the symbol (estimate text width for centering)
-                text_w_est = len(label_text) * 1.6 * 0.6  # approx width
-                label_x = comp.x + h_extent / 2 - text_w_est / 2
-                backend.add_mtext(
-                    label_text,
-                    insert=(label_x, comp.y + v_half + 2.5),
-                    char_height=1.6,
-                )
+                if comp.symbol_name == "ELR":
+                    # ELR: label left of box (spec text, 2 lines)
+                    ch = 1.6
+                    lines = label_text.split("\\P")
+                    max_len = max(len(ln) for ln in lines) if lines else 4
+                    text_w_est = max_len * ch * 0.6
+                    label_x = comp.x - text_w_est - 1.5
+                    v_half = symbol.height / 2 if symbol else 2.0
+                    label_y = comp.y + v_half
+                    backend.add_mtext(
+                        label_text, insert=(label_x, label_y), char_height=ch,
+                    )
+                elif comp.symbol_name == "KWH_METER":
+                    # KWH: label right of box (per reference DWG)
+                    ch = 1.6
+                    rw = getattr(symbol, '_rect_w', 7.8)
+                    stub = getattr(symbol, '_stub', 2.0)
+                    label_x = comp.x + rw + stub + 1.5
+                    v_half = getattr(symbol, '_rect_h', 3.9) / 2
+                    label_y = comp.y + v_half
+                    backend.add_mtext(
+                        label_text, insert=(label_x, label_y), char_height=ch,
+                    )
+                else:
+                    v_half = symbol.width / 2 if symbol else 4
+                    h_extent = symbol.height if symbol else 14
+                    # Center label above the symbol (estimate text width for centering)
+                    text_w_est = len(label_text) * 1.6 * 0.6  # approx width
+                    label_x = comp.x + h_extent / 2 - text_w_est / 2
+                    backend.add_mtext(
+                        label_text,
+                        insert=(label_x, comp.y + v_half + 2.5),
+                        char_height=1.6,
+                    )
             else:
                 lx = symbol.width + 3 if symbol else 8
-                ly = symbol.height / 2 + 2 if symbol else 14
+                if comp.label_y_override is not None:
+                    label_abs_y = comp.label_y_override
+                else:
+                    label_abs_y = comp.y + (symbol.height / 2 + 2 if symbol else 14)
                 backend.add_mtext(
                     label_text,
-                    insert=(comp.x + lx, comp.y + ly),
-                    char_height=2.3,
+                    insert=(comp.x + lx, label_abs_y),
+                    char_height=1.6,
                 )
 
         if comp.cable_annotation:

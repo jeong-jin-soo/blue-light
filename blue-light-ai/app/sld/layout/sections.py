@@ -816,8 +816,8 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     metering_ct_center_y = cursor + ct_h / 2
     cursor += ct_h
 
-    # Advance past branches
-    highest_branch = metering_ct_center_y + ct_to_branch_gap + 5
+    # Advance past branches (VSS placed midway between ASS and BI)
+    highest_branch = metering_ct_center_y + ct_to_branch_gap * 2 + 5
     cursor = max(cursor, highest_branch)
     cursor += ct_to_ct_gap
 
@@ -841,9 +841,11 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         ))
 
         # Branch from Protection CT (LEFT): ELR
-        elr_label = "ELR"
+        # Label: spec only (no "ELR" prefix — box already has "ELR" text)
         if ctx.elr_spec:
-            elr_label = f"ELR\\P{ctx.elr_spec}"
+            elr_label = ctx.elr_spec.replace(" ", "\\P")  # 2-line: "0-3A\P0.2sec"
+        else:
+            elr_label = "ELR"
         _place_metering_branch(
             result, cx, prot_ct_center_y, direction="left",
             components=[("ELR", elr_label, 12.0)],
@@ -852,49 +854,57 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         result.junction_arrows.append((cx, prot_ct_center_y, "left"))
         result.symbols_used.add("ELR")
 
-        # ELR sensing line: L-shaped routing from ELR left → down → MCCB contacts
+        # ELR sensing line: bottom exit → down → right to MCCB contacts
+        # Reference: line exits from ELR bottom center, not left side
         if ctx.main_breaker_arc_center_y:
             from app.sld.real_symbols import get_real_symbol
             elr_sym = get_real_symbol("ELR")
             elr_hp = elr_sym.horizontal_pins(0, 0)
             elr_stub = getattr(elr_sym, '_stub', 2.0)
             elr_body = elr_hp["right"][0] - elr_hp["left"][0] - 2 * elr_stub
-            elr_left_x = cx - branch_arm_len - elr_body - elr_stub
+            # ELR bottom center X
+            elr_comp_x = cx - branch_arm_len - elr_body
+            elr_bottom_cx = elr_comp_x + elr_sym.width / 2
+            # ELR bottom stub tip Y
+            elr_bottom_y = prot_ct_center_y - elr_sym.height / 2 - elr_stub
             mccb_y = ctx.main_breaker_arc_center_y
-            # Vertical down
-            result.connections.append(((elr_left_x, prot_ct_center_y), (elr_left_x, mccb_y)))
+            # Vertical down from bottom stub tip
+            result.connections.append(((elr_bottom_cx, elr_bottom_y), (elr_bottom_cx, mccb_y)))
             # Horizontal right — stops just before MCCB contact gap
-            result.connections.append(((elr_left_x, mccb_y), (cx - 1.0, mccb_y)))
+            result.connections.append(((elr_bottom_cx, mccb_y), (cx - 1.0, mccb_y)))
 
     # Metering CT
     if ct_ratio:
         ct_label = f"CT {ct_ratio}\\P({metering_ct_class})"
     else:
         ct_label = SG_LOCALE.meter_board.ct_by_sp
+    # --- 4. Branches from Metering CT ---
+    branch_y = metering_ct_center_y
+    ass_branch_y = branch_y + ct_to_branch_gap
+
+    # Place Metering CT — label aligned with ASS branch height
     result.components.append(PlacedComponent(
         symbol_name="CT", x=cx - ct_w / 2, y=metering_ct_y, label=ct_label,
+        label_y_override=ass_branch_y + 3,
     ))
     result.symbols_used.add("CT")
 
-    # --- 4. Branches from Metering CT ---
-    branch_y = metering_ct_center_y
-
     # Branch 1 (LEFT): ASS → Ammeter
     if ctx.has_ammeter:
-        _branch_y = branch_y + ct_to_branch_gap
         _place_metering_branch(
-            result, cx, _branch_y, direction="left",
+            result, cx, ass_branch_y, direction="left",
             components=[
                 ("SELECTOR_SWITCH", "ASS", 8.0),
                 ("AMMETER", ctx.ammeter_range or "0-500A", 7.6),
             ],
             arm_len=branch_arm_len, gap=branch_gap,
         )
-        result.junction_arrows.append((cx, _branch_y, "left"))
+        result.junction_arrows.append((cx, ass_branch_y, "left"))
 
     # Branch 2 (RIGHT): VSS → Voltmeter
+    # Placed midway between ASS branch and BI Connector — per reference DWG.
     if ctx.has_voltmeter:
-        _branch_y = branch_y
+        _branch_y = (ass_branch_y + bi_y) / 2
         _place_metering_branch(
             result, cx, _branch_y, direction="right",
             components=[
@@ -905,19 +915,18 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         )
         result.junction_arrows.append((cx, _branch_y, "right"))
 
-    # Branch 3 (RIGHT): 2A MCB → KWH Meter
+    # Branch 3 (RIGHT): KWH Meter (no MCB — per reference DWG)
     _kwh_branch_y = branch_y - ct_to_branch_gap
-    _kwh_label = "SPPG kWh METER" if ctx.supply_source != "landlord" else "kWh METER"
+    _kwh_label = "SPPG\\PkWh METER" if ctx.supply_source != "landlord" else "kWh METER"
     _place_metering_branch(
         result, cx, _kwh_branch_y, direction="right",
         components=[
-            ("CB_MCB", "2A SPN MCB", config.mcb_w),
             ("KWH_METER", _kwh_label, 14.0),
         ],
         arm_len=branch_arm_len, gap=branch_gap,
     )
     result.junction_arrows.append((cx, _kwh_branch_y, "right"))
-    result.symbols_used.update({"MCB", "KWH_METER"})
+    result.symbols_used.add("KWH_METER")
 
     # BI Connector
     result.components.append(PlacedComponent(

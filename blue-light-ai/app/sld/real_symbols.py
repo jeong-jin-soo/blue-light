@@ -408,8 +408,7 @@ class RealKwhMeter(BaseSymbol):
 
         # "KWH" label inside (uppercase, matching real samples)
         backend.set_layer("SLD_ANNOTATIONS")
-        label_size = min(rw * 0.35, 3.5)  # Scale text to fit box
-        backend.add_mtext("KWH", insert=(cx - rw * 0.35, cy + label_size * 0.5), char_height=label_size)
+        backend.add_mtext("KWH", insert=(cx - rw * 0.35, cy + 1.6 * 0.5), char_height=1.6)
 
         # Connection lines
         backend.set_layer("SLD_CONNECTIONS")
@@ -423,37 +422,36 @@ class RealKwhMeter(BaseSymbol):
         wider than tall, matching reference LEW drawings.
         """
         # Horizontal orientation: wide rectangle (landscape)
-        # rect_w (12.0) becomes horizontal width, rect_h (6.0) becomes vertical height
+        # x = left edge of body (matching BaseSymbol convention)
         hrw = self._rect_w  # horizontal rect width (wide dimension)
         hrh = self._rect_h  # horizontal rect height (narrow dimension)
-        cx = x  # horizontal center
-        cy = y  # vertical center
+        cx = x + hrw / 2    # center from left edge
+        cy = y              # vertical center
 
         backend.set_layer(self.layer)
-        # Draw rectangle (rotated 90 degrees)
+        # Draw rectangle
         backend.add_lwpolyline([
-            (cx - hrw / 2, cy - hrh / 2),
-            (cx + hrw / 2, cy - hrh / 2),
-            (cx + hrw / 2, cy + hrh / 2),
-            (cx - hrw / 2, cy + hrh / 2),
+            (x, cy - hrh / 2),
+            (x + hrw, cy - hrh / 2),
+            (x + hrw, cy + hrh / 2),
+            (x, cy + hrh / 2),
         ], close=True)
 
         # "KWH" label inside (uppercase, matching real samples)
         backend.set_layer("SLD_ANNOTATIONS")
-        label_size = min(hrw * 0.35, 3.5)  # Scale text to fit box
-        backend.add_mtext("KWH", insert=(cx - hrw * 0.35, cy + label_size * 0.5), char_height=label_size)
+        backend.add_mtext("KWH", insert=(cx - hrw * 0.35, cy + 1.6 * 0.5), char_height=1.6)
 
         # Connection lines (horizontal: left and right)
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx + hrw / 2, cy), (cx + hrw / 2 + self._stub, cy))  # right
-        backend.add_line((cx - hrw / 2, cy), (cx - hrw / 2 - self._stub, cy))  # left
+        backend.add_line((x + hrw, cy), (x + hrw + self._stub, cy))  # right
+        backend.add_line((x, cy), (x - self._stub, cy))              # left
 
     def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
-        """x is CENTER of the rectangle in horizontal mode."""
+        """x = left edge of body (matching BaseSymbol convention)."""
         rw = self._rect_w
         return {
-            "left": (x - rw / 2 - self._stub, y),
-            "right": (x + rw / 2 + self._stub, y),
+            "left": (x - self._stub, y),
+            "right": (x + rw + self._stub, y),
         }
 
 
@@ -916,16 +914,20 @@ class RealELR(BaseSymbol):
         mid_x = x + h_extent / 2
         backend.add_mtext("ELR", insert=(mid_x - ch * 0.9, cy + ch * 0.4), char_height=ch)
 
-        # Connection stubs (horizontal)
+        # Connection stubs
         backend.set_layer("SLD_CONNECTIONS")
+        # Right stub (connects to arm from spine)
         backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
-        backend.add_line((x, cy), (x - self._stub, cy))
+        # Bottom center stub (sensing line exit — per reference DWG)
+        bcx = x + h_extent / 2
+        backend.add_line((bcx, cy - v_extent / 2), (bcx, cy - v_extent / 2 - self._stub))
 
     def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
         """h_extent = self.width (not height) for ELR."""
         return {
-            "left": (x - self._stub, y),
+            "left": (x - self._stub, y),   # kept for body extent calc
             "right": (x + self.width + self._stub, y),
+            "bottom": (x + self.width / 2, y - self.height / 2 - self._stub),
         }
 
 

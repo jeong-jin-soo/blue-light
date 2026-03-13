@@ -320,6 +320,12 @@ def compute_layout(
         merged.layout_regions = list(plan.db_regions)
 
         db_box_right = _place_multi_db_boxes(final_ctx, dbs, topmost)
+
+        # Set merged.busbar_y from root board so _place_earth_bar positions
+        # the earth symbol relative to the actual busbar, not the default 0.
+        root_br = board_results[plan.root_db_idx]
+        merged.busbar_y = root_br.layout.busbar_y
+
         _place_earth_bar(final_ctx, db_box_right)
 
         from app.sld.layout.connectivity import validate_connectivity
@@ -349,6 +355,9 @@ def compute_layout(
             _place_ct_pre_mccb_fuse(ctx)
             _place_main_breaker(ctx, skip_gap=True)
             _place_ct_metering_section(ctx)
+            # Detect and resolve CT metering branch/label overlaps.
+            from app.sld.layout.ct_overlap import validate_ct_metering_overlaps
+            validate_ct_metering_overlaps(ctx.result, ctx.config)
             # Override db_box_start_y to include CT metering in DB box
             ctx.db_box_start_y = _ct_box_start_y
         else:
@@ -403,8 +412,10 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
             # Handle \\P line breaks: only longest line contributes to Y extent
             lines = comp.label.split("\\P")
             max_line_len = max(len(line) for line in lines)
-            text_extent = max_line_len * config.char_w_info
+            text_extent = max_line_len * config.char_w_label
             all_ys.append(comp.y + text_extent)
+    for jx, jy, jdir in result.junction_arrows:
+        all_ys.append(jy)
     for (sx, sy), (ex, ey) in result.connections:
         all_ys.extend([sy, ey])
     for (sx, sy), (ex, ey) in result.dashed_connections:
@@ -466,6 +477,8 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     # Apply vertical shift to all elements
     for comp in result.components:
         comp.y += shift
+        if comp.label_y_override is not None:
+            comp.label_y_override += shift
     for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
         result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
@@ -964,6 +977,9 @@ def render_board(
         _place_ct_pre_mccb_fuse(ctx)
         _place_main_breaker(ctx, skip_gap=True)
         _place_ct_metering_section(ctx)
+        # Detect and resolve CT metering branch/label overlaps.
+        from app.sld.layout.ct_overlap import validate_ct_metering_overlaps
+        validate_ct_metering_overlaps(ctx.result, ctx.config)
     else:
         _place_main_breaker(ctx)
         _place_ct_pre_mccb_fuse(ctx)
@@ -1474,7 +1490,7 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
         if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
             lines = comp.label.split("\\P")
             max_line_len = max(len(line) for line in lines)
-            all_ys.append(comp.y + max_line_len * config.char_w_info)
+            all_ys.append(comp.y + max_line_len * config.char_w_label)
 
     for collection in (result.connections, result.dashed_connections, result.thick_connections):
         for (sx, sy), (ex, ey) in collection:
@@ -1489,6 +1505,9 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
     for ax, ay in result.arrow_points:
         all_xs.append(ax)
         all_ys.append(ay)
+    for jx, jy, jdir in result.junction_arrows:
+        all_xs.append(jx)
+        all_ys.append(jy)
 
     if not all_xs or not all_ys:
         result.overflow_metrics = metrics
