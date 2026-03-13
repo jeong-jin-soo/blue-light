@@ -156,18 +156,19 @@ def _get_symbol_dims() -> dict[str, tuple[float, float]]:
     return _SYMBOL_DIMS
 
 # Text measurement constants — defaults mirrored in LayoutConfig
-# (char_width_estimate, label_char_height) for centralised overrides.
-_CHAR_W = 1.8    # Approximate mm per character
+# (char_w_label, label_char_height) for centralised overrides.
+_CHAR_W_DEFAULT = 1.8    # Fallback mm per character (when config unavailable)
 _LABEL_CHAR_H = 2.8  # Default label char height (mm)
 
 
-def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
+def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" = None) -> BoundingBox | None:
     """
     Compute the bounding box for a placed component.
 
     Returns None for structural elements (BUSBAR) that should never be moved.
     Handles text sizing and 90-degree rotation for labels.
     """
+    _char_w = config.char_w_label if config else _CHAR_W_DEFAULT
     name = comp.symbol_name
 
     # Structural — skip
@@ -176,12 +177,14 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
 
     # Special: CIRCUIT_ID_BOX — vertical text at tap_x (rotation=90°)
     if name == "CIRCUIT_ID_BOX":
-        text_h = len(comp.circuit_id or "") * _CHAR_W + 2  # text length → height
+        text_h = len(comp.circuit_id or "") * _char_w + 2  # text length → height
         return BoundingBox(x=comp.x - 1.5, y=comp.y, width=3, height=text_h)
 
     # Special: DB_INFO_BOX extends downward from comp.y
+    # Uses sub-anchor fields from PlacedComponent for accurate bbox
     if name == "DB_INFO_BOX":
-        return BoundingBox(x=comp.x, y=comp.y - 18, width=80, height=18)
+        total_h = abs(comp.rating_offset_y) + comp.rating_char_height + 2
+        return BoundingBox(x=comp.x, y=comp.y - total_h, width=80, height=total_h)
 
     # Breaker with breaker_block label style (sub-circuit breakers)
     if name.startswith("CB_") and comp.label_style == "breaker_block":
@@ -244,13 +247,13 @@ def _compute_bounding_box(comp: PlacedComponent) -> BoundingBox | None:
                 x=comp.x,
                 y=comp.y,
                 width=num_lines * char_h,
-                height=max_line_len * _CHAR_W,
+                height=max_line_len * _char_w,
             )
         else:
             return BoundingBox(
                 x=comp.x,
                 y=comp.y,
-                width=max_line_len * _CHAR_W,
+                width=max_line_len * _char_w,
                 height=num_lines * char_h,
             )
 
@@ -658,7 +661,7 @@ def _compute_group_width(
 
     if group.breaker_idx is not None:
         comp = components[group.breaker_idx]
-        bb = _compute_bounding_box(comp)
+        bb = _compute_bounding_box(comp, config=config)
         if bb is not None:
             tap_x = group.tap_x
             group.left_extent = (tap_x - bb.x) + _MARGIN
@@ -1015,7 +1018,7 @@ def _fit_busbar_to_groups(
     # Update DB_INFO_BOX position to match new DB box left
     for comp in components:
         if comp.symbol_name == "DB_INFO_BOX":
-            comp.x = new_db_left + 3
+            comp.x = new_db_left + 6  # 6mm = 3mm box inset + 3mm text inset
             break
 
 
@@ -1252,10 +1255,9 @@ def _add_cable_leader_lines(
             cable_groups.setdefault(cable_spec, []).append(tap_x)
 
         # Estimate cable text height and clamp leader_y to keep text within top border
-        _CHAR_W_EST = 1.8  # mirrored in LayoutConfig.char_width_estimate
         max_spec_len = max(len(s) for s in cable_groups.keys())
         est_line_chars = max_spec_len // 2 + 5
-        est_text_h = est_line_chars * _CHAR_W_EST
+        est_text_h = est_line_chars * config.char_w_label
         max_leader_y = config.max_y - config.leader_bend_height - 1 - est_text_h
         if leader_y > max_leader_y:
             leader_y = max_leader_y

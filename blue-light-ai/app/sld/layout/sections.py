@@ -150,6 +150,7 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
     ctx.has_ammeter = metering_cfg.get("has_ammeter", True)
     ctx.has_voltmeter = metering_cfg.get("has_voltmeter", True)
     ctx.has_elr = metering_cfg.get("has_elr", True)
+    ctx.has_indicator_lights = metering_cfg.get("has_indicator_lights", True)
     ctx.elr_spec = metering_cfg.get("elr_spec", "")
     ctx.voltmeter_range = metering_cfg.get("voltmeter_range", "")
     ctx.ammeter_range = metering_cfg.get("ammeter_range", "")
@@ -210,6 +211,7 @@ def _parse_sub_circuits(ctx: _LayoutContext, requirements: dict, application_inf
         logger.warning("Circuit normalization failed, using raw input: %s", exc)
 
     ctx.sub_circuits = raw_circuits
+    ctx.premises_type = premises_type
 
     ctx.busbar_rating = requirements.get("busbar_rating", 0)
     if not ctx.busbar_rating:
@@ -501,7 +503,7 @@ def _place_meter_board_symbols(
     if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
         ct_mid_x = (g.iso_cx + g.kwh_cx) / 2
         ct_r = ctx.config.ct_size / 2
-        ct_label = f"CT {ctx.ct_ratio}" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
+        ct_label = f"{ctx.ct_ratio} CT" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
         result.components.append(PlacedComponent(
             symbol_name="CT", x=ct_mid_x - ct_r, y=g.mb_center_y - ct_r, label=ct_label,
         ))
@@ -696,19 +698,67 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
 # CT Metering Section — Vertical layout for ≥125A 3-phase installations
 # ---------------------------------------------------------------------------
 
+# ── Electrical Flow Specification (Singapore CT Metering) ──
+# Defines the CORRECT order of spine components from supply (bottom) to
+# load (top) in a CT metering installation (≥125A, 3-phase, non-landlord).
+#
+# Each entry: (symbol_name, role_description)
+# This order is validated by test_spine_flow_order.py to prevent regressions.
+CT_METERING_SPINE_ORDER: list[tuple[str, str]] = [
+    # --- Supply side (bottom, lowest Y) ---
+    ("CB_MCCB",         "Main breaker — overcurrent protection after supply"),
+    ("CT",              "Protection CT — for Earth Leakage Relay (ELR)"),
+    # ELR branches LEFT from Protection CT (not on spine)
+    ("CT",              "Metering CT — for kWh meter, ammeter, voltmeter"),
+    # ASS+Ammeter LEFT, VSS+Voltmeter RIGHT, KWH RIGHT (branches, not on spine)
+    ("BI_CONNECTOR",    "Busbar Interconnect — connects metering to distribution"),
+    # --- Load side (top, highest Y) ---
+    #
+    # NOTE: 2A POTENTIAL_FUSE is NOT on the spine. Per 150A/400A TPN reference
+    # DWGs, fuses are horizontal branch elements that depart rightward from
+    # T-junctions on the spine. The vertical spine LINE runs uninterrupted
+    # past fuse junction points.
+    # Ref: 150A DXF — FUSE INSERT at X≈23494 (1100 DU right of spine X≈22385),
+    #      horizontal LINE (22385,6376)→(23230,6376) connects spine to fuse.
+]
+
+
+def _derive_ammeter_range(ct_ratio: str) -> str:
+    """Derive ammeter range from CT ratio primary current.
+
+    '100/5A' → '0-100A', '200/5A' → '0-200A'.
+    Falls back to '0-500A' when ratio is absent or unparseable.
+    """
+    if not ct_ratio:
+        return "0-500A"
+    m = re.match(r"(\d+)/", ct_ratio)
+    return f"0-{m.group(1)}A" if m else "0-500A"
+
+
 def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     """Place vertical CT metering section (≥125A 3-phase, non-landlord).
 
-    Reference layout (bottom → top in Y-up coordinates):
-      BI Connector → Metering CT (CL1) →
-        [ASS+Ammeter LEFT, VSS+Voltmeter RIGHT, KWH+2A MCB RIGHT]
-      → Protection CT (5P10) → [ELR LEFT]
+    Called AFTER _place_ct_pre_mccb_fuse and _place_main_breaker in engine.py.
+
+    Correct flow order (bottom → top, supply → load):
+      (Pre-MCCB fuse branch RIGHT + MCCB already placed by engine.py)
+      → PROTECTION_CT [ELR LEFT]
+      → METERING_CT
+          [ASS+Ammeter LEFT, VSS+Voltmeter RIGHT — same height]
+          [KWH RIGHT — below CT center]
+      → 2A POTENTIAL_FUSE (RIGHT branch, NOT on spine)
+      → BI_CONNECTOR (exit to ELCB/busbar)
 
     Components on the main vertical spine:
-      BI_CONNECTOR, CT (metering), CT (protection)
+      CT (protection), CT (metering), BI_CONNECTOR
     Horizontal branches from spine:
-      LEFT: ASS→Ammeter, ELR
-      RIGHT: VSS→Voltmeter, KWH+2A MCB
+      LEFT:  ELR (at Protection CT center), ASS→Ammeter (at Metering CT center)
+      RIGHT: VSS→Voltmeter (at Metering CT center), KWH (below Metering CT),
+             Pre-MCCB fuse (before MCCB), Post-CT fuse (after Metering CT)
+
+    DXF reference: 2A FUSE is always a horizontal branch element. The vertical
+    spine LINE runs uninterrupted past fuse junction points.
+    Ref: CT_METERING_SPINE_ORDER constant, 150A/400A TPN reference DWGs.
     """
     result = ctx.result
     config = ctx.config
@@ -724,50 +774,96 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     from app.sld.real_symbols import get_symbol_dimensions
     bi_dims = get_symbol_dimensions("BI_CONNECTOR")
     ct_dims = get_symbol_dimensions("CT")
+    pf_dims = get_symbol_dimensions("POTENTIAL_FUSE")
     bi_w, bi_h = bi_dims["width_mm"], bi_dims["height_mm"]
     bi_stub = bi_dims["stub_mm"]
     ct_w, ct_h = ct_dims["width_mm"], ct_dims["height_mm"]
     ct_stub = ct_dims["stub_mm"]
+    pf_w, pf_h = pf_dims["width_mm"], pf_dims["height_mm"]
+    pf_stub = pf_dims["stub_mm"]
 
     # Spacing constants (compact layout — minimized for A3 with many circuits)
-    bi_to_ct_gap = 1.0       # gap between BI connector top and metering CT bottom
-    ct_to_branch_gap = 3.0   # gap from CT center to first branch
-    branch_spacing = 10.0    # vertical spacing between branches
+    entry_gap = 0.5          # minimal gap from entry point to first component
+    ct_to_ct_gap = 3.0       # gap between protection CT and metering CT
+    ct_to_branch_gap = 3.0   # vertical offset from CT center to KWH branch
     branch_arm_len = 15.0    # horizontal arm from spine to first component
     branch_gap = 3.0         # gap between components on a branch
-    metering_to_prot_gap = 3.0    # gap between metering CT top and protection CT bottom
-    prot_to_exit_gap = 0.5   # minimal gap — keeps connection non-zero for validation
+    ct_to_pf_gap = 1.0       # gap between metering CT and potential fuse
+    pf_to_bi_gap = 1.0       # gap between potential fuse and BI connector
 
-    # --- BI Connector (on spine) ---
-    # No entry stub — the caller's gap already connects to this point.
-    bi_x = cx - bi_w / 2
-    result.components.append(PlacedComponent(
-        symbol_name="BI_CONNECTOR", x=bi_x, y=y, label="BI CONNECTOR",
-    ))
-    result.symbols_used.add("BI_CONNECTOR")
-    y += bi_h
+    # ═══════════════════════════════════════════════════════════════════════
+    # Correct flow order (bottom → top, supply → load):
+    #   Protection CT → Metering CT → BI_CONNECTOR
+    # Ref: CT_METERING_SPINE_ORDER constant
+    #
+    # Drawing strategy: ONE straight spine line from MCCB exit to BI
+    # Connector. All CT components and branches overlay on this backbone.
+    # ═══════════════════════════════════════════════════════════════════════
 
-    # --- Connection: BI → Metering CT ---
-    result.connections.append(((cx, y + bi_stub), (cx, y + bi_stub + bi_to_ct_gap)))
-    y += bi_stub + bi_to_ct_gap
+    spine_bottom = y  # entry point (after MCCB)
 
-    # --- Metering CT (on spine) ---
+    # --- 1. Calculate component positions along spine ---
+    cursor = y
+
+    # Protection CT (on spine, closest to supply/MCCB)
+    prot_ct_y = cursor
+    prot_ct_center_y = cursor + ct_h / 2
+    if ctx.has_elr:
+        cursor += ct_h + ct_stub + ct_to_ct_gap
+
+    # Metering CT (on spine)
+    metering_ct_y = cursor
+    metering_ct_center_y = cursor + ct_h / 2
+    cursor += ct_h
+
+    # Advance past branches
+    highest_branch = metering_ct_center_y + ct_to_branch_gap + 5
+    cursor = max(cursor, highest_branch)
+    cursor += ct_to_ct_gap
+
+    # BI Connector (on spine, closest to distribution busbar/load)
+    bi_y = cursor
+    spine_top = bi_y + bi_h + bi_stub
+
+    # --- 2. Spine backbone — ONE straight line, MCCB exit → BI top ---
+    result.connections.append(((cx, spine_bottom), (cx, spine_top)))
+
+    # --- 3. Place components on spine ---
+
+    # Protection CT
+    if ctx.has_elr:
+        if protection_ct_ratio:
+            prot_ct_label = f"CT {protection_ct_ratio}\\P({protection_ct_class})"
+        else:
+            prot_ct_label = f"CT\\P({protection_ct_class})"
+        result.components.append(PlacedComponent(
+            symbol_name="CT", x=cx - ct_w / 2, y=prot_ct_y, label=prot_ct_label,
+        ))
+
+        # Branch from Protection CT (LEFT): ELR
+        elr_label = "ELR"
+        if ctx.elr_spec:
+            elr_label = f"ELR\\P{ctx.elr_spec}"
+        _place_metering_branch(
+            result, cx, prot_ct_center_y, direction="left",
+            components=[("ELR", elr_label, 12.0)],
+            arm_len=branch_arm_len, gap=branch_gap,
+        )
+        result.junction_arrows.append((cx, prot_ct_center_y, "left"))
+        result.symbols_used.add("ELR")
+
+    # Metering CT
     if ct_ratio:
         ct_label = f"CT {ct_ratio}\\P({metering_ct_class})"
     else:
         ct_label = SG_LOCALE.meter_board.ct_by_sp
     result.components.append(PlacedComponent(
-        symbol_name="CT", x=cx - ct_w / 2, y=y, label=ct_label,
+        symbol_name="CT", x=cx - ct_w / 2, y=metering_ct_y, label=ct_label,
     ))
     result.symbols_used.add("CT")
-    metering_ct_center_y = y + ct_h / 2
-    y += ct_h
 
-    # --- Branches from Metering CT ---
-    # Branches are placed at Y offsets from the metering CT center.
-    # Each branch is a horizontal arm going LEFT or RIGHT with components.
-
-    branch_y = metering_ct_center_y  # start branches from CT center level
+    # --- 4. Branches from Metering CT ---
+    branch_y = metering_ct_center_y
 
     # Branch 1 (LEFT): ASS → Ammeter
     if ctx.has_ammeter:
@@ -778,11 +874,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
                 ("SELECTOR_SWITCH", "ASS", 8.0),
                 ("AMMETER", ctx.ammeter_range or "0-500A", 7.6),
             ],
-            arm_len=branch_arm_len,
-            gap=branch_gap,
+            arm_len=branch_arm_len, gap=branch_gap,
         )
-        # Junction dot at spine
-        result.junction_dots.append((cx, _branch_y))
+        result.junction_arrows.append((cx, _branch_y, "left"))
 
     # Branch 2 (RIGHT): VSS → Voltmeter
     if ctx.has_voltmeter:
@@ -793,11 +887,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
                 ("SELECTOR_SWITCH", "VSS", 8.0),
                 ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
             ],
-            arm_len=branch_arm_len,
-            gap=branch_gap,
+            arm_len=branch_arm_len, gap=branch_gap,
         )
-        # Junction dot at spine
-        result.junction_dots.append((cx, _branch_y))
+        result.junction_arrows.append((cx, _branch_y, "right"))
 
     # Branch 3 (RIGHT): 2A MCB → KWH Meter
     _kwh_branch_y = branch_y - ct_to_branch_gap
@@ -808,58 +900,18 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             ("CB_MCB", "2A SPN MCB", config.mcb_w),
             ("KWH_METER", _kwh_label, 14.0),
         ],
-        arm_len=branch_arm_len,
-        gap=branch_gap,
+        arm_len=branch_arm_len, gap=branch_gap,
     )
-    result.junction_dots.append((cx, _kwh_branch_y))
+    result.junction_arrows.append((cx, _kwh_branch_y, "right"))
     result.symbols_used.update({"MCB", "KWH_METER"})
 
-    # Advance y past the branches (use the highest branch point)
-    highest_branch = branch_y + ct_to_branch_gap + 5  # ammeter branch + some padding
-    y = max(y, highest_branch)
+    # BI Connector
+    result.components.append(PlacedComponent(
+        symbol_name="BI_CONNECTOR", x=cx - bi_w / 2, y=bi_y, label="BI CONNECTOR",
+    ))
+    result.symbols_used.add("BI_CONNECTOR")
 
-    # --- Connection: Metering CT → Protection CT ---
-    y += metering_to_prot_gap
-    result.connections.append(((cx, metering_ct_center_y + ct_h / 2 + ct_stub),
-                                (cx, y - ct_stub)))
-
-    # --- Protection CT (on spine) ---
-    if ctx.has_elr:
-        if protection_ct_ratio:
-            prot_ct_label = f"CT {protection_ct_ratio}\\P({protection_ct_class})"
-        else:
-            prot_ct_label = f"CT\\P({protection_ct_class})"
-        result.components.append(PlacedComponent(
-            symbol_name="CT", x=cx - ct_w / 2, y=y, label=prot_ct_label,
-        ))
-        prot_ct_center_y = y + ct_h / 2
-        y += ct_h
-
-        # Branch from Protection CT (LEFT): ELR
-        elr_label = "ELR"
-        if ctx.elr_spec:
-            elr_label = f"ELR\\P{ctx.elr_spec}"
-        _place_metering_branch(
-            result, cx, prot_ct_center_y, direction="left",
-            components=[
-                ("ELR", elr_label, 20.0),
-            ],
-            arm_len=branch_arm_len,
-            gap=branch_gap,
-        )
-        result.junction_dots.append((cx, prot_ct_center_y))
-        result.symbols_used.add("ELR")
-
-        # Advance past protection CT
-        y += ct_stub + prot_to_exit_gap
-        result.connections.append(((cx, prot_ct_center_y + ct_h / 2 + ct_stub),
-                                    (cx, y)))
-    else:
-        # No protection CT — just advance with a connection
-        result.connections.append(((cx, y - ct_stub), (cx, y + prot_to_exit_gap)))
-        y += prot_to_exit_gap
-
-    ctx.y = y
+    ctx.y = spine_top
 
 
 def _place_metering_branch(
@@ -871,24 +923,40 @@ def _place_metering_branch(
 ) -> None:
     """Place a horizontal branch from the main spine.
 
+    Components occupy their own space (no line through them).
+    Connection lines bridge: spine→arm→comp1→gap→comp2→...
+    Symbol widths are resolved from the registry to guarantee connectivity.
+
     Args:
         result: LayoutResult to add components/connections to.
         cx: spine X coordinate.
         branch_y: Y coordinate of the branch.
         direction: 'left' or 'right'.
-        components: list of (symbol_name, label, width_mm) tuples.
+        components: list of (symbol_name, label, width_hint) tuples.
+            width_hint is used as fallback only if the symbol is not found
+            in the registry; otherwise the real symbol width is used.
         arm_len: length of the initial arm from spine to first component.
         gap: gap between components on the branch.
     """
+    from app.sld.real_symbols import get_real_symbol
+
     sign = -1 if direction == "left" else 1
     x = cx
 
-    # Initial arm from spine
+    # Initial arm from spine to first component
     x_next = x + sign * arm_len
     result.connections.append(((x, branch_y), (x_next, branch_y)))
     x = x_next
 
-    for i, (symbol_name, label, w) in enumerate(components):
+    for i, (symbol_name, label, w_hint) in enumerate(components):
+        # Components are placed with rotation=90°, so horizontal extent
+        # is the symbol's height (not width).
+        try:
+            sym = get_real_symbol(symbol_name)
+            w = sym.height
+        except ValueError:
+            w = w_hint
+
         # Place symbol (horizontal orientation)
         if sign > 0:  # right
             comp_x = x
@@ -907,11 +975,62 @@ def _place_metering_branch(
         # Advance past this component
         x = x + sign * w
 
-        # Gap to next component (if not last)
+        # Gap connection to next component (if not last)
         if i < len(components) - 1:
             x_next = x + sign * gap
             result.connections.append(((x, branch_y), (x_next, branch_y)))
             x = x_next
+
+
+def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
+    """Place 2A potential fuse + indicator lights as horizontal RIGHT branch.
+
+    Called from engine.py BEFORE _place_main_breaker when CT metering is active.
+    This fuse isolates the CT voltage sensing circuits from supply.
+    Indicator lights (○-○-○) show R/Y/B incoming phase status.
+
+    DXF reference: 2A FUSE is a horizontal branch element, NOT on the vertical
+    spine. LED IND LTG block (3 circles) follows the fuse on the branch.
+    Ref: 150A/400A TPN DWGs — FUSE at X≈23494, LED IND LTG at X≈24250.
+    """
+    if not ctx._ct_pre_mccb_fuse:
+        return
+
+    from app.sld.real_symbols import get_symbol_dimensions
+    pf_dims = get_symbol_dimensions("POTENTIAL_FUSE")
+    pf_h = pf_dims["height_mm"]  # 8mm — horizontal extent when rotated
+
+    result = ctx.result
+    cx = ctx.cx
+    y = ctx.y
+
+    # Build branch components: fuse + optional indicator lights
+    components: list[tuple[str, str, float]] = [
+        ("POTENTIAL_FUSE", "2A", pf_h),
+    ]
+    if ctx.has_indicator_lights:
+        il_dims = get_symbol_dimensions("INDICATOR_LIGHTS")
+        components.append(("INDICATOR_LIGHTS", "", il_dims["width_mm"]))
+
+    # Place as horizontal RIGHT branch (T-junction from spine)
+    # DB box bottom is at ~(y - 1), so offset +4 gives 5mm clearance.
+    branch_y = y + 4.0
+    _place_metering_branch(
+        result, cx, branch_y, direction="right",
+        components=components,
+        arm_len=8.0,
+        gap=3.0,
+    )
+    result.junction_dots.append((cx, branch_y))
+    result.symbols_used.add("POTENTIAL_FUSE")
+    if ctx.has_indicator_lights:
+        result.symbols_used.add("INDICATOR_LIGHTS")
+
+    # Spine continues — fuse is a branch, not on the main vertical path.
+    # Spine segment covers entry (y) through branch junction and a bit beyond.
+    junction_end = branch_y + 1.0
+    result.connections.append(((cx, y), (cx, junction_end)))
+    ctx.y = junction_end
 
 
 def _place_unit_isolator(ctx: _LayoutContext) -> None:
@@ -940,7 +1059,7 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         ctx.y = y
         return
 
-    _iso_w = 8.0  # Isolator symbol width (from real_symbols) — needed for centering
+    _iso_w = config.isolator_w  # Isolator symbol width — needed for centering
     isolator_rating = requirements.get("isolator_rating", 0)
     isolator_label_extra = requirements.get("isolator_label", "")
 
@@ -1016,7 +1135,7 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             # Position at 2/3 from isolator (closer to DB box / higher up)
             # to leave vertical space for the location text below the DB box.
             _enclosure_pad = 1.5  # same as RealIsolator.draw()
-            _db_info_height = 9  # title(4mm) + 1 info line(3mm) + bottom pad(2mm)
+            _db_info_height = config.db_info_height("x")  # 1 info line estimate
             _iso_box_top = y - (4 - _enclosure_pad)
             _db_box_bottom = y + config.isolator_to_db_gap - 1 - _db_info_height
             tick_y = _iso_box_top + (_db_box_bottom - _iso_box_top) * 0.67
@@ -1064,7 +1183,9 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
     ctx.db_box_start_y = y - 1  # Track DB box bottom (below main breaker, above cable annotation)
 
     if breaker_type == "ACB":
-        cb_w, cb_h = 16, 22
+        from app.sld.real_symbols import get_symbol_dimensions as _get_acb_dims
+        _acb = _get_acb_dims("ACB")
+        cb_w, cb_h = _acb["width_mm"], _acb["height_mm"]
     elif breaker_type == "MCB":
         cb_w, cb_h = config.mcb_w, config.mcb_h
     else:
@@ -1399,63 +1520,93 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     return busbar_y_row
 
 
+def _emit_db_box_rect_and_labels(
+    result: LayoutResult,
+    config: LayoutConfig,
+    *,
+    box_start_y: float,
+    box_end_y: float,
+    box_left: float,
+    box_right: float,
+    text_anchor_y: float,
+    display_label: str,
+    info_text: str,
+    location_text: str,
+    has_ct_metering: bool = False,
+) -> None:
+    """Emit dashed DB box rectangle, info text, and location label.
+
+    Shared between single-DB _place_db_box() and multi-DB _place_multi_db_boxes().
+    Callers compute box extents and pass them in; this function only draws.
+    """
+    # Dashed rectangle (4 sides: bottom, top, left, right)
+    result.dashed_connections.extend([
+        ((box_left, box_start_y), (box_right, box_start_y)),
+        ((box_left, box_end_y), (box_right, box_end_y)),
+        ((box_left, box_start_y), (box_left, box_end_y)),
+        ((box_right, box_start_y), (box_right, box_end_y)),
+    ])
+
+    # DB info: board name + approved load inside box bottom-left
+    if display_label:
+        if has_ct_metering:
+            info_y = text_anchor_y + 7  # title at +7, rating at +3 — both above dashed line
+        else:
+            info_y = text_anchor_y - 1  # Just below separator line (inside info area)
+        result.components.append(PlacedComponent(
+            symbol_name="DB_INFO_BOX",
+            x=box_left + 6,  # 6mm = 3mm box inset + 3mm text inset
+            y=info_y,
+            label=display_label,
+            rating=info_text,
+        ))
+
+    # Location text — BELOW the DB box (outside)
+    if location_text:
+        loc_y = box_start_y - 3 if has_ct_metering else box_start_y - 5
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=box_left + 6,
+            y=loc_y,
+            label=location_text,
+        ))
+
+
 def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     """Place DB box (dashed rectangle around distribution board). Returns db_box_right."""
     result = ctx.result
     config = ctx.config
-    # Original DB box bottom (at main breaker level)
     text_anchor_y = ctx.db_box_start_y
 
-    # Expand DB box bottom to accommodate DB info text below the main breaker.
-    # Text layout (top→bottom): board name (char 3.0→~4mm) + gap(1) + info lines (char 1.8→~3mm each) + bottom pad
-    db_info_lines = ctx.db_info_text.count("\\P") + 1 if ctx.db_info_text else 0
-    db_info_height = 4 + db_info_lines * 3 + 2  # title(4mm) + info lines(3mm each) + bottom pad(2mm)
-    db_box_start_y = text_anchor_y - db_info_height
-
-    # -- 6a. DB Box (DASHED rectangle around distribution board per reference DWG) --
-    # Encompasses: main breaker, ELCB/RCCB, busbar, and all sub-circuit breakers
+    # DB box vertical extents
+    db_box_start_y = text_anchor_y - config.db_info_height(ctx.db_info_text)
     db_box_end_y = (busbar_y_row + config.db_box_busbar_margin
                     + config.mcb_h + config.stub_len
                     + config.db_box_tail_margin + config.db_box_label_margin)
-    db_box_left = result.busbar_start_x - 10   # Extra margin for leftmost circuit labels
-    db_box_right = result.busbar_end_x + 10    # Extra margin for rightmost circuit labels
-    # Clamp to drawing bounds
-    db_box_left = max(db_box_left, config.min_x + 2)
-    db_box_right = min(db_box_right, config.max_x - 2)
 
-    # Store DB box y-range for later update by resolve_overlaps
+    # DB box horizontal extents
+    db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
+    db_box_right = min(result.busbar_end_x + 10, config.max_x - 2)
+
+    # Store for later update by resolve_overlaps
     result.db_box_start_y = db_box_start_y
     result.db_box_end_y = db_box_end_y
 
-    # DB Box — DASHED rectangle (matching reference DWG CENTER linetype)
-    # Four sides of dashed rectangle — store indices for later update
+    # Store dashed line indices for resolve_overlaps to update
     base_idx = len(result.dashed_connections)
-    result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_right, db_box_start_y)))
-    result.dashed_connections.append(((db_box_left, db_box_end_y), (db_box_right, db_box_end_y)))
-    result.dashed_connections.append(((db_box_left, db_box_start_y), (db_box_left, db_box_end_y)))
-    result.dashed_connections.append(((db_box_right, db_box_start_y), (db_box_right, db_box_end_y)))
-    result.db_box_dashed_indices = [base_idx, base_idx + 1, base_idx + 2, base_idx + 3]
 
-    # DB info: board name (e.g., "MSB") inside box, bottom-left (per reference DWG)
-    # Reference style: text near bottom dashed line — MSB label then APPROVED LOAD below
     db_display_label = ctx.board_name if ctx.board_name else ctx.db_info_label
-    if db_display_label:
-        result.components.append(PlacedComponent(
-            symbol_name="DB_INFO_BOX",
-            x=db_box_left + 3,
-            y=text_anchor_y - 1,  # Just below separator line (inside info area)
-            label=db_display_label,
-            rating=ctx.db_info_text,
-        ))
+    _emit_db_box_rect_and_labels(
+        result, config,
+        box_start_y=db_box_start_y, box_end_y=db_box_end_y,
+        box_left=db_box_left, box_right=db_box_right,
+        text_anchor_y=text_anchor_y,
+        display_label=db_display_label,
+        info_text=ctx.db_info_text,
+        location_text=ctx.db_location_text,
+    )
 
-    # Unit location text — BELOW the DB box (outside), per LEW guide Rule 9
-    if ctx.db_location_text:
-        result.components.append(PlacedComponent(
-            symbol_name="LABEL",
-            x=db_box_left + 6,
-            y=db_box_start_y - 5,  # 5mm below DB box bottom (clearance for cable tick text)
-            label=ctx.db_location_text,
-        ))
+    result.db_box_dashed_indices = [base_idx, base_idx + 1, base_idx + 2, base_idx + 3]
 
     return db_box_right
 
@@ -1495,12 +1646,11 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             earth_conductor_mm2 = get_earth_conductor_size(inc_size)
 
     # -- Boundary check: ensure earth + labels fit within drawing border --
-    _CHAR_W = 1.8  # Approximate character width in mm at char_height 2.3
     earth_label_right = earth_x + _earth_w + 3 + 2  # symbol + gap + "E" text width
     _earth_cond = SG_LOCALE.circuit.earth_conductor
     if earth_conductor_mm2:
         conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
-        conductor_label_right = earth_x + len(conductor_label) * _CHAR_W
+        conductor_label_right = earth_x + len(conductor_label) * config.char_w_label
         earth_rightmost = max(earth_label_right, conductor_label_right)
     else:
         earth_rightmost = earth_label_right
@@ -1522,8 +1672,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
 
     if earth_conductor_mm2:
         conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
-        _CHAR_W_LABEL = 1.8  # Approximate char width at char_height 2.8
-        label_width = len(conductor_label) * _CHAR_W_LABEL
+        label_width = len(conductor_label) * config.char_w_label
         label_x = earth_x
         # Ensure label doesn't exceed right drawing border (A3: 420 - 10mm margin)
         border_right_abs = config.max_x + 15  # 395 + 15 = 410 for A3
@@ -1532,7 +1681,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             label_x = border_right_abs - 2 - label_width
             label_x = max(label_x, config.min_x)
             # If still too wide, wrap to 2 lines at "CU/GRN-YEL" boundary
-            recalc_width = len(conductor_label) * _CHAR_W_LABEL
+            recalc_width = len(conductor_label) * config.char_w_label
             if label_x + recalc_width > border_right_abs - 2:
                 conductor_label = f"1 x {earth_conductor_mm2}sqmm\\P{_earth_cond}"
                 label_x = earth_x  # Reset x since text is now shorter per line

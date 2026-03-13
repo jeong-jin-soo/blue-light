@@ -283,6 +283,7 @@ class SldGenerator:
             self._draw_connections(backend, layout_result)
             self._draw_dashed_connections(backend, layout_result)
             self._draw_junction_dots(backend, layout_result)
+            self._draw_junction_arrows(backend, layout_result)
             self._draw_arrow_points(backend, layout_result)
             self._draw_solid_boxes(backend, layout_result)
 
@@ -387,6 +388,7 @@ class SldGenerator:
             generator._draw_connections(backend, layout_result)
             generator._draw_dashed_connections(backend, layout_result)
             generator._draw_junction_dots(backend, layout_result)
+            generator._draw_junction_arrows(backend, layout_result)
             generator._draw_arrow_points(backend, layout_result)
             generator._draw_solid_boxes(backend, layout_result)
 
@@ -498,11 +500,17 @@ class SldGenerator:
         )
 
     def _draw_db_info_component(self, backend: DrawingBackend, comp: PlacedComponent) -> None:
-        """Draw a DB_INFO_BOX component (DB rating + approved load)."""
+        """Draw a DB_INFO_BOX component (DB rating + approved load).
+
+        All positions and sizes come from PlacedComponent fields set by the layout
+        engine — the renderer adds NO offsets of its own.
+        """
         backend.set_layer("SLD_ANNOTATIONS")
-        backend.add_mtext(comp.label, insert=(comp.x + 3, comp.y), char_height=3.0)
+        backend.add_mtext(comp.label, insert=(comp.x, comp.y), char_height=comp.title_char_height)
         if comp.rating:
-            backend.add_mtext(comp.rating, insert=(comp.x + 3, comp.y - 4), char_height=1.8)
+            backend.add_mtext(comp.rating,
+                              insert=(comp.x, comp.y + comp.rating_offset_y),
+                              char_height=comp.rating_char_height)
 
     def _draw_symbol_component(
         self,
@@ -581,9 +589,12 @@ class SldGenerator:
             if use_horizontal:
                 v_half = symbol.width / 2 if symbol else 4
                 h_extent = symbol.height if symbol else 14
+                # Center label above the symbol (estimate text width for centering)
+                text_w_est = len(label_text) * 1.6 * 0.6  # approx width
+                label_x = comp.x + h_extent / 2 - text_w_est / 2
                 backend.add_mtext(
                     label_text,
-                    insert=(comp.x + h_extent / 2 - 5, comp.y - v_half - 1.5),
+                    insert=(label_x, comp.y + v_half + 2.5),
                     char_height=1.6,
                 )
             else:
@@ -837,7 +848,33 @@ class SldGenerator:
         """Draw filled junction dots at busbar tap points."""
         backend.set_layer("SLD_SYMBOLS")
         for cx, cy in layout_result.junction_dots:
-            backend.add_filled_circle((cx, cy), radius=0.8)
+            backend.add_filled_circle((cx, cy), radius=0.5)
+
+    def _draw_junction_arrows(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
+        """Draw curved hook connectors at CT branch junction points.
+
+        Each hook is a half-ellipse (horizontally 2x wider than tall) protruding
+        on the OPPOSITE side of the branch direction.
+        Left branch → hooks protrude right.  Right branch → hooks protrude left.
+        """
+        backend.set_layer("SLD_SYMBOLS")
+        r0 = 0.6        # original circle radius (mm) — preserve area (π·r0²)
+        rx = r0 * 2     # horizontal semi-axis — 2x wider
+        ry = r0 / 2     # vertical semi-axis — halved (area = π·rx·ry = π·r0²)
+        offset = ry     # two half-ellipses touch at the center
+        n_pts = 16       # polyline segments per half-ellipse
+
+        for cx, cy, direction in layout_result.junction_arrows:
+            sign = 1.0 if direction == "left" else -1.0  # protrude opposite
+            for oy in (offset, -offset):
+                ey = cy + oy
+                pts = []
+                for i in range(n_pts + 1):
+                    t = math.pi * i / n_pts  # 0 → π  (half ellipse)
+                    px = cx + sign * rx * (math.sin(t) - 0.5)  # straddle spine
+                    py = ey - ry * math.cos(t)  # top → bottom
+                    pts.append((px, py))
+                backend.add_lwpolyline(pts)
 
     def _draw_arrow_points(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw V-shaped arrowheads at wire termination points."""

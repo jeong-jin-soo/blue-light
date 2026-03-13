@@ -39,6 +39,20 @@ MISSING_KVA_OR_BREAKER = (
     "Cannot determine installation specifications."
 )
 
+# ELCB sensitivity
+ELCB_SENSITIVITY_TOO_LOW = (
+    f"{SS638_PREFIX}: ELCB/RCCB sensitivity too low for installation rating"
+)
+
+# Capacity limits
+SINGLE_PHASE_MAX_KVA = (
+    f"{SS638_PREFIX}: Single-phase supply maximum is 23kVA (100A at 230V)"
+)
+DIRECT_SERVICE_MAX_KVA = (
+    "SP PowerGrid: Direct service limited to 280kVA (400A). "
+    "Higher loads require substation supply."
+)
+
 # Metering
 METERING_NOT_SPECIFIED = "metering not specified — will use standard SP kWh meter"
 INCOMING_CABLE_NOT_SPECIFIED = (

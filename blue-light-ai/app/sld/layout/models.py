@@ -266,7 +266,11 @@ class LayoutConfig:
     earth_x_from_db: float = 5.0          # Earth bar X right of DB box
 
     # -- Consolidated text measurement constants (D1) --
-    char_width_estimate: float = 1.8      # mm per char for bounding box estimation
+    # Character width estimates (mm per character) for different text sizes.
+    # Used throughout layout, overlap, and centering for bounding-box estimation.
+    char_w_label: float = 1.8        # mm/char for label text (char_height=2.8, bounding boxes)
+    char_w_info: float = 1.55        # mm/char for info text (char_height=2.0~2.3, centering/overflow)
+    char_width_estimate: float = 1.8      # mm per char (legacy alias, prefer char_w_label)
     label_char_height: float = 2.8        # Default label text height (mm)
     char_advance: float = 1.7             # Vertical char advance for label wrapping
     preferred_max_label_chars: int = 25   # Preferred max chars before line wrapping
@@ -286,6 +290,20 @@ class LayoutConfig:
     overlap_margin: float = 2.0           # Margin in bounding box computation
     busbar_end_margin: float = 10.0       # Margin at busbar ends for final positions
     db_box_overlap_margin: float = 12.0   # DB box margin in overlap resolution
+
+    # -- DB info text layout (used by _place_db_box / _place_multi_db_boxes) --
+    db_info_title_h: float = 4.0     # Title line height (char_height=3.0 + gap)
+    db_info_line_h: float = 3.0      # Per info line height (char_height=1.8 + gap)
+    db_info_pad: float = 2.0         # Bottom padding
+
+    def db_info_height(self, info_text: str) -> float:
+        """Compute DB info area height from text content.
+
+        Formula: title_h + lines × line_h + pad
+        Previously duplicated as ``4 + lines * 3 + 2`` in sections.py and engine.py.
+        """
+        lines = info_text.count("\\P") + 1 if info_text else 0
+        return self.db_info_title_h + lines * self.db_info_line_h + self.db_info_pad
 
     @classmethod
     def from_page_config(
@@ -378,6 +396,10 @@ class PlacedComponent:
     breaker_characteristic: str = ""  # e.g., "B", "C", "D" (IEC 60898-1 trip curve)
     no_ditto: bool = False  # True = always show full label (e.g., per-phase RCCB in protection groups)
     enclosed: bool = False  # True = draw enclosure box around symbol (e.g., landlord unit isolator)
+    # -- DB_INFO_BOX sub-anchors (layout determines, renderer uses as-is) --
+    rating_offset_y: float = -4.0    # Y offset for rating text relative to title
+    title_char_height: float = 3.0   # Title text char_height (mm)
+    rating_char_height: float = 1.8  # Rating text char_height (mm)
 
 
 @dataclass
@@ -389,6 +411,9 @@ class LayoutResult:
     thick_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     junction_dots: list[tuple[float, float]] = field(default_factory=list)
+    # CT branch junction arrows: (x, y, direction) — triangular connectors at CT branch points
+    # direction: "left" or "right" (branch direction from spine)
+    junction_arrows: list[tuple[float, float, str]] = field(default_factory=list)
     solid_boxes: list[tuple[float, float, float, float]] = field(default_factory=list)
     arrow_points: list[tuple[float, float]] = field(default_factory=list)
     busbar_y: float = 0
@@ -670,6 +695,9 @@ class _LayoutContext:
     elcb_ma: int = 30
     elcb_type_str: str = "ELCB"
 
+    # Premises type (residential, commercial, industrial, etc.)
+    premises_type: str = ""
+
     # Metering
     metering: str | None = None
 
@@ -697,9 +725,11 @@ class _LayoutContext:
     has_ammeter: bool = True
     has_voltmeter: bool = True
     has_elr: bool = True
+    has_indicator_lights: bool = True  # 3-phase indicator lights on fuse branches (per ref DWGs)
     elr_spec: str = ""
     voltmeter_range: str = ""
     ammeter_range: str = ""
+    _ct_pre_mccb_fuse: bool = False  # Flag: place pre-MCCB fuse as horizontal branch
 
     # Raw inputs (for sections that need full access)
     requirements: dict = field(default_factory=dict)

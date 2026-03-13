@@ -148,31 +148,40 @@ class TestCTMeterLabel:
         return req
 
     def test_ct_ratio_label(self):
-        """CT component should include ratio in label when ct.ratio is provided."""
+        """CT component should include ratio in label when ct.ratio is provided.
+
+        With correct flow order (Protection CT → Metering CT), the metering CT
+        that carries the ratio label is the SECOND CT component (index 1).
+        """
         req = self._ct_req(ct_ratio="200/5A")
         result = compute_layout(req, skip_validation=True)
         ct_components = [c for c in result.components if c.symbol_name == "CT"]
-        assert len(ct_components) >= 1, "Expected CT component for ct_meter metering"
-        ct = ct_components[0]
-        assert "200/5A" in ct.label, f"Expected '200/5A' in CT label, got: '{ct.label}'"
+        assert len(ct_components) >= 2, "Expected ≥2 CT components (protection + metering)"
+        metering_ct = ct_components[1]
+        assert "200/5A" in metering_ct.label, f"Expected '200/5A' in metering CT label, got: '{metering_ct.label}'"
 
     def test_ct_default_label(self):
-        """CT component should use default 'CT BY SP' label when ratio not specified."""
+        """CT component should use default 'CT BY SP' label when ratio not specified.
+
+        With correct flow order, metering CT is at index 1 (after protection CT).
+        """
         req = self._ct_req()
         result = compute_layout(req, skip_validation=True)
         ct_components = [c for c in result.components if c.symbol_name == "CT"]
-        assert len(ct_components) >= 1, "Expected CT component for ct_meter metering"
-        ct = ct_components[0]
-        assert "CT BY SP" in ct.label, f"Expected 'CT BY SP' in CT label, got: '{ct.label}'"
+        assert len(ct_components) >= 2, "Expected ≥2 CT components (protection + metering)"
+        metering_ct = ct_components[1]
+        assert "CT BY SP" in metering_ct.label, f"Expected 'CT BY SP' in metering CT label, got: '{metering_ct.label}'"
 
     def test_ct_ratio_string_input(self):
-        """CT ratio should work when ct is passed as a plain string."""
+        """CT ratio should work when ct is passed as a plain string.
+
+        With correct flow order, metering CT is at index 1 (after protection CT).
+        """
         req = _base_requirements(breaker_rating=200)
         req["metering"] = "ct_meter"
         req["ct"] = "300/5A"
         result = compute_layout(req, skip_validation=True)
         ct_components = [c for c in result.components if c.symbol_name == "CT"]
-        assert len(ct_components) >= 1
-        # When ct is a plain string, ct_ratio = "300/5A"
-        ct = ct_components[0]
-        assert "300/5A" in ct.label, f"Expected '300/5A' in CT label, got: '{ct.label}'"
+        assert len(ct_components) >= 2, "Expected ≥2 CT components (protection + metering)"
+        metering_ct = ct_components[1]
+        assert "300/5A" in metering_ct.label, f"Expected '300/5A' in metering CT label, got: '{metering_ct.label}'"

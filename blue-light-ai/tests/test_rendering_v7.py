@@ -536,12 +536,14 @@ class TestComputeBoundingBox:
         assert bb.height == pytest.approx(expected_h, abs=0.5)
 
     def test_db_info_box_extends_down(self):
-        """DB_INFO_BOX should extend downward from y."""
+        """DB_INFO_BOX should extend downward from y using sub-anchor fields."""
         comp = PlacedComponent(symbol_name="DB_INFO_BOX", x=50, y=100, label="info")
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        assert bb.y == pytest.approx(82.0)  # 100 - 18
-        assert bb.height == pytest.approx(18.0)
+        # Height from sub-anchor fields: abs(rating_offset_y) + rating_char_height + 2
+        expected_h = abs(comp.rating_offset_y) + comp.rating_char_height + 2
+        assert bb.y == pytest.approx(100 - expected_h)
+        assert bb.height == pytest.approx(expected_h)
 
     def test_label_horizontal(self):
         """Horizontal LABEL should compute width from text length."""
@@ -577,8 +579,8 @@ class TestComputeBoundingBox:
         comp = PlacedComponent(symbol_name="KWH_METER", x=50, y=100, label="kWh")
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        assert bb.width == pytest.approx(14.0)
-        assert bb.height == pytest.approx(10.0)
+        assert bb.width == pytest.approx(9.0)
+        assert bb.height == pytest.approx(6.5)
 
 
 # -- Test: resolve_overlaps --

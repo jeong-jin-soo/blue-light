@@ -40,6 +40,12 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
   4. 정상 동작 확인 후에만 commit → push → 개발서버 배포
 - 문법 체크(`ast.parse`)만으로는 불충분 — 실제 기능 동작 확인 필수
 
+## SLD 레이아웃 코드 수정 시 필수 참조
+- **도메인 지식**: `blue-light-ai/data/sg-sld-domain-knowledge.md` — 싱가포르 SLD 컴포넌트 흐름 순서, 부품 역할, 전기 규정
+- **흐름 순서 명세**: `sections.py:CT_METERING_SPINE_ORDER` — CT 계측 스파인 순서 상수 (자동 테스트로 검증)
+- **자동 검증 테스트**: `tests/test_spine_flow_order.py` — 스파인 컴포넌트 배치 순서 검증
+- **원칙**: 컴포넌트 배치 순서는 반드시 실제 전기적 흐름(전원→부하)을 따를 것. SP Group §6.9.6 참조.
+
 ## Key Conventions
 - 한국어 커밋 메시지 사용
 - Soft delete 패턴 (deleted_at, @SQLDelete + @SQLRestriction)

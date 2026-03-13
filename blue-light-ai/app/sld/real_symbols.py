@@ -450,7 +450,11 @@ class RealKwhMeter(BaseSymbol):
 
 
 class RealCT(BaseSymbol):
-    """Current Transformer at real proportions (two concentric circles)."""
+    """Current Transformer — two interlocking rings (chain-link style).
+
+    Reference DWG: two small arcs on the conductor, NOT concentric circles.
+    The arcs protrude to the right of the conductor and interlock vertically.
+    """
 
     name: str = "CT"
     layer: str = "SLD_SYMBOLS"
@@ -459,31 +463,34 @@ class RealCT(BaseSymbol):
         dims = get_symbol_dimensions("CT")
         self.width = dims["width_mm"]
         self.height = dims["height_mm"]
-        self._outer_r = dims["outer_radius_mm"]
-        self._inner_r = dims["inner_radius_mm"]
+        self._ring_r = dims["ring_radius_mm"]
+        self._ring_offset = dims["ring_offset_mm"]
         self._stub = dims["stub_mm"]
 
         cx = self.width / 2
+        half_d = self._ring_offset / 2
+        top_extent = half_d + self._ring_r
         self.pins = {
-            "top": (cx, self.height / 2 + self._outer_r + self._stub),
-            "bottom": (cx, self.height / 2 - self._outer_r - self._stub),
+            "top": (cx, self.height / 2 + top_extent + self._stub),
+            "bottom": (cx, self.height / 2 - top_extent - self._stub),
         }
         self.anchors = {
-            "label_right": (self.width / 2 + self._outer_r + 2, self.height / 2),
+            "label_right": (self.width / 2 + self._ring_r + 2, self.height / 2),
         }
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         cx = x + self.width / 2
         cy = y + self.height / 2
+        r = self._ring_r
+        d = self._ring_offset / 2  # half offset from center
 
-        backend.set_layer(self.layer)
-        backend.add_circle((cx, cy), radius=self._outer_r)
-        backend.add_circle((cx, cy), radius=self._inner_r)
-
-        # Connection lines through outer circle
+        # CT arcs are rendered via junction_arrows at the branch junction
+        # points, so the symbol itself only draws connection stubs.
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, cy + self._outer_r), (cx, cy + self._outer_r + self._stub))
-        backend.add_line((cx, cy - self._outer_r), (cx, cy - self._outer_r - self._stub))
+        top_y = cy - d - r
+        bottom_y = cy + d + r
+        backend.add_line((cx, top_y), (cx, top_y - self._stub))
+        backend.add_line((cx, bottom_y), (cx, bottom_y + self._stub))
 
 
 class RealIsolator(BaseSymbol):
@@ -520,8 +527,8 @@ class RealIsolator(BaseSymbol):
 
         backend.set_layer(self.layer)
 
-        # Contact separation matches MCCB (2 × arc_radius = 6mm)
-        contact_sep = 6.0
+        # Contact separation matches MCCB (2 × arc_radius)
+        contact_sep = 2 * get_symbol_dimensions("MCCB")["arc_radius_mm"]
         center_y = y + h / 2
         contact_top_y = center_y + contact_sep / 2
         contact_bottom_y = center_y - contact_sep / 2
@@ -578,8 +585,8 @@ class RealIsolator(BaseSymbol):
 
         backend.set_layer(self.layer)
 
-        # Contact separation matches MCCB (2 × arc_radius = 6mm)
-        contact_sep = 6.0
+        # Contact separation matches MCCB (2 × arc_radius)
+        contact_sep = 2 * get_symbol_dimensions("MCCB")["arc_radius_mm"]
         center_x = x + h_extent / 2
         contact_left_x = center_x - contact_sep / 2
         contact_right_x = center_x + contact_sep / 2
@@ -860,9 +867,9 @@ class RealELR(BaseSymbol):
             close=True,
         )
 
-        # "ELR" text centered
+        # "ELR" text centered (scaled to box size)
         backend.set_layer("SLD_ANNOTATIONS")
-        ch = 3.0
+        ch = min(self.height * 0.35, 2.5)
         backend.add_mtext("ELR", insert=(cx - ch * 0.9, y + self.height / 2 + ch * 0.4), char_height=ch)
 
         # Connection stubs (vertical)
@@ -887,9 +894,9 @@ class RealELR(BaseSymbol):
             close=True,
         )
 
-        # "ELR" text centered
+        # "ELR" text centered (scaled to box size)
         backend.set_layer("SLD_ANNOTATIONS")
-        ch = 3.0
+        ch = min(v_extent * 0.35, 2.5)
         mid_x = x + h_extent / 2
         backend.add_mtext("ELR", insert=(mid_x - ch * 0.9, cy + ch * 0.4), char_height=ch)
 
@@ -977,6 +984,179 @@ class RealFuse(BaseSymbol):
         backend.add_line((cx, y), (cx, y - self._stub))
 
 
+class RealPotentialFuse(BaseSymbol):
+    """Potential fuse / 2A fuse link (○×○) on conductor for CT metering.
+
+    DXF '2A FUSE' block pattern: two circles connected by diagonal cross lines.
+    Previous style was ○-○-○ (3 circles); updated to match reference DWG files.
+    """
+
+    name: str = "POTENTIAL_FUSE"
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self):
+        dims = get_symbol_dimensions("POTENTIAL_FUSE")
+        self.width = dims["width_mm"]
+        self.height = dims["height_mm"]
+        self._circle_r = dims["circle_radius_mm"]
+        self._stub = dims["stub_mm"]
+        self._cross_gap = dims.get("cross_gap_mm", 3.0)
+
+        cx = self.width / 2
+        self.pins = {
+            "top": (cx, self.height + self._stub),
+            "bottom": (cx, -self._stub),
+        }
+        self.anchors = {
+            "label_right": (self.width + 2, self.height / 2),
+        }
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        cx = x + self.width / 2
+        mid_y = y + self.height / 2
+
+        # Two circles: top and bottom, separated by cross_gap
+        top_cy = mid_y + self._cross_gap / 2 + self._circle_r
+        bot_cy = mid_y - self._cross_gap / 2 - self._circle_r
+
+        backend.set_layer(self.layer)
+        backend.add_circle((cx, top_cy), radius=self._circle_r)
+        backend.add_circle((cx, bot_cy), radius=self._circle_r)
+
+        # Diagonal cross lines between circles (○×○ pattern)
+        cross_top = mid_y + self._cross_gap / 2
+        cross_bot = mid_y - self._cross_gap / 2
+        cross_hw = self._circle_r * 0.8  # half-width of cross
+        backend.add_line((cx - cross_hw, cross_top), (cx + cross_hw, cross_bot))
+        backend.add_line((cx + cross_hw, cross_top), (cx - cross_hw, cross_bot))
+
+        # Stubs (connections)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
+        backend.add_line((cx, y), (cx, y - self._stub))
+
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw horizontally — connections left/right.
+
+        x: leftmost point of the horizontal extent
+        y: vertical center line of the branch.
+
+        DXF reference: 2A FUSE is always a horizontal branch element
+        (never on the vertical spine). The fuse branches RIGHT from
+        a T-junction on the spine, protecting voltage sensing circuits.
+        Ref: 150A/400A TPN DWGs — FUSE INSERT at X≈23494 (right of spine).
+        """
+        # In horizontal orientation, the "height" dimension (8mm) becomes
+        # the horizontal extent, and "width" (4mm) becomes the vertical extent.
+        h_extent = self.height
+        mid_x = x + h_extent / 2
+        cy = y
+
+        # Two circles: left and right, separated by cross_gap
+        left_cx = mid_x - self._cross_gap / 2 - self._circle_r
+        right_cx = mid_x + self._cross_gap / 2 + self._circle_r
+
+        backend.set_layer(self.layer)
+        backend.add_circle((left_cx, cy), radius=self._circle_r)
+        backend.add_circle((right_cx, cy), radius=self._circle_r)
+
+        # Diagonal cross lines between circles (○×○ pattern)
+        cross_left = mid_x - self._cross_gap / 2
+        cross_right = mid_x + self._cross_gap / 2
+        cross_hh = self._circle_r * 0.8  # half-height of cross
+        backend.add_line((cross_left, cy - cross_hh), (cross_right, cy + cross_hh))
+        backend.add_line((cross_left, cy + cross_hh), (cross_right, cy - cross_hh))
+
+        # Internal lines connecting boundaries to circle edges
+        # (fill gaps between component extent and circle perimeters)
+        backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x, cy), (left_cx - self._circle_r, cy))
+        backend.add_line((right_cx + self._circle_r, cy), (x + h_extent, cy))
+
+        # Stubs (horizontal connections to adjacent components)
+        backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
+        backend.add_line((x, cy), (x - self._stub, cy))
+
+
+class RealIndicatorLights(BaseSymbol):
+    """3-phase indicator lights for CT metering fuse branches.
+
+    Each indicator light is a circle with 4 radial lines extending outward
+    at 45° angles (NE/NW/SE/SW), representing a lamp/light symbol.
+    Adjacent circles are connected by horizontal lines.
+    Always placed horizontally after the 2A potential fuse on a branch.
+    Ref: 150A/400A TPN DWGs — 'LED IND LTG' block at X≈24250.
+    """
+
+    name: str = "INDICATOR_LIGHTS"
+    layer: str = "SLD_SYMBOLS"
+
+    # Length of each radial ray extending outward from the circle perimeter
+    _ray_len: float = 0.8
+
+    def __init__(self):
+        dims = get_symbol_dimensions("INDICATOR_LIGHTS")
+        self.width = dims["width_mm"]       # 13.2mm total horizontal extent
+        self.height = dims["height_mm"]     # 4mm vertical extent
+        self._circle_r = dims["circle_radius_mm"]   # 1.2mm
+        self._count = dims.get("circle_count", 3)
+        self._spacing = dims.get("circle_spacing_mm", 3.0)
+
+        # Pins for connection (horizontal orientation only)
+        self.pins = {
+            "left": (0, self.height / 2),
+            "right": (self.width, self.height / 2),
+        }
+        self.anchors = {}
+
+    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Vertical draw — delegates to horizontal (indicator lights are always horizontal)."""
+        self.draw_horizontal(backend, x, y + self.height / 2)
+
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+        """Draw indicator lights horizontally with radial rays and inter-connections.
+
+        Each light: circle with 4 diagonal lines extending outward (lamp symbol).
+        Adjacent lights are connected by horizontal lines.
+
+        x: leftmost point of the horizontal extent.
+        y: vertical center line of the branch.
+        """
+        r = self._circle_r
+        d = self._ray_len  # ray length beyond circle perimeter
+        cos45 = 0.7071  # cos(45°) = sin(45°)
+
+        backend.set_layer(self.layer)
+        centers = []
+        for i in range(self._count):
+            cx = x + r + i * self._spacing
+            centers.append(cx)
+
+            # Circle
+            backend.add_circle((cx, y), radius=r)
+
+            # 4 radial rays at 45° angles (NE, NW, SE, SW)
+            for dx_sign, dy_sign in [(1, 1), (-1, 1), (1, -1), (-1, -1)]:
+                # Ray starts at circle perimeter, extends outward by d
+                start_x = cx + dx_sign * r * cos45
+                start_y = y + dy_sign * r * cos45
+                end_x = cx + dx_sign * (r + d) * cos45
+                end_y = y + dy_sign * (r + d) * cos45
+                backend.add_line((start_x, start_y), (end_x, end_y))
+
+        # Horizontal connections between adjacent circles
+        backend.set_layer("SLD_CONNECTIONS")
+        for i in range(len(centers) - 1):
+            # Connect right edge of circle i to left edge of circle i+1
+            backend.add_line(
+                (centers[i] + r, y),
+                (centers[i + 1] - r, y),
+            )
+
+        # Left connection stub (to fuse); no right stub per reference DWG
+        backend.add_line((x, y), (x - 2.0, y))
+
+
 # ---------------------------------------------------------------------------
 # Symbol registry — maps type names to real-proportion symbol classes
 # ---------------------------------------------------------------------------
@@ -992,9 +1172,11 @@ REAL_SYMBOL_MAP: dict[str, type | object] = {
     "ISOLATOR": RealIsolator,
     "EARTH": RealEarth,
     "FUSE": RealFuse,
+    "POTENTIAL_FUSE": RealPotentialFuse,
     "BI_CONNECTOR": RealBIConnector,
     "SELECTOR_SWITCH": RealSelectorSwitch,
     "ELR": RealELR,
+    "INDICATOR_LIGHTS": RealIndicatorLights,
 }
 
 # Meter symbols are instances (parameterized by letter), not classes

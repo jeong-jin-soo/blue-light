@@ -20,8 +20,10 @@ from app.sld.layout.overlap import (
     resolve_overlaps,
 )
 from app.sld.layout.sections import (
+    _emit_db_box_rect_and_labels,
     _parse_requirements,
     _place_ct_metering_section,
+    _place_ct_pre_mccb_fuse,
     _place_db_box,
     _place_earth_bar,
     _place_elcb,
@@ -328,11 +330,28 @@ def compute_layout(
         # ═══ SINGLE-DB PATH ═══
         _place_incoming_supply(ctx)
         if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
+            # CT metering: spine order (supply → load):
+            #   MCCB → Protection CT → Metering CT → BI
+            # Fuses are horizontal RIGHT branches (not on spine).
+            # Ref: CT_METERING_SPINE_ORDER in sections.py, 150A/400A TPN DWGs
+            _place_unit_isolator(ctx)
+            # Add isolator-to-DB gap before CT metering section
+            _gap = config.isolator_to_db_gap
+            result.connections.append(((cx, ctx.y), (cx, ctx.y + _gap)))
+            ctx.y += _gap
+            _ct_box_start_y = ctx.y - 1
+            # Pre-MCCB fuse as horizontal RIGHT branch from spine
+            ctx._ct_pre_mccb_fuse = True
+            _place_ct_pre_mccb_fuse(ctx)
+            _place_main_breaker(ctx, skip_gap=True)
             _place_ct_metering_section(ctx)
+            # Override db_box_start_y to include CT metering in DB box
+            ctx.db_box_start_y = _ct_box_start_y
         else:
             _place_meter_board(ctx)
-        _place_unit_isolator(ctx)
-        _place_main_breaker(ctx)
+            _place_unit_isolator(ctx)
+            _place_main_breaker(ctx)
+            _place_ct_pre_mccb_fuse(ctx)
         _place_elcb(ctx)
         _place_main_busbar(ctx)
         busbar_y_row = _place_sub_circuits_rows(ctx)
@@ -367,8 +386,6 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     Vertical text (rotation=90°) extends UPWARD from comp.y, so its top
     extent = comp.y + len(text) * char_width_estimate.
     """
-    _CHAR_W = 1.55  # Approximate character advance width (Arial 2.8pt × 0.55 avg ratio)
-
     # Collect all Y coordinates (including rendered text extents)
     all_ys: list[float] = []
     for comp in result.components:
@@ -378,7 +395,7 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
             # Handle \\P line breaks: only longest line contributes to Y extent
             lines = comp.label.split("\\P")
             max_line_len = max(len(line) for line in lines)
-            text_extent = max_line_len * _CHAR_W
+            text_extent = max_line_len * config.char_w_info
             all_ys.append(comp.y + text_extent)
     for (sx, sy), (ex, ey) in result.connections:
         all_ys.extend([sy, ey])
@@ -453,6 +470,8 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
         result.junction_dots[i] = (dx, dy + shift)
     for i, (ax, ay) in enumerate(result.arrow_points):
         result.arrow_points[i] = (ax, ay + shift)
+    for i, (jx, jy, jdir) in enumerate(result.junction_arrows):
+        result.junction_arrows[i] = (jx, jy + shift, jdir)
 
     # Update stored Y references
     result.busbar_y += shift
@@ -764,6 +783,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.thick_connections.extend(source.thick_connections)
     target.dashed_connections.extend(source.dashed_connections)
     target.junction_dots.extend(source.junction_dots)
+    target.junction_arrows.extend(source.junction_arrows)
     target.solid_boxes.extend(source.solid_boxes)
     target.arrow_points.extend(source.arrow_points)
     target.symbols_used.update(source.symbols_used)
@@ -855,6 +875,7 @@ def render_board(
     from app.sld.layout.helpers import _should_use_triplets
     from app.sld.layout.sections import (
         _place_ct_metering_section,
+        _place_ct_pre_mccb_fuse,
         _place_elcb,
         _place_main_breaker,
         _place_main_busbar,
@@ -927,10 +948,17 @@ def render_board(
         ctx.y += _gap
         # DB box bottom starts AFTER the gap (so cable annotation stays outside)
         _ct_box_start_y = ctx.y - 1
+        # CT metering: spine order (supply → load):
+        #   MCCB → Protection CT → Metering CT → BI
+        # Fuses are horizontal RIGHT branches (not on spine).
+        # Ref: CT_METERING_SPINE_ORDER in sections.py, 150A/400A TPN DWGs
+        ctx._ct_pre_mccb_fuse = True
+        _place_ct_pre_mccb_fuse(ctx)
+        _place_main_breaker(ctx, skip_gap=True)
         _place_ct_metering_section(ctx)
-
-    # Place board sections (reuses all existing section functions unchanged)
-    _place_main_breaker(ctx, skip_gap=bool(_has_ct_metering))
+    else:
+        _place_main_breaker(ctx)
+        _place_ct_pre_mccb_fuse(ctx)
     _place_elcb(ctx)
     _place_main_busbar(ctx)
 
@@ -1349,8 +1377,6 @@ def _place_protection_groups(
 def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
                           topmost_busbar_y: float) -> float:
     """Place dashed DB boxes for each sub-DB. Returns rightmost DB box edge."""
-    from app.sld.layout.models import PlacedComponent
-
     result = ctx.result
     config = ctx.config
     rightmost_x = 0.0
@@ -1364,45 +1390,34 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
         midpoints.append((right_edge + left_edge) / 2)
 
     for range_idx, db_range in enumerate(db_ranges):
-        db_idx = db_range["db_idx"]
         start_y = db_range["db_box_start_y"]
         busbar_y_row = db_range["busbar_y_row"]
-        db_cx = db_range["cx"]
         bus_start_x = db_range["busbar_start_x"]
         bus_end_x = db_range["busbar_end_x"]
         breaker_rating = db_range["breaker_rating"]
         db_name = db_range["name"]
 
-        # DB box extents
         db_info_text = db_range.get("db_info_text", "")
-        db_info_lines = db_info_text.count("\\P") + 1 if db_info_text else 0
-        db_info_height = 4 + db_info_lines * 3 + 2  # title(4mm) + info lines(3mm each) + bottom pad(2mm)
-        # For CT metering boards, don't extend box below start_y.
-        # The info text is placed inside the box at the bottom edge instead
-        # of in a downward extension.  This keeps the cable annotation and
-        # isolator clearly outside the MSB box.
         _has_ct = db_range.get("_has_ct_metering", False)
+
+        # Vertical extents
         if _has_ct:
-            box_start_y = start_y  # No downward extension
+            box_start_y = start_y  # No downward extension for CT metering
         else:
-            box_start_y = start_y - db_info_height
+            box_start_y = start_y - config.db_info_height(db_info_text)
 
         box_end_y = (busbar_y_row + config.db_box_busbar_margin
                      + config.mcb_h + config.stub_len
                      + config.db_box_tail_margin + config.db_box_label_margin)
 
+        # Horizontal extents — region-based (preferred) or midpoint-based
         box_left = bus_start_x - 10
         box_right = bus_end_x + 10
-
-        # ── Region-based box bounds (preferred) ──
-        # Use pre-computed LayoutRegion if available — these are strict and
-        # guaranteed non-overlapping by _plan_layout().
         if ctx.plan and ctx.plan.db_regions and range_idx < len(ctx.plan.db_regions):
             region = ctx.plan.db_regions[range_idx]
             box_left = region.min_x
             box_right = region.max_x
         else:
-            # Fallback: midpoint-based boundary clamping
             box_left = max(box_left, config.min_x + 1)
             box_right = min(box_right, config.max_x - 1)
             if range_idx > 0 and midpoints:
@@ -1410,50 +1425,18 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
             if range_idx < len(midpoints):
                 box_right = min(box_right, midpoints[range_idx] - 2)
 
-        # Four dashed lines (bottom, top, left, right)
-        result.dashed_connections.append(((box_left, box_start_y), (box_right, box_start_y)))
-        result.dashed_connections.append(((box_left, box_end_y), (box_right, box_end_y)))
-        result.dashed_connections.append(((box_left, box_start_y), (box_left, box_end_y)))
-        result.dashed_connections.append(((box_right, box_start_y), (box_right, box_end_y)))
-
-        # DB info: board name (e.g., "MSB") inside box, bottom-left (per reference DWG)
-        # Reference style: text near bottom dashed line — MSB label then APPROVED LOAD below
+        # Emit dashed rect + info labels + location text (shared with _place_db_box)
         db_display_label = db_name if db_name else db_range.get("db_info_label", f"{breaker_rating}A DB")
-        if _has_ct:
-            # CT metering board: both "MSB" and "APPROVED LOAD" INSIDE box.
-            # _draw_db_info_component renders title at comp.y, rating at comp.y-4.
-            # Box bottom dashed line is at start_y, so place comp.y high enough
-            # that comp.y - 4 (rating) is still above start_y.
-            result.components.append(PlacedComponent(
-                symbol_name="DB_INFO_BOX",
-                x=box_left + 3,
-                y=start_y + 7,  # title at +7, rating at +3 — both above dashed line
-                label=db_display_label,
-                rating=db_info_text,
-            ))
-        else:
-            result.components.append(PlacedComponent(
-                symbol_name="DB_INFO_BOX",
-                x=box_left + 3,
-                y=start_y - 1,  # Just below separator line (inside info area)
-                label=db_display_label,
-                rating=db_info_text,
-            ))
-
-        # Location text — BELOW the DB box (outside), per LEW guide Rule 9
-        db_location_text = db_range.get("db_location_text", "")
-        if db_location_text:
-            if _has_ct:
-                # CT metering: box bottom = start_y. Place location text just below.
-                loc_y = box_start_y - 3
-            else:
-                loc_y = box_start_y - 3  # Below DB box bottom
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=box_left + 6,
-                y=loc_y,
-                label=db_location_text,
-            ))
+        _emit_db_box_rect_and_labels(
+            result, config,
+            box_start_y=box_start_y, box_end_y=box_end_y,
+            box_left=box_left, box_right=box_right,
+            text_anchor_y=start_y,
+            display_label=db_display_label,
+            info_text=db_info_text,
+            location_text=db_range.get("db_location_text", ""),
+            has_ct_metering=_has_ct,
+        )
 
         rightmost_x = max(rightmost_x, box_right)
 
@@ -1472,7 +1455,6 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
     from app.sld.layout.models import OverflowMetrics
 
     metrics = OverflowMetrics()
-    _CHAR_W = 1.55  # Approximate character advance width (matches _center_vertically)
 
     all_xs: list[float] = []
     all_ys: list[float] = []
@@ -1484,7 +1466,7 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
         if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
             lines = comp.label.split("\\P")
             max_line_len = max(len(line) for line in lines)
-            all_ys.append(comp.y + max_line_len * _CHAR_W)
+            all_ys.append(comp.y + max_line_len * config.char_w_info)
 
     for collection in (result.connections, result.dashed_connections, result.thick_connections):
         for (sx, sy), (ex, ey) in collection:

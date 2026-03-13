@@ -128,7 +128,7 @@ def build_requirements() -> dict:
             "has_elr": True,
             "elr_spec": "0-3A 0.2sec",
             "voltmeter_range": "0-500V",
-            "ammeter_range": "0-500A",
+            "ammeter_range": "0-100A",
         },
 
         "distribution_boards": [

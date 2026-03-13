@@ -649,6 +649,101 @@ def _validate_poles(
         )
 
 
+def _validate_elcb(
+    effective_spec: IncomingSpec | None,
+    effective_rating: int,
+    requirements: dict,
+    result: ValidationResult,
+) -> None:
+    """Validate / auto-correct ELCB/RCCB configuration (Step 8.5).
+
+    EMA July 2023: 30mA RCCB mandatory for residential.
+    SS 638: ELCB sensitivity depends on supply type and rating.
+
+    Rules:
+      - 1-phase (any rating): 30mA DP
+      - 3-phase ≤100A: 30mA 4P
+      - 3-phase >100A: 100~300mA 4P
+    """
+    from app.sld.validation_messages import ELCB_RECOMMENDED
+
+    elcb = requirements.get("elcb", {})
+    # Use corrected supply_type if available, else original
+    supply_type_correction = result.corrections.get("supply_type", {})
+    supply_type = (
+        supply_type_correction.get("corrected", "")
+        if supply_type_correction
+        else requirements.get("supply_type", "")
+    )
+
+    # --- A. Missing ELCB warning ---
+    if not elcb or not elcb.get("rating"):
+        result.add_warning(ELCB_RECOMMENDED)
+        return
+
+    # --- B. Sensitivity validation ---
+    user_ma = elcb.get("sensitivity_ma", 0)
+    is_three_phase = supply_type == "three_phase"
+
+    if is_three_phase and effective_rating and effective_rating > 100:
+        # 3-phase >100A: 100~300mA required
+        expected_ma = 100
+        if user_ma and user_ma < 100:
+            result.add_correction(
+                "elcb.sensitivity_ma", user_ma, expected_ma,
+                f"3-phase {effective_rating}A requires 100~300mA sensitivity "
+                f"(30mA too sensitive for >100A). Auto-corrected to {expected_ma}mA.",
+            )
+        elif user_ma and user_ma > 300:
+            result.add_warning(
+                f"ELCB sensitivity {user_ma}mA exceeds maximum 300mA for "
+                f"3-phase {effective_rating}A. Verify setting."
+            )
+        elif not user_ma:
+            result.add_correction(
+                "elcb.sensitivity_ma", 0, expected_ma,
+                f"Auto-determined: 3-phase {effective_rating}A → {expected_ma}mA",
+            )
+    else:
+        # 1-phase or 3-phase ≤100A: 30mA
+        expected_ma = 30
+        if user_ma and user_ma > 30:
+            result.add_warning(
+                f"ELCB sensitivity {user_ma}mA exceeds recommended 30mA for "
+                f"{'single-phase' if not is_three_phase else f'3-phase {effective_rating}A'}. "
+                f"30mA provides better protection for personnel safety."
+            )
+        elif not user_ma:
+            result.add_correction(
+                "elcb.sensitivity_ma", 0, expected_ma,
+                f"Auto-determined: "
+                f"{'single-phase' if not is_three_phase else f'3-phase ≤100A'} → {expected_ma}mA",
+            )
+
+    # --- C. Poles validation ---
+    user_poles = elcb.get("poles", "")
+    expected_poles = "4P" if is_three_phase else "DP"
+    if user_poles and user_poles.upper() != expected_poles:
+        result.add_correction(
+            "elcb.poles", user_poles, expected_poles,
+            f"ELCB poles '{user_poles}' incorrect for {supply_type}. "
+            f"Corrected to {expected_poles}.",
+        )
+    elif not user_poles:
+        result.add_correction(
+            "elcb.poles", "", expected_poles,
+            f"Auto-determined: {supply_type} → {expected_poles}",
+        )
+
+    # --- D. Rating validation (≥ main breaker rating) ---
+    elcb_rating = elcb.get("rating", 0)
+    if elcb_rating and effective_rating and elcb_rating < effective_rating:
+        result.add_warning(
+            f"ELCB rating {elcb_rating}A is less than main breaker {effective_rating}A. "
+            f"ELCB rating should be ≥ main breaker rating."
+        )
+
+
 def _validate_metering(
     effective_spec: IncomingSpec | None,
     metering: str,
@@ -777,6 +872,21 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
         except ValueError as e:
             result.add_warning(str(e))
 
+    # ── 1.5 Capacity limit checks ─────────────────────────────────
+    if kva and supply_type == "single_phase" and kva > 23:
+        result.add_warning(
+            "Single-phase supply maximum is 23kVA (100A at 230V). "
+            f"Requested {kva}kVA exceeds this limit. "
+            "Consider three-phase supply or verify with SP PowerGrid."
+        )
+    supply_source = requirements.get("supply_source", "")
+    if kva and kva > 280 and supply_source not in ("landlord", "substation"):
+        result.add_warning(
+            "Direct service from SP PowerGrid limited to 280kVA (400A). "
+            f"Requested {kva}kVA may require substation supply. "
+            "Verify supply arrangement with SP PowerGrid."
+        )
+
     # ── 2. 3-Phase incoming to Single Phase DB detection ──────────
     if _detect_3phase_to_single_phase_db(requirements):
         result.add_warning(
@@ -807,6 +917,8 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     _validate_breaker_type(effective_spec, breaker_type, effective_rating, result)
     _validate_fault_rating(effective_spec, breaker_ka, effective_rating, breaker_type, result)
     _validate_poles(effective_spec, breaker_poles, effective_rating, requirements, result)
+    # ── 8.5 ELCB/RCCB validation ──────────────────────────────────
+    _validate_elcb(effective_spec, effective_rating, requirements, result)
     # ── 8. Cable size auto-correction ─────────────────────────────
     cable_size = requirements.get("cable_size", "")
     if effective_spec and not cable_size:
@@ -826,10 +938,18 @@ def apply_corrections(requirements: dict, result: ValidationResult) -> dict:
     Apply auto-corrections from validation to requirements dict.
 
     Returns a new dict with corrections applied (does NOT mutate original).
+    Supports dot-notation keys for nested dicts (e.g. "elcb.sensitivity_ma").
     """
     corrected = dict(requirements)
     for key, correction in result.corrections.items():
-        corrected[key] = correction["corrected"]
+        if "." in key:
+            # Nested key: "elcb.sensitivity_ma" → corrected["elcb"]["sensitivity_ma"]
+            parent_key, child_key = key.split(".", 1)
+            parent = corrected.setdefault(parent_key, {})
+            if isinstance(parent, dict):
+                parent[child_key] = correction["corrected"]
+        else:
+            corrected[key] = correction["corrected"]
     return corrected
 
 
