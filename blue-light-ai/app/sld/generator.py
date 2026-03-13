@@ -553,6 +553,8 @@ class SldGenerator:
             if comp.enclosed and isinstance(symbol, RealIsolator):
                 trip_kwargs["enclosed"] = True
             if use_horizontal:
+                if getattr(comp, 'no_right_stub', False):
+                    trip_kwargs['no_right_stub'] = True
                 symbol.draw_horizontal(backend, comp.x, comp.y, **trip_kwargs)
             else:
                 symbol.draw(backend, comp.x, comp.y, **trip_kwargs)

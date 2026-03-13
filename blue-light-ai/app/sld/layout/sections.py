@@ -811,6 +811,16 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     if ctx.has_elr:
         cursor += ct_h + ct_stub + ct_to_ct_gap
 
+    # Reserve space for KWH branch arm between Protection CT and Metering CT.
+    # The arm exits the spine at _kwh_branch_y; metering CT bottom stub must
+    # be above that line so the arm doesn't visually cross the metering CT.
+    from app.sld.real_symbols import get_real_symbol as _get_kwh_pre
+    _kwh_pre = _get_kwh_pre("KWH_METER")
+    _kwh_rect_h_pre = getattr(_kwh_pre, '_rect_h', 3.9)
+    _kwh_arm_y_pre = prot_ct_center_y + 3.0 + _kwh_rect_h_pre / 2 + 1.5
+    _min_metering_start = _kwh_arm_y_pre + ct_stub + 1.0
+    cursor = max(cursor, _min_metering_start)
+
     # Metering CT (on spine)
     metering_ct_y = cursor
     metering_ct_center_y = cursor + ct_h / 2
@@ -915,18 +925,50 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         )
         result.junction_arrows.append((cx, _branch_y, "right"))
 
-    # Branch 3 (RIGHT): KWH Meter (no MCB — per reference DWG)
-    _kwh_branch_y = branch_y - ct_to_branch_gap
+    # Branch 3 (RIGHT): KWH Meter (no MCB, no right stub — per reference DWG)
+    # Return line connects 3mm above ELR hook (prot_ct_center_y).
+    from app.sld.real_symbols import get_real_symbol as _get_kwh_sym
+    _kwh_sym = _get_kwh_sym("KWH_METER")
+    _kwh_rect_w = getattr(_kwh_sym, '_rect_w', 7.8)
+    _kwh_rect_h = getattr(_kwh_sym, '_rect_h', 3.9)
+    _kwh_hp = _kwh_sym.horizontal_pins(0, 0)
+
+    _kwh_return_y = prot_ct_center_y + 3.0      # 3mm above ELR hook
+    # KWH branch Y: box bottom must clear return line by ≥1.5mm
+    _kwh_branch_y = _kwh_return_y + _kwh_rect_h / 2 + 1.5
+
     _kwh_label = "SPPG\\PkWh METER" if ctx.supply_source != "landlord" else "kWh METER"
-    _place_metering_branch(
-        result, cx, _kwh_branch_y, direction="right",
-        components=[
-            ("KWH_METER", _kwh_label, 14.0),
-        ],
-        arm_len=branch_arm_len, gap=branch_gap,
-    )
-    result.junction_arrows.append((cx, _kwh_branch_y, "right"))
+
+    # Place KWH component (right of spine, no right stub)
+    _kwh_comp_x = cx + branch_arm_len  # rect left edge (same as _place_metering_branch)
+    result.components.append(PlacedComponent(
+        symbol_name="KWH_METER",
+        x=_kwh_comp_x,
+        y=_kwh_branch_y,
+        label=_kwh_label,
+        rotation=90.0,
+        no_right_stub=True,
+    ))
     result.symbols_used.add("KWH_METER")
+
+    # Arm connection: spine → KWH left pin
+    result.connections.append(((cx, _kwh_branch_y), (cx + branch_arm_len, _kwh_branch_y)))
+    result.junction_arrows.append((cx, _kwh_branch_y, "right"))
+
+    # KWH return connection: bottom of KWH box → down → left to spine.
+    # Creates CT measurement loop per reference DWG (SP Group §6.9.6).
+    _kwh_bottom_cx = _kwh_comp_x + _kwh_rect_w / 2  # bottom center X of rect
+    _kwh_bottom_y = _kwh_branch_y - _kwh_rect_h / 2  # bottom edge Y of rect
+    # Vertical: KWH bottom → down to return Y
+    result.connections.append((
+        (_kwh_bottom_cx, _kwh_bottom_y),
+        (_kwh_bottom_cx, _kwh_return_y),
+    ))
+    # Horizontal: return point → left to spine
+    result.connections.append((
+        (_kwh_bottom_cx, _kwh_return_y),
+        (cx, _kwh_return_y),
+    ))
 
     # BI Connector
     result.components.append(PlacedComponent(

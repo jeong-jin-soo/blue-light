@@ -415,11 +415,16 @@ class RealKwhMeter(BaseSymbol):
         backend.add_line((cx, cy + rh / 2), (cx, cy + rh / 2 + self._stub))
         backend.add_line((cx, cy - rh / 2), (cx, cy - rh / 2 - self._stub))
 
-    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float,
+                         *, no_right_stub: bool = False) -> None:
         """Draw KWH meter rotated 90 degrees — connection points at LEFT and RIGHT.
 
         For horizontal meter board layout. The rectangle is drawn as a HORIZONTAL box:
         wider than tall, matching reference LEW drawings.
+
+        Args:
+            no_right_stub: If True, skip the right connection stub (CT metering
+                mode — KWH output exits from the bottom, not the right).
         """
         # Horizontal orientation: wide rectangle (landscape)
         # x = left edge of body (matching BaseSymbol convention)
@@ -443,7 +448,8 @@ class RealKwhMeter(BaseSymbol):
 
         # Connection lines (horizontal: left and right)
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((x + hrw, cy), (x + hrw + self._stub, cy))  # right
+        if not no_right_stub:
+            backend.add_line((x + hrw, cy), (x + hrw + self._stub, cy))  # right
         backend.add_line((x, cy), (x - self._stub, cy))              # left
 
     def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:

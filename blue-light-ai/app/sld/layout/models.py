@@ -397,6 +397,7 @@ class PlacedComponent:
     no_ditto: bool = False  # True = always show full label (e.g., per-phase RCCB in protection groups)
     enclosed: bool = False  # True = draw enclosure box around symbol (e.g., landlord unit isolator)
     label_y_override: float | None = None  # Absolute Y for label (bypasses default calculation)
+    no_right_stub: bool = False  # True = skip right connection stub (e.g., KWH in CT metering)
     # -- DB_INFO_BOX sub-anchors (layout determines, renderer uses as-is) --
     rating_offset_y: float = -4.0    # Y offset for rating text relative to title
     title_char_height: float = 3.0   # Title text char_height (mm)
