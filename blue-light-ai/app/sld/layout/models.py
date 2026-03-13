@@ -706,6 +706,7 @@ class _LayoutContext:
     busbar_rating: int = 0
 
     # Tracking (set by sections, read by later sections)
+    main_breaker_arc_center_y: float = 0  # MCCB arc center Y (between contacts)
     db_box_start_y: float = 0
     board_name: str = ""         # e.g. "MSB", "DB1" — displayed inside DB box
     db_info_label: str = ""      # e.g. "40A DB"

@@ -852,6 +852,20 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         result.junction_arrows.append((cx, prot_ct_center_y, "left"))
         result.symbols_used.add("ELR")
 
+        # ELR sensing line: L-shaped routing from ELR left → down → MCCB contacts
+        if ctx.main_breaker_arc_center_y:
+            from app.sld.real_symbols import get_real_symbol
+            elr_sym = get_real_symbol("ELR")
+            elr_hp = elr_sym.horizontal_pins(0, 0)
+            elr_stub = getattr(elr_sym, '_stub', 2.0)
+            elr_body = elr_hp["right"][0] - elr_hp["left"][0] - 2 * elr_stub
+            elr_left_x = cx - branch_arm_len - elr_body - elr_stub
+            mccb_y = ctx.main_breaker_arc_center_y
+            # Vertical down
+            result.connections.append(((elr_left_x, prot_ct_center_y), (elr_left_x, mccb_y)))
+            # Horizontal right — stops just before MCCB contact gap
+            result.connections.append(((elr_left_x, mccb_y), (cx - 1.0, mccb_y)))
+
     # Metering CT
     if ct_ratio:
         ct_label = f"CT {ct_ratio}\\P({metering_ct_class})"
@@ -949,12 +963,15 @@ def _place_metering_branch(
     x = x_next
 
     for i, (symbol_name, label, w_hint) in enumerate(components):
-        # Components are placed with rotation=90°, so horizontal extent
-        # is the symbol's height (not width).
+        # Resolve actual horizontal body extent from pin positions.
+        # Most symbols: h_extent == height (rotated 90°).
+        # Some (ELR, KWH_METER, INDICATOR_LIGHTS) use a different extent.
         try:
             sym = get_real_symbol(symbol_name)
-            w = sym.height
-        except ValueError:
+            hp = sym.horizontal_pins(0, 0)
+            stub = getattr(sym, '_stub', 3.0)
+            w = hp["right"][0] - hp["left"][0] - 2 * stub
+        except (ValueError, KeyError):
             w = w_hint
 
         # Place symbol (horizontal orientation)
@@ -1204,6 +1221,7 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
         y=y,
         label=main_label,
     ))
+    ctx.main_breaker_arc_center_y = y + cb_h / 2  # between contacts
     y += cb_h + config.stub_len  # height + stub — symbol draws stub beyond height
     # No extra connection gap — symbol stubs of adjacent components overlap for continuity
     result.symbols_used.add(breaker_type)

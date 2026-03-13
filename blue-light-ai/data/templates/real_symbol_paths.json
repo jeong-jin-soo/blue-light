@@ -139,10 +139,10 @@
     "description": "Selector Switch (ASS/VSS) — two opposing arcs. Viewport-corrected."
   },
   "ELR": {
-    "width_mm": 12.0,
-    "height_mm": 7.0,
+    "width_mm": 7.8,
+    "height_mm": 3.9,
     "stub_mm": 2.0,
-    "description": "Earth Leakage Relay — rectangular device block. DXF inline rect ~6×3.3mm. Sized up for readability."
+    "description": "Earth Leakage Relay — rectangular device block. Sized to match KWH meter box."
   },
   "POTENTIAL_FUSE": {
     "width_mm": 2.0,

@@ -96,6 +96,34 @@ class BaseSymbol(ABC):
         ax, ay = self.anchors[anchor_name]
         return (x + ax, y + ay)
 
+    def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """Absolute pin positions for horizontal placement (rotation=90°).
+
+        Default: h_extent = self.height, stubs at both ends.
+        Override in symbols where h_extent differs (e.g. ELR uses width).
+
+        Args:
+            x: Left edge of horizontal extent (comp.x).
+            y: Vertical center line (comp.y).
+        Returns:
+            {"left": (abs_x, abs_y), "right": (abs_x, abs_y)}
+        """
+        stub = getattr(self, '_stub', 3.0)
+        return {"left": (x - stub, y), "right": (x + self.height + stub, y)}
+
+    def vertical_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """Absolute pin positions for vertical placement (rotation=0°).
+
+        Uses the existing ``pins`` dict offset by (x, y).
+
+        Args:
+            x: Left edge of component (comp.x).
+            y: Bottom edge of component (comp.y).
+        Returns:
+            Dict of pin_name -> (abs_x, abs_y).
+        """
+        return {name: (x + px, y + py) for name, (px, py) in self.pins.items()}
+
     def center(self) -> tuple[float, float]:
         """Get the center point of the symbol bounding box (relative to origin)."""
         return (self.width / 2, self.height / 2)

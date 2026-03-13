@@ -448,6 +448,14 @@ class RealKwhMeter(BaseSymbol):
         backend.add_line((cx + hrw / 2, cy), (cx + hrw / 2 + self._stub, cy))  # right
         backend.add_line((cx - hrw / 2, cy), (cx - hrw / 2 - self._stub, cy))  # left
 
+    def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """x is CENTER of the rectangle in horizontal mode."""
+        rw = self._rect_w
+        return {
+            "left": (x - rw / 2 - self._stub, y),
+            "right": (x + rw / 2 + self._stub, y),
+        }
+
 
 class RealCT(BaseSymbol):
     """Current Transformer — two interlocking rings (chain-link style).
@@ -729,6 +737,14 @@ class RealMeter(BaseSymbol):
         backend.add_line((cx - r, cy), (cx - r - self._stub, cy))  # left stub
         backend.add_line((cx + r, cy), (cx + r + self._stub, cy))  # right stub
 
+    def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """x is the leftmost extent (left stub end)."""
+        r = self._radius
+        return {
+            "left": (x, y),
+            "right": (x + 2 * self._stub + 2 * r, y),
+        }
+
 
 class RealSelectorSwitch(BaseSymbol):
     """Selector Switch (ASS/VSS) at real proportions.
@@ -905,6 +921,13 @@ class RealELR(BaseSymbol):
         backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
         backend.add_line((x, cy), (x - self._stub, cy))
 
+    def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """h_extent = self.width (not height) for ELR."""
+        return {
+            "left": (x - self._stub, y),
+            "right": (x + self.width + self._stub, y),
+        }
+
 
 class RealEarth(BaseSymbol):
     """Earth/Ground symbol at real proportions."""
@@ -943,6 +966,11 @@ class RealEarth(BaseSymbol):
 
         y3 = y + self.height * 0.1
         backend.add_line((cx - w / 6, y3), (cx + w / 6, y3))
+
+    def vertical_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """Earth has only a top pin — no bottom connection."""
+        cx = x + self.width / 2
+        return {"top": (cx, y + self.height)}
 
 
 class RealFuse(BaseSymbol):
@@ -1155,6 +1183,13 @@ class RealIndicatorLights(BaseSymbol):
 
         # Left connection stub (to fuse); no right stub per reference DWG
         backend.add_line((x, y), (x - 2.0, y))
+
+    def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """Left stub = 2mm; no right stub (terminal component)."""
+        return {
+            "left": (x - 2.0, y),
+            "right": (x + self.width, y),
+        }
 
 
 # ---------------------------------------------------------------------------

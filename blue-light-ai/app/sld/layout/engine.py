@@ -321,6 +321,10 @@ def compute_layout(
 
         db_box_right = _place_multi_db_boxes(final_ctx, dbs, topmost)
         _place_earth_bar(final_ctx, db_box_right)
+
+        from app.sld.layout.connectivity import validate_connectivity
+        validate_connectivity(merged, config)
+
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
 
@@ -366,6 +370,10 @@ def compute_layout(
 
         db_box_right = _place_db_box(ctx, busbar_y_row)
         _place_earth_bar(ctx, db_box_right)
+
+        # Post-layout: snap connection endpoints to actual symbol pin positions
+        from app.sld.layout.connectivity import validate_connectivity
+        validate_connectivity(ctx.result, ctx.config)
 
         # Post-layout: center content vertically in drawing area
         _center_vertically(ctx.result, ctx.config)
