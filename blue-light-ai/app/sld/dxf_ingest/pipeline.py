@@ -427,6 +427,95 @@ class DxfIngestPipeline:
 
         return stats
 
+    def status_dict(self) -> dict:
+        """현재 라이브러리 현황을 dict로 반환 (API용)."""
+        library = self._load_or_init(self.library_path, _init_library)
+
+        total_files = library["_meta"].get("total_source_files", 0)
+        total_blocks = len(library["blocks"])
+        total_custom = len(library.get("custom_blocks", {}))
+        last_updated = library["_meta"].get("last_updated", "N/A")
+
+        blocks_info = []
+        for name in sorted(library["blocks"].keys()):
+            blk = library["blocks"][name]
+            blocks_info.append({
+                "name": name,
+                "source_count": blk.get("source_count", 1),
+                "height_du": blk.get("height_du", 0),
+                "width_du": blk.get("width_du", 0),
+                "entity_count": len(blk.get("entities", [])),
+            })
+
+        custom_info = []
+        for name, blk in library.get("custom_blocks", {}).items():
+            custom_info.append({
+                "name": name,
+                "height_du": blk.get("height_du", 0),
+                "width_du": blk.get("width_du", 0),
+            })
+
+        all_dxf = set(f.name for f in self.dxf_dir.glob("*.dxf"))
+        processed = set(library["_processed_files"].keys())
+        unprocessed = sorted(all_dxf - processed)
+
+        return {
+            "last_updated": last_updated,
+            "total_source_files": total_files,
+            "total_blocks": total_blocks,
+            "total_custom_blocks": total_custom,
+            "blocks": blocks_info,
+            "custom_blocks": custom_info,
+            "unprocessed_files": unprocessed,
+        }
+
+    def inspect_dict(self, block_name: str) -> dict | None:
+        """블록 상세 정보를 dict로 반환 (API용).
+
+        Returns None if block not found.
+        """
+        library = self._load_or_init(self.library_path, _init_library)
+
+        blk = library["blocks"].get(block_name) or library.get("custom_blocks", {}).get(block_name)
+        if not blk:
+            return None
+
+        is_custom = block_name in library.get("custom_blocks", {})
+        entities = blk.get("entities", [])
+        type_counts = Counter(e["type"] for e in entities)
+
+        result: dict[str, Any] = {
+            "name": block_name,
+            "is_custom": is_custom,
+            "width_du": blk.get("width_du", 0),
+            "height_du": blk.get("height_du", 0),
+            "source": blk.get("source_file", blk.get("source", "N/A")),
+            "source_count": blk.get("source_count", 1) if not is_custom else None,
+            "entity_count": len(entities),
+            "entity_types": dict(type_counts),
+            "bounds": blk.get("bounds"),
+            "pins": blk.get("pins", {}),
+        }
+
+        # Scale usage from spacing profiles
+        spacing = self._load_or_init(self.spacing_path, _init_spacing)
+        scale_usage: dict[str, dict] = {}
+        for prof_name, prof in spacing["profiles"].items():
+            usage = prof.get("scale_usage", {}).get(block_name)
+            if usage:
+                scale_usage[prof_name] = usage
+        if scale_usage:
+            result["scale_usage"] = scale_usage
+
+        return result
+
+    def list_blocks(self) -> list[str]:
+        """Return sorted list of all block names (blocks + custom_blocks)."""
+        library = self._load_or_init(self.library_path, _init_library)
+        names = list(library["blocks"].keys())
+        names.extend(library.get("custom_blocks", {}).keys())
+        return sorted(names)
+
     def status(self) -> None:
         """현재 라이브러리 현황 출력."""
         library = self._load_or_init(self.library_path, _init_library)

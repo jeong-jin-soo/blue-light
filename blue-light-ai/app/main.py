@@ -32,6 +32,7 @@ from app.models.schemas import (
     HealthResponse,
     ResetRequest,
 )
+from app.sld.dxf_ingest.router import router as dxf_ingest_router
 
 # ── Logging ──────────────────────────────────────────
 
@@ -151,6 +152,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
+
+# ── DXF Ingest API ──────────────────────────────────
+app.include_router(dxf_ingest_router)
 
 
 # ── Version Info (프로세스 시작 시점의 Git 상태 캡처) ──
