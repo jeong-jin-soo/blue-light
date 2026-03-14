@@ -79,6 +79,11 @@ Extract EVERY row from the circuit table:
 - **SP PowerGrid supply** (direct SP supply): metering is "sp_meter" (residential) or "ct_meter" (≥125A three-phase).
   - Keywords: "INCOMING FROM HDB", "SP POWERGRID", "FROM SP"
 - If supply source is unclear, default to "sp_powergrid".
+- **incoming_label**: Extract from supply source text for the SLD diagram label. Common patterns:
+  - "Landlord riser ..." → "FROM LANDLORD RISER"
+  - "HDB electrical riser ..." → "INCOMING FROM HDB ELECTRICAL RISER"
+  - "Building riser ..." → "FROM BUILDING RISER"
+  - If the supply source text explicitly states the label, use it as-is (uppercased).
 
 ## Output JSON Schema
 
@@ -90,6 +95,7 @@ Extract EVERY row from the circuit table:
     "phase": "<single_phase|three_phase or null>",
     "voltage": <230|400 or null>,
     "supply_source": "<sp_powergrid|landlord|null>",
+    "incoming_label": "<supply source label for SLD diagram, e.g. 'FROM LANDLORD RISER', 'INCOMING FROM HDB ELECTRICAL RISER', or null>",
     "main_breaker": {
       "type": "<MCB|MCCB|ACB or null>",
       "rating_a": <int or null>,
@@ -157,6 +163,7 @@ Extract EVERY row from the circuit table:
     "phase": "<single_phase|three_phase or null>",
     "voltage": <230|400 or null>,
     "supply_source": "<sp_powergrid|landlord|null>",
+    "incoming_label": "<supply source label for SLD diagram or null>",
     "main_breaker": { ... },
     "cable": { ... },
     "metering": { ... },

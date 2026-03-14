@@ -1105,10 +1105,15 @@ def _compute_safe_leader_bounds(
     # Clamp to circuit name label bounding boxes (rotated 90° vertical text)
     # Cable text half_w estimate for 2-line text (most cable specs split into 2 lines)
     if groups and components:
+        # Collect tap_xs for the current cable group to skip own labels
+        current_group_taps = list(cable_groups.values())[gi]
         _CABLE_TEXT_HALF_W = config.label_char_height  # 2.8mm for 2-line text
         _LABEL_GAP = _CABLE_TEXT_HALF_W + 1.5  # 4.3mm total clearance
         for g in groups:
             if g.name_label_idx is None:
+                continue
+            # Skip labels belonging to circuits in the current cable group
+            if any(abs(g.tap_x - tx) < 0.5 for tx in current_group_taps):
                 continue
             label_comp = components[g.name_label_idx]
             # 90° rotated label: horizontal extent = num_lines × char_height
@@ -1615,18 +1620,20 @@ def _add_phase_fanout(
     config: LayoutConfig,
     supply_type: str,
 ) -> None:
-    """Add 3-phase fan-out lines at busbar (post-resolve_overlaps).
+    """Add 3-phase fan-out at busbar (post-resolve_overlaps).
 
     Position-based triplet grouping: every 3 consecutive busbar positions
     form one fan-out group. ALL circuit types participate (MCB, ISOLATOR,
     SPARE) since they all occupy physical positions on the comb bar.
 
-    Reference pattern (63A TPN SLD 14):
-        Triplet:        Pair:
-        |    /|\\          /|
-        |   / | \\        / |
-        |  /  |  \\      /  |
-      ━━━━━━(●)━━━━━━  ━(●)━━━━
+    Reference pattern (63A TPN SLD 14 DXF):
+      - Center circuit: straight vertical from busbar to MCB
+      - Side circuits: diagonal from (center_x, busbar_y) to (side_x, busbar_y + fan_h),
+        then vertical from (side_x, busbar_y + fan_h) to MCB
+      - Fan-out height ratio: dy/dx ≈ 0.266 (193 DU / 727 DU spacing)
+
+    Fan-out geometry is stored in layout_result.fanout_groups for backend-specific
+    rendering (DXF block INSERT or procedural lines).
     """
     if supply_type != "three_phase":
         return
@@ -1643,39 +1650,36 @@ def _add_phase_fanout(
     # --- Group ALL circuits (including SPARE and ISOL) PER ROW ---
     rows: dict[int, list[tuple[SubCircuitGroup, float]]] = {}
     for g in groups:
-        # Include all circuits: breaker circuits AND spares
         if g.breaker_idx is not None or g.is_spare:
             row_idx = g.row_idx
             by = g.row_busbar_y if g.row_busbar_y else busbar_ys[0]
             rows.setdefault(row_idx, []).append((g, by))
 
-    _FAN_HEIGHT = 2.5  # mm above busbar where diagonals meet side verticals
+    # Reference: 63A TPN SLD 14 → dy/dx = 193/727 ≈ 0.266
+    _FAN_RATIO = 0.266
 
     connections = layout_result.connections
 
     for row_idx in sorted(rows.keys()):
         all_circuits = rows[row_idx]
-        # all_circuits is sorted by tap_x (from _identify_groups sort)
 
         phase_groups = _build_phase_groups(all_circuits, components)
 
         for pg in phase_groups:
             if len(pg) == 3:
-                # Triplet: LEFT / CENTER / RIGHT
                 left_g, _ = pg[0]
                 center_g, center_by = pg[1]
                 right_g, _ = pg[2]
                 by = center_by
             elif len(pg) == 2:
-                # Pair: first is center, second is side
                 center_g, center_by = pg[0]
                 side_g, _ = pg[1]
                 by = center_by
             else:
-                continue  # Single or unexpected — no fan-out
+                continue
 
-            intermediate_y = by + _FAN_HEIGHT
             center_x = center_g.tap_x
+            side_xs: list[float] = []
 
             if len(pg) == 3:
                 sides = [left_g, right_g]
@@ -1683,17 +1687,26 @@ def _add_phase_fanout(
                 sides = [side_g]
 
             for s_g in sides:
+                side_xs.append(s_g.tap_x)
+                spacing = abs(s_g.tap_x - center_x)
+                fan_h = spacing * _FAN_RATIO
+                intermediate_y = by + fan_h
+
+                # Modify side vertical connections: start from intermediate_y
+                # (original starts from busbar_y — truncate to start from fan-out tip)
                 for ci in s_g.connection_indices:
                     (sx, sy), (ex, ey) = connections[ci]
                     if abs(sy - by) < 1.0 and abs(sx - ex) < 0.5:
                         connections[ci] = ((sx, intermediate_y), (ex, ey))
 
+                # Relocate junction dot to center busbar position
                 if s_g.junction_dot_idx is not None:
                     layout_result.junction_dots[s_g.junction_dot_idx] = (center_x, by)
                     layout_result.fanout_relocated_dots.add(s_g.junction_dot_idx)
 
-                # Diagonal from center busbar junction to side intermediate
-                connections.append(((center_x, by), (s_g.tap_x, intermediate_y)))
+            # Store fan-out group data for rendering
+            # (center vertical + diagonals + side verticals rendered by generator)
+            layout_result.fanout_groups.append((center_x, by, side_xs))
 
 
 def _normalize_row_spacing(

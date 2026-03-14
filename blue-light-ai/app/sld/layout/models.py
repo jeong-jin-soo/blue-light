@@ -451,6 +451,10 @@ class LayoutResult:
     # Junction dot indices relocated by phase fanout (excluded from orphan validation)
     fanout_relocated_dots: set[int] = field(default_factory=set)
 
+    # Phase fan-out groups: list of (center_x, busbar_y, side_xs: list[float])
+    # Used by generator to render fan-out as DXF blocks or procedural lines
+    fanout_groups: list[tuple[float, float, list[float]]] = field(default_factory=list)
+
     # Overflow detection metrics (populated by _detect_overflow after centering)
     overflow_metrics: "OverflowMetrics | None" = None
 

@@ -300,6 +300,67 @@ class DxfBackend:
             },
         )
 
+    def create_fanout_block(
+        self,
+        center_x: float,
+        busbar_y: float,
+        side_xs: list[float],
+        mcb_bottom_y: float,
+    ) -> None:
+        """Create and insert a 3-phase fan-out block at the given busbar position.
+
+        Generates a unique block definition for this fan-out geometry, matching
+        the reference DXF pattern (63A TPN SLD 14):
+          - Center: vertical line from busbar to MCB
+          - Sides: diagonal from center busbar to intermediate, then vertical to MCB
+
+        Reference ratio: fan_height / spacing = 193 / 727 ≈ 0.266
+
+        Args:
+            center_x: X coordinate of center circuit on busbar.
+            busbar_y: Y coordinate of busbar line.
+            side_xs: X coordinates of side circuits (1 or 2 elements).
+            mcb_bottom_y: Y coordinate of MCB bottom contact.
+        """
+        _FAN_RATIO = 0.266
+
+        # Build a unique block name based on geometry
+        side_count = len(side_xs)
+        spacings = [abs(sx - center_x) for sx in side_xs]
+        avg_sp = sum(spacings) / len(spacings) if spacings else 0
+        block_name = f"FANOUT_3P_{side_count}S_{avg_sp:.1f}"
+
+        total_h = mcb_bottom_y - busbar_y  # total height from busbar to MCB
+
+        if block_name not in self._doc.blocks:
+            # Block origin = (0, 0) at center busbar junction
+            block = self._doc.blocks.new(name=block_name)
+            layer = "SLD_CONNECTIONS"
+            attribs = {"layer": layer, "lineweight": 25}
+
+            # Center vertical: busbar to MCB
+            block.add_line((0, 0), (0, total_h), dxfattribs=attribs)
+
+            for sx in side_xs:
+                dx = sx - center_x  # signed offset
+                fan_h = abs(dx) * _FAN_RATIO
+
+                # Diagonal: center busbar → side intermediate
+                block.add_line((0, 0), (dx, fan_h), dxfattribs=attribs)
+                # Side vertical: intermediate → MCB bottom
+                block.add_line((dx, fan_h), (dx, total_h), dxfattribs=attribs)
+
+        # Insert the block
+        self._msp.add_blockref(
+            block_name,
+            insert=(center_x, busbar_y),
+            dxfattribs={
+                "layer": "SLD_CONNECTIONS",
+                "xscale": 1.0,
+                "yscale": 1.0,
+            },
+        )
+
     # -- Output --
 
     def save(self, path: str) -> None:

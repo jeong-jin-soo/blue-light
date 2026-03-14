@@ -50,7 +50,7 @@ class MeterBoardLabels:
 class IncomingLabels:
     """Incoming supply area labels."""
     incoming_hdb: str = "INCOMING FROM HDB ELECTRICAL RISER"
-    from_landlord: str = "SUPPLY FROM BUILDING RISER"
+    from_landlord: str = "FROM LANDLORD RISER"
     from_landlord_supply: str = "FROM LANDLORD SUPPLY"
     from_power_supply: str = "FROM POWER SUPPLY ON SITE"
     approved_load: str = "APPROVED LOAD"

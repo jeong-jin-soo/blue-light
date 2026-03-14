@@ -230,6 +230,7 @@ class SldGenerator:
 
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
+            self._draw_fanout_groups(backend, layout_result)
             self._draw_dashed_connections(backend, layout_result)
             self._draw_junction_dots(backend, layout_result)
             self._draw_junction_arrows(backend, layout_result)
@@ -334,6 +335,7 @@ class SldGenerator:
 
             generator._draw_components(backend, layout_result)
             generator._draw_connections(backend, layout_result)
+            generator._draw_fanout_groups(backend, layout_result)
             generator._draw_dashed_connections(backend, layout_result)
             generator._draw_junction_dots(backend, layout_result)
             generator._draw_junction_arrows(backend, layout_result)
@@ -526,6 +528,9 @@ class SldGenerator:
                 needs_special_kwargs = True
         else:
             needs_special_kwargs = True  # horizontal always needs procedural
+            # Horizontal CBs (meter board) — no trip arrow per LEW reference convention
+            if isinstance(symbol, RealCircuitBreaker):
+                trip_kwargs["skip_trip_arrow"] = True
 
         # BlockReplayer path: DxfBackend uses native INSERT for 100% fidelity.
         # PDF/SVG use procedural rendering because DXF block dimensions differ
@@ -621,13 +626,17 @@ class SldGenerator:
                 else:
                     v_half = symbol.width / 2 if symbol else 4
                     h_extent = symbol.height if symbol else 14
-                    # Center label above the symbol (estimate text width for centering)
-                    text_w_est = len(label_text) * 1.6 * 0.6  # approx width
+                    ch = 1.6
+                    # Meter board horizontal symbols: label below, centered
+                    lines = label_text.split("\\P")
+                    longest = max(len(ln) for ln in lines) if lines else 1
+                    text_w_est = longest * ch * 0.6
                     label_x = comp.x + h_extent / 2 - text_w_est / 2
+                    label_y = comp.y - v_half - 0.8
                     backend.add_mtext(
                         label_text,
-                        insert=(label_x, comp.y + v_half + 2.5),
-                        char_height=1.6,
+                        insert=(label_x, label_y),
+                        char_height=ch,
                     )
             else:
                 # Phase 8A: DXF 백엔드에서 라벨을 블록 실제 폭 기준으로 배치
@@ -884,6 +893,51 @@ class SldGenerator:
         # Thick connections — heavier line weight (0.5mm) for outgoing cable tick marks
         for start, end in layout_result.thick_connections:
             backend.add_line(start, end, lineweight=50)
+
+    def _draw_fanout_groups(
+        self, backend: DrawingBackend, layout_result: LayoutResult,
+    ) -> None:
+        """Draw 3-phase fan-out groups.
+
+        DXF backend: creates editable FANOUT_3P blocks.
+        PDF/SVG backend: draws procedural lines matching reference DXF geometry.
+
+        Reference: 63A TPN SLD 14 — dy/dx ratio = 193/727 ≈ 0.266
+        """
+        if not layout_result.fanout_groups:
+            return
+
+        _FAN_RATIO = 0.266
+        backend.set_layer("SLD_CONNECTIONS")
+
+        for center_x, busbar_y, side_xs in layout_result.fanout_groups:
+            if isinstance(backend, DxfBackend):
+                # Find MCB bottom Y
+                max_spacing = max(abs(sx - center_x) for sx in side_xs)
+                mcb_bottom_y = busbar_y + max_spacing  # approximate
+                # Better: find the actual MCB Y from connections
+                for start, end in layout_result.connections:
+                    (sx, sy), (ex, ey) = start, end
+                    if abs(sx - center_x) < 0.5 and abs(ex - center_x) < 0.5:
+                        if sy > busbar_y and ey > sy:
+                            mcb_bottom_y = ey
+                            break
+                        if ey > busbar_y and sy > ey:
+                            mcb_bottom_y = sy
+                            break
+                backend.create_fanout_block(
+                    center_x, busbar_y, side_xs, mcb_bottom_y,
+                )
+            else:
+                # PDF/SVG: draw procedural lines
+                for sx in side_xs:
+                    dx = sx - center_x
+                    fan_h = abs(dx) * _FAN_RATIO
+                    # Diagonal: center busbar → side intermediate
+                    backend.add_line(
+                        (center_x, busbar_y),
+                        (sx, busbar_y + fan_h),
+                    )
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw dashed connection lines (DB box boundary per reference DWG).

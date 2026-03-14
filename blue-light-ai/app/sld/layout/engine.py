@@ -498,6 +498,9 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     # Update stored Y references
     result.busbar_y += shift
     result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
+    result.fanout_groups = [
+        (cx, by + shift, sxs) for cx, by, sxs in result.fanout_groups
+    ]
     result.db_box_start_y += shift
     result.db_box_end_y += shift
 
@@ -811,6 +814,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.symbols_used.update(source.symbols_used)
     target.busbar_y_per_row.extend(source.busbar_y_per_row)
     target.busbar_x_per_row.update(source.busbar_x_per_row)
+    target.fanout_groups.extend(source.fanout_groups)
 
 
 def _compose_boards(
