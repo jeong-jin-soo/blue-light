@@ -120,7 +120,13 @@ def _parse_main_breaker(ctx: _LayoutContext, requirements: dict) -> None:
     if is_cable_ext:
         ctx.metering = None
     else:
-        ctx.metering = requirements.get("metering", "sp_meter")
+        raw_metering = requirements.get("metering", "sp_meter")
+        # Normalize common variants: "ct_metered" → "ct_meter"
+        if isinstance(raw_metering, str) and raw_metering.lower().replace("_", "").replace("-", "") in (
+            "ctmetered", "ctmeter", "ct",
+        ):
+            raw_metering = "ct_meter"
+        ctx.metering = raw_metering
 
 
 def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
@@ -134,24 +140,44 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
     )
 
     # CT ratio parsing (e.g., "200/5A")
+    # Accept: "ct": {"ratio": "100/5A"} or "ct": "100/5A" or "ct_ratio": "100/5A"
     ct_config = requirements.get("ct", {})
     if isinstance(ct_config, dict):
         ctx.ct_ratio = ct_config.get("ratio", "")
     elif isinstance(ct_config, str):
         ctx.ct_ratio = ct_config
+    # Fallback: top-level "ct_ratio" key
+    if not ctx.ct_ratio:
+        ctx.ct_ratio = requirements.get("ct_ratio", "")
 
-    # CT metering section details (from metering_config or metering dict)
+    # CT metering section details
+    # Accept from "metering_config" sub-dict OR top-level keys as fallback.
     metering_cfg = requirements.get("metering_config", {})
     if not isinstance(metering_cfg, dict):
         metering_cfg = {}
     ctx.protection_ct_ratio = metering_cfg.get("protection_ct_ratio", ctx.ct_ratio)
     ctx.metering_ct_class = metering_cfg.get("metering_ct_class", "CL1 5VA")
     ctx.protection_ct_class = metering_cfg.get("protection_ct_class", "5P10 20VA")
-    ctx.has_ammeter = metering_cfg.get("has_ammeter", True)
-    ctx.has_voltmeter = metering_cfg.get("has_voltmeter", True)
-    ctx.has_elr = metering_cfg.get("has_elr", True)
+    ctx.has_ammeter = metering_cfg.get(
+        "has_ammeter", requirements.get("has_ammeter", True))
+    ctx.has_voltmeter = metering_cfg.get(
+        "has_voltmeter", requirements.get("has_voltmeter", True))
+    ctx.has_elr = metering_cfg.get(
+        "has_elr", requirements.get("has_elr", True))
     ctx.has_indicator_lights = metering_cfg.get("has_indicator_lights", True)
+    # ELR spec: accept metering_config.elr_spec or top-level "elr" dict
     ctx.elr_spec = metering_cfg.get("elr_spec", "")
+    if not ctx.elr_spec:
+        elr_cfg = requirements.get("elr", {})
+        if isinstance(elr_cfg, dict):
+            parts = []
+            if elr_cfg.get("rating"):
+                parts.append(str(elr_cfg["rating"]))
+            if elr_cfg.get("time_delay"):
+                parts.append(str(elr_cfg["time_delay"]))
+            ctx.elr_spec = " ".join(parts)
+        elif isinstance(elr_cfg, str):
+            ctx.elr_spec = elr_cfg
     ctx.voltmeter_range = metering_cfg.get("voltmeter_range", "")
     ctx.ammeter_range = metering_cfg.get("ammeter_range", "")
 
@@ -239,7 +265,7 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
     # Board name: from distribution_boards[0] or requirements top-level
     dbs = requirements.get("distribution_boards")
     if dbs and isinstance(dbs, list) and len(dbs) >= 1:
-        ctx.board_name = dbs[0].get("name", "")
+        ctx.board_name = dbs[0].get("name") or dbs[0].get("db_name") or ""
     if not ctx.board_name:
         ctx.board_name = requirements.get("db_name", "")
 
@@ -270,12 +296,14 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         ctx.y = y
         return
 
-    # --- Non-metered supply (landlord / cable extension) only below ---
-    # Priority: user-specified label > cable extension > supply_label_type > default
+    # --- Non-metered / CT-metered supply (landlord / building_riser) ---
+    # Priority: user-specified label > cable extension > supply_source > default
     if ctx.requirements.get("incoming_label"):
         supply_label = ctx.requirements["incoming_label"]
     elif ctx.is_cable_extension:
         supply_label = SG_LOCALE.incoming.from_power_supply
+    elif supply_source == "building_riser":
+        supply_label = SG_LOCALE.incoming.from_building_riser
     elif ctx.requirements.get("supply_label_type") == "supply":
         supply_label = SG_LOCALE.incoming.from_landlord_supply
     else:
@@ -566,6 +594,8 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
             supply_label = SG_LOCALE.incoming.from_landlord_supply
         else:
             supply_label = SG_LOCALE.incoming.from_landlord
+    elif ctx.supply_source == "building_riser":
+        supply_label = SG_LOCALE.incoming.from_building_riser
     else:
         supply_label = SG_LOCALE.incoming.incoming_hdb
     result.components.append(PlacedComponent(

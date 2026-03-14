@@ -113,12 +113,12 @@ class TestCircuitIdBox:
     def test_circuit_id_box_in_layout(self):
         """CIRCUIT_ID_BOX components should exist for each sub-circuit.
 
-        3-phase with 3 non-spare + 1 spare → padded to 6 (triplet alignment).
+        Without phase data, triplets are not applied → no spare padding.
         """
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
-        # 3-phase triplet padding: 4 circuits → 6 (Lighting, SPARE×2, Power, Aircon, Spare)
-        assert len(id_boxes) == 6
+        # No triplet padding without phase info → 4 circuits remain as 4
+        assert len(id_boxes) == 4
 
     def test_circuit_id_box_position(self):
         """CIRCUIT_ID_BOX should be positioned near busbar_y (within 5mm above)."""
@@ -131,15 +131,13 @@ class TestCircuitIdBox:
             )
 
     def test_circuit_id_box_has_valid_ids(self):
-        """Each CIRCUIT_ID_BOX should have a non-empty circuit_id with phase prefix."""
+        """Each CIRCUIT_ID_BOX should have a non-empty circuit_id."""
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
         ids = [box.circuit_id for box in id_boxes]
         assert all(len(cid) > 0 for cid in ids)
-        # 3-phase IDs use L1/L2/L3 prefix (e.g., L1S1, L2S1, L3S1, L1P1, ...)
-        assert any(cid.startswith("L1") for cid in ids)
-        assert any(cid.startswith("L2") for cid in ids)
-        assert any(cid.startswith("L3") for cid in ids)
+        # Without phase info, sequential IDs (S1, P1, etc.) are assigned
+        assert len(ids) == 4
 
 
 # -- Test: DB_INFO_BOX --
@@ -356,16 +354,15 @@ class TestLayoutCorrectness:
     def test_breaker_block_components(self):
         """Sub-circuit breakers should use breaker_block label_style.
 
-        3-phase with triplet padding: 4 user circuits → 6 total (including padded SPAREs).
-        All sub-circuit breakers (including spares) use breaker_block style.
+        Without phase info, triplets are not applied → no spare padding.
+        4 user circuits → 4 total breaker blocks.
         """
         result = compute_layout(BASIC_3PHASE_REQ)
         breaker_comps = [
             c for c in result.components
             if c.symbol_name.startswith("CB_") and c.label_style == "breaker_block"
         ]
-        # 3 non-spare + 3 spare (1 original + 2 padded) = 6 breaker blocks
-        assert len(breaker_comps) == 6
+        assert len(breaker_comps) == 4
 
     def test_earth_bar_present(self):
         """Earth bar should always be present in the layout.
@@ -833,14 +830,10 @@ class TestSubCircuitGrouping:
     """Tests for _identify_groups() sub-circuit classification."""
 
     def test_identify_groups_basic_3phase(self):
-        """Basic 3-phase with 4 circuits → 6 groups (triplet padding).
-
-        3-phase triplet padding: 4 user circuits (3 non-spare + 1 spare)
-        → 6 total (pad 2 SPAREs to fill L2/L3 of first triplet).
-        """
+        """Basic 3-phase with 4 circuits → 4 groups (no triplet padding without phase info)."""
         result = compute_layout(BASIC_3PHASE_REQ)
         groups, incoming_x = _identify_groups(result)
-        assert len(groups) == 6
+        assert len(groups) == 4
         # Should be sorted by tap_x
         for i in range(len(groups) - 1):
             assert groups[i].tap_x <= groups[i + 1].tap_x

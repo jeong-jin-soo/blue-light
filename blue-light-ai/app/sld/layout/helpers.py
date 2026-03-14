@@ -182,7 +182,7 @@ def _should_use_triplets(sub_circuits: list[dict], supply_type: str) -> bool:
             phases.append(phase)
 
     if len(phases) < 3:
-        return True  # Not enough data → default to current behavior (triplets)
+        return False  # Not enough phase data → default to no triplets
 
     # Count transitions between different phases
     transitions = 0

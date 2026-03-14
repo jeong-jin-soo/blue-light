@@ -1021,7 +1021,7 @@ def render_board(
         layout=result,
         board_spec=board,
         board_idx=board_idx,
-        board_name=board.get("name", f"DB{board_idx + 1}"),
+        board_name=board.get("name") or board.get("db_name") or f"DB{board_idx + 1}",
         effective_supply_type=ctx.supply_type,
         spine_x=cx,
         region=region,
