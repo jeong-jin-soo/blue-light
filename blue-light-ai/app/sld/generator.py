@@ -352,6 +352,37 @@ class SldGenerator:
         """Map a symbol type name to its DXF block name, if one exists."""
         return _SYMBOL_TO_DXF_BLOCK.get(symbol_name)
 
+    @staticmethod
+    def _dxf_label_offset_x(symbol_name: str, symbol_width: float, symbol_height: float) -> float:
+        """DXF 백엔드용 라벨 X 오프셋 계산.
+
+        블록의 실제 스케일링 폭을 사용하여 라벨이 심볼 바로 옆(3mm)에
+        배치되도록 한다. 블록이 없으면 절차적 폭을 사용.
+
+        Args:
+            symbol_name: 심볼 이름 (e.g. "CB_MCCB").
+            symbol_width: 절차적 심볼 폭 (mm).
+            symbol_height: 절차적 심볼 높이 (mm, 스케일 계산용).
+
+        Returns:
+            라벨 X 오프셋 (comp.x 기준, mm).
+        """
+        if _BLOCK_REPLAYER is None:
+            return symbol_width + 3
+
+        dxf_block_name = _SYMBOL_TO_DXF_BLOCK.get(symbol_name)
+        if not dxf_block_name or not _BLOCK_REPLAYER.has_block(dxf_block_name):
+            return symbol_width + 3
+
+        scaled_w, _ = _BLOCK_REPLAYER.get_scaled_size(
+            dxf_block_name, target_height_mm=symbol_height,
+        )
+        # 블록은 compute_aligned_insertion()으로 핀 정렬 → 블록 중심이
+        # 절차적 핀(comp.x + width/2)에 위치. 라벨은 블록 우측 가장자리 + 3mm.
+        # 블록 우측 가장자리 = comp.x + width/2 + scaled_w/2
+        # 라벨 X 오프셋 = width/2 + scaled_w/2 + 3
+        return symbol_width / 2 + scaled_w / 2 + 3
+
     def _get_symbol(self, symbol_name: str):
         """Get a calibrated symbol instance by its block/type name."""
         try:
@@ -599,7 +630,12 @@ class SldGenerator:
                         char_height=1.6,
                     )
             else:
-                lx = symbol.width + 3 if symbol else 8
+                # Phase 8A: DXF 백엔드에서 라벨을 블록 실제 폭 기준으로 배치
+                if symbol and isinstance(backend, DxfBackend):
+                    lx = self._dxf_label_offset_x(
+                        comp.symbol_name, symbol.width, symbol.height)
+                else:
+                    lx = symbol.width + 3 if symbol else 8
                 if comp.label_y_override is not None:
                     label_abs_y = comp.label_y_override
                 else:
@@ -612,7 +648,12 @@ class SldGenerator:
 
         if comp.cable_annotation:
             backend.set_layer("SLD_ANNOTATIONS")
-            cable_offset_x = symbol.width + 3 if symbol else 8
+            # Phase 8A: DXF 백엔드에서 케이블 주석도 블록 폭 기준
+            if symbol and isinstance(backend, DxfBackend):
+                cable_offset_x = self._dxf_label_offset_x(
+                    comp.symbol_name, symbol.width, symbol.height)
+            else:
+                cable_offset_x = symbol.width + 3 if symbol else 8
             backend.add_mtext(
                 comp.cable_annotation,
                 insert=(comp.x + cable_offset_x, comp.y - 2),
@@ -793,7 +834,12 @@ class SldGenerator:
             # Horizontal text (all text upright, no rotation)
             if comp.label_style == "breaker_block":
                 # Sub-circuit breaker — info items stacked vertically, right of symbol
-                if comp.breaker_type_str in ("MCCB", "ACB"):
+                # Phase 8A: DXF 백엔드에서 블록 실제 폭 기준으로 라벨 배치
+                if isinstance(backend, DxfBackend):
+                    sym_name = f"CB_{comp.breaker_type_str}" if comp.breaker_type_str else comp.symbol_name
+                    lx = self._dxf_label_offset_x(sym_name, sym_w, sym_h)
+                    base_x = comp.x + lx
+                elif comp.breaker_type_str in ("MCCB", "ACB"):
                     base_x = comp.x + 7
                 else:
                     base_x = comp.x + 6
