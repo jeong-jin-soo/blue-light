@@ -152,7 +152,9 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
 
     # CT metering section details
     # Accept from "metering_config" sub-dict OR top-level keys as fallback.
-    metering_cfg = requirements.get("metering_config", {})
+    # metering_detail (from extraction) is lowest priority, metering_config overrides.
+    metering_cfg = {**requirements.get("metering_detail", {}),
+                    **requirements.get("metering_config", {})}
     if not isinstance(metering_cfg, dict):
         metering_cfg = {}
     ctx.protection_ct_ratio = metering_cfg.get("protection_ct_ratio", ctx.ct_ratio)
@@ -512,7 +514,7 @@ def _place_meter_board_symbols(
     if g.iso_left_x > ctx.cx:
         result.connections.append(((ctx.cx, g.mb_center_y), (g.iso_left_x, g.mb_center_y)))
 
-    # ISOLATOR (left)
+    # ISOLATOR (left) — Reference uses procedural isolator symbol (2 circles + diagonal)
     result.components.append(PlacedComponent(
         symbol_name="ISOLATOR",
         x=g.iso_cx - g.iso_h_extent / 2,
@@ -603,6 +605,10 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     ))
 
     # Incoming cable tick + leader line
+    # For landlord supply, the outgoing cable tick (DB→meter board) already labels
+    # the same cable — skip here to avoid duplication (ref DXF has only 1 cable label)
+    if ctx.supply_source == "landlord":
+        return
     cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
     if cable_text:
         tick_x = g.mcb_right_x + 10
@@ -671,13 +677,15 @@ def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> N
         symbol_name="LABEL", x=g.mb_box_left + 1, y=g.mb_label_y,
         label=SG_LOCALE.meter_board.meter_board,
     ))
-    # "LOCATED AT METER COMPARTMENT" below box
-    result.components.append(PlacedComponent(
-        symbol_name="LABEL",
-        x=(g.mb_box_left + g.mb_box_right) / 2 - 18,
-        y=g.mb_box_bottom - 3,
-        label=SG_LOCALE.meter_board.located_meter_compartment,
-    ))
+    # "LOCATED AT METER COMPARTMENT" below box — only if no DB-level location text
+    # Reference DXF: location info appears in DB box area only, not at meter board
+    if not ctx.db_location_text:
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=(g.mb_box_left + g.mb_box_right) / 2 - 18,
+            y=g.mb_box_bottom - 3,
+            label=SG_LOCALE.meter_board.located_meter_compartment,
+        ))
 
     # Earth symbol — 3-phase only
     if ctx.supply_type != "single_phase":
@@ -884,9 +892,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         ))
 
         # Branch from Protection CT (LEFT): ELR
-        # Label: spec only (no "ELR" prefix — box already has "ELR" text)
+        # Label: "ELR" prefix + spec on next line (reference format: "ELR\P0-3A 0.2 SEC")
         if ctx.elr_spec:
-            elr_label = ctx.elr_spec.replace(" ", "\\P")  # 2-line: "0-3A\P0.2sec"
+            elr_label = f"ELR\\P{ctx.elr_spec}"
         else:
             elr_label = "ELR"
         _place_metering_branch(
@@ -1293,12 +1301,12 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
         cb_w, cb_h = config.breaker_w, config.breaker_h
 
     cb_symbol = f"CB_{breaker_type}"
-    # Singapore SLD format (single line, matching reference):
-    #   "100A TPN MCCB (35KA)" or "63A DP MCB (TYPE B 10KA)"
+    # Singapore SLD format (matching reference DXF MTEXT):
+    #   "63A TPN MCB 10kA TYPE B" or "100A TPN MCCB (35kA)"
     if main_breaker_char:
-        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} (TYPE {main_breaker_char} {breaker_fault_kA}KA)"
+        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} {breaker_fault_kA}kA TYPE {main_breaker_char}"
     else:
-        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} ({breaker_fault_kA}KA)"
+        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} ({breaker_fault_kA}kA)"
     result.components.append(PlacedComponent(
         symbol_name=cb_symbol,
         x=cx - cb_w / 2,
@@ -1350,7 +1358,53 @@ def _place_elcb(ctx: _LayoutContext) -> None:
     # No extra connection gap — symbol stubs of adjacent components overlap for continuity
     result.symbols_used.add(elcb_type_str)
 
+    # Post-ELCB MCB: RCCB+MCB serial structure (e.g., 63A RCCB → 63A MCB Type B)
+    post_mcb = ctx.post_elcb_mcb
+    if post_mcb:
+        mcb_type = post_mcb.get("type", "MCB")
+        mcb_symbol = f"CB_{mcb_type}"
+        mcb_w, mcb_h = config.mcb_w, config.mcb_h
+        mcb_rating = post_mcb.get("rating", 0)
+        mcb_poles = post_mcb.get("poles", "TPN")
+        mcb_char = post_mcb.get("breaker_characteristic", "")
+        mcb_fault = post_mcb.get("fault_kA", 10)
+
+        if mcb_char:
+            mcb_label = f"{mcb_rating}A {mcb_poles} Type {mcb_char} {mcb_type} ({mcb_fault}KA)"
+        else:
+            mcb_label = f"{mcb_rating}A {mcb_poles} {mcb_type} ({mcb_fault}KA)"
+
+        result.components.append(PlacedComponent(
+            symbol_name=mcb_symbol,
+            x=cx - mcb_w / 2,
+            y=y,
+            label=mcb_label,
+            rating=f"{mcb_rating}A",
+            poles=mcb_poles,
+            breaker_type_str=mcb_type,
+        ))
+        y += mcb_h + config.stub_len
+        result.symbols_used.add(mcb_type)
+
     ctx.y = y
+
+
+def _place_internal_cable(ctx: _LayoutContext) -> None:
+    """Place internal cable annotation between MCCB/ELCB and busbar (conditional)."""
+    if not ctx.internal_cable:
+        return
+    result = ctx.result
+    cx = ctx.cx
+    y = ctx.y
+    cable_text = ctx.internal_cable
+    # Cable annotation label — placed to the right of the spine
+    result.components.append(PlacedComponent(
+        symbol_name="LABEL",
+        x=cx + 8,
+        y=y - 5,
+        label=cable_text,
+        label_style="cable_annotation",
+    ))
 
 
 def _place_main_busbar(ctx: _LayoutContext) -> None:
@@ -1410,7 +1464,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
 
     busbar_label = (
         f"{busbar_rating}A {SG_LOCALE.circuit.comb_busbar}"
-        if busbar_rating <= 500
+        if busbar_rating <= 100
         else f"{busbar_rating}A {SG_LOCALE.circuit.busbar}"
     )
     result.components.append(PlacedComponent(
@@ -1441,7 +1495,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
             if _m:
                 unit_number = _m.group(0)
 
-    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} kVA"
+    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} KVA AT {voltage}V"
 
     # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
     db_location_text = ""

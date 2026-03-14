@@ -769,6 +769,34 @@ def normalize_to_generation_format(
             metering_type = ""  # Landlord supply: no SP meter board
         if metering_type:
             requirements["metering"] = metering_type
+            # Propagate detailed metering fields for CT/SP metering sections
+            if inc.metering:
+                m = inc.metering
+                metering_detail: dict = {}
+                if m.ct_ratio:
+                    metering_detail["ct_ratio"] = m.ct_ratio
+                if m.protection_ct_ratio:
+                    metering_detail["protection_ct_ratio"] = m.protection_ct_ratio
+                if m.protection_ct_class:
+                    metering_detail["protection_ct_class"] = m.protection_ct_class
+                if m.metering_ct_class:
+                    metering_detail["metering_ct_class"] = m.metering_ct_class
+                if m.has_ammeter is not None:
+                    metering_detail["has_ammeter"] = m.has_ammeter
+                if m.has_voltmeter is not None:
+                    metering_detail["has_voltmeter"] = m.has_voltmeter
+                if m.has_elr is not None:
+                    metering_detail["has_elr"] = m.has_elr
+                if m.has_indicator_lights is not None:
+                    metering_detail["has_indicator_lights"] = m.has_indicator_lights
+                if m.elr_spec:
+                    metering_detail["elr_spec"] = m.elr_spec
+                if m.voltmeter_range:
+                    metering_detail["voltmeter_range"] = m.voltmeter_range
+                if m.ammeter_range:
+                    metering_detail["ammeter_range"] = m.ammeter_range
+                if metering_detail:
+                    requirements["metering_detail"] = metering_detail
 
         # Incoming cable
         if inc.cable and inc.cable.description:

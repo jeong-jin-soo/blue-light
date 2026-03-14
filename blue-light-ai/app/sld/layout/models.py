@@ -705,6 +705,17 @@ class _LayoutContext:
     elcb_rating: int = 0
     elcb_ma: int = 30
     elcb_type_str: str = "ELCB"
+    post_elcb_mcb: dict = field(default_factory=dict)  # MCB after RCCB (serial)
+
+    # Feeder connection (hierarchical topology)
+    feeder_breaker: dict = field(default_factory=dict)
+    feeder_cable: str = ""
+
+    # Internal cable (MCCB→busbar segment)
+    internal_cable: str = ""
+
+    # Meter board label
+    meter_board_label: str = ""
 
     # Premises type (residential, commercial, industrial, etc.)
     premises_type: str = ""

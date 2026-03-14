@@ -99,6 +99,7 @@ _SYMBOL_TO_DXF_BLOCK = {
     "CB_ELCB": "RCCB",
     # Isolators
     "ISOLATOR": "DP ISOL",
+    "DP_ISOL_DEVICE": "DP ISOL",  # circuit-level isolator device at conductor top
     "3P_ISOLATOR": "3P ISOL",
     # CT metering
     "CT": "SLD-CT",
@@ -289,6 +290,14 @@ class SldGenerator:
         app_info = application_info or {}
         if not app_info and "title_block" in requirements:
             app_info = requirements["title_block"]
+
+        # Normalize application_info keys (drawing_no→drawing_number, contractor split)
+        try:
+            from app.sld.circuit_normalizer import normalize_application_info
+            app_info = normalize_application_info(app_info)
+        except Exception as exc:
+            logger.warning("application_info normalization failed: %s", exc)
+
         generator = SldGenerator()
         pc = page_config
         tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
@@ -505,7 +514,15 @@ class SldGenerator:
         """Draw a symbol component (breaker, meter, earth, CT, etc.)."""
         symbol = self._get_symbol(comp.symbol_name)
         if not symbol:
-            logger.warning(f"Unknown symbol: {comp.symbol_name}")
+            if comp.symbol_name == "CB_SPARE" and comp.label:
+                # SPARE circuit: no breaker symbol, just render "SPARE" label text
+                backend.add_mtext(
+                    comp.label,
+                    insert=(comp.x + 6, comp.y + 2),
+                    char_height=1.8,
+                )
+            else:
+                logger.warning(f"Unknown symbol: {comp.symbol_name}")
             return
 
         use_horizontal = (
@@ -527,38 +544,55 @@ class SldGenerator:
                 trip_kwargs["enclosed"] = True
                 needs_special_kwargs = True
         else:
-            needs_special_kwargs = True  # horizontal always needs procedural
+            needs_special_kwargs = True  # horizontal uses special kwargs for procedural fallback
             # Horizontal CBs (meter board) — no trip arrow per LEW reference convention
             if isinstance(symbol, RealCircuitBreaker):
                 trip_kwargs["skip_trip_arrow"] = True
 
-        # BlockReplayer path: DxfBackend uses native INSERT for 100% fidelity.
-        # PDF/SVG use procedural rendering because DXF block dimensions differ
-        # from procedural symbol dimensions (see check_dimension_compatibility).
-        # Phase 6: pin-aligned insertion — block pins align with connection lines.
+        # BlockReplayer path: renders extracted DXF block geometry.
+        # DxfBackend → native INSERT (100% fidelity).
+        # PDF/SVG → _replay_entities() (primitive conversion).
+        # Supports vertical (0°) and horizontal (90°) orientations.
         block_used = False
-        if (
-            _BLOCK_REPLAYER is not None
-            and not use_horizontal
-            and not needs_special_kwargs
-            and isinstance(backend, DxfBackend)
-        ):
+        if _BLOCK_REPLAYER is not None:
             dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
-            if dxf_block_name and backend.has_block(dxf_block_name):
-                # Compute pin-aligned insertion point.
-                # Procedural bottom pin: (comp.x + width/2, comp.y - stub)
-                proc_pins = symbol.vertical_pins(comp.x, comp.y)
-                target_pin = proc_pins.get("bottom", (comp.x, comp.y))
+            if dxf_block_name and _BLOCK_REPLAYER.has_block(dxf_block_name):
+                # Determine rotation and pin based on intent + block native orientation
+                native_horiz = _BLOCK_REPLAYER.is_native_horizontal(dxf_block_name)
+                if use_horizontal:
+                    target_pin = (comp.x, comp.y)
+                    if native_horiz:
+                        # Block is already horizontal → no rotation, use left pin
+                        rotation = 0.0
+                        pin_name = "left"
+                    else:
+                        # Block is vertical → rotate 90° to make horizontal
+                        rotation = 90.0
+                        pin_name = "bottom"  # rotated: bottom→left
+                else:
+                    # Vertical placement
+                    proc_pins = symbol.vertical_pins(comp.x, comp.y)
+                    target_pin = proc_pins.get("bottom", (comp.x, comp.y))
+                    if native_horiz:
+                        # Block is horizontal → rotate 90° to make vertical
+                        rotation = 90.0
+                        pin_name = "left"  # rotated: left→bottom
+                    else:
+                        rotation = 0.0
+                        pin_name = "bottom"
                 try:
                     ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
-                        dxf_block_name, target_pin, "bottom",
+                        dxf_block_name, target_pin, pin_name,
                         target_height_mm=symbol.height,
                     )
                 except ValueError:
                     ix, iy = comp.x, comp.y
                     block_height_du = _BLOCK_REPLAYER.block_height_du(dxf_block_name)
                     scale = symbol.height / (block_height_du or _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82))
-                backend.insert_block(dxf_block_name, ix, iy, scale=scale)
+                _BLOCK_REPLAYER.draw(
+                    backend, dxf_block_name, ix, iy,
+                    scale=scale, rotation=rotation, layer="SLD_SYMBOLS",
+                )
                 block_used = True
 
         # Fallback: procedural symbol rendering
@@ -569,6 +603,18 @@ class SldGenerator:
                 symbol.draw_horizontal(backend, comp.x, comp.y, **trip_kwargs)
             else:
                 symbol.draw(backend, comp.x, comp.y, **trip_kwargs)
+
+        # Enclosed isolator: draw enclosure box around block-rendered isolator
+        if block_used and getattr(comp, 'enclosed', False):
+            pad = 1.0
+            sw = getattr(symbol, 'width', 6)
+            sh = getattr(symbol, 'height', 12)
+            bx, by = comp.x, comp.y
+            backend.set_layer("SLD_SYMBOLS")
+            backend.add_lwpolyline([
+                (bx - pad, by - pad), (bx + sw + pad, by - pad),
+                (bx + sw + pad, by + sh + pad), (bx - pad, by + sh + pad),
+            ], close=True)
 
         # Chain arrow for ditto MCBs
         if comp_idx in ditto_prev_map and isinstance(symbol, RealCircuitBreaker):
@@ -844,6 +890,7 @@ class SldGenerator:
             if comp.label_style == "breaker_block":
                 # Sub-circuit breaker — info items stacked vertically, right of symbol
                 # Phase 8A: DXF 백엔드에서 블록 실제 폭 기준으로 라벨 배치
+                sym_w, sym_h = self._get_breaker_dims(comp.breaker_type_str)
                 if isinstance(backend, DxfBackend):
                     sym_name = f"CB_{comp.breaker_type_str}" if comp.breaker_type_str else comp.symbol_name
                     lx = self._dxf_label_offset_x(sym_name, sym_w, sym_h)
@@ -943,10 +990,17 @@ class SldGenerator:
         """Draw dashed connection lines (DB box boundary per reference DWG).
 
         Reference uses IEC CENTER linetype: long dash + short dash alternating.
+        DXF backend: single LINE per side with CENTER linetype on SLD_DB_FRAME layer.
+        PDF/SVG backend: procedural dash pattern via _draw_center_line().
         """
-        backend.set_layer("SLD_CONNECTIONS")
-        for start, end in layout_result.dashed_connections:
-            _draw_center_line(backend, start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
+        if isinstance(backend, DxfBackend):
+            backend.set_layer("SLD_DB_FRAME")
+            for start, end in layout_result.dashed_connections:
+                backend.add_line(start, end)
+        else:
+            backend.set_layer("SLD_CONNECTIONS")
+            for start, end in layout_result.dashed_connections:
+                _draw_center_line(backend, start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
 
     def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw filled junction dots at busbar tap points."""

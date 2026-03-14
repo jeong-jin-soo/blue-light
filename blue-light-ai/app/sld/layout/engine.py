@@ -28,6 +28,7 @@ from app.sld.layout.sections import (
     _place_earth_bar,
     _place_elcb,
     _place_incoming_supply,
+    _place_internal_cable,
     _place_main_breaker,
     _place_main_busbar,
     _place_meter_board,
@@ -208,7 +209,17 @@ def compute_layout(
 
     dbs = requirements.get("distribution_boards")
     is_multi_db = dbs and len(dbs) > 1
-    topology = requirements.get("db_topology", "parallel") if is_multi_db else "parallel"
+    if is_multi_db:
+        topology = requirements.get("db_topology")
+        if not topology:
+            # Auto-detect: if any DB has fed_from, use hierarchical topology
+            topology = "parallel"
+            for db in dbs:
+                if db.get("fed_from"):
+                    topology = "hierarchical"
+                    break
+    else:
+        topology = "parallel"
 
     if is_multi_db:
         # ═══ MULTI-DB PATH: Board-Unit Independent Rendering ═══
@@ -250,6 +261,7 @@ def compute_layout(
         if topology != "hierarchical":
             _place_main_breaker(incoming_ctx)
             _place_elcb(incoming_ctx)
+            _place_internal_cable(incoming_ctx)
             _place_main_busbar(incoming_ctx)
             main_busbar_y = incoming_result.busbar_y
 
@@ -260,20 +272,35 @@ def compute_layout(
             board_start_y = main_busbar_y + 5 + 10 + 3  # bi_gap + bi_h + gap
 
         # 2. Render each board independently
-        # Propagate top-level kVA to first board (MSB) if it doesn't have its own
+        # Propagate top-level keys to root board (MSB) so _parse_board_requirements
+        # can find main_breaker, elcb, post_elcb_mcb, internal_cable, isolator, etc.
+        _PROPAGATE_KEYS = (
+            "main_breaker", "breaker", "elcb", "post_elcb_mcb",
+            "internal_cable", "isolator", "isolator_rating",
+            "busbar_rating",
+        )
         top_kva = requirements.get("kva", 0)
         root_idx = plan.root_db_idx
         board_results: list["BoardResult"] = []
         for db_idx, db in enumerate(dbs):
             if db_idx == 0 and top_kva and not db.get("kva"):
                 db = {**db, "kva": top_kva}
+            # Propagate top-level requirement keys into root board dict
+            # so that render_board → _parse_board_requirements can consume them.
+            if db_idx == root_idx:
+                for key in _PROPAGATE_KEYS:
+                    if key not in db and key in requirements:
+                        db = {**db, key: requirements[key]}
             # Inject CT metering config into root board so render_board
             # places the CT metering section INSIDE the board (not incoming).
             if db_idx == root_idx and incoming_ctx.metering == "ct_meter":
+                # Merge metering_config (manual) with metering_detail (from extraction)
+                mc = {**requirements.get("metering_detail", {}),
+                      **requirements.get("metering_config", {})}
                 db = {
                     **db,
                     "_ct_metering": True,
-                    "_metering_config": requirements.get("metering_config", {}),
+                    "_metering_config": mc,
                 }
             region = plan.db_regions[db_idx] if db_idx < len(plan.db_regions) else None
             br = render_board(
@@ -301,7 +328,7 @@ def compute_layout(
                 c for c in dbs[root_idx].get("sub_circuits", [])
                 if c.get("_is_feeder")
             ]
-            _add_hierarchical_connections(merged, root_br, child_brs, feeder_circuits)
+            _add_hierarchical_connections(merged, root_br, child_brs, feeder_circuits, dbs)
         else:
             assert main_busbar_y is not None
             _add_parallel_connections(merged, board_results, main_busbar_y)
@@ -367,6 +394,7 @@ def compute_layout(
             _place_main_breaker(ctx)
             _place_ct_pre_mccb_fuse(ctx)
         _place_elcb(ctx)
+        _place_internal_cable(ctx)
         _place_main_busbar(ctx)
         busbar_y_row = _place_sub_circuits_rows(ctx)
 
@@ -765,8 +793,14 @@ def _parse_board_requirements(
     Extracts breaker, ELCB, circuits, and busbar info from a board dict
     into the shared context.  Used by render_board() for per-board setup.
     """
-    # Breaker
-    breaker = board.get("breaker", board.get("main_breaker", {}))
+    # Breaker — priority chain: incoming_breaker > main_mcb > breaker > main_breaker
+    breaker = (
+        board.get("incoming_breaker")
+        or board.get("main_mcb")
+        or board.get("breaker")
+        or board.get("main_breaker")
+        or {}
+    )
     ctx.breaker_type = breaker.get("type", "MCCB")
     ctx.breaker_rating = breaker.get("rating", 100)
     ctx.breaker_poles = breaker.get("poles", "TPN")
@@ -799,6 +833,28 @@ def _parse_board_requirements(
     # Supply type inherited from global
     ctx.supply_type = global_supply_type
     ctx.voltage = 400 if global_supply_type == "three_phase" else 230
+
+    # Post-ELCB MCB (RCCB+MCB serial structure)
+    ctx.post_elcb_mcb = board.get("post_elcb_mcb", {})
+
+    # Feeder connection metadata (hierarchical topology)
+    ctx.feeder_breaker = board.get("feeder_breaker", {})
+    ctx.feeder_cable = board.get("feeder_cable", "")
+
+    # Internal cable (MCCB→busbar segment label)
+    ctx.internal_cable = board.get("internal_cable", "")
+
+    # Meter board label
+    ctx.meter_board_label = board.get("meter_board", "")
+
+    # Isolator — flatten dict form {"rating": N, "type": "4P", "location_text": ...}
+    # into flat keys that _place_unit_isolator reads from ctx.requirements
+    isolator = board.get("isolator", {})
+    if isinstance(isolator, dict) and isolator:
+        if "isolator_rating" not in board:
+            board["isolator_rating"] = isolator.get("rating", 0)
+        if "isolator_label" not in board:
+            board["isolator_label"] = isolator.get("location_text", "")
 
 
 def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
@@ -903,6 +959,7 @@ def render_board(
         _place_ct_metering_section,
         _place_ct_pre_mccb_fuse,
         _place_elcb,
+        _place_internal_cable,
         _place_main_breaker,
         _place_main_busbar,
         _place_sub_circuits_rows,
@@ -989,6 +1046,7 @@ def render_board(
         _place_main_breaker(ctx)
         _place_ct_pre_mccb_fuse(ctx)
     _place_elcb(ctx)
+    _place_internal_cable(ctx)
     _place_main_busbar(ctx)
 
     # Override db_box_start_y to include CT metering section inside the DB box.
@@ -1042,11 +1100,23 @@ def _add_hierarchical_connections(
     root_result: "BoardResult",
     child_results: list["BoardResult"],
     feeder_circuits: list[dict],
+    dbs: list[dict] | None = None,
 ) -> None:
     """Add feeder connections from root board busbar to child boards.
 
-    Places junction dots, cable runs, SUPPLY FROM labels, and BI_CONNECTORs
-    between root board and each child board.
+    Places junction dots, cable runs, feeder MCBs, BI_CONNECTORs, incoming MCBs,
+    SUPPLY FROM labels, and cable spec labels between root board and each child board.
+
+    Reference layout (top→bottom, Y increases upward):
+        root busbar
+            ↓ junction dot
+        feeder MCB (from root's feeder_breaker)
+            ↓
+        BI_CONNECTOR
+            ↓
+        incoming MCB (from child's incoming_breaker)
+            ↓ cable + label
+        child board top
     """
     from app.sld.layout.models import PlacedComponent
 
@@ -1056,6 +1126,9 @@ def _add_hierarchical_connections(
     root_name = root_result.board_name
     bi_h = 10
     bi_w = 16
+    mcb_w = 7.2
+    mcb_h = 13.0
+    stub = 3.0
 
     for child in child_results:
         child_cx = child.spine_x
@@ -1067,6 +1140,15 @@ def _add_hierarchical_connections(
                 feeder_ckt = fc
                 break
 
+        # Find child DB dict for incoming_breaker
+        child_db = None
+        if dbs:
+            for db in dbs:
+                db_name = (db.get("name") or db.get("db_name") or "").upper()
+                if db_name == child.board_name.upper():
+                    child_db = db
+                    break
+
         # Junction on root busbar
         tap_x = max(root_busbar_sx + 2, min(child_cx, root_busbar_ex - 2))
         merged.junction_dots.append((tap_x, root_busbar_y))
@@ -1076,41 +1158,117 @@ def _add_hierarchical_connections(
             cable_run_y = root_busbar_y - 8
             merged.connections.append(((tap_x, root_busbar_y), (tap_x, cable_run_y)))
             merged.connections.append(((tap_x, cable_run_y), (child_cx, cable_run_y)))
-            cable_bottom_y = cable_run_y
+            connect_y = cable_run_y
         else:
-            cable_bottom_y = root_busbar_y
+            connect_y = root_busbar_y
 
-        # Labels
-        merged.components.append(PlacedComponent(
-            symbol_name="LABEL",
-            x=child_cx + 5,
-            y=cable_bottom_y - 3,
-            label=f"SUPPLY FROM {root_name}",
-        ))
-        if feeder_ckt:
-            cable_spec = feeder_ckt.get("cable_size", "") or feeder_ckt.get("cable", "")
-            if cable_spec:
-                merged.components.append(PlacedComponent(
-                    symbol_name="LABEL",
-                    x=child_cx + 5,
-                    y=cable_bottom_y - 6,
-                    label=str(cable_spec),
-                ))
+        # ── Feeder MCB (root side) ──
+        # Priority: feeder circuit → root board dict → child DB dict
+        feeder_brk = feeder_ckt.get("feeder_breaker", {}) if feeder_ckt else {}
+        if not feeder_brk:
+            # Check root board dict (MSB) for feeder_breaker
+            root_db = dbs[root_result.board_idx] if dbs and root_result.board_idx < len(dbs) else None
+            if root_db:
+                feeder_brk = root_db.get("feeder_breaker", {})
+        if not feeder_brk and child_db:
+            feeder_brk = child_db.get("feeder_breaker", {})
+        if feeder_brk and feeder_brk.get("rating"):
+            fmcb_y = connect_y - stub - mcb_h
+            merged.connections.append(((child_cx, connect_y), (child_cx, fmcb_y + mcb_h)))
+            f_type = feeder_brk.get("type", "MCB")
+            f_char = feeder_brk.get("breaker_characteristic", "")
+            f_rating = feeder_brk.get("rating", 0)
+            f_poles = feeder_brk.get("poles", "TPN")
+            f_kA = feeder_brk.get("fault_kA", 10)
+            if f_char:
+                f_label = f"{f_rating}A {f_poles} Type {f_char} {f_type} ({f_kA}KA)"
+            else:
+                f_label = f"{f_rating}A {f_poles} {f_type} ({f_kA}KA)"
+            merged.components.append(PlacedComponent(
+                symbol_name=f"CB_{f_type}",
+                x=child_cx - mcb_w / 2,
+                y=fmcb_y,
+                label=f_label,
+                rating=f"{f_rating}A",
+                poles=f_poles,
+                breaker_type_str=f_type,
+            ))
+            merged.symbols_used.add(f_type)
+            connect_y = fmcb_y - stub
+        else:
+            # No feeder MCB — direct connection to BI_CONNECTOR
+            pass
 
-        # BI_CONNECTOR
-        bi_y = cable_bottom_y - 12
-        merged.connections.append(((child_cx, cable_bottom_y), (child_cx, bi_y)))
+        # ── BI_CONNECTOR ──
+        bi_y = connect_y - bi_h
+        merged.connections.append(((child_cx, connect_y), (child_cx, bi_y + bi_h)))
+        # BI CONNECTOR label includes root breaker rating (e.g., "100A BI CONN.")
+        bi_rating = root_result.breaker_rating or ""
+        bi_label = f"{bi_rating}A BI CONN." if bi_rating else "BI CONN."
         merged.components.append(PlacedComponent(
             symbol_name="BI_CONNECTOR",
             x=child_cx - bi_w / 2,
             y=bi_y,
-            label="BI CONN.",
+            label=bi_label,
         ))
         merged.symbols_used.add("BI_CONNECTOR")
+        connect_y = bi_y - stub
 
-        # Connection from BI_CONNECTOR to child board top
-        child_top_y = bi_y + bi_h
-        merged.connections.append(((child_cx, child_top_y), (child_cx, child_top_y + 3)))
+        # ── Incoming MCB (child side) ──
+        incoming_brk = child_db.get("incoming_breaker", {}) if child_db else {}
+        if incoming_brk and incoming_brk.get("rating"):
+            imcb_y = connect_y - mcb_h
+            merged.connections.append(((child_cx, connect_y), (child_cx, imcb_y + mcb_h)))
+            i_type = incoming_brk.get("type", "MCB")
+            i_char = incoming_brk.get("breaker_characteristic", "")
+            i_rating = incoming_brk.get("rating", 0)
+            i_poles = incoming_brk.get("poles", "TPN")
+            i_kA = incoming_brk.get("fault_kA", 10)
+            if i_char:
+                i_label = f"{i_rating}A {i_poles} Type {i_char} {i_type} ({i_kA}KA)"
+            else:
+                i_label = f"{i_rating}A {i_poles} {i_type} ({i_kA}KA)"
+            merged.components.append(PlacedComponent(
+                symbol_name=f"CB_{i_type}",
+                x=child_cx - mcb_w / 2,
+                y=imcb_y,
+                label=i_label,
+                rating=f"{i_rating}A",
+                poles=i_poles,
+                breaker_type_str=i_type,
+            ))
+            merged.symbols_used.add(i_type)
+            connect_y = imcb_y - stub
+
+        # ── Labels ──
+        merged.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=child_cx + 5,
+            y=connect_y - 3,
+            label=f"SUPPLY FROM {root_name}",
+        ))
+
+        # Cable spec label
+        cable_spec = ""
+        if feeder_ckt:
+            cable_spec = feeder_ckt.get("cable_size", "") or feeder_ckt.get("cable", "")
+        if not cable_spec:
+            # Check root board dict (MSB) for feeder_cable
+            root_db = dbs[root_result.board_idx] if dbs and root_result.board_idx < len(dbs) else None
+            if root_db:
+                cable_spec = root_db.get("feeder_cable", "")
+        if not cable_spec and child_db:
+            cable_spec = child_db.get("feeder_cable", "")
+        if cable_spec:
+            merged.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=child_cx + 5,
+                y=connect_y - 6,
+                label=str(cable_spec),
+            ))
+
+        # Connection to child board top
+        merged.connections.append(((child_cx, connect_y), (child_cx, connect_y - 3)))
 
 
 def _add_parallel_connections(

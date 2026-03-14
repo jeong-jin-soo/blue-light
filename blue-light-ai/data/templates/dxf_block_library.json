@@ -1,8 +1,8 @@
 {
   "_meta": {
     "version": 1,
-    "last_updated": "2026-03-14T04:54:54",
-    "total_source_files": 27,
+    "last_updated": "2026-03-14T12:44:27",
+    "total_source_files": 28,
     "total_blocks": 11
   },
   "_processed_files": {
@@ -269,12 +269,22 @@
         "3P SOCKET"
       ],
       "sld_type": "cable_extension"
+    },
+    "I2R-ETR-NLB-SLD-1.dxf": {
+      "sha256": "697f2c4b02d98b5f44e26059561efd7397d3280db012bf0fa67a912ba3c41ca7",
+      "processed_at": "2026-03-14T12:44:27",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "unknown"
     }
   },
   "blocks": {
     "DP ISOL": {
       "source_file": "100A Single Phase DB 1 DWG.dxf",
-      "source_count": 16,
+      "source_count": 17,
       "width_du": 282.3756,
       "height_du": 430.6284,
       "bounds": {
@@ -356,7 +366,7 @@
     },
     "MCCB": {
       "source_file": "100A TPN SLD 1 DWG.dxf",
-      "source_count": 24,
+      "source_count": 25,
       "width_du": 127.5901,
       "height_du": 597.8178,
       "bounds": {
@@ -422,7 +432,7 @@
     },
     "RCCB": {
       "source_file": "100A TPN SLD 1 DWG.dxf",
-      "source_count": 19,
+      "source_count": 20,
       "width_du": 400.5061,
       "height_du": 597.8178,
       "bounds": {

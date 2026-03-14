@@ -156,7 +156,7 @@ class TestDbInfoBox:
         result = compute_layout(BASIC_3PHASE_REQ)
         db_box = _get_components_by_type(result, "DB_INFO_BOX")[0]
         assert "APPROVED LOAD" in db_box.rating
-        assert "kVA" in db_box.rating
+        assert "KVA" in db_box.rating  # uppercase per reference (63A TPN SLD 14)
 
     def test_db_info_box_contains_db_rating(self):
         """DB_INFO_BOX label should show DB rating."""

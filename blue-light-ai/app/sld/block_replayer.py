@@ -211,6 +211,13 @@ class BlockReplayer:
         s = self.compute_scale(block_name, target_height_mm)
         return abs(top_pin[0]) * s
 
+    def is_native_horizontal(self, block_name: str) -> bool:
+        """블록의 네이티브 방향이 가로(width > height)인지 판단."""
+        blk = self._blocks.get(block_name)
+        if not blk:
+            return False
+        return blk.get("width_du", 0) > blk.get("height_du", 0) * 1.2
+
     def compute_aligned_insertion(
         self,
         block_name: str,

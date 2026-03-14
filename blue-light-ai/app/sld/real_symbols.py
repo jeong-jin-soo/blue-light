@@ -1213,6 +1213,7 @@ REAL_SYMBOL_MAP: dict[str, type | object] = {
     "KWH_METER": RealKwhMeter,
     "CT": RealCT,
     "ISOLATOR": RealIsolator,
+    "DP_ISOL_DEVICE": RealIsolator,
     "EARTH": RealEarth,
     "FUSE": RealFuse,
     "POTENTIAL_FUSE": RealPotentialFuse,

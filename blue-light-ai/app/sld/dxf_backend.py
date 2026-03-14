@@ -38,6 +38,7 @@ _LAYER_CONFIG: dict[str, dict] = {
     "SLD_POWER_MAIN": {"color": 7, "lineweight": 50},    # 0.50mm (busbar)
     "SLD_ANNOTATIONS": {"color": 7, "lineweight": 25},   # 0.25mm
     "SLD_TITLE_BLOCK": {"color": 7, "lineweight": 25},   # 0.25mm
+    "SLD_DB_FRAME": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # ref: E-SLD-FRAME
 }
 
 # Text style name
@@ -64,12 +65,21 @@ class DxfBackend:
 
     def _setup_layers(self) -> None:
         """Create DXF layers matching real LEW SLD style."""
+        # Register CENTER linetype if any layer needs it (ref: E-SLD-FRAME uses CENTER)
+        if "CENTER" not in self._doc.linetypes:
+            self._doc.linetypes.add(
+                "CENTER",
+                pattern=[1.25, 0.75, -0.125, 0.25, -0.125],
+                description="Center ____ _ ____ _ ____",
+            )
         for name, cfg in _LAYER_CONFIG.items():
-            self._doc.layers.add(
+            layer = self._doc.layers.add(
                 name,
                 color=cfg["color"],
                 lineweight=cfg["lineweight"],
             )
+            if "linetype" in cfg:
+                layer.dxf.linetype = cfg["linetype"]
 
     def _setup_text_style(self) -> None:
         """Set up Arial TrueType text style (matches ArialMT in real samples)."""

@@ -1499,26 +1499,14 @@ def _add_isolator_device_symbols(
         box_bottom = conductor_top_y
         box_top = conductor_top_y + _BOX_SIZE
 
-        # 1. Outline rectangle (4 line segments, no internal lines)
-        layout_result.connections.append(
-            ((tap_x - _BOX_HW, box_bottom), (tap_x + _BOX_HW, box_bottom)))  # bottom
-        layout_result.connections.append(
-            ((tap_x - _BOX_HW, box_top), (tap_x + _BOX_HW, box_top)))        # top
-        layout_result.connections.append(
-            ((tap_x - _BOX_HW, box_bottom), (tap_x - _BOX_HW, box_top)))     # left
-        layout_result.connections.append(
-            ((tap_x + _BOX_HW, box_bottom), (tap_x + _BOX_HW, box_top)))     # right
-
-        # 2. L-shaped connection stub (right edge middle → right → down)
-        stub_start_x = tap_x + _BOX_HW
-        stub_mid_y = (box_bottom + box_top) / 2
-        stub_corner_x = stub_start_x + _STUB_RIGHT
-        stub_end_y = stub_mid_y - _STUB_DOWN
-
-        layout_result.connections.append(
-            ((stub_start_x, stub_mid_y), (stub_corner_x, stub_mid_y)))        # horizontal
-        layout_result.connections.append(
-            ((stub_corner_x, stub_mid_y), (stub_corner_x, stub_end_y)))       # vertical down
+        # Place DP ISOL device as a component (DXF block INSERT, matching reference)
+        # Reference DXF: DP ISOL blocks at circuit tops, rot=90°, scale=0.81
+        layout_result.components.append(PlacedComponent(
+            symbol_name="DP_ISOL_DEVICE",
+            x=tap_x - _BOX_HW,
+            y=box_bottom,
+            rotation=90.0,
+        ))
 
 
 def _get_circuit_id(group: SubCircuitGroup, components: list) -> str:

@@ -844,19 +844,31 @@ def _place_sub_circuits_upward(
         result.connections.append(((tap_x, busbar_y), (tap_x, sc_y)))
         result.junction_dots.append((tap_x, busbar_y))
 
-        # Place breaker
-        _render_type = "MCB" if cd["breaker_type"] == "ISOLATOR" else cd["breaker_type"]
-        result.components.append(PlacedComponent(
-            symbol_name=f"CB_{_render_type}",
-            x=tap_x - sc_cb_w / 2, y=sc_y,
-            label=cd["name"], rating=f"{cd['breaker_rating']}A",
-            cable_annotation=cd["cable"], circuit_id=circuit_id,
-            load_info=cd["load_info"], rotation=90.0,
-            poles=cd["poles"], breaker_type_str=cd["breaker_type"],
-            fault_kA=cd["fault_kA"], label_style="breaker_block",
-            breaker_characteristic=cd["breaker_char"],
-        ))
-        result.symbols_used.add(cd["breaker_type"])
+        # Place breaker (SPARE circuits: no breaker symbol, just stub line)
+        if cd["breaker_type"] == "SPARE":
+            # SPARE: extend stub line and place "SPARE" label only
+            result.components.append(PlacedComponent(
+                symbol_name="CB_SPARE",
+                x=tap_x - sc_cb_w / 2, y=sc_y,
+                label="SPARE", rating="",
+                cable_annotation="", circuit_id=circuit_id,
+                load_info="", rotation=90.0,
+                poles="", breaker_type_str="SPARE",
+                fault_kA=0, label_style="breaker_block",
+            ))
+        else:
+            _render_type = "MCB" if cd["breaker_type"] == "ISOLATOR" else cd["breaker_type"]
+            result.components.append(PlacedComponent(
+                symbol_name=f"CB_{_render_type}",
+                x=tap_x - sc_cb_w / 2, y=sc_y,
+                label=cd["name"], rating=f"{cd['breaker_rating']}A",
+                cable_annotation=cd["cable"], circuit_id=circuit_id,
+                load_info=cd["load_info"], rotation=90.0,
+                poles=cd["poles"], breaker_type_str=cd["breaker_type"],
+                fault_kA=cd["fault_kA"], label_style="breaker_block",
+                breaker_characteristic=cd["breaker_char"],
+            ))
+            result.symbols_used.add(cd["breaker_type"])
 
         # Conductor tail (extends upward past cable leader line)
         breaker_top_y = sc_y + sc_cb_h + config.stub_len
