@@ -34,6 +34,9 @@
   <circle cx="267.80" cy="183.01" r="0.35" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="271.20" cy="183.01" r="0.35" stroke="#000000" stroke-width="0.25" fill="none" />
   <path d="M 271.15,182.60 A 1.70,1.70 0 0,0 267.86,182.58" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="269.46" y1="187.31" x2="269.51" y2="181.31" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="269.51" y1="181.31" x2="270.10" y2="182.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="269.51" y1="181.31" x2="268.90" y2="182.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="271.55" y1="183.01" x2="273.50" y2="183.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="265.50" y1="183.01" x2="267.45" y2="183.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="273.50" y1="183.01" x2="275.50" y2="183.01" stroke="#000000" stroke-width="0.25" fill="none" />

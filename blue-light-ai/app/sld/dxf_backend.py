@@ -231,13 +231,13 @@ class DxfBackend:
 
     def import_symbol_blocks(self, reference_dxf_path: str) -> None:
         """
-        Import symbol block definitions (MCCB, RCCB, DP ISOL) from a reference DXF file.
+        Import all SLD symbol block definitions from a reference DXF file.
 
-        These blocks are identical across all 26 SLD template DXF files and represent
-        the authoritative IEC 60617 circuit breaker symbols used in real LEW SLDs.
+        Imports every named block (excluding anonymous *-prefixed and AutoCAD
+        internal A$C-prefixed blocks) from the reference DXF into this document.
 
         Args:
-            reference_dxf_path: Path to a template DXF file (e.g., "100A TPN SLD 1 DWG.dxf")
+            reference_dxf_path: Path to a template DXF file (e.g., "150A TPN SLD 1 DWG.dxf")
         """
         try:
             ref_doc = ezdxf.readfile(reference_dxf_path)
@@ -245,20 +245,24 @@ class DxfBackend:
             logger.warning(f"Failed to read reference DXF for block import: {e}")
             return
 
-        target_blocks = ["MCCB", "RCCB", "DP ISOL"]
         imported = []
 
-        for block_name in target_blocks:
-            if block_name in ref_doc.blocks and block_name not in self._doc.blocks:
-                try:
-                    # Copy block definition from reference to current document
-                    ref_block = ref_doc.blocks.get(block_name)
-                    new_block = self._doc.blocks.new(name=block_name)
-                    for entity in ref_block:
-                        new_block.add_entity(entity.copy())
-                    imported.append(block_name)
-                except Exception as e:
-                    logger.warning(f"Failed to import block '{block_name}': {e}")
+        for block in ref_doc.blocks:
+            block_name = block.name
+            # Skip anonymous, standard, and AutoCAD internal blocks
+            if block_name.startswith("*") or block_name.startswith("_") or block_name.startswith("A$C"):
+                continue
+            # Skip empty blocks and already-imported blocks
+            if not list(block) or block_name in self._doc.blocks:
+                continue
+
+            try:
+                new_block = self._doc.blocks.new(name=block_name)
+                for entity in block:
+                    new_block.add_entity(entity.copy())
+                imported.append(block_name)
+            except Exception as e:
+                logger.warning(f"Failed to import block '{block_name}': {e}")
 
         if imported:
             logger.info(f"Imported DXF symbol blocks: {imported}")

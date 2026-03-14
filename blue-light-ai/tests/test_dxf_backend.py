@@ -237,34 +237,35 @@ class TestDxfBlockImport:
 
 
 class TestDxfBlockHeightValidation:
-    """Runtime validation of hardcoded _DXF_BLOCK_HEIGHTS."""
+    """Validation of BlockReplayer library heights against legacy constants."""
 
-    @pytest.mark.skipif(
-        not _REFERENCE_DXF_PATH.exists(),
-        reason="Reference DXF not found — skipping height validation tests",
-    )
-    def test_hardcoded_heights_match_reference(self):
-        """Hardcoded block heights match actual DXF block measurements within 1%."""
-        from app.sld.generator import _DXF_BLOCK_HEIGHTS, _compute_block_heights_from_dxf
+    def test_block_replayer_heights_match_legacy(self):
+        """BlockReplayer block heights match legacy _DXF_BLOCK_HEIGHTS within 1%."""
+        from app.sld.block_replayer import BlockReplayer
+        from app.sld.generator import _DXF_BLOCK_HEIGHTS
 
-        measured = _compute_block_heights_from_dxf(_REFERENCE_DXF_PATH)
-        assert len(measured) > 0, "No blocks measured from reference DXF"
+        replayer = BlockReplayer.load()
 
-        for name, hardcoded in _DXF_BLOCK_HEIGHTS.items():
-            actual = measured.get(name)
-            assert actual is not None, f"Block '{name}' not found in reference DXF"
-            pct_diff = abs(actual - hardcoded) / hardcoded * 100
+        for name, legacy_height in _DXF_BLOCK_HEIGHTS.items():
+            lib_height = replayer.block_height_du(name)
+            assert lib_height > 0, f"Block '{name}' not in library"
+            pct_diff = abs(lib_height - legacy_height) / legacy_height * 100
             assert pct_diff <= 1.0, (
-                f"Block '{name}': hardcoded={hardcoded:.2f}, "
-                f"measured={actual:.2f} ({pct_diff:.1f}% diff)"
+                f"Block '{name}': legacy={legacy_height:.2f}, "
+                f"library={lib_height:.2f} ({pct_diff:.1f}% diff)"
             )
 
-    def test_compute_block_heights_nonexistent_file(self):
-        """_compute_block_heights_from_dxf returns empty dict for missing file."""
-        from app.sld.generator import _compute_block_heights_from_dxf
+    def test_block_replayer_loads_all_expected_blocks(self):
+        """BlockReplayer loads all blocks referenced in _SYMBOL_TO_DXF_BLOCK."""
+        from app.sld.block_replayer import BlockReplayer
+        from app.sld.generator import _SYMBOL_TO_DXF_BLOCK
 
-        result = _compute_block_heights_from_dxf(Path("/nonexistent/file.dxf"))
-        assert result == {}
+        replayer = BlockReplayer.load()
+
+        for symbol_name, block_name in _SYMBOL_TO_DXF_BLOCK.items():
+            assert replayer.has_block(block_name), (
+                f"Block '{block_name}' (for symbol '{symbol_name}') not in library"
+            )
 
 
 # ── TestDxfBackendOutput ─────────────────────────────────────────

@@ -1,0 +1,1365 @@
+{
+  "_meta": {
+    "version": 1,
+    "last_updated": "2026-03-14T04:54:54",
+    "total_source_files": 27,
+    "total_blocks": 11
+  },
+  "_processed_files": {
+    "100A Single Phase DB 1 DWG.dxf": {
+      "sha256": "19686d8927554d3a8387ecce819250aea0907944f8f12d38f6e90aac7de51550",
+      "processed_at": "2026-03-14T04:50:50",
+      "blocks_found": [
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_1phase"
+    },
+    "100A TPN SLD 1 DWG.dxf": {
+      "sha256": "5d68fa3368927af8585bae7096ea7f000b42ee945f705609b1e62dc96b62af8f",
+      "processed_at": "2026-03-14T04:50:50",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "125A TPN SLD 1 DWG.dxf": {
+      "sha256": "c94fd2ab5cb89e32768fe518c84ee7c17a0615ea0529ad5b663eac2a9c44e75f",
+      "processed_at": "2026-03-14T04:50:50",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "150A TPN SLD 1 DWG.dxf": {
+      "sha256": "89db55241b88005aa869645f5e905ff931f27a224ff48c8589ea741c8dc5a40e",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL",
+        "SLD-CT",
+        "2A FUSE",
+        "LED IND LTG",
+        "SS",
+        "VOLTMETER",
+        "EF"
+      ],
+      "sld_type": "ct_metering_3phase"
+    },
+    "150A TPN SLD 3 DWG.dxf": {
+      "sha256": "2a30f1e7b5258a49bf44fafc93fa67dc827d1c524dd0d3669dd421d47403ce4c",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "200A TPN SLD 1 DWG.dxf": {
+      "sha256": "cfcdcf2d8f5df04e2a0d19c912ad622c2b20ff2b878168f95bb7934149341a0b",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "200A TPN SLD 3 DWG.dxf": {
+      "sha256": "67205449a576bece4e1930295748e2326e30323893a103b95910acce482bfd04",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "300A TPN SLD 1 DWG.dxf": {
+      "sha256": "514e4705538c8912c8b3de0f186ab0ba3bc3e232449ece4375a005033847a2b4",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "32A Single Phase DB 1 DWG.dxf": {
+      "sha256": "7f188529f23f1e5bfc046f8486d808baa6302d8acb88be318b54c146659f6908",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [],
+      "sld_type": "direct_metering_1phase"
+    },
+    "32A Single Phase DB 3 DWG.dxf": {
+      "sha256": "3930154880bb9b3f5beda233423f23c7abf501dc92aafa67716572bade2b3f9c",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_1phase"
+    },
+    "32A TPN SLD 1 DWG.dxf": {
+      "sha256": "6d99cf9ce1ef102c1d5376c88818d49aa97953963d3acd9a81e93ff042d00b39",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "400A TPN SLD 1 DWG.dxf": {
+      "sha256": "09447518f367a2f6e7a1e19b339ab777e959e9140aa6f1a10f317a0144c4d02a",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL",
+        "SLD-CT",
+        "2A FUSE",
+        "LED IND LTG",
+        "SS",
+        "VOLTMETER",
+        "EF"
+      ],
+      "sld_type": "ct_metering_3phase"
+    },
+    "40A Single Phase DB 1 DWG.dxf": {
+      "sha256": "a7f60f98525e067792c45062b259d1d743fb486cc46bc32e5695c5c6751683b6",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB"
+      ],
+      "sld_type": "direct_metering_1phase"
+    },
+    "40A Single Phase DB 3 DWG.dxf": {
+      "sha256": "f1bce02d1750cceefa28171d39fdbfa598ac29e5c69083ea1f96a285f922f965",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB"
+      ],
+      "sld_type": "direct_metering_1phase"
+    },
+    "40A TPN SLD 1 DWG.dxf": {
+      "sha256": "6dde4eee996e1333082f06ff1fb8e002d199f2cdcb78796444e18c6046ce1117",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "DP ISOL",
+        "MCCB"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "40A TPN SLD 3 DWG.dxf": {
+      "sha256": "04c7dd979ccc1ab9b9f24a0c13f6210b270e42acd1d0d639ce848cea71251ea2",
+      "processed_at": "2026-03-14T04:50:51",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "500A TPN SLD 1 DWG.dxf": {
+      "sha256": "81f5311f2a747ea96d614bb3b0934b7be2c1f2bd583d17f13d1e7b9ec2678f92",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "63A Single Phase DB 3 DWG.dxf": {
+      "sha256": "226d56cfee89d2b314ed455fa29438db2c373487239db03d68aafa9db817fe59",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB"
+      ],
+      "sld_type": "direct_metering_1phase"
+    },
+    "63A Single Phase DB 6 DWG.dxf": {
+      "sha256": "a257c39fe22e1c389c444672fae75bda80355013a5114ff5a5b47cc3e7aff2f1",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_1phase"
+    },
+    "63A TPN SLD 1 DWG.dxf": {
+      "sha256": "bf58b51b90774228424adc3ee23b4233f17bc72019202e83c1c30f5e78c4421f",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "63A TPN SLD 14.dxf": {
+      "sha256": "89edaebb65f8fa1210cc8102462bab9a9d03f4dc2420f580676b3ee30a4833b7",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "3P ISOL",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "63A TPN SLD 16 DWG.dxf": {
+      "sha256": "b1a4a2cf955e2ddd61b75884ffa44b30373cb50daf0fda6fbe4be1c0fde59193",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "3P ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "63A TPN SLD 8 DWG.dxf": {
+      "sha256": "97ea3ee0c55ad0500bd585e3afa2affd77cd55c335b65c12605f8d8ffb769d02",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "3P ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "80A TPN SLD 2 DWG.dxf": {
+      "sha256": "9903c59d485e4614aa291b04f015c98a7e456a9c1909120deeb737051dc0c6bc",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "DP ISOL"
+      ],
+      "sld_type": "direct_metering_3phase"
+    },
+    "Cable Extension SLD 2 DWG.dxf": {
+      "sha256": "a865835761816972043a447d5a9da6cbb221b27247565b87785412f3558266c9",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB"
+      ],
+      "sld_type": "cable_extension"
+    },
+    "Cable Extension SLD 4 DWG.dxf": {
+      "sha256": "5179947d1c987910262fd401bf33fd12a7dc40506c5eb8aa0fb9fbbbbba03cc0",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "3P SOCKET"
+      ],
+      "sld_type": "cable_extension"
+    },
+    "Cable Extension SLD 5 DWG.dxf": {
+      "sha256": "8c66ccc3cd4c9d5adf224c221524f5f25a773bf43a0d57dbc8a34d0378f8e7ad",
+      "processed_at": "2026-03-14T04:50:52",
+      "blocks_found": [
+        "MCCB",
+        "RCCB",
+        "3P SOCKET"
+      ],
+      "sld_type": "cable_extension"
+    }
+  },
+  "blocks": {
+    "DP ISOL": {
+      "source_file": "100A Single Phase DB 1 DWG.dxf",
+      "source_count": 16,
+      "width_du": 282.3756,
+      "height_du": 430.6284,
+      "bounds": {
+        "min_x": 0.0,
+        "min_y": -289.3285,
+        "max_x": 282.3756,
+        "max_y": 141.2999
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              0.0,
+              141.2999
+            ],
+            [
+              0.0,
+              -141.2999
+            ],
+            [
+              282.3756,
+              -141.2999
+            ],
+            [
+              282.3756,
+              141.2999
+            ]
+          ],
+          "bulges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "closed": true
+        },
+        {
+          "type": "LINE",
+          "start": [
+            141.1878,
+            -141.2999
+          ],
+          "end": [
+            141.1878,
+            -289.3285
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            141.1878,
+            -289.3285
+          ],
+          "end": [
+            20.1699,
+            -289.3285
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          141.1878,
+          141.2999
+        ],
+        "bottom": [
+          141.1878,
+          -289.3285
+        ],
+        "left": [
+          0.0,
+          -74.0143
+        ],
+        "right": [
+          282.3756,
+          -74.0143
+        ]
+      }
+    },
+    "MCCB": {
+      "source_file": "100A TPN SLD 1 DWG.dxf",
+      "source_count": 24,
+      "width_du": 127.5901,
+      "height_du": 597.8178,
+      "bounds": {
+        "min_x": -50.2459,
+        "min_y": 0.0,
+        "max_x": 77.3442,
+        "max_y": 597.8178
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              77.3442,
+              49.4702
+            ],
+            [
+              77.2869,
+              548.3476
+            ]
+          ],
+          "bulges": [
+            0.611384,
+            0.0
+          ],
+          "closed": false
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            -0.7757,
+            548.3476
+          ],
+          "radius": 49.4702
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            0.0,
+            49.4702
+          ],
+          "radius": 49.4702
+        }
+      ],
+      "pins": {
+        "top": [
+          13.5492,
+          597.8178
+        ],
+        "bottom": [
+          13.5492,
+          0.0
+        ],
+        "left": [
+          -50.2459,
+          298.9089
+        ],
+        "right": [
+          77.3442,
+          298.9089
+        ]
+      }
+    },
+    "RCCB": {
+      "source_file": "100A TPN SLD 1 DWG.dxf",
+      "source_count": 19,
+      "width_du": 400.5061,
+      "height_du": 597.8178,
+      "bounds": {
+        "min_x": -50.2459,
+        "min_y": 0.0,
+        "max_x": 350.2602,
+        "max_y": 597.8178
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              77.3442,
+              49.4702
+            ],
+            [
+              77.2869,
+              548.3476
+            ]
+          ],
+          "bulges": [
+            0.611384,
+            0.0
+          ],
+          "closed": false
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            -0.7757,
+            548.3476
+          ],
+          "radius": 49.4702
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            0.0,
+            49.4702
+          ],
+          "radius": 49.4702
+        },
+        {
+          "type": "LINE",
+          "start": [
+            229.8183,
+            298.9264
+          ],
+          "end": [
+            350.2602,
+            298.9264
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            350.2602,
+            189.9583
+          ],
+          "end": [
+            350.2602,
+            407.8945
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          150.0071,
+          597.8178
+        ],
+        "bottom": [
+          150.0071,
+          0.0
+        ],
+        "left": [
+          -50.2459,
+          298.9089
+        ],
+        "right": [
+          350.2602,
+          298.9089
+        ]
+      }
+    },
+    "SLD-CT": {
+      "source_file": "150A TPN SLD 1 DWG.dxf",
+      "source_count": 2,
+      "width_du": 50.0,
+      "height_du": 50.0,
+      "bounds": {
+        "min_x": -50.0,
+        "min_y": -25.0,
+        "max_x": 0.0,
+        "max_y": 25.0
+      },
+      "entities": [
+        {
+          "type": "LINE",
+          "start": [
+            0.0,
+            0.0
+          ],
+          "end": [
+            -50.0,
+            0.0
+          ]
+        },
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              -25.0,
+              25.0
+            ],
+            [
+              0.0,
+              25.0
+            ],
+            [
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              -25.0
+            ],
+            [
+              -25.0,
+              -25.0
+            ]
+          ],
+          "bulges": [
+            0.0,
+            -1.0,
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "closed": false
+        }
+      ],
+      "pins": {
+        "top": [
+          -25.0,
+          25.0
+        ],
+        "bottom": [
+          -25.0,
+          -25.0
+        ],
+        "left": [
+          -50.0,
+          0.0
+        ],
+        "right": [
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "2A FUSE": {
+      "source_file": "150A TPN SLD 1 DWG.dxf",
+      "source_count": 2,
+      "width_du": 453.477,
+      "height_du": 123.6756,
+      "bounds": {
+        "min_x": -226.7385,
+        "min_y": -61.8378,
+        "max_x": 226.7385,
+        "max_y": 61.8378
+      },
+      "entities": [
+        {
+          "type": "LINE",
+          "start": [
+            -141.7115,
+            -57.3251
+          ],
+          "end": [
+            141.7115,
+            57.3251
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            -141.7115,
+            57.3251
+          ],
+          "end": [
+            141.7115,
+            -57.3251
+          ]
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            164.9007,
+            -0.0
+          ],
+          "radius": 61.8378
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            -164.9007,
+            -0.0
+          ],
+          "radius": 61.8378
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          61.8378
+        ],
+        "bottom": [
+          0.0,
+          -61.8378
+        ],
+        "left": [
+          -226.7385,
+          0.0
+        ],
+        "right": [
+          226.7385,
+          0.0
+        ]
+      }
+    },
+    "LED IND LTG": {
+      "source_file": "150A TPN SLD 1 DWG.dxf",
+      "source_count": 2,
+      "width_du": 1700.3353,
+      "height_du": 420.9188,
+      "bounds": {
+        "min_x": -40.9188,
+        "min_y": -190.9188,
+        "max_x": 1659.4165,
+        "max_y": 230.0
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            1350.0,
+            0.0
+          ],
+          "radius": 150.0
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            750.0,
+            0.0
+          ],
+          "radius": 150.0
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            150.0,
+            0.0
+          ],
+          "radius": 150.0
+        },
+        {
+          "type": "LINE",
+          "start": [
+            300.0,
+            0.0
+          ],
+          "end": [
+            600.0,
+            0.0
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            900.0,
+            0.0
+          ],
+          "end": [
+            1200.0,
+            0.0
+          ]
+        },
+        {
+          "type": "TEXT",
+          "text": "L1",
+          "insert": [
+            74.2343,
+            230.0
+          ],
+          "height": 200.0
+        },
+        {
+          "type": "LINE",
+          "start": [
+            43.934,
+            106.066
+          ],
+          "end": [
+            -40.9188,
+            190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            256.066,
+            106.066
+          ],
+          "end": [
+            340.9188,
+            190.9188
+          ]
+        },
+        {
+          "type": "TEXT",
+          "text": "L3",
+          "insert": [
+            1260.0,
+            230.0
+          ],
+          "height": 200.0
+        },
+        {
+          "type": "TEXT",
+          "text": "L2",
+          "insert": [
+            660.0,
+            230.0
+          ],
+          "height": 200.0
+        },
+        {
+          "type": "TEXT",
+          "text": "LED",
+          "insert": [
+            1659.4165,
+            -100.3999
+          ],
+          "height": 200.0
+        },
+        {
+          "type": "LINE",
+          "start": [
+            43.934,
+            -106.066
+          ],
+          "end": [
+            -40.9188,
+            -190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            256.066,
+            -106.066
+          ],
+          "end": [
+            340.9188,
+            -190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            643.934,
+            106.066
+          ],
+          "end": [
+            559.0812,
+            190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            856.066,
+            106.066
+          ],
+          "end": [
+            940.9188,
+            190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            643.934,
+            -106.066
+          ],
+          "end": [
+            559.0812,
+            -190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            856.066,
+            -106.066
+          ],
+          "end": [
+            940.9188,
+            -190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            1243.934,
+            106.066
+          ],
+          "end": [
+            1159.0812,
+            190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            1456.066,
+            106.066
+          ],
+          "end": [
+            1540.9188,
+            190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            1243.934,
+            -106.066
+          ],
+          "end": [
+            1159.0812,
+            -190.9188
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            1456.066,
+            -106.066
+          ],
+          "end": [
+            1540.9188,
+            -190.9188
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          809.2489,
+          230.0
+        ],
+        "bottom": [
+          809.2489,
+          -190.9188
+        ],
+        "left": [
+          -40.9188,
+          19.5406
+        ],
+        "right": [
+          1659.4165,
+          19.5406
+        ]
+      }
+    },
+    "SS": {
+      "source_file": "150A TPN SLD 1 DWG.dxf",
+      "source_count": 2,
+      "width_du": 180.0,
+      "height_du": 180.0,
+      "bounds": {
+        "min_x": -90.0,
+        "min_y": -90.0,
+        "max_x": 90.0,
+        "max_y": 90.0
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            0.0,
+            -0.0
+          ],
+          "radius": 90.0
+        },
+        {
+          "type": "LINE",
+          "start": [
+            -63.6396,
+            -63.6396
+          ],
+          "end": [
+            63.6396,
+            63.6396
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          90.0
+        ],
+        "bottom": [
+          0.0,
+          -90.0
+        ],
+        "left": [
+          -90.0,
+          0.0
+        ],
+        "right": [
+          90.0,
+          0.0
+        ]
+      }
+    },
+    "VOLTMETER": {
+      "source_file": "150A TPN SLD 1 DWG.dxf",
+      "source_count": 2,
+      "width_du": 481.85,
+      "height_du": 481.85,
+      "bounds": {
+        "min_x": -240.925,
+        "min_y": -240.925,
+        "max_x": 240.925,
+        "max_y": 240.925
+      },
+      "entities": [
+        {
+          "type": "TEXT",
+          "text": "V",
+          "insert": [
+            -125.2702,
+            -164.2018
+          ],
+          "height": 275.0
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            0.0,
+            0.0
+          ],
+          "radius": 240.925
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          240.925
+        ],
+        "bottom": [
+          0.0,
+          -240.925
+        ],
+        "left": [
+          -240.925,
+          0.0
+        ],
+        "right": [
+          240.925,
+          0.0
+        ]
+      }
+    },
+    "EF": {
+      "source_file": "150A TPN SLD 1 DWG.dxf",
+      "source_count": 2,
+      "width_du": 652.5554,
+      "height_du": 326.2777,
+      "bounds": {
+        "min_x": -326.2777,
+        "min_y": 0.0,
+        "max_x": 326.2777,
+        "max_y": 326.2777
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              326.2777,
+              0.0
+            ],
+            [
+              -326.2777,
+              0.0
+            ],
+            [
+              -326.2777,
+              326.2777
+            ],
+            [
+              326.2777,
+              326.2777
+            ]
+          ],
+          "bulges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "closed": true
+        },
+        {
+          "type": "TEXT",
+          "text": "E/F",
+          "insert": [
+            -214.8261,
+            62.6388
+          ],
+          "height": 200.0
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          326.2777
+        ],
+        "bottom": [
+          0.0,
+          0.0
+        ],
+        "left": [
+          -326.2777,
+          163.1388
+        ],
+        "right": [
+          326.2777,
+          163.1388
+        ]
+      }
+    },
+    "3P ISOL": {
+      "source_file": "63A TPN SLD 14.dxf",
+      "source_count": 3,
+      "width_du": 402.5362,
+      "height_du": 263.9547,
+      "bounds": {
+        "min_x": -132.0822,
+        "min_y": 0.0,
+        "max_x": 270.454,
+        "max_y": 263.9547
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              -132.0822,
+              0.0
+            ],
+            [
+              132.0822,
+              0.0
+            ],
+            [
+              132.0822,
+              263.9547
+            ],
+            [
+              -132.0822,
+              263.9547
+            ]
+          ],
+          "bulges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "closed": true
+        },
+        {
+          "type": "LINE",
+          "start": [
+            132.0822,
+            131.9773
+          ],
+          "end": [
+            270.454,
+            131.9773
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            270.454,
+            131.9773
+          ],
+          "end": [
+            270.454,
+            18.8541
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            -132.0822,
+            0.0
+          ],
+          "end": [
+            132.0822,
+            263.9547
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          69.1859,
+          263.9547
+        ],
+        "bottom": [
+          69.1859,
+          0.0
+        ],
+        "left": [
+          -132.0822,
+          131.9774
+        ],
+        "right": [
+          270.454,
+          131.9774
+        ]
+      }
+    },
+    "3P SOCKET": {
+      "source_file": "Cable Extension SLD 4 DWG.dxf",
+      "source_count": 2,
+      "width_du": 588.2092,
+      "height_du": 588.2092,
+      "bounds": {
+        "min_x": -294.1046,
+        "min_y": 0.0,
+        "max_x": 294.1046,
+        "max_y": 588.2092
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            0.0,
+            294.1046
+          ],
+          "radius": 294.1046
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            144.6033,
+            217.2137
+          ],
+          "radius": 51.2445
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            0.0,
+            422.5591
+          ],
+          "radius": 51.2445
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            -144.6033,
+            217.2137
+          ],
+          "radius": 51.2445
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          588.2092
+        ],
+        "bottom": [
+          0.0,
+          0.0
+        ],
+        "left": [
+          -294.1046,
+          294.1046
+        ],
+        "right": [
+          294.1046,
+          294.1046
+        ]
+      }
+    }
+  },
+  "custom_blocks": {
+    "KWH_METER": {
+      "source": "150A TPN SLD 1 DWG.dxf (model space LWPOLYLINE)",
+      "description": "KWH meter — rectangle with KWH text. Extracted from model space loose entity and normalized to origin.",
+      "width_du": 1067.6,
+      "height_du": 533.2,
+      "bounds": {
+        "min_x": 0,
+        "min_y": 0,
+        "max_x": 1067.6,
+        "max_y": 533.2
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              0.0,
+              533.2
+            ],
+            [
+              1067.6,
+              533.2
+            ],
+            [
+              1067.6,
+              0.0
+            ],
+            [
+              0.0,
+              0.0
+            ]
+          ],
+          "bulges": [
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "closed": true
+        },
+        {
+          "type": "TEXT",
+          "text": "KWH",
+          "insert": [
+            320.0,
+            310.0
+          ],
+          "height": 200.0
+        }
+      ],
+      "pins": {
+        "top": [
+          533.8,
+          533.2
+        ],
+        "bottom": [
+          533.8,
+          0.0
+        ],
+        "left": [
+          0.0,
+          266.6
+        ],
+        "right": [
+          1067.6,
+          266.6
+        ]
+      }
+    },
+    "EARTH": {
+      "source": "Standard IEC 60617 earth/ground symbol — 3 horizontal lines of decreasing width + vertical stem",
+      "description": "Earth/ground symbol. No DXF block exists; defined from IEC standard.",
+      "width_du": 600.0,
+      "height_du": 600.0,
+      "bounds": {
+        "min_x": 0,
+        "min_y": 0,
+        "max_x": 600.0,
+        "max_y": 600.0
+      },
+      "entities": [
+        {
+          "type": "LINE",
+          "start": [
+            300.0,
+            600.0
+          ],
+          "end": [
+            300.0,
+            360.0
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            0.0,
+            360.0
+          ],
+          "end": [
+            600.0,
+            360.0
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            100.0,
+            210.0
+          ],
+          "end": [
+            500.0,
+            210.0
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            200.0,
+            60.0
+          ],
+          "end": [
+            400.0,
+            60.0
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          300.0,
+          600.0
+        ]
+      }
+    }
+  }
+}

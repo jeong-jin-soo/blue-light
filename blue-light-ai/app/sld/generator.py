@@ -31,6 +31,7 @@ import re
 from pathlib import Path
 
 from app.sld.backend import DrawingBackend
+from app.sld.block_replayer import BlockReplayer
 from app.sld.dxf_backend import DxfBackend
 from app.sld.layout import (
     LayoutConfig,
@@ -62,106 +63,55 @@ from app.sld.title_block import TitleBlockConfig, draw_border, draw_title_block_
 
 logger = logging.getLogger(__name__)
 
-# Reference DXF file for importing native CAD symbol blocks (MCCB, RCCB, DP ISOL).
-# All 26 DXF template files contain identical block definitions.
-_REFERENCE_DXF_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "sld-info" / "slds-dxf" / "100A TPN SLD 1 DWG.dxf"
+# Reference DXF files for importing native CAD symbol blocks.
+# 150A TPN has the most blocks (MCCB, RCCB, DP ISOL, SLD-CT, VOLTMETER, 2A FUSE, SS, EF, LED IND LTG).
+_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_REFERENCE_DXF_PATH = _DATA_DIR / "sld-info" / "slds-dxf" / "150A TPN SLD 1 DWG.dxf"
+_REFERENCE_DXF_FALLBACK = _DATA_DIR / "sld-info" / "slds-dxf" / "100A TPN SLD 1 DWG.dxf"
 
-# DXF block bounding heights in drawing units (for scale computation).
-# Measured from the DXF MCCB/RCCB blocks: total height = top_circle_top - bottom_circle_bottom.
+# Block Replayer — loads block library once at module level
+try:
+    _BLOCK_REPLAYER = BlockReplayer.load()
+    logger.info("BlockReplayer loaded: %d blocks", len(_BLOCK_REPLAYER._blocks))
+except Exception as _exc:
+    logger.warning("BlockReplayer load failed: %s — falling back to procedural rendering", _exc)
+    _BLOCK_REPLAYER = None
+
+# Legacy fallback: DXF block heights (used only when BlockReplayer is unavailable)
 _DXF_BLOCK_HEIGHTS = {
-    "MCCB": 597.82,   # (548.35 + 49.47) - (49.47 - 49.47)
-    "RCCB": 597.82,   # Same geometry as MCCB for the breaker portion
-    "DP ISOL": 430.63,  # From DXF block analysis
+    "MCCB": 597.82,
+    "RCCB": 597.82,
+    "DP ISOL": 430.63,
 }
 
 
-def _compute_block_heights_from_dxf(dxf_path: Path) -> dict[str, float]:
-    """Compute actual block bounding heights from a reference DXF file.
-
-    Reads block definitions and measures the Y-extent of each block's entities.
-    Returns empty dict on any failure (never crashes).
-    """
-    try:
-        import ezdxf
-    except ImportError:
-        return {}
-    try:
-        doc = ezdxf.readfile(str(dxf_path))
-    except Exception as exc:
-        logger.debug("DXF reference file read failed (%s): %s", dxf_path, exc)
-        return {}
-    heights: dict[str, float] = {}
-    for block_name in _DXF_BLOCK_HEIGHTS:
-        if block_name not in doc.blocks:
-            continue
-        block = doc.blocks.get(block_name)
-        y_coords: list[float] = []
-        for entity in block:
-            try:
-                etype = entity.dxftype()
-                if etype == "CIRCLE":
-                    cy = entity.dxf.center.y
-                    r = entity.dxf.radius
-                    y_coords.extend([cy - r, cy + r])
-                elif etype == "LINE":
-                    y_coords.append(entity.dxf.start.y)
-                    y_coords.append(entity.dxf.end.y)
-                elif etype == "ARC":
-                    cy = entity.dxf.center.y
-                    r = entity.dxf.radius
-                    y_coords.extend([cy - r, cy + r])
-                elif etype in ("LWPOLYLINE", "POLYLINE"):
-                    for pt in entity.get_points():
-                        y_coords.append(pt[1])
-            except Exception as exc:
-                logger.debug("DXF entity parse skipped in block %s: %s", block_name, exc)
-                continue
-        if y_coords:
-            heights[block_name] = max(y_coords) - min(y_coords)
-    return heights
-
-
-def _validate_block_heights() -> None:
-    """Log warning if hardcoded block heights diverge >1% from reference DXF.
-
-    Called once at module load. Never modifies ``_DXF_BLOCK_HEIGHTS`` —
-    only emits diagnostics so discrepancies are caught early.
-    """
-    if not _REFERENCE_DXF_PATH.exists():
-        return
-    measured = _compute_block_heights_from_dxf(_REFERENCE_DXF_PATH)
-    if not measured:
-        return
-    for name, hardcoded in _DXF_BLOCK_HEIGHTS.items():
-        actual = measured.get(name)
-        if actual is None:
-            logger.warning("Block '%s' not found in reference DXF for height validation", name)
-            continue
-        pct_diff = abs(actual - hardcoded) / hardcoded * 100
-        if pct_diff > 1.0:
-            logger.warning(
-                "Block height mismatch '%s': hardcoded=%.2f, measured=%.2f (%.1f%% diff)",
-                name, hardcoded, actual, pct_diff,
-            )
-        else:
-            logger.debug(
-                "Block height OK '%s': hardcoded=%.2f, measured=%.2f (%.1f%%)",
-                name, hardcoded, actual, pct_diff,
-            )
-
-
-# Validate hardcoded block heights against reference DXF at module load
-_validate_block_heights()
-
-
-# Map symbol type names to DXF block names
+# Map symbol type names to DXF/library block names.
+# BlockReplayer uses this mapping to find the right block definition.
 _SYMBOL_TO_DXF_BLOCK = {
+    # Circuit breakers
     "MCCB": "MCCB",
     "CB_MCCB": "MCCB",
+    "MCB": "MCCB",         # MCB = MCCB block at different scale (per reference DXF)
+    "CB_MCB": "MCCB",
     "RCCB": "RCCB",
     "CB_RCCB": "RCCB",
-    "ELCB": "RCCB",  # ELCB uses RCCB block (same IEC symbol)
+    "ELCB": "RCCB",        # ELCB uses RCCB block (same IEC symbol)
     "CB_ELCB": "RCCB",
+    # Isolators
+    "ISOLATOR": "DP ISOL",
+    "3P_ISOLATOR": "3P ISOL",
+    # CT metering
+    "CT": "SLD-CT",
+    # Meters
+    "KWH_METER": "KWH_METER",   # custom block
+    "VOLTMETER": "VOLTMETER",
+    # Protection / auxiliaries
+    "EARTH": "EARTH",           # custom block
+    "FUSE": "2A FUSE",
+    "POTENTIAL_FUSE": "2A FUSE",
+    "SELECTOR_SWITCH": "SS",
+    "ELR": "EF",
+    "INDICATOR_LIGHTS": "LED IND LTG",
 }
 
 
@@ -257,11 +207,10 @@ class SldGenerator:
         if backend_type == "dxf":
             # DXF backend (primary CAD output) + ReportLab PDF (EMA submission) + SVG (preview)
             dxf = DxfBackend(page_config=pc)
-            # Import native CAD symbol blocks from reference DXF template
-            if _REFERENCE_DXF_PATH.exists():
-                dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
-            else:
-                logger.warning("Reference DXF not found: %s — DXF symbol blocks will be missing", _REFERENCE_DXF_PATH)
+            # Import native CAD symbol blocks from reference DXF templates
+            for ref_path in (_REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
+                if ref_path.exists():
+                    dxf.import_symbol_blocks(str(ref_path))
             pdf = PdfBackend(pdf_output_path, page_config=pc)
             svg = SvgBackend(page_config=pc)
             backends = [dxf, pdf, svg]
@@ -371,11 +320,10 @@ class SldGenerator:
         dxf_bytes = None
         if backend_type == "dxf":
             dxf = DxfBackend(page_config=pc)
-            # Import native CAD symbol blocks from reference DXF template
-            if _REFERENCE_DXF_PATH.exists():
-                dxf.import_symbol_blocks(str(_REFERENCE_DXF_PATH))
-            else:
-                logger.warning("Reference DXF not found: %s — DXF symbol blocks will be missing", _REFERENCE_DXF_PATH)
+            # Import native CAD symbol blocks from reference DXF templates
+            for ref_path in (_REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
+                if ref_path.exists():
+                    dxf.import_symbol_blocks(str(ref_path))
             backends = [dxf, pdf, svg]
         else:
             backends = [pdf, svg]
@@ -533,25 +481,45 @@ class SldGenerator:
             and getattr(comp, 'label_style', '') != 'breaker_block'
         )
 
-        # DXF block insertion (when available)
-        dxf_block_used = False
-        if not use_horizontal and isinstance(backend, DxfBackend):
-            dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
-            if dxf_block_name and backend.has_block(dxf_block_name):
-                scale = symbol.height / _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82)
-                backend.insert_block(dxf_block_name, comp.x, comp.y, scale=scale)
-                dxf_block_used = True
-
-        if not dxf_block_used:
+        # Determine if we need special procedural rendering kwargs
+        needs_special_kwargs = False
+        trip_kwargs = {}
+        if not use_horizontal:
             is_sub_circuit = comp.label_style == "breaker_block"
             is_ditto = comp_idx in ditto_indices
             should_skip_trip = not is_sub_circuit or is_ditto
-            trip_kwargs = {}
             if should_skip_trip and isinstance(symbol, RealCircuitBreaker):
                 trip_kwargs["skip_trip_arrow"] = True
-            # Enclosed isolator (landlord unit isolator with enclosure box)
             if comp.enclosed and isinstance(symbol, RealIsolator):
                 trip_kwargs["enclosed"] = True
+                needs_special_kwargs = True
+        else:
+            needs_special_kwargs = True  # horizontal always needs procedural
+
+        # BlockReplayer path: DxfBackend only (native INSERT = 100% fidelity).
+        # PDF/SVG use procedural rendering because the layout engine computes
+        # connection endpoints based on procedural symbol pin positions, and
+        # DXF block coordinate origins differ from procedural symbol origins
+        # (e.g., MCCB block origin is at bottom-circle center, not body bottom-left).
+        block_used = False
+        if (
+            _BLOCK_REPLAYER is not None
+            and not use_horizontal
+            and not needs_special_kwargs
+            and isinstance(backend, DxfBackend)
+        ):
+            dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
+            if dxf_block_name and backend.has_block(dxf_block_name):
+                block_height_du = _BLOCK_REPLAYER.block_height_du(dxf_block_name)
+                if block_height_du > 0:
+                    scale = symbol.height / block_height_du
+                else:
+                    scale = symbol.height / _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82)
+                backend.insert_block(dxf_block_name, comp.x, comp.y, scale=scale)
+                block_used = True
+
+        # Fallback: procedural symbol rendering
+        if not block_used:
             if use_horizontal:
                 if getattr(comp, 'no_right_stub', False):
                     trip_kwargs['no_right_stub'] = True
