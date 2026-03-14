@@ -291,6 +291,11 @@ class LayoutConfig:
     busbar_end_margin: float = 10.0       # Margin at busbar ends for final positions
     db_box_overlap_margin: float = 12.0   # DB box margin in overlap resolution
 
+    # -- CT metering spine spacing (calibrated from DXF reference) --
+    ct_entry_gap: float = 0.5        # Gap from spine entry point to first CT component
+    ct_to_ct_gap: float = 3.0        # Gap between protection CT and metering CT
+    ct_to_branch_gap: float = 3.0    # Vertical offset from CT center to horizontal branch
+
     # -- DB info text layout (used by _place_db_box / _place_multi_db_boxes) --
     db_info_title_h: float = 4.0     # Title line height (char_height=3.0 + gap)
     db_info_line_h: float = 3.0      # Per info line height (char_height=1.8 + gap)

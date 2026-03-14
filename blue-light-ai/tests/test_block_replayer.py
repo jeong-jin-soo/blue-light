@@ -276,6 +276,20 @@ def test_scale_and_target_height_mutually_exclusive(mini_replayer):
         mini_replayer.draw(rec, "TEST_LINE", 0, 0, scale=1.0, target_height_mm=10.0)
 
 
+def test_pin_half_width_mccb(replayer):
+    """Phase 4: get_pin_half_width returns scaled top-pin X offset."""
+    hw = replayer.get_pin_half_width("MCCB", target_height_mm=15.0)
+    assert hw > 0
+    # Pin X should be small fraction of block width
+    w, _h = replayer.get_scaled_size("MCCB", target_height_mm=15.0)
+    assert hw < w
+
+
+def test_pin_half_width_unknown_block(replayer):
+    """Unknown block returns 0."""
+    assert replayer.get_pin_half_width("NONEXISTENT", target_height_mm=10.0) == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Tests: Bulge→Arc conversion
 # ---------------------------------------------------------------------------

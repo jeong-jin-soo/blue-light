@@ -785,10 +785,10 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     pf_w, pf_h = pf_dims["width_mm"], pf_dims["height_mm"]
     pf_stub = pf_dims["stub_mm"]
 
-    # Spacing constants (compact layout — minimized for A3 with many circuits)
-    entry_gap = 0.5          # minimal gap from entry point to first component
-    ct_to_ct_gap = 3.0       # gap between protection CT and metering CT
-    ct_to_branch_gap = 3.0   # vertical offset from CT center to KWH branch
+    # Spacing constants — centralized in LayoutConfig (Phase 4: magic number → config)
+    entry_gap = ctx.config.ct_entry_gap
+    ct_to_ct_gap = ctx.config.ct_to_ct_gap
+    ct_to_branch_gap = ctx.config.ct_to_branch_gap
     branch_arm_len = 15.0    # horizontal arm from spine to first component
     branch_gap = 3.0         # gap between components on a branch
     ct_to_pf_gap = 1.0       # gap between metering CT and potential fuse

@@ -192,6 +192,25 @@ class BlockReplayer:
 
         return (blk["width_du"] * s, blk["height_du"] * s)
 
+    def get_pin_half_width(self, block_name: str, target_height_mm: float) -> float:
+        """Get horizontal pin offset (half-width) at a given target height.
+
+        Computes the X distance from the block's insertion point to the
+        top/bottom pin's X coordinate, scaled to the target height.
+        This is the data-driven equivalent of the layout engine's
+        ``_breaker_half_width()`` function.
+
+        Returns 0.0 if the block or pins are not available.
+        """
+        blk = self._blocks.get(block_name)
+        if not blk or "pins" not in blk:
+            return 0.0
+        top_pin = blk["pins"].get("top")
+        if not top_pin:
+            return 0.0
+        s = self.compute_scale(block_name, target_height_mm)
+        return abs(top_pin[0]) * s
+
     # ------------------------------------------------------------------
     # Entity replay (PDF/SVG backends)
     # ------------------------------------------------------------------

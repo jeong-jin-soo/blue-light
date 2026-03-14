@@ -282,22 +282,52 @@ class SubCircuitGroup:
     row_busbar_y: float = 0.0            # Busbar Y of this circuit's row
 
 
+# Map symbol_name → real_symbol_paths.json key for pin half-width lookup.
+_SYMBOL_TO_JSON_KEY_FOR_PINS: dict[str, str] = {
+    "CB_MCB": "MCB",
+    "CB_MCCB": "MCCB",
+    "CB_RCCB": "RCCB",
+    "CB_ELCB": "ELCB",
+    "CB_ACB": "ACB",
+}
+
+# Cached pin half-widths loaded from real_symbol_paths.json.
+# {json_key: width_mm / 2}
+_PIN_HALF_WIDTHS: dict[str, float] | None = None
+
+
+def _load_pin_half_widths() -> dict[str, float]:
+    """Load pin half-widths from real_symbol_paths.json (once)."""
+    global _PIN_HALF_WIDTHS
+    if _PIN_HALF_WIDTHS is not None:
+        return _PIN_HALF_WIDTHS
+    try:
+        from app.sld.real_symbols import get_symbol_dimensions
+        result: dict[str, float] = {}
+        for json_key in ("MCB", "MCCB", "RCCB", "ELCB", "ACB"):
+            dims = get_symbol_dimensions(json_key)
+            result[json_key] = dims["width_mm"] / 2.0
+        _PIN_HALF_WIDTHS = result
+    except Exception:
+        # Fallback to hardcoded values if JSON unavailable
+        _PIN_HALF_WIDTHS = {
+            "MCB": 2.5, "MCCB": 2.75, "RCCB": 3.25, "ELCB": 3.25, "ACB": 3.5,
+        }
+    return _PIN_HALF_WIDTHS
+
+
 def _breaker_half_width(comp: PlacedComponent) -> float:
     """Return pin X offset from comp.x for tap_x calculation.
 
+    Data-driven: reads width_mm / 2 from real_symbol_paths.json.
     Must match the actual symbol pin position so that connection lines
-    align with the symbol's top/bottom pins.
-    Values = symbol_width / 2  (pin is at horizontal center of each symbol).
+    align with the symbol's top/bottom pins (pin is at horizontal center).
     """
-    if comp.symbol_name == "CB_MCB":
-        return 2.5   # 5.0mm / 2
-    elif comp.symbol_name == "CB_MCCB":
-        return 2.75  # 5.5mm / 2
-    elif comp.symbol_name in ("CB_RCCB", "CB_ELCB"):
-        return 3.25  # 6.5mm / 2
-    elif comp.symbol_name == "CB_ACB":
-        return 3.5   # 7.0mm / 2
-    return 2.75
+    hw = _load_pin_half_widths()
+    json_key = _SYMBOL_TO_JSON_KEY_FOR_PINS.get(comp.symbol_name)
+    if json_key and json_key in hw:
+        return hw[json_key]
+    return hw.get("MCCB", 2.75)  # default fallback
 
 
 def _compute_dynamic_spacing(
