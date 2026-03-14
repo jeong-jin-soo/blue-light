@@ -291,6 +291,80 @@ def test_pin_half_width_unknown_block(replayer):
 
 
 # ---------------------------------------------------------------------------
+# Tests: compute_aligned_insertion (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+def test_aligned_insertion_bottom_pin(replayer):
+    """Pin-aligned insertion puts block bottom pin at target position."""
+    target = (100.0, 50.0)
+    ix, iy, scale = replayer.compute_aligned_insertion(
+        "MCCB", target, "bottom", target_height_mm=9.0,
+    )
+    # Verify: insertion + pin * scale == target
+    blk = replayer.get_block_def("MCCB")
+    bp = blk["pins"]["bottom"]
+    assert abs(ix + bp[0] * scale - target[0]) < 0.001
+    assert abs(iy + bp[1] * scale - target[1]) < 0.001
+
+
+def test_aligned_insertion_top_pin(replayer):
+    """Pin-aligned insertion works for top pin too."""
+    target = (100.0, 59.0)
+    ix, iy, scale = replayer.compute_aligned_insertion(
+        "MCCB", target, "top", target_height_mm=9.0,
+    )
+    blk = replayer.get_block_def("MCCB")
+    tp = blk["pins"]["top"]
+    assert abs(ix + tp[0] * scale - target[0]) < 0.001
+    assert abs(iy + tp[1] * scale - target[1]) < 0.001
+
+
+def test_aligned_insertion_unknown_block(replayer):
+    """Unknown block raises ValueError."""
+    with pytest.raises(ValueError, match="Unknown block"):
+        replayer.compute_aligned_insertion("NONEXISTENT", (0, 0), "bottom", scale=1.0)
+
+
+def test_aligned_insertion_unknown_pin(replayer):
+    """Unknown pin name raises ValueError."""
+    with pytest.raises(ValueError, match="no pin"):
+        replayer.compute_aligned_insertion("MCCB", (0, 0), "center", target_height_mm=9.0)
+
+
+def test_aligned_insertion_mutually_exclusive(replayer):
+    """Cannot specify both target_height_mm and scale."""
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        replayer.compute_aligned_insertion("MCCB", (0, 0), "bottom", target_height_mm=9.0, scale=1.0)
+
+
+# ---------------------------------------------------------------------------
+# Tests: check_dimension_compatibility (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+def test_dimension_compatibility_voltmeter(replayer):
+    """VOLTMETER should be compatible (1:1 match)."""
+    result = replayer.check_dimension_compatibility("VOLTMETER", 5.0, 5.0)
+    assert result["compatible"] is True
+    assert abs(result["width_ratio"] - 1.0) < 0.05
+
+
+def test_dimension_compatibility_mccb(replayer):
+    """MCCB is NOT compatible — block is much narrower than procedural."""
+    result = replayer.check_dimension_compatibility("MCCB", 5.5, 9.0)
+    assert result["compatible"] is False
+    assert result["width_ratio"] < 0.5  # block is < 50% of procedural width
+
+
+def test_dimension_compatibility_unknown(replayer):
+    """Unknown block returns error dict."""
+    result = replayer.check_dimension_compatibility("NONEXISTENT", 5.0, 5.0)
+    assert result["compatible"] is False
+    assert "error" in result
+
+
+# ---------------------------------------------------------------------------
 # Tests: Bulge→Arc conversion
 # ---------------------------------------------------------------------------
 

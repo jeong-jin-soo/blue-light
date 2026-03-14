@@ -211,6 +211,107 @@ class BlockReplayer:
         s = self.compute_scale(block_name, target_height_mm)
         return abs(top_pin[0]) * s
 
+    def compute_aligned_insertion(
+        self,
+        block_name: str,
+        target_pin: tuple[float, float],
+        pin_name: str = "bottom",
+        *,
+        target_height_mm: float | None = None,
+        scale: float | None = None,
+    ) -> tuple[float, float, float]:
+        """Compute insertion point that aligns a block pin with a target position.
+
+        When the layout engine places a component at (comp.x, comp.y), the
+        procedural symbol's pin positions differ from the DXF block's pin
+        positions at the same insertion point.  This method computes the
+        correct insertion point (ix, iy) so that ``block_pin * scale + (ix, iy)``
+        equals ``target_pin``.
+
+        Args:
+            block_name: Block name in the library.
+            target_pin: Where the pin should appear in page coordinates (mm).
+            pin_name: Which block pin to align ("top", "bottom", "left", "right").
+            target_height_mm: Target height for scale computation.
+            scale: Direct scale factor (mutually exclusive with target_height_mm).
+
+        Returns:
+            (insertion_x, insertion_y, computed_scale)
+
+        Raises:
+            ValueError: If both target_height_mm and scale are given, or block unknown.
+        """
+        if target_height_mm is not None and scale is not None:
+            raise ValueError("target_height_mm and scale are mutually exclusive")
+
+        blk = self._blocks.get(block_name)
+        if not blk:
+            raise ValueError(f"Unknown block: {block_name}")
+
+        if target_height_mm is not None:
+            s = self.compute_scale(block_name, target_height_mm)
+        elif scale is not None:
+            s = scale
+        else:
+            s = 1.0
+
+        pins = blk.get("pins", {})
+        pin = pins.get(pin_name)
+        if pin is None:
+            raise ValueError(f"Block {block_name} has no pin '{pin_name}'")
+
+        # insertion + pin * scale = target → insertion = target - pin * scale
+        ix = target_pin[0] - pin[0] * s
+        iy = target_pin[1] - pin[1] * s
+        return (ix, iy, s)
+
+    def check_dimension_compatibility(
+        self,
+        block_name: str,
+        procedural_width: float,
+        procedural_height: float,
+        *,
+        tolerance: float = 0.15,
+    ) -> dict[str, Any]:
+        """Check if a DXF block is dimensionally compatible with its procedural symbol.
+
+        Compares the block's rendered size (at target_height = procedural_height)
+        with the procedural symbol's bounding box.
+
+        Args:
+            block_name: DXF block name.
+            procedural_width: Procedural symbol width (mm).
+            procedural_height: Procedural symbol height (mm).
+            tolerance: Maximum relative deviation (0.15 = 15%).
+
+        Returns:
+            {"compatible": bool, "width_ratio": float, "height_ratio": float,
+             "block_width_mm": float, "block_height_mm": float}
+        """
+        blk = self._blocks.get(block_name)
+        if not blk:
+            return {"compatible": False, "error": f"Unknown block: {block_name}"}
+
+        s = self.compute_scale(block_name, procedural_height)
+        bw = blk["width_du"] * s
+        bh = blk["height_du"] * s
+
+        w_ratio = bw / procedural_width if procedural_width > 0 else 0
+        h_ratio = bh / procedural_height if procedural_height > 0 else 0
+
+        compatible = (
+            abs(w_ratio - 1.0) <= tolerance
+            and abs(h_ratio - 1.0) <= tolerance
+        )
+
+        return {
+            "compatible": compatible,
+            "width_ratio": round(w_ratio, 3),
+            "height_ratio": round(h_ratio, 3),
+            "block_width_mm": round(bw, 2),
+            "block_height_mm": round(bh, 2),
+        }
+
     # ------------------------------------------------------------------
     # Entity replay (PDF/SVG backends)
     # ------------------------------------------------------------------

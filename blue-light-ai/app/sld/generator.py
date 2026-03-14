@@ -496,11 +496,10 @@ class SldGenerator:
         else:
             needs_special_kwargs = True  # horizontal always needs procedural
 
-        # BlockReplayer path: DxfBackend only (native INSERT = 100% fidelity).
-        # PDF/SVG use procedural rendering because the layout engine computes
-        # connection endpoints based on procedural symbol pin positions, and
-        # DXF block coordinate origins differ from procedural symbol origins
-        # (e.g., MCCB block origin is at bottom-circle center, not body bottom-left).
+        # BlockReplayer path: DxfBackend uses native INSERT for 100% fidelity.
+        # PDF/SVG use procedural rendering because DXF block dimensions differ
+        # from procedural symbol dimensions (see check_dimension_compatibility).
+        # Phase 6: pin-aligned insertion — block pins align with connection lines.
         block_used = False
         if (
             _BLOCK_REPLAYER is not None
@@ -510,12 +509,20 @@ class SldGenerator:
         ):
             dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
             if dxf_block_name and backend.has_block(dxf_block_name):
-                block_height_du = _BLOCK_REPLAYER.block_height_du(dxf_block_name)
-                if block_height_du > 0:
-                    scale = symbol.height / block_height_du
-                else:
-                    scale = symbol.height / _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82)
-                backend.insert_block(dxf_block_name, comp.x, comp.y, scale=scale)
+                # Compute pin-aligned insertion point.
+                # Procedural bottom pin: (comp.x + width/2, comp.y - stub)
+                proc_pins = symbol.vertical_pins(comp.x, comp.y)
+                target_pin = proc_pins.get("bottom", (comp.x, comp.y))
+                try:
+                    ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
+                        dxf_block_name, target_pin, "bottom",
+                        target_height_mm=symbol.height,
+                    )
+                except ValueError:
+                    ix, iy = comp.x, comp.y
+                    block_height_du = _BLOCK_REPLAYER.block_height_du(dxf_block_name)
+                    scale = symbol.height / (block_height_du or _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82))
+                backend.insert_block(dxf_block_name, ix, iy, scale=scale)
                 block_used = True
 
         # Fallback: procedural symbol rendering
