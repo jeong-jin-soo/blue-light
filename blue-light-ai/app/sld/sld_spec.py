@@ -750,19 +750,33 @@ def _validate_metering(
     supply_source: str,
     effective_rating: int,
     result: ValidationResult,
+    *,
+    is_cable_extension: bool = False,
 ) -> None:
     """Validate / auto-correct metering type (Step 9).
 
     Landlord supply skips metering auto-correction. Otherwise determines
     CT metering (requires_ct) or SP meter based on the effective spec.
     """
-    # Landlord supply: no SP metering — only an isolator inside the unit.
-    if supply_source == "landlord":
-        if metering == "sp_meter":
+    # Cable extension: no meter board — strip any metering (regardless of supply_source).
+    if is_cable_extension:
+        if metering:
             result.add_correction(
-                "metering", "sp_meter", "",
-                "Landlord supply has no SP meter board — removed sp_meter",
+                "metering", metering, "",
+                "Cable extension has no meter board — removed metering",
             )
+        return
+    # Landlord supply: keep sp_meter if explicitly specified (PG KWH meter board).
+    if supply_source == "landlord":
+        if metering:
+            # User explicitly specified metering — keep it as-is.
+            return
+        # No metering specified for landlord — default to sp_meter
+        # (landlord riser → KWH meter board → DB is the standard pattern).
+        result.add_correction(
+            "metering", "", "sp_meter",
+            "Landlord supply: auto-added sp_meter (PG KWH meter board)",
+        )
         return
     if not effective_spec:
         return
@@ -927,7 +941,8 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             f"Auto-determined: {effective_rating}A → {effective_spec.cable_size}",
         )
     _validate_metering(effective_spec, requirements.get("metering", ""),
-                       requirements.get("supply_source", ""), effective_rating, result)
+                       requirements.get("supply_source", ""), effective_rating, result,
+                       is_cable_extension=bool(requirements.get("is_cable_extension")))
     _validate_sub_circuits(requirements.get("circuits", []), effective_rating, result)
     _log_validation_summary(result)
     return result

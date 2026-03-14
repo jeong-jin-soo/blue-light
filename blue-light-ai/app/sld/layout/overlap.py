@@ -283,19 +283,21 @@ class SubCircuitGroup:
 
 
 def _breaker_half_width(comp: PlacedComponent) -> float:
-    """Return half the breaker symbol width for tap_x calculation.
+    """Return pin X offset from comp.x for tap_x calculation.
 
-    Values synced with real_symbol_paths.json (DWG-calibrated).
+    Must match the actual symbol pin position so that connection lines
+    align with the symbol's top/bottom pins.
+    Values = symbol_width / 2  (pin is at horizontal center of each symbol).
     """
     if comp.symbol_name == "CB_MCB":
-        return 3.6   # 7.2mm / 2
+        return 2.5   # 5.0mm / 2
     elif comp.symbol_name == "CB_MCCB":
-        return 4.2   # 8.4mm / 2
+        return 2.75  # 5.5mm / 2
     elif comp.symbol_name in ("CB_RCCB", "CB_ELCB"):
-        return 5.0   # 10.0mm / 2
+        return 3.25  # 6.5mm / 2
     elif comp.symbol_name == "CB_ACB":
-        return 5.0   # 10.0mm / 2
-    return 4.2
+        return 3.5   # 7.0mm / 2
+    return 2.75
 
 
 def _compute_dynamic_spacing(

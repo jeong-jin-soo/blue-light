@@ -80,6 +80,7 @@ def _validate_and_correct(requirements: dict) -> dict:
             or requirements.get("fault_kA", 0)
         ),
         "metering": requirements.get("metering", ""),
+        "is_cable_extension": bool(requirements.get("is_cable_extension")),
         "circuits": [
             {
                 "name": sc.get("name", ""),

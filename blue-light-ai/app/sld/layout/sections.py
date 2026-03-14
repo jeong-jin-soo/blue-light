@@ -114,11 +114,11 @@ def _parse_main_breaker(ctx: _LayoutContext, requirements: dict) -> None:
     ).upper()
 
     # Metering type
-    # Landlord supply has no SP meter — only an isolator inside the unit.
-    # Even if requirements specify "sp_meter" for landlord, discard it.
-    if ctx.supply_source == "landlord":
-        metering_val = requirements.get("metering", None)
-        ctx.metering = None if metering_val == "sp_meter" else metering_val
+    # Landlord supply can have PG KWH meter board (sp_meter).
+    # Cable extension is landlord but has NO meter board.
+    is_cable_ext = requirements.get("is_cable_extension", False)
+    if is_cable_ext:
+        ctx.metering = None
     else:
         ctx.metering = requirements.get("metering", "sp_meter")
 
@@ -562,7 +562,10 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     elif ctx.is_cable_extension:
         supply_label = SG_LOCALE.incoming.from_power_supply
     elif ctx.supply_source == "landlord":
-        supply_label = SG_LOCALE.incoming.from_landlord
+        if ctx.requirements.get("supply_label_type") == "supply":
+            supply_label = SG_LOCALE.incoming.from_landlord_supply
+        else:
+            supply_label = SG_LOCALE.incoming.from_landlord
     else:
         supply_label = SG_LOCALE.incoming.incoming_hdb
     result.components.append(PlacedComponent(
