@@ -144,6 +144,19 @@ def validate_connectivity(result: LayoutResult, config: LayoutConfig) -> int:
             pin_dict = adjusted
         else:
             pin_dict = sym.vertical_pins(comp.x, comp.y)
+            # vertical_pins returns stub-inclusive positions (body edge ± stub).
+            # Connection lines reach body edges directly; adjust to body edge
+            # (remove stub offset) for correct snapping — same logic as horizontal.
+            stub = getattr(sym, '_stub', 2.0)
+            adjusted_v: dict[str, tuple[float, float]] = {}
+            for pn, (px, py) in pin_dict.items():
+                if pn == "bottom":
+                    adjusted_v[pn] = (px, py + stub)  # move up to body bottom edge
+                elif pn == "top":
+                    adjusted_v[pn] = (px, py - stub)  # move down to body top edge
+                else:
+                    adjusted_v[pn] = (px, py)
+            pin_dict = adjusted_v
 
         for pin_name, (px, py) in pin_dict.items():
             pins.append((px, py, comp_idx, pin_name))

@@ -1520,8 +1520,9 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         label=busbar_label,
     ))
 
-    # Connection from main breaker to busbar
-    result.connections.append(((cx, y - 3), (cx, y)))
+    # Connection from last spine component (main breaker or ELCB) body top to busbar.
+    # y already includes component height + stub_len, so body top = y - stub_len.
+    result.connections.append(((cx, y - config.stub_len), (cx, y)))
 
 
 def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:

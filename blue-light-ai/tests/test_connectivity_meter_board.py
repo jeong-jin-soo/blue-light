@@ -275,6 +275,146 @@ class TestMeterBoardConnectionAlignment:
             )
 
 
+class TestVerticalSpineConnectionAlignment:
+    """수직 스파인 MCB/ELCB 커넥션이 body edge에 정렬되는지 검증.
+
+    버그: validate_connectivity()가 수직 컴포넌트의 vertical_pins() 결과
+    (stub 포함 위치)로 커넥션을 스냅하여 2mm 갭 발생.
+
+    수정: connectivity.py에서 vertical_pins() 결과의 stub offset을 제거하여
+    body edge 위치를 사용하도록 변경.
+    """
+
+    @pytest.mark.parametrize("requirements", [
+        pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
+        pytest.param(THREE_PHASE_METERED, id="3ph_metered"),
+    ])
+    def test_main_mcb_bottom_connection_at_body_edge(self, requirements: dict):
+        """메인 MCB 하단 커넥션이 body bottom edge에 맞는지 확인."""
+        from app.sld.real_symbols import get_real_symbol
+
+        result = compute_layout(requirements)
+
+        # 수직 메인 MCB 찾기 (rotation=0)
+        main_mcb = None
+        for comp in result.components:
+            if comp.symbol_name == "CB_MCB" and comp.rotation == 0:
+                main_mcb = comp
+                break
+
+        assert main_mcb is not None, "수직 메인 MCB를 찾을 수 없음"
+
+        sym = get_real_symbol("CB_MCB")
+        stub = getattr(sym, "_stub", 2.0)
+        body_bottom = main_mcb.y  # body starts at placement y
+
+        # MCB body bottom에 닿는 수직 커넥션 찾기
+        found = False
+        for start, end in result.connections:
+            if abs(start[0] - end[0]) > 1.0:
+                continue  # 수평 커넥션 스킵
+            for pt in [start, end]:
+                if abs(pt[1] - body_bottom) < 0.5 and abs(pt[0] - (main_mcb.x + 2.5)) < 3:
+                    found = True
+                    # stub 위치가 아닌 body edge에 있어야 함
+                    assert abs(pt[1] - body_bottom) < 0.5, (
+                        f"MCB 하단 커넥션({pt[1]:.2f})이 body edge({body_bottom:.2f})에서 벗어남"
+                    )
+                    # stub 위치(body_bottom - stub)에 있으면 안 됨
+                    assert abs(pt[1] - (body_bottom - stub)) > 0.5, (
+                        f"MCB 하단 커넥션({pt[1]:.2f})이 stub 위치({body_bottom - stub:.2f})에 있음 — 갭 발생"
+                    )
+
+        assert found, f"MCB body bottom({body_bottom:.2f}) 근처 수직 커넥션을 찾을 수 없음"
+
+    @pytest.mark.parametrize("requirements", [
+        pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
+        pytest.param(THREE_PHASE_METERED, id="3ph_metered"),
+    ])
+    def test_elcb_busbar_connection_at_body_edge(self, requirements: dict):
+        """ELCB/RCCB 상단 → 버스바 커넥션이 body top edge에서 시작하는지 확인."""
+        from app.sld.real_symbols import get_real_symbol
+
+        result = compute_layout(requirements)
+
+        # 수직 ELCB/RCCB 찾기 (rotation=0)
+        main_elcb = None
+        for comp in result.components:
+            if comp.symbol_name in ("CB_ELCB", "CB_RCCB") and comp.rotation == 0:
+                main_elcb = comp
+                break
+
+        assert main_elcb is not None, "수직 ELCB/RCCB를 찾을 수 없음"
+
+        sym = get_real_symbol(main_elcb.symbol_name)
+        stub = getattr(sym, "_stub", 2.0)
+        raw_pins = sym.vertical_pins(main_elcb.x, main_elcb.y)
+        body_top = raw_pins["top"][1] - stub
+
+        # ELCB body top 근처 수직 커넥션 찾기
+        spine_x = raw_pins["top"][0]
+        found = False
+        for start, end in result.connections:
+            if abs(start[0] - end[0]) > 1.0:
+                continue  # 수평 커넥션 스킵
+            for pt in [start, end]:
+                if abs(pt[1] - body_top) < 1.0 and abs(pt[0] - spine_x) < 3:
+                    found = True
+                    assert abs(pt[1] - body_top) < 0.5, (
+                        f"ELCB 상단 커넥션({pt[1]:.2f})이 body edge({body_top:.2f})에서 벗어남"
+                    )
+                    # stub 위치에 있으면 안 됨
+                    stub_top = raw_pins["top"][1]
+                    assert abs(pt[1] - stub_top) > 0.5, (
+                        f"ELCB 상단 커넥션({pt[1]:.2f})이 stub 위치({stub_top:.2f})에 있음 — 갭 발생"
+                    )
+
+        assert found, f"ELCB body top({body_top:.2f}) 근처 수직 커넥션을 찾을 수 없음"
+
+    @pytest.mark.parametrize("requirements", [
+        pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
+        pytest.param(THREE_PHASE_METERED, id="3ph_metered"),
+    ])
+    def test_validate_connectivity_idempotent_for_vertical_spine(
+        self, requirements: dict,
+    ):
+        """validate_connectivity() 재호출 시 수직 스파인 커넥션 불변 검증."""
+        result = compute_layout(requirements)
+
+        # 스파인 X 좌표 찾기
+        spine_x = None
+        for comp in result.components:
+            if comp.symbol_name == "CB_MCB" and comp.rotation == 0:
+                spine_x = comp.x + 2.5
+                break
+        assert spine_x is not None
+
+        # 수직 커넥션 스냅샷
+        def get_vertical_conns():
+            conns = []
+            for s, e in result.connections:
+                if abs(s[0] - e[0]) < 1.0 and abs(s[0] - spine_x) < 3:
+                    conns.append((s[1], e[1]))
+            return conns
+
+        before = get_vertical_conns()
+
+        config = LayoutConfig()
+        validate_connectivity(result, config)
+
+        after = get_vertical_conns()
+
+        assert len(before) == len(after), (
+            f"validate_connectivity() 재호출 후 수직 커넥션 수 변경: "
+            f"{len(before)} → {len(after)}"
+        )
+
+        for i, (b, a) in enumerate(zip(before, after)):
+            assert abs(b[0] - a[0]) < 0.1 and abs(b[1] - a[1]) < 0.1, (
+                f"수직 커넥션 #{i} 변경: ({b[0]:.2f},{b[1]:.2f}) → ({a[0]:.2f},{a[1]:.2f})"
+            )
+
+
 class TestMeterBoardSupplyConnection:
     """미터보드 MCB → 공급 라인 커넥션 검증."""
 
