@@ -18,9 +18,9 @@
   <text x="388.00" y="258.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">DATE :</text>
   <text x="364.00" y="273.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">DRAWING NO. :</text>
   <text x="388.00" y="273.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">REV :</text>
-  <polygon points="211.41,179.81 216.00,179.81 216.00,175.22 211.41,175.22" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="216.00" y1="177.51" x2="218.41" y2="177.51" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="218.41" y1="177.51" x2="218.41" y2="179.48" stroke="#000000" stroke-width="0.25" fill="none" />
+  <circle cx="219.50" cy="184.51" r="3.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <circle cx="247.57" cy="184.51" r="3.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="222.80,183.33 247.10,174.64" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="215.66" y="189.34" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="215.66">63A DP</tspan><tspan x="215.66" dy="2.2">ISOLATOR</tspan></text>
   <polygon points="244.50,181.26 257.51,181.26 257.51,187.76 244.50,187.76" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="248.40" y="185.93" font-family="Arial, Helvetica, sans-serif" font-size="2.4" fill="#000000">KWH</text>

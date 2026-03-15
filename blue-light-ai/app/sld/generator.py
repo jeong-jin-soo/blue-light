@@ -98,7 +98,7 @@ _SYMBOL_TO_DXF_BLOCK = {
     "ELCB": "RCCB",        # ELCB uses RCCB block (same IEC symbol)
     "CB_ELCB": "RCCB",
     # Isolators
-    "ISOLATOR": "DP ISOL",
+    "ISOLATOR": "IEC ISOLATOR",   # meter board / unit isolator — IEC switch symbol
     "DP_ISOL_DEVICE": "DP ISOL",  # circuit-level isolator device at conductor top
     "3P_ISOLATOR": "3P ISOL",
     # CT metering

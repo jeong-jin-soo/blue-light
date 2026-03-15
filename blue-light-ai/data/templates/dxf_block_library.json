@@ -3,7 +3,7 @@
     "version": 1,
     "last_updated": "2026-03-14T12:44:27",
     "total_source_files": 28,
-    "total_blocks": 11
+    "total_blocks": 12
   },
   "_processed_files": {
     "100A Single Phase DB 1 DWG.dxf": {
@@ -1305,6 +1305,45 @@
           1067.6,
           266.6
         ]
+      }
+    },
+    "IEC ISOLATOR": {
+      "source": "63A TPN SLD 14.dxf (model space raw entities — 2 CIRCLEs + LWPOLYLINE)",
+      "description": "IEC disconnect switch / isolator — two contact circles with diagonal lever blade. Extracted from meter board area of reference DXF. Native horizontal orientation (width > height).",
+      "width_du": 567.8,
+      "height_du": 141.6,
+      "bounds": {
+        "min_x": -70.8,
+        "min_y": -70.8,
+        "max_x": 638.6,
+        "max_y": 70.8
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [0.0, 0.0],
+          "radius": 70.8
+        },
+        {
+          "type": "CIRCLE",
+          "center": [567.8, 0.0],
+          "radius": 70.8
+        },
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [66.7, 23.9],
+            [558.4, 199.7]
+          ],
+          "bulges": [0.0, 0.0],
+          "closed": false
+        }
+      ],
+      "pins": {
+        "top": [283.9, 70.8],
+        "bottom": [283.9, -70.8],
+        "left": [-70.8, 0.0],
+        "right": [638.6, 0.0]
       }
     },
     "EARTH": {
