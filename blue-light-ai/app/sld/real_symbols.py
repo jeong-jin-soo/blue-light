@@ -391,6 +391,16 @@ class RealKwhMeter(BaseSymbol):
             "label_right": (self.width / 2 + self._rect_w / 2 + 2, self.height / 2),
         }
 
+    @property
+    def h_extent(self) -> float:
+        """KWH 수평 배치 시 가로 폭 = rect_w (symbol.height가 아님).
+
+        Block library의 KWH_METER는 native horizontal(width_du > height_du).
+        수평 배치 시 DXF 블록 스케일링은 이 값으로 블록 width에 맞추어야
+        레이아웃이 예약한 공간(kwh_rect_w)과 정확히 일치함.
+        """
+        return self._rect_w
+
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         cx = x + self.width / 2
         cy = y + self.height / 2

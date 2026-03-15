@@ -575,10 +575,12 @@ class SldGenerator:
                     rotation = 90.0 if native_horiz else 0.0
                 try:
                     # Native-horizontal blocks in horizontal placement:
-                    # scale by width (= horizontal extent) to fit layout slot.
+                    # scale by h_extent (target width) / block_width_du to fit
+                    # the layout slot. symbol.h_extent defaults to symbol.height
+                    # but overridden for symbols like KWH_METER (rect_w ≠ height).
                     if native_horiz and use_horizontal:
                         block_w = _BLOCK_REPLAYER.block_width_du(dxf_block_name)
-                        scale_override = symbol.height / block_w if block_w > 0 else None
+                        scale_override = symbol.h_extent / block_w if block_w > 0 else None
                     else:
                         scale_override = None
 

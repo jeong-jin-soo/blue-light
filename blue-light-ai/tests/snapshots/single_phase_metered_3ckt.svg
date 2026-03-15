@@ -22,8 +22,8 @@
   <circle cx="223.87" cy="184.51" r="0.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <polyline points="217.70,184.22 223.76,182.05" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="215.66" y="189.34" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="215.66">63A DP</tspan><tspan x="215.66" dy="2.2">ISOLATOR</tspan></text>
-  <polygon points="244.50,182.89 251.00,182.89 251.00,186.13 244.50,186.13" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="246.45" y="185.22" font-family="Arial, Helvetica, sans-serif" font-size="1.2" fill="#000000">KWH</text>
+  <polygon points="244.50,182.56 252.30,182.56 252.30,186.46 244.50,186.46" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="246.84" y="185.36" font-family="Arial, Helvetica, sans-serif" font-size="1.5" fill="#000000">KWH</text>
   <text x="234.50" y="179.70" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">KWH METER BY SP</text>
   <path d="M 272.84,183.66 A 3.75,3.75 0 0,0 266.16,183.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="266.16" cy="184.70" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
