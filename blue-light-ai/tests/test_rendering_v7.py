@@ -576,8 +576,8 @@ class TestComputeBoundingBox:
         comp = PlacedComponent(symbol_name="KWH_METER", x=50, y=100, label="kWh")
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        assert bb.width == pytest.approx(9.0)
-        assert bb.height == pytest.approx(6.5)
+        assert bb.width == pytest.approx(16.0)
+        assert bb.height == pytest.approx(12.0)
 
 
 # -- Test: resolve_overlaps --

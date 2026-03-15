@@ -91,7 +91,7 @@ class TestDxfLabelAlignment:
             # 오프셋은 항상 양수여야 함
             assert offset > 0, f"{sym_name}: offset={offset} should be > 0"
             # 오프셋은 합리적 범위 내여야 함 (3mm ~ 20mm)
-            assert 3 <= offset <= 20, f"{sym_name}: offset={offset} out of range"
+            assert 3 <= offset <= 25, f"{sym_name}: offset={offset} out of range"
 
     def test_pdf_backend_unchanged(self):
         """PDF 백엔드에서는 라벨 위치가 기존과 동일해야 함."""

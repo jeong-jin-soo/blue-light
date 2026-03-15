@@ -66,12 +66,12 @@
     "description": "Earth Leakage Circuit Breaker (same symbol as RCCB). Viewport-corrected."
   },
   "KWH_METER": {
-    "width_mm": 9.0,
-    "height_mm": 6.5,
+    "width_mm": 16.0,
+    "height_mm": 12.0,
     "circle_radius_mm": 4.5,
     "rect_ratio": 2.0,
     "stub_mm": 2.0,
-    "description": "kWh Energy Meter — rectangle w/h=2.0. Viewport-corrected."
+    "description": "kWh Energy Meter — rectangle w/h=2.0. Ref 63A TPN SLD 14: KWH box 1.52x isolator width."
   },
   "CT": {
     "width_mm": 2.5,

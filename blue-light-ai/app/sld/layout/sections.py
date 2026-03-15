@@ -468,11 +468,13 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
     mcb_cx = iso_cx + 2 * comp_spacing
     mb_center_y = y + 8
 
-    # Pin positions
+    # Pin positions — connection lines go directly to component body edge.
+    # Block replayer does not draw stubs; procedural symbols draw their own
+    # stubs internally and overlap harmlessly with the connection lines.
     iso_left_x = cx + _mb_inset
-    iso_right_x = iso_cx + iso_h_extent / 2 + _stub
-    mcb_left_x = mcb_cx - mcb_h_extent / 2 - _stub
-    mcb_right_x = mcb_cx + mcb_h_extent / 2 + _stub
+    iso_right_x = iso_cx + iso_h_extent / 2
+    mcb_left_x = mcb_cx - mcb_h_extent / 2
+    mcb_right_x = mcb_cx + mcb_h_extent / 2
 
     # Vertical bands — above center
     _gap = config.meter_board_gap
@@ -526,7 +528,7 @@ def _place_meter_board_symbols(
     result.symbols_used.add("ISOLATOR")
 
     # ISO → KWH wiring
-    kwh_left_x = g.kwh_cx - g.kwh_h_extent / 2 - g.stub
+    kwh_left_x = g.kwh_cx - g.kwh_h_extent / 2
     result.connections.append(((g.iso_right_x, g.mb_center_y), (kwh_left_x, g.mb_center_y)))
 
     # CT (between ISO and KWH) — ct_meter + non-landlord only
@@ -560,7 +562,7 @@ def _place_meter_board_symbols(
     ))
 
     # KWH → MCB wiring
-    kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2 + g.stub
+    kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2
     result.connections.append(((kwh_right_x, g.mb_center_y), (g.mcb_left_x, g.mb_center_y)))
 
     # MCB (right)
