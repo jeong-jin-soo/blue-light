@@ -128,6 +128,20 @@ def validate_connectivity(result: LayoutResult, config: LayoutConfig) -> int:
 
         if use_horizontal:
             pin_dict = sym.horizontal_pins(comp.x, comp.y)
+            # horizontal_pins returns stub-inclusive positions (body edge ± stub).
+            # Connection lines reach body edges directly; DXF blocks have pins
+            # at body edges, and procedural stubs overlap with connections.
+            # → Adjust to body edge (remove stub offset) for correct snapping.
+            stub = getattr(sym, '_stub', 2.0)
+            adjusted: dict[str, tuple[float, float]] = {}
+            for pn, (px, py) in pin_dict.items():
+                if pn == "left":
+                    adjusted[pn] = (px + stub, py)
+                elif pn == "right":
+                    adjusted[pn] = (px - stub, py)
+                else:
+                    adjusted[pn] = (px, py)
+            pin_dict = adjusted
         else:
             pin_dict = sym.vertical_pins(comp.x, comp.y)
 

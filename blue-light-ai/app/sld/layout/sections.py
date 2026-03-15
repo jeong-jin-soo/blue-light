@@ -468,10 +468,10 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
     mcb_cx = iso_cx + 2 * comp_spacing
     mb_center_y = y + 8
 
-    # Pin positions — connection lines go directly to component body edge.
-    # Block replayer does not draw stubs; procedural symbols draw their own
-    # stubs internally and overlap harmlessly with the connection lines.
-    iso_left_x = cx + _mb_inset
+    # Pin positions — connection lines reach directly to component pin (body edge).
+    # DXF blocks have pins at body edge; procedural symbols draw stubs that
+    # extend outward from body edge, overlapping harmlessly with connection lines.
+    iso_left_x = iso_cx - iso_h_extent / 2
     iso_right_x = iso_cx + iso_h_extent / 2
     mcb_left_x = mcb_cx - mcb_h_extent / 2
     mcb_right_x = mcb_cx + mcb_h_extent / 2
@@ -527,7 +527,7 @@ def _place_meter_board_symbols(
     ))
     result.symbols_used.add("ISOLATOR")
 
-    # ISO → KWH wiring
+    # ISO → KWH wiring (connection reaches KWH left pin / body edge)
     kwh_left_x = g.kwh_cx - g.kwh_h_extent / 2
     result.connections.append(((g.iso_right_x, g.mb_center_y), (kwh_left_x, g.mb_center_y)))
 
@@ -541,9 +541,9 @@ def _place_meter_board_symbols(
         ))
         result.symbols_used.add("CT")
 
-    # KWH METER (center)
+    # KWH METER — x = left edge (same pattern as ISO/MCB for pin="left" alignment)
     result.components.append(PlacedComponent(
-        symbol_name="KWH_METER", x=g.kwh_cx, y=g.mb_center_y, rotation=90.0,
+        symbol_name="KWH_METER", x=g.kwh_cx - g.kwh_h_extent / 2, y=g.mb_center_y, rotation=90.0,
     ))
     result.symbols_used.add("KWH_METER")
 
@@ -561,7 +561,7 @@ def _place_meter_board_symbols(
         label=_kwh_label,
     ))
 
-    # KWH → MCB wiring
+    # KWH → MCB wiring (connection reaches KWH right pin / body edge)
     kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2
     result.connections.append(((kwh_right_x, g.mb_center_y), (g.mcb_left_x, g.mb_center_y)))
 

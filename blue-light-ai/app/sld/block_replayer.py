@@ -73,6 +73,23 @@ class BlockReplayer:
         blk = self._blocks.get(block_name)
         return blk["width_du"] if blk else 0.0
 
+    def pin_span_horizontal_du(self, block_name: str) -> float:
+        """Get horizontal pin-to-pin span in DU (right.x - left.x).
+
+        For blocks whose pins extend beyond the body (e.g. IEC ISOLATOR),
+        this returns a larger value than block_width_du.  Falls back to
+        block_width_du when left/right pins are not defined.
+        """
+        blk = self._blocks.get(block_name)
+        if not blk or "pins" not in blk:
+            return self.block_width_du(block_name)
+        pins = blk["pins"]
+        left = pins.get("left")
+        right = pins.get("right")
+        if left is None or right is None:
+            return self.block_width_du(block_name)
+        return abs(right[0] - left[0])
+
     def compute_scale(self, block_name: str, target_height_mm: float) -> float:
         """Compute DU→mm scale factor for a given target height.
 

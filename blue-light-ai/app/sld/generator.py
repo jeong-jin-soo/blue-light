@@ -570,16 +570,25 @@ class SldGenerator:
                     rotation = 0.0 if native_horiz else 90.0
                 else:
                     proc_pins = symbol.vertical_pins(comp.x, comp.y)
-                    target_pin = proc_pins.get("bottom", (comp.x, comp.y))
-                    pin_name = "bottom"  # 렌더링 결과의 하단에 정렬
+                    # Prefer "bottom" pin; fall back to "top" for symbols
+                    # like EARTH that only have a top connection point.
+                    if "bottom" in proc_pins:
+                        target_pin = proc_pins["bottom"]
+                        pin_name = "bottom"
+                    elif "top" in proc_pins:
+                        target_pin = proc_pins["top"]
+                        pin_name = "top"
+                    else:
+                        target_pin = (comp.x, comp.y)
+                        pin_name = "bottom"
                     rotation = 90.0 if native_horiz else 0.0
                 try:
                     # Native-horizontal blocks in horizontal placement:
-                    # scale by h_extent (target width) / block_width_du to fit
-                    # the layout slot. symbol.h_extent defaults to symbol.height
-                    # but overridden for symbols like KWH_METER (rect_w ≠ height).
+                    # scale by h_extent / pin_span to fit the layout slot.
+                    # pin_span accounts for pins extending beyond the body
+                    # (e.g. IEC ISOLATOR left=-70.8, right=638.6 vs body=567.8).
                     if native_horiz and use_horizontal:
-                        block_w = _BLOCK_REPLAYER.block_width_du(dxf_block_name)
+                        block_w = _BLOCK_REPLAYER.pin_span_horizontal_du(dxf_block_name)
                         scale_override = symbol.h_extent / block_w if block_w > 0 else None
                     else:
                         scale_override = None
