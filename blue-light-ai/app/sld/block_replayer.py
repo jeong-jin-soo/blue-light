@@ -218,6 +218,16 @@ class BlockReplayer:
             return False
         return blk.get("width_du", 0) > blk.get("height_du", 0) * 1.2
 
+    # 90° 단위 회전에서 "렌더링 후 방향 → 원본 핀" 매핑.
+    # 호출자가 "left" 라고 하면 "렌더링된 결과의 왼쪽 핀"을 의미.
+    # 회전 전 블록 핀 이름으로 변환해야 올바른 좌표를 얻을 수 있음.
+    _ROTATED_PIN_MAP: dict[int, dict[str, str]] = {
+        0:   {"bottom": "bottom", "top": "top", "left": "left", "right": "right"},
+        90:  {"left": "top", "right": "bottom", "top": "right", "bottom": "left"},
+        180: {"bottom": "top", "top": "bottom", "left": "right", "right": "left"},
+        270: {"left": "bottom", "right": "top", "top": "left", "bottom": "right"},
+    }
+
     def compute_aligned_insertion(
         self,
         block_name: str,
@@ -226,27 +236,30 @@ class BlockReplayer:
         *,
         target_height_mm: float | None = None,
         scale: float | None = None,
+        rotation: float = 0.0,
     ) -> tuple[float, float, float]:
         """Compute insertion point that aligns a block pin with a target position.
 
-        When the layout engine places a component at (comp.x, comp.y), the
-        procedural symbol's pin positions differ from the DXF block's pin
-        positions at the same insertion point.  This method computes the
-        correct insertion point (ix, iy) so that ``block_pin * scale + (ix, iy)``
-        equals ``target_pin``.
+        ``pin_name`` is specified in **rendered (post-rotation) coordinates**:
+        - "left"   = 렌더링 결과의 왼쪽 연결점
+        - "right"  = 렌더링 결과의 오른쪽 연결점
+        - "bottom" = 렌더링 결과의 하단 연결점
+        - "top"    = 렌더링 결과의 상단 연결점
+
+        The method internally maps this to the correct pre-rotation pin,
+        transforms its coordinates by *rotation*, and computes the insertion
+        point so the rendered pin lands exactly at *target_pin*.
 
         Args:
             block_name: Block name in the library.
             target_pin: Where the pin should appear in page coordinates (mm).
-            pin_name: Which block pin to align ("top", "bottom", "left", "right").
+            pin_name: Desired rendered direction ("top", "bottom", "left", "right").
             target_height_mm: Target height for scale computation.
             scale: Direct scale factor (mutually exclusive with target_height_mm).
+            rotation: Rotation angle in degrees (CCW), must be 0/90/180/270.
 
         Returns:
             (insertion_x, insertion_y, computed_scale)
-
-        Raises:
-            ValueError: If both target_height_mm and scale are given, or block unknown.
         """
         if target_height_mm is not None and scale is not None:
             raise ValueError("target_height_mm and scale are mutually exclusive")
@@ -262,14 +275,32 @@ class BlockReplayer:
         else:
             s = 1.0
 
-        pins = blk.get("pins", {})
-        pin = pins.get(pin_name)
-        if pin is None:
-            raise ValueError(f"Block {block_name} has no pin '{pin_name}'")
+        # Map rendered direction → original pin name
+        rot_key = round(rotation) % 360
+        pin_map = self._ROTATED_PIN_MAP.get(rot_key, self._ROTATED_PIN_MAP[0])
+        original_pin_name = pin_map.get(pin_name, pin_name)
 
-        # insertion + pin * scale = target → insertion = target - pin * scale
-        ix = target_pin[0] - pin[0] * s
-        iy = target_pin[1] - pin[1] * s
+        pins = blk.get("pins", {})
+        pin = pins.get(original_pin_name)
+        if pin is None:
+            # Fallback: try the requested name directly
+            pin = pins.get(pin_name)
+        if pin is None:
+            raise ValueError(
+                f"Block {block_name} has no pin '{original_pin_name}' "
+                f"(mapped from rendered '{pin_name}' at {rotation}°)"
+            )
+
+        # Rotate pin coordinates: (px, py) → (px·cosθ − py·sinθ, px·sinθ + py·cosθ)
+        rad = math.radians(rotation)
+        cos_r = math.cos(rad)
+        sin_r = math.sin(rad)
+        rpx = pin[0] * cos_r - pin[1] * sin_r
+        rpy = pin[0] * sin_r + pin[1] * cos_r
+
+        # insertion + rotated_pin * scale = target
+        ix = target_pin[0] - rpx * s
+        iy = target_pin[1] - rpy * s
         return (ix, iy, s)
 
     def check_dimension_compatibility(

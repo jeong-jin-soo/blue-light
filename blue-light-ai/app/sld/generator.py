@@ -557,49 +557,40 @@ class SldGenerator:
         if _BLOCK_REPLAYER is not None:
             dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
             if dxf_block_name and _BLOCK_REPLAYER.has_block(dxf_block_name):
-                # Determine rotation and pin based on intent + block native orientation
+                # Determine rotation and pin based on intent + block native orientation.
+                # pin_name is specified in RENDERED (post-rotation) coordinates:
+                #   "left" = 렌더링 결과의 왼쪽 연결점에 target_pin 정렬
+                #   "bottom" = 렌더링 결과의 하단 연결점에 target_pin 정렬
+                # compute_aligned_insertion()이 rotation을 고려하여 올바른
+                # 원본 핀 좌표를 자동으로 선택 + 회전 변환함.
                 native_horiz = _BLOCK_REPLAYER.is_native_horizontal(dxf_block_name)
                 if use_horizontal:
                     target_pin = (comp.x, comp.y)
-                    if native_horiz:
-                        # Block is already horizontal → no rotation, use left pin
-                        rotation = 0.0
-                        pin_name = "left"
-                    else:
-                        # Block is vertical → rotate 90° to make horizontal
-                        rotation = 90.0
-                        pin_name = "bottom"  # rotated: bottom→left
+                    pin_name = "left"  # 렌더링 결과의 왼쪽에 정렬
+                    rotation = 0.0 if native_horiz else 90.0
                 else:
-                    # Vertical placement
                     proc_pins = symbol.vertical_pins(comp.x, comp.y)
                     target_pin = proc_pins.get("bottom", (comp.x, comp.y))
-                    if native_horiz:
-                        # Block is horizontal → rotate 90° to make vertical
-                        rotation = 90.0
-                        pin_name = "left"  # rotated: left→bottom
-                    else:
-                        rotation = 0.0
-                        pin_name = "bottom"
+                    pin_name = "bottom"  # 렌더링 결과의 하단에 정렬
+                    rotation = 90.0 if native_horiz else 0.0
                 try:
-                    # Native-horizontal blocks: scale by width (= horizontal extent)
-                    # so the symbol fits the layout slot correctly.
+                    # Native-horizontal blocks in horizontal placement:
+                    # scale by width (= horizontal extent) to fit layout slot.
                     if native_horiz and use_horizontal:
-                        target_w = symbol.height  # layout uses height as h_extent
                         block_w = _BLOCK_REPLAYER.block_width_du(dxf_block_name)
-                        scale_override = target_w / block_w if block_w > 0 else None
+                        scale_override = symbol.height / block_w if block_w > 0 else None
                     else:
                         scale_override = None
 
-                    ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
-                        dxf_block_name, target_pin, pin_name,
-                        target_height_mm=symbol.height,
-                    )
                     if scale_override is not None:
-                        scale = scale_override
-                        # Recompute insertion from scale
-                        ix, iy, _ = _BLOCK_REPLAYER.compute_aligned_insertion(
+                        ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
                             dxf_block_name, target_pin, pin_name,
-                            scale=scale,
+                            scale=scale_override, rotation=rotation,
+                        )
+                    else:
+                        ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
+                            dxf_block_name, target_pin, pin_name,
+                            target_height_mm=symbol.height, rotation=rotation,
                         )
                 except ValueError:
                     ix, iy = comp.x, comp.y
