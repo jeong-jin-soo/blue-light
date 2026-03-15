@@ -581,10 +581,26 @@ class SldGenerator:
                         rotation = 0.0
                         pin_name = "bottom"
                 try:
+                    # Native-horizontal blocks: scale by width (= horizontal extent)
+                    # so the symbol fits the layout slot correctly.
+                    if native_horiz and use_horizontal:
+                        target_w = symbol.height  # layout uses height as h_extent
+                        block_w = _BLOCK_REPLAYER.block_width_du(dxf_block_name)
+                        scale_override = target_w / block_w if block_w > 0 else None
+                    else:
+                        scale_override = None
+
                     ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
                         dxf_block_name, target_pin, pin_name,
                         target_height_mm=symbol.height,
                     )
+                    if scale_override is not None:
+                        scale = scale_override
+                        # Recompute insertion from scale
+                        ix, iy, _ = _BLOCK_REPLAYER.compute_aligned_insertion(
+                            dxf_block_name, target_pin, pin_name,
+                            scale=scale,
+                        )
                 except ValueError:
                     ix, iy = comp.x, comp.y
                     block_height_du = _BLOCK_REPLAYER.block_height_du(dxf_block_name)
