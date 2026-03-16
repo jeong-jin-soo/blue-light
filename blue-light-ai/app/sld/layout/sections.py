@@ -942,19 +942,21 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     ))
     result.symbols_used.add("CT")
 
-    # Branch 1 (LEFT): ASS → Ammeter
+    # Branch 1 (LEFT): ASS → Ammeter → (A) instrument circle
     if ctx.has_ammeter:
         _place_metering_branch(
             result, cx, ass_branch_y, direction="left",
             components=[
                 ("SELECTOR_SWITCH", "ASS", 8.0),
                 ("AMMETER", ctx.ammeter_range or "0-500A", 7.6),
+                ("METER_A", "A", 5.0),
             ],
             arm_len=branch_arm_len, gap=branch_gap,
         )
         result.junction_arrows.append((cx, ass_branch_y, "left"))
+        result.symbols_used.add("METER_A")
 
-    # Branch 2 (RIGHT): VSS → Voltmeter
+    # Branch 2 (RIGHT): VSS → Voltmeter → (V) instrument circle
     # Placed midway between ASS branch and BI Connector — per reference DWG.
     if ctx.has_voltmeter:
         _branch_y = (ass_branch_y + bi_y) / 2
@@ -963,10 +965,12 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             components=[
                 ("SELECTOR_SWITCH", "VSS", 8.0),
                 ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
+                ("METER_V", "V", 5.0),
             ],
             arm_len=branch_arm_len, gap=branch_gap,
         )
         result.junction_arrows.append((cx, _branch_y, "right"))
+        result.symbols_used.add("METER_V")
 
     # Branch 3 (RIGHT): KWH Meter (no MCB, no right stub — per reference DWG)
     # Return line connects 3mm above ELR hook (prot_ct_center_y).
@@ -980,7 +984,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # KWH branch Y: box bottom must clear return line by ≥1.5mm
     _kwh_branch_y = _kwh_return_y + _kwh_rect_h / 2 + 1.5
 
-    _kwh_label = "SPPG\\PkWh METER" if ctx.supply_source != "landlord" else "kWh METER"
+    _kwh_label = "SP PG\\PkWh METER" if ctx.supply_source != "landlord" else "kWh METER"
 
     # Place KWH component (right of spine, no right stub)
     _kwh_comp_x = cx + branch_arm_len  # rect left edge (same as _place_metering_branch)
@@ -1013,9 +1017,11 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         (cx, _kwh_return_y),
     ))
 
-    # BI Connector
+    # BI Connector — include isolator/busbar rating (e.g., "100A BI CONNECTOR")
+    _bi_rating = ctx.busbar_rating or ctx.breaker_rating or 0
+    _bi_label = f"{_bi_rating}A BI CONNECTOR" if _bi_rating else "BI CONNECTOR"
     result.components.append(PlacedComponent(
-        symbol_name="BI_CONNECTOR", x=cx - bi_w / 2, y=bi_y, label="BI CONNECTOR",
+        symbol_name="BI_CONNECTOR", x=cx - bi_w / 2, y=bi_y, label=_bi_label,
     ))
     result.symbols_used.add("BI_CONNECTOR")
 
@@ -1464,11 +1470,8 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     result.busbar_start_x = bus_start_x
     result.busbar_end_x = bus_end_x
 
-    busbar_label = (
-        f"{busbar_rating}A {SG_LOCALE.circuit.comb_busbar}"
-        if busbar_rating <= 100
-        else f"{busbar_rating}A {SG_LOCALE.circuit.busbar}"
-    )
+    # Always use "BUSBAR" label regardless of rating (LEW convention)
+    busbar_label = f"{busbar_rating}A {SG_LOCALE.circuit.busbar}"
     result.components.append(PlacedComponent(
         symbol_name="BUSBAR",
         x=bus_start_x,
@@ -1501,14 +1504,23 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
 
     # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
     # For landlord supply, DB is always inside the tenant's unit.
+    # Sub-boards (fed_from is set) should NOT show location text — only the root
+    # board (MSB) shows it.
     db_location_text = ""
-    if unit_number:
-        db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
-    elif application_info and application_info.get("address"):
-        db_location_text = f"(LOCATED AT {application_info['address']})"
-    elif ctx.supply_source == "landlord":
-        # Landlord supply → DB is inside tenant's unit (no specific unit number)
-        db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit})"
+    _current_board = (
+        ctx.distribution_boards[ctx.current_db_idx]
+        if ctx.distribution_boards and 0 <= ctx.current_db_idx < len(ctx.distribution_boards)
+        else {}
+    )
+    _is_sub_board = bool(_current_board.get("fed_from"))
+    if not _is_sub_board:
+        if unit_number:
+            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
+        elif application_info and application_info.get("address"):
+            db_location_text = f"(LOCATED AT {application_info['address']})"
+        elif ctx.supply_source == "landlord":
+            # Landlord supply → DB is inside tenant's unit (no specific unit number)
+            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit})"
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
     ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"

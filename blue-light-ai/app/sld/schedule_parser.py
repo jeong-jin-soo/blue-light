@@ -244,7 +244,11 @@ Extract EVERY row from the circuit table:
 8. Preserve the original circuit ordering from the file.
 9. Output ONLY valid JSON — no markdown, no explanation, no code fences.
 10. **Multi-DB detection**: If the file has multiple sheets/tabs each representing a distribution board, OR has separate sections for different boards, use `distribution_boards` array. Otherwise use flat `outgoing_circuits`.
-11. **Protection groups**: If a board has a "Protection Group" column (e.g., "RCCB L1", "RCCB L2", "RCCB L3"), group those circuits into `protection_groups` array with per-phase RCCB details. Circuits without protection groups go into the board's `outgoing_circuits`.
+11. **Protection groups**: Group circuits into `protection_groups` when ANY of these conditions is met:
+    a) The file has a "Protection Group" column (e.g., "RCCB L1", "RCCB L2", "RCCB L3").
+    b) A three-phase DB has circuits assigned to specific phases (L1/L2/L3 or R/Y/B) AND has per-phase RCCBs.
+    c) A three-phase DB has many circuits (≥9) with clear per-phase distribution — in Singapore practice, such boards typically use per-phase 2P RCCBs (40A 2P RCCB per phase with separate busbar).
+    When creating protection_groups, each group has its own RCCB (typically 2P for single-phase groups within a 3-phase board) and its own busbar segment. Circuits NOT assigned to a specific phase go into the board's `outgoing_circuits`.
 12. **Phase normalization**: Always normalize phase names to L1/L2/L3. Convert R→L1, Y→L2, B→L3, RED→L1, YELLOW→L2, BLUE→L3.
 13. **Metering**: For landlord supply (supply_source="landlord"), metering MUST be null. Only SP PowerGrid direct supplies have SP meters.
 14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations."""
@@ -408,6 +412,104 @@ async def _call_gemini_vision(
     return json.loads(response.text)
 
 
+# ── Post-processing: Auto-detect Protection Groups ──
+
+
+def _auto_detect_protection_groups(data: dict) -> dict:
+    """Post-process Gemini output: detect and create per-phase RCCB protection groups.
+
+    For three-phase distribution boards where circuits are assigned to specific phases
+    (L1/L2/L3) but Gemini did not create protection_groups, this function auto-groups
+    them — matching Singapore LEW practice of per-phase 2P RCCB grouping.
+    """
+    dbs = data.get("distribution_boards")
+    if not dbs:
+        return data
+
+    # Check if incoming is three-phase
+    incoming = data.get("incoming", {})
+    is_three_phase = incoming.get("phase") == "three_phase"
+    if not is_three_phase:
+        return data
+
+    for db in dbs:
+        # Skip if protection_groups already populated
+        if db.get("protection_groups"):
+            continue
+
+        circuits = db.get("outgoing_circuits", [])
+        if not circuits:
+            continue
+
+        # Count circuits per phase
+        phase_map: dict[str, list[dict]] = {"L1": [], "L2": [], "L3": []}
+        unassigned: list[dict] = []
+        _PHASE_NORM = {
+            "L1": "L1", "L2": "L2", "L3": "L3",
+            "R": "L1", "Y": "L2", "B": "L3",
+            "RED": "L1", "YELLOW": "L2", "BLUE": "L3",
+        }
+
+        for c in circuits:
+            phase_raw = (c.get("phase") or "").upper().strip()
+            phase = _PHASE_NORM.get(phase_raw)
+            if phase:
+                phase_map[phase].append(c)
+            else:
+                # Try to infer from circuit ID (e.g., L1P1, L2S1)
+                cid = (c.get("id") or "").upper()
+                inferred = None
+                for prefix in ("L1", "L2", "L3"):
+                    if cid.startswith(prefix):
+                        inferred = prefix
+                        break
+                if inferred:
+                    phase_map[inferred].append(c)
+                else:
+                    unassigned.append(c)
+
+        # Only create protection groups if ≥2 phases have circuits and
+        # total phase-assigned circuits ≥ 6 (typical 3-phase DB threshold)
+        phases_with_circuits = sum(1 for v in phase_map.values() if v)
+        total_assigned = sum(len(v) for v in phase_map.values())
+
+        if phases_with_circuits >= 2 and total_assigned >= 6:
+            # Determine per-phase RCCB rating from board's ELCB or default
+            board_elcb = db.get("elcb", {}) or {}
+            per_phase_rating = board_elcb.get("rating_a", 40)
+            sensitivity = board_elcb.get("sensitivity_ma", 30)
+
+            protection_groups = []
+            for phase in ("L1", "L2", "L3"):
+                if not phase_map[phase]:
+                    continue
+                protection_groups.append({
+                    "phase": phase,
+                    "rccb": {
+                        "type": "RCCB",
+                        "rating_a": per_phase_rating,
+                        "poles": 2,
+                        "sensitivity_ma": sensitivity,
+                    },
+                    "circuits": phase_map[phase],
+                })
+
+            if protection_groups:
+                db["protection_groups"] = protection_groups
+                db["outgoing_circuits"] = unassigned
+                # Remove board-level ELCB since it's now per-phase
+                if db.get("elcb"):
+                    del db["elcb"]
+                logger.info(
+                    "Auto-detected protection groups for DB '%s': %d groups, %d circuits",
+                    db.get("name", "?"),
+                    len(protection_groups),
+                    total_assigned,
+                )
+
+    return data
+
+
 # ── Public API ──────────────────────────────────────
 
 async def extract_schedule_from_file(
@@ -504,13 +606,23 @@ async def extract_schedule_from_file(
             "error": str(e),
         }
 
-    # Validate basic structure
-    if not extracted_data.get("outgoing_circuits"):
+    # Post-process: auto-detect per-phase RCCB protection groups
+    extracted_data = _auto_detect_protection_groups(extracted_data)
+
+    # Validate basic structure (check both single-DB and multi-DB paths)
+    has_circuits = bool(extracted_data.get("outgoing_circuits"))
+    has_dbs = bool(extracted_data.get("distribution_boards"))
+    if not has_circuits and not has_dbs:
         warnings.append("No outgoing circuits found in the file")
     if not extracted_data.get("incoming"):
         warnings.append("No incoming supply information found in the file")
 
+    # Count total circuits across all paths
     circuit_count = len(extracted_data.get("outgoing_circuits", []))
+    for _db in extracted_data.get("distribution_boards", []):
+        circuit_count += len(_db.get("outgoing_circuits", []))
+        for _pg in _db.get("protection_groups", []):
+            circuit_count += len(_pg.get("circuits", []))
     logger.info(
         "Schedule extraction complete: file_type=%s, circuits=%d, warnings=%d",
         file_type, circuit_count, len(warnings),
@@ -589,24 +701,51 @@ def format_extracted_schedule(result: dict) -> str:
         if metering and metering.get("type"):
             lines.append(f"- Metering: {metering['type']}")
 
-    # Outgoing circuits
+    # Helper to format a circuit line
+    def _fmt_circuit(oc: dict, idx: int) -> str:
+        cid = oc.get("id", f"#{idx}")
+        desc = oc.get("description", "Unknown")
+        breaker = oc.get("breaker", {})
+        br_parts = [p for p in [
+            breaker.get("type"),
+            f"{breaker['rating_a']}A" if breaker.get("rating_a") else None,
+            breaker.get("poles"),
+            f"Type {breaker['characteristic']}" if breaker.get("characteristic") else None,
+        ] if p]
+        br_str = " ".join(br_parts) if br_parts else "—"
+        cable_str = oc.get("cable", "—") or "—"
+        room_str = f" [{oc['room']}]" if oc.get("room") else ""
+        return f"  {cid}: {desc}{room_str} | Breaker: {br_str} | Cable: {cable_str}"
+
+    # Distribution boards (multi-DB)
+    dbs = data.get("distribution_boards", [])
+    if dbs:
+        for db in dbs:
+            db_name = db.get("name", "DB")
+            pg_list = db.get("protection_groups", [])
+            db_circuits = db.get("outgoing_circuits", [])
+            total = len(db_circuits) + sum(len(pg.get("circuits", [])) for pg in pg_list)
+            lines.append(f"\n## {db_name} ({total} circuits)")
+
+            if pg_list:
+                for pg in pg_list:
+                    phase = pg.get("phase", "?")
+                    rccb = pg.get("rccb", {})
+                    rccb_str = f"{rccb.get('rating_a', '?')}A {rccb.get('poles', '?')}P RCCB ({rccb.get('sensitivity_ma', '?')}mA)"
+                    pg_circuits = pg.get("circuits", [])
+                    lines.append(f"  ### Protection Group {phase} — {rccb_str} ({len(pg_circuits)} circuits)")
+                    for j, c in enumerate(pg_circuits, 1):
+                        lines.append(f"  {_fmt_circuit(c, j)}")
+
+            for j, oc in enumerate(db_circuits, 1):
+                lines.append(_fmt_circuit(oc, j))
+
+    # Outgoing circuits (single-DB)
     circuits = data.get("outgoing_circuits", [])
     if circuits:
         lines.append(f"\n## Circuit Schedule ({len(circuits)} circuits)")
         for i, oc in enumerate(circuits, 1):
-            cid = oc.get("id", f"#{i}")
-            desc = oc.get("description", "Unknown")
-            breaker = oc.get("breaker", {})
-            br_parts = [p for p in [
-                breaker.get("type"),
-                f"{breaker['rating_a']}A" if breaker.get("rating_a") else None,
-                breaker.get("poles"),
-                f"Type {breaker['characteristic']}" if breaker.get("characteristic") else None,
-            ] if p]
-            br_str = " ".join(br_parts) if br_parts else "—"
-            cable_str = oc.get("cable", "—") or "—"
-            room_str = f" [{oc['room']}]" if oc.get("room") else ""
-            lines.append(f"  {cid}: {desc}{room_str} | Breaker: {br_str} | Cable: {cable_str}")
+            lines.append(_fmt_circuit(oc, i))
 
     # Client info
     client = data.get("client_info", {})

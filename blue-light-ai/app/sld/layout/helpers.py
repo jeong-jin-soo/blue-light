@@ -863,9 +863,13 @@ def _place_sub_circuits_upward(
                 fault_kA=0, label_style="breaker_block",
             ))
         else:
-            _render_type = "MCB" if cd["breaker_type"] == "ISOLATOR" else cd["breaker_type"]
+            # ISOLATOR uses its own symbol (rectangle + switch arm), not CB_MCB circle
+            if cd["breaker_type"] == "ISOLATOR":
+                _symbol_name = "ISOLATOR"
+            else:
+                _symbol_name = f"CB_{cd['breaker_type']}"
             result.components.append(PlacedComponent(
-                symbol_name=f"CB_{_render_type}",
+                symbol_name=_symbol_name,
                 x=tap_x - sc_cb_w / 2, y=sc_y,
                 label=cd["name"], rating=f"{cd['breaker_rating']}A",
                 cable_annotation=cd["cable"], circuit_id=circuit_id,

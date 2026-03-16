@@ -633,8 +633,10 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     allocable = avail_width - gap_space
 
     # --- Helper: compute DB width at a given spacing ---
-    PG_GAP = 8.0         # mm gap between protection groups (synced with _place_protection_groups)
-    PG_MARGIN = 3.0      # mm margin per PG side (much smaller than busbar_margin)
+    # LEW reference: PG boundaries use ~3mm extra spacing (same as phase gaps),
+    # not large physical gaps.  Keep tight to avoid inflating DB2 width.
+    PG_GAP = 3.0         # mm gap between protection groups (synced with _place_protection_groups)
+    PG_MARGIN = 1.0      # mm margin per PG side (minimal busbar-end clearance)
 
     def _db_width_at_spacing(p: DBPlan, spacing: float) -> float:
         if p.protection_groups:
@@ -1237,30 +1239,9 @@ def _add_hierarchical_connections(
         connect_y = bi_y - stub
 
         # ── Incoming MCB (child side) ──
-        incoming_brk = child_db.get("incoming_breaker", {}) if child_db else {}
-        if incoming_brk and incoming_brk.get("rating"):
-            imcb_y = connect_y - mcb_h
-            merged.connections.append(((child_cx, connect_y), (child_cx, imcb_y + mcb_h)))
-            i_type = incoming_brk.get("type", "MCB")
-            i_char = incoming_brk.get("breaker_characteristic", "")
-            i_rating = incoming_brk.get("rating", 0)
-            i_poles = incoming_brk.get("poles", "TPN")
-            i_kA = incoming_brk.get("fault_kA", 10)
-            if i_char:
-                i_label = f"{i_rating}A {i_poles} Type {i_char} {i_type} ({i_kA}KA)"
-            else:
-                i_label = f"{i_rating}A {i_poles} {i_type} ({i_kA}KA)"
-            merged.components.append(PlacedComponent(
-                symbol_name=f"CB_{i_type}",
-                x=child_cx - mcb_w / 2,
-                y=imcb_y,
-                label=i_label,
-                rating=f"{i_rating}A",
-                poles=i_poles,
-                breaker_type_str=i_type,
-            ))
-            merged.symbols_used.add(i_type)
-            connect_y = imcb_y - stub
+        # Skip: render_board() already renders incoming_breaker as the board's
+        # main breaker.  Drawing it here too would duplicate it on the diagram.
+        # (LEW reference: only feeder MCB on connection path, incoming MCB inside DB.)
 
         # ── Labels ──
         merged.components.append(PlacedComponent(
@@ -1388,9 +1369,9 @@ def _place_protection_groups(
         group_circuit_counts.append(max(n, 1))
 
     total_circuits = sum(group_circuit_counts)
-    gap = 8  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
-    # Minimal margins for protection groups (3mm per side = 6mm total per group)
-    pg_margin = 3  # mm per side for each group busbar
+    gap = 3  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
+    # Minimal margins for protection groups (1mm per side = 2mm total per group)
+    pg_margin = 1  # mm per side for each group busbar
     margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * gap
     # STRICT: never exceed actual available width (no inflation by min_spacing)
     usable_for_circuits = max(db_available_width - margin_overhead, total_circuits * 3)

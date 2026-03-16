@@ -283,7 +283,7 @@ class LayoutConfig:
     # -- Overlap resolution constants (D2) --
     overlap_group_gap: float = 3.0        # Gap between sub-circuit groups
     overlap_ditto_extent: float = 5.5     # Width for "ditto" (identical spec) circuits
-    circuit_group_gap: float = 6.0        # Gap between circuit groups in helpers
+    circuit_group_gap: float = 3.0        # Gap between circuit groups (LEW ref: ~3mm extra at phase transitions)
 
     # -- Matching tolerances / margins (D3) --
     position_tolerance: float = 1.5       # X-axis matching tolerance

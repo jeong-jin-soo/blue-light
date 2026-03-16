@@ -665,7 +665,7 @@ class TestResolveOverlaps:
                     f"BUSBAR should have rating='' but has rating='{bus.rating}'"
                 )
         # There should be a LABEL with busbar rating text
-        # Busbar label uses "COMB BAR" for <=100A, "BUSBAR" for >100A
+        # Busbar label always uses "BUSBAR" (LEW convention)
         labels = [c for c in result.components if c.symbol_name == "LABEL"]
         busbar_labels = [
             l for l in labels

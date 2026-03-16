@@ -80,19 +80,29 @@
   <line x1="183.50" y1="143.70" x2="181.50" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="188.50" y1="143.70" x2="190.50" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="181.12" y="148.28" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0-500A</text>
+  <circle cx="178.00" cy="143.70" r="2.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="177.10" y="144.90" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">A</text>
+  <line x1="175.50" y1="143.70" x2="173.50" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="180.50" y1="143.70" x2="182.50" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="175.52" y="148.28" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">A</text>
   <circle cx="227.75" cy="135.62" r="2.75" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="229.69" y1="137.56" x2="225.81" y2="133.68" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="226.31" y="139.70" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">VSS</text>
   <text x="237.70" y="139.20" font-family="Arial, Helvetica, sans-serif" font-size="2.9" fill="#000000" transform="rotate(-90.0,237.70,136.92)">V</text>
   <circle cx="236.00" cy="135.62" r="2.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="233.12" y="140.20" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0-500V</text>
+  <circle cx="246.00" cy="138.20" r="2.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="245.10" y="139.40" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">V</text>
+  <line x1="243.50" y1="138.20" x2="241.50" y2="138.20" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="248.50" y1="138.20" x2="250.50" y2="138.20" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="243.52" y="142.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">V</text>
   <polygon points="225.00,147.10 239.40,147.10 239.40,154.30 225.00,154.30" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="229.32" y="152.27" font-family="Arial, Helvetica, sans-serif" font-size="2.7" fill="#000000">KWH</text>
-  <text x="242.90" y="148.38" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="242.90">SPPG</tspan><tspan x="242.90" dy="2.2">kWh METER</tspan></text>
+  <text x="242.90" y="148.38" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="242.90">SP PG</tspan><tspan x="242.90" dy="2.2">kWh METER</tspan></text>
   <polygon points="206.50,132.70 213.50,132.70 213.50,127.20 206.50,127.20" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="127.20" x2="210.00" y2="125.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="132.70" x2="210.00" y2="134.20" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="216.50" y="129.23" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">BI CONNECTOR</text>
+  <text x="216.50" y="129.23" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">200A BI CONNECTOR</text>
   <line x1="49.27" y1="125.70" x2="368.79" y2="125.70" stroke="#000000" stroke-width="0.50" fill="none" />
   <text x="52.27" y="130.94" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A BUSBAR</text>
   <text x="64.27" y="123.96" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,64.27,122.20)">L1P1</text>
@@ -394,8 +404,10 @@
   <line x1="191.10" y1="166.80" x2="209.00" y2="166.80" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="143.70" x2="195.00" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.50" y1="143.70" x2="186.50" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="181.50" y1="143.70" x2="178.50" y2="143.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="135.62" x2="225.00" y2="135.62" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="230.50" y1="135.62" x2="235.50" y2="135.62" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="238.50" y1="135.62" x2="241.50" y2="135.62" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="150.70" x2="225.00" y2="150.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="232.20" y1="154.30" x2="232.20" y2="155.80" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="232.20" y1="155.80" x2="210.00" y2="155.80" stroke="#000000" stroke-width="0.25" fill="none" />

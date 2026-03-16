@@ -1237,6 +1237,8 @@ REAL_SYMBOL_MAP: dict[str, type | object] = {
 _METER_INSTANCES: dict[str, BaseSymbol] = {
     "AMMETER": RealMeter("A"),
     "VOLTMETER": RealMeter("V"),
+    "METER_A": RealMeter("A"),
+    "METER_V": RealMeter("V"),
 }
 
 
