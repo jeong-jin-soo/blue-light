@@ -1174,6 +1174,26 @@ def _add_hierarchical_connections(
                 feeder_brk = root_db.get("feeder_breaker", {})
         if not feeder_brk and child_db:
             feeder_brk = child_db.get("feeder_breaker", {})
+        # Normalize feeder_brk: may be a string like "63A Type C MCB 10kA"
+        if feeder_brk and isinstance(feeder_brk, str):
+            import re as _re
+            _fb = {}
+            _rm = _re.search(r'(\d+)\s*[Aa]', feeder_brk)
+            if _rm:
+                _fb['rating'] = int(_rm.group(1))
+            _tm = _re.search(r'(MCB|MCCB|ACB)', feeder_brk, _re.I)
+            if _tm:
+                _fb['type'] = _tm.group(1).upper()
+            _cm = _re.search(r'Type\s*([A-D])', feeder_brk, _re.I)
+            if _cm:
+                _fb['breaker_characteristic'] = _cm.group(1).upper()
+            _km = _re.search(r'(\d+)\s*[Kk][Aa]', feeder_brk)
+            if _km:
+                _fb['fault_kA'] = int(_km.group(1))
+            _pm = _re.search(r'(TPN|SPN|DP|4P)', feeder_brk, _re.I)
+            if _pm:
+                _fb['poles'] = _pm.group(1).upper()
+            feeder_brk = _fb
         if feeder_brk and feeder_brk.get("rating"):
             fmcb_y = connect_y - stub - mcb_h
             merged.connections.append(((child_cx, connect_y), (child_cx, fmcb_y + mcb_h)))
