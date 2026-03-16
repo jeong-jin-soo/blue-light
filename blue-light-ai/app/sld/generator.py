@@ -63,6 +63,60 @@ from app.sld.title_block import TitleBlockConfig, draw_border, draw_title_block_
 
 logger = logging.getLogger(__name__)
 
+
+def _draw_trip_arrow(
+    backend, symbol, comp_x: float, comp_y: float,
+    *, dxf_block_name: str | None = None,
+) -> None:
+    """Draw trip mechanism arrow for a DXF-block-rendered circuit breaker.
+
+    Computes the arrow so that the tip touches the DXF block's actual arc
+    midpoint (not the procedural symbol's arc_r, which differs in size).
+    """
+    import math as _m
+
+    cx = comp_x + symbol.width / 2
+    arc_center_y = comp_y + symbol.height / 2
+
+    # Determine effective arc extent from DXF block geometry
+    arc_extent = symbol._arc_r  # fallback to procedural
+    if dxf_block_name and _BLOCK_REPLAYER is not None:
+        blk_data = _BLOCK_REPLAYER._blocks.get(dxf_block_name, {})
+        pin_x = blk_data.get("pins", {}).get("bottom", [0, 0])[0]
+        scale = _BLOCK_REPLAYER.compute_scale(dxf_block_name, symbol.height)
+        for ent in blk_data.get("entities", []):
+            if ent["type"] == "LWPOLYLINE" and ent.get("bulges"):
+                bulge = ent["bulges"][0]
+                if abs(bulge) > 0.01:
+                    pts = ent["points"]
+                    chord = _m.sqrt(
+                        (pts[1][0] - pts[0][0]) ** 2 + (pts[1][1] - pts[0][1]) ** 2
+                    )
+                    sagitta = abs(bulge) * chord / 2
+                    chord_mid_x = (pts[0][0] + pts[1][0]) / 2
+                    arc_mid_x = chord_mid_x + sagitta  # bulge > 0 → right
+                    arc_extent = (arc_mid_x - pin_x) * scale
+                    break
+
+    # Arrow tip at arc midpoint (rightward from center)
+    arc_mx = cx + arc_extent
+    arc_my = arc_center_y
+
+    # Arrow points LEFT → RIGHT toward arc surface
+    shaft = 6.0
+    sx = arc_mx - shaft  # start to the left of tip
+    sy = arc_my
+
+    backend.set_layer("SLD_SYMBOLS")
+    backend.add_line((sx, sy), (arc_mx, arc_my))
+
+    # Arrowhead pointing right (toward arc)
+    hl = 1.2
+    backend.add_line((arc_mx, arc_my),
+                     (arc_mx - hl, arc_my + 0.6))
+    backend.add_line((arc_mx, arc_my),
+                     (arc_mx - hl, arc_my - 0.6))
+
 # Reference DXF files for importing native CAD symbol blocks.
 # 150A TPN has the most blocks (MCCB, RCCB, DP ISOL, SLD-CT, VOLTMETER, 2A FUSE, SS, EF, LED IND LTG).
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
@@ -568,15 +622,38 @@ class SldGenerator:
                     target_pin = (comp.x, comp.y)
                     pin_name = "left"  # 렌더링 결과의 왼쪽에 정렬
                     rotation = 0.0 if native_horiz else 90.0
+                    # DP ISOL: align rendered block bottom with comp.y
+                    # The 'left' pin sits at block center y; offset so bottom = comp.y
+                    if dxf_block_name == "DP ISOL" and not native_horiz:
+                        blk_data = _BLOCK_REPLAYER._blocks.get(dxf_block_name, {})
+                        ents = blk_data.get("entities", [])
+                        all_x = []
+                        for ent in ents:
+                            if ent["type"] == "LWPOLYLINE":
+                                all_x.extend(p[0] for p in ent["points"])
+                            elif ent["type"] in ("LINE", "CIRCLE"):
+                                if "start" in ent:
+                                    all_x.extend([ent["start"][0], ent["end"][0]])
+                                if "center" in ent:
+                                    all_x.append(ent["center"][0])
+                        if all_x:
+                            # After rot=90, rendered y ∝ original x.
+                            # Block bottom at min(x), left pin at top pin's x.
+                            top_pin_x = blk_data.get("pins", {}).get("top", [0, 0])[0]
+                            _pre_scale = _BLOCK_REPLAYER.compute_scale(dxf_block_name, symbol.height)
+                            offset_y = (top_pin_x - min(all_x)) * _pre_scale
+                            target_pin = (comp.x, comp.y + offset_y)
                 else:
+                    # Align block bottom to body bottom (comp.y), NOT stub pin.
+                    # Layout/connection coordinates reference body edges.
+                    # Stub lines are drawn separately below.
                     proc_pins = symbol.vertical_pins(comp.x, comp.y)
-                    # Prefer "bottom" pin; fall back to "top" for symbols
-                    # like EARTH that only have a top connection point.
+                    cx_center = comp.x + symbol.width / 2
                     if "bottom" in proc_pins:
-                        target_pin = proc_pins["bottom"]
+                        target_pin = (cx_center, comp.y)
                         pin_name = "bottom"
                     elif "top" in proc_pins:
-                        target_pin = proc_pins["top"]
+                        target_pin = (cx_center, comp.y + symbol.height)
                         pin_name = "top"
                     else:
                         target_pin = (comp.x, comp.y)
@@ -612,6 +689,48 @@ class SldGenerator:
                     scale=scale, rotation=rotation, layer="SLD_SYMBOLS",
                 )
                 block_used = True
+
+                # DXF blocks don't include stub lines (body-edge-to-pin lines).
+                # The layout engine relies on stub overlap for visual continuity
+                # between adjacent spine components. Draw stubs programmatically.
+                # Only for circuit breaker symbols — blocks like DP ISOL already
+                # include their own connection geometry (L-shaped stem).
+                _CB_BLOCKS = {"MCCB", "RCCB"}
+                if dxf_block_name in _CB_BLOCKS:
+                    stub = getattr(symbol, '_stub', 2.0)
+                    if not use_horizontal:
+                        # Vertical block: stubs at top and bottom
+                        cx_stub = comp.x + symbol.width / 2
+                        backend.set_layer("SLD_CONNECTIONS")
+                        backend.add_line(
+                            (cx_stub, comp.y),
+                            (cx_stub, comp.y - stub),
+                        )
+                        backend.add_line(
+                            (cx_stub, comp.y + symbol.height),
+                            (cx_stub, comp.y + symbol.height + stub),
+                        )
+                    else:
+                        cy_stub = comp.y
+                        h_ext = getattr(symbol, 'h_extent', symbol.height)
+                        backend.set_layer("SLD_CONNECTIONS")
+                        backend.add_line(
+                            (comp.x, cy_stub),
+                            (comp.x - stub, cy_stub),
+                        )
+                        backend.add_line(
+                            (comp.x + h_ext, cy_stub),
+                            (comp.x + h_ext + stub, cy_stub),
+                        )
+
+                # DXF breaker blocks don't include trip mechanism arrows.
+                # Draw arrow programmatically for sub-circuit MCBs (vertical).
+                if (dxf_block_name in _CB_BLOCKS
+                        and not use_horizontal
+                        and isinstance(symbol, RealCircuitBreaker)
+                        and not trip_kwargs.get("skip_trip_arrow", False)):
+                    _draw_trip_arrow(backend, symbol, comp.x, comp.y,
+                                     dxf_block_name=dxf_block_name)
 
         # Fallback: procedural symbol rendering
         if not block_used:
@@ -778,61 +897,58 @@ class SldGenerator:
         its arrowhead touches the current arc surface.
         """
         w, h = symbol.width, symbol.height
-        ar = symbol._arc_r
-        sweep = (symbol._arc_end - symbol._arc_start) % 360
-        mid_angle_deg = symbol._arc_start + sweep / 2
-        mid_angle_rad = math.radians(mid_angle_deg)
+
+        # Use DXF block arc extent if available (matches _draw_trip_arrow logic)
+        arc_extent = symbol._arc_r
+        dxf_block_name = self._get_dxf_block_name(curr_comp.symbol_name)
+        if dxf_block_name and _BLOCK_REPLAYER is not None:
+            blk_data = _BLOCK_REPLAYER._blocks.get(dxf_block_name, {})
+            if blk_data:
+                pin_x = blk_data.get("pins", {}).get("bottom", [0, 0])[0]
+                scale = _BLOCK_REPLAYER.compute_scale(dxf_block_name, symbol.height)
+                for ent in blk_data.get("entities", []):
+                    if ent["type"] == "LWPOLYLINE" and ent.get("bulges"):
+                        bulge = ent["bulges"][0]
+                        if abs(bulge) > 0.01:
+                            pts = ent["points"]
+                            chord = math.sqrt(
+                                (pts[1][0] - pts[0][0]) ** 2 + (pts[1][1] - pts[0][1]) ** 2
+                            )
+                            sagitta = abs(bulge) * chord / 2
+                            chord_mid_x = (pts[0][0] + pts[1][0]) / 2
+                            arc_mid_x = chord_mid_x + sagitta
+                            arc_extent = (arc_mid_x - pin_x) * scale
+                            break
 
         backend.set_layer("SLD_SYMBOLS")
 
         if use_horizontal:
-            # Horizontal layout: arcs are rotated 90° — connection goes vertically
-            # In horizontal draw, the arc center is at different coordinates
-            # For now, skip horizontal chain arrows (meter board rarely has ditto)
             pass
         else:
-            # Vertical layout — standard sub-circuit MCBs above busbar
-            # Arc center for each MCB
+            # Arc midpoint for each MCB = cx + arc_extent (rightmost point)
             prev_cx = prev_comp.x + w / 2
-            prev_arc_cy = prev_comp.y + h / 2
             curr_cx = curr_comp.x + w / 2
-            curr_arc_cy = curr_comp.y + h / 2
+            prev_arc_my = prev_comp.y + h / 2
+            curr_arc_my = curr_comp.y + h / 2
 
-            # Arc midpoint on each MCB (where the arrow touches the arc surface)
-            # Mid-angle ~0° = rightmost point of arc
-            cos_mid = math.cos(mid_angle_rad)
-            sin_mid = math.sin(mid_angle_rad)
+            prev_arc_mx = prev_cx + arc_extent
+            curr_arc_mx = curr_cx + arc_extent
 
-            prev_arc_mx = prev_cx + ar * cos_mid
-            prev_arc_my = prev_arc_cy + ar * sin_mid
-            curr_arc_mx = curr_cx + ar * cos_mid
-            curr_arc_my = curr_arc_cy + ar * sin_mid
-
-            # Draw shaft: line from previous arc midpoint to current arc midpoint
+            # Shaft: previous arc midpoint → current arc midpoint
             backend.add_line(
                 (prev_arc_mx, prev_arc_my),
                 (curr_arc_mx, curr_arc_my),
             )
 
-            # Draw arrowhead at current arc midpoint (same style as trip arrow)
-            # Direction: from arc midpoint toward center (inward)
-            dx = curr_cx - curr_arc_mx
-            dy = curr_arc_cy - curr_arc_my
-            dist = math.sqrt(dx * dx + dy * dy)
-            if dist > 0:
-                dx /= dist
-                dy /= dist
+            # Arrowhead at current arc midpoint (pointing right → toward arc)
             head_len = 1.2
-            px, py = -dy, dx  # perpendicular
             backend.add_line(
                 (curr_arc_mx, curr_arc_my),
-                (curr_arc_mx + dx * head_len + px * 0.6,
-                 curr_arc_my + dy * head_len + py * 0.6),
+                (curr_arc_mx - head_len, curr_arc_my + 0.6),
             )
             backend.add_line(
                 (curr_arc_mx, curr_arc_my),
-                (curr_arc_mx + dx * head_len - px * 0.6,
-                 curr_arc_my + dy * head_len - py * 0.6),
+                (curr_arc_mx - head_len, curr_arc_my - 0.6),
             )
 
     def _draw_breaker_block_label(

@@ -182,7 +182,13 @@ def _should_use_triplets(sub_circuits: list[dict], supply_type: str) -> bool:
             phases.append(phase)
 
     if len(phases) < 3:
-        return False  # Not enough phase data → default to no triplets
+        # No explicit phase data available.
+        # For TPN DBs (three_phase), default to interleaved triplets
+        # since standard residential/commercial TPN distribution boards
+        # use round-robin L1→L2→L3 phase allocation.
+        # Phase-grouped mode is only used when explicit phase data
+        # shows grouped arrangement (e.g., MSB with RL1,RL2,RL3,RS1,...).
+        return True
 
     # Count transitions between different phases
     transitions = 0

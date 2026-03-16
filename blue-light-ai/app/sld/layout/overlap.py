@@ -1304,9 +1304,10 @@ def _add_cable_leader_lines(
         # Build circuit name label bounding boxes for collision detection
         # (X range only; at same Y zone, vertical ranges always overlap for 90° text)
         # Store (x_min, x_max, center_x) to allow filtering own-group names
+        # Include SPARE labels — they occupy space and cable text must not overlap them.
         name_label_bbs: list[tuple[float, float, float]] = []
         for g in groups:
-            if g.name_label_idx is None or g.is_spare:
+            if g.name_label_idx is None:
                 continue
             comp = layout_result.components[g.name_label_idx]
             n_lines = max(len((comp.label or "").split("\\P")), 1)
@@ -1319,18 +1320,24 @@ def _add_cable_leader_lines(
         def _has_collision(
             bb: tuple[float, float], y: float,
             own_tap_xs: list[float] | None = None,
+            text_x: float | None = None,
         ) -> bool:
-            """Check if cable text BB collides with EXTERNAL name labels or placed cable texts.
+            """Check if cable text BB collides with name labels or placed cable texts.
 
             own_tap_xs: tap positions of the current cable group — names at these
-            positions are excluded (cable leader passes over its own group's names,
-            so moderate overlap is expected and acceptable).
+            positions are excluded ONLY if they are far from the cable text anchor
+            (i.e., they are mid-leader names that the leader line passes over).
+            Names near text_x (the cable text placement point) are always checked.
             """
             _MARGIN = 0.5  # extra clearance to catch near-misses
+            _TEXT_PROXIMITY = 8.0  # mm — labels within this distance of text_x are always checked
             for nx_min, nx_max, nx_center in name_label_bbs:
-                # Skip names that belong to the current cable group
+                # Skip own-group names ONLY if far from text placement point
                 if own_tap_xs and any(abs(nx_center - tx) < 0.5 for tx in own_tap_xs):
-                    continue
+                    if text_x is not None and abs(nx_center - text_x) < _TEXT_PROXIMITY:
+                        pass  # Near text anchor — do NOT skip, check collision
+                    else:
+                        continue  # Mid-leader — safe to skip
                 if bb[1] > nx_min - _MARGIN and bb[0] < nx_max + _MARGIN:
                     return True
             for px_min, px_max, py in placed_cable_bbs:
@@ -1377,7 +1384,7 @@ def _add_cable_leader_lines(
             text_x = (leader_start_x - 3) if text_on_left else leader_end_x
             cable_bb = (text_x - cable_hw, text_x + cable_hw)
 
-            collision = _has_collision(cable_bb, effective_leader_y, own_tap_xs=tap_xs)
+            collision = _has_collision(cable_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=text_x)
 
             if collision:
                 # Attempt 1: flip text direction
@@ -1392,7 +1399,7 @@ def _add_cable_leader_lines(
                     alt_text_x = alt_end
                 alt_bb = (alt_text_x - cable_hw, alt_text_x + cable_hw)
 
-                if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs):
+                if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=alt_text_x):
                     # Flip resolved the collision
                     text_on_left = alt_on_left
                     if text_on_left:
@@ -1406,10 +1413,10 @@ def _add_cable_leader_lines(
                     # Attempt 2: Y stagger (+4mm)
                     stagger_y = min(effective_leader_y + 4.0, max_leader_y)
                     # Try original direction with stagger
-                    if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs):
+                    if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs, text_x=text_x):
                         effective_leader_y = stagger_y
                     # Try flipped direction with stagger
-                    elif not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs):
+                    elif not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs, text_x=alt_text_x):
                         effective_leader_y = stagger_y
                         text_on_left = alt_on_left
                         if text_on_left:
@@ -1420,8 +1427,44 @@ def _add_cable_leader_lines(
                             leader_end_x = rightmost_x + alt_ext
                         cable_bb = alt_bb
                     else:
-                        # Best-effort: apply stagger even if not fully resolved
-                        effective_leader_y = stagger_y
+                        # Attempt 3: extend leader further to push text clear
+                        # Try both directions with incremental extension
+                        _resolved = False
+                        for _try_left in (text_on_left, not text_on_left):
+                            for _extra in (4.0, 8.0, 12.0, 16.0):
+                                if _try_left:
+                                    _ext2 = min(leader_extension + _extra, effective_left + _extra)
+                                    _start2 = leftmost_x - _ext2
+                                    _tx2 = _start2 - 3
+                                    _bb2 = (_tx2 - cable_hw, _tx2 + cable_hw)
+                                    if _bb2[0] < config.min_x:
+                                        continue
+                                    if not _has_collision(_bb2, effective_leader_y, own_tap_xs=tap_xs, text_x=_tx2):
+                                        text_on_left = True
+                                        leader_start_x = _start2
+                                        leader_end_x = rightmost_x
+                                        cable_bb = _bb2
+                                        _resolved = True
+                                        break
+                                else:
+                                    _ext2 = min(leader_extension + _extra, effective_right + _extra)
+                                    _end2 = rightmost_x + _ext2
+                                    _tx2 = _end2
+                                    _bb2 = (_tx2 - cable_hw, _tx2 + cable_hw)
+                                    if _bb2[1] > config.max_x:
+                                        continue
+                                    if not _has_collision(_bb2, effective_leader_y, own_tap_xs=tap_xs, text_x=_tx2):
+                                        text_on_left = False
+                                        leader_start_x = leftmost_x
+                                        leader_end_x = _end2
+                                        cable_bb = _bb2
+                                        _resolved = True
+                                        break
+                            if _resolved:
+                                break
+                        if not _resolved:
+                            # Best-effort: apply stagger even if not fully resolved
+                            effective_leader_y = stagger_y
 
             # Clamp to drawing bounds
             if effective_leader_y > max_leader_y:
