@@ -467,6 +467,13 @@ class LayoutResult:
     # Symbols used (diagnostic — tracks which symbol types are placed)
     symbols_used: set[str] = field(default_factory=set)
 
+    # Sections rendered (diagnostic — tracks which layout sections actually placed components).
+    # Keys: "incoming_supply", "meter_board", "unit_isolator", "ct_pre_mccb_fuse",
+    #        "main_breaker", "ct_metering_section", "elcb", "internal_cable",
+    #        "main_busbar", "sub_circuits", "db_box", "earth_bar"
+    # Value: True if section placed components, absent/False if skipped.
+    sections_rendered: dict[str, bool] = field(default_factory=dict)
+
     # Incoming supply spine x-coordinate (set by compute_layout)
     # Used by _identify_groups() for deterministic incoming chain detection
     spine_x: float = 0.0

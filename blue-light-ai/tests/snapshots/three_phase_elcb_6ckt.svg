@@ -55,7 +55,7 @@
   <line x1="210.00" y1="133.61" x2="210.00" y2="135.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="124.61" x2="210.00" y2="122.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="216.25" y="128.39" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">63A 4P ELCB (100mA)</text>
-  <line x1="114.00" y1="122.61" x2="306.00" y2="122.61" stroke="#000000" stroke-width="0.50" fill="none" />
+  <line x1="114.00" y1="122.61" x2="346.00" y2="122.61" stroke="#000000" stroke-width="0.50" fill="none" />
   <text x="117.00" y="127.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A BUSBAR</text>
   <text x="129.00" y="120.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,129.00,119.11)">L1S1</text>
   <path d="M 128.35,109.95 A 3.75,3.75 0 0,0 128.35,103.27" stroke="#000000" stroke-width="0.25" fill="none" />

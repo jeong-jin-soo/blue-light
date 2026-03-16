@@ -26,7 +26,7 @@
   <line x1="210.00" y1="160.50" x2="210.00" y2="162.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="151.50" x2="210.00" y2="149.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="215.75" y="155.28" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">63A TPN MCCB (25kA)</text>
-  <line x1="82.00" y1="149.50" x2="338.00" y2="149.50" stroke="#000000" stroke-width="0.50" fill="none" />
+  <line x1="82.00" y1="149.50" x2="346.00" y2="149.50" stroke="#000000" stroke-width="0.50" fill="none" />
   <text x="85.00" y="154.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A BUSBAR</text>
   <text x="97.00" y="147.76" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,97.00,146.00)">L1S1</text>
   <path d="M 96.35,136.84 A 3.75,3.75 0 0,0 96.35,130.16" stroke="#000000" stroke-width="0.25" fill="none" />

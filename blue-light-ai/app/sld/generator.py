@@ -366,27 +366,29 @@ class SldGenerator:
     ) -> None:
         """Draw a BUSBAR component (main or sub-busbar)."""
         backend.set_layer("SLD_POWER_MAIN")
-        bus_start_x = layout_result.busbar_start_x
-        bus_end_x = layout_result.busbar_end_x
 
-        if comp.label:  # Main busbar
-            backend.add_line(
-                (bus_start_x, layout_result.busbar_y),
-                (bus_end_x, layout_result.busbar_y),
-                lineweight=50,
-            )
+        # Each BUSBAR component stores its own extent: x=start, cable_annotation=end_x
+        bus_start = comp.x
+        if comp.cable_annotation:
+            try:
+                bus_end = float(comp.cable_annotation)
+            except ValueError:
+                bus_end = comp.x + 100  # fallback
         else:
-            row_bus_width = bus_end_x - bus_start_x
-            backend.add_line(
-                (comp.x, comp.y),
-                (comp.x + row_bus_width, comp.y),
-                lineweight=50,
-            )
+            # Legacy: use global busbar extent
+            bus_start = layout_result.busbar_start_x
+            bus_end = layout_result.busbar_end_x
+
+        backend.add_line(
+            (bus_start, comp.y),
+            (bus_end, comp.y),
+            lineweight=50,
+        )
         if comp.rating:
             backend.set_layer("SLD_ANNOTATIONS")
             backend.add_mtext(
                 comp.rating,
-                insert=(bus_end_x - 30, layout_result.busbar_y + 5),
+                insert=(bus_end - 30, comp.y + 5),
                 char_height=2.5,
             )
 

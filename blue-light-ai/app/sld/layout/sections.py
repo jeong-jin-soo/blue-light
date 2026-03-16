@@ -298,6 +298,8 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         ctx.y = y
         return
 
+    result.sections_rendered["incoming_supply"] = True
+
     # --- Non-metered / CT-metered supply (landlord / building_riser) ---
     # Priority: user-specified label > cable extension > supply_source > default
     if ctx.requirements.get("incoming_label"):
@@ -311,9 +313,9 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
     else:
         supply_label = SG_LOCALE.incoming.from_landlord
 
-    if supply_source == "landlord":
-        # ── Landlord supply: label RIGHT + cable tick marks (reference style) ──
-        # Supply label at bottom-right with horizontal tick from spine
+    if supply_source in ("landlord", "building_riser"):
+        # ── Landlord / building riser supply: label RIGHT + cable tick marks ──
+        # Both use same visual style per LEW practice (enclosed isolator path).
         _h_tick_len = 5
         result.connections.append(((cx, y), (cx + _h_tick_len, y)))
         result.components.append(PlacedComponent(
@@ -719,6 +721,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
     y = ctx.y
 
     if ctx.metering:
+        ctx.result.sections_rendered["meter_board"] = True
         g = _compute_meter_board_geom(ctx.config, ctx.cx, y)
 
         _place_meter_board_symbols(ctx, g)
@@ -807,6 +810,8 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     config = ctx.config
     cx = ctx.cx
     y = ctx.y
+
+    result.sections_rendered["ct_metering_section"] = True
 
     ct_ratio = ctx.ct_ratio  # may be empty — "CT BY SP" label used when empty
     metering_ct_class = ctx.metering_ct_class or "CL1 5VA"
@@ -1113,6 +1118,7 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
     if not ctx._ct_pre_mccb_fuse:
         return
 
+    ctx.result.sections_rendered["ct_pre_mccb_fuse"] = True
     from app.sld.real_symbols import get_symbol_dimensions
     pf_dims = get_symbol_dimensions("POTENTIAL_FUSE")
     pf_h = pf_dims["height_mm"]  # 8mm — horizontal extent when rotated
@@ -1177,23 +1183,36 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         return
 
     _iso_w = config.isolator_w  # Isolator symbol width — needed for centering
+
+    # Flatten nested isolator dict → top-level keys (same as _parse_board_requirements)
+    _iso_dict = requirements.get("isolator", {})
+    if isinstance(_iso_dict, dict) and _iso_dict:
+        if "isolator_rating" not in requirements:
+            requirements["isolator_rating"] = _iso_dict.get("rating", 0)
+        if "isolator_label" not in requirements:
+            requirements["isolator_label"] = _iso_dict.get("location_text", "")
+
     isolator_rating = requirements.get("isolator_rating", 0)
     isolator_label_extra = requirements.get("isolator_label", "")
 
-    # Landlord supply: ALWAYS needs unit isolator (building riser → unit disconnect)
+    # Landlord / building riser: ALWAYS needs unit isolator (disconnect switch)
     # Exception: cable extension SLDs skip the isolator
-    if supply_source == "landlord" and not ctx.is_cable_extension:
+    if supply_source in ("landlord", "building_riser") and not ctx.is_cable_extension:
         if not isolator_rating and breaker_rating:
             isolator_rating = breaker_rating  # Same rating as main breaker
         if not isolator_label_extra:
             # Unit number is shown on the DB box label, not on the isolator
             isolator_label_extra = SG_LOCALE.meter_board.located_inside_unit
-    elif not isolator_rating and metering == "ct_meter" and supply_source != "landlord":
-        # Non-landlord ct_meter: unit isolator sized to next standard rating
+    elif not isolator_rating and supply_source not in ("landlord", "building_riser"):
+        # Other supply sources (sp_powergrid, etc.): unit isolator sized to
+        # next standard rating.  Note: metering is temporarily cleared by
+        # engine.py before calling this function for ct_meter, so we check
+        # supply_source instead of metering flag.
         if breaker_rating:
             isolator_rating = _next_standard_rating(breaker_rating)
 
     if isolator_rating:
+        result.sections_rendered["unit_isolator"] = True
         result.connections.append(((cx, y), (cx, y + 2)))
         y += 2
         iso_main_label = f"{isolator_rating}A {meter_poles} {SG_LOCALE.meter_board.isolator}"
@@ -1201,8 +1220,8 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             f"({isolator_label_extra})" if isolator_label_extra else SG_LOCALE.meter_board.isolator
         )
 
-        if supply_source == "landlord":
-            # E: Landlord — enclosed isolator with labels to the LEFT (reference style)
+        if supply_source in ("landlord", "building_riser"):
+            # Landlord / building riser — enclosed isolator with labels to the LEFT
             result.components.append(PlacedComponent(
                 symbol_name="ISOLATOR",
                 x=cx - _iso_w / 2,
@@ -1290,6 +1309,7 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
     breaker_fault_kA = ctx.breaker_fault_kA
     main_breaker_char = ctx.main_breaker_char
 
+    result.sections_rendered["main_breaker"] = True
     # -- 4. Main Circuit Breaker --
     # Add gap so outgoing cable annotation (tick mark + text) from isolator/meter board
     # stays OUTSIDE (below) the DB dashed box.
@@ -1333,6 +1353,8 @@ def _place_elcb(ctx: _LayoutContext) -> None:
     """Place ELCB/RCCB inline between main breaker and busbar (conditional)."""
     if not ctx.elcb_rating:
         return
+
+    ctx.result.sections_rendered["elcb"] = True
 
     result = ctx.result
     config = ctx.config
@@ -1401,15 +1423,18 @@ def _place_internal_cable(ctx: _LayoutContext) -> None:
     """Place internal cable annotation between MCCB/ELCB and busbar (conditional)."""
     if not ctx.internal_cable:
         return
+    ctx.result.sections_rendered["internal_cable"] = True
     result = ctx.result
     cx = ctx.cx
     y = ctx.y
     cable_text = ctx.internal_cable
-    # Cable annotation label — placed to the right of the spine
+    # Cable annotation label — placed to the right of the spine, just below busbar.
+    # Use y - 2 (closer to busbar) to avoid collision with feeder MCB labels
+    # that are placed further down (at connect_y level).
     result.components.append(PlacedComponent(
         symbol_name="LABEL",
         x=cx + 8,
-        y=y - 5,
+        y=y - 2,
         label=cable_text,
         label_style="cable_annotation",
     ))
@@ -1430,6 +1455,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     sub_circuits = ctx.sub_circuits
     application_info = ctx.application_info
 
+    result.sections_rendered["main_busbar"] = True
     # -- 5. Main Busbar --
     num_circuits = max(len(sub_circuits), 1)
     effective_count = min(num_circuits, config.max_circuits_per_row)
@@ -1478,6 +1504,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         y=y,
         label=f"{breaker_rating}A {SG_LOCALE.circuit.db}",
         rating="",
+        cable_annotation=f"{bus_end_x:.1f}",  # encode bus_end_x for renderer
     ))
     # -- DB Info: compute text, defer placement to _place_db_box() --
     # Reference format: "APPROVED LOAD: 69.282 kVA" (raw value, space + kVA, no voltage)
@@ -1543,6 +1570,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
 
 def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     """Place sub-circuit rows branching upward from busbar. Returns busbar_y_row."""
+    ctx.result.sections_rendered["sub_circuits"] = True
     result = ctx.result
     config = ctx.config
     cx = ctx.cx
@@ -1657,6 +1685,7 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
                 y=busbar_y_row,
                 label="",
                 rating="",
+                cable_annotation=f"{row_bus_end:.1f}",  # encode bus_end_x for renderer
             ))
             result.busbar_start_x = min(result.busbar_start_x, row_bus_start)
             result.busbar_end_x = max(result.busbar_end_x, row_bus_end)
@@ -1749,6 +1778,7 @@ def _emit_db_box_rect_and_labels(
 
 def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     """Place DB box (dashed rectangle around distribution board). Returns db_box_right."""
+    ctx.result.sections_rendered["db_box"] = True
     result = ctx.result
     config = ctx.config
     text_anchor_y = ctx.db_box_start_y
@@ -1788,6 +1818,7 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
 
 def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     """Place earth bar symbol, conductor label, and connections."""
+    ctx.result.sections_rendered["earth_bar"] = True
     result = ctx.result
     config = ctx.config
     requirements = ctx.requirements
@@ -1830,12 +1861,13 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     else:
         earth_rightmost = earth_label_right
 
-    border_right = config.max_x + 10  # Drawing border at A3 width - margin (~410mm)
-    if earth_rightmost > border_right - 3:
-        shift = earth_rightmost - (border_right - 3)
+    border_right = config.max_x  # Strict drawing boundary
+    if earth_rightmost > border_right - 1:
+        # Shift earth left, possibly overlapping into DB box area
+        shift = earth_rightmost - (border_right - 1)
         earth_x = earth_x - shift
-        # Maintain minimum 3mm gap from DB box
-        earth_x = max(earth_x, db_box_right + config.earth_x_from_db - 2)
+        # Allow earth bar inside DB box if no space outside
+        earth_x = max(earth_x, db_box_right - _earth_w - 2)
 
     result.components.append(PlacedComponent(
         symbol_name="EARTH",
@@ -1849,8 +1881,8 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
         conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
         label_width = len(conductor_label) * config.char_w_label
         label_x = earth_x
-        # Ensure label doesn't exceed right drawing border (A3: 420 - 10mm margin)
-        border_right_abs = config.max_x + 15  # 395 + 15 = 410 for A3
+        # Ensure label doesn't exceed right drawing border
+        border_right_abs = config.max_x
         if label_x + label_width > border_right_abs - 2:
             # Try shifting label left (can overlap into DB box area since it's below)
             label_x = border_right_abs - 2 - label_width

@@ -300,8 +300,50 @@ CT ratio의 1차측 값 = Ammeter range 상한
 
 ---
 
+## 11. SLD 비교 체크리스트
+
+> **실행 지시는 CLAUDE.md의 "SLD 비교 분석 시 필수 절차" 참조.**
+> 아래는 각 섹션의 상세 확인 항목과 코드 위치 레퍼런스.
+
+### 비교 순서 (하단 → 상단, 전원 → 부하 방향)
+
+| # | 섹션 | 확인 항목 | 코드 위치 |
+|---|------|----------|----------|
+| 1 | **INCOMING SUPPLY** | supply 라벨, AC심볼/케이블+tick, 위상선 (L1 L2 L3 N) | `_place_incoming_supply()` |
+| 2 | **INCOMING CABLE** | 케이블 사양 텍스트, tick mark 위치 (좌/우) | `_place_incoming_supply()` 내부 |
+| 3 | **METER BOARD** *(sp_meter)* | 점선 박스, ISO→KWH→MCB 수평 배치, 라벨 | `_place_meter_board()` |
+| 4 | **UNIT ISOLATOR** *(non-meter)* | 심볼 형태 (enclosed/open), 라벨 위치 (좌/우), 등급 | `_place_unit_isolator()` |
+| 5 | **OUTGOING CABLE** | 아이솔레이터→DB 사이 케이블 사양, tick mark | `_place_unit_isolator()` 내부 |
+| 6 | **CT PRE-MCCB FUSE** *(ct_meter)* | 2A 퓨즈 + 표시등, 수평 분기 방향 | `_place_ct_pre_mccb_fuse()` |
+| 7 | **MAIN BREAKER** | 심볼 종류 (MCB/MCCB), 등급, 극수, 차단용량 | `_place_main_breaker()` |
+| 8 | **CT METERING** *(ct_meter)* | CT hook, ELR, ASS/Ammeter, VSS/Voltmeter, kWh, BI CONNECTOR | `_place_ct_metering_section()` |
+| 9 | **ELCB/RCCB** | 심볼, 등급, 감도(mA), post-ELCB MCB 유무 | `_place_elcb()` |
+| 10 | **INTERNAL CABLE** | 케이블 사양 텍스트 | `_place_internal_cable()` |
+| 11 | **MAIN BUSBAR** | 명칭 (BUSBAR/COMB BAR), 등급, DB 정보 박스 | `_place_main_busbar()` |
+| 12 | **CIRCUIT BRANCHES** | 심볼 종류 (MCB/ISOLATOR), 위상 그룹 간격, 라벨 | `_place_sub_circuits_rows()` |
+| 13 | **DB BOX** | 점선 박스 크기, DB 이름 텍스트 | `_place_db_box()` |
+| 14 | **EARTH BAR** | 심볼, 도체 라벨, 연결 위치 | `_place_earth_bar()` |
+
+### 비교 규칙
+
+1. **존재 여부 먼저** — 각 섹션이 렌더링되었는지부터 확인 (없는 것은 비교 불가)
+2. **심볼 형태** — 동일 기능이라도 enclosed/open, 원형/사각형 등 시각적 차이 확인
+3. **텍스트 내용** — 등급, 명칭, 공백/줄바꿈, 대소문자
+4. **라벨 위치** — 좌/우, 상/하 배치 방향
+5. **간격·비율** — 섹션 간 간격, 위상 그룹 갭, 전체 DB 폭 비율
+
+### 자동 검증
+
+`test_section_completeness.py`가 6개 입력 조합에서 섹션 존재 여부를 자동 검증한다:
+- `LayoutResult.sections_rendered` 필드가 각 섹션의 렌더링 여부를 추적
+- 상호 배타 규칙: meter_board ↔ unit_isolator 동시 불가
+- 의존 규칙: ct_metering_section → unit_isolator 필수
+
+---
+
 ## 변경 이력
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-03-16 | SLD 비교 체크리스트 추가 (§11): 14개 섹션 순회 검증 절차 |
 | 2026-03-13 | 초기 작성: SP Group 핸드북, SS 638, 실제 LEW SLD 레퍼런스 기반 |

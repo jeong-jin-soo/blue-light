@@ -308,6 +308,7 @@ def compute_layout(
                 global_supply_type=ctx.supply_type,
                 start_y=board_start_y,
                 application_info=application_info,
+                distribution_boards=dbs,
             )
             board_results.append(br)
 
@@ -372,7 +373,13 @@ def compute_layout(
             #   MCCB → Protection CT → Metering CT → BI
             # Fuses are horizontal RIGHT branches (not on spine).
             # Ref: CT_METERING_SPINE_ORDER in sections.py, 150A/400A TPN DWGs
+            # Temporarily clear metering so _place_unit_isolator doesn't skip
+            # (it returns early when metering is set, since meter board has its
+            # own isolator — but CT metering has no meter board).
+            _saved_metering = ctx.metering
+            ctx.metering = ""
             _place_unit_isolator(ctx)
+            ctx.metering = _saved_metering
             # Add isolator-to-DB gap before CT metering section
             _gap = config.isolator_to_db_gap
             result.connections.append(((cx, ctx.y), (cx, ctx.y + _gap)))
@@ -640,10 +647,14 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
 
     def _db_width_at_spacing(p: DBPlan, spacing: float) -> float:
         if p.protection_groups:
+            # PG circuits are bounded within their group, so they can be tighter
+            # than top-level circuits.  Cap PG spacing at 9mm (LEW practice:
+            # PG circuits ~8-9mm vs main board ~12-14mm).
+            pg_spacing = min(spacing, 9.0)
             num_pg = len(p.protection_groups)
             pg_overhead = max(0, num_pg - 1) * PG_GAP + num_pg * 2 * PG_MARGIN
             total_pg_circuits = sum(pg.circuit_count for pg in p.protection_groups)
-            return max(total_pg_circuits * spacing + pg_overhead, 60)
+            return max(total_pg_circuits * pg_spacing + pg_overhead, 60)
         else:
             return max(p.circuit_count * spacing + 2 * config.busbar_margin, 60)
 
@@ -663,6 +674,26 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # Assign widths at chosen spacing
     for p in db_plans:
         p.estimated_width = _db_width_at_spacing(p, chosen_spacing)
+
+    # When root DB has fewer circuits than children combined (common for
+    # main board + PG sub-boards), boost root width for readability.
+    # Only apply when child DBs use protection groups (PG circuits can be
+    # tighter because they're bounded within their group).
+    if len(db_plans) >= 2:
+        child_has_pg = any(p.protection_groups for p in db_plans[1:])
+        child_total_circuits = sum(p.circuit_count for p in db_plans[1:])
+        root_circuits = db_plans[0].circuit_count
+        if child_has_pg and child_total_circuits > root_circuits:
+            root_min = allocable * 0.52
+            if db_plans[0].estimated_width < root_min:
+                deficit = root_min - db_plans[0].estimated_width
+                db_plans[0].estimated_width = root_min
+                # Shrink child boards proportionally to compensate
+                child_total_w = sum(p.estimated_width for p in db_plans[1:])
+                if child_total_w > 0:
+                    shrink = deficit / child_total_w
+                    for p in db_plans[1:]:
+                        p.estimated_width = max(p.estimated_width * (1 - shrink), 60)
 
     # Scale proportionally if still over budget
     total_w = sum(p.estimated_width for p in db_plans)
@@ -700,6 +731,16 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
                     p.circuits_per_row = ((p.circuits_per_row + 2) // 3) * 3
             else:
                 p.circuits_per_row = min(p.circuit_count, max_per_row)
+
+    # Distribute remaining space to root DB (it benefits most from extra width).
+    # Cap root at 60% of allocable to avoid squishing small child DBs.
+    total_width = sum(p.estimated_width for p in db_plans) + gap_space
+    if total_width < avail_width and len(db_plans) >= 2:
+        surplus = avail_width - total_width
+        root_max = allocable * 0.55
+        usable_surplus = min(surplus, root_max - db_plans[0].estimated_width)
+        if usable_surplus > 0:
+            db_plans[0].estimated_width += usable_surplus
 
     # Final scaling if total still exceeds available
     total_width = sum(p.estimated_width for p in db_plans) + gap_space
@@ -943,6 +984,7 @@ def render_board(
     global_supply_type: str = "three_phase",
     start_y: float | None = None,
     application_info: dict | None = None,
+    distribution_boards: list[dict] | None = None,
 ) -> "BoardResult":
     """Render a single distribution board independently.
 
@@ -996,6 +1038,8 @@ def render_board(
         ctx.constrained_width = region.width
 
     ctx.current_db_idx = board_idx
+    if distribution_boards:
+        ctx.distribution_boards = distribution_boards
 
     # Parse board-level requirements
     _parse_board_requirements(ctx, board, global_supply_type=global_supply_type)
@@ -1397,14 +1441,27 @@ def _place_protection_groups(
         overall_spacing *= compress
 
     groups_start_x = db_cx - total_groups_width / 2
-    # Clamp to active region
+    # Clamp to active region (strict: never exceed boundaries)
     if ctx.active_region:
         clamp_left = ctx.active_region.min_x
         clamp_right = ctx.active_region.max_x
+        region_width = clamp_right - clamp_left
+        if total_groups_width > region_width:
+            # Compress groups to fit within region
+            compress = region_width / total_groups_width
+            group_widths = [w * compress for w in group_widths]
+            total_groups_width = region_width
+            overall_spacing *= compress
         if groups_start_x < clamp_left:
             groups_start_x = clamp_left
         if groups_start_x + total_groups_width > clamp_right:
             groups_start_x = clamp_right - total_groups_width
+
+    # Page-level clamping (even without active_region)
+    if groups_start_x < config.min_x:
+        groups_start_x = config.min_x
+    if groups_start_x + total_groups_width > config.max_x:
+        groups_start_x = config.max_x - total_groups_width
 
     # Group center X positions
     group_cxs: list[float] = []
@@ -1507,6 +1564,7 @@ def _place_protection_groups(
             y=sub_busbar_y_pos,
             label=sub_busbar_label,
             rating="",
+            cable_annotation=f"{sub_bus_ex:.1f}",  # encode bus_end_x for renderer
         ))
 
         # Place sub-circuits within constrained busbar range

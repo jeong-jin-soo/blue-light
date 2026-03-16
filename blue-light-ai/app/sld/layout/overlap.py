@@ -1160,6 +1160,7 @@ def _draw_cable_leader_group(
     bend_height: float,
     tick_size: float,
     layout_result: LayoutResult,
+    config: "LayoutConfig | None" = None,
 ) -> None:
     """Draw one cable leader group: horizontal line, ticker marks, L-bend, and text.
 
@@ -1190,26 +1191,31 @@ def _draw_cable_leader_group(
 
     # L-shaped bend + cable spec text at leader end
     bend_top_y = leader_y + bend_height
+    # Clamp leader endpoints to drawing boundaries
+    _max_x = config.max_x if config else 395.0
+    _min_x = config.min_x if config else 25.0
     if text_on_left:
+        _bend_x = max(leader_start_x, _min_x)
         layout_result.connections.append((
-            (leader_start_x, leader_y),
-            (leader_start_x, bend_top_y),
+            (_bend_x, leader_y),
+            (_bend_x, bend_top_y),
         ))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=leader_start_x - 3,
+            x=max(_bend_x - 3, _min_x),
             y=bend_top_y + 1,
             label=cable_text,
             rotation=90.0,
         ))
     else:
+        _bend_x = min(leader_end_x, _max_x - 3)
         layout_result.connections.append((
-            (leader_end_x, leader_y),
-            (leader_end_x, bend_top_y),
+            (_bend_x, leader_y),
+            (_bend_x, bend_top_y),
         ))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=leader_end_x,
+            x=_bend_x,
             y=bend_top_y + 1,
             label=cable_text,
             rotation=90.0,
@@ -1470,6 +1476,9 @@ def _add_cable_leader_lines(
             # Clamp to drawing bounds
             if effective_leader_y > max_leader_y:
                 effective_leader_y = max_leader_y
+            # Clamp leader endpoints to drawing X boundaries
+            leader_start_x = max(leader_start_x, config.min_x)
+            leader_end_x = min(leader_end_x, config.max_x - 1)
 
             # Register final cable text BB for subsequent collision checks
             final_text_x = (leader_start_x - 3) if text_on_left else leader_end_x
@@ -1481,6 +1490,7 @@ def _add_cable_leader_lines(
                 tap_xs, cable_spec, effective_leader_y, text_on_left,
                 leader_start_x, leader_end_x,
                 config.leader_bend_height, tick_size, layout_result,
+                config=config,
             )
 
 
