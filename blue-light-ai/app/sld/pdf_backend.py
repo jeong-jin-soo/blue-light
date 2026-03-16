@@ -31,6 +31,8 @@ _LAYER_COLORS: dict[str, tuple[float, float, float]] = {
     "SLD_POWER_MAIN": (0.0, 0.0, 0.0),
     "SLD_ANNOTATIONS": (0.0, 0.0, 0.0),
     "SLD_TITLE_BLOCK": (0.0, 0.0, 0.0),
+    "SLD_FRAME": (0.0, 0.0, 0.0),
+    "SLD_DB_FRAME": (0.0, 0.0, 0.0),
 }
 
 # Line widths per layer calibrated from real LEW SLD samples (0.25mm uniform)
@@ -40,6 +42,8 @@ _LAYER_LINE_WIDTHS_MM: dict[str, float] = {
     "SLD_POWER_MAIN": 0.50,
     "SLD_ANNOTATIONS": 0.25,
     "SLD_TITLE_BLOCK": 0.25,
+    "SLD_FRAME": 0.25,
+    "SLD_DB_FRAME": 0.25,
 }
 
 

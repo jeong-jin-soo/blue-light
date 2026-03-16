@@ -1126,9 +1126,11 @@ def _add_hierarchical_connections(
     root_name = root_result.board_name
     bi_h = 10
     bi_w = 16
-    mcb_w = 7.2
-    mcb_h = 13.0
-    stub = 3.0
+    from app.sld.layout.models import LayoutConfig as _LC
+    _cfg = _LC()  # C4: use LayoutConfig (synced from JSON via __post_init__)
+    mcb_w = _cfg.mcb_w
+    mcb_h = _cfg.mcb_h
+    stub = _cfg.stub_len
 
     for child in child_results:
         child_cx = child.spine_x

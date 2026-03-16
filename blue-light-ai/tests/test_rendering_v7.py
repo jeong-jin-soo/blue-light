@@ -113,12 +113,12 @@ class TestCircuitIdBox:
     def test_circuit_id_box_in_layout(self):
         """CIRCUIT_ID_BOX components should exist for each sub-circuit.
 
-        Without phase data, triplets are not applied → no spare padding.
+        3-phase triplet padding rounds 4 circuits up to 6 (next multiple of 3).
         """
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
-        # No triplet padding without phase info → 4 circuits remain as 4
-        assert len(id_boxes) == 4
+        # Triplet padding: 4 circuits → 6 (next multiple of 3)
+        assert len(id_boxes) == 6
 
     def test_circuit_id_box_position(self):
         """CIRCUIT_ID_BOX should be positioned near busbar_y (within 5mm above)."""
@@ -136,8 +136,8 @@ class TestCircuitIdBox:
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
         ids = [box.circuit_id for box in id_boxes]
         assert all(len(cid) > 0 for cid in ids)
-        # Without phase info, sequential IDs (S1, P1, etc.) are assigned
-        assert len(ids) == 4
+        # Triplet padding: 4 circuits → 6 (next multiple of 3)
+        assert len(ids) == 6
 
 
 # -- Test: DB_INFO_BOX --
@@ -354,15 +354,14 @@ class TestLayoutCorrectness:
     def test_breaker_block_components(self):
         """Sub-circuit breakers should use breaker_block label_style.
 
-        Without phase info, triplets are not applied → no spare padding.
-        4 user circuits → 4 total breaker blocks.
+        3-phase triplet padding rounds 4 circuits up to 6 (next multiple of 3).
         """
         result = compute_layout(BASIC_3PHASE_REQ)
         breaker_comps = [
             c for c in result.components
             if c.symbol_name.startswith("CB_") and c.label_style == "breaker_block"
         ]
-        assert len(breaker_comps) == 4
+        assert len(breaker_comps) == 6
 
     def test_earth_bar_present(self):
         """Earth bar should always be present in the layout.
@@ -830,10 +829,10 @@ class TestSubCircuitGrouping:
     """Tests for _identify_groups() sub-circuit classification."""
 
     def test_identify_groups_basic_3phase(self):
-        """Basic 3-phase with 4 circuits → 4 groups (no triplet padding without phase info)."""
+        """Basic 3-phase with 4 circuits → 6 groups (triplet padding to next multiple of 3)."""
         result = compute_layout(BASIC_3PHASE_REQ)
         groups, incoming_x = _identify_groups(result)
-        assert len(groups) == 4
+        assert len(groups) == 6
         # Should be sorted by tap_x
         for i in range(len(groups) - 1):
             assert groups[i].tap_x <= groups[i + 1].tap_x

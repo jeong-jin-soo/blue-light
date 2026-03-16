@@ -225,17 +225,17 @@ class LayoutConfig:
     max_y: float = 285              # Top drawing border (297 - 10mm margin - 2mm buffer)
 
     # Symbol dimension references — auto-synced from real_symbol_paths.json
-    # These are default fallback values; __post_init__ overwrites from JSON source
-    breaker_w: float = 8.4           # MCCB width
-    breaker_h: float = 15.0          # MCCB height
-    mcb_w: float = 7.2              # MCB width
-    mcb_h: float = 13.0             # MCB height
-    rccb_w: float = 10.0            # RCCB/ELCB width
-    rccb_h: float = 15.0            # RCCB/ELCB height
-    meter_size: float = 14.0         # kWh meter overall size
-    isolator_w: float = 8.0          # Isolator width
-    isolator_h: float = 10.0         # Isolator height (contact sep 6mm matching MCCB)
-    ct_size: float = 12.0            # CT diameter
+    # Defaults match JSON values (C4 fix); __post_init__ re-reads from JSON to stay current
+    breaker_w: float = 5.5           # MCCB width (real_symbol_paths.json)
+    breaker_h: float = 9.0           # MCCB height
+    mcb_w: float = 5.0              # MCB width
+    mcb_h: float = 8.0              # MCB height
+    rccb_w: float = 6.5             # RCCB/ELCB width
+    rccb_h: float = 9.0             # RCCB/ELCB height
+    meter_size: float = 16.0         # kWh meter overall size
+    isolator_w: float = 5.5          # Isolator width
+    isolator_h: float = 7.0          # Isolator height
+    ct_size: float = 2.5             # CT diameter
     stub_len: float = 3.0            # Connection stub length
     # KWH meter rectangle dimensions (for horizontal meter board layout)
     kwh_rect_w: float = 12.0         # KWH inner rectangle width (horizontal span)
@@ -382,7 +382,30 @@ class LayoutConfig:
 
 @dataclass
 class PlacedComponent:
-    """A component placed at a specific position in the layout."""
+    """A component placed at a specific position in the layout.
+
+    Coordinate Contract (A2):
+        x : left edge of the symbol body bounding box (mm).
+        y : bottom edge of the symbol body bounding box (mm).
+
+        The body bbox excludes connection stubs (the short lines that
+        attach the symbol to the busbar/spine).  In concrete terms:
+
+            +--- body top  = y + symbol.height
+            |  [symbol]
+            +--- body bottom = y          ← comp.y
+            |  (stub line, not part of body)
+            +--- pin tip   = y - stub
+
+        comp.x is the left edge:  center_x = comp.x + symbol.width / 2
+
+        This anchor convention is used consistently by:
+        - Layout code (sections.py, engine.py): sets x, y
+        - Symbol.render(): interprets x, y for drawing
+        - Generator labels: offsets from x, y for text placement
+
+    See also: Symbol.render() docstring in symbol.py.
+    """
 
     symbol_name: str
     x: float

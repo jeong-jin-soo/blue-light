@@ -175,6 +175,27 @@ class DistributionBoardData(BaseModel):
         default=None,
         description="Circuits not in a protection group",
     )
+    # B1 fix: 5 fields consumed by engine.py but previously missing from schema
+    incoming_breaker: Optional[BreakerSpec] = Field(
+        None,
+        description="Incoming breaker at the board entry (distinct from outgoing main breaker).",
+    )
+    feeder_breaker: Optional[BreakerSpec] = Field(
+        None,
+        description="Feeder breaker on the parent board side that feeds this DB.",
+    )
+    feeder_cable: Optional[CableSpec] = Field(
+        None,
+        description="Cable connecting parent board to this DB.",
+    )
+    main_mcb: Optional[BreakerSpec] = Field(
+        None,
+        description="Main MCB if distinct from the incoming breaker (e.g., post-isolator MCB).",
+    )
+    meter_board: Optional[str] = Field(
+        None,
+        description="Meter board label/type (e.g., 'SP METER BOARD', 'CT METER BOARD').",
+    )
 
     @model_validator(mode="after")
     def _coerce_nulls_to_lists(self) -> "DistributionBoardData":
@@ -871,10 +892,44 @@ def normalize_to_generation_format(
             if db_data.outgoing_circuits:
                 db_req["sub_circuits"] = _convert_circuits(db_data.outgoing_circuits)
 
+            # B1 fix: populate 5 fields consumed by engine.py
+            if db_data.incoming_breaker:
+                db_req["incoming_breaker"] = {
+                    "type": db_data.incoming_breaker.type or "MCB",
+                    "rating": db_data.incoming_breaker.rating_a or 0,
+                    "poles": db_data.incoming_breaker.poles or "",
+                    "fault_kA": db_data.incoming_breaker.ka_rating or 10,
+                }
+                if db_data.incoming_breaker.characteristic:
+                    db_req["incoming_breaker"]["breaker_characteristic"] = db_data.incoming_breaker.characteristic
+            if db_data.feeder_breaker:
+                db_req["feeder_breaker"] = {
+                    "type": db_data.feeder_breaker.type or "MCB",
+                    "rating": db_data.feeder_breaker.rating_a or 0,
+                    "poles": db_data.feeder_breaker.poles or "",
+                    "fault_kA": db_data.feeder_breaker.ka_rating or 10,
+                }
+            if db_data.feeder_cable:
+                db_req["feeder_cable"] = db_data.feeder_cable.description or ""
+            if db_data.main_mcb:
+                db_req["main_mcb"] = {
+                    "type": db_data.main_mcb.type or "MCB",
+                    "rating": db_data.main_mcb.rating_a or 0,
+                    "poles": db_data.main_mcb.poles or "",
+                    "fault_kA": db_data.main_mcb.ka_rating or 10,
+                }
+            if db_data.meter_board:
+                db_req["meter_board"] = db_data.meter_board
+
             db_list.append(db_req)
 
         requirements["distribution_boards"] = db_list
-        requirements["db_topology"] = _build_db_hierarchy(db_list)
+        # B2 fix: only set db_topology if hierarchy was actually detected;
+        # otherwise let engine.py auto-detect from fed_from fields
+        detected_topology = _build_db_hierarchy(db_list)
+        if detected_topology == "hierarchical":
+            requirements["db_topology"] = "hierarchical"
+        # else: omit db_topology → engine.py will auto-detect
         return requirements
 
     # -- Single-DB path (backward compatible) --

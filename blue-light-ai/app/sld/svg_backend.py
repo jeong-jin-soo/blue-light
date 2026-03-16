@@ -28,6 +28,8 @@ _LAYER_COLORS: dict[str, str] = {
     "SLD_POWER_MAIN": "#000000",
     "SLD_ANNOTATIONS": "#000000",
     "SLD_TITLE_BLOCK": "#000000",
+    "SLD_FRAME": "#000000",
+    "SLD_DB_FRAME": "#000000",
 }
 
 # Layer -> stroke width calibrated from real LEW SLD samples (0.25mm uniform)
@@ -37,6 +39,8 @@ _LAYER_STROKE_WIDTHS: dict[str, float] = {
     "SLD_POWER_MAIN": 0.50,
     "SLD_ANNOTATIONS": 0.25,
     "SLD_TITLE_BLOCK": 0.25,
+    "SLD_FRAME": 0.25,
+    "SLD_DB_FRAME": 0.25,
 }
 
 

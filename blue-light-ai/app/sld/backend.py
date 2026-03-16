@@ -32,11 +32,13 @@ class DrawingBackend(Protocol):
         Set the current drawing layer.
 
         Layers (calibrated from real LEW SLD samples):
-        - SLD_SYMBOLS: Main symbol outlines (0.25mm)
-        - SLD_CONNECTIONS: Connection lines between symbols (0.25mm)
-        - SLD_POWER_MAIN: Main power supply lines / busbar (0.50mm)
-        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.25mm)
-        - SLD_TITLE_BLOCK: Border and title block elements (0.25mm)
+        - SLD_SYMBOLS: Main symbol outlines (0.25mm) → DXF: E-SLD-SYM
+        - SLD_CONNECTIONS: Connection lines between symbols (0.25mm) → DXF: E-SLD-LINE
+        - SLD_POWER_MAIN: Main power supply lines / busbar (0.50mm) → DXF: E-SLD-BUSBAR
+        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.25mm) → DXF: E-SLD-TXT
+        - SLD_TITLE_BLOCK: Title block elements (0.25mm) → DXF: E-SLD-TITLE
+        - SLD_FRAME: Drawing border (0.25mm) → DXF: E-SLD-FRAME
+        - SLD_DB_FRAME: DB dashed boxes (0.25mm, gray) → DXF: E-SLD-BOX
         """
         ...
 

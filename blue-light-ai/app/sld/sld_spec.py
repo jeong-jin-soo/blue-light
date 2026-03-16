@@ -123,6 +123,12 @@ INCOMING_SPEC: dict[int, IncomingSpec] = {
         phase="three_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
         requires_ct=True, requires_isolator=True,
     ),
+    500: IncomingSpec(
+        rating_a=500, cable_size="240", cable_cores="1 X 4 CORE",
+        cable_type="XLPE/PVC", poles="TPN", breaker_type="MCCB", breaker_ka=35,
+        phase="three_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
+        requires_ct=True, requires_isolator=True,
+    ),
     630: IncomingSpec(
         rating_a=630, cable_size="300", cable_cores="1 X 4 CORE",
         cable_type="XLPE/PVC", poles="TPN", breaker_type="MCCB", breaker_ka=35,
@@ -213,12 +219,19 @@ INCOMING_SPEC_3PHASE: dict[int, IncomingSpec] = {
 #
 # Sub-breaker rating (A) → minimum cable size (mm²)
 # From Excel columns B (cable size) & E (rating)
+# Cross-validated with 62 real LEW DWG/DXF files (2019-2024).
+# Note: 13A is common in SG for fused socket outlets (BS 1363).
+# Note: 15A/25A seen in older installations and industrial circuits.
 
 OUTGOING_SPEC: dict[int, float] = {
+    5: 1.0,
     6: 1.5,
     10: 1.5,
+    13: 1.5,
+    15: 1.5,
     16: 2.5,
     20: 2.5,
+    25: 4.0,
     32: 6,
     63: 16,
     80: 35,
@@ -228,6 +241,7 @@ OUTGOING_SPEC: dict[int, float] = {
     250: 95,
     300: 120,
     400: 185,
+    500: 240,
     630: 300,
     800: 500,
     1000: 500,

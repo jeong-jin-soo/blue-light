@@ -104,16 +104,17 @@ class BoundingBox:
 
 
 # Fallback symbol dimensions used when real_symbol_paths.json is unavailable.
+# Values match real_symbol_paths.json as of 2026-03-16 (C4 sync fix).
 _FALLBACK_SYMBOL_DIMS: dict[str, tuple[float, float]] = {
-    "CB_MCB": (7.2, 13.0),
-    "CB_MCCB": (8.4, 15.0),
-    "CB_ACB": (10, 17),
-    "CB_ELCB": (10.0, 15.0),
-    "CB_RCCB": (10.0, 15.0),
-    "ISOLATOR": (8, 14),
-    "KWH_METER": (14, 10),
-    "CT": (12, 12),
-    "EARTH": (8, 6.7),
+    "CB_MCB": (5.0, 8.0),
+    "CB_MCCB": (5.5, 9.0),
+    "CB_ACB": (7.0, 11.0),
+    "CB_ELCB": (6.5, 9.0),
+    "CB_RCCB": (6.5, 9.0),
+    "ISOLATOR": (5.5, 7.0),
+    "KWH_METER": (16.0, 12.0),
+    "CT": (2.5, 3.0),
+    "EARTH": (5.5, 4.5),
     "CIRCUIT_ID_BOX": (8, 5),
     "DB_INFO_BOX": (80, 18),
     "FLOW_ARROW_UP": (8, 10),

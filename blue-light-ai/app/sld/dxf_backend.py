@@ -30,15 +30,38 @@ logger = logging.getLogger(__name__)
 _PAGE_WIDTH = 420.0
 _PAGE_HEIGHT = 297.0
 
-# Layer configuration matching real LEW SLD style
+# DXF layer names following i2R LEW convention (E-SLD-* prefix)
+# Discovered from analysis of 28 DXF templates from LEW submissions.
 # ACI color 7 = white (on black background) / black (on white paper, i.e., print)
 _LAYER_CONFIG: dict[str, dict] = {
-    "SLD_SYMBOLS": {"color": 7, "lineweight": 25},       # 0.25mm
-    "SLD_CONNECTIONS": {"color": 7, "lineweight": 25},    # 0.25mm
-    "SLD_POWER_MAIN": {"color": 7, "lineweight": 50},    # 0.50mm (busbar)
-    "SLD_ANNOTATIONS": {"color": 7, "lineweight": 25},   # 0.25mm
-    "SLD_TITLE_BLOCK": {"color": 7, "lineweight": 25},   # 0.25mm
-    "SLD_DB_FRAME": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # ref: E-SLD-FRAME
+    "E-SLD-SYM": {"color": 7, "lineweight": 25},         # symbol/block inserts
+    "E-SLD-LINE": {"color": 7, "lineweight": 25},        # connection lines, spine
+    "E-SLD-BUSBAR": {"color": 7, "lineweight": 50},      # busbar (0.50mm)
+    "E-SLD-TXT": {"color": 7, "lineweight": 25},         # text labels
+    "E-SLD-TITLE": {"color": 7, "lineweight": 25},       # title block
+    "E-SLD-BOX": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # dashed boxes (DB frame)
+    "E-SLD-FRAME": {"color": 7, "lineweight": 25},       # drawing border/frame
+}
+
+# Mapping from logical layer names (used by symbols/generator) to DXF layer names.
+# This allows all backends to share the same set_layer("SLD_*") calls while
+# the DXF backend outputs the i2R-convention layer names.
+_LOGICAL_TO_DXF_LAYER: dict[str, str] = {
+    "SLD_SYMBOLS": "E-SLD-SYM",
+    "SLD_CONNECTIONS": "E-SLD-LINE",
+    "SLD_POWER_MAIN": "E-SLD-BUSBAR",
+    "SLD_ANNOTATIONS": "E-SLD-TXT",
+    "SLD_TITLE_BLOCK": "E-SLD-TITLE",
+    "SLD_DB_FRAME": "E-SLD-BOX",
+    "SLD_FRAME": "E-SLD-FRAME",
+    # Direct E-SLD-* names also accepted (identity mapping)
+    "E-SLD-SYM": "E-SLD-SYM",
+    "E-SLD-LINE": "E-SLD-LINE",
+    "E-SLD-BUSBAR": "E-SLD-BUSBAR",
+    "E-SLD-TXT": "E-SLD-TXT",
+    "E-SLD-TITLE": "E-SLD-TITLE",
+    "E-SLD-BOX": "E-SLD-BOX",
+    "E-SLD-FRAME": "E-SLD-FRAME",
 }
 
 # Text style name
@@ -58,7 +81,7 @@ class DxfBackend:
         self._doc = ezdxf.new("R2013")  # AutoCAD 2013 format for broad compatibility
         self._doc.units = units.MM
         self._msp = self._doc.modelspace()
-        self._current_layer = "SLD_SYMBOLS"
+        self._current_layer = _LOGICAL_TO_DXF_LAYER["SLD_SYMBOLS"]
 
         self._setup_layers()
         self._setup_text_style()
@@ -98,7 +121,7 @@ class DxfBackend:
     # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:
-        self._current_layer = layer_name
+        self._current_layer = _LOGICAL_TO_DXF_LAYER.get(layer_name, layer_name)
 
     # -- Drawing primitives --
 
@@ -345,7 +368,7 @@ class DxfBackend:
         if block_name not in self._doc.blocks:
             # Block origin = (0, 0) at center busbar junction
             block = self._doc.blocks.new(name=block_name)
-            layer = "SLD_CONNECTIONS"
+            layer = "E-SLD-LINE"
             attribs = {"layer": layer, "lineweight": 25}
 
             # Center vertical: busbar to MCB
@@ -365,7 +388,7 @@ class DxfBackend:
             block_name,
             insert=(center_x, busbar_y),
             dxfattribs={
-                "layer": "SLD_CONNECTIONS",
+                "layer": "E-SLD-LINE",
                 "xscale": 1.0,
                 "yscale": 1.0,
             },

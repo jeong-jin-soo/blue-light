@@ -1,0 +1,706 @@
+{
+  "version": "1.0",
+  "generated_from": "62 LEW DWG/DXF files (2019-2024), i2R M&E PTE. LTD. Singapore",
+  "generated_date": "2026-03-16",
+  "description": "Structured AI learning dataset for SLD generation quality improvement. All numbers derived from real-world LEW submissions.",
+
+  "statistics": {
+    "total_files": 62,
+    "successful_extractions": 48,
+    "files_with_circuits": 29,
+    "files_with_load_types": 46,
+    "total_circuits_detected": 1654,
+    "avg_circuits_per_db": 23.7,
+    "circuit_count_range": {"min": 1, "max": 42, "median": 21},
+    "db_rating_distribution": {
+      "32A": 5,
+      "40A": 5,
+      "63A": 13,
+      "80A": 1,
+      "100A": 5,
+      "125A": 1,
+      "150A": 2,
+      "200A": 1,
+      "300A": 1,
+      "400A": 1,
+      "unknown": 27
+    },
+    "supply_source_distribution": {
+      "landlord": 18,
+      "building_riser": 9,
+      "sp_group": 1,
+      "unknown": 34
+    },
+    "phase_distribution": {
+      "three_phase": 31,
+      "single_phase": 14,
+      "unknown": 17
+    },
+    "load_type_distribution": {
+      "power": {"count": 460, "percent": 27.8},
+      "isolator": {"count": 307, "percent": 18.6},
+      "lighting": {"count": 305, "percent": 18.4},
+      "spare": {"count": 215, "percent": 13.0},
+      "aircon": {"count": 148, "percent": 8.9},
+      "water_heater": {"count": 104, "percent": 6.3},
+      "kitchen": {"count": 53, "percent": 3.2},
+      "emergency": {"count": 50, "percent": 3.0},
+      "signage": {"count": 8, "percent": 0.5},
+      "exhaust_fan": {"count": 3, "percent": 0.2},
+      "fire_alarm": {"count": 1, "percent": 0.1}
+    },
+    "breaker_type_distribution": {
+      "MCB": 398,
+      "RCCB": 111,
+      "MCCB": 76,
+      "ELCB": 15,
+      "RCD": 4
+    },
+    "meter_type_distribution": {
+      "KWH": 35
+    }
+  },
+
+  "circuit_patterns": {
+    "lighting_10a": {
+      "description": "Standard lighting circuit (LED downlights, track lights, general illumination)",
+      "breaker_rating": 10,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 1.5,
+      "cable_spec_3phase": "2 x 1C 1.5sqmm PVC + 1.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "cable_spec_1phase": "2C 1.5sqmm PVC/PVC",
+      "frequency": 305,
+      "typical_load": "6-15 lighting points",
+      "naming_convention": "S (section) prefix, e.g. L1S1, L2S1",
+      "notes": "Most common circuit type. Typically 2-4 lighting circuits per DB."
+    },
+    "power_20a": {
+      "description": "Standard 13A socket outlet circuit (general power, office, retail)",
+      "breaker_rating": 20,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 2.5,
+      "cable_spec_3phase": "2 x 1C 2.5sqmm PVC + 2.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "cable_spec_1phase": "2C 2.5sqmm PVC/PVC",
+      "frequency": 460,
+      "typical_load": "2-6 Nos 13A S/S/O (switched socket outlets)",
+      "naming_convention": "P (power) prefix, e.g. L1P1, L2P3",
+      "notes": "Most frequent breaker rating. 20A MCB with 2.5mm cable is the industry standard for socket circuits."
+    },
+    "power_13a": {
+      "description": "Light-duty socket circuit (single appliance: fridge, washer, etc.)",
+      "breaker_rating": 13,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 1.5,
+      "cable_spec_3phase": "2 x 1C 1.5sqmm PVC + 1.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "cable_spec_1phase": "2C 1.5sqmm PVC/PVC",
+      "frequency": 37,
+      "typical_load": "1 No. 13A S/S/O (dedicated appliance)",
+      "notes": "Used for dedicated single-appliance circuits like fridge, POS terminal."
+    },
+    "water_heater_20a": {
+      "description": "Instantaneous water heater (bathroom/kitchen)",
+      "breaker_rating": 20,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 2.5,
+      "cable_spec_3phase": "2 x 1C 2.5sqmm PVC + 2.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "cable_spec_1phase": "2C 2.5sqmm PVC/PVC",
+      "frequency": 104,
+      "typical_load": "1 No. instantaneous water heater (3.5-4.5kW)",
+      "notes": "Common in both residential and commercial. Typically 1-4 per DB."
+    },
+    "aircon_20a": {
+      "description": "Wall-mounted split aircon unit (9000-18000 BTU)",
+      "breaker_rating": 20,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 4.0,
+      "cable_spec_3phase": "2 x 1C 4.0sqmm PVC + 4.0sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "cable_spec_1phase": "2C 4.0sqmm PVC/PVC",
+      "frequency": 148,
+      "typical_load": "1 No. aircon FCU (fan coil unit)",
+      "notes": "Aircon circuits use thicker cable (4mm) despite 20A breaker due to motor starting current."
+    },
+    "kitchen_32a": {
+      "description": "Heavy kitchen equipment (oven, fryer, steamer, dishwasher)",
+      "breaker_rating": 32,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "C",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 6.0,
+      "cable_spec_3phase": "2 x 1C 6.0sqmm PVC + 6.0sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "frequency": 53,
+      "typical_load": "1 No. commercial kitchen equipment",
+      "notes": "Type C characteristic for motor/inductive loads. Only in F&B and industrial premises."
+    },
+    "emergency_10a": {
+      "description": "Emergency lighting circuit (battery-backed exit signs, emergency luminaires)",
+      "breaker_rating": 10,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 1.5,
+      "cable_spec_3phase": "2 x 1C 1.5sqmm PVC + 1.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "frequency": 50,
+      "typical_load": "Emergency exit signs and luminaires",
+      "notes": "Required by SCDF regulations. Typically 1-2 per DB."
+    },
+    "signage_10a": {
+      "description": "External/internal signage circuit",
+      "breaker_rating": 10,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 1.5,
+      "cable_spec_3phase": "2 x 1C 1.5sqmm PVC + 1.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "frequency": 8,
+      "typical_load": "Shop front signage / illuminated sign",
+      "notes": "Common in commercial tenancies. Usually 1 circuit."
+    },
+    "spare_20a": {
+      "description": "Spare/reserved circuit way",
+      "breaker_rating": 20,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": null,
+      "frequency": 215,
+      "typical_load": "SPARE (no cable, no load)",
+      "notes": "Industry practice to provide 10-20% spare ways. Always the last circuits on the busbar."
+    },
+    "exhaust_fan_16a": {
+      "description": "Kitchen/toilet exhaust fan",
+      "breaker_rating": 16,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "B",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 2.5,
+      "cable_spec_3phase": "2 x 1C 2.5sqmm PVC + 2.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "frequency": 3,
+      "typical_load": "Exhaust fan motor",
+      "notes": "Mainly in F&B kitchens."
+    },
+    "isolator_20a": {
+      "description": "DP/TP isolator for aircon outdoor units",
+      "breaker_rating": 20,
+      "breaker_type": "ISOLATOR",
+      "poles": "DP",
+      "cable_mm2": 4.0,
+      "cable_spec_1phase": "2C 4.0sqmm PVC/PVC",
+      "frequency": 307,
+      "typical_load": "Aircon condensing unit isolator",
+      "notes": "Very common in residential. Required for each aircon outdoor unit."
+    },
+    "machine_supply_40a": {
+      "description": "Industrial machinery supply",
+      "breaker_rating": 40,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "C",
+      "fault_kA": 6,
+      "poles": "SPN",
+      "cable_mm2": 10.0,
+      "cable_spec_3phase": "2 x 1C 10.0sqmm PVC + 10.0sqmm PVC CPC IN METAL TRUNKING",
+      "frequency": 30,
+      "typical_load": "Industrial machinery, compressor",
+      "notes": "Type C for inductive/motor loads. Industrial premises only."
+    },
+    "machine_supply_63a": {
+      "description": "Heavy industrial machinery supply",
+      "breaker_rating": 63,
+      "breaker_type": "MCB",
+      "breaker_characteristic": "C",
+      "fault_kA": 10,
+      "poles": "SPN",
+      "cable_mm2": 16.0,
+      "cable_spec_3phase": "2 x 1C 16.0sqmm PVC + 16.0sqmm PVC CPC IN METAL TRUNKING",
+      "frequency": 26,
+      "typical_load": "Heavy machinery, CNC machine",
+      "notes": "Higher fault rating (10kA) required for heavy loads."
+    }
+  },
+
+  "breaker_cable_mapping": {
+    "2": {"min_cable_mm2": 1.0, "typical_cable_mm2": 1.0, "breaker_count": 11, "use_case": "fuse, pilot light"},
+    "3": {"min_cable_mm2": 1.0, "typical_cable_mm2": 1.0, "breaker_count": 7, "use_case": "fuse, signal circuit"},
+    "5": {"min_cable_mm2": 1.0, "typical_cable_mm2": 1.0, "breaker_count": 9, "use_case": "fuse, indicator"},
+    "6": {"min_cable_mm2": 1.5, "typical_cable_mm2": 1.5, "breaker_count": 6, "use_case": "small lighting"},
+    "10": {"min_cable_mm2": 1.5, "typical_cable_mm2": 1.5, "breaker_count": 98, "use_case": "lighting, emergency lighting, signage"},
+    "13": {"min_cable_mm2": 1.5, "typical_cable_mm2": 1.5, "breaker_count": 37, "use_case": "single appliance socket"},
+    "16": {"min_cable_mm2": 2.5, "typical_cable_mm2": 2.5, "breaker_count": 36, "use_case": "fan, small motor, ventilation"},
+    "20": {"min_cable_mm2": 2.5, "typical_cable_mm2": 2.5, "breaker_count": 149, "use_case": "socket outlets, water heater, aircon FCU"},
+    "32": {"min_cable_mm2": 6.0, "typical_cable_mm2": 6.0, "breaker_count": 54, "use_case": "kitchen equipment, machinery, meter isolator"},
+    "40": {"min_cable_mm2": 10.0, "typical_cable_mm2": 10.0, "breaker_count": 30, "use_case": "machinery, main breaker (single-phase DB)"},
+    "63": {"min_cable_mm2": 16.0, "typical_cable_mm2": 16.0, "breaker_count": 51, "use_case": "main breaker (63A DB), heavy machinery"},
+    "80": {"min_cable_mm2": 25.0, "typical_cable_mm2": 25.0, "breaker_count": 8, "use_case": "main breaker (80A DB)"},
+    "100": {"min_cable_mm2": 25.0, "typical_cable_mm2": 35.0, "breaker_count": 40, "use_case": "main breaker (100A DB), RCCB, MCCB"},
+    "125": {"min_cable_mm2": 35.0, "typical_cable_mm2": 50.0, "breaker_count": 1, "use_case": "main breaker (125A DB)"},
+    "150": {"min_cable_mm2": 50.0, "typical_cable_mm2": 70.0, "breaker_count": 2, "use_case": "main breaker (150A DB)"},
+    "200": {"min_cable_mm2": 70.0, "typical_cable_mm2": 95.0, "breaker_count": 1, "use_case": "main breaker (200A DB)"},
+    "300": {"min_cable_mm2": 120.0, "typical_cable_mm2": 150.0, "breaker_count": 1, "use_case": "main breaker (300A DB)"},
+    "400": {"min_cable_mm2": 150.0, "typical_cable_mm2": 185.0, "breaker_count": 1, "use_case": "main breaker (400A DB)"}
+  },
+
+  "db_rating_to_kva": {
+    "32A": {"typical_kva": 7.4, "range": [7.4, 22.2], "samples": 3},
+    "40A": {"typical_kva": 9.2, "range": [9.2, 55.4], "samples": 4},
+    "63A": {"typical_kva": 43.6, "range": [14.5, 69.3], "samples": 12},
+    "80A": {"typical_kva": 55.4, "range": [55.4, 55.4], "samples": 1},
+    "100A": {"typical_kva": 57.6, "range": [23.0, 69.3], "samples": 4},
+    "125A": {"typical_kva": 69.3, "range": [69.3, 69.3], "samples": 1},
+    "150A": {"typical_kva": 121.3, "range": [104.0, 138.6], "samples": 2},
+    "200A": {"typical_kva": 138.6, "range": [138.6, 138.6], "samples": 1},
+    "300A": {"typical_kva": 207.8, "range": [207.8, 207.8], "samples": 1},
+    "400A": {"typical_kva": 276.0, "range": [276.0, 276.0], "samples": 1}
+  },
+
+  "elcb_rccb_configurations": {
+    "most_common": [
+      {"type": "RCCB", "rating_A": 40, "sensitivity_mA": 30, "poles": 2, "count": 26, "use": "Single-phase DB protection"},
+      {"type": "RCCB", "rating_A": 63, "sensitivity_mA": 30, "poles": 4, "count": 22, "use": "Three-phase 63A DB protection"},
+      {"type": "RCCB", "rating_A": 100, "sensitivity_mA": 30, "poles": 4, "count": 3, "use": "Three-phase 100A+ DB protection"},
+      {"type": "ELCB", "rating_A": 100, "sensitivity_mA": 30, "poles": 4, "count": 2, "use": "Legacy three-phase protection"},
+      {"type": "ELCB", "rating_A": 63, "sensitivity_mA": 30, "poles": 4, "count": 2, "use": "Legacy three-phase protection"}
+    ],
+    "rules": {
+      "single_phase_db": "RCCB rating >= main breaker rating, 2-pole, 30mA sensitivity",
+      "three_phase_db": "RCCB rating >= main breaker rating (min 63A), 4-pole, 30mA sensitivity",
+      "sensitivity_standard": "30mA for personnel protection (most common)",
+      "sensitivity_high": "10mA for medical/sensitive equipment (rare)",
+      "sensitivity_time_delayed": "100mA for fire protection (rare, upstream coordination)",
+      "files_with_elcb_rccb": 41,
+      "percentage_of_files": 66
+    }
+  },
+
+  "premises_profiles": {
+    "cafe_restaurant_fnb": {
+      "description": "Cafe, restaurant, F&B outlet, bubble tea shop, bakery",
+      "typical_db_ratings": [63, 100],
+      "typical_phase": "three_phase",
+      "typical_supply": "landlord",
+      "typical_kva_range": [43, 69],
+      "circuit_mix": {
+        "lighting": 0.19,
+        "power": 0.25,
+        "aircon": 0.12,
+        "kitchen": 0.10,
+        "water_heater": 0.08,
+        "spare": 0.14,
+        "isolator": 0.05,
+        "emergency": 0.04,
+        "signage": 0.02,
+        "exhaust_fan": 0.01
+      },
+      "typical_circuit_count": {"min": 12, "max": 24, "typical": 16},
+      "typical_circuits": [
+        "Lighting x2-3 (10A MCB)",
+        "Emergency Lighting x1 (10A MCB)",
+        "Signage x1 (10A MCB)",
+        "13A S/S/O x3-5 (20A MCB)",
+        "Kitchen Equipment x1-3 (32A MCB Type C)",
+        "Water Heater x1-2 (20A MCB)",
+        "Aircon x2-4 (20A MCB)",
+        "Exhaust Fan x1 (16A MCB)",
+        "Spare x2-3 (20A MCB)"
+      ],
+      "file_count_observed": 8,
+      "inference_keywords": ["cafe", "restaurant", "kitchen", "fnb", "food", "bakery", "yogurt", "pezzo", "crave", "acai"]
+    },
+    "office": {
+      "description": "Office, co-working space, corporate tenancy",
+      "typical_db_ratings": [40, 63],
+      "typical_phase": "three_phase",
+      "typical_supply": "building_riser",
+      "typical_kva_range": [9, 45],
+      "circuit_mix": {
+        "lighting": 0.22,
+        "power": 0.35,
+        "aircon": 0.15,
+        "water_heater": 0.06,
+        "spare": 0.12,
+        "isolator": 0.03,
+        "emergency": 0.05,
+        "signage": 0.02
+      },
+      "typical_circuit_count": {"min": 9, "max": 18, "typical": 12},
+      "typical_circuits": [
+        "Lighting (Zone A/B) x2-3 (10A MCB)",
+        "Emergency Lighting x1 (10A MCB)",
+        "13A S/S/O x3-5 (20A MCB)",
+        "Water Heater (Pantry) x1 (20A MCB)",
+        "Aircon x2-3 (20A MCB)",
+        "Spare x2-3 (20A MCB)"
+      ],
+      "file_count_observed": 6,
+      "inference_keywords": ["office", "pte ltd", "llc", "concept", "corporate", "coworking"]
+    },
+    "retail_shop": {
+      "description": "Retail shop, boutique, showroom, mall unit",
+      "typical_db_ratings": [40, 63],
+      "typical_phase": "single_phase",
+      "typical_supply": "landlord",
+      "typical_kva_range": [9, 45],
+      "circuit_mix": {
+        "lighting": 0.28,
+        "power": 0.30,
+        "aircon": 0.10,
+        "water_heater": 0.05,
+        "spare": 0.12,
+        "isolator": 0.05,
+        "emergency": 0.06,
+        "signage": 0.04
+      },
+      "typical_circuit_count": {"min": 8, "max": 14, "typical": 10},
+      "typical_circuits": [
+        "Display Lighting x2-3 (10A MCB)",
+        "General Lighting x1 (10A MCB)",
+        "Signage x1 (10A MCB)",
+        "13A S/S/O x2-3 (20A MCB)",
+        "Aircon x1-2 (20A MCB)",
+        "Spare x1-2 (20A MCB)"
+      ],
+      "file_count_observed": 5,
+      "inference_keywords": ["shop", "retail", "boutique", "store", "plaza", "mall", "showroom"]
+    },
+    "residential_hdb": {
+      "description": "HDB flat, standard residential",
+      "typical_db_ratings": [40],
+      "typical_phase": "single_phase",
+      "typical_supply": "sp_group",
+      "typical_kva_range": [9, 9],
+      "circuit_mix": {
+        "lighting": 0.25,
+        "power": 0.25,
+        "aircon": 0.15,
+        "water_heater": 0.15,
+        "spare": 0.10,
+        "isolator": 0.10
+      },
+      "typical_circuit_count": {"min": 8, "max": 12, "typical": 10},
+      "typical_circuits": [
+        "Lighting x2-3 (10A MCB)",
+        "13A S/S/O x2-3 (20A MCB)",
+        "Water Heater x1-2 (20A MCB)",
+        "Aircon Isolator x1-2 (20A ISOLATOR)",
+        "Spare x1 (20A MCB)"
+      ],
+      "file_count_observed": 3,
+      "inference_keywords": ["hdb", "flat", "blk", "block", "ave", "avenue", "street"]
+    },
+    "residential_condo_landed": {
+      "description": "Condominium unit, landed house, executive apartment",
+      "typical_db_ratings": [63, 100],
+      "typical_phase": "three_phase",
+      "typical_supply": "sp_group",
+      "typical_kva_range": [14, 69],
+      "circuit_mix": {
+        "lighting": 0.18,
+        "power": 0.30,
+        "aircon": 0.12,
+        "water_heater": 0.10,
+        "spare": 0.10,
+        "isolator": 0.15,
+        "kitchen": 0.05
+      },
+      "typical_circuit_count": {"min": 15, "max": 42, "typical": 24},
+      "typical_circuits": [
+        "Lighting x3-6 (10A MCB)",
+        "13A S/S/O x6-12 (20A MCB, per room)",
+        "Water Heater x2-3 (20A MCB)",
+        "Kitchen Equipment x1-2 (32A MCB)",
+        "Aircon Isolator x3-6 (20A ISOLATOR)",
+        "Spare x2-3 (20A MCB)"
+      ],
+      "file_count_observed": 4,
+      "inference_keywords": ["condo", "condominium", "landed", "terrace", "semi-detached", "bungalow", "house", "lorong", "jalan"]
+    },
+    "industrial_warehouse": {
+      "description": "Warehouse, light industrial, workshop, logistics",
+      "typical_db_ratings": [100, 150],
+      "typical_phase": "three_phase",
+      "typical_supply": "building_riser",
+      "typical_kva_range": [69, 138],
+      "circuit_mix": {
+        "lighting": 0.20,
+        "power": 0.25,
+        "aircon": 0.08,
+        "water_heater": 0.04,
+        "spare": 0.15,
+        "isolator": 0.20,
+        "emergency": 0.04,
+        "kitchen": 0.02,
+        "exhaust_fan": 0.02
+      },
+      "typical_circuit_count": {"min": 15, "max": 30, "typical": 20},
+      "typical_circuits": [
+        "High Bay Lighting x3 (10A MCB)",
+        "Office Lighting x1-2 (10A MCB)",
+        "Emergency Lighting x1-2 (10A MCB)",
+        "13A S/S/O x3-5 (20A MCB)",
+        "Machine Supply x2-4 (32A-63A MCB Type C)",
+        "Water Heater x1 (20A MCB)",
+        "Ventilation Fan x1-2 (16A MCB)",
+        "Aircon (Office) x1-2 (20A MCB)",
+        "Spare x2-3 (20A MCB)"
+      ],
+      "file_count_observed": 5,
+      "inference_keywords": ["warehouse", "industrial", "factory", "workshop", "logistics", "production", "eunos", "toa payoh industrial"]
+    },
+    "large_commercial": {
+      "description": "Large commercial premises (supermarket, department store, large restaurant chain)",
+      "typical_db_ratings": [200, 300, 400],
+      "typical_phase": "three_phase",
+      "typical_supply": "building_riser",
+      "typical_kva_range": [138, 276],
+      "circuit_mix": {
+        "lighting": 0.18,
+        "power": 0.22,
+        "aircon": 0.15,
+        "water_heater": 0.03,
+        "spare": 0.18,
+        "isolator": 0.20,
+        "emergency": 0.02,
+        "kitchen": 0.02
+      },
+      "typical_circuit_count": {"min": 30, "max": 138, "typical": 60},
+      "file_count_observed": 4,
+      "inference_keywords": ["supermarket", "department", "chain", "megastore"]
+    }
+  },
+
+  "premises_inference_rules": {
+    "description": "Rules to infer premises type from circuit composition when no explicit type given",
+    "rules": [
+      {
+        "condition": "kitchen_circuits >= 2 AND (exhaust_fan >= 1 OR water_heater >= 2)",
+        "inferred_type": "cafe_restaurant_fnb",
+        "confidence": 0.85
+      },
+      {
+        "condition": "kitchen_circuits >= 1 AND signage >= 1 AND db_rating <= 63",
+        "inferred_type": "cafe_restaurant_fnb",
+        "confidence": 0.75
+      },
+      {
+        "condition": "isolator_ratio > 0.25 AND phase == 'three_phase' AND db_rating >= 200",
+        "inferred_type": "large_commercial",
+        "confidence": 0.80
+      },
+      {
+        "condition": "isolator_ratio > 0.10 AND aircon_ratio > 0.10 AND kitchen_circuits == 0",
+        "inferred_type": "residential_condo_landed",
+        "confidence": 0.70
+      },
+      {
+        "condition": "supply == 'sp_group' AND phase == 'single_phase' AND db_rating <= 40",
+        "inferred_type": "residential_hdb",
+        "confidence": 0.90
+      },
+      {
+        "condition": "lighting_ratio > 0.25 AND signage >= 1 AND kitchen_circuits == 0",
+        "inferred_type": "retail_shop",
+        "confidence": 0.70
+      },
+      {
+        "condition": "power_ratio > 0.30 AND aircon_ratio > 0.10 AND kitchen_circuits == 0 AND isolator_ratio < 0.10",
+        "inferred_type": "office",
+        "confidence": 0.65
+      },
+      {
+        "condition": "any breaker >= 40A Type C AND supply == 'building_riser'",
+        "inferred_type": "industrial_warehouse",
+        "confidence": 0.75
+      }
+    ]
+  },
+
+  "phase_balance_guidelines": {
+    "description": "Phase balancing rules derived from real LEW practice (3-phase DBs only)",
+    "observed_distribution": {
+      "L1": 0.338,
+      "L2": 0.332,
+      "L3": 0.330
+    },
+    "rules": [
+      "Circuits are distributed as evenly as possible across L1, L2, L3 (target: within 5% of each other)",
+      "Circuit IDs follow round-robin: L1S1, L2S1, L3S1, L1S2, L2S2, L3S2, ...",
+      "Lighting section (S) is balanced first, then power section (P)",
+      "Higher-load circuits (32A+) should be spread across phases to avoid imbalance",
+      "Spare circuits should be evenly distributed across all three phases",
+      "In real data: L1=33.8%, L2=33.2%, L3=33.0% — nearly perfect balance"
+    ],
+    "section_distribution": {
+      "S_section_circuits": 234,
+      "P_section_circuits": 429,
+      "ISO_circuits": 25,
+      "S_to_P_ratio": 0.55,
+      "notes": "Power circuits (P) outnumber lighting/section circuits (S) by ~1.8:1"
+    },
+    "phase_assignment_algorithm": "Round-robin starting from L1. For N circuits: assign L1 to circuits 1, 4, 7, ...; L2 to 2, 5, 8, ...; L3 to 3, 6, 9, ..."
+  },
+
+  "naming_conventions": {
+    "description": "Circuit naming patterns observed in 62 real LEW files",
+    "circuit_id_format": {
+      "three_phase": "{phase}{section_type}{number}",
+      "single_phase": "{section_type}{number}",
+      "examples": ["L1S1", "L2P3", "L3S2", "S1", "P4", "ISO1"]
+    },
+    "phase_prefix": {
+      "L1": "Phase 1 (Red)",
+      "L2": "Phase 2 (Yellow)",
+      "L3": "Phase 3 (Blue)"
+    },
+    "section_types": {
+      "S": {
+        "meaning": "Section/Lighting circuit",
+        "typical_breaker": "10A MCB",
+        "count_observed": 234,
+        "description": "Lighting, emergency lighting, signage circuits"
+      },
+      "P": {
+        "meaning": "Power circuit",
+        "typical_breaker": "20A MCB",
+        "count_observed": 429,
+        "description": "Socket outlets, water heater, aircon, kitchen equipment"
+      },
+      "ISO": {
+        "meaning": "Isolator circuit",
+        "typical_breaker": "20A DP/TP Isolator",
+        "count_observed": 25,
+        "description": "Aircon outdoor unit isolators, sub-DB isolators"
+      }
+    },
+    "load_description_patterns": {
+      "socket_outlets": "{count} Nos {type} S/S/O ({location})",
+      "socket_outlet_examples": [
+        "4 Nos 13A SINGLE S/S/O",
+        "2 Nos 2x13A S/S/O (KITCHEN)",
+        "1 No. 1x13A S/S/O (FRIDGE)",
+        "1 No. 1x13A WEATHERPROOF S/S/O (CAR PORCH)"
+      ],
+      "lighting": "{count} Nos LIGHTING POINTS",
+      "lighting_examples": [
+        "10 Nos LIGHTING POINTS",
+        "6 Nos LED ADJUSTABLE SPOT LIGHTS",
+        "(TRACK LIGHTS WITH 3 FITTINGS)"
+      ],
+      "water_heater": "1 No. INSTANT WATER HEATER ({location})",
+      "aircon": "1 No. AIRCON FCU ({zone})",
+      "spare": "SPARE",
+      "emergency": "EMERGENCY LIGHTING"
+    },
+    "cable_description_format": {
+      "three_phase_trunking": "{n} x 1C {size}sqmm PVC + {cpc_size}sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+      "single_phase_pvc": "2C {size}sqmm PVC/PVC",
+      "xlpe_cable": "{n} x 1C {size}mm XLPE CABLE + {cpc_size}sqmm CPC PVC CABLE",
+      "examples": [
+        "2 x 1C 1.5sqmm PVC + 1.5sqmm PVC CPC IN METAL TRUNKING/CONDUIT",
+        "2 x 1C 2.5sqmm PVC + 2.5sqmm PVC CPC IN PVC TRUNKING",
+        "4 x 1C 25sqmm PVC/PVC + 16sqmm PVC CPC IN TRUNKING/CABLE TRAY",
+        "2 x 1C 50mm XLPE CABLE + 25sqmm CPC PVC CABLE"
+      ]
+    }
+  },
+
+  "validation_rules": {
+    "description": "Validation rules derived from Singapore SS 638 / CP5 standards and real-world LEW practice",
+    "breaker_cable_minimum": {
+      "rule": "Cable current capacity must meet or exceed breaker rating",
+      "mapping": {
+        "6A_MCB": "min 1.0mm2",
+        "10A_MCB": "min 1.5mm2",
+        "13A_MCB": "min 1.5mm2",
+        "16A_MCB": "min 2.5mm2",
+        "20A_MCB": "min 2.5mm2",
+        "32A_MCB": "min 6.0mm2",
+        "40A_MCB": "min 10.0mm2",
+        "63A_MCB": "min 16.0mm2"
+      }
+    },
+    "elcb_rccb_rules": [
+      "Every DB must have RCCB/ELCB protection (Singapore regulation)",
+      "RCCB rating >= main breaker rating",
+      "Standard sensitivity: 30mA for all general circuits",
+      "Single-phase DB: 2-pole RCCB",
+      "Three-phase DB: 4-pole RCCB",
+      "66% of analyzed files have ELCB/RCCB data (41 out of 62)"
+    ],
+    "spare_circuit_rules": [
+      "Minimum 10% spare ways recommended",
+      "Spare circuits are always placed at the end of each phase group",
+      "Spare breakers installed but no cable connected",
+      "Observed average: 13% spare circuits"
+    ],
+    "circuit_count_limits": {
+      "32A_DB": {"max_ways": 8, "typical": 6},
+      "40A_DB_single_phase": {"max_ways": 12, "typical": 9},
+      "63A_DB_single_phase": {"max_ways": 18, "typical": 14},
+      "63A_DB_three_phase": {"max_ways": 24, "typical": 16},
+      "100A_DB_three_phase": {"max_ways": 36, "typical": 24},
+      "150A_DB_three_phase": {"max_ways": 42, "typical": 30},
+      "200A_plus_DB": {"max_ways": 48, "typical": 36}
+    },
+    "main_breaker_rules": {
+      "single_phase_small": {"rating": [32, 40], "type": "MCB", "poles": "DP", "fault_kA": 10},
+      "single_phase_large": {"rating": [63, 80, 100], "type": "MCB", "poles": "DP", "fault_kA": 10},
+      "three_phase_small": {"rating": [32, 40, 63], "type": "MCCB", "poles": "TPN", "fault_kA": 25},
+      "three_phase_large": {"rating": [100, 125, 150, 200], "type": "MCCB", "poles": "TPN", "fault_kA": [25, 36]},
+      "three_phase_heavy": {"rating": [300, 400], "type": "MCCB", "poles": "TPN", "fault_kA": [36, 50]}
+    },
+    "metering_rules": {
+      "direct_meter": "For loads up to 45kVA (typically <=63A DB)",
+      "ct_meter": "For loads above 45kVA (typically >63A DB)",
+      "ct_ratios_common": ["100/5A", "150/5A", "200/5A", "300/5A", "400/5A"],
+      "landlord_supply": "KWH meter at meter board (landlord provides meter)",
+      "sp_group_supply": "SP meter at meter compartment (SP Group provides meter)"
+    },
+    "busbar_ratings": {
+      "32A_DB": 100,
+      "40A_DB": 100,
+      "63A_DB": 200,
+      "100A_DB": 200,
+      "150A_DB": 200,
+      "200A_DB": 400,
+      "300A_DB": 400,
+      "400A_DB": 630
+    }
+  },
+
+  "symbol_catalog_summary": {
+    "description": "DXF block symbols used in i2R SLD templates",
+    "blocks": {
+      "MCCB": {"instances": 825, "category": "breakers", "description": "Molded case circuit breaker (also used for MCB in DXF)"},
+      "DP ISOL": {"instances": 96, "category": "isolators", "description": "Double-pole isolator (single-phase)"},
+      "3P ISOL": {"instances": 70, "category": "isolators", "description": "Triple-pole isolator (three-phase)"},
+      "RCCB": {"instances": 82, "category": "breakers_rcd", "description": "Residual current circuit breaker"},
+      "3P SOCKET": {"instances": 13, "category": "sockets", "description": "Three-phase socket outlet"},
+      "SLD-CT": {"instances": 7, "category": "ct_hooks", "description": "Current transformer hooks for CT metering"},
+      "2A FUSE": {"instances": 6, "category": "fuses", "description": "2A fuse link (for pilot/indicator circuits)"}
+    },
+    "drawing_types": {
+      "single_phase_db": 7,
+      "three_phase_tpn": 17,
+      "cable_extension": 3,
+      "distribution_board_with_rcd": 1
+    }
+  }
+}

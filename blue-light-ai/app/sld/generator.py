@@ -40,86 +40,19 @@ from app.sld.layout import (
     compute_layout,
 )
 from app.sld.pdf_backend import PdfBackend
-from app.sld.real_symbols import (
-    REAL_SYMBOL_MAP,
-    RealACB,
-    RealCircuitBreaker,
-    RealCT,
-    RealELCB,
-    RealEarth,
-    RealFuse,
-    RealIsolator,
-    RealKwhMeter,
-    RealMCB,
-    RealMCCB,
-    RealRCCB,
-    get_real_symbol,
-    get_symbol_dimensions,
-)
+from app.sld.real_symbols import get_symbol_dimensions
 from app.sld.locale import SG_LOCALE
 from app.sld.page_config import PageConfig
 from app.sld.svg_backend import SvgBackend
+from app.sld.symbol import Symbol, create_symbol
 from app.sld.title_block import TitleBlockConfig, draw_border, draw_title_block_frame, fill_title_block_data
 
 logger = logging.getLogger(__name__)
 
 
-def _draw_trip_arrow(
-    backend, symbol, comp_x: float, comp_y: float,
-    *, dxf_block_name: str | None = None,
-) -> None:
-    """Draw trip mechanism arrow for a DXF-block-rendered circuit breaker.
-
-    Computes the arrow so that the tip touches the DXF block's actual arc
-    midpoint (not the procedural symbol's arc_r, which differs in size).
-    """
-    import math as _m
-
-    cx = comp_x + symbol.width / 2
-    arc_center_y = comp_y + symbol.height / 2
-
-    # Determine effective arc extent from DXF block geometry
-    arc_extent = symbol._arc_r  # fallback to procedural
-    if dxf_block_name and _BLOCK_REPLAYER is not None:
-        blk_data = _BLOCK_REPLAYER._blocks.get(dxf_block_name, {})
-        pin_x = blk_data.get("pins", {}).get("bottom", [0, 0])[0]
-        scale = _BLOCK_REPLAYER.compute_scale(dxf_block_name, symbol.height)
-        for ent in blk_data.get("entities", []):
-            if ent["type"] == "LWPOLYLINE" and ent.get("bulges"):
-                bulge = ent["bulges"][0]
-                if abs(bulge) > 0.01:
-                    pts = ent["points"]
-                    chord = _m.sqrt(
-                        (pts[1][0] - pts[0][0]) ** 2 + (pts[1][1] - pts[0][1]) ** 2
-                    )
-                    sagitta = abs(bulge) * chord / 2
-                    chord_mid_x = (pts[0][0] + pts[1][0]) / 2
-                    arc_mid_x = chord_mid_x + sagitta  # bulge > 0 → right
-                    arc_extent = (arc_mid_x - pin_x) * scale
-                    break
-
-    # Arrow tip at arc midpoint (rightward from center)
-    arc_mx = cx + arc_extent
-    arc_my = arc_center_y
-
-    # Arrow points LEFT → RIGHT toward arc surface
-    shaft = 6.0
-    sx = arc_mx - shaft  # start to the left of tip
-    sy = arc_my
-
-    backend.set_layer("SLD_SYMBOLS")
-    backend.add_line((sx, sy), (arc_mx, arc_my))
-
-    # Arrowhead pointing right (toward arc)
-    hl = 1.2
-    backend.add_line((arc_mx, arc_my),
-                     (arc_mx - hl, arc_my + 0.6))
-    backend.add_line((arc_mx, arc_my),
-                     (arc_mx - hl, arc_my - 0.6))
-
 # Reference DXF files for importing native CAD symbol blocks.
-# 150A TPN has the most blocks (MCCB, RCCB, DP ISOL, SLD-CT, VOLTMETER, 2A FUSE, SS, EF, LED IND LTG).
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+_BLOCK_LIBRARY_DXF = _DATA_DIR / "templates" / "symbols" / "sld_block_library.dxf"
 _REFERENCE_DXF_PATH = _DATA_DIR / "sld-info" / "slds-dxf" / "150A TPN SLD 1 DWG.dxf"
 _REFERENCE_DXF_FALLBACK = _DATA_DIR / "sld-info" / "slds-dxf" / "100A TPN SLD 1 DWG.dxf"
 
@@ -130,44 +63,6 @@ try:
 except Exception as _exc:
     logger.warning("BlockReplayer load failed: %s — falling back to procedural rendering", _exc)
     _BLOCK_REPLAYER = None
-
-# Legacy fallback: DXF block heights (used only when BlockReplayer is unavailable)
-_DXF_BLOCK_HEIGHTS = {
-    "MCCB": 597.82,
-    "RCCB": 597.82,
-    "DP ISOL": 430.63,
-}
-
-
-# Map symbol type names to DXF/library block names.
-# BlockReplayer uses this mapping to find the right block definition.
-_SYMBOL_TO_DXF_BLOCK = {
-    # Circuit breakers
-    "MCCB": "MCCB",
-    "CB_MCCB": "MCCB",
-    "MCB": "MCCB",         # MCB = MCCB block at different scale (per reference DXF)
-    "CB_MCB": "MCCB",
-    "RCCB": "RCCB",
-    "CB_RCCB": "RCCB",
-    "ELCB": "RCCB",        # ELCB uses RCCB block (same IEC symbol)
-    "CB_ELCB": "RCCB",
-    # Isolators
-    "ISOLATOR": "IEC ISOLATOR",   # meter board / unit isolator — IEC switch symbol
-    "DP_ISOL_DEVICE": "DP ISOL",  # circuit-level isolator device at conductor top
-    "3P_ISOLATOR": "3P ISOL",
-    # CT metering
-    "CT": "SLD-CT",
-    # Meters
-    "KWH_METER": "KWH_METER",   # custom block
-    "VOLTMETER": "VOLTMETER",
-    # Protection / auxiliaries
-    "EARTH": "EARTH",           # custom block
-    "FUSE": "2A FUSE",
-    "POTENTIAL_FUSE": "2A FUSE",
-    "SELECTOR_SWITCH": "SS",
-    "ELR": "EF",
-    "INDICATOR_LIGHTS": "LED IND LTG",
-}
 
 
 class SldGenerator:
@@ -262,8 +157,8 @@ class SldGenerator:
         if backend_type == "dxf":
             # DXF backend (primary CAD output) + ReportLab PDF (EMA submission) + SVG (preview)
             dxf = DxfBackend(page_config=pc)
-            # Import native CAD symbol blocks from reference DXF templates
-            for ref_path in (_REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
+            # Import native CAD symbol blocks: consolidated library first, then reference DXFs
+            for ref_path in (_BLOCK_LIBRARY_DXF, _REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
                 if ref_path.exists():
                     dxf.import_symbol_blocks(str(ref_path))
             pdf = PdfBackend(pdf_output_path, page_config=pc)
@@ -384,8 +279,8 @@ class SldGenerator:
         dxf_bytes = None
         if backend_type == "dxf":
             dxf = DxfBackend(page_config=pc)
-            # Import native CAD symbol blocks from reference DXF templates
-            for ref_path in (_REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
+            # Import native CAD symbol blocks: consolidated library first, then reference DXFs
+            for ref_path in (_BLOCK_LIBRARY_DXF, _REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
                 if ref_path.exists():
                     dxf.import_symbol_blocks(str(ref_path))
             backends = [dxf, pdf, svg]
@@ -412,49 +307,9 @@ class SldGenerator:
 
         return pdf.get_bytes(), svg.get_svg_string(), dxf_bytes
 
-    @staticmethod
-    def _get_dxf_block_name(symbol_name: str) -> str | None:
-        """Map a symbol type name to its DXF block name, if one exists."""
-        return _SYMBOL_TO_DXF_BLOCK.get(symbol_name)
-
-    @staticmethod
-    def _dxf_label_offset_x(symbol_name: str, symbol_width: float, symbol_height: float) -> float:
-        """DXF 백엔드용 라벨 X 오프셋 계산.
-
-        블록의 실제 스케일링 폭을 사용하여 라벨이 심볼 바로 옆(3mm)에
-        배치되도록 한다. 블록이 없으면 절차적 폭을 사용.
-
-        Args:
-            symbol_name: 심볼 이름 (e.g. "CB_MCCB").
-            symbol_width: 절차적 심볼 폭 (mm).
-            symbol_height: 절차적 심볼 높이 (mm, 스케일 계산용).
-
-        Returns:
-            라벨 X 오프셋 (comp.x 기준, mm).
-        """
-        if _BLOCK_REPLAYER is None:
-            return symbol_width + 3
-
-        dxf_block_name = _SYMBOL_TO_DXF_BLOCK.get(symbol_name)
-        if not dxf_block_name or not _BLOCK_REPLAYER.has_block(dxf_block_name):
-            return symbol_width + 3
-
-        scaled_w, _ = _BLOCK_REPLAYER.get_scaled_size(
-            dxf_block_name, target_height_mm=symbol_height,
-        )
-        # 블록은 compute_aligned_insertion()으로 핀 정렬 → 블록 중심이
-        # 절차적 핀(comp.x + width/2)에 위치. 라벨은 블록 우측 가장자리 + 3mm.
-        # 블록 우측 가장자리 = comp.x + width/2 + scaled_w/2
-        # 라벨 X 오프셋 = width/2 + scaled_w/2 + 3
-        return symbol_width / 2 + scaled_w / 2 + 3
-
-    def _get_symbol(self, symbol_name: str):
-        """Get a calibrated symbol instance by its block/type name."""
-        try:
-            return get_real_symbol(symbol_name)
-        except ValueError:
-            logger.warning("Unknown symbol type: %s", symbol_name)
-            return None
+    def _get_symbol(self, symbol_name: str) -> Symbol | None:
+        """Get a unified Symbol instance (Block or Procedural)."""
+        return create_symbol(symbol_name, _BLOCK_REPLAYER)
 
     @staticmethod
     def _build_ditto_map(
@@ -565,15 +420,15 @@ class SldGenerator:
         ditto_indices: set[int],
         ditto_prev_map: dict[int, int],
     ) -> None:
-        """Draw a symbol component (breaker, meter, earth, CT, etc.)."""
+        """Draw a symbol component (breaker, meter, earth, CT, etc.).
+
+        Uses the unified Symbol interface — no block_used branching.
+        """
         symbol = self._get_symbol(comp.symbol_name)
         if not symbol:
             if comp.symbol_name == "CB_SPARE" and comp.label:
-                # SPARE circuit: no breaker symbol, just render "SPARE" label text
                 backend.add_mtext(
-                    comp.label,
-                    insert=(comp.x + 6, comp.y + 2),
-                    char_height=1.8,
+                    comp.label, insert=(comp.x + 6, comp.y + 2), char_height=1.8,
                 )
             else:
                 logger.warning(f"Unknown symbol: {comp.symbol_name}")
@@ -581,180 +436,30 @@ class SldGenerator:
 
         use_horizontal = (
             comp.rotation == 90.0
-            and hasattr(symbol, 'draw_horizontal')
+            and hasattr(symbol.procedural, 'draw_horizontal')
             and getattr(comp, 'label_style', '') != 'breaker_block'
         )
 
-        # Determine if we need special procedural rendering kwargs
-        needs_special_kwargs = False
-        trip_kwargs = {}
+        # Determine skip_trip_arrow
+        skip_trip = False
         if not use_horizontal:
-            is_sub_circuit = comp.label_style == "breaker_block"
+            is_sub = comp.label_style == "breaker_block"
             is_ditto = comp_idx in ditto_indices
-            should_skip_trip = not is_sub_circuit or is_ditto
-            if should_skip_trip and isinstance(symbol, RealCircuitBreaker):
-                trip_kwargs["skip_trip_arrow"] = True
-            if comp.enclosed and isinstance(symbol, RealIsolator):
-                trip_kwargs["enclosed"] = True
-                needs_special_kwargs = True
+            skip_trip = not is_sub or is_ditto
         else:
-            needs_special_kwargs = True  # horizontal uses special kwargs for procedural fallback
-            # Horizontal CBs (meter board) — no trip arrow per LEW reference convention
-            if isinstance(symbol, RealCircuitBreaker):
-                trip_kwargs["skip_trip_arrow"] = True
+            skip_trip = True  # horizontal CBs: no trip arrow
 
-        # BlockReplayer path: renders extracted DXF block geometry.
-        # DxfBackend → native INSERT (100% fidelity).
-        # PDF/SVG → _replay_entities() (primitive conversion).
-        # Supports vertical (0°) and horizontal (90°) orientations.
-        block_used = False
-        if _BLOCK_REPLAYER is not None:
-            dxf_block_name = self._get_dxf_block_name(comp.symbol_name)
-            if dxf_block_name and _BLOCK_REPLAYER.has_block(dxf_block_name):
-                # Determine rotation and pin based on intent + block native orientation.
-                # pin_name is specified in RENDERED (post-rotation) coordinates:
-                #   "left" = 렌더링 결과의 왼쪽 연결점에 target_pin 정렬
-                #   "bottom" = 렌더링 결과의 하단 연결점에 target_pin 정렬
-                # compute_aligned_insertion()이 rotation을 고려하여 올바른
-                # 원본 핀 좌표를 자동으로 선택 + 회전 변환함.
-                native_horiz = _BLOCK_REPLAYER.is_native_horizontal(dxf_block_name)
-                if use_horizontal:
-                    target_pin = (comp.x, comp.y)
-                    pin_name = "left"  # 렌더링 결과의 왼쪽에 정렬
-                    rotation = 0.0 if native_horiz else 90.0
-                    # DP ISOL: align rendered block bottom with comp.y
-                    # The 'left' pin sits at block center y; offset so bottom = comp.y
-                    if dxf_block_name == "DP ISOL" and not native_horiz:
-                        blk_data = _BLOCK_REPLAYER._blocks.get(dxf_block_name, {})
-                        ents = blk_data.get("entities", [])
-                        all_x = []
-                        for ent in ents:
-                            if ent["type"] == "LWPOLYLINE":
-                                all_x.extend(p[0] for p in ent["points"])
-                            elif ent["type"] in ("LINE", "CIRCLE"):
-                                if "start" in ent:
-                                    all_x.extend([ent["start"][0], ent["end"][0]])
-                                if "center" in ent:
-                                    all_x.append(ent["center"][0])
-                        if all_x:
-                            # After rot=90, rendered y ∝ original x.
-                            # Block bottom at min(x), left pin at top pin's x.
-                            top_pin_x = blk_data.get("pins", {}).get("top", [0, 0])[0]
-                            _pre_scale = _BLOCK_REPLAYER.compute_scale(dxf_block_name, symbol.height)
-                            offset_y = (top_pin_x - min(all_x)) * _pre_scale
-                            target_pin = (comp.x, comp.y + offset_y)
-                else:
-                    # Align block bottom to body bottom (comp.y), NOT stub pin.
-                    # Layout/connection coordinates reference body edges.
-                    # Stub lines are drawn separately below.
-                    proc_pins = symbol.vertical_pins(comp.x, comp.y)
-                    cx_center = comp.x + symbol.width / 2
-                    if "bottom" in proc_pins:
-                        target_pin = (cx_center, comp.y)
-                        pin_name = "bottom"
-                    elif "top" in proc_pins:
-                        target_pin = (cx_center, comp.y + symbol.height)
-                        pin_name = "top"
-                    else:
-                        target_pin = (comp.x, comp.y)
-                        pin_name = "bottom"
-                    rotation = 90.0 if native_horiz else 0.0
-                try:
-                    # Native-horizontal blocks in horizontal placement:
-                    # scale by h_extent / pin_span to fit the layout slot.
-                    # pin_span accounts for pins extending beyond the body
-                    # (e.g. IEC ISOLATOR left=-70.8, right=638.6 vs body=567.8).
-                    if native_horiz and use_horizontal:
-                        block_w = _BLOCK_REPLAYER.pin_span_horizontal_du(dxf_block_name)
-                        scale_override = symbol.h_extent / block_w if block_w > 0 else None
-                    else:
-                        scale_override = None
-
-                    if scale_override is not None:
-                        ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
-                            dxf_block_name, target_pin, pin_name,
-                            scale=scale_override, rotation=rotation,
-                        )
-                    else:
-                        ix, iy, scale = _BLOCK_REPLAYER.compute_aligned_insertion(
-                            dxf_block_name, target_pin, pin_name,
-                            target_height_mm=symbol.height, rotation=rotation,
-                        )
-                except ValueError:
-                    ix, iy = comp.x, comp.y
-                    block_height_du = _BLOCK_REPLAYER.block_height_du(dxf_block_name)
-                    scale = symbol.height / (block_height_du or _DXF_BLOCK_HEIGHTS.get(dxf_block_name, 597.82))
-                _BLOCK_REPLAYER.draw(
-                    backend, dxf_block_name, ix, iy,
-                    scale=scale, rotation=rotation, layer="SLD_SYMBOLS",
-                )
-                block_used = True
-
-                # DXF blocks don't include stub lines (body-edge-to-pin lines).
-                # The layout engine relies on stub overlap for visual continuity
-                # between adjacent spine components. Draw stubs programmatically.
-                # Only for circuit breaker symbols — blocks like DP ISOL already
-                # include their own connection geometry (L-shaped stem).
-                _CB_BLOCKS = {"MCCB", "RCCB"}
-                if dxf_block_name in _CB_BLOCKS:
-                    stub = getattr(symbol, '_stub', 2.0)
-                    if not use_horizontal:
-                        # Vertical block: stubs at top and bottom
-                        cx_stub = comp.x + symbol.width / 2
-                        backend.set_layer("SLD_CONNECTIONS")
-                        backend.add_line(
-                            (cx_stub, comp.y),
-                            (cx_stub, comp.y - stub),
-                        )
-                        backend.add_line(
-                            (cx_stub, comp.y + symbol.height),
-                            (cx_stub, comp.y + symbol.height + stub),
-                        )
-                    else:
-                        cy_stub = comp.y
-                        h_ext = getattr(symbol, 'h_extent', symbol.height)
-                        backend.set_layer("SLD_CONNECTIONS")
-                        backend.add_line(
-                            (comp.x, cy_stub),
-                            (comp.x - stub, cy_stub),
-                        )
-                        backend.add_line(
-                            (comp.x + h_ext, cy_stub),
-                            (comp.x + h_ext + stub, cy_stub),
-                        )
-
-                # DXF breaker blocks don't include trip mechanism arrows.
-                # Draw arrow programmatically for sub-circuit MCBs (vertical).
-                if (dxf_block_name in _CB_BLOCKS
-                        and not use_horizontal
-                        and isinstance(symbol, RealCircuitBreaker)
-                        and not trip_kwargs.get("skip_trip_arrow", False)):
-                    _draw_trip_arrow(backend, symbol, comp.x, comp.y,
-                                     dxf_block_name=dxf_block_name)
-
-        # Fallback: procedural symbol rendering
-        if not block_used:
-            if use_horizontal:
-                if getattr(comp, 'no_right_stub', False):
-                    trip_kwargs['no_right_stub'] = True
-                symbol.draw_horizontal(backend, comp.x, comp.y, **trip_kwargs)
-            else:
-                symbol.draw(backend, comp.x, comp.y, **trip_kwargs)
-
-        # Enclosed isolator: draw enclosure box around block-rendered isolator
-        if block_used and getattr(comp, 'enclosed', False):
-            pad = 1.0
-            sw = getattr(symbol, 'width', 6)
-            sh = getattr(symbol, 'height', 12)
-            bx, by = comp.x, comp.y
-            backend.set_layer("SLD_SYMBOLS")
-            backend.add_lwpolyline([
-                (bx - pad, by - pad), (bx + sw + pad, by - pad),
-                (bx + sw + pad, by + sh + pad), (bx - pad, by + sh + pad),
-            ], close=True)
+        # Unified render — Symbol handles block vs procedural internally
+        symbol.render(
+            backend, comp.x, comp.y,
+            horizontal=use_horizontal,
+            skip_trip_arrow=skip_trip if symbol.is_circuit_breaker else False,
+            enclosed=comp.enclosed if symbol.is_isolator else False,
+            no_right_stub=getattr(comp, 'no_right_stub', False),
+        )
 
         # Chain arrow for ditto MCBs
-        if comp_idx in ditto_prev_map and isinstance(symbol, RealCircuitBreaker):
+        if comp_idx in ditto_prev_map and symbol.is_circuit_breaker:
             prev_comp = layout_result.components[ditto_prev_map[comp_idx]]
             self._draw_chain_arrow(backend, prev_comp, comp, symbol, use_horizontal)
 
@@ -798,10 +503,11 @@ class SldGenerator:
                 elif comp.symbol_name == "KWH_METER":
                     # KWH: label right of box (per reference DWG)
                     ch = 1.6
-                    rw = getattr(symbol, '_rect_w', 7.8)
-                    stub = getattr(symbol, '_stub', 2.0)
+                    _proc = symbol.procedural
+                    rw = getattr(_proc, '_rect_w', 7.8)
+                    stub = getattr(_proc, '_stub', 2.0)
                     label_x = comp.x + rw + stub + 1.5
-                    v_half = getattr(symbol, '_rect_h', 3.9) / 2
+                    v_half = getattr(_proc, '_rect_h', 3.9) / 2
                     label_y = comp.y + v_half
                     backend.add_mtext(
                         label_text, insert=(label_x, label_y), char_height=ch,
@@ -822,12 +528,8 @@ class SldGenerator:
                         char_height=ch,
                     )
             else:
-                # Phase 8A: DXF 백엔드에서 라벨을 블록 실제 폭 기준으로 배치
-                if symbol and isinstance(backend, DxfBackend):
-                    lx = self._dxf_label_offset_x(
-                        comp.symbol_name, symbol.width, symbol.height)
-                else:
-                    lx = symbol.width + 3 if symbol else 8
+                # Label X offset: Symbol handles DXF/procedural difference
+                lx = symbol.label_offset_x(backend) if symbol else 8
                 if comp.label_y_override is not None:
                     label_abs_y = comp.label_y_override
                 else:
@@ -840,12 +542,7 @@ class SldGenerator:
 
         if comp.cable_annotation:
             backend.set_layer("SLD_ANNOTATIONS")
-            # Phase 8A: DXF 백엔드에서 케이블 주석도 블록 폭 기준
-            if symbol and isinstance(backend, DxfBackend):
-                cable_offset_x = self._dxf_label_offset_x(
-                    comp.symbol_name, symbol.width, symbol.height)
-            else:
-                cable_offset_x = symbol.width + 3 if symbol else 8
+            cable_offset_x = symbol.label_offset_x(backend) if symbol else 8
             backend.add_mtext(
                 comp.cable_annotation,
                 insert=(comp.x + cable_offset_x, comp.y - 2),
@@ -885,71 +582,32 @@ class SldGenerator:
         backend: DrawingBackend,
         prev_comp: PlacedComponent,
         curr_comp: PlacedComponent,
-        symbol: RealCircuitBreaker,
+        symbol: Symbol,
         use_horizontal: bool = False,
     ) -> None:
         """Draw a connecting chain arrow from previous MCB's arc to current MCB's arc.
 
-        LEW convention for identical breakers: instead of separate ditto arrows,
-        the arcs are connected by arrows in a chain pattern:
-          arrow→arc→arrow→arc→arrow→arc
-        Each connecting arrow's shaft starts at the previous arc surface and
-        its arrowhead touches the current arc surface.
+        Uses Symbol.get_arc_midpoint() — single source of truth for arc geometry.
         """
-        w, h = symbol.width, symbol.height
+        if use_horizontal:
+            return
 
-        # Use DXF block arc extent if available (matches _draw_trip_arrow logic)
-        arc_extent = symbol._arc_r
-        dxf_block_name = self._get_dxf_block_name(curr_comp.symbol_name)
-        if dxf_block_name and _BLOCK_REPLAYER is not None:
-            blk_data = _BLOCK_REPLAYER._blocks.get(dxf_block_name, {})
-            if blk_data:
-                pin_x = blk_data.get("pins", {}).get("bottom", [0, 0])[0]
-                scale = _BLOCK_REPLAYER.compute_scale(dxf_block_name, symbol.height)
-                for ent in blk_data.get("entities", []):
-                    if ent["type"] == "LWPOLYLINE" and ent.get("bulges"):
-                        bulge = ent["bulges"][0]
-                        if abs(bulge) > 0.01:
-                            pts = ent["points"]
-                            chord = math.sqrt(
-                                (pts[1][0] - pts[0][0]) ** 2 + (pts[1][1] - pts[0][1]) ** 2
-                            )
-                            sagitta = abs(bulge) * chord / 2
-                            chord_mid_x = (pts[0][0] + pts[1][0]) / 2
-                            arc_mid_x = chord_mid_x + sagitta
-                            arc_extent = (arc_mid_x - pin_x) * scale
-                            break
+        prev_arc = symbol.get_arc_midpoint(prev_comp.x, prev_comp.y)
+        curr_arc = symbol.get_arc_midpoint(curr_comp.x, curr_comp.y)
+        if not prev_arc or not curr_arc:
+            return
 
         backend.set_layer("SLD_SYMBOLS")
+        backend.add_line(prev_arc, curr_arc)
 
-        if use_horizontal:
-            pass
-        else:
-            # Arc midpoint for each MCB = cx + arc_extent (rightmost point)
-            prev_cx = prev_comp.x + w / 2
-            curr_cx = curr_comp.x + w / 2
-            prev_arc_my = prev_comp.y + h / 2
-            curr_arc_my = curr_comp.y + h / 2
-
-            prev_arc_mx = prev_cx + arc_extent
-            curr_arc_mx = curr_cx + arc_extent
-
-            # Shaft: previous arc midpoint → current arc midpoint
-            backend.add_line(
-                (prev_arc_mx, prev_arc_my),
-                (curr_arc_mx, curr_arc_my),
-            )
-
-            # Arrowhead at current arc midpoint (pointing right → toward arc)
-            head_len = 1.2
-            backend.add_line(
-                (curr_arc_mx, curr_arc_my),
-                (curr_arc_mx - head_len, curr_arc_my + 0.6),
-            )
-            backend.add_line(
-                (curr_arc_mx, curr_arc_my),
-                (curr_arc_mx - head_len, curr_arc_my - 0.6),
-            )
+        # Arrowhead at current arc midpoint (pointing right → toward arc)
+        head_len = 1.2
+        backend.add_line(
+            curr_arc, (curr_arc[0] - head_len, curr_arc[1] + 0.6),
+        )
+        backend.add_line(
+            curr_arc, (curr_arc[0] - head_len, curr_arc[1] - 0.6),
+        )
 
     def _draw_breaker_block_label(
         self,
@@ -1027,7 +685,8 @@ class SldGenerator:
                 sym_w, sym_h = self._get_breaker_dims(comp.breaker_type_str)
                 if isinstance(backend, DxfBackend):
                     sym_name = f"CB_{comp.breaker_type_str}" if comp.breaker_type_str else comp.symbol_name
-                    lx = self._dxf_label_offset_x(sym_name, sym_w, sym_h)
+                    _sym = self._get_symbol(sym_name)
+                    lx = _sym.label_offset_x(backend) if _sym else sym_w + 3
                     base_x = comp.x + lx
                 elif comp.breaker_type_str in ("MCCB", "ACB"):
                     base_x = comp.x + 7

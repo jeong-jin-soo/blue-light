@@ -920,3 +920,215 @@ class TestFeederDetection:
         ]
         topology = _build_db_hierarchy(db_list)
         assert topology == "parallel"
+
+
+# ---------------------------------------------------------------------------
+# B1: DistributionBoardData 5-field extraction (incoming_breaker, etc.)
+# ---------------------------------------------------------------------------
+
+class TestB1FieldExtraction:
+    """B1 fix: 5 fields in DistributionBoardData are extracted and propagated."""
+
+    def test_distribution_board_data_has_new_fields(self):
+        """DistributionBoardData schema includes 5 new fields."""
+        from app.sld.extraction_schema import DistributionBoardData
+        fields = set(DistributionBoardData.model_fields.keys())
+        assert "incoming_breaker" in fields
+        assert "feeder_breaker" in fields
+        assert "feeder_cable" in fields
+        assert "main_mcb" in fields
+        assert "meter_board" in fields
+
+    def test_normalize_populates_incoming_breaker(self):
+        """normalize_to_generation_format propagates incoming_breaker."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    incoming_breaker=BreakerSpec(type="MCCB", rating_a=150, poles="TPN", ka_rating=35),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        assert len(dbs) == 1
+        assert "incoming_breaker" in dbs[0]
+        assert dbs[0]["incoming_breaker"]["rating"] == 150
+        assert dbs[0]["incoming_breaker"]["type"] == "MCCB"
+
+    def test_normalize_populates_feeder_breaker(self):
+        """normalize_to_generation_format propagates feeder_breaker."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+                DistributionBoardData(
+                    name="DB2",
+                    fed_from="MSB",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    feeder_breaker=BreakerSpec(type="MCCB", rating_a=80, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        db2 = next(d for d in dbs if d["name"] == "DB2")
+        assert "feeder_breaker" in db2
+        assert db2["feeder_breaker"]["rating"] == 80
+
+    def test_normalize_populates_meter_board(self):
+        """normalize_to_generation_format propagates meter_board."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    meter_board="CT METER BOARD",
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        assert dbs[0].get("meter_board") == "CT METER BOARD"
+
+    def test_missing_fields_not_in_output(self):
+        """If DistributionBoardData field is None, it should not appear in output dict."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        # None fields should not appear in the dict
+        assert "incoming_breaker" not in dbs[0]
+        assert "feeder_breaker" not in dbs[0]
+        assert "feeder_cable" not in dbs[0]
+
+
+# ---------------------------------------------------------------------------
+# B2: Topology auto-detection fallback
+# ---------------------------------------------------------------------------
+
+class TestB2TopologyAutoDetect:
+    """B2 fix: db_topology omitted for parallel → engine auto-detects."""
+
+    def test_parallel_topology_not_set(self):
+        """When no hierarchy detected, db_topology should be absent."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="DB1",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+                DistributionBoardData(
+                    name="DB2",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        # No hierarchy → db_topology should be absent (let engine auto-detect)
+        assert "db_topology" not in result
+
+    def test_hierarchical_topology_set(self):
+        """When hierarchy detected (fed_from set), db_topology = 'hierarchical'."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format, OutgoingCircuit,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    outgoing_circuits=[
+                        OutgoingCircuit(description="Feeder to DB2", breaker=BreakerSpec(type="MCB", rating_a=63)),
+                    ],
+                ),
+                DistributionBoardData(
+                    name="DB2",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        assert result.get("db_topology") == "hierarchical"
+
+    def test_engine_auto_detects_from_fed_from(self):
+        """Engine auto-detects hierarchy when db_topology is absent."""
+        reqs = {
+            "supply_type": "three_phase",
+            "kva": 100,
+            "voltage": 400,
+            "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            "metering": "ct_meter",
+            "busbar_rating": 200,
+            # Note: no db_topology key — engine should auto-detect
+            "distribution_boards": [
+                {
+                    "name": "MSB",
+                    "breaker": {"type": "MCCB", "rating": 100, "poles": "TPN"},
+                    "busbar_rating": 100,
+                    "sub_circuits": [
+                        {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "Light 3", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "name": "DB2",
+                    "fed_from": "MSB",
+                    "breaker": {"type": "MCB", "rating": 63, "poles": "TPN"},
+                    "busbar_rating": 100,
+                    "sub_circuits": [
+                        {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "Power 3", "breaker_type": "MCB", "breaker_rating": 20},
+                    ],
+                },
+            ],
+        }
+        result = compute_layout(reqs)
+        assert result.db_count == 2
+        assert len(result.components) > 0

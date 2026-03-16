@@ -34,8 +34,8 @@ from app.sld.sld_spec import (
 class TestIncomingSpecTable:
     """Verify INCOMING_SPEC matches Excel 'Table form' data exactly."""
 
-    def test_all_15_tiers_present(self):
-        expected = [32, 40, 63, 80, 100, 150, 200, 250, 300, 400, 630, 800, 1000, 1200, 1600]
+    def test_all_16_tiers_present(self):
+        expected = [32, 40, 63, 80, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1200, 1600]
         assert sorted(INCOMING_SPEC.keys()) == expected
 
     def test_cable_sizes_match_excel(self):
@@ -51,6 +51,7 @@ class TestIncomingSpecTable:
             250: "95",
             300: "120",
             400: "185",
+            500: "240",
             630: "300",
             800: "500",
             1000: "500",
@@ -118,8 +119,8 @@ class TestIncomingSpecTable:
 class TestOutgoingSpecTable:
     """Verify OUTGOING_SPEC matches Excel 'Table form' OUTGOING section."""
 
-    def test_all_18_tiers_present(self):
-        expected = [6, 10, 16, 20, 32, 63, 80, 100, 150, 200, 250, 300, 400, 630, 800, 1000, 1200, 1600]
+    def test_all_23_tiers_present(self):
+        expected = [5, 6, 10, 13, 15, 16, 20, 25, 32, 63, 80, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1200, 1600]
         assert sorted(OUTGOING_SPEC.keys()) == expected
 
     def test_cable_sizes_match_excel(self):
@@ -140,7 +141,7 @@ class TestOutgoingSpecTable:
 
     def test_lookup_non_standard_rounds_up(self):
         """Non-standard ratings should round up to next tier."""
-        assert lookup_outgoing_cable(15) == 2.5   # next ≥ 15 is 16 → 2.5
+        assert lookup_outgoing_cable(14) == 1.5    # next ≥ 14 is 15 → 1.5
         assert lookup_outgoing_cable(50) == 16     # next ≥ 50 is 63 → 16
 
     def test_lookup_exceeds_max_raises(self):
