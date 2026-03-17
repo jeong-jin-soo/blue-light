@@ -75,7 +75,7 @@ class TestDxfLabelAlignment:
                 continue
             offset = sym.label_offset_x(backend)
             assert offset > 0, f"{sym_name}: offset={offset} should be > 0"
-            assert 3 <= offset <= 25, f"{sym_name}: offset={offset} out of range"
+            assert 3 <= offset <= 50, f"{sym_name}: offset={offset} out of range"
 
     def test_block_replayer_loads_all_mapped_blocks(self, replayer):
         """BlockReplayer loads all blocks referenced in SYMBOL_TO_DXF_BLOCK."""

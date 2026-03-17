@@ -139,10 +139,10 @@
     "description": "Selector Switch (ASS/VSS) — two opposing arcs. Viewport-corrected."
   },
   "ELR": {
-    "width_mm": 7.8,
-    "height_mm": 3.9,
+    "width_mm": 12.0,
+    "height_mm": 6.0,
     "stub_mm": 2.0,
-    "description": "Earth Leakage Relay — rectangular device block. Sized to match KWH meter box."
+    "description": "Earth Leakage Relay — rectangular device block. Enlarged to match reference DWG proportions (ELR box is visually prominent)."
   },
   "POTENTIAL_FUSE": {
     "width_mm": 2.0,
@@ -153,11 +153,11 @@
     "description": "Potential fuse / 2A fuse link (○×○ pattern). Viewport-corrected."
   },
   "INDICATOR_LIGHTS": {
-    "width_mm": 15.0,
-    "height_mm": 5.0,
-    "circle_radius_mm": 1.5,
+    "width_mm": 16.0,
+    "height_mm": 6.0,
+    "circle_radius_mm": 2.0,
     "circle_count": 3,
-    "circle_spacing_mm": 5.0,
-    "description": "3-phase indicator lights (○-○-○). Sized to match reference DWG LED IND LTG block — circles same scale as fuse/breaker contact symbols. circle_spacing_mm is center-to-center (edge gap = 5.0 - 2*1.5 = 2.0mm)."
+    "circle_spacing_mm": 6.0,
+    "description": "3-phase indicator lights (○-○-○). LED circles ~4x fuse circle radius (0.6mm). circle_spacing_mm is center-to-center (edge gap = 7.5 - 2*2.5 = 2.5mm)."
   }
 }

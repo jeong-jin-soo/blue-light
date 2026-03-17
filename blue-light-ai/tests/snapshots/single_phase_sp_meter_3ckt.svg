@@ -41,7 +41,7 @@
   <circle cx="209.82" cy="143.65" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="144.31" x2="210.00" y2="146.31" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="136.31" x2="210.00" y2="134.31" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="215.50" y="139.59" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">63A DP MCB (10kA)</text>
+  <text x="215.50" y="139.59" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">63A DP MCB (10KA)</text>
   <path d="M 211.17,133.57 A 4.22,4.22 0 0,0 211.17,126.05" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="209.99" cy="126.05" r="0.74" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="210.01" cy="133.57" r="0.74" stroke="#000000" stroke-width="0.25" fill="none" />

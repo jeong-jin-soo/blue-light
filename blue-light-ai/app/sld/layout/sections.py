@@ -183,7 +183,10 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
         elif isinstance(elr_cfg, str):
             ctx.elr_spec = elr_cfg
     ctx.voltmeter_range = metering_cfg.get("voltmeter_range", "")
-    ctx.ammeter_range = metering_cfg.get("ammeter_range", "")
+    # Auto-derive ammeter range from CT ratio when not explicitly provided.
+    # e.g., CT ratio "100/5A" → ammeter range "0-100A" (primary current).
+    _explicit_ammeter = metering_cfg.get("ammeter_range", "")
+    ctx.ammeter_range = _explicit_ammeter or _derive_ammeter_range(ctx.ct_ratio)
 
 
 def _parse_incoming_cable(ctx: _LayoutContext, requirements: dict) -> None:
@@ -907,11 +910,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         ))
 
         # Branch from Protection CT (LEFT): ELR
-        # Label: "ELR" prefix + spec on next line (reference format: "ELR\P0-3A 0.2 SEC")
-        if ctx.elr_spec:
-            elr_label = f"ELR\\P{ctx.elr_spec}"
-        else:
-            elr_label = "ELR"
+        # "ELR" is drawn inside the box by the symbol itself.
+        # Label shows only the spec text to the left (reference format: "0-3A\P0.2 SEC").
+        elr_label = ctx.elr_spec if ctx.elr_spec else ""
         _place_metering_branch(
             result, cx, prot_ct_center_y, direction="left",
             components=[("ELR", elr_label, 12.0)],
@@ -945,8 +946,10 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     else:
         ct_label = SG_LOCALE.meter_board.ct_by_sp
     # --- 4. Branches from Metering CT ---
+    # Reference DWG order (bottom → top): VSS/Voltmeter below, ASS/Ammeter above.
     branch_y = metering_ct_center_y
-    ass_branch_y = branch_y + ct_to_branch_gap
+    vss_branch_y = branch_y + ct_to_branch_gap  # VSS closer to metering CT (lower)
+    ass_branch_y = (vss_branch_y + bi_y) / 2    # ASS midway to BI (higher)
 
     # Place Metering CT — label aligned with ASS branch height
     result.components.append(PlacedComponent(
@@ -955,7 +958,23 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     ))
     result.symbols_used.add("CT")
 
-    # Branch 1 (LEFT): ASS → Ammeter → (A) instrument circle
+    # Branch 1 (RIGHT): VSS → Voltmeter → (V) instrument circle
+    # Placed near Metering CT (lower position) — per reference DWG.
+    if ctx.has_voltmeter:
+        _place_metering_branch(
+            result, cx, vss_branch_y, direction="right",
+            components=[
+                ("SELECTOR_SWITCH", "VSS", 8.0),
+                ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
+                ("METER_V", "V", 5.0),
+            ],
+            arm_len=branch_arm_len, gap=branch_gap,
+        )
+        result.junction_arrows.append((cx, vss_branch_y, "right"))
+        result.symbols_used.add("METER_V")
+
+    # Branch 2 (LEFT): ASS → Ammeter → (A) instrument circle
+    # Placed midway between VSS branch and BI Connector (higher) — per reference DWG.
     if ctx.has_ammeter:
         _place_metering_branch(
             result, cx, ass_branch_y, direction="left",
@@ -968,22 +987,6 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         )
         result.junction_arrows.append((cx, ass_branch_y, "left"))
         result.symbols_used.add("METER_A")
-
-    # Branch 2 (RIGHT): VSS → Voltmeter → (V) instrument circle
-    # Placed midway between ASS branch and BI Connector — per reference DWG.
-    if ctx.has_voltmeter:
-        _branch_y = (ass_branch_y + bi_y) / 2
-        _place_metering_branch(
-            result, cx, _branch_y, direction="right",
-            components=[
-                ("SELECTOR_SWITCH", "VSS", 8.0),
-                ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
-                ("METER_V", "V", 5.0),
-            ],
-            arm_len=branch_arm_len, gap=branch_gap,
-        )
-        result.junction_arrows.append((cx, _branch_y, "right"))
-        result.symbols_used.add("METER_V")
 
     # Branch 3 (RIGHT): KWH Meter (no MCB, no right stub — per reference DWG)
     # Return line connects 3mm above ELR hook (prot_ct_center_y).
@@ -1029,6 +1032,22 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         (_kwh_bottom_cx, _kwh_return_y),
         (cx, _kwh_return_y),
     ))
+
+    # Instrument fuse (RIGHT branch below BI Connector)
+    # Reference DWG: 2A fuse for instrument protection (ammeter/voltmeter circuits).
+    # This is separate from the pre-MCCB fuse which protects voltage sensing.
+    if ctx._ct_pre_mccb_fuse:  # instrument fuse present when CT metering is active
+        _inst_fuse_y = bi_y - pf_h - 2.0  # below BI connector
+        _place_metering_branch(
+            result, cx, _inst_fuse_y, direction="right",
+            components=[
+                ("POTENTIAL_FUSE", "2A", pf_h),
+            ],
+            arm_len=8.0,
+            gap=3.0,
+        )
+        result.junction_dots.append((cx, _inst_fuse_y))
+        result.symbols_used.add("POTENTIAL_FUSE")
 
     # BI Connector — include isolator/busbar rating (e.g., "100A BI CONNECTOR")
     _bi_rating = ctx.busbar_rating or ctx.breaker_rating or 0
@@ -1350,9 +1369,9 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
 
     cb_symbol = f"CB_{breaker_type}"
     # Singapore SLD format (matching reference DXF MTEXT):
-    #   "63A TPN MCB 6kA TYPE B" or "100A TPN MCCB (35kA)"
-    # Always lowercase "kA" — verified from DXF original text.
-    _ka_suffix = "kA"
+    #   "63A TPN MCB 6KA TYPE B" or "100A TPN MCCB (35KA)"
+    # LEW convention uses uppercase "KA" — per I2R/ETR reference DWGs.
+    _ka_suffix = "KA"
     if main_breaker_char:
         main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} {breaker_fault_kA}{_ka_suffix} TYPE {main_breaker_char}"
     else:

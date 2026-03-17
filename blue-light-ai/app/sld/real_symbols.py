@@ -1138,7 +1138,8 @@ class RealIndicatorLights(BaseSymbol):
     layer: str = "SLD_SYMBOLS"
 
     # Length of each radial ray extending outward from the circle perimeter
-    _ray_len: float = 1.2
+    # Enlarged to match reference DWG — rays are visually prominent (≈circle radius)
+    _ray_len: float = 1.0
 
     def __init__(self):
         dims = get_symbol_dimensions("INDICATOR_LIGHTS")

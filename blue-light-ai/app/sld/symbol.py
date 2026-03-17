@@ -45,8 +45,7 @@ SYMBOL_TO_DXF_BLOCK: dict[str, str] = {
     "ISOLATOR": "IEC ISOLATOR",
     "DP_ISOL_DEVICE": "DP ISOL",
     "3P_ISOLATOR": "3P ISOL",
-    # CT metering
-    "CT": "SLD-CT",
+    # CT: procedural rendering only — DXF block "SLD-CT" renders incorrectly (not hook shape).
     # Meters
     "KWH_METER": "KWH_METER",
     "VOLTMETER": "VOLTMETER",
@@ -55,8 +54,8 @@ SYMBOL_TO_DXF_BLOCK: dict[str, str] = {
     "FUSE": "2A FUSE",
     "POTENTIAL_FUSE": "2A FUSE",
     "SELECTOR_SWITCH": "SS",
-    "ELR": "EF",
-    "INDICATOR_LIGHTS": "LED IND LTG",
+    # ELR: procedural rendering only — DXF block "EF" has wrong dimensions.
+    # INDICATOR_LIGHTS: procedural rendering only — DXF block "LED IND LTG" has wrong dimensions.
 }
 
 # DXF block names that represent circuit breakers needing stub lines + trip arrows.
