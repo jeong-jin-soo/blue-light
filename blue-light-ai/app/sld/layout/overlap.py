@@ -1420,23 +1420,29 @@ def _add_cable_leader_lines(
                         leader_end_x = rightmost_x + alt_ext
                     cable_bb = alt_bb
                 else:
-                    # Attempt 2: Y stagger (+4mm)
-                    stagger_y = min(effective_leader_y + 4.0, max_leader_y)
-                    # Try original direction with stagger
-                    if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs, text_x=text_x):
-                        effective_leader_y = stagger_y
-                    # Try flipped direction with stagger
-                    elif not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs, text_x=alt_text_x):
-                        effective_leader_y = stagger_y
-                        text_on_left = alt_on_left
-                        if text_on_left:
-                            leader_start_x = leftmost_x - alt_ext
-                            leader_end_x = rightmost_x
-                        else:
-                            leader_start_x = leftmost_x
-                            leader_end_x = rightmost_x + alt_ext
-                        cable_bb = alt_bb
-                    else:
+                    # Attempt 2: Progressive Y stagger (+4, +8, +12mm)
+                    _stagger_resolved = False
+                    for _stagger_offset in (4.0, 8.0, 12.0):
+                        stagger_y = min(effective_leader_y + _stagger_offset, max_leader_y)
+                        # Try original direction with stagger
+                        if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs, text_x=text_x):
+                            effective_leader_y = stagger_y
+                            _stagger_resolved = True
+                            break
+                        # Try flipped direction with stagger
+                        if not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs, text_x=alt_text_x):
+                            effective_leader_y = stagger_y
+                            text_on_left = alt_on_left
+                            if text_on_left:
+                                leader_start_x = leftmost_x - alt_ext
+                                leader_end_x = rightmost_x
+                            else:
+                                leader_start_x = leftmost_x
+                                leader_end_x = rightmost_x + alt_ext
+                            cable_bb = alt_bb
+                            _stagger_resolved = True
+                            break
+                    if not _stagger_resolved:
                         # Attempt 3: extend leader further to push text clear
                         # Try both directions with incremental extension
                         _resolved = False
