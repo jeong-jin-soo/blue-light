@@ -1122,7 +1122,7 @@ async def extract_sld_from_text(user_input: str) -> dict:
         system_instruction=SLD_EXTRACTION_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.0,
         ),
     )
 

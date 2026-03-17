@@ -386,7 +386,7 @@ async def _call_gemini_text(text_content: str, api_key: str | None = None) -> di
         config=types.GenerateContentConfig(
             system_instruction=SCHEDULE_EXTRACTION_PROMPT,
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.0,
         ),
     )
     return json.loads(response.text)
@@ -426,7 +426,7 @@ async def _call_gemini_vision(
         config=types.GenerateContentConfig(
             system_instruction=SCHEDULE_EXTRACTION_PROMPT,
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.0,
         ),
     )
     return json.loads(response.text)

@@ -153,11 +153,11 @@
     "description": "Potential fuse / 2A fuse link (○×○ pattern). Viewport-corrected."
   },
   "INDICATOR_LIGHTS": {
-    "width_mm": 9.0,
-    "height_mm": 3.0,
-    "circle_radius_mm": 0.8,
+    "width_mm": 15.0,
+    "height_mm": 5.0,
+    "circle_radius_mm": 1.5,
     "circle_count": 3,
-    "circle_spacing_mm": 3.6,
-    "description": "3-phase indicator lights (○-○-○). Viewport-corrected. circle_spacing_mm is center-to-center (edge gap = 3.6 - 2*0.8 = 2.0mm)."
+    "circle_spacing_mm": 5.0,
+    "description": "3-phase indicator lights (○-○-○). Sized to match reference DWG LED IND LTG block — circles same scale as fuse/breaker contact symbols. circle_spacing_mm is center-to-center (edge gap = 5.0 - 2*1.5 = 2.0mm)."
   }
 }
