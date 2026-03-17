@@ -216,8 +216,8 @@ class TestComputeBoundingBox:
         comp = PlacedComponent(symbol_name="KWH_METER", x=50, y=100)
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        assert bb.width == 16.0
-        assert bb.height == 12.0
+        assert bb.width == 14.0
+        assert bb.height == 10.0
 
     def test_label_horizontal(self):
         comp = PlacedComponent(

@@ -66,8 +66,8 @@
     "description": "Earth Leakage Circuit Breaker (same symbol as RCCB). Viewport-corrected."
   },
   "KWH_METER": {
-    "width_mm": 16.0,
-    "height_mm": 12.0,
+    "width_mm": 14.0,
+    "height_mm": 10.0,
     "circle_radius_mm": 4.5,
     "rect_ratio": 2.0,
     "stub_mm": 2.0,
@@ -118,25 +118,23 @@
     "description": "BI Connector — rectangular block (IEC busbar interconnect). Viewport-corrected."
   },
   "AMMETER": {
-    "radius_mm": 2.5,
+    "radius_mm": 2.0,
     "stub_mm": 2.0,
     "letter": "A",
-    "description": "Ammeter — circle with letter A (IEC 60617). Viewport-corrected."
+    "description": "Ammeter — circle with letter A (IEC 60617). Same radius as selector switch (r=2mm)."
   },
   "VOLTMETER": {
-    "radius_mm": 2.5,
+    "radius_mm": 2.0,
     "stub_mm": 2.0,
     "letter": "V",
-    "description": "Voltmeter — circle with letter V (IEC 60617). Viewport-corrected."
+    "description": "Voltmeter — circle with letter V (IEC 60617). Same radius as selector switch (r=2mm)."
   },
   "SELECTOR_SWITCH": {
     "width_mm": 4.0,
-    "height_mm": 5.5,
-    "arc_radius_mm": 0.6,
-    "arc_start_deg": 304,
-    "arc_end_deg": 56,
+    "height_mm": 4.0,
+    "radius_mm": 2.0,
     "stub_mm": 2.0,
-    "description": "Selector Switch (ASS/VSS) — two opposing arcs. Viewport-corrected."
+    "description": "Selector Switch (ASS/VSS) — circle with diagonal slash (top-right to bottom-left). Same radius as LED indicator (r=2mm)."
   },
   "ELR": {
     "width_mm": 12.0,

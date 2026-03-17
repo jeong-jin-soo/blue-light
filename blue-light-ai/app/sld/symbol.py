@@ -48,12 +48,14 @@ SYMBOL_TO_DXF_BLOCK: dict[str, str] = {
     # CT: procedural rendering only — DXF block "SLD-CT" renders incorrectly (not hook shape).
     # Meters
     "KWH_METER": "KWH_METER",
-    "VOLTMETER": "VOLTMETER",
+    # VOLTMETER: procedural rendering only — consistent body-edge convention with AMMETER.
+    # "VOLTMETER": "VOLTMETER",
     # Protection / auxiliaries
     "EARTH": "EARTH",
     "FUSE": "2A FUSE",
     "POTENTIAL_FUSE": "2A FUSE",
-    "SELECTOR_SWITCH": "SS",
+    # SELECTOR_SWITCH: procedural rendering only — DXF block "SS" renders dual-arc instead of circle+slash.
+    # "SELECTOR_SWITCH": "SS",
     # ELR: procedural rendering only — DXF block "EF" has wrong dimensions.
     # INDICATOR_LIGHTS: procedural rendering only — DXF block "LED IND LTG" has wrong dimensions.
 }
@@ -136,6 +138,7 @@ class Symbol(ABC):
         skip_trip_arrow: bool = False,
         enclosed: bool = False,
         no_right_stub: bool = False,
+        no_left_stub: bool = False,
     ) -> None:
         """Draw the symbol onto *backend* at the given position.
 
@@ -146,6 +149,7 @@ class Symbol(ABC):
             skip_trip_arrow: If True, omit the trip arrow (for ditto marks).
             enclosed: If True, draw enclosure box around symbol.
             no_right_stub: If True, skip the right-side connection stub.
+            no_left_stub: If True, skip the left-side connection stub.
         """
         ...
 
@@ -222,7 +226,8 @@ class ProceduralSymbol(Symbol):
     # ── Rendering ────────────────────────────────────────────
 
     def render(self, backend, x, y, *, horizontal=False,
-               skip_trip_arrow=False, enclosed=False, no_right_stub=False):
+               skip_trip_arrow=False, enclosed=False,
+               no_right_stub=False, no_left_stub=False):
         kwargs: dict = {}
         if self.is_circuit_breaker and skip_trip_arrow:
             kwargs["skip_trip_arrow"] = True
@@ -230,8 +235,13 @@ class ProceduralSymbol(Symbol):
             kwargs["enclosed"] = True
 
         if horizontal:
-            if no_right_stub:
+            # Only pass stub suppression kwargs if the symbol's draw_horizontal accepts them
+            import inspect
+            sig = inspect.signature(self._sym.draw_horizontal)
+            if no_right_stub and "no_right_stub" in sig.parameters:
                 kwargs["no_right_stub"] = True
+            if no_left_stub and "no_left_stub" in sig.parameters:
+                kwargs["no_left_stub"] = True
             self._sym.draw_horizontal(backend, x, y, **kwargs)
         else:
             self._sym.draw(backend, x, y, **kwargs)
@@ -313,7 +323,8 @@ class BlockSymbol(Symbol):
     # ── Rendering ────────────────────────────────────────────
 
     def render(self, backend, x, y, *, horizontal=False,
-               skip_trip_arrow=False, enclosed=False, no_right_stub=False):
+               skip_trip_arrow=False, enclosed=False,
+               no_right_stub=False, no_left_stub=False):
         native_horiz = self._replayer.is_native_horizontal(self._block_name)
 
         if horizontal:

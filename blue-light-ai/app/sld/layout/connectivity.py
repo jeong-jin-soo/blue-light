@@ -72,7 +72,9 @@ def _find_nearest_pin(
 
     for px, py, _ci, _pn in pins:
         d = math.hypot(pt[0] - px, pt[1] - py)
-        if d < _EPSILON or d >= best_dist:
+        if d < _EPSILON:
+            return None  # Already at a pin — no snapping needed.
+        if d >= best_dist:
             continue
 
         # Cross-axis check: snap must not displace the perpendicular axis too much.

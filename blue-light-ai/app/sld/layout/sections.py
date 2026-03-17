@@ -946,10 +946,10 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     else:
         ct_label = SG_LOCALE.meter_board.ct_by_sp
     # --- 4. Branches from Metering CT ---
-    # Reference DWG order (bottom → top): VSS/Voltmeter below, ASS/Ammeter above.
+    # Reference DWG order (bottom → top): VSS/Voltmeter, ASS/Ammeter, 2A fuse, BI.
     branch_y = metering_ct_center_y
     vss_branch_y = branch_y + ct_to_branch_gap  # VSS closer to metering CT (lower)
-    ass_branch_y = (vss_branch_y + bi_y) / 2    # ASS midway to BI (higher)
+    ass_branch_y = vss_branch_y + ct_to_branch_gap  # ASS just above VSS
 
     # Place Metering CT — label aligned with ASS branch height
     result.components.append(PlacedComponent(
@@ -958,7 +958,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     ))
     result.symbols_used.add("CT")
 
-    # Branch 1 (RIGHT): VSS → Voltmeter → (V) instrument circle
+    # Branch 1 (RIGHT): VSS → Voltmeter (circle with "V" inside + range label)
     # Placed near Metering CT (lower position) — per reference DWG.
     if ctx.has_voltmeter:
         _place_metering_branch(
@@ -966,27 +966,28 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             components=[
                 ("SELECTOR_SWITCH", "VSS", 8.0),
                 ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
-                ("METER_V", "V", 5.0),
             ],
             arm_len=branch_arm_len, gap=branch_gap,
         )
         result.junction_arrows.append((cx, vss_branch_y, "right"))
-        result.symbols_used.add("METER_V")
 
-    # Branch 2 (LEFT): ASS → Ammeter → (A) instrument circle
-    # Placed midway between VSS branch and BI Connector (higher) — per reference DWG.
+    # Branch 2 (LEFT): ASS → Ammeter (circle with "A" inside + range label)
+    # Placed just above VSS — per reference DWG.
+    # ASS is positioned at the midpoint between ammeter and CT hook (spine).
+    # Both ASS and ammeter have r=2mm (body width=4mm).
+    # Midpoint condition: arm = gap + 2 → arm=9, gap=7 gives
+    #   ASS center = -(9+2)= -11,  Ammeter center = -(9+4+7+2)= -22
+    #   midpoint(0, -22) = -11 = ASS center ✓
     if ctx.has_ammeter:
         _place_metering_branch(
             result, cx, ass_branch_y, direction="left",
             components=[
                 ("SELECTOR_SWITCH", "ASS", 8.0),
                 ("AMMETER", ctx.ammeter_range or "0-500A", 7.6),
-                ("METER_A", "A", 5.0),
             ],
-            arm_len=branch_arm_len, gap=branch_gap,
+            arm_len=9.0, gap=7.0,
         )
         result.junction_arrows.append((cx, ass_branch_y, "left"))
-        result.symbols_used.add("METER_A")
 
     # Branch 3 (RIGHT): KWH Meter (no MCB, no right stub — per reference DWG)
     # Return line connects 3mm above ELR hook (prot_ct_center_y).
@@ -997,8 +998,10 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     _kwh_hp = _kwh_sym.horizontal_pins(0, 0)
 
     _kwh_return_y = prot_ct_center_y + 3.0      # 3mm above ELR hook
-    # KWH branch Y: box bottom must clear return line by ≥1.5mm
-    _kwh_branch_y = _kwh_return_y + _kwh_rect_h / 2 + 1.5
+    # KWH branch Y: box bottom → return line drop = ELR box height (6mm)
+    # so the vertical line below KWH matches ELR box proportions.
+    _elr_box_h = 6.0  # ELR box height from real_symbol_paths.json
+    _kwh_branch_y = _kwh_return_y + _kwh_rect_h / 2 + _elr_box_h
 
     _kwh_label = "SPPG\\PKWH METER" if ctx.supply_source != "landlord" else "KWH METER"
 
@@ -1037,7 +1040,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # Reference DWG: 2A fuse for instrument protection (ammeter/voltmeter circuits).
     # This is separate from the pre-MCCB fuse which protects voltage sensing.
     if ctx._ct_pre_mccb_fuse:  # instrument fuse present when CT metering is active
-        _inst_fuse_y = bi_y - pf_h - 2.0  # below BI connector
+        _inst_fuse_y = (ass_branch_y + bi_y) / 2  # midpoint between ASS and BI
         _place_metering_branch(
             result, cx, _inst_fuse_y, direction="right",
             components=[
@@ -1112,12 +1115,22 @@ def _place_metering_branch(
         else:  # left: symbol extends leftward
             comp_x = x - w
 
+        is_last = (i == len(components) - 1)
+        # Last component on branch: suppress outer stub (no dangling line)
+        comp_kwargs = {}
+        if is_last:
+            if direction == "left":
+                comp_kwargs["no_left_stub"] = True
+            else:
+                comp_kwargs["no_right_stub"] = True
+
         result.components.append(PlacedComponent(
             symbol_name=symbol_name,
             x=comp_x,
             y=branch_y,
             label=label,
             rotation=90.0,
+            **comp_kwargs,
         ))
         result.symbols_used.add(symbol_name.replace("CB_", ""))
 
@@ -1125,7 +1138,7 @@ def _place_metering_branch(
         x = x + sign * w
 
         # Gap connection to next component (if not last)
-        if i < len(components) - 1:
+        if not is_last:
             x_next = x + sign * gap
             result.connections.append(((x, branch_y), (x_next, branch_y)))
             x = x_next

@@ -727,15 +727,16 @@ class RealMeter(BaseSymbol):
         backend.add_line((cx, cy + r), (cx, cy + r + self._stub))
         backend.add_line((cx, cy - r), (cx, cy - r - self._stub))
 
-    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw_horizontal(self, backend: DrawingBackend, x: float, y: float,
+                         *, no_left_stub: bool = False, no_right_stub: bool = False) -> None:
         """Draw horizontally — connections left/right.
 
-        x: leftmost point of the horizontal extent (circle left edge - stub)
+        x: left edge of body (circle left edge). NOT stub tip.
         y: vertical center line of the branch.
+        Stubs extend outward from circle edges, overlapping with connection lines.
         """
         r = self._radius
-        # Center of circle: stub + radius from left edge
-        cx = x + self._stub + r
+        cx = x + r  # circle center
         cy = y
 
         backend.set_layer(self.layer)
@@ -746,25 +747,27 @@ class RealMeter(BaseSymbol):
         ch = r * 1.2
         backend.add_mtext(self._letter, insert=(cx - ch * 0.3, cy + ch * 0.4), char_height=ch)
 
-        # Connection stubs (horizontal)
+        # Connection stubs — from circle edge outward
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx - r, cy), (cx - r - self._stub, cy))  # left stub
-        backend.add_line((cx + r, cy), (cx + r + self._stub, cy))  # right stub
+        if not no_left_stub:
+            backend.add_line((cx - r, cy), (x - self._stub, cy))      # left stub
+        if not no_right_stub:
+            backend.add_line((cx + r, cy), (x + 2 * r + self._stub, cy))  # right stub
 
     def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
-        """x is the leftmost extent (left stub end)."""
+        """x = left edge of body (circle left edge). Stubs extend beyond."""
         r = self._radius
         return {
-            "left": (x, y),
-            "right": (x + 2 * self._stub + 2 * r, y),
+            "left": (x - self._stub, y),
+            "right": (x + 2 * r + self._stub, y),
         }
 
 
 class RealSelectorSwitch(BaseSymbol):
     """Selector Switch (ASS/VSS) at real proportions.
 
-    DXF reference: two opposing arcs, r=0.85mm, sweep 304°→56°.
-    IEC 60617 symbol for ammeter/voltmeter selector switch.
+    Reference DWG: circle with diagonal slash (top-right to bottom-left).
+    Same radius as LED indicator (r=2mm). Label placed above the circle.
     Horizontal mode: used on branches with left/right connections.
     """
 
@@ -775,9 +778,7 @@ class RealSelectorSwitch(BaseSymbol):
         dims = get_symbol_dimensions("SELECTOR_SWITCH")
         self.width = dims["width_mm"]
         self.height = dims["height_mm"]
-        self._arc_r = dims["arc_radius_mm"]
-        self._arc_start = dims["arc_start_deg"]
-        self._arc_end = dims["arc_end_deg"]
+        self._radius = dims["radius_mm"]
         self._stub = dims["stub_mm"]
 
         cx = self.width / 2
@@ -789,76 +790,62 @@ class RealSelectorSwitch(BaseSymbol):
             "label_right": (self.width + 2, self.height / 2),
         }
 
+    def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
+        """Return left/right connection points for horizontal layout.
+
+        Convention: x = left edge of body (circle left edge).
+        Stubs extend beyond body edges, overlapping with connection lines.
+        """
+        r = self._radius
+        stub = self._stub
+        return {
+            "left": (x - stub, y),
+            "right": (x + 2 * r + stub, y),
+        }
+
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         """Draw vertically — connections top/bottom."""
         cx = x + self.width / 2
         cy = y + self.height / 2
-        r = self._arc_r
-        gap = 1.5  # gap between the two arc centers
+        r = self._radius
 
         backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=r)
+        # Diagonal slash: visually ╱ (top-right → bottom-left).
+        # DXF Y-up, SVG flips → DXF (right,up)→(left,down) = SVG ╱.
+        import math
+        d = r * math.cos(math.radians(45))
+        backend.add_line((cx + d, cy + d), (cx - d, cy - d))
 
-        # Top arc (opening upward)
-        backend.add_arc(
-            center=(cx, cy + gap / 2),
-            radius=r,
-            start_angle=self._arc_start,
-            end_angle=self._arc_end,
-        )
-        # Bottom arc (opening downward — mirrored)
-        backend.add_arc(
-            center=(cx, cy - gap / 2),
-            radius=r,
-            start_angle=(self._arc_start + 180) % 360,
-            end_angle=(self._arc_end + 180) % 360,
-        )
-
-        # Vertical connection lines through the switch
-        backend.add_line((cx, y), (cx, cy - gap / 2 - r))
-        backend.add_line((cx, cy + gap / 2 + r), (cx, y + self.height))
-
-        # Connection stubs
+        # Connection stubs (vertical)
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
-        backend.add_line((cx, y), (cx, y - self._stub))
+        backend.add_line((cx, cy + r), (cx, y + self.height + self._stub))
+        backend.add_line((cx, cy - r), (cx, y - self._stub))
 
     def draw_horizontal(self, backend: DrawingBackend, x: float, y: float) -> None:
         """Draw horizontally — connections left/right.
 
-        x: leftmost point of the horizontal extent
-        y: vertical center line of the branch.
+        x: left edge of body (circle left edge). NOT stub tip.
+        Stubs extend LEFT of x and RIGHT of x+2r, overlapping with
+        connection lines drawn by _place_metering_branch.
         """
-        h_extent = self.height  # use height as horizontal span
-        cx = x + h_extent / 2
+        r = self._radius
+        stub = self._stub
+        cx = x + r         # circle center
         cy = y
-        r = self._arc_r
-        gap = 1.5
 
         backend.set_layer(self.layer)
+        backend.add_circle((cx, cy), radius=r)
+        # Diagonal slash: visually ╱ (top-right → bottom-left).
+        # DXF Y-up, SVG flips → DXF (right,up)→(left,down) = SVG ╱.
+        import math
+        d = r * math.cos(math.radians(45))
+        backend.add_line((cx + d, cy + d), (cx - d, cy - d))
 
-        # Left arc (opening left)
-        backend.add_arc(
-            center=(cx - gap / 2, cy),
-            radius=r,
-            start_angle=self._arc_start + 90,
-            end_angle=self._arc_end + 90,
-        )
-        # Right arc (opening right — mirrored)
-        backend.add_arc(
-            center=(cx + gap / 2, cy),
-            radius=r,
-            start_angle=(self._arc_start + 90 + 180) % 360,
-            end_angle=(self._arc_end + 90 + 180) % 360,
-        )
-
-        # Horizontal connection lines through the switch
-        backend.add_line((x, cy), (cx - gap / 2 - r, cy))
-        backend.add_line((cx + gap / 2 + r, cy), (x + h_extent, cy))
-
-        # Connection stubs (horizontal)
+        # Connection stubs — extend from circle edge outward
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((x + h_extent, cy), (x + h_extent + self._stub, cy))
-        backend.add_line((x, cy), (x - self._stub, cy))
+        backend.add_line((cx + r, cy), (cx + r + stub, cy))
+        backend.add_line((cx - r, cy), (x - stub, cy))
 
 
 class RealELR(BaseSymbol):

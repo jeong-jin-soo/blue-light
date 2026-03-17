@@ -112,7 +112,7 @@ _FALLBACK_SYMBOL_DIMS: dict[str, tuple[float, float]] = {
     "CB_ELCB": (6.5, 9.0),
     "CB_RCCB": (6.5, 9.0),
     "ISOLATOR": (5.5, 7.0),
-    "KWH_METER": (16.0, 12.0),
+    "KWH_METER": (14.0, 10.0),
     "CT": (2.5, 3.0),
     "EARTH": (5.5, 4.5),
     "CIRCUIT_ID_BOX": (8, 5),

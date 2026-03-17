@@ -426,6 +426,7 @@ class PlacedComponent:
     enclosed: bool = False  # True = draw enclosure box around symbol (e.g., landlord unit isolator)
     label_y_override: float | None = None  # Absolute Y for label (bypasses default calculation)
     no_right_stub: bool = False  # True = skip right connection stub (e.g., KWH in CT metering)
+    no_left_stub: bool = False   # True = skip left connection stub (e.g., last component on left branch)
     # -- DB_INFO_BOX sub-anchors (layout determines, renderer uses as-is) --
     rating_offset_y: float = -4.0    # Y offset for rating text relative to title
     title_char_height: float = 3.0   # Title text char_height (mm)

@@ -458,6 +458,7 @@ class SldGenerator:
             skip_trip_arrow=skip_trip if symbol.is_circuit_breaker else False,
             enclosed=comp.enclosed if symbol.is_isolator else False,
             no_right_stub=getattr(comp, 'no_right_stub', False),
+            no_left_stub=getattr(comp, 'no_left_stub', False),
         )
 
         # Chain arrow for ditto MCBs
@@ -511,6 +512,37 @@ class SldGenerator:
                     label_x = comp.x + rw + stub + 1.5
                     v_half = getattr(_proc, '_rect_h', 3.9) / 2
                     label_y = comp.y + v_half
+                    backend.add_mtext(
+                        label_text, insert=(label_x, label_y), char_height=ch,
+                    )
+                elif comp.symbol_name == "SELECTOR_SWITCH":
+                    # Label ABOVE the circle (per reference DWG: "ASS"/"VSS" above switch)
+                    # comp.x = body left edge (circle left edge)
+                    ch = 1.6
+                    _proc = symbol.procedural
+                    r = getattr(_proc, '_radius', 2.0)
+                    text_w_est = len(label_text) * ch * 0.6
+                    label_x = comp.x + r - text_w_est / 2
+                    label_y = comp.y + r + ch + 0.5
+                    backend.add_mtext(
+                        label_text, insert=(label_x, label_y), char_height=ch,
+                    )
+                elif comp.symbol_name in ("AMMETER", "VOLTMETER"):
+                    # Range label to the OUTER side (left for AMMETER, right for VOLTMETER)
+                    # comp.x = body left edge (circle left edge)
+                    ch = 1.6
+                    _proc = symbol.procedural
+                    r = getattr(_proc, '_radius', 2.5)
+                    stub = getattr(_proc, '_stub', 2.0)
+                    if comp.symbol_name == "AMMETER":
+                        # Left of circle (outer end of left branch)
+                        text_w_est = len(label_text) * ch * 0.6
+                        label_x = comp.x - text_w_est - 0.5
+                        label_y = comp.y + ch * 0.4
+                    else:
+                        # Right of circle (outer end of right branch)
+                        label_x = comp.x + 2 * r + stub + 1.0
+                        label_y = comp.y + ch * 0.4
                     backend.add_mtext(
                         label_text, insert=(label_x, label_y), char_height=ch,
                     )
