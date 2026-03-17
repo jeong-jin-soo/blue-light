@@ -44,7 +44,30 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 - **도메인 지식**: `blue-light-ai/data/sg-sld-domain-knowledge.md` — 싱가포르 SLD 컴포넌트 흐름 순서, 부품 역할, 전기 규정
 - **흐름 순서 명세**: `sections.py:CT_METERING_SPINE_ORDER` — CT 계측 스파인 순서 상수 (자동 테스트로 검증)
 - **자동 검증 테스트**: `tests/test_spine_flow_order.py` — 스파인 컴포넌트 배치 순서 검증
+- **섹션 완전성 테스트**: `tests/test_section_completeness.py` — 입력 조합별 섹션 렌더링 여부 자동 검증
 - **원칙**: 컴포넌트 배치 순서는 반드시 실제 전기적 흐름(전원→부하)을 따를 것. SP Group §6.9.6 참조.
+
+## SLD 비교 분석 시 필수 절차
+생성된 SLD와 LEW 레퍼런스를 비교할 때, 반드시 아래 14개 섹션을 **순서대로 전수 점검**해야 한다.
+"눈에 띄는 차이"만 찾으면 렌더링되지 않은 섹션을 놓치게 된다.
+
+**비교 순서** (하단 → 상단, 전원 → 부하):
+1. INCOMING SUPPLY — supply 라벨, AC심볼/케이블+tick, 위상선
+2. INCOMING CABLE — 케이블 사양, tick mark 위치
+3. METER BOARD *(sp_meter일 때)* — 점선 박스, ISO→KWH→MCB 배치
+4. UNIT ISOLATOR *(non-meter일 때)* — 심볼 형태(enclosed/open), 라벨 위치(좌/우), 등급
+5. OUTGOING CABLE — 아이솔레이터→DB 사이 케이블
+6. CT PRE-MCCB FUSE *(ct_meter일 때)* — 2A 퓨즈+표시등
+7. MAIN BREAKER — 심볼 종류, 등급, 극수, 차단용량
+8. CT METERING *(ct_meter일 때)* — CT hook, ELR, ASS/Ammeter, VSS/Voltmeter, kWh, BI CONNECTOR
+9. ELCB/RCCB — 심볼, 등급, 감도
+10. INTERNAL CABLE — 케이블 사양
+11. MAIN BUSBAR — 명칭, 등급, DB 정보 박스
+12. CIRCUIT BRANCHES — 심볼 종류(MCB/ISOLATOR 구분), 위상 그룹 간격, 라벨
+13. DB BOX — 점선 박스 크기, DB 이름
+14. EARTH BAR — 심볼, 도체 라벨
+
+**각 섹션에서 확인할 것**: ① 존재 여부 ② 심볼 형태 ③ 텍스트 내용 ④ 라벨 위치 ⑤ 간격·비율
 
 ## Key Conventions
 - 한국어 커밋 메시지 사용

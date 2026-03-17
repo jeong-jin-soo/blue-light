@@ -73,9 +73,14 @@ Extract EVERY row from the circuit table:
 
 ## Supply Source & Metering Rules
 - supply_source: "sp_powergrid" (SP PowerGrid direct supply) or "landlord" (building riser / landlord supply)
-- **Landlord supply** (supply from building riser): NO SP metering. Set metering to null.
+- **IMPORTANT — Explicit metering equipment overrides supply_source inference**:
+  - If the schedule explicitly mentions metering equipment such as "kWh meter", "CT", "SPPG", "CT ratio", ammeter, voltmeter, or ELR, then metering MUST be set according to what is stated, regardless of supply_source.
+  - "SPPG kWh meter" with a CT ratio (e.g. "100/5A CT") → metering type = "ct_meter".
+  - "SPPG kWh meter" without CT → metering type = "sp_meter".
+  - supply_source should be "sp_powergrid" when explicit SP metering equipment (kWh meter, CT ratio) is present, even if the supply text says "building riser".
+- **Landlord supply** (supply from building riser, with NO metering equipment listed): Set metering to null.
   - Landlord installations have their own isolator inside the unit, NOT an SP meter board.
-  - Keywords: "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
+  - Keywords (when NO metering equipment is mentioned): "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
 - **SP PowerGrid supply** (direct SP supply): metering is "sp_meter" (residential) or "ct_meter" (≥125A three-phase).
   - Keywords: "INCOMING FROM HDB", "SP POWERGRID", "FROM SP"
 - If supply source is unclear, default to "sp_powergrid".
@@ -122,7 +127,17 @@ Extract EVERY row from the circuit table:
     },
     "metering": {
       "type": "<ct_meter|sp_meter or null>",
-      "ct_ratio": "<string e.g. '100/5A' or null>"
+      "ct_ratio": "<string e.g. '100/5A' or null>",
+      "protection_ct_ratio": "<string e.g. '100/5A' — ratio for PROTECTION CT, or null if not specified>",
+      "protection_ct_class": "<string e.g. '5P10 20VA' — class for protection CT, or null>",
+      "metering_ct_class": "<string e.g. 'CL1 5VA' — class for metering CT, or null>",
+      "has_indicator_lights": "<bool — true if L1/L2/L3 indicator lights on potential fuse branch, default true for ct_meter>",
+      "has_elr": "<bool — true if ELR (Earth Leakage Relay) present, default true for ct_meter>",
+      "elr_spec": "<string e.g. '0-3A 0.2 SEC' — ELR specification, or null>",
+      "has_ammeter": "<bool — true if ammeter with selector switch (ASS) present, default true for ct_meter>",
+      "has_voltmeter": "<bool — true if voltmeter with selector switch (VSS) present, default true for ct_meter>",
+      "voltmeter_range": "<string e.g. '0-500V' or null>",
+      "ammeter_range": "<string e.g. '0-500A' or null>"
     },
     "outgoing_cable": {
       "size_mm2": "<string or null>",
@@ -249,8 +264,9 @@ Extract EVERY row from the circuit table:
     b) A three-phase DB has circuits assigned to specific phases (L1/L2/L3 or R/Y/B) AND has per-phase RCCBs.
     c) A three-phase DB has many circuits (≥9) with clear per-phase distribution — in Singapore practice, such boards typically use per-phase 2P RCCBs (40A 2P RCCB per phase with separate busbar).
     When creating protection_groups, each group has its own RCCB (typically 2P for single-phase groups within a 3-phase board) and its own busbar segment. Circuits NOT assigned to a specific phase go into the board's `outgoing_circuits`.
+    **IMPORTANT — 4P RCCB rule**: If the schedule shows a SINGLE 4P RCCB (e.g., "63A 4P RCCB 30mA") for the entire board, do NOT split it into per-phase 2P RCCB groups. Instead, put ALL circuits into the board's `outgoing_circuits` (with their phase assignments) and set the board-level `elcb` to that 4P RCCB. Only create separate per-phase `protection_groups` when the schedule explicitly shows different/separate RCCBs per phase (e.g., "40A 2P RCCB" for each phase).
 12. **Phase normalization**: Always normalize phase names to L1/L2/L3. Convert R→L1, Y→L2, B→L3, RED→L1, YELLOW→L2, BLUE→L3.
-13. **Metering**: For landlord supply (supply_source="landlord"), metering MUST be null. Only SP PowerGrid direct supplies have SP meters.
+13. **Metering**: For landlord supply (supply_source="landlord") with NO explicit metering equipment mentioned, metering MUST be null. However, if the schedule explicitly lists metering equipment (kWh meter, CT, SPPG, ammeter, voltmeter, ELR), set metering accordingly and change supply_source to "sp_powergrid".
 14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations."""
 
 
@@ -479,6 +495,16 @@ def _auto_detect_protection_groups(data: dict) -> dict:
             per_phase_rating = board_elcb.get("rating_a", 40)
             sensitivity = board_elcb.get("sensitivity_ma", 30)
 
+            # Do NOT split into per-phase groups if the board has a 4P RCCB —
+            # a 4P RCCB protects all phases together as a single device.
+            board_elcb_poles = board_elcb.get("poles")
+            if board_elcb_poles == 4 or board_elcb_poles == "4P":
+                logger.info(
+                    "Skipping auto protection-group split for DB '%s': board has 4P RCCB",
+                    db.get("name", "?"),
+                )
+                continue
+
             protection_groups = []
             for phase in ("L1", "L2", "L3"):
                 if not phase_map[phase]:
@@ -506,6 +532,69 @@ def _auto_detect_protection_groups(data: dict) -> dict:
                     len(protection_groups),
                     total_assigned,
                 )
+
+    return data
+
+
+def _merge_identical_4p_rccb_groups(data: dict) -> dict:
+    """Safety net: merge protection_groups back when they all share the same 4P RCCB.
+
+    If Gemini incorrectly split a single 4P RCCB into per-phase groups (each with
+    the same RCCB spec and poles=4), merge them back into the board's outgoing_circuits
+    and restore the board-level elcb.
+    """
+    dbs = data.get("distribution_boards")
+    if not dbs:
+        return data
+
+    for db in dbs:
+        pgs = db.get("protection_groups")
+        if not pgs or len(pgs) < 2:
+            continue
+
+        # Check if ALL protection groups have the same RCCB spec with poles=4
+        first_rccb = pgs[0].get("rccb", {})
+        first_poles = first_rccb.get("poles")
+        if first_poles not in (4, "4P"):
+            continue
+
+        all_same = all(
+            pg.get("rccb", {}).get("type") == first_rccb.get("type")
+            and pg.get("rccb", {}).get("rating_a") == first_rccb.get("rating_a")
+            and pg.get("rccb", {}).get("poles") in (4, "4P")
+            and pg.get("rccb", {}).get("sensitivity_ma") == first_rccb.get("sensitivity_ma")
+            for pg in pgs
+        )
+        if not all_same:
+            continue
+
+        # Merge: collect all circuits from protection groups into outgoing_circuits
+        merged_circuits: list[dict] = []
+        for pg in pgs:
+            phase = pg.get("phase")
+            for c in pg.get("circuits", []):
+                if phase and not c.get("phase"):
+                    c["phase"] = phase
+                merged_circuits.append(c)
+
+        existing_circuits = db.get("outgoing_circuits", [])
+        db["outgoing_circuits"] = merged_circuits + existing_circuits
+        db["protection_groups"] = []
+
+        # Restore board-level ELCB from the merged RCCB spec
+        db["elcb"] = {
+            "type": first_rccb.get("type", "RCCB"),
+            "rating_a": first_rccb.get("rating_a"),
+            "poles": 4,
+            "sensitivity_ma": first_rccb.get("sensitivity_ma"),
+        }
+
+        logger.info(
+            "Merged %d identical 4P RCCB protection_groups back into board-level ELCB for DB '%s' (%d circuits)",
+            len(pgs),
+            db.get("name", "?"),
+            len(merged_circuits),
+        )
 
     return data
 
@@ -606,6 +695,8 @@ async def extract_schedule_from_file(
             "error": str(e),
         }
 
+    # Post-process: merge incorrectly-split 4P RCCB groups (safety net — runs first)
+    extracted_data = _merge_identical_4p_rccb_groups(extracted_data)
     # Post-process: auto-detect per-phase RCCB protection groups
     extracted_data = _auto_detect_protection_groups(extracted_data)
 

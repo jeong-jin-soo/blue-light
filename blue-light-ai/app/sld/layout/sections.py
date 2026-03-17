@@ -157,7 +157,9 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
                     **requirements.get("metering_config", {})}
     if not isinstance(metering_cfg, dict):
         metering_cfg = {}
-    ctx.protection_ct_ratio = metering_cfg.get("protection_ct_ratio", ctx.ct_ratio)
+    # Protection CT: ratio is NOT shown by default (reference DWGs show only "CT\P<class>").
+    # Only show ratio if explicitly provided in metering_config/metering_detail.
+    ctx.protection_ct_ratio = metering_cfg.get("protection_ct_ratio", "")
     ctx.metering_ct_class = metering_cfg.get("metering_ct_class", "CL1 5VA")
     ctx.protection_ct_class = metering_cfg.get("protection_ct_class", "5P10 20VA")
     ctx.has_ammeter = metering_cfg.get(
@@ -1330,9 +1332,9 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
 
     cb_symbol = f"CB_{breaker_type}"
     # Singapore SLD format (matching reference DXF MTEXT):
-    #   "63A TPN MCB 6kA TYPE B" or "100A TPN MCCB (35KA)"
-    # Convention: ≥10kA → uppercase "KA", <10kA → lowercase "kA"
-    _ka_suffix = "KA" if breaker_fault_kA >= 10 else "kA"
+    #   "63A TPN MCB 6kA TYPE B" or "100A TPN MCCB (35kA)"
+    # Always lowercase "kA" — verified from DXF original text.
+    _ka_suffix = "kA"
     if main_breaker_char:
         main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} {breaker_fault_kA}{_ka_suffix} TYPE {main_breaker_char}"
     else:

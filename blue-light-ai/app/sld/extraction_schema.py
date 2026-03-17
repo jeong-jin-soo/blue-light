@@ -872,21 +872,64 @@ def normalize_to_generation_format(
 
             # Protection groups (per-phase RCCB)
             if db_data.protection_groups:
-                pg_list = []
-                for pg in db_data.protection_groups:
-                    pg_req: dict[str, Any] = {
-                        "phase": normalize_phase_name(pg.phase or ""),
-                    }
-                    if pg.rccb:
-                        pg_req["rccb"] = {
-                            "type": pg.rccb.type or "RCCB",
-                            "rating": pg.rccb.rating_a or 0,
-                            "sensitivity_ma": pg.rccb.sensitivity_ma or 30,
-                            "poles": pg.rccb.poles or 2,
+                # Safety net: if all protection_groups share the same 4P RCCB,
+                # merge them back — a 4P RCCB is a single device, not per-phase.
+                _all_4p = (
+                    len(db_data.protection_groups) >= 2
+                    and all(
+                        pg.rccb and pg.rccb.poles in (4, "4P")
+                        for pg in db_data.protection_groups
+                    )
+                )
+                _first_rccb = db_data.protection_groups[0].rccb if db_data.protection_groups else None
+                _all_same_spec = _all_4p and _first_rccb and all(
+                    pg.rccb
+                    and pg.rccb.rating_a == _first_rccb.rating_a
+                    and pg.rccb.sensitivity_ma == _first_rccb.sensitivity_ma
+                    for pg in db_data.protection_groups
+                )
+
+                if _all_same_spec and _first_rccb:
+                    # Merge: flatten all protection_group circuits into outgoing
+                    merged = []
+                    for pg in db_data.protection_groups:
+                        for c in pg.circuits:
+                            if pg.phase and not c.phase:
+                                c.phase = pg.phase
+                            merged.append(c)
+                    # Prepend merged circuits to existing outgoing
+                    db_data.outgoing_circuits = merged + list(db_data.outgoing_circuits or [])
+                    db_data.protection_groups = []
+                    # Restore board-level ELCB
+                    if not db_data.elcb:
+                        db_data.elcb = ElcbSpec(
+                            type=_first_rccb.type or "RCCB",
+                            rating_a=_first_rccb.rating_a,
+                            poles=4,
+                            sensitivity_ma=_first_rccb.sensitivity_ma,
+                        )
+                    logger.info(
+                        "normalize: merged 4P RCCB protection_groups for DB '%s' (%d circuits)",
+                        db_data.name or "?",
+                        len(merged),
+                    )
+
+                else:
+                    pg_list = []
+                    for pg in db_data.protection_groups:
+                        pg_req: dict[str, Any] = {
+                            "phase": normalize_phase_name(pg.phase or ""),
                         }
-                    pg_req["circuits"] = _convert_circuits(pg.circuits)
-                    pg_list.append(pg_req)
-                db_req["protection_groups"] = pg_list
+                        if pg.rccb:
+                            pg_req["rccb"] = {
+                                "type": pg.rccb.type or "RCCB",
+                                "rating": pg.rccb.rating_a or 0,
+                                "sensitivity_ma": pg.rccb.sensitivity_ma or 30,
+                                "poles": pg.rccb.poles or 2,
+                            }
+                        pg_req["circuits"] = _convert_circuits(pg.circuits)
+                        pg_list.append(pg_req)
+                    db_req["protection_groups"] = pg_list
 
             # DB outgoing circuits (not in protection groups)
             if db_data.outgoing_circuits:

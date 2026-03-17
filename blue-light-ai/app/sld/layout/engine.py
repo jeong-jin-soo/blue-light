@@ -677,12 +677,19 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # main board + PG sub-boards), boost root width for readability.
     # Only apply when child DBs use protection groups (PG circuits can be
     # tighter because they're bounded within their group).
+    # IMPORTANT: Don't over-allocate to root when child has comparable or
+    # more circuits — use proportional allocation instead of fixed 52%.
     if len(db_plans) >= 2:
         child_has_pg = any(p.protection_groups for p in db_plans[1:])
         child_total_circuits = sum(p.circuit_count for p in db_plans[1:])
         root_circuits = db_plans[0].circuit_count
-        if child_has_pg and child_total_circuits > root_circuits:
-            root_min = allocable * 0.52
+        total_all_circuits = root_circuits + child_total_circuits
+        if child_has_pg and child_total_circuits > root_circuits * 2:
+            # Only boost root when children have significantly more circuits
+            # (e.g., root=8, children=20). When comparable (root=16, children=18),
+            # let natural proportional allocation handle it.
+            root_share = root_circuits / max(total_all_circuits, 1)
+            root_min = allocable * min(root_share + 0.08, 0.50)
             if db_plans[0].estimated_width < root_min:
                 deficit = root_min - db_plans[0].estimated_width
                 db_plans[0].estimated_width = root_min
@@ -730,15 +737,15 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
             else:
                 p.circuits_per_row = min(p.circuit_count, max_per_row)
 
-    # Distribute remaining space to root DB (it benefits most from extra width).
-    # Cap root at 60% of allocable to avoid squishing small child DBs.
+    # Distribute remaining space proportionally to all DBs based on circuit count.
     total_width = sum(p.estimated_width for p in db_plans) + gap_space
     if total_width < avail_width and len(db_plans) >= 2:
         surplus = avail_width - total_width
-        root_max = allocable * 0.55
-        usable_surplus = min(surplus, root_max - db_plans[0].estimated_width)
-        if usable_surplus > 0:
-            db_plans[0].estimated_width += usable_surplus
+        total_circuits_all = sum(p.circuit_count for p in db_plans)
+        if total_circuits_all > 0 and surplus > 0:
+            for p in db_plans:
+                share = p.circuit_count / total_circuits_all
+                p.estimated_width += surplus * share
 
     # Final scaling if total still exceeds available
     total_width = sum(p.estimated_width for p in db_plans) + gap_space
@@ -1064,6 +1071,7 @@ def render_board(
         ctx.has_ammeter = mc.get("has_ammeter", True)
         ctx.has_voltmeter = mc.get("has_voltmeter", True)
         ctx.has_elr = mc.get("has_elr", True)
+        ctx.has_indicator_lights = mc.get("has_indicator_lights", True)
         ctx.elr_spec = mc.get("elr_spec", "")
         ctx.voltmeter_range = mc.get("voltmeter_range", "")
         ctx.ammeter_range = mc.get("ammeter_range", "")
@@ -1247,9 +1255,9 @@ def _add_hierarchical_connections(
             f_poles = feeder_brk.get("poles", "TPN")
             f_kA = feeder_brk.get("fault_kA", 10)
             if f_char:
-                f_label = f"{f_rating}A {f_poles} Type {f_char} {f_type} ({f_kA}KA)"
+                f_label = f"{f_rating}A {f_poles} Type {f_char} {f_type} ({f_kA}kA)"
             else:
-                f_label = f"{f_rating}A {f_poles} {f_type} ({f_kA}KA)"
+                f_label = f"{f_rating}A {f_poles} {f_type} ({f_kA}kA)"
             merged.components.append(PlacedComponent(
                 symbol_name=f"CB_{f_type}",
                 x=child_cx - mcb_w / 2,
@@ -1275,10 +1283,26 @@ def _add_hierarchical_connections(
         # (LEW reference: only feeder MCB on connection path, incoming MCB inside DB.)
 
         # ── Labels ──
+        # Position supply labels to the right of the connection spine,
+        # BELOW the child board's main breaker (near DB box top).
+        # Reference: text sits between incoming MCB and DB box, to the right.
+        _label_x = child_cx + 5
+        if child.region:
+            _label_x = max(child_cx + 5, child.region.max_x - 55)
+
+        # Y: use child's busbar_y (or db_box_start_y) so labels are BELOW
+        # the busbar where circuits are placed ABOVE.
+        _label_y = connect_y - 3
+        if child.busbar_y > 0:
+            # Place label between incoming breaker and busbar — below busbar level
+            _label_y = child.busbar_y + 3
+        elif child.db_box_start_y > 0:
+            _label_y = child.db_box_start_y - 8
+
         merged.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=child_cx + 5,
-            y=connect_y - 3,
+            x=_label_x,
+            y=_label_y,
             label=f"SUPPLY FROM {root_name}",
         ))
 
@@ -1297,8 +1321,8 @@ def _add_hierarchical_connections(
             from app.sld.layout.models import format_cable_spec
             merged.components.append(PlacedComponent(
                 symbol_name="LABEL",
-                x=child_cx + 5,
-                y=connect_y - 6,
+                x=_label_x,
+                y=_label_y - 3,
                 label=format_cable_spec(str(cable_spec), multiline=True),
             ))
 
@@ -1345,6 +1369,245 @@ def _add_parallel_connections(
         merged.connections.append(((db_cx, sub_start_y), (db_cx, sub_start_y + 3)))
 
 
+def _is_per_phase_busbar_mode(db: dict, ctx: _LayoutContext) -> bool:
+    """Detect per-phase busbar pattern: phase-grouped circuits with single board-level RCCB.
+
+    Returns True when:
+    - Board has protection_groups (phase-organized circuits)
+    - Protection groups do NOT have per-group RCCBs (missing or empty rccb spec)
+    - Board has a board-level ELCB/RCCB (placed on spine by _place_elcb)
+
+    This pattern produces 3 separate busbar segments at the same Y coordinate,
+    each serving one phase's circuits, with a single 4P RCCB on the spine above.
+
+    Reference DXF: 3 horizontal busbar lines at same Y, single 4P RCCB above.
+    MCB spacing: 8.6mm within group, 11.5mm between phase groups.
+    """
+    pgroups = db.get("protection_groups", [])
+    if not pgroups:
+        return False
+
+    # Check if ANY group has its own RCCB spec with a rating
+    has_per_group_rccb = any(
+        pg.get("rccb", {}).get("rating", 0) > 0
+        for pg in pgroups
+    )
+    if has_per_group_rccb:
+        return False
+
+    # Board must have a board-level ELCB/RCCB
+    return ctx.elcb_rating > 0
+
+
+def _place_per_phase_busbars(
+    ctx: _LayoutContext,
+    db: dict,
+    db_cx: float,
+    pgroups: list[dict],
+    db_available_width: float,
+) -> float:
+    """Place 3 separate busbar segments at the same Y for per-phase layout.
+
+    Layout (single 4P RCCB pattern):
+
+        [circuits L1]  [circuits L2]  [circuits L3]
+              |              |              |
+        [busbar L1]    [busbar L2]    [busbar L3]   ← 3 segments, same Y
+              └──────────────┼──────────────┘
+                       [main busbar]   ← result.busbar_y (already placed)
+                             |
+                       [4P RCCB]       ← already placed by _place_elcb()
+
+    The single 4P RCCB is placed on the spine by _place_elcb() before this
+    function is called. This function only creates the 3 busbar segments and
+    their circuits.
+
+    Reference DXF spacing:
+    - 8.6mm between MCBs within a phase group
+    - 11.5mm gap between phase groups
+
+    Returns the topmost Y (for DB box sizing).
+    """
+    from app.sld.layout.models import LayoutRegion, PlacedComponent
+    from app.sld.layout.sections import _place_sub_circuits_rows
+
+    result = ctx.result
+    config = ctx.config
+    main_busbar_y = result.busbar_y
+    num_groups = len(pgroups)
+
+    # ── Calculate per-group widths and positions ──
+    group_circuit_counts = []
+    for pg in pgroups:
+        n = len(pg.get("circuits", []))
+        group_circuit_counts.append(max(n, 1))
+
+    total_circuits = sum(group_circuit_counts)
+
+    # Reference DXF spacing constants
+    INTRA_GROUP_SPACING = 8.6   # mm between MCBs within a phase group
+    INTER_GROUP_GAP = 11.5      # mm gap between phase groups
+    pg_margin = 1               # mm per side for busbar end caps
+
+    margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * INTER_GROUP_GAP
+    usable_for_circuits = max(db_available_width - margin_overhead, total_circuits * 3)
+
+    # Use reference spacing if it fits, otherwise scale down
+    direct_spacing = usable_for_circuits / max(total_circuits, 1)
+    overall_spacing = max(3.0, min(direct_spacing, INTRA_GROUP_SPACING))
+
+    # Distribute width proportionally per group
+    group_widths = []
+    for n in group_circuit_counts:
+        w = n * overall_spacing + 2 * pg_margin
+        group_widths.append(max(w, 25))
+
+    # Ensure total groups width fits within DB allocation
+    total_groups_width = sum(group_widths) + max(0, num_groups - 1) * INTER_GROUP_GAP
+    if total_groups_width > db_available_width:
+        compress = db_available_width / total_groups_width
+        group_widths = [w * compress for w in group_widths]
+        total_groups_width = db_available_width
+        overall_spacing *= compress
+
+    groups_start_x = db_cx - total_groups_width / 2
+
+    # Clamp to active region
+    if ctx.active_region:
+        clamp_left = ctx.active_region.min_x
+        clamp_right = ctx.active_region.max_x
+        region_width = clamp_right - clamp_left
+        if total_groups_width > region_width:
+            compress = region_width / total_groups_width
+            group_widths = [w * compress for w in group_widths]
+            total_groups_width = region_width
+            overall_spacing *= compress
+        if groups_start_x < clamp_left:
+            groups_start_x = clamp_left
+        if groups_start_x + total_groups_width > clamp_right:
+            groups_start_x = clamp_right - total_groups_width
+
+    # Page-level clamping
+    if groups_start_x < config.min_x:
+        groups_start_x = config.min_x
+    if groups_start_x + total_groups_width > config.max_x:
+        groups_start_x = config.max_x - total_groups_width
+
+    # Group center X positions
+    group_cxs: list[float] = []
+    x_cursor = groups_start_x
+    for w in group_widths:
+        group_cxs.append(x_cursor + w / 2)
+        x_cursor += w + INTER_GROUP_GAP
+
+    # ── Place each phase's busbar segment and circuits ──
+    # All busbars at the SAME Y (directly above main busbar)
+    per_phase_busbar_y = main_busbar_y  # Same Y as main busbar — segments replace it
+    topmost_y = main_busbar_y
+
+    for pg_idx, (pg, pg_cx, pg_width) in enumerate(
+        zip(pgroups, group_cxs, group_widths)
+    ):
+        phase = pg.get("phase", f"L{pg_idx + 1}")
+        pg_circuits = pg.get("circuits", [])
+
+        # Junction dot on main busbar at group center
+        result.junction_dots.append((pg_cx, main_busbar_y))
+
+        # Vertical connection from main busbar to per-phase busbar
+        # (They are at the same Y, so this is just a junction — no visible line needed
+        # unless the per-phase busbar is offset. For visual clarity, draw a short stub.)
+        result.connections.append(((pg_cx, main_busbar_y), (pg_cx, per_phase_busbar_y)))
+
+        # ── Place sub-circuits for this group ──
+        saved_cx = ctx.cx
+        saved_y = ctx.y
+        saved_sub_circuits = ctx.sub_circuits
+        saved_busbar_y = result.busbar_y
+        saved_bus_sx = result.busbar_start_x
+        saved_bus_ex = result.busbar_end_x
+        saved_active_region = ctx.active_region
+        saved_constrained_width = ctx.constrained_width
+
+        ctx.cx = pg_cx
+        ctx.y = per_phase_busbar_y
+
+        # PG circuits are single-phase — no triplet padding needed
+        pg_padded = list(pg_circuits)
+        for c in pg_padded:
+            c["_skip_section_pad"] = True
+        ctx.sub_circuits = pg_padded
+
+        # Per-phase busbar extents
+        half_w = pg_width / 2
+        sub_bus_sx = pg_cx - half_w
+        sub_bus_ex = pg_cx + half_w
+
+        # Set per-group region constraint
+        ctx.active_region = LayoutRegion(
+            min_x=sub_bus_sx, max_x=sub_bus_ex,
+            name=f"PG-{phase}",
+        )
+        ctx.constrained_width = pg_width
+
+        result.busbar_y = per_phase_busbar_y
+        result.busbar_start_x = sub_bus_sx
+        result.busbar_end_x = sub_bus_ex
+
+        # Per-phase busbar component
+        phase_upper = phase.upper() if phase else f"L{pg_idx + 1}"
+        sub_busbar_label = f"{db.get('busbar_rating', 80)}A BUSBAR"
+        result.components.append(PlacedComponent(
+            symbol_name="BUSBAR",
+            x=sub_bus_sx,
+            y=per_phase_busbar_y,
+            label=sub_busbar_label,
+            rating="",
+            cable_annotation=f"{sub_bus_ex:.1f}",
+        ))
+
+        # Place sub-circuits within constrained busbar range
+        ctx.skip_row_bi_connector = True
+        sub_busbar_y = _place_sub_circuits_rows(ctx)
+        ctx.skip_row_bi_connector = False
+        topmost_y = max(topmost_y, sub_busbar_y)
+
+        # Restore context
+        ctx.cx = saved_cx
+        ctx.y = saved_y
+        ctx.sub_circuits = saved_sub_circuits
+        result.busbar_y = saved_busbar_y
+        ctx.active_region = saved_active_region
+        ctx.constrained_width = saved_constrained_width
+        result.busbar_start_x = saved_bus_sx
+        result.busbar_end_x = saved_bus_ex
+
+    # Register PG-level regions for overlap resolution
+    db_idx = ctx.current_db_idx
+    if db_idx >= 0 and result.layout_regions:
+        db_name = db.get("name", "")
+        result.layout_regions = [
+            r for r in result.layout_regions if r.name != db_name
+        ]
+    for pg_idx, (pg_cx, pg_width) in enumerate(zip(group_cxs, group_widths)):
+        pg_region = LayoutRegion(
+            min_x=pg_cx - pg_width / 2,
+            max_x=pg_cx + pg_width / 2,
+            name=f"PG-{pgroups[pg_idx].get('phase', f'L{pg_idx + 1}')}",
+        )
+        result.layout_regions.append(pg_region)
+
+    # Update DB busbar_start_x/end_x to span all groups
+    if group_cxs:
+        result.busbar_start_x = min(group_cxs) - group_widths[0] / 2
+        result.busbar_end_x = max(group_cxs) + group_widths[-1] / 2
+        if ctx.active_region:
+            result.busbar_start_x = max(result.busbar_start_x, ctx.active_region.min_x)
+            result.busbar_end_x = min(result.busbar_end_x, ctx.active_region.max_x)
+
+    return topmost_y
+
+
 def _place_protection_groups(
     ctx: _LayoutContext,
     db: dict,
@@ -1352,7 +1615,18 @@ def _place_protection_groups(
 ) -> float:
     """Place per-phase RCCB protection groups within a sub-DB.
 
-    Layout (DB2 pattern with 3 per-phase RCCBs):
+    Two modes:
+
+    1. Per-group RCCB mode (existing, default):
+       Each phase group has its own 2P RCCB between the main busbar and
+       the group's sub-busbar. 3 separate vertical chains.
+
+    2. Per-phase busbar mode (new):
+       A single 4P RCCB sits on the spine (placed by _place_elcb()),
+       and 3 separate busbar segments at the same Y serve each phase's
+       circuits directly. No per-group RCCBs.
+
+    Layout mode 1 (per-group RCCBs):
 
         [circuits L1]  [circuits L2]  [circuits L3]
               |              |              |
@@ -1362,8 +1636,15 @@ def _place_protection_groups(
               └──────────────┼──────────────┘
                        [DB main busbar]   ← result.busbar_y (already placed)
 
-    Each group gets: junction dot on main busbar → vertical line → RCCB →
-    sub-busbar → sub-circuits placed upward.
+    Layout mode 2 (per-phase busbars, single 4P RCCB):
+
+        [circuits L1]  [circuits L2]  [circuits L3]
+              |              |              |
+        [busbar L1]    [busbar L2]    [busbar L3]   ← 3 segments, same Y
+              └──────────────┼──────────────┘
+                       [main busbar]   ← result.busbar_y (already placed)
+                             |
+                       [4P RCCB]       ← already on spine
 
     Returns the topmost Y (for DB box sizing).
     """
@@ -1393,6 +1674,16 @@ def _place_protection_groups(
     if not db_available_width:
         db_available_width = (config.max_x - config.min_x) / max(result.db_count, 1)
 
+    # ── Dispatch: per-phase busbar mode vs per-group RCCB mode ──
+    if _is_per_phase_busbar_mode(db, ctx):
+        logger.info(
+            "Per-phase busbar mode: %d groups, single %dA %s on spine",
+            num_groups, ctx.elcb_rating, ctx.elcb_type_str,
+        )
+        return _place_per_phase_busbars(ctx, db, db_cx, pgroups, db_available_width)
+
+    # ── Per-group RCCB mode (existing behavior) ──
+
     # ── Calculate per-group widths and positions ──
     group_circuit_counts = []
     for pg in pgroups:
@@ -1401,7 +1692,7 @@ def _place_protection_groups(
         group_circuit_counts.append(max(n, 1))
 
     total_circuits = sum(group_circuit_counts)
-    gap = 3  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
+    gap = 8  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
     # Minimal margins for protection groups (1mm per side = 2mm total per group)
     pg_margin = 1  # mm per side for each group busbar
     margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * gap

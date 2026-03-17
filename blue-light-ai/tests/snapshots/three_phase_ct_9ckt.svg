@@ -60,7 +60,7 @@
   <circle cx="209.80" cy="168.56" r="0.74" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="169.30" x2="210.00" y2="171.30" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="160.30" x2="210.00" y2="158.30" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="215.75" y="164.08" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">100A TPN MCCB (25KA)</text>
+  <text x="215.75" y="164.08" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">100A TPN MCCB (25kA)</text>
   <line x1="211.50" y1="156.80" x2="208.50" y2="156.80" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="155.30" x2="211.50" y2="155.30" stroke="#000000" stroke-width="0.25" fill="none" />
   <path d="M 211.50,156.80 A 0.75,0.75 0 0,0 211.50,155.30" stroke="#000000" stroke-width="0.25" fill="none" />
