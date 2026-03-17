@@ -290,6 +290,7 @@ _SYMBOL_TO_JSON_KEY_FOR_PINS: dict[str, str] = {
     "CB_RCCB": "RCCB",
     "CB_ELCB": "ELCB",
     "CB_ACB": "ACB",
+    "ISOLATOR": "ISOLATOR",
 }
 
 # Cached pin half-widths loaded from real_symbol_paths.json.
@@ -377,7 +378,9 @@ def _create_groups_from_breakers(
     """Create initial groups from breaker_block components (pure)."""
     groups: list[SubCircuitGroup] = []
     for i, comp in enumerate(components):
-        if comp.label_style == "breaker_block" and comp.symbol_name.startswith("CB_"):
+        if comp.label_style == "breaker_block" and (
+            comp.symbol_name.startswith("CB_") or comp.symbol_name == "ISOLATOR"
+        ):
             tap_x = comp.x + _breaker_half_width(comp)
             groups.append(SubCircuitGroup(tap_x=tap_x, breaker_idx=i))
     return groups

@@ -465,14 +465,13 @@ def _assign_circuit_ids(
         categories.append(cat)
         user_ids.append(uid)
 
-    # Normalize isolator circuits: force breaker_type/poles regardless of
-    # what the schedule file (Excel/Gemini) specified.  Without this, an
-    # Excel row like "ISOL1 | 20A DP isolator | 20A SPN MCB …" would keep
-    # breaker_type="MCB" and render with a full MCB label instead of the
-    # isolator symbol.
+    # Mark isolator circuits for DP ISOL device rendering at conductor top.
+    # Per LEW reference: the BREAKER is still MCB (not isolator symbol);
+    # only the LOAD DEVICE at the conductor end is a DP ISOL box.
+    # breaker_type stays as-is ("MCB") to render MCB symbol at busbar.
     for i, cat in enumerate(categories):
         if cat == "isolator":
-            sub_circuits[i]["breaker_type"] = "ISOLATOR"
+            sub_circuits[i]["_is_isolator_load"] = True
             sub_circuits[i].setdefault("breaker_poles", "DP")
             if sub_circuits[i].get("breaker_poles", "").upper() == "SPN":
                 sub_circuits[i]["breaker_poles"] = "DP"
@@ -760,7 +759,7 @@ def _parse_circuit_data(circuit: dict, supply_type: str) -> dict:
         or circuit.get("breaker_char", "")
     ).upper()
 
-    return {
+    result = {
         "name": sc_name,
         "breaker_type": sc_breaker_type,
         "breaker_rating": sc_breaker_rating,
@@ -770,6 +769,10 @@ def _parse_circuit_data(circuit: dict, supply_type: str) -> dict:
         "fault_kA": sc_fault_kA,
         "breaker_char": sc_breaker_char,
     }
+    # Propagate isolator-load flag for DP ISOL device rendering
+    if circuit.get("_is_isolator_load"):
+        result["_is_isolator_load"] = True
+    return result
 
 
 def _get_breaker_dimensions(breaker_type: str, config: LayoutConfig) -> tuple[float, float]:
@@ -791,8 +794,14 @@ def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, co
     else:
         sc_display_name = sc_name
     sc_display_name = _normalize_load_quantity(sc_display_name)
+    # Singapore LEW convention: load descriptions in ALL UPPERCASE
+    # Reference: "3 Nos LIGHTING POINTS", "1 No. 20A DP ISOLATOR"
+    sc_display_name = sc_display_name.upper()
+    # Restore "No." / "Nos" convention (capital N, singular with period)
+    sc_display_name = re.sub(r'\b(\d+)\s+NOS\.?\s+', r'\1 Nos ', sc_display_name)
+    sc_display_name = re.sub(r'\b1\s+Nos\s+', r'1 No. ', sc_display_name)
     if sc_room:
-        sc_display_name = f"{sc_display_name} — {sc_room}"
+        sc_display_name = f"{sc_display_name} — {sc_room.upper()}"
 
     _CHAR_ADVANCE = config.char_advance
     _PREFERRED_MAX_CHARS = config.preferred_max_label_chars
@@ -816,6 +825,7 @@ def _place_sub_circuits_upward(
     supply_type: str = "three_phase",
     circuit_ids: list[str] | None = None,
     use_triplets: bool = True,
+    row_start_idx: int | None = None,
 ) -> None:
     """Place a row of sub-circuits branching UPWARD from busbar with vertical labels."""
     group_breaks = _detect_section_breaks(
@@ -825,7 +835,7 @@ def _place_sub_circuits_upward(
     )
 
     for i, circuit in enumerate(row_circuits):
-        global_idx = row_idx * config.max_circuits_per_row + i
+        global_idx = (row_start_idx + i) if row_start_idx is not None else (row_idx * config.max_circuits_per_row + i)
         tap_x = _compute_tap_x(i, row_count, bus_start_x, bus_end_x, group_breaks, config)
 
         # Circuit ID
@@ -863,18 +873,21 @@ def _place_sub_circuits_upward(
                 fault_kA=0, label_style="breaker_block",
             ))
         else:
-            # ISOLATOR uses its own symbol (rectangle + switch arm), not CB_MCB circle
-            if cd["breaker_type"] == "ISOLATOR":
-                _symbol_name = "ISOLATOR"
-            else:
-                _symbol_name = f"CB_{cd['breaker_type']}"
+            # Per LEW reference: all sub-circuit breakers use MCB symbol (CB_MCB),
+            # even isolator-load circuits. The DP ISOL device box is added separately
+            # at the conductor top by _add_isolator_device_symbols().
+            _symbol_name = f"CB_{cd['breaker_type']}"
+            # Mark isolator-load circuits for DP ISOL device rendering
+            _btype_str = cd["breaker_type"]
+            if cd.get("_is_isolator_load"):
+                _btype_str = "ISOLATOR"  # used by _add_isolator_device_symbols()
             result.components.append(PlacedComponent(
                 symbol_name=_symbol_name,
                 x=tap_x - sc_cb_w / 2, y=sc_y,
                 label=cd["name"], rating=f"{cd['breaker_rating']}A",
-                cable_annotation=cd["cable"], circuit_id=circuit_id,
+                cable_annotation=format_cable_spec(cd["cable"]), circuit_id=circuit_id,
                 load_info=cd["load_info"], rotation=90.0,
-                poles=cd["poles"], breaker_type_str=cd["breaker_type"],
+                poles=cd["poles"], breaker_type_str=_btype_str,
                 fault_kA=cd["fault_kA"], label_style="breaker_block",
                 breaker_characteristic=cd["breaker_char"],
             ))
@@ -893,7 +906,7 @@ def _place_sub_circuits_upward(
 
         # ISOLATOR: extra space for device box
         _ISOL_DEVICE_BOX_H = 3.8
-        _isol_extra = _ISOL_DEVICE_BOX_H if cd["breaker_type"] == "ISOLATOR" else 0.0
+        _isol_extra = _ISOL_DEVICE_BOX_H if cd.get("_is_isolator_load") else 0.0
         conductor_top_y = tail_end_y + _isol_extra
         result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
 

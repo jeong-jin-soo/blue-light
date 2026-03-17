@@ -812,3 +812,6 @@ class _LayoutContext:
 
     # Phase arrangement: False = phase-grouped, skip triplet rendering.
     use_triplets: bool = True
+
+    # Skip BI connector between multi-row busbars (protection groups don't use BI connectors)
+    skip_row_bi_connector: bool = False

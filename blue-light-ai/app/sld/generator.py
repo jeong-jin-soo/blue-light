@@ -649,7 +649,9 @@ class SldGenerator:
             _display_type = "MCB" if comp.breaker_type_str.upper() == "ISOLATOR" else comp.breaker_type_str
             info_items.append(_display_type)
         if comp.fault_kA:
-            info_items.append(f"{comp.fault_kA}kA")  # e.g., "6kA"
+            # Singapore SLD convention: ≥10kA → uppercase "KA", <10kA → lowercase "kA"
+            _ka_suffix = "KA" if comp.fault_kA >= 10 else "kA"
+            info_items.append(f"{comp.fault_kA}{_ka_suffix}")  # e.g., "6kA" or "35KA"
 
         if abs(comp.rotation - 90.0) < 0.1:
             # HORIZONTAL stacked text to the LEFT of breaker (matching reference DWG)

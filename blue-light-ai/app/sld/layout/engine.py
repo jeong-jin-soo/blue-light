@@ -350,12 +350,10 @@ def compute_layout(
 
         db_box_right = _place_multi_db_boxes(final_ctx, dbs, topmost)
 
-        # Set merged.busbar_y from root board so _place_earth_bar positions
-        # the earth symbol relative to the actual busbar, not the default 0.
+        # Earth bars are now placed per-DB inside _place_multi_db_boxes.
+        # Set merged.busbar_y from root board for other layout operations.
         root_br = board_results[plan.root_db_idx]
         merged.busbar_y = root_br.layout.busbar_y
-
-        _place_earth_bar(final_ctx, db_box_right)
 
         from app.sld.layout.connectivity import validate_connectivity
         validate_connectivity(merged, config)
@@ -1267,20 +1265,9 @@ def _add_hierarchical_connections(
             # No feeder MCB — direct connection to BI_CONNECTOR
             pass
 
-        # ── BI_CONNECTOR ──
-        bi_y = connect_y - bi_h
-        merged.connections.append(((child_cx, connect_y), (child_cx, bi_y + bi_h)))
-        # BI CONNECTOR label includes root breaker rating (e.g., "100A BI CONN.")
-        bi_rating = root_result.breaker_rating or ""
-        bi_label = f"{bi_rating}A BI CONN." if bi_rating else "BI CONN."
-        merged.components.append(PlacedComponent(
-            symbol_name="BI_CONNECTOR",
-            x=child_cx - bi_w / 2,
-            y=bi_y,
-            label=bi_label,
-        ))
-        merged.symbols_used.add("BI_CONNECTOR")
-        connect_y = bi_y - stub
+        # ── Direct connection (no BI_CONNECTOR for hierarchical feeders) ──
+        # LEW reference: feeder MCB → cable → child DB incoming breaker, no BI connector.
+        connect_y = connect_y - stub
 
         # ── Incoming MCB (child side) ──
         # Skip: render_board() already renders incoming_breaker as the board's
@@ -1307,11 +1294,12 @@ def _add_hierarchical_connections(
         if not cable_spec and child_db:
             cable_spec = child_db.get("feeder_cable", "")
         if cable_spec:
+            from app.sld.layout.models import format_cable_spec
             merged.components.append(PlacedComponent(
                 symbol_name="LABEL",
                 x=child_cx + 5,
                 y=connect_y - 6,
-                label=str(cable_spec),
+                label=format_cable_spec(str(cable_spec), multiline=True),
             ))
 
         # Connection to child board top
@@ -1568,7 +1556,10 @@ def _place_protection_groups(
         ))
 
         # Place sub-circuits within constrained busbar range
+        # Protection groups don't use BI connectors between multi-row busbars
+        ctx.skip_row_bi_connector = True
         sub_busbar_y = _place_sub_circuits_rows(ctx)
+        ctx.skip_row_bi_connector = False
         topmost_y = max(topmost_y, sub_busbar_y)
 
         # NOTE: PG sub-busbars all share the same Y, so we use
@@ -1687,6 +1678,12 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
         )
 
         rightmost_x = max(rightmost_x, box_right)
+
+        # Place per-DB earth bar (outside each DB box, right side)
+        _saved_busbar_y = result.busbar_y
+        result.busbar_y = busbar_y_row  # Earth bar relative to THIS DB's busbar
+        _place_earth_bar(ctx, box_right)
+        result.busbar_y = _saved_busbar_y
 
     return rightmost_x
 

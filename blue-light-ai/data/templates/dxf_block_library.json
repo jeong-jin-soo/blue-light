@@ -1308,42 +1308,69 @@
       }
     },
     "IEC ISOLATOR": {
-      "source": "63A TPN SLD 14.dxf (model space raw entities — 2 CIRCLEs + LWPOLYLINE)",
-      "description": "IEC disconnect switch / isolator — two contact circles with diagonal lever blade. Extracted from meter board area of reference DXF. Native horizontal orientation (width > height).",
-      "width_du": 567.8,
-      "height_du": 141.6,
+      "source": "I2R-ETR-NLB-SLD-1.dxf (standalone enclosed isolator — 2 CIRCLEs + diagonal blade)",
+      "description": "IEC disconnect switch / isolator — two contact circles with diagonal lever blade. Extracted from standalone unit isolator in reference DXF. Native VERTICAL orientation (height > width).",
+      "width_du": 249.0,
+      "height_du": 442.5,
       "bounds": {
-        "min_x": -70.8,
-        "min_y": -70.8,
-        "max_x": 638.6,
-        "max_y": 70.8
+        "min_x": -124.5,
+        "min_y": 0.0,
+        "max_x": 124.5,
+        "max_y": 442.5
       },
       "entities": [
         {
           "type": "CIRCLE",
-          "center": [0.0, 0.0],
-          "radius": 70.8
+          "center": [
+            0.0,
+            44.2
+          ],
+          "radius": 44.2
         },
         {
           "type": "CIRCLE",
-          "center": [567.8, 0.0],
-          "radius": 70.8
+          "center": [
+            0.0,
+            398.3
+          ],
+          "radius": 44.2
         },
         {
           "type": "LWPOLYLINE",
           "points": [
-            [66.7, 23.9],
-            [558.4, 199.7]
+            [
+              14.8,
+              356.7
+            ],
+            [
+              124.5,
+              50.1
+            ]
           ],
-          "bulges": [0.0, 0.0],
+          "bulges": [
+            0.0,
+            0.0
+          ],
           "closed": false
         }
       ],
       "pins": {
-        "top": [283.9, 70.8],
-        "bottom": [283.9, -70.8],
-        "left": [-70.8, 0.0],
-        "right": [638.6, 0.0]
+        "top": [
+          0.0,
+          442.5
+        ],
+        "bottom": [
+          0.0,
+          0.0
+        ],
+        "left": [
+          -124.5,
+          221.25
+        ],
+        "right": [
+          124.5,
+          221.25
+        ]
       }
     },
     "EARTH": {

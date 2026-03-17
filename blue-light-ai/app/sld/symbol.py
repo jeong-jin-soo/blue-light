@@ -480,14 +480,28 @@ class BlockSymbol(Symbol):
         backend.add_line((arc_mx, arc_my), (arc_mx - hl, arc_my - 0.6))
 
     def _draw_enclosure(self, backend, x, y):
-        """Draw enclosure box around an isolator block."""
-        pad = 1.0
-        sw = self._proc.width
-        sh = self._proc.height
+        """Draw enclosure box around an isolator block.
+
+        Uses the actual scaled block dimensions so the enclosure matches
+        the rendered symbol size (not just the procedural fallback dims).
+        """
+        pad = 1.5
+        # Use actual scaled block size for proper enclosure fit
+        try:
+            scaled_w, scaled_h = self._replayer.get_scaled_size(
+                self._block_name, target_height_mm=self._proc.height)
+            sw = max(scaled_w, self._proc.width)
+            sh = self._proc.height
+        except Exception:
+            sw = self._proc.width
+            sh = self._proc.height
+        cx = x + self._proc.width / 2
         backend.set_layer("SLD_SYMBOLS")
         backend.add_lwpolyline([
-            (x - pad, y - pad), (x + sw + pad, y - pad),
-            (x + sw + pad, y + sh + pad), (x - pad, y + sh + pad),
+            (cx - sw / 2 - pad, y - pad),
+            (cx + sw / 2 + pad, y - pad),
+            (cx + sw / 2 + pad, y + sh + pad),
+            (cx - sw / 2 - pad, y + sh + pad),
         ], close=True)
 
     def _compute_arc_extent(self) -> float:

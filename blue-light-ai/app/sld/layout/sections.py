@@ -891,9 +891,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # Protection CT
     if ctx.has_elr:
         if protection_ct_ratio:
-            prot_ct_label = f"CT {protection_ct_ratio}\\P({protection_ct_class})"
+            prot_ct_label = f"{protection_ct_ratio} CT\\P{protection_ct_class}"
         else:
-            prot_ct_label = f"CT\\P({protection_ct_class})"
+            prot_ct_label = f"CT\\P{protection_ct_class}"
         result.components.append(PlacedComponent(
             symbol_name="CT", x=cx - ct_w / 2, y=prot_ct_y, label=prot_ct_label,
         ))
@@ -933,7 +933,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
 
     # Metering CT
     if ct_ratio:
-        ct_label = f"CT {ct_ratio}\\P({metering_ct_class})"
+        ct_label = f"{ct_ratio}\\P{metering_ct_class}"
     else:
         ct_label = SG_LOCALE.meter_board.ct_by_sp
     # --- 4. Branches from Metering CT ---
@@ -989,7 +989,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # KWH branch Y: box bottom must clear return line by ≥1.5mm
     _kwh_branch_y = _kwh_return_y + _kwh_rect_h / 2 + 1.5
 
-    _kwh_label = "SP PG\\PkWh METER" if ctx.supply_source != "landlord" else "kWh METER"
+    _kwh_label = "SPPG\\PKWH METER" if ctx.supply_source != "landlord" else "KWH METER"
 
     # Place KWH component (right of spine, no right stub)
     _kwh_comp_x = cx + branch_arm_len  # rect left edge (same as _place_metering_branch)
@@ -1330,11 +1330,13 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
 
     cb_symbol = f"CB_{breaker_type}"
     # Singapore SLD format (matching reference DXF MTEXT):
-    #   "63A TPN MCB 10kA TYPE B" or "100A TPN MCCB (35kA)"
+    #   "63A TPN MCB 6kA TYPE B" or "100A TPN MCCB (35KA)"
+    # Convention: ≥10kA → uppercase "KA", <10kA → lowercase "kA"
+    _ka_suffix = "KA" if breaker_fault_kA >= 10 else "kA"
     if main_breaker_char:
-        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} {breaker_fault_kA}kA TYPE {main_breaker_char}"
+        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} {breaker_fault_kA}{_ka_suffix} TYPE {main_breaker_char}"
     else:
-        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} ({breaker_fault_kA}kA)"
+        main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} ({breaker_fault_kA}{_ka_suffix})"
     result.components.append(PlacedComponent(
         symbol_name=cb_symbol,
         x=cx - cb_w / 2,
@@ -1382,7 +1384,7 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         symbol_name=elcb_symbol,
         x=cx - elcb_w / 2,
         y=y,
-        label=f"{elcb_rating}A {elcb_poles_str} {elcb_type_str} ({elcb_ma}mA)",
+        label=f"{elcb_rating}A {elcb_poles_str}\\P{elcb_type_str} \\P({elcb_ma}mA)",
     ))
     y += elcb_h + config.stub_len  # height + stub — symbol draws stub beyond height
     # No extra connection gap — symbol stubs of adjacent components overlap for continuity
@@ -1427,7 +1429,7 @@ def _place_internal_cable(ctx: _LayoutContext) -> None:
     result = ctx.result
     cx = ctx.cx
     y = ctx.y
-    cable_text = ctx.internal_cable
+    cable_text = format_cable_spec(ctx.internal_cable, multiline=False)
     # Cable annotation label — placed to the right of the spine, just below busbar.
     # Use y - 2 (closer to busbar) to avoid collision with feeder MCB labels
     # that are placed further down (at connect_y level).
@@ -1527,7 +1529,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
             if _m:
                 unit_number = _m.group(0)
 
-    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} KVA AT {voltage}V"
+    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} kVA"
 
     # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
     # For landlord supply, DB is always inside the tenant's unit.
@@ -1542,12 +1544,12 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     _is_sub_board = bool(_current_board.get("fed_from"))
     if not _is_sub_board:
         if unit_number:
-            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
+            db_location_text = f"{SG_LOCALE.meter_board.located_inside_unit} {unit_number}"
         elif application_info and application_info.get("address"):
-            db_location_text = f"(LOCATED AT {application_info['address']})"
+            db_location_text = f"LOCATED AT {application_info['address']}"
         elif ctx.supply_source == "landlord":
             # Landlord supply → DB is inside tenant's unit (no specific unit number)
-            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit})"
+            db_location_text = SG_LOCALE.meter_board.located_inside_unit
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
     ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"
@@ -1661,6 +1663,7 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     )
 
     busbar_y_row = y  # Default for single-row case
+    cumulative_idx = 0  # Track cumulative circuit index across rows
 
     for row_idx, row_circuits in enumerate(rows):
         row_count = len(row_circuits)
@@ -1690,23 +1693,27 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             result.busbar_start_x = min(result.busbar_start_x, row_bus_start)
             result.busbar_end_x = max(result.busbar_end_x, row_bus_end)
 
-            # BI Connector between rows (replacing plain vertical line)
-            bi_w = 16   # BIConnector symbol width
-            bi_h = 10   # BIConnector symbol height
             prev_busbar_y = result.busbar_y_per_row[row_idx - 1]
-            bi_y = (prev_busbar_y + busbar_y_row) / 2 - bi_h / 2
+            if getattr(ctx, 'skip_row_bi_connector', False):
+                # Protection groups: plain vertical line between rows (no BI connector)
+                result.connections.append(((cx, prev_busbar_y + 2), (cx, busbar_y_row)))
+            else:
+                # BI Connector between rows (replacing plain vertical line)
+                bi_w = 16   # BIConnector symbol width
+                bi_h = 10   # BIConnector symbol height
+                bi_y = (prev_busbar_y + busbar_y_row) / 2 - bi_h / 2
 
-            result.components.append(PlacedComponent(
-                symbol_name="BI_CONNECTOR",
-                x=cx - bi_w / 2,
-                y=bi_y,
-                label="BI CONN.",
-            ))
-            result.symbols_used.add("BI_CONNECTOR")
+                result.components.append(PlacedComponent(
+                    symbol_name="BI_CONNECTOR",
+                    x=cx - bi_w / 2,
+                    y=bi_y,
+                    label="BI CONN.",
+                ))
+                result.symbols_used.add("BI_CONNECTOR")
 
-            # Connection lines: prev busbar → BI top, BI bottom → new busbar
-            result.connections.append(((cx, prev_busbar_y + 2), (cx, bi_y)))
-            result.connections.append(((cx, bi_y + bi_h), (cx, busbar_y_row)))
+                # Connection lines: prev busbar → BI top, BI bottom → new busbar
+                result.connections.append(((cx, prev_busbar_y + 2), (cx, bi_y)))
+                result.connections.append(((cx, bi_y + bi_h), (cx, busbar_y_row)))
 
         sc_bus_start = row_bus_start
         result.busbar_y_per_row.append(busbar_y_row)
@@ -1719,7 +1726,9 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             busbar_y_row, sc_bus_start, row_bus_end,
             h_spacing, config, sub_circuits, supply_type, circuit_ids,
             use_triplets=ctx.use_triplets,
+            row_start_idx=cumulative_idx,
         )
+        cumulative_idx += row_count
 
     return busbar_y_row
 
@@ -1844,6 +1853,14 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
                 inc_size = float(inc_size) if inc_size else 0
             except (ValueError, TypeError) as exc:
                 logger.debug("Cable size float conversion failed: %r → %s", inc_size, exc)
+                inc_size = 0
+        elif isinstance(inc_cable, str) and inc_cable:
+            # Parse cable size from string like "4 x 50mm² PVC/PVC cable + 50mm² CPC"
+            import re
+            _m = re.search(r'(\d+(?:\.\d+)?)\s*(?:mm²|sqmm|mm2)', inc_cable)
+            try:
+                inc_size = float(_m.group(1)) if _m else 0
+            except (ValueError, TypeError):
                 inc_size = 0
         else:
             inc_size = 0
