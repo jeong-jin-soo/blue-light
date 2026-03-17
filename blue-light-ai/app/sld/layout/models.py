@@ -441,6 +441,8 @@ class LayoutResult:
     connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     thick_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
+    # Fixed connections: not affected by resolve_overlaps (e.g., VSS diagonal)
+    fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     junction_dots: list[tuple[float, float]] = field(default_factory=list)
     # CT branch junction arrows: (x, y, direction) — triangular connectors at CT branch points
     # direction: "left" or "right" (branch direction from spine)

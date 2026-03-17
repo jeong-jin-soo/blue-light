@@ -456,6 +456,8 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
         all_ys.extend([sy, ey])
     for (sx, sy), (ex, ey) in result.thick_connections:
         all_ys.extend([sy, ey])
+    for (sx, sy), (ex, ey) in result.fixed_connections:
+        all_ys.extend([sy, ey])
     for x1, y1, x2, y2 in result.solid_boxes:
         all_ys.extend([y1, y2])
     for dx, dy in result.junction_dots:
@@ -519,6 +521,8 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
         result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
         result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
+        result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
         result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
     for i, (dx, dy) in enumerate(result.junction_dots):
@@ -911,6 +915,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.connections.extend(source.connections)
     target.thick_connections.extend(source.thick_connections)
     target.dashed_connections.extend(source.dashed_connections)
+    target.fixed_connections.extend(source.fixed_connections)
     target.junction_dots.extend(source.junction_dots)
     target.junction_arrows.extend(source.junction_arrows)
     target.solid_boxes.extend(source.solid_boxes)
@@ -2004,7 +2009,7 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
             max_line_len = max(len(line) for line in lines)
             all_ys.append(comp.y + max_line_len * config.char_w_label)
 
-    for collection in (result.connections, result.dashed_connections, result.thick_connections):
+    for collection in (result.connections, result.dashed_connections, result.thick_connections, result.fixed_connections):
         for (sx, sy), (ex, ey) in collection:
             all_xs.extend([sx, ex])
             all_ys.extend([sy, ey])

@@ -769,6 +769,9 @@ class SldGenerator:
         # Thick connections — heavier line weight (0.5mm) for outgoing cable tick marks
         for start, end in layout_result.thick_connections:
             backend.add_line(start, end, lineweight=50)
+        # Fixed connections — not affected by resolve_overlaps (e.g., VSS diagonal)
+        for start, end in layout_result.fixed_connections:
+            backend.add_line(start, end)
 
     def _draw_fanout_groups(
         self, backend: DrawingBackend, layout_result: LayoutResult,

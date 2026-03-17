@@ -885,8 +885,8 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     metering_ct_center_y = cursor + ct_h / 2
     cursor += ct_h
 
-    # Advance past branches (VSS placed midway between ASS and BI)
-    highest_branch = metering_ct_center_y + ct_to_branch_gap * 2 + 5
+    # Advance past branches — reserve enough height for fuse + VSS + ASS branches
+    highest_branch = metering_ct_center_y + ct_to_branch_gap * 2 + 20
     cursor = max(cursor, highest_branch)
     cursor += ct_to_ct_gap
 
@@ -948,8 +948,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # --- 4. Branches from Metering CT ---
     # Reference DWG order (bottom → top): VSS/Voltmeter, ASS/Ammeter, 2A fuse, BI.
     branch_y = metering_ct_center_y
-    vss_branch_y = branch_y + ct_to_branch_gap  # VSS closer to metering CT (lower)
-    ass_branch_y = vss_branch_y + ct_to_branch_gap  # ASS just above VSS
+    ass_branch_y = branch_y + ct_to_branch_gap  # ASS above metering CT
+    # VSS Y: default fallback (overridden below when instrument fuse is present)
+    vss_branch_y = ass_branch_y + ct_to_branch_gap
 
     # Place Metering CT — label aligned with ASS branch height
     result.components.append(PlacedComponent(
@@ -958,18 +959,13 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     ))
     result.symbols_used.add("CT")
 
-    # Branch 1 (RIGHT): VSS → Voltmeter (circle with "V" inside + range label)
-    # Placed near Metering CT (lower position) — per reference DWG.
-    if ctx.has_voltmeter:
-        _place_metering_branch(
-            result, cx, vss_branch_y, direction="right",
-            components=[
-                ("SELECTOR_SWITCH", "VSS", 8.0),
-                ("VOLTMETER", ctx.voltmeter_range or "0-500V", 7.6),
-            ],
-            arm_len=branch_arm_len, gap=branch_gap,
-        )
-        result.junction_arrows.append((cx, vss_branch_y, "right"))
+    # Branch 1 (RIGHT): VSS → Voltmeter
+    # Reference DWG: VSS branch originates from the instrument fuse branch
+    # (midpoint between fuse and LED), NOT from the spine.
+    # Diagonal connection goes from fuse branch down to VSS at vss_branch_y.
+    # Placement is deferred until after the instrument fuse branch is placed,
+    # so we can compute the fuse-LED midpoint coordinates.
+    # (See "VSS diagonal branch" section below the instrument fuse.)
 
     # Branch 2 (LEFT): ASS → Ammeter (circle with "A" inside + range label)
     # Placed just above VSS — per reference DWG.
@@ -1037,20 +1033,110 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     ))
 
     # Instrument fuse (RIGHT branch below BI Connector)
-    # Reference DWG: 2A fuse for instrument protection (ammeter/voltmeter circuits).
-    # This is separate from the pre-MCCB fuse which protects voltage sensing.
+    # Reference DWG: 2A fuse + indicator lights for instrument protection
+    # (ammeter/voltmeter circuits). Same layout as pre-MCCB fuse branch.
     if ctx._ct_pre_mccb_fuse:  # instrument fuse present when CT metering is active
-        _inst_fuse_y = (ass_branch_y + bi_y) / 2  # midpoint between ASS and BI
+        # Position very close to BI so VSS diagonal doesn't overlap KWH box
+        _inst_fuse_y = bi_y - 4.0  # 4mm below BI connector
+        # VSS Y: below fuse branch with longer diagonal for visual clarity
+        vss_branch_y = _inst_fuse_y - 10.0
+        _inst_fuse_components: list[tuple[str, str, float]] = [
+            ("POTENTIAL_FUSE", "2A", pf_h),
+        ]
+        if ctx.has_indicator_lights:
+            from app.sld.real_symbols import get_symbol_dimensions as _get_il_dims
+            _il_dims = _get_il_dims("INDICATOR_LIGHTS")
+            _inst_fuse_components.append(("INDICATOR_LIGHTS", "", _il_dims["width_mm"]))
+        _inst_fuse_gap = 10.0  # wider gap for VSS diagonal start visibility
         _place_metering_branch(
             result, cx, _inst_fuse_y, direction="right",
-            components=[
-                ("POTENTIAL_FUSE", "2A", pf_h),
-            ],
+            components=_inst_fuse_components,
             arm_len=8.0,
-            gap=3.0,
+            gap=_inst_fuse_gap,
         )
         result.junction_dots.append((cx, _inst_fuse_y))
         result.symbols_used.add("POTENTIAL_FUSE")
+        if ctx.has_indicator_lights:
+            result.symbols_used.add("INDICATOR_LIGHTS")
+
+        # --- VSS diagonal branch (from fuse-LED midpoint) ---
+        # Reference DWG: diagonal originates at midpoint between fuse right stub
+        # tip and LED left stub tip, going down-right to VSS left stub tip.
+        if ctx.has_voltmeter:
+            from app.sld.real_symbols import get_real_symbol as _get_vss_sym
+            _pf_sym = _get_vss_sym("POTENTIAL_FUSE")
+            _pf_hp = _pf_sym.horizontal_pins(0, 0)
+            _pf_stub = getattr(_pf_sym, '_stub', 1.5)
+            _pf_body_w = _pf_hp["right"][0] - _pf_hp["left"][0] - 2 * _pf_stub
+
+            _il_sym = _get_vss_sym("INDICATOR_LIGHTS")
+            _il_stub = getattr(_il_sym, '_stub', 3.0)  # default 3.0 in _place_metering_branch
+
+            # Fuse right stub tip = cx + arm + body_w + stub
+            _fuse_right_stub_tip = cx + 8.0 + _pf_body_w + _pf_stub
+            # LED left stub tip = cx + arm + body_w + gap - il_stub
+            _led_left_stub_tip = cx + 8.0 + _pf_body_w + _inst_fuse_gap - _il_stub
+            # Exact midpoint between the two stub tips
+            _diag_start_x = (_fuse_right_stub_tip + _led_left_stub_tip) / 2
+            _diag_start_y = _inst_fuse_y
+
+            # VSS + Voltmeter placed horizontally at vss_branch_y
+            _vss_sym = _get_vss_sym("SELECTOR_SWITCH")
+            _vss_r = getattr(_vss_sym, '_radius', 2.0)
+            _vss_stub = getattr(_vss_sym, '_stub', 2.0)
+            _vss_body_w = 2 * _vss_r  # 4.0mm
+
+            _vm_sym = _get_vss_sym("VOLTMETER")
+            _vm_r = getattr(_vm_sym, '_radius', 2.0)
+            _vm_stub = getattr(_vm_sym, '_stub', 2.0)
+            _vm_body_w = 2 * _vm_r  # 4.0mm
+
+            # 45° diagonal: horizontal shift = vertical drop.
+            # Diagonal end connects to VSS left stub tip.
+            _vert_drop = _diag_start_y - vss_branch_y
+            # diag_end_x = diag_start_x + vert_drop (true 45°)
+            _diag_end_x = _diag_start_x + _vert_drop
+            _diag_end_y = vss_branch_y
+            # VSS body starts at stub distance right of diagonal end
+            _vss_body_x = _diag_end_x + _vss_stub
+
+            # Diagonal connection: fuse-LED midpoint → VSS left stub tip
+            # Use fixed_connections to prevent validate_connectivity from
+            # snapping this diagonal to nearby component pins.
+            result.fixed_connections.append((
+                (_diag_start_x, _diag_start_y),
+                (_diag_end_x, _diag_end_y),
+            ))
+
+            # Place VSS component
+            result.components.append(PlacedComponent(
+                symbol_name="SELECTOR_SWITCH",
+                x=_vss_body_x,
+                y=vss_branch_y,
+                label="VSS",
+                rotation=90.0,
+            ))
+            result.symbols_used.add("SELECTOR_SWITCH")
+
+            # Gap connection: VSS right pin → Voltmeter left pin
+            _vss_right_pin_x = _vss_body_x + _vss_body_w + _vss_stub
+            _vm_body_x = _vss_right_pin_x + branch_gap
+            _vm_left_pin_x = _vm_body_x - _vm_stub
+            result.connections.append((
+                (_vss_right_pin_x, vss_branch_y),
+                (_vm_left_pin_x, vss_branch_y),
+            ))
+
+            # Place Voltmeter component (last on branch → no right stub)
+            result.components.append(PlacedComponent(
+                symbol_name="VOLTMETER",
+                x=_vm_body_x,
+                y=vss_branch_y,
+                label=ctx.voltmeter_range or "0-500V",
+                rotation=90.0,
+                no_right_stub=True,
+            ))
+            result.symbols_used.add("VOLTMETER")
 
     # BI Connector — include isolator/busbar rating (e.g., "100A BI CONNECTOR")
     _bi_rating = ctx.busbar_rating or ctx.breaker_rating or 0
@@ -1182,7 +1268,7 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
         result, cx, branch_y, direction="right",
         components=components,
         arm_len=8.0,
-        gap=3.0,
+        gap=6.0,
     )
     result.junction_dots.append((cx, branch_y))
     result.symbols_used.add("POTENTIAL_FUSE")
