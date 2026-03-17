@@ -366,7 +366,7 @@ def compute_layout(
     else:
         # ═══ SINGLE-DB PATH ═══
         _place_incoming_supply(ctx)
-        if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
+        if ctx.metering == "ct_meter":
             # CT metering: spine order (supply → load):
             #   MCCB → Protection CT → Metering CT → BI
             # Fuses are horizontal RIGHT branches (not on spine).

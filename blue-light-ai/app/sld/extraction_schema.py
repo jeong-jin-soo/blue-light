@@ -101,7 +101,7 @@ class IncomingData(BaseModel):
     kva: Optional[float] = Field(None, description="Total load capacity in kVA")
     phase: Optional[str] = Field(None, description="single_phase or three_phase")
     voltage: Optional[int] = Field(None, description="Supply voltage (230 or 400)")
-    supply_source: Optional[str] = Field(None, description="sp_powergrid or landlord")
+    supply_source: Optional[str] = Field(None, description="sp_powergrid, landlord, or building_riser")
     incoming_label: Optional[str] = Field(None, description="Supply source label for SLD diagram, e.g. 'FROM LANDLORD RISER'")
     main_breaker: Optional[BreakerSpec] = Field(None, description="[A] Main Breaker")
     cable: Optional[CableSpec] = Field(None, description="[B] Incoming Cable")
@@ -711,11 +711,16 @@ def normalize_to_generation_format(
         # kVA
         requirements["kva"] = inc.kva or 0
 
-        # Supply source (landlord vs sp_powergrid)
+        # Supply source (landlord vs building_riser vs sp_powergrid)
         if inc.supply_source:
             requirements["supply_source"] = inc.supply_source
         if inc.incoming_label:
             requirements["incoming_label"] = inc.incoming_label
+            # Auto-correct supply_source from incoming_label when Gemini returns
+            # generic "landlord" but the label explicitly says "BUILDING RISER".
+            _label_upper = inc.incoming_label.upper()
+            if "BUILDING RISER" in _label_upper and requirements.get("supply_source") != "building_riser":
+                requirements["supply_source"] = "building_riser"
 
         # Main breaker
         mb = inc.main_breaker

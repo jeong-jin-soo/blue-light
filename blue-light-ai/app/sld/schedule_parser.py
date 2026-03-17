@@ -72,15 +72,19 @@ Extract EVERY row from the circuit table:
 - Common cable: "2 x 1C 2.5mm² PVC + 2.5mm² CPC in G.I. conduit / metal trunking"
 
 ## Supply Source & Metering Rules
+- supply_source and metering are INDEPENDENT properties:
+  - supply_source: WHERE the power comes from → determines incoming_label, isolator type
+  - metering: HOW metering is done → determines CT metering section rendering
 - supply_source: "sp_powergrid" (SP PowerGrid direct supply) or "landlord" (building riser / landlord supply)
-- **IMPORTANT — Explicit metering equipment overrides supply_source inference**:
-  - If the schedule explicitly mentions metering equipment such as "kWh meter", "CT", "SPPG", "CT ratio", ammeter, voltmeter, or ELR, then metering MUST be set according to what is stated, regardless of supply_source.
-  - "SPPG kWh meter" with a CT ratio (e.g. "100/5A CT") → metering type = "ct_meter".
-  - "SPPG kWh meter" without CT → metering type = "sp_meter".
-  - supply_source should be "sp_powergrid" when explicit SP metering equipment (kWh meter, CT ratio) is present, even if the supply text says "building riser".
-- **Landlord supply** (supply from building riser, with NO metering equipment listed): Set metering to null.
-  - Landlord installations have their own isolator inside the unit, NOT an SP meter board.
-  - Keywords (when NO metering equipment is mentioned): "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
+- **IMPORTANT — supply_source and metering are determined independently**:
+  - supply_source is determined ONLY from supply text keywords (building riser → "landlord", SP/HDB → "sp_powergrid"). Do NOT change supply_source based on metering equipment.
+  - metering is determined from explicit metering equipment in the schedule:
+    - "SPPG kWh meter" with CT ratio (e.g. "100/5A CT") → metering type = "ct_meter"
+    - "SPPG kWh meter" without CT → metering type = "sp_meter"
+    - No metering equipment mentioned → metering = null
+  - A landlord supply CAN have CT metering (e.g., SPPG kWh + CT in a building riser installation). This is common for larger commercial tenants.
+- **Landlord supply**: Keywords: "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
+  - Landlord installations have their own isolator inside the unit (enclosed type), NOT an SP meter board.
 - **SP PowerGrid supply** (direct SP supply): metering is "sp_meter" (residential) or "ct_meter" (≥125A three-phase).
   - Keywords: "INCOMING FROM HDB", "SP POWERGRID", "FROM SP"
 - If supply source is unclear, default to "sp_powergrid".
@@ -266,7 +270,7 @@ Extract EVERY row from the circuit table:
     When creating protection_groups, each group has its own RCCB (typically 2P for single-phase groups within a 3-phase board) and its own busbar segment. Circuits NOT assigned to a specific phase go into the board's `outgoing_circuits`.
     **IMPORTANT — 4P RCCB rule**: If the schedule shows a SINGLE 4P RCCB (e.g., "63A 4P RCCB 30mA") for the entire board, do NOT split it into per-phase 2P RCCB groups. Instead, put ALL circuits into the board's `outgoing_circuits` (with their phase assignments) and set the board-level `elcb` to that 4P RCCB. Only create separate per-phase `protection_groups` when the schedule explicitly shows different/separate RCCBs per phase (e.g., "40A 2P RCCB" for each phase).
 12. **Phase normalization**: Always normalize phase names to L1/L2/L3. Convert R→L1, Y→L2, B→L3, RED→L1, YELLOW→L2, BLUE→L3.
-13. **Metering**: For landlord supply (supply_source="landlord") with NO explicit metering equipment mentioned, metering MUST be null. However, if the schedule explicitly lists metering equipment (kWh meter, CT, SPPG, ammeter, voltmeter, ELR), set metering accordingly and change supply_source to "sp_powergrid".
+13. **Metering**: supply_source and metering are INDEPENDENT. For landlord supply with NO metering equipment mentioned → metering = null. If the schedule explicitly lists metering equipment (kWh meter, CT, SPPG, ammeter, voltmeter, ELR) → set metering accordingly (ct_meter or sp_meter). Do NOT change supply_source — a landlord supply can have CT metering.
 14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations."""
 
 
@@ -711,9 +715,9 @@ async def extract_schedule_from_file(
     # Count total circuits across all paths
     circuit_count = len(extracted_data.get("outgoing_circuits", []))
     for _db in extracted_data.get("distribution_boards", []):
-        circuit_count += len(_db.get("outgoing_circuits", []))
-        for _pg in _db.get("protection_groups", []):
-            circuit_count += len(_pg.get("circuits", []))
+        circuit_count += len(_db.get("outgoing_circuits") or [])
+        for _pg in (_db.get("protection_groups") or []):
+            circuit_count += len(_pg.get("circuits") or [])
     logger.info(
         "Schedule extraction complete: file_type=%s, circuits=%d, warnings=%d",
         file_type, circuit_count, len(warnings),

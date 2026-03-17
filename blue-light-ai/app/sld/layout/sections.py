@@ -303,15 +303,21 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
     result.sections_rendered["incoming_supply"] = True
 
     # --- Non-metered / CT-metered supply (landlord / building_riser) ---
-    # Priority: user-specified label > cable extension > supply_source > default
-    if ctx.requirements.get("incoming_label"):
-        supply_label = ctx.requirements["incoming_label"]
-    elif ctx.is_cable_extension:
+    # Priority: supply_source locale > user-specified label > cable extension > default
+    # Known supply_source types always use locale labels (Gemini-extracted labels
+    # may omit the "SUPPLY" prefix — e.g. "FROM BUILDING RISER" instead of
+    # "SUPPLY FROM BUILDING RISER").
+    if ctx.is_cable_extension:
         supply_label = SG_LOCALE.incoming.from_power_supply
     elif supply_source == "building_riser":
         supply_label = SG_LOCALE.incoming.from_building_riser
-    elif ctx.requirements.get("supply_label_type") == "supply":
-        supply_label = SG_LOCALE.incoming.from_landlord_supply
+    elif supply_source == "landlord":
+        if ctx.requirements.get("supply_label_type") == "supply":
+            supply_label = SG_LOCALE.incoming.from_landlord_supply
+        else:
+            supply_label = SG_LOCALE.incoming.from_landlord
+    elif ctx.requirements.get("incoming_label"):
+        supply_label = ctx.requirements["incoming_label"]
     else:
         supply_label = SG_LOCALE.incoming.from_landlord
 
@@ -592,18 +598,18 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     supply_end_x = g.mcb_right_x + 20
     result.connections.append(((g.mcb_right_x, g.mb_center_y), (supply_end_x, g.mb_center_y)))
 
-    # Incoming label
-    if ctx.requirements.get("incoming_label"):
-        supply_label = ctx.requirements["incoming_label"]
-    elif ctx.is_cable_extension:
+    # Incoming label — known supply_source types always use locale labels
+    if ctx.is_cable_extension:
         supply_label = SG_LOCALE.incoming.from_power_supply
+    elif ctx.supply_source == "building_riser":
+        supply_label = SG_LOCALE.incoming.from_building_riser
     elif ctx.supply_source == "landlord":
         if ctx.requirements.get("supply_label_type") == "supply":
             supply_label = SG_LOCALE.incoming.from_landlord_supply
         else:
             supply_label = SG_LOCALE.incoming.from_landlord
-    elif ctx.supply_source == "building_riser":
-        supply_label = SG_LOCALE.incoming.from_building_riser
+    elif ctx.requirements.get("incoming_label"):
+        supply_label = ctx.requirements["incoming_label"]
     else:
         supply_label = SG_LOCALE.incoming.incoming_hdb
     result.components.append(PlacedComponent(
@@ -1203,8 +1209,20 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         if not isolator_rating and breaker_rating:
             isolator_rating = breaker_rating  # Same rating as main breaker
         if not isolator_label_extra:
-            # Unit number is shown on the DB box label, not on the isolator
-            isolator_label_extra = SG_LOCALE.meter_board.located_inside_unit
+            # Include unit number from application_info if available
+            # Reference: "LOCATED INSIDE UNIT #05-26"
+            _unit_no = ""
+            if ctx.application_info:
+                _unit_no = str(ctx.application_info.get("unit_number", "")).strip()
+                if not _unit_no and ctx.application_info.get("address"):
+                    import re as _re
+                    _m = _re.search(r"#\d{2,}-\d{2,}", ctx.application_info["address"])
+                    if _m:
+                        _unit_no = _m.group(0)
+            if _unit_no:
+                isolator_label_extra = f"{SG_LOCALE.meter_board.located_inside_unit} {_unit_no}"
+            else:
+                isolator_label_extra = SG_LOCALE.meter_board.located_inside_unit
     elif not isolator_rating and supply_source not in ("landlord", "building_riser"):
         # Other supply sources (sp_powergrid, etc.): unit isolator sized to
         # next standard rating.  Note: metering is temporarily cleared by
