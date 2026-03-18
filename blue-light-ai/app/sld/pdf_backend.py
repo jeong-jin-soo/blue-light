@@ -32,7 +32,7 @@ _LAYER_COLORS: dict[str, tuple[float, float, float]] = {
     "SLD_ANNOTATIONS": (0.0, 0.0, 0.0),
     "SLD_TITLE_BLOCK": (0.0, 0.0, 0.0),
     "SLD_FRAME": (0.0, 0.0, 0.0),
-    "SLD_DB_FRAME": (0.0, 0.0, 0.0),
+    "SLD_DB_FRAME": (0.502, 0.502, 0.502),  # Gray, matching DXF ACI color 8
 }
 
 # Line widths per layer calibrated from real LEW SLD samples (0.25mm uniform)
@@ -294,6 +294,66 @@ class PdfBackend:
         c.setStrokeColorRGB(0, 0, 0)
         c.rect(x * mm, y * mm, width * mm, height * mm, stroke=1, fill=1)
         c.restoreState()
+
+    # -- Composite drawing methods (DrawingBackend protocol) --
+
+    def draw_center_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        long_dash: float = 8.0,
+        short_dash: float = 1.5,
+        gap: float = 2.0,
+    ) -> None:
+        """Draw IEC CENTER linetype line procedurally on SLD_DB_FRAME layer (gray)."""
+        prev_layer = self._current_layer
+        self.set_layer("SLD_DB_FRAME")
+
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = math.sqrt(dx * dx + dy * dy)
+        if length < 0.1:
+            self.set_layer(prev_layer)
+            return
+
+        ux, uy = dx / length, dy / length
+        pattern = [long_dash, gap, short_dash, gap]
+        pos = 0.0
+        step_idx = 0
+        while pos < length:
+            seg_len = pattern[step_idx % 4]
+            if step_idx % 2 == 0:  # dash segments
+                seg_start = (start[0] + ux * pos, start[1] + uy * pos)
+                seg_end_pos = min(pos + seg_len, length)
+                seg_end = (start[0] + ux * seg_end_pos, start[1] + uy * seg_end_pos)
+                self.add_line(seg_start, seg_end)
+            pos += seg_len
+            step_idx += 1
+
+        self.set_layer(prev_layer)
+
+    def draw_fanout(
+        self,
+        center_x: float,
+        busbar_y: float,
+        side_xs: list[float],
+        mcb_bottom_y: float,
+    ) -> None:
+        """Draw 3-phase fan-out procedurally: center vertical + diagonals + side verticals."""
+        _FAN_RATIO = 0.266
+
+        # Center vertical: busbar → MCB bottom
+        self.add_line((center_x, busbar_y), (center_x, mcb_bottom_y))
+
+        for sx in side_xs:
+            dx = sx - center_x
+            fan_h = abs(dx) * _FAN_RATIO
+            intermediate_y = busbar_y + fan_h
+            # Diagonal: center busbar → side intermediate
+            self.add_line((center_x, busbar_y), (sx, intermediate_y))
+            # Side vertical: intermediate → MCB bottom
+            self.add_line((sx, intermediate_y), (sx, mcb_bottom_y))
 
     # -- Output --
 

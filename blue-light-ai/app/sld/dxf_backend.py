@@ -333,7 +333,24 @@ class DxfBackend:
             },
         )
 
-    def create_fanout_block(
+    # -- Composite drawing methods (DrawingBackend protocol) --
+
+    def draw_center_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        long_dash: float = 8.0,
+        short_dash: float = 1.5,
+        gap: float = 2.0,
+    ) -> None:
+        """Draw IEC CENTER linetype line using native DXF linetype on SLD_DB_FRAME layer."""
+        prev_layer = self._current_layer
+        self.set_layer("SLD_DB_FRAME")
+        self.add_line(start, end)
+        self._current_layer = prev_layer
+
+    def draw_fanout(
         self,
         center_x: float,
         busbar_y: float,
@@ -348,12 +365,6 @@ class DxfBackend:
           - Sides: diagonal from center busbar to intermediate, then vertical to MCB
 
         Reference ratio: fan_height / spacing = 193 / 727 ≈ 0.266
-
-        Args:
-            center_x: X coordinate of center circuit on busbar.
-            busbar_y: Y coordinate of busbar line.
-            side_xs: X coordinates of side circuits (1 or 2 elements).
-            mcb_bottom_y: Y coordinate of MCB bottom contact.
         """
         _FAN_RATIO = 0.266
 

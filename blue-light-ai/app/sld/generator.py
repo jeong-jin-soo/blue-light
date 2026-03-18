@@ -354,11 +354,16 @@ class SldGenerator:
         return ditto_indices, ditto_prev_map
 
     def _draw_label_component(self, backend: DrawingBackend, comp: PlacedComponent) -> None:
-        """Draw a text-only LABEL component."""
+        """Draw a text-only LABEL component.
+
+        Sub-circuit labels use top-left anchor (center_across=False) so that
+        single-line and multi-line labels start at the same Y position.
+        """
         backend.set_layer("SLD_ANNOTATIONS")
         backend.add_mtext(
             comp.label, insert=(comp.x, comp.y),
-            char_height=2.8, rotation=comp.rotation, center_across=True,
+            char_height=LayoutConfig.label_char_height, rotation=comp.rotation,
+            center_across=False,
         )
 
     def _draw_busbar_component(
@@ -499,7 +504,12 @@ class SldGenerator:
         elif comp.label:
             label_text = comp.label
 
-        ch = config.label_ch_horizontal
+        # Spine/meter board breaker/isolator labels use 1.8mm (larger than CT metering 1.6mm)
+        is_spine_or_meterboard = comp.symbol_name in (
+            "CB_ELCB", "CB_RCCB", "CB_MCB", "CB_MCCB", "CB_ACB",
+            "ISOLATOR", "ISOLATOR_ENCLOSED",
+        )
+        ch = 1.8 if is_spine_or_meterboard else config.label_ch_horizontal
         wr = config.text_width_ratio
         gap = config.symbol_label_gap
 
@@ -734,17 +744,11 @@ class SldGenerator:
             # Horizontal text (all text upright, no rotation)
             if comp.label_style == "breaker_block":
                 # Sub-circuit breaker — info items stacked vertically, right of symbol
-                # Phase 8A: DXF 백엔드에서 블록 실제 폭 기준으로 라벨 배치
+                # Label offset computed from block library (consistent across all backends)
                 sym_w, sym_h = self._get_breaker_dims(comp.breaker_type_str)
-                if isinstance(backend, DxfBackend):
-                    sym_name = f"CB_{comp.breaker_type_str}" if comp.breaker_type_str else comp.symbol_name
-                    _sym = self._get_symbol(sym_name)
-                    lx = _sym.label_offset_x(backend) if _sym else sym_w + 3
-                    base_x = comp.x + lx
-                elif comp.breaker_type_str in ("MCCB", "ACB"):
-                    base_x = comp.x + config.breaker_label_x_wide
-                else:
-                    base_x = comp.x + config.breaker_label_x_default
+                sym_name = f"CB_{comp.breaker_type_str}" if comp.breaker_type_str else comp.symbol_name
+                _sym = self._get_symbol(sym_name)
+                base_x = comp.x + (_sym.label_offset_x() if _sym else sym_w + 3)
                 char_h = config.label_ch_breaker_sub
                 line_gap = char_h + config.breaker_line_gap_v
 
@@ -793,61 +797,42 @@ class SldGenerator:
     ) -> None:
         """Draw 3-phase fan-out groups.
 
-        DXF backend: creates editable FANOUT_3P blocks.
-        PDF/SVG backend: draws procedural lines matching reference DXF geometry.
+        Each backend implements draw_fanout() with format-specific rendering:
+        DXF: creates editable FANOUT_3P blocks.
+        PDF/SVG: draws all line types procedurally (center vertical + diagonals + side verticals).
 
         Reference: 63A TPN SLD 14 — dy/dx ratio = 193/727 ≈ 0.266
         """
         if not layout_result.fanout_groups:
             return
 
-        _FAN_RATIO = 0.266
         backend.set_layer("SLD_CONNECTIONS")
 
         for center_x, busbar_y, side_xs in layout_result.fanout_groups:
-            if isinstance(backend, DxfBackend):
-                # Find MCB bottom Y
-                max_spacing = max(abs(sx - center_x) for sx in side_xs)
-                mcb_bottom_y = busbar_y + max_spacing  # approximate
-                # Better: find the actual MCB Y from connections
+            # Resolve MCB stub bottom Y for each circuit in the fanout group.
+            # For each x (center + sides), find the first connection endpoint
+            # above the busbar — this is the MCB stub bottom (pin position).
+            def _find_stub_bottom(target_x: float) -> float:
                 for start, end in layout_result.connections:
                     (sx, sy), (ex, ey) = start, end
-                    if abs(sx - center_x) < 0.5 and abs(ex - center_x) < 0.5:
-                        if sy > busbar_y and ey > sy:
-                            mcb_bottom_y = ey
-                            break
-                        if ey > busbar_y and sy > ey:
-                            mcb_bottom_y = sy
-                            break
-                backend.create_fanout_block(
-                    center_x, busbar_y, side_xs, mcb_bottom_y,
-                )
-            else:
-                # PDF/SVG: draw procedural lines
-                for sx in side_xs:
-                    dx = sx - center_x
-                    fan_h = abs(dx) * _FAN_RATIO
-                    # Diagonal: center busbar → side intermediate
-                    backend.add_line(
-                        (center_x, busbar_y),
-                        (sx, busbar_y + fan_h),
-                    )
+                    if abs(sx - target_x) < 0.5 and abs(ex - target_x) < 0.5:
+                        lo, hi = min(sy, ey), max(sy, ey)
+                        if lo > busbar_y and hi - lo < 15:  # short segment = busbar→stub
+                            return hi
+                return busbar_y + max(abs(sx - center_x) for sx in side_xs)
+
+            mcb_bottom_y = _find_stub_bottom(center_x)
+            backend.draw_fanout(center_x, busbar_y, side_xs, mcb_bottom_y)
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw dashed connection lines (DB box boundary per reference DWG).
 
-        Reference uses IEC CENTER linetype: long dash + short dash alternating.
-        DXF backend: single LINE per side with CENTER linetype on SLD_DB_FRAME layer.
-        PDF/SVG backend: procedural dash pattern via _draw_center_line().
+        Each backend implements draw_center_line() with format-specific rendering:
+        DXF: single LINE on SLD_DB_FRAME layer with native CENTER linetype (gray).
+        PDF/SVG: procedural dash pattern on SLD_DB_FRAME layer (gray).
         """
-        if isinstance(backend, DxfBackend):
-            backend.set_layer("SLD_DB_FRAME")
-            for start, end in layout_result.dashed_connections:
-                backend.add_line(start, end)
-        else:
-            backend.set_layer("SLD_CONNECTIONS")
-            for start, end in layout_result.dashed_connections:
-                _draw_center_line(backend, start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
+        for start, end in layout_result.dashed_connections:
+            backend.draw_center_line(start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
 
     def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw filled junction dots at busbar tap points."""
@@ -1020,39 +1005,3 @@ def _draw_dashed_line(
         pos += segment_len
 
 
-def _draw_center_line(
-    backend: DrawingBackend,
-    start: tuple[float, float],
-    end: tuple[float, float],
-    long_dash: float = 8.0,
-    short_dash: float = 1.5,
-    gap: float = 2.0,
-) -> None:
-    """Draw an IEC CENTER linetype: long dash, gap, short dash, gap, repeat.
-
-    Reference DWG uses this pattern for DB box boundaries.
-    """
-    dx = end[0] - start[0]
-    dy = end[1] - start[1]
-    length = math.sqrt(dx * dx + dy * dy)
-
-    if length < 0.1:
-        return
-
-    ux, uy = dx / length, dy / length
-    # Pattern: [long_dash, gap, short_dash, gap]
-    pattern = [long_dash, gap, short_dash, gap]
-    cycle_len = sum(pattern)
-
-    pos = 0.0
-    step_idx = 0
-    while pos < length:
-        seg_len = pattern[step_idx % 4]
-        is_dash = (step_idx % 2 == 0)  # even indices = dash, odd = gap
-        if is_dash:
-            seg_start = (start[0] + ux * pos, start[1] + uy * pos)
-            seg_end_pos = min(pos + seg_len, length)
-            seg_end = (start[0] + ux * seg_end_pos, start[1] + uy * seg_end_pos)
-            backend.add_line(seg_start, seg_end)
-        pos += seg_len
-        step_idx += 1

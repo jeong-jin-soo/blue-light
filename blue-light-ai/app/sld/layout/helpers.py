@@ -82,12 +82,16 @@ def _normalize_load_quantity(text: str) -> str:
     if not text or text.upper() == "SPARE":
         return text
 
-    # Split on '+' separator for multi-item descriptions
+    # Split on '+' separator for multi-item descriptions.
+    # Each part is normalized independently (quantity prefix added).
+    # Max 2 lines per LEW reference: line 1 = first item, line 2 = remaining items joined.
     if "+" in text:
         parts = [p.strip() for p in text.split("+")]
         normalized = [_normalize_single_quantity(p) for p in parts if p]
-        # Join with \\P (DXF/SVG line break) so each item starts on its own line
-        return "\\P".join(normalized)
+        if len(normalized) <= 2:
+            return "\\P".join(normalized)
+        # 3+ items: first item on line 1, rest joined with ", " on line 2
+        return normalized[0] + "\\P" + ", ".join(normalized[1:])
 
     return _normalize_single_quantity(text)
 
@@ -122,6 +126,10 @@ def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
     if len(lines) > max_lines:
         target = len(text) // max_lines + 1
         lines = _split_words(target)
+
+    # Hard cap: never exceed max_lines (truncate with "..." if necessary)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
 
     return "\\P".join(lines)
 
@@ -876,11 +884,9 @@ def _place_sub_circuits_upward(
             # Per LEW reference: all sub-circuit breakers use MCB symbol (CB_MCB),
             # even isolator-load circuits. The DP ISOL device box is added separately
             # at the conductor top by _add_isolator_device_symbols().
-            _symbol_name = f"CB_{cd['breaker_type']}"
-            # Mark isolator-load circuits for DP ISOL device rendering
-            _btype_str = cd["breaker_type"]
-            if cd.get("_is_isolator_load"):
-                _btype_str = "ISOLATOR"  # used by _add_isolator_device_symbols()
+            _is_isol = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
+            _symbol_name = "CB_MCB" if _is_isol else f"CB_{cd['breaker_type']}"
+            _btype_str = "ISOLATOR" if _is_isol else cd["breaker_type"]
             result.components.append(PlacedComponent(
                 symbol_name=_symbol_name,
                 x=tap_x - sc_cb_w / 2, y=sc_y,
@@ -895,7 +901,7 @@ def _place_sub_circuits_upward(
 
         # Conductor tail (extends upward past cable leader line)
         breaker_top_y = sc_y + sc_cb_h + config.stub_len
-        _leader_y_from_busbar = (config.db_box_busbar_margin + config.mcb_h
+        _leader_y_from_busbar = (config.db_box_busbar_margin + sc_cb_h
                                  + config.stub_len + config.db_box_tail_margin
                                  + config.db_box_label_margin
                                  + config.leader_margin_above_db)
@@ -904,16 +910,24 @@ def _place_sub_circuits_upward(
                              _leader_y_from_busbar - _breaker_top_from_busbar + 5)
         tail_end_y = breaker_top_y + effective_tail
 
-        # ISOLATOR: extra space for device box
+        # Conductor ends at tail_end_y.  ISOLATOR device box (3.8mm) is added
+        # later by _add_isolator_device_symbols() sitting ON TOP of the conductor end.
         _ISOL_DEVICE_BOX_H = 3.8
-        _isol_extra = _ISOL_DEVICE_BOX_H if cd.get("_is_isolator_load") else 0.0
-        conductor_top_y = tail_end_y + _isol_extra
+        _is_isol_circuit = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
+        conductor_top_y = tail_end_y + (_ISOL_DEVICE_BOX_H if _is_isol_circuit else 0.0)
         result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
 
-        # Circuit name label
-        display_label = _build_display_label(circuit, cd["name"], conductor_top_y, config)
+        # Circuit name label — above device box for ISOLATOR, above conductor for MCB.
+        # When row has ISOLATORs, all labels align at the ISOLATOR label height.
+        _has_any_isol = any(
+            c.get("_is_isolator_load") or str(c.get("breaker_type", "")).upper() == "ISOLATOR"
+            for c in row_circuits
+        )
+        _ISOL_LABEL_GAP = 4.0  # gap above device box top to clear the symbol
+        label_y = tail_end_y + (_ISOL_DEVICE_BOX_H + _ISOL_LABEL_GAP if _has_any_isol else 2)
+        display_label = _build_display_label(circuit, cd["name"], label_y, config)
         result.components.append(PlacedComponent(
-            symbol_name="LABEL", x=tap_x, y=conductor_top_y + 2,
+            symbol_name="LABEL", x=tap_x, y=label_y,
             label=display_label, rotation=90.0,
         ))
 

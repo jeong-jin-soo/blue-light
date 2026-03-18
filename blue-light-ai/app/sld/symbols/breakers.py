@@ -98,16 +98,12 @@ class CircuitBreaker(BaseSymbol):
             end_angle=90,
         )
 
-        # -- Top connection line (from outer edge of top contact to symbol top) --
-        backend.add_line((cx, contact_top_y + cr), (cx, y + h))
-
-        # -- Bottom connection line (from symbol bottom to outer edge of bottom contact) --
-        backend.add_line((cx, y), (cx, contact_bottom_y - cr))
-
-        # -- Connection stubs (top and bottom) --
+        # -- Connection stubs (from outer edge of contacts outward) --
+        # Per LEW reference: NO line between contacts — only arc + contacts.
+        # Stubs extend from contact outer edges to pin positions.
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((cx, y + h), (cx, y + h + 5))
-        backend.add_line((cx, y), (cx, y - 5))
+        backend.add_line((cx, contact_top_y + cr), (cx, y + h + 5))
+        backend.add_line((cx, y - 5), (cx, contact_bottom_y - cr))
 
 
 class ACB(CircuitBreaker):

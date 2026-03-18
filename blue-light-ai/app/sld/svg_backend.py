@@ -29,7 +29,7 @@ _LAYER_COLORS: dict[str, str] = {
     "SLD_ANNOTATIONS": "#000000",
     "SLD_TITLE_BLOCK": "#000000",
     "SLD_FRAME": "#000000",
-    "SLD_DB_FRAME": "#000000",
+    "SLD_DB_FRAME": "#808080",  # Gray, matching DXF ACI color 8
 }
 
 # Layer -> stroke width calibrated from real LEW SLD samples (0.25mm uniform)
@@ -223,25 +223,12 @@ class SvgBackend:
         color = self._text_color()
         line_spacing = char_height * 1.4
 
-        # Build transform attribute for rotation
-        transform = ""
-        if abs(rotation) > 0.1:
-            svg_x = x
-            svg_y = self._flip_y(insert[1])
-            transform = f' transform="rotate({-rotation},{svg_x:.2f},{svg_y:.2f})"'
-
-        if len(lines) == 1:
-            escaped = escape(lines[0])
-            self._elements.append(
-                f'<text x="{x:.2f}" y="{base_y:.2f}" '
-                f'font-family="Arial, Helvetica, sans-serif" font-size="{char_height:.1f}" '
-                f'fill="{color}"{transform}>{escaped}</text>'
-            )
-        elif abs(rotation) > 0.1:
-            # Rotated multiline: <tspan dy> offsets are applied in the
-            # rotated coordinate system, so dy shifts horizontally instead
-            # of vertically when rotation=90°.  Fix by emitting separate
-            # <text> elements with pre-rotated absolute coordinates.
+        if abs(rotation) > 0.1 and len(lines) >= 1:
+            # Rotated text (single or multi-line): emit separate <text>
+            # elements per line, each rotating around its own (lx, ly) point.
+            # This ensures: (1) line spacing works after rotation, and
+            # (2) single-line and multi-line first lines share the same
+            #     position formula, so labels align at the same visual height.
             rot_rad = math.radians(-rotation)
             cos_r = math.cos(rot_rad)
             sin_r = math.sin(rot_rad)
@@ -249,30 +236,39 @@ class SvgBackend:
                 f'font-family="Arial, Helvetica, sans-serif" '
                 f'font-size="{char_height:.1f}" fill="{color}"'
             )
-            # center_across: shift start so text block is centered
-            # perpendicular to the text direction (MIDDLE_LEFT equivalent).
-            # Block height = char_height + (n-1)*line_spacing.
-            # Center offset = block/2 - char_height (shift from top-left).
             n = len(lines)
             if center_across and n > 1:
                 block = char_height + (n - 1) * line_spacing
                 perp_shift = block / 2 - char_height
-                # Apply perpendicular shift (unrotated Y direction → SVG +Y)
                 base_y += perp_shift
+            # Rotation center: vertically centered on the glyph body so that
+            # after rotation the visual text center aligns with comp.x (the
+            # conductor/tap position).  base_y is the text baseline; the glyph
+            # center is approximately base_y - char_height * 0.4.
+            center_offset_y = -char_height * 0.4
             for i, line_text in enumerate(lines):
                 escaped = escape(line_text)
-                # Local offset along the unrotated Y axis
                 local_dy = i * line_spacing
-                # Rotate the offset vector (0, local_dy) by the text rotation
                 ox = -local_dy * sin_r
                 oy = local_dy * cos_r
                 lx = x + ox
                 ly = base_y + oy
+                # Rotation center is at glyph vertical center, not baseline
+                rcx = lx
+                rcy = ly + center_offset_y
                 self._elements.append(
                     f'<text x="{lx:.2f}" y="{ly:.2f}" {font_attr} '
-                    f'transform="rotate({-rotation},{lx:.2f},{ly:.2f})">'
+                    f'transform="rotate({-rotation},{rcx:.2f},{rcy:.2f})">'
                     f'{escaped}</text>'
                 )
+        elif len(lines) == 1:
+            # Non-rotated single line
+            escaped = escape(lines[0])
+            self._elements.append(
+                f'<text x="{x:.2f}" y="{base_y:.2f}" '
+                f'font-family="Arial, Helvetica, sans-serif" font-size="{char_height:.1f}" '
+                f'fill="{color}">{escaped}</text>'
+            )
         else:
             # Non-rotated multiline: <tspan dy> works correctly
             parts = [
@@ -313,6 +309,66 @@ class SvgBackend:
             f'<rect x="{x:.2f}" y="{svg_y:.2f}" width="{width:.2f}" height="{height:.2f}" '
             f'fill="{fill}" stroke="#000000" stroke-width="0.35" />'
         )
+
+    # -- Composite drawing methods (DrawingBackend protocol) --
+
+    def draw_center_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        long_dash: float = 8.0,
+        short_dash: float = 1.5,
+        gap: float = 2.0,
+    ) -> None:
+        """Draw IEC CENTER linetype line procedurally on SLD_DB_FRAME layer (gray)."""
+        prev_layer = self._current_layer
+        self.set_layer("SLD_DB_FRAME")
+
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length = math.sqrt(dx * dx + dy * dy)
+        if length < 0.1:
+            self.set_layer(prev_layer)
+            return
+
+        ux, uy = dx / length, dy / length
+        pattern = [long_dash, gap, short_dash, gap]
+        pos = 0.0
+        step_idx = 0
+        while pos < length:
+            seg_len = pattern[step_idx % 4]
+            if step_idx % 2 == 0:  # dash segments
+                seg_start = (start[0] + ux * pos, start[1] + uy * pos)
+                seg_end_pos = min(pos + seg_len, length)
+                seg_end = (start[0] + ux * seg_end_pos, start[1] + uy * seg_end_pos)
+                self.add_line(seg_start, seg_end)
+            pos += seg_len
+            step_idx += 1
+
+        self.set_layer(prev_layer)
+
+    def draw_fanout(
+        self,
+        center_x: float,
+        busbar_y: float,
+        side_xs: list[float],
+        mcb_bottom_y: float,
+    ) -> None:
+        """Draw 3-phase fan-out procedurally: center vertical + diagonals + side verticals."""
+        _FAN_RATIO = 0.266
+
+        # Center vertical: busbar → MCB bottom
+        self.add_line((center_x, busbar_y), (center_x, mcb_bottom_y))
+
+        for sx in side_xs:
+            dx = sx - center_x
+            fan_h = abs(dx) * _FAN_RATIO
+            intermediate_y = busbar_y + fan_h
+            # Diagonal: center busbar → side intermediate
+            self.add_line((center_x, busbar_y), (sx, intermediate_y))
+            # Side vertical: intermediate → MCB bottom
+            self.add_line((sx, intermediate_y), (sx, mcb_bottom_y))
 
     # -- Output --
 

@@ -132,8 +132,12 @@ def _parse_main_breaker(ctx: _LayoutContext, requirements: dict) -> None:
 def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
     """ELCB 설정 파싱 (dict/non-dict 처리)."""
     ctx.elcb_config = requirements.get("elcb", {})
-    ctx.elcb_rating = ctx.elcb_config.get("rating", 0) if isinstance(ctx.elcb_config, dict) else 0
-    ctx.elcb_ma = ctx.elcb_config.get("sensitivity_ma", 30) if isinstance(ctx.elcb_config, dict) else 30
+    if isinstance(ctx.elcb_config, dict):
+        ctx.elcb_rating = ctx.elcb_config.get("rating", 0) or ctx.elcb_config.get("rating_A", 0)
+        ctx.elcb_ma = ctx.elcb_config.get("sensitivity_ma", 0) or ctx.elcb_config.get("sensitivity_mA", 0) or 30
+    else:
+        ctx.elcb_rating = 0
+        ctx.elcb_ma = 30
     ctx.elcb_type_str = (
         ctx.elcb_config.get("type", "ELCB").upper()
         if isinstance(ctx.elcb_config, dict) else "ELCB"
@@ -1485,9 +1489,13 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
         label=main_label,
     ))
     ctx.main_breaker_arc_center_y = y + cb_h / 2  # between contacts
-    y += cb_h + config.stub_len  # height + stub — symbol draws stub beyond height
-    # No extra connection gap — symbol stubs of adjacent components overlap for continuity
+    y += cb_h + config.stub_len
     result.symbols_used.add(breaker_type)
+
+    # Extra gap with connection line for visual spacing
+    gap = config.spine_component_gap
+    result.connections.append(((cx, y), (cx, y + gap)))
+    y += gap
 
     ctx.y = y
 
@@ -1527,9 +1535,13 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         y=y,
         label=f"{elcb_rating}A {elcb_poles_str}\\P{elcb_type_str} \\P({elcb_ma}mA)",
     ))
-    y += elcb_h + config.stub_len  # height + stub — symbol draws stub beyond height
-    # No extra connection gap — symbol stubs of adjacent components overlap for continuity
+    y += elcb_h + config.stub_len
     result.symbols_used.add(elcb_type_str)
+
+    # Extra gap with connection line for visual spacing
+    gap = config.spine_component_gap
+    result.connections.append(((cx, y), (cx, y + gap)))
+    y += gap
 
     # Post-ELCB MCB: RCCB+MCB serial structure (e.g., 63A RCCB → 63A MCB Type B)
     post_mcb = ctx.post_elcb_mcb
@@ -1558,6 +1570,11 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         ))
         y += mcb_h + config.stub_len
         result.symbols_used.add(mcb_type)
+
+        # Extra gap with connection line
+        gap = config.spine_component_gap
+        result.connections.append(((cx, y), (cx, y + gap)))
+        y += gap
 
     ctx.y = y
 
@@ -1940,8 +1957,12 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
                     + config.db_box_tail_margin + config.db_box_label_margin)
 
     # DB box horizontal extents
+    # Reserve space to the right for earth bar (symbol + gap + label)
+    from app.sld.real_symbols import get_symbol_dimensions as _gsd
+    _earth_w = _gsd("EARTH")["width_mm"]
+    earth_reserve = config.earth_x_from_db + _earth_w + 5  # gap + symbol + E label
     db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
-    db_box_right = min(result.busbar_end_x + 10, config.max_x - 2)
+    db_box_right = min(result.busbar_end_x + 10, config.max_x - earth_reserve)
 
     # Store for later update by resolve_overlaps
     result.db_box_start_y = db_box_start_y
@@ -1980,8 +2001,19 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     _earth_w = _earth_dims["width_mm"]   # 12
     _earth_h = _earth_dims["height_mm"]  # 10
 
-    earth_x = db_box_right + config.earth_x_from_db
-    earth_y = result.busbar_y - config.earth_y_below_busbar
+    # Position earth bar BELOW the DB box, slightly left of the right edge.
+    # Connection is a straight vertical line from DB box bottom to earth top pin.
+    db_box_bottom = getattr(result, "db_box_start_y", None)
+    earth_drop = 8.0  # mm below DB box bottom to earth top pin
+    # Place earth bar at ~90% along the DB box bottom (right-biased)
+    db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
+    db_box_width = db_box_right - db_box_left
+    earth_cx = db_box_left + db_box_width * 0.95  # 95% position
+    earth_x = earth_cx - _earth_w / 2
+    if db_box_bottom is not None:
+        earth_y = db_box_bottom - earth_drop - _earth_h
+    else:
+        earth_y = result.busbar_y - config.earth_y_below_busbar
 
     # Earth conductor size annotation (calculate early for boundary check)
     earth_conductor_mm2 = requirements.get("earth_conductor_mm2", 0)
@@ -2021,11 +2053,12 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
 
     border_right = config.max_x  # Strict drawing boundary
     if earth_rightmost > border_right - 1:
-        # Shift earth left, possibly overlapping into DB box area
-        shift = earth_rightmost - (border_right - 1)
-        earth_x = earth_x - shift
-        # Allow earth bar inside DB box if no space outside
-        earth_x = max(earth_x, db_box_right - _earth_w - 2)
+        # Shift earth left but NEVER into the DB box
+        shift_amt = earth_rightmost - (border_right - 1)
+        earth_x = earth_x - shift_amt
+        # Earth bar is now below the DB box (not beside it), so x inside
+        # the DB box horizontal range is fine — the vertical position keeps
+        # it outside the box.
 
     result.components.append(PlacedComponent(
         symbol_name="EARTH",
@@ -2057,11 +2090,13 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             label=conductor_label,
         ))
 
-    # Solid earth conductor -- from DB box right wall to earth bar (outside DB box)
+    # Solid earth conductor -- straight vertical from DB box bottom to earth bar
     earth_cx = earth_x + _earth_w / 2  # Center of earth symbol
     earth_top_pin_y = earth_y + _earth_h  # top pin at y + height
-    # Horizontal: DB box right wall → earth bar center X (at earth bar top pin level)
-    result.connections.append(((db_box_right, earth_top_pin_y),
+    db_box_bottom_y = getattr(result, "db_box_start_y", earth_top_pin_y)
+
+    # Single vertical line: DB box bottom → earth bar top pin
+    result.connections.append(((earth_cx, db_box_bottom_y),
                                (earth_cx, earth_top_pin_y)))
-    # Junction dot at DB box right wall (connection point indicator)
-    result.junction_dots.append((db_box_right, earth_top_pin_y))
+    # Junction dot at DB box bottom edge (connection point on box border)
+    result.junction_dots.append((earth_cx, db_box_bottom_y))

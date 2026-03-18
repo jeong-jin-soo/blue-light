@@ -481,20 +481,17 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     else:
         # Content doesn't fit in drawing area.  Position content so that:
         # 1. TOP (circuit labels) stays within page — most critical for readability
-        # 2. BOTTOM overflow goes into title block area (OK) but try to stay
-        #    above y=0 (content below y=0 is invisible in SVG/PDF)
+        # 2. BOTTOM stays above title block (min_y) as much as possible
         #
-        # Strategy: anchor content_max at page_height - 1 (top of page in layout
-        # coords), letting the overflow extend downward.  If content fits within
-        # the page (0 to page_height), center it.
-        page_height = 297.0  # A3 height
-        # Anchor top: content_max_y + shift = page_height - 1
-        shift = page_height - 1 - content_max_y
-        # Check bottom: if content fits on page, shift to center on page
-        if content_min_y + shift >= 1.0:
-            # Fits on page — center within page
-            page_center = page_height / 2
-            shift = page_center - current_center
+        # Strategy: center within drawing area, then clamp so top doesn't
+        # exceed max_y and bottom doesn't go below min_y (title block).
+        # If content is too tall for even that, prioritise keeping the top
+        # within bounds (top is circuit labels — most readable), letting
+        # the bottom overflow into the title block zone.
+        if content_max_y + shift > config.max_y - 2:
+            shift = config.max_y - 2 - content_max_y
+        if content_min_y + shift < config.min_y:
+            shift = config.min_y - content_min_y
 
     if abs(shift) < 1.0:
         return  # Already centered enough
@@ -852,8 +849,8 @@ def _parse_board_requirements(
     elcb = board.get("elcb", {})
     if elcb:
         ctx.elcb_config = elcb
-        ctx.elcb_rating = elcb.get("rating", 0)
-        ctx.elcb_ma = elcb.get("sensitivity_ma", 30)
+        ctx.elcb_rating = elcb.get("rating", 0) or elcb.get("rating_A", 0)
+        ctx.elcb_ma = elcb.get("sensitivity_ma", 0) or elcb.get("sensitivity_mA", 0) or 30
         ctx.elcb_type_str = elcb.get("type", "ELCB")
     else:
         ctx.elcb_config = {}

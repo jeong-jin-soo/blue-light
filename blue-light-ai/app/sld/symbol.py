@@ -164,7 +164,7 @@ class Symbol(ABC):
 
     # ── Label offset ─────────────────────────────────────────
 
-    def label_offset_x(self, backend: DrawingBackend) -> float:
+    def label_offset_x(self, backend: DrawingBackend | None = None) -> float:
         """X offset from comp.x for label/cable annotation placement."""
         return self.width + 3
 
@@ -369,13 +369,11 @@ class BlockSymbol(Symbol):
 
     # ── Label offset ─────────────────────────────────────────
 
-    def label_offset_x(self, backend):
-        from app.sld.dxf_backend import DxfBackend
-        if isinstance(backend, DxfBackend):
-            scaled_w, _ = self._replayer.get_scaled_size(
-                self._block_name, target_height_mm=self.height)
-            return self.width / 2 + scaled_w / 2 + 3
-        return self.width + 3
+    def label_offset_x(self, backend=None) -> float:
+        """X offset from comp.x for label placement (uses block library dimensions)."""
+        scaled_w, _ = self._replayer.get_scaled_size(
+            self._block_name, target_height_mm=self.height)
+        return self.width / 2 + scaled_w / 2 + 3
 
     # ── Private helpers ──────────────────────────────────────
 
@@ -454,7 +452,11 @@ class BlockSymbol(Symbol):
             return ix, iy, scale
 
     def _draw_stub_lines(self, backend, x, y, horizontal):
-        """Draw stub lines for CB blocks (body-edge-to-pin lines)."""
+        """Draw stub lines for CB blocks (body-edge-to-pin lines).
+
+        Stubs connect from body boundary outward to pin positions.
+        No line enters the body — the block handles contacts + arc internally.
+        """
         stub = self.stub
         backend.set_layer("SLD_CONNECTIONS")
         if not horizontal:

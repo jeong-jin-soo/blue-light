@@ -1164,11 +1164,16 @@ def _draw_cable_leader_group(
     tick_size: float,
     layout_result: LayoutResult,
     config: "LayoutConfig | None" = None,
+    label_y_override: float | None = None,
 ) -> None:
     """Draw one cable leader group: horizontal line, ticker marks, L-bend, and text.
 
     Appends connections (leader line, L-bend), thick_connections (tickers),
     and a LABEL component (cable spec text) to layout_result.
+
+    Args:
+        label_y_override: If set, cable text label starts at this Y instead of
+            bend_top_y + 1. Used to align cable labels with sub-circuit labels.
     """
     # Horizontal leader line
     layout_result.connections.append((
@@ -1194,6 +1199,7 @@ def _draw_cable_leader_group(
 
     # L-shaped bend + cable spec text at leader end
     bend_top_y = leader_y + bend_height
+    text_y = label_y_override if label_y_override is not None else (bend_top_y + 1)
     # Clamp leader endpoints to drawing boundaries
     _max_x = config.max_x if config else 395.0
     _min_x = config.min_x if config else 25.0
@@ -1206,7 +1212,7 @@ def _draw_cable_leader_group(
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=max(_bend_x - 3, _min_x),
-            y=bend_top_y + 1,
+            y=text_y,
             label=cable_text,
             rotation=90.0,
         ))
@@ -1219,7 +1225,7 @@ def _draw_cable_leader_group(
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=_bend_x,
-            y=bend_top_y + 1,
+            y=text_y,
             label=cable_text,
             rotation=90.0,
         ))
@@ -1292,8 +1298,19 @@ def _add_cable_leader_lines(
 
     tick_size = 1.25  # Half-length of diagonal tick (matches meter board)
 
+    # Find sub-circuit label Y to align cable labels with (if available)
+    _subcircuit_label_y = None
+    for comp in layout_result.components:
+        if (comp.symbol_name == "LABEL" and comp.rotation == 90.0
+                and comp.label and "sqmm" not in comp.label.lower()
+                and comp.label != "SPARE"
+                and not comp.label.startswith("2C ")
+                and not comp.label.startswith("4 x")):
+            _subcircuit_label_y = comp.y
+            break
+
     for row_busbar_y, row_entries in rows_map.items():
-        # Leader Y for this row
+        # Leader Y for this row (original position — not shifted by ISOLATOR)
         leader_y = row_busbar_y + db_box_top_offset + config.leader_margin_above_db
 
         # Group by cable spec within this row
@@ -1500,6 +1517,7 @@ def _add_cable_leader_lines(
                 leader_start_x, leader_end_x,
                 config.leader_bend_height, tick_size, layout_result,
                 config=config,
+                label_y_override=_subcircuit_label_y,
             )
 
 

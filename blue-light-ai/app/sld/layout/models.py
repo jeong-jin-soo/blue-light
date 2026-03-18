@@ -237,6 +237,7 @@ class LayoutConfig:
     isolator_h: float = 7.0          # Isolator height
     ct_size: float = 2.5             # CT diameter
     stub_len: float = 3.0            # Connection stub length
+    spine_component_gap: float = 5.0  # Extra gap between spine components (with connection line)
     # KWH meter rectangle dimensions (for horizontal meter board layout)
     kwh_rect_w: float = 12.0         # KWH inner rectangle width (horizontal span)
     kwh_rect_h: float = 6.0          # KWH inner rectangle height (vertical span)
@@ -299,7 +300,7 @@ class LayoutConfig:
     # -- Label rendering constants (extracted from generator.py) --
     label_ch_horizontal: float = 1.6        # 수평 미터보드 심볼(ELR, KWH, Fuse 등) 라벨
     label_ch_breaker_info: float = 2.0      # 수평 브레이커 블록 라벨 (incoming chain)
-    label_ch_breaker_sub: float = 1.8       # 수직 서브회로 브레이커 블록 라벨
+    label_ch_breaker_sub: float = 1.8       # 서브서킷 브레이커 블록 라벨 (기존 유지)
     label_ch_cable: float = 2.0             # 케이블 어노테이션
     label_ch_busbar_rating: float = 2.5     # 부스바 등급 텍스트
     text_width_ratio: float = 0.6           # 글자폭 비율 (ch × ratio)

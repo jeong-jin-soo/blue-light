@@ -140,3 +140,42 @@ class DrawingBackend(Protocol):
             fill_color: Fill color as (r, g, b) floats 0-1 or hex string.
         """
         ...
+
+    def draw_center_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        long_dash: float = 8.0,
+        short_dash: float = 1.5,
+        gap: float = 2.0,
+    ) -> None:
+        """Draw an IEC CENTER linetype line (long dash, gap, short dash, gap).
+
+        Used for DB box frame boundaries.
+
+        DXF: single LINE entity on SLD_DB_FRAME layer with native CENTER linetype.
+        PDF/SVG: procedural dash pattern on SLD_DB_FRAME layer with gray color.
+        """
+        ...
+
+    def draw_fanout(
+        self,
+        center_x: float,
+        busbar_y: float,
+        side_xs: list[float],
+        mcb_bottom_y: float,
+    ) -> None:
+        """Draw a 3-phase fan-out from busbar to sub-circuit MCBs.
+
+        DXF: creates a named editable block (FANOUT_3P_*).
+        PDF/SVG: draws all three line types procedurally —
+          center vertical (busbar→MCB), diagonals, side verticals.
+
+        Args:
+            center_x: X of center circuit on busbar.
+            busbar_y: Y of busbar.
+            side_xs: X coords of side circuits (1 or 2 elements).
+            mcb_bottom_y: Y of MCB bottom contact.
+        """
+        ...
