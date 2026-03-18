@@ -355,12 +355,6 @@ def compute_layout(
         root_br = board_results[plan.root_db_idx]
         merged.busbar_y = root_br.layout.busbar_y
 
-        # validate_connectivity REMOVED (v2 architecture):
-        # Connection endpoints are computed from exact symbol pin positions
-        # in each section. Post-hoc snapping caused regressions (e.g., VSS
-        # diagonal snapped to wrong pin). Sections are responsible for
-        # computing correct coordinates from real_symbols dimensions.
-
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
 
@@ -370,8 +364,6 @@ def compute_layout(
         # ═══ SINGLE-DB PATH (v2 architecture) ═══
         # Section sequence is determined by the template registry based on
         # requirements (metering type, supply source, etc.).
-        # Each section places its own components with exact pin coordinates
-        # — no post-hoc validate_connectivity snapping needed.
         from app.sld.layout.section_registry import get_section_sequence
 
         section_sequence = get_section_sequence(requirements)
@@ -1073,8 +1065,6 @@ def render_board(
         _place_ct_pre_mccb_fuse(ctx)
         _place_main_breaker(ctx, skip_gap=True)
         _place_ct_metering_section(ctx)
-        # validate_ct_metering_overlaps REMOVED (v2 architecture):
-        # CT metering section computes sufficient spacing internally.
     else:
         _place_main_breaker(ctx)
         _place_ct_pre_mccb_fuse(ctx)

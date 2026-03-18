@@ -1,24 +1,16 @@
 """
-미터보드 커넥션 갭 회귀 테스트.
+미터보드 커넥션 정렬 및 스파인 연결 검증 테스트.
 
-버그: validate_connectivity()가 수평 미터보드 커넥션 엔드포인트를
-procedural symbol의 stub 포함 핀 위치로 스냅하여 2mm 갭 발생.
+미터보드 수평 컴포넌트(ISO, KWH, MCB) 간 커넥션이 body edge에 정확히
+정렬되는지 검증. 수직 스파인 커넥션의 X좌표 일관성도 확인.
 
-DXF 블록은 body edge에 핀이 있고, sections.py의 _place_meter_board_symbols()도
-body edge 위치에 커넥션을 생성함. validate_connectivity()가 이를 ±2mm stub
-위치로 이동시키면 ISO↔KWH, KWH↔MCB 사이에 갭이 생김.
-
-수정: validate_connectivity()에서 horizontal_pins() 결과에서 stub offset을 제거하여
-body edge 위치를 사용하도록 변경.
-
-이 테스트는 수정이 유지되는지 검증함.
+v2 아키텍처: validate_connectivity 제거 후, 각 섹션이 처음부터
+정확한 핀 좌표를 생성하는지 검증.
 """
 
 import pytest
 
 from app.sld.layout import compute_layout, LayoutResult, PlacedComponent
-from app.sld.layout.connectivity import validate_connectivity
-from app.sld.layout.models import LayoutConfig
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +106,7 @@ def _get_body_edge_x(comp: PlacedComponent) -> tuple[float, float]:
 # ---------------------------------------------------------------------------
 
 class TestMeterBoardConnectionAlignment:
-    """validate_connectivity() 이후 미터보드 커넥션 갭 없음을 검증."""
+    """미터보드 수평 커넥션이 body edge에 정렬되는지 검증."""
 
     @pytest.mark.parametrize("requirements", [
         pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
@@ -222,58 +214,6 @@ class TestMeterBoardConnectionAlignment:
             f"MCB body edge({mcb_left:.2f})에서 {abs(conn_right_x - mcb_left):.2f}mm 벗어남 — "
             f"stub offset으로 인한 갭 발생 가능"
         )
-
-    @pytest.mark.parametrize("requirements", [
-        pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
-        pytest.param(THREE_PHASE_METERED, id="3ph_metered"),
-    ])
-    def test_validate_connectivity_preserves_meter_board_endpoints(
-        self, requirements: dict,
-    ):
-        """validate_connectivity() 전후로 미터보드 수평 커넥션 엔드포인트 불변 검증.
-
-        validate_connectivity()가 이미 정확한 body edge 위치에 있는
-        엔드포인트를 stub 위치로 이동시키지 않는지 직접 확인.
-        """
-        result = compute_layout(requirements)
-        comps = _find_meter_board_components(result)
-        assert comps["ISO"] is not None
-
-        mb_y = comps["ISO"].y
-
-        # validate_connectivity() 호출 전 엔드포인트 스냅샷
-        h_conns_before = _find_horizontal_connections_at_y(result, mb_y)
-        endpoints_before = []
-        for start, end in h_conns_before:
-            endpoints_before.append((start[0], end[0]))
-
-        # validate_connectivity() 재호출 — compute_layout이 이미 호출했지만
-        # 추가 호출이 엔드포인트를 변경하지 않아야 함 (멱등성)
-        config = LayoutConfig()
-        snapped = validate_connectivity(result, config)
-
-        h_conns_after = _find_horizontal_connections_at_y(result, mb_y)
-        endpoints_after = []
-        for start, end in h_conns_after:
-            endpoints_after.append((start[0], end[0]))
-
-        # 미터보드 수평 커넥션 수 동일
-        assert len(endpoints_before) == len(endpoints_after), (
-            f"validate_connectivity() 재호출 후 미터보드 커넥션 수 변경: "
-            f"{len(endpoints_before)} → {len(endpoints_after)}"
-        )
-
-        # 각 엔드포인트 좌표 불변 (±0.1mm)
-        for i, (before, after) in enumerate(zip(endpoints_before, endpoints_after)):
-            assert abs(before[0] - after[0]) < 0.1, (
-                f"커넥션 #{i} 시작점 X가 변경됨: {before[0]:.2f} → {after[0]:.2f} "
-                f"(validate_connectivity가 stub 위치로 스냅)"
-            )
-            assert abs(before[1] - after[1]) < 0.1, (
-                f"커넥션 #{i} 끝점 X가 변경됨: {before[1]:.2f} → {after[1]:.2f} "
-                f"(validate_connectivity가 stub 위치로 스냅)"
-            )
-
 
 class TestVerticalSpineConnectionAlignment:
     """수직 스파인 MCB/ELCB 커넥션이 body edge에 정렬되는지 검증.
