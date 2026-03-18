@@ -358,6 +358,10 @@ def compute_layout(
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
 
+        # Post-layout: audit quality (read-only, no coordinate changes)
+        from app.sld.layout.audit import audit_layout
+        merged.audit_report = audit_layout(merged, config, requirements)
+
         return merged
 
     else:
@@ -392,6 +396,10 @@ def compute_layout(
 
         # Post-layout: detect overflow beyond drawing boundaries
         _detect_overflow(ctx.result, ctx.config)
+
+        # Post-layout: audit quality (read-only, no coordinate changes)
+        from app.sld.layout.audit import audit_layout
+        ctx.result.audit_report = audit_layout(ctx.result, ctx.config, requirements)
 
         return ctx.result
 
