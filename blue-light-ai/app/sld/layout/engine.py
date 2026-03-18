@@ -371,8 +371,8 @@ def compute_layout(
         from app.sld.layout.section_registry import get_section_sequence
 
         section_sequence = get_section_sequence(requirements)
-        for section_name, section_fn in section_sequence:
-            section_fn(ctx)
+        for section in section_sequence:
+            section.execute(ctx)
 
         # Sub-circuits (always present, placed after busbar)
         busbar_y_row = _place_sub_circuits_rows(ctx)

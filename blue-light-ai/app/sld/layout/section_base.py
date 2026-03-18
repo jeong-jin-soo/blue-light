@@ -59,11 +59,52 @@ class Section(ABC):
     - Appends PlacedComponents to ctx.result.components
     - Appends connections to ctx.result.connections
     - Advances ctx.y past the section's extent
+
+    The execute() method wraps place() with automatic sections_rendered tracking.
     """
+
+    #: Section name for sections_rendered tracking (override in subclass or __init__)
+    name: str = ""
 
     @abstractmethod
     def place(self, ctx: _LayoutContext) -> None:
         """Place this section's elements and advance ctx.y."""
+
+    def execute(self, ctx: _LayoutContext) -> None:
+        """Place with automatic sections_rendered tracking.
+
+        Calls place(), then marks the section as rendered.
+        Subclasses should NOT override this — override place() instead.
+        """
+        y_before = ctx.y
+        self.place(ctx)
+        # sections_rendered는 place() 내부에서도 설정 가능 (기존 패턴 호환)
+        # place() 후 Y가 변했으면 실제로 렌더링된 것으로 간주
+        if self.name and ctx.y != y_before:
+            ctx.result.sections_rendered.setdefault(self.name, True)
+
+
+class FunctionSection(Section):
+    """Adapter: wraps a _place_* function as a Section instance.
+
+    Enables gradual migration — existing functions work unchanged via::
+
+        FunctionSection("main_breaker", _place_main_breaker)
+    """
+
+    def __init__(self, name: str, fn, **kwargs):
+        self.name = name
+        self._fn = fn
+        self._kwargs = kwargs
+
+    def place(self, ctx: _LayoutContext) -> None:
+        if self._kwargs:
+            self._fn(ctx, **self._kwargs)
+        else:
+            self._fn(ctx)
+
+    def __repr__(self) -> str:
+        return f"FunctionSection({self.name!r})"
 
     # ── Spine placement helpers ──
 
