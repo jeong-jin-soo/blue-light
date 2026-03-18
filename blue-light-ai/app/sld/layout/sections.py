@@ -1101,9 +1101,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             _vss_body_x = _diag_end_x + _vss_stub
 
             # Diagonal connection: fuse-LED midpoint → VSS left stub tip
-            # Use fixed_connections to prevent validate_connectivity from
-            # snapping this diagonal to nearby component pins.
-            result.fixed_connections.append((
+            # v2 architecture: validate_connectivity removed, so this can
+            # be a regular connection without risk of post-hoc snapping.
+            result.connections.append((
                 (_diag_start_x, _diag_start_y),
                 (_diag_end_x, _diag_end_y),
             ))

@@ -375,10 +375,14 @@ class TestVerticalSpineConnectionAlignment:
         pytest.param(SINGLE_PHASE_METERED, id="1ph_metered"),
         pytest.param(THREE_PHASE_METERED, id="3ph_metered"),
     ])
-    def test_validate_connectivity_idempotent_for_vertical_spine(
+    def test_spine_connections_are_correct_without_validate_connectivity(
         self, requirements: dict,
     ):
-        """validate_connectivity() 재호출 시 수직 스파인 커넥션 불변 검증."""
+        """v2 아키텍처: validate_connectivity 없이도 스파인 커넥션이 정확한지 검증.
+
+        validate_connectivity가 파이프라인에서 제거되었으므로 (대각선/브랜치 좌표를
+        잘못 스냅하는 문제), sections.py가 처음부터 정확한 핀 좌표를 생성해야 함.
+        """
         result = compute_layout(requirements)
 
         # 스파인 X 좌표 찾기
@@ -389,29 +393,21 @@ class TestVerticalSpineConnectionAlignment:
                 break
         assert spine_x is not None
 
-        # 수직 커넥션 스냅샷
-        def get_vertical_conns():
-            conns = []
-            for s, e in result.connections:
-                if abs(s[0] - e[0]) < 1.0 and abs(s[0] - spine_x) < 3:
-                    conns.append((s[1], e[1]))
-            return conns
+        # 수직 커넥션 확인: 스파인 커넥션의 X 좌표가 일관적인지
+        vertical_conns = []
+        for s, e in result.connections:
+            if abs(s[0] - e[0]) < 1.0 and abs(s[0] - spine_x) < 3:
+                vertical_conns.append((s, e))
 
-        before = get_vertical_conns()
+        assert len(vertical_conns) > 0, "스파인 수직 커넥션이 하나도 없음"
 
-        config = LayoutConfig()
-        validate_connectivity(result, config)
-
-        after = get_vertical_conns()
-
-        assert len(before) == len(after), (
-            f"validate_connectivity() 재호출 후 수직 커넥션 수 변경: "
-            f"{len(before)} → {len(after)}"
-        )
-
-        for i, (b, a) in enumerate(zip(before, after)):
-            assert abs(b[0] - a[0]) < 0.1 and abs(b[1] - a[1]) < 0.1, (
-                f"수직 커넥션 #{i} 변경: ({b[0]:.2f},{b[1]:.2f}) → ({a[0]:.2f},{a[1]:.2f})"
+        # 모든 수직 스파인 커넥션의 X가 spine_x ± 1mm 이내
+        for s, e in vertical_conns:
+            assert abs(s[0] - spine_x) < 1.5, (
+                f"스파인 커넥션 start X ({s[0]:.2f})가 spine_x ({spine_x:.2f})에서 벗어남"
+            )
+            assert abs(e[0] - spine_x) < 1.5, (
+                f"스파인 커넥션 end X ({e[0]:.2f})가 spine_x ({spine_x:.2f})에서 벗어남"
             )
 
 

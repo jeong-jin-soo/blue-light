@@ -355,8 +355,11 @@ def compute_layout(
         root_br = board_results[plan.root_db_idx]
         merged.busbar_y = root_br.layout.busbar_y
 
-        from app.sld.layout.connectivity import validate_connectivity
-        validate_connectivity(merged, config)
+        # validate_connectivity REMOVED (v2 architecture):
+        # Connection endpoints are computed from exact symbol pin positions
+        # in each section. Post-hoc snapping caused regressions (e.g., VSS
+        # diagonal snapped to wrong pin). Sections are responsible for
+        # computing correct coordinates from real_symbols dimensions.
 
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
@@ -364,48 +367,26 @@ def compute_layout(
         return merged
 
     else:
-        # ═══ SINGLE-DB PATH ═══
-        _place_incoming_supply(ctx)
-        if ctx.metering == "ct_meter":
-            # CT metering: spine order (supply → load):
-            #   MCCB → Protection CT → Metering CT → BI
-            # Fuses are horizontal RIGHT branches (not on spine).
-            # Ref: CT_METERING_SPINE_ORDER in sections.py, 150A/400A TPN DWGs
-            # Temporarily clear metering so _place_unit_isolator doesn't skip
-            # (it returns early when metering is set, since meter board has its
-            # own isolator — but CT metering has no meter board).
-            _saved_metering = ctx.metering
-            ctx.metering = ""
-            _place_unit_isolator(ctx)
-            ctx.metering = _saved_metering
-            # Add isolator-to-DB gap before CT metering section
-            _gap = config.isolator_to_db_gap
-            result.connections.append(((cx, ctx.y), (cx, ctx.y + _gap)))
-            ctx.y += _gap
-            _ct_box_start_y = ctx.y - 1
-            # Pre-MCCB fuse as horizontal RIGHT branch from spine
-            ctx._ct_pre_mccb_fuse = True
-            _place_ct_pre_mccb_fuse(ctx)
-            _place_main_breaker(ctx, skip_gap=True)
-            _place_ct_metering_section(ctx)
-            # Detect and resolve CT metering branch/label overlaps.
-            from app.sld.layout.ct_overlap import validate_ct_metering_overlaps
-            validate_ct_metering_overlaps(ctx.result, ctx.config)
-            # Override db_box_start_y to include CT metering in DB box
-            ctx.db_box_start_y = _ct_box_start_y
-        else:
-            _place_meter_board(ctx)
-            _place_unit_isolator(ctx)
-            _place_main_breaker(ctx)
-            _place_ct_pre_mccb_fuse(ctx)
-        _place_elcb(ctx)
-        _place_internal_cable(ctx)
-        _place_main_busbar(ctx)
+        # ═══ SINGLE-DB PATH (v2 architecture) ═══
+        # Section sequence is determined by the template registry based on
+        # requirements (metering type, supply source, etc.).
+        # Each section places its own components with exact pin coordinates
+        # — no post-hoc validate_connectivity snapping needed.
+        from app.sld.layout.section_registry import get_section_sequence
+
+        section_sequence = get_section_sequence(requirements)
+        for section_name, section_fn in section_sequence:
+            section_fn(ctx)
+
+        # Sub-circuits (always present, placed after busbar)
         busbar_y_row = _place_sub_circuits_rows(ctx)
 
         # Store spine_x BEFORE resolve_overlaps for deterministic incoming chain detection
         ctx.result.spine_x = cx
 
+        # Sub-circuit post-processing (these only ADD new elements or
+        # reposition sub-circuit X coordinates — they don't modify spine
+        # or branch connection coordinates)
         resolve_overlaps(ctx.result, ctx.config)
         _add_phase_fanout(ctx.result, ctx.config, ctx.supply_type)
         _add_cable_leader_lines(ctx.result, ctx.config)
@@ -413,10 +394,6 @@ def compute_layout(
 
         db_box_right = _place_db_box(ctx, busbar_y_row)
         _place_earth_bar(ctx, db_box_right)
-
-        # Post-layout: snap connection endpoints to actual symbol pin positions
-        from app.sld.layout.connectivity import validate_connectivity
-        validate_connectivity(ctx.result, ctx.config)
 
         # Post-layout: center content vertically in drawing area
         _center_vertically(ctx.result, ctx.config)
@@ -1096,9 +1073,8 @@ def render_board(
         _place_ct_pre_mccb_fuse(ctx)
         _place_main_breaker(ctx, skip_gap=True)
         _place_ct_metering_section(ctx)
-        # Detect and resolve CT metering branch/label overlaps.
-        from app.sld.layout.ct_overlap import validate_ct_metering_overlaps
-        validate_ct_metering_overlaps(ctx.result, ctx.config)
+        # validate_ct_metering_overlaps REMOVED (v2 architecture):
+        # CT metering section computes sufficient spacing internally.
     else:
         _place_main_breaker(ctx)
         _place_ct_pre_mccb_fuse(ctx)
