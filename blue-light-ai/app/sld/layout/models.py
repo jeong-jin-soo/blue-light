@@ -729,6 +729,7 @@ class BoardResult:
     db_info_label: str = ""
     db_info_text: str = ""
     db_location_text: str = ""
+    meter_board_location_text: str = ""  # e.g. "LOCATED AT METER COMPARTMENT"
     breaker_rating: int = 0
 
 
@@ -794,6 +795,7 @@ class _LayoutContext:
     db_info_label: str = ""      # e.g. "40A DB"
     db_info_text: str = ""       # e.g. "APPROVED LOAD: 9.2KVA AT 230V"
     db_location_text: str = ""   # e.g. "LOCATED AT BLK 824 ..." (below DB box)
+    meter_board_location_text: str = ""  # e.g. "LOCATED AT METER COMPARTMENT"
 
     # Cable extension mode (no meter board / no isolator)
     is_cable_extension: bool = False

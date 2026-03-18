@@ -283,6 +283,9 @@ def _parse_requirements(ctx: _LayoutContext, requirements: dict, application_inf
     if not ctx.board_name:
         ctx.board_name = requirements.get("db_name", "")
 
+    # Meter board location text (optional, only shown when explicitly provided)
+    ctx.meter_board_location_text = requirements.get("meter_board_location_text", "")
+
 
 def _place_incoming_supply(ctx: _LayoutContext) -> None:
     """Place incoming supply label, AC symbol, phase lines, and cable annotation.
@@ -699,14 +702,14 @@ def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> N
         symbol_name="LABEL", x=g.mb_box_left + 1, y=g.mb_label_y,
         label=SG_LOCALE.meter_board.meter_board,
     ))
-    # "LOCATED AT METER COMPARTMENT" below box — only if no DB-level location text
-    # Reference DXF: location info appears in DB box area only, not at meter board
-    if not ctx.db_location_text:
+    # Meter board location text (e.g. "LOCATED AT METER COMPARTMENT")
+    # Only shown when explicitly provided via requirements
+    if ctx.meter_board_location_text:
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=(g.mb_box_left + g.mb_box_right) / 2 - 18,
             y=g.mb_box_bottom - 3,
-            label=SG_LOCALE.meter_board.located_meter_compartment,
+            label=ctx.meter_board_location_text,
         ))
 
     # Earth symbol — 3-phase only
