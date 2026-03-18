@@ -2133,3 +2133,122 @@ def resolve_overlaps(
         )
 
     return layout_result
+
+
+# =============================================
+# Spine Label Post-Placement Validation
+# =============================================
+
+# Utility types that have no user-visible labels
+_SKIP_SYMBOL_NAMES = frozenset({
+    "BUSBAR", "LABEL", "FLOW_ARROW_UP", "CIRCUIT_ID_BOX", "DB_INFO_BOX",
+    "CONNECTION", "JUNCTION_DOT", "EARTH", "TICK_MARK",
+})
+
+
+def _estimate_spine_label_bbox(
+    comp: PlacedComponent,
+    config: LayoutConfig,
+) -> BoundingBox | None:
+    """Estimate label bounding box for a horizontal spine component.
+
+    Returns None if the component has no label text.
+    """
+    label_text = ""
+    if comp.circuit_id:
+        label_text = f"{comp.circuit_id}\\P{comp.label} {comp.rating}"
+    elif comp.rating:
+        label_text = f"{comp.label}\\P{comp.rating}"
+    elif comp.label:
+        label_text = comp.label
+
+    if not label_text:
+        return None
+
+    ch = config.label_ch_horizontal
+    wr = config.text_width_ratio
+    lines = label_text.split("\\P")
+    max_len = max(len(ln) for ln in lines) if lines else 1
+    text_w = max_len * ch * wr
+    text_h = len(lines) * ch * 1.3  # approx line height
+
+    dims = _get_symbol_dims()
+    sym_dims = dims.get(comp.symbol_name, (8.0, 14.0))
+    sym_w, sym_h = sym_dims  # width (vertical extent), height (horizontal extent)
+
+    if comp.symbol_name in ("POTENTIAL_FUSE", "FUSE"):
+        v_half = sym_w / 2
+        label_x = comp.x + sym_h / 2 - text_w / 2
+        label_y = comp.y + v_half + config.fuse_label_gap_above
+        return BoundingBox(label_x, label_y, text_w, text_h)
+    elif comp.symbol_name == "ELR":
+        v_half = sym_h / 2
+        label_x = comp.x - text_w - config.symbol_label_gap
+        return BoundingBox(label_x, comp.y + v_half - text_h / 2, text_w, text_h)
+    elif comp.symbol_name == "KWH_METER":
+        label_x = comp.x + sym_h + 2
+        return BoundingBox(label_x, comp.y, text_w, text_h)
+    elif comp.symbol_name == "SELECTOR_SWITCH":
+        r = 2.0  # default radius
+        label_x = comp.x + r - text_w / 2
+        label_y = comp.y + r + ch + config.symbol_label_gap
+        return BoundingBox(label_x, label_y, text_w, text_h)
+    elif comp.symbol_name in ("AMMETER", "VOLTMETER"):
+        r = 2.5
+        if comp.symbol_name == "AMMETER":
+            label_x = comp.x - text_w - config.symbol_label_gap
+        else:
+            label_x = comp.x + 2 * r + 2.0 + 1.0
+        label_y = comp.y + ch * 0.4 - text_h / 2
+        return BoundingBox(label_x, label_y, text_w, text_h)
+    else:
+        # Generic: label below symbol, centered
+        v_half = sym_w / 2
+        h_extent = sym_h
+        label_x = comp.x + h_extent / 2 - text_w / 2
+        label_y = comp.y - v_half - config.generic_label_gap_below - text_h
+        return BoundingBox(label_x, label_y, text_w, text_h)
+
+
+def validate_spine_labels(
+    result: LayoutResult,
+    config: LayoutConfig,
+) -> list[str]:
+    """Post-placement validation: check spine component labels don't overlap.
+
+    Returns list of warning strings (empty = all clear).
+    Does NOT modify positions — warnings only.
+    """
+    warnings: list[str] = []
+
+    # Collect horizontal spine components (rotation=90, not breaker_block, not utility)
+    spine_comps = [
+        c for c in result.components
+        if c.rotation == 90.0
+        and c.label_style != "breaker_block"
+        and c.symbol_name not in _SKIP_SYMBOL_NAMES
+        and (c.label or c.rating or c.circuit_id)
+    ]
+
+    # Build label bounding boxes
+    label_entries: list[tuple[str, BoundingBox]] = []
+    for comp in spine_comps:
+        bbox = _estimate_spine_label_bbox(comp, config)
+        if bbox:
+            name = f"{comp.symbol_name}({comp.label or comp.rating or ''})"
+            label_entries.append((name, bbox))
+
+    # Check all pairs for overlap
+    for i in range(len(label_entries)):
+        for j in range(i + 1, len(label_entries)):
+            name_a, bb_a = label_entries[i]
+            name_b, bb_b = label_entries[j]
+            if bb_a.overlaps(bb_b):
+                area = bb_a.overlap_area(bb_b)
+                if area > 1.0:  # 1 sq mm tolerance
+                    warnings.append(
+                        f"Spine label overlap: {name_a} ↔ {name_b} "
+                        f"(overlap area: {area:.1f}mm²)"
+                    )
+
+    return warnings

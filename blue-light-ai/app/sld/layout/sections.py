@@ -139,6 +139,9 @@ def _parse_elcb_config(ctx: _LayoutContext, requirements: dict) -> None:
         if isinstance(ctx.elcb_config, dict) else "ELCB"
     )
 
+    # Post-ELCB MCB (RCCB+MCB serial structure, e.g., 63A RCCB → 63A MCB Type B)
+    ctx.post_elcb_mcb = requirements.get("post_elcb_mcb", {})
+
     # CT ratio parsing (e.g., "200/5A")
     # Accept: "ct": {"ratio": "100/5A"} or "ct": "100/5A" or "ct_ratio": "100/5A"
     ct_config = requirements.get("ct", {})

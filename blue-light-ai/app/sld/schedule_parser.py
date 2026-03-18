@@ -125,6 +125,13 @@ Extract EVERY row from the circuit table:
       "poles": <2|4 or null>,
       "sensitivity_ma": <30|100|300 or null>
     },
+    "post_elcb_mcb": {
+      "type": "<MCB|MCCB or null — secondary breaker in series with RCCB, e.g. '63A TPN Type B MCB' after '63A 4P RCCB'>",
+      "rating_a": <int or null>,
+      "poles": "<SPN|DP|TPN or null>",
+      "ka_rating": <int or null>,
+      "characteristic": "<B|C|D or null>"
+    },
     "busbar": {
       "rating_a": <int or null>,
       "type": "<COMB|COPPER or null>"
@@ -204,6 +211,13 @@ Extract EVERY row from the circuit table:
         "poles": <2|4 or null>,
         "sensitivity_ma": <30|100|300 or null>
       },
+      "post_elcb_mcb": {
+        "type": "<MCB|MCCB or null — secondary breaker in series after RCCB>",
+        "rating_a": <int or null>,
+        "poles": "<SPN|DP|TPN or null>",
+        "ka_rating": <int or null>,
+        "characteristic": "<B|C|D or null>"
+      },
       "busbar": {
         "rating_a": <int or null>,
         "type": "<COMB|COPPER or null>"
@@ -271,7 +285,8 @@ Extract EVERY row from the circuit table:
     **IMPORTANT — 4P RCCB rule**: If the schedule shows a SINGLE 4P RCCB (e.g., "63A 4P RCCB 30mA") for the entire board, do NOT split it into per-phase 2P RCCB groups. Instead, put ALL circuits into the board's `outgoing_circuits` (with their phase assignments) and set the board-level `elcb` to that 4P RCCB. Only create separate per-phase `protection_groups` when the schedule explicitly shows different/separate RCCBs per phase (e.g., "40A 2P RCCB" for each phase).
 12. **Phase normalization**: Always normalize phase names to L1/L2/L3. Convert R→L1, Y→L2, B→L3, RED→L1, YELLOW→L2, BLUE→L3.
 13. **Metering**: supply_source and metering are INDEPENDENT. For landlord supply with NO metering equipment mentioned → metering = null. If the schedule explicitly lists metering equipment (kWh meter, CT, SPPG, ammeter, voltmeter, ELR) → set metering accordingly (ct_meter or sp_meter). Do NOT change supply_source — a landlord supply can have CT metering.
-14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations."""
+14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations.
+15. **RCCB + MCB serial structure**: When the schedule shows RCCB/ELCB followed by a separate MCB in series (e.g., "63A 4P RCCB (30mA) + 63A TPN Type B MCB"), extract the RCCB into `elcb` and the MCB into `post_elcb_mcb`. This is common in Singapore commercial installations where an additional MCB provides overcurrent protection after the RCCB. Keywords: "RCCB + MCB", "RCCB ... MCB", "RCCB (30mA) + ... MCB"."""
 
 
 # ── File Type Detection ─────────────────────────────

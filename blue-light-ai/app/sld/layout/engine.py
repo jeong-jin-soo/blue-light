@@ -397,9 +397,21 @@ def compute_layout(
         # Post-layout: detect overflow beyond drawing boundaries
         _detect_overflow(ctx.result, ctx.config)
 
+        # Post-layout: validate spine label overlaps (warning-only, no position changes)
+        from app.sld.layout.overlap import validate_spine_labels
+        spine_label_warnings = validate_spine_labels(ctx.result, ctx.config)
+        if spine_label_warnings:
+            for w in spine_label_warnings:
+                logger.warning("Label validation: %s", w)
+            if hasattr(ctx.result, 'overflow_metrics') and ctx.result.overflow_metrics:
+                ctx.result.overflow_metrics.warnings.extend(spine_label_warnings)
+
         # Post-layout: audit quality (read-only, no coordinate changes)
         from app.sld.layout.audit import audit_layout
         ctx.result.audit_report = audit_layout(ctx.result, ctx.config, requirements)
+
+        # Attach config for renderer access (label constants, etc.)
+        ctx.result.config = ctx.config
 
         return ctx.result
 

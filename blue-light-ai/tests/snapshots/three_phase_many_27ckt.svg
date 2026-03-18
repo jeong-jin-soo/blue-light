@@ -33,7 +33,7 @@
   <line x1="219.03" y1="172.30" x2="222.47" y2="173.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="222.75" cy="173.00" r="0.75" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="218.75" cy="173.00" r="0.75" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="219.79" y="176.08" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">2A</text>
+  <text x="219.79" y="170.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">2A</text>
   <circle cx="231.50" cy="173.00" r="2.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="232.91" y1="171.59" x2="233.62" y2="170.88" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="230.09" y1="171.59" x2="229.38" y2="170.88" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -79,12 +79,12 @@
   <text x="179.74" y="145.64" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0-200A</text>
   <polygon points="225.00,144.50 237.00,144.50 237.00,150.50 225.00,150.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="228.60" y="148.81" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000">KWH</text>
-  <text x="240.50" y="145.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="240.50">SPPG</tspan><tspan x="240.50" dy="2.2">KWH METER</tspan></text>
+  <text x="239.50" y="145.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="239.50">SPPG</tspan><tspan x="239.50" dy="2.2">KWH METER</tspan></text>
   <line x1="219.03" y1="123.70" x2="222.47" y2="122.30" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="219.03" y1="122.30" x2="222.47" y2="123.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="222.75" cy="123.00" r="0.75" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="218.75" cy="123.00" r="0.75" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="219.79" y="126.08" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">2A</text>
+  <text x="219.79" y="120.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">2A</text>
   <circle cx="235.50" cy="123.00" r="2.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="236.91" y1="121.59" x2="237.62" y2="120.88" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="234.09" y1="121.59" x2="233.38" y2="120.88" stroke="#000000" stroke-width="0.25" fill="none" />

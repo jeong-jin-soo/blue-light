@@ -296,6 +296,26 @@ class LayoutConfig:
     ct_to_ct_gap: float = 3.0        # Gap between protection CT and metering CT
     ct_to_branch_gap: float = 3.0    # Vertical offset from CT center to horizontal branch
 
+    # -- Label rendering constants (extracted from generator.py) --
+    label_ch_horizontal: float = 1.6        # 수평 미터보드 심볼(ELR, KWH, Fuse 등) 라벨
+    label_ch_breaker_info: float = 2.0      # 수평 브레이커 블록 라벨 (incoming chain)
+    label_ch_breaker_sub: float = 1.8       # 수직 서브회로 브레이커 블록 라벨
+    label_ch_cable: float = 2.0             # 케이블 어노테이션
+    label_ch_busbar_rating: float = 2.5     # 부스바 등급 텍스트
+    text_width_ratio: float = 0.6           # 글자폭 비율 (ch × ratio)
+    symbol_label_gap: float = 0.5           # 심볼-라벨 기본 간격 (ELR 좌측, KWH 우측 등)
+    fuse_label_gap_above: float = 2.5       # 퓨즈 위 라벨 간격
+    generic_label_gap_below: float = 0.8    # 일반 수평 심볼 아래 라벨 간격
+    breaker_line_gap_h: float = 0.5         # 수평 브레이커 줄 간격 (char_h + gap)
+    breaker_line_gap_v: float = 0.8         # 수직 브레이커 줄 간격 (char_h + gap)
+    breaker_label_x_default: float = 6.0    # 브레이커 라벨 X 오프셋 (MCB 등)
+    breaker_label_x_wide: float = 7.0       # MCCB/ACB 라벨 X 오프셋
+    incoming_label_x: float = 8.0           # 인커밍 브레이커 라벨 X 오프셋
+    incoming_label_y: float = 6.0           # 인커밍 브레이커 라벨 Y 오프셋
+    cable_annotation_y: float = 2.0         # 케이블 어노테이션 Y 오프셋
+    busbar_rating_x_inset: float = 30.0     # 부스바 등급 우측 인셋
+    busbar_rating_y: float = 5.0            # 부스바 등급 Y 오프셋
+
     # -- DB info text layout (used by _place_db_box / _place_multi_db_boxes) --
     db_info_title_h: float = 4.0     # Title line height (char_height=3.0 + gap)
     db_info_line_h: float = 3.0      # Per info line height (char_height=1.8 + gap)
@@ -458,6 +478,9 @@ class LayoutResult:
     db_box_dashed_indices: list[int] = field(default_factory=list)
     db_box_start_y: float = 0
     db_box_end_y: float = 0
+
+    # Layout config reference (set by compute_layout for renderer access)
+    config: LayoutConfig | None = None
 
     # Supply info for rendering
     supply_type: str = "three_phase"

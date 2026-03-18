@@ -90,6 +90,13 @@ When the user explicitly specifies protection device ratings or circuit details,
   ```json
   "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"}
   ```
+- **RCCB + MCB serial structure**: When the schedule shows RCCB followed by an MCB in series
+  (e.g., "63A 4P RCCB (30mA) + 63A TPN Type B MCB"), add `post_elcb_mcb` to requirements:
+  ```json
+  "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+  "post_elcb_mcb": {"type": "MCB", "rating": 63, "poles": "TPN", "breaker_characteristic": "B", "fault_kA": 10}
+  ```
+  This renders the MCB directly below the RCCB on the spine (common in Singapore commercial installations).
 
 ### Supply Source
 - `"supply_source"`: `"sp_powergrid"` (default) or `"landlord"`

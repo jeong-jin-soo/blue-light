@@ -385,11 +385,12 @@ class SldGenerator:
             lineweight=50,
         )
         if comp.rating:
+            _cfg = layout_result.config or LayoutConfig()
             backend.set_layer("SLD_ANNOTATIONS")
             backend.add_mtext(
                 comp.rating,
-                insert=(bus_end - 30, comp.y + 5),
-                char_height=2.5,
+                insert=(bus_end - _cfg.busbar_rating_x_inset, comp.y + _cfg.busbar_rating_y),
+                char_height=_cfg.label_ch_busbar_rating,
             )
 
     def _draw_circuit_id_component(self, backend: DrawingBackend, comp: PlacedComponent) -> None:
@@ -429,8 +430,11 @@ class SldGenerator:
         symbol = self._get_symbol(comp.symbol_name)
         if not symbol:
             if comp.symbol_name == "CB_SPARE" and comp.label:
+                _cfg = layout_result.config or LayoutConfig()
                 backend.add_mtext(
-                    comp.label, insert=(comp.x + 6, comp.y + 2), char_height=1.8,
+                    comp.label,
+                    insert=(comp.x + _cfg.breaker_label_x_default, comp.y + 2),
+                    char_height=_cfg.label_ch_breaker_sub,
                 )
             else:
                 logger.warning(f"Unknown symbol: {comp.symbol_name}")
@@ -468,19 +472,25 @@ class SldGenerator:
 
         # Labels
         backend.set_layer("SLD_ANNOTATIONS")
+        _cfg = layout_result.config
         if comp.label_style == "breaker_block":
             is_isolator = (comp.breaker_type_str or "").upper() == "ISOLATOR"
             if not is_isolator:
                 self._draw_breaker_block_label(
-                    backend, comp, is_ditto=comp_idx in ditto_indices,
+                    backend, comp, is_ditto=comp_idx in ditto_indices, config=_cfg,
                 )
         else:
-            self._draw_default_symbol_label(backend, comp, symbol, use_horizontal)
+            self._draw_default_symbol_label(backend, comp, symbol, use_horizontal, config=_cfg)
 
     def _draw_default_symbol_label(
-        self, backend: DrawingBackend, comp: PlacedComponent, symbol, use_horizontal: bool,
+        self, backend: DrawingBackend, comp: PlacedComponent, symbol,
+        use_horizontal: bool, config: LayoutConfig | None = None,
     ) -> None:
         """Draw default label + cable annotation for non-breaker-block symbols."""
+        # Resolve config (prefer explicit, fall back to default)
+        if config is None:
+            config = LayoutConfig()
+
         label_text = ""
         if comp.circuit_id:
             label_text = f"{comp.circuit_id}\\P{comp.label} {comp.rating}"
@@ -489,15 +499,18 @@ class SldGenerator:
         elif comp.label:
             label_text = comp.label
 
+        ch = config.label_ch_horizontal
+        wr = config.text_width_ratio
+        gap = config.symbol_label_gap
+
         if label_text:
             if use_horizontal:
                 if comp.symbol_name == "ELR":
                     # ELR: label left of box (spec text, 2 lines)
-                    ch = 1.6
                     lines = label_text.split("\\P")
                     max_len = max(len(ln) for ln in lines) if lines else 4
-                    text_w_est = max_len * ch * 0.6
-                    label_x = comp.x - text_w_est - 1.5
+                    text_w_est = max_len * ch * wr
+                    label_x = comp.x - text_w_est - gap
                     v_half = symbol.height / 2 if symbol else 2.0
                     label_y = comp.y + v_half
                     backend.add_mtext(
@@ -505,11 +518,10 @@ class SldGenerator:
                     )
                 elif comp.symbol_name == "KWH_METER":
                     # KWH: label right of box (per reference DWG)
-                    ch = 1.6
                     _proc = symbol.procedural
                     rw = getattr(_proc, '_rect_w', 7.8)
                     stub = getattr(_proc, '_stub', 2.0)
-                    label_x = comp.x + rw + stub + 1.5
+                    label_x = comp.x + rw + stub + gap
                     v_half = getattr(_proc, '_rect_h', 3.9) / 2
                     label_y = comp.y + v_half
                     backend.add_mtext(
@@ -518,26 +530,24 @@ class SldGenerator:
                 elif comp.symbol_name == "SELECTOR_SWITCH":
                     # Label ABOVE the circle (per reference DWG: "ASS"/"VSS" above switch)
                     # comp.x = body left edge (circle left edge)
-                    ch = 1.6
                     _proc = symbol.procedural
                     r = getattr(_proc, '_radius', 2.0)
-                    text_w_est = len(label_text) * ch * 0.6
+                    text_w_est = len(label_text) * ch * wr
                     label_x = comp.x + r - text_w_est / 2
-                    label_y = comp.y + r + ch + 0.5
+                    label_y = comp.y + r + ch + gap
                     backend.add_mtext(
                         label_text, insert=(label_x, label_y), char_height=ch,
                     )
                 elif comp.symbol_name in ("AMMETER", "VOLTMETER"):
                     # Range label to the OUTER side (left for AMMETER, right for VOLTMETER)
                     # comp.x = body left edge (circle left edge)
-                    ch = 1.6
                     _proc = symbol.procedural
                     r = getattr(_proc, '_radius', 2.5)
                     stub = getattr(_proc, '_stub', 2.0)
                     if comp.symbol_name == "AMMETER":
                         # Left of circle (outer end of left branch)
-                        text_w_est = len(label_text) * ch * 0.6
-                        label_x = comp.x - text_w_est - 0.5
+                        text_w_est = len(label_text) * ch * wr
+                        label_x = comp.x - text_w_est - gap
                         label_y = comp.y + ch * 0.4
                     else:
                         # Right of circle (outer end of right branch)
@@ -546,16 +556,25 @@ class SldGenerator:
                     backend.add_mtext(
                         label_text, insert=(label_x, label_y), char_height=ch,
                     )
+                elif comp.symbol_name in ("POTENTIAL_FUSE", "FUSE"):
+                    # Fuse: label ABOVE the symbol (per reference DWG)
+                    v_half = symbol.width / 2 if symbol else 4
+                    h_extent = symbol.height if symbol else 14
+                    text_w_est = len(label_text) * ch * wr
+                    label_x = comp.x + h_extent / 2 - text_w_est / 2
+                    label_y = comp.y + v_half + config.fuse_label_gap_above
+                    backend.add_mtext(
+                        label_text, insert=(label_x, label_y), char_height=ch,
+                    )
                 else:
                     v_half = symbol.width / 2 if symbol else 4
                     h_extent = symbol.height if symbol else 14
-                    ch = 1.6
                     # Meter board horizontal symbols: label below, centered
                     lines = label_text.split("\\P")
                     longest = max(len(ln) for ln in lines) if lines else 1
-                    text_w_est = longest * ch * 0.6
+                    text_w_est = longest * ch * wr
                     label_x = comp.x + h_extent / 2 - text_w_est / 2
-                    label_y = comp.y - v_half - 0.8
+                    label_y = comp.y - v_half - config.generic_label_gap_below
                     backend.add_mtext(
                         label_text,
                         insert=(label_x, label_y),
@@ -571,7 +590,7 @@ class SldGenerator:
                 backend.add_mtext(
                     label_text,
                     insert=(comp.x + lx, label_abs_y),
-                    char_height=1.6,
+                    char_height=ch,
                 )
 
         if comp.cable_annotation:
@@ -579,8 +598,8 @@ class SldGenerator:
             cable_offset_x = symbol.label_offset_x(backend) if symbol else 8
             backend.add_mtext(
                 comp.cable_annotation,
-                insert=(comp.x + cable_offset_x, comp.y - 2),
-                char_height=2.0,
+                insert=(comp.x + cable_offset_x, comp.y - config.cable_annotation_y),
+                char_height=config.label_ch_cable,
             )
 
     def _draw_components(self, backend: DrawingBackend, layout_result: LayoutResult) -> int:
@@ -648,6 +667,7 @@ class SldGenerator:
         backend: DrawingBackend,
         comp: PlacedComponent,
         is_ditto: bool = False,
+        config: LayoutConfig | None = None,
     ) -> None:
         """
         Draw LEW-style breaker block label.
@@ -664,6 +684,9 @@ class SldGenerator:
         For vertical text (rotation=90), text runs upward from the breaker.
         The circuit ID is shown in the CIRCUIT_ID_BOX at the busbar tap point.
         """
+        if config is None:
+            config = LayoutConfig()
+
         # Build breaker info -- render as SEPARATE text items for better spacing
         # Each line drawn individually to control vertical position precisely
         # Singapore SLD convention: characteristic prefix on rating (e.g., "B20A"),
@@ -689,20 +712,16 @@ class SldGenerator:
             # HORIZONTAL stacked text to the LEFT of breaker (matching reference DWG)
             # Format: B10A / SPN / MCB / 6kA — each on its own horizontal line
             sym_w, sym_h = self._get_breaker_dims(comp.breaker_type_str)
-            char_h = 2.0  # Compact horizontal text
-            line_gap = char_h + 0.5  # ~2.5mm line spacing
+            char_h = config.label_ch_breaker_info
+            line_gap = char_h + config.breaker_line_gap_h
 
             if is_ditto:
                 # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
                 pass
             else:
                 # Labels stacked from TOP of breaker downward, to the LEFT
-                # In layout coords: higher Y = higher on screen
-                # So first item at highest Y (top), each subsequent lower
                 label_top_y = comp.y + sym_h - 1  # Start 1mm below top of breaker
-                # Position LEFT of breaker: text starts here and extends rightward
-                # but stays to the left of the breaker symbol edge
-                base_x = comp.x - 6  # 6mm left of breaker left edge
+                base_x = comp.x - config.breaker_label_x_default
                 for idx, line_text in enumerate(info_items):
                     backend.add_mtext(
                         line_text,
@@ -711,8 +730,6 @@ class SldGenerator:
                     )
 
             # Cable annotation — now handled by layout.py as shared leader lines
-            # (horizontal leader + ticker marks + cable spec text at ends)
-            # Individual per-breaker cable text rendering is no longer used.
         else:
             # Horizontal text (all text upright, no rotation)
             if comp.label_style == "breaker_block":
@@ -725,11 +742,11 @@ class SldGenerator:
                     lx = _sym.label_offset_x(backend) if _sym else sym_w + 3
                     base_x = comp.x + lx
                 elif comp.breaker_type_str in ("MCCB", "ACB"):
-                    base_x = comp.x + 7
+                    base_x = comp.x + config.breaker_label_x_wide
                 else:
-                    base_x = comp.x + 6
-                char_h = 1.8
-                line_gap = char_h + 0.8  # ~2.6mm per line
+                    base_x = comp.x + config.breaker_label_x_default
+                char_h = config.label_ch_breaker_sub
+                line_gap = char_h + config.breaker_line_gap_v
 
                 if is_ditto:
                     # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
@@ -743,22 +760,20 @@ class SldGenerator:
                         )
 
                 # Cable annotation — now handled by layout.py as shared leader lines
-                # (horizontal leader + ticker marks + cable spec text at ends)
-                # Individual per-breaker cable text rendering is no longer used.
             else:
                 # Incoming chain breakers (original horizontal stacked logic)
                 block_text = "\\P".join(info_items)
                 backend.add_mtext(
                     block_text,
-                    insert=(comp.x + 8, comp.y + 6),
-                    char_height=2.0,
+                    insert=(comp.x + config.incoming_label_x, comp.y + config.incoming_label_y),
+                    char_height=config.label_ch_breaker_info,
                 )
 
                 if comp.cable_annotation:
                     backend.add_mtext(
                         comp.cable_annotation,
-                        insert=(comp.x + 8, comp.y - 2),
-                        char_height=1.8,
+                        insert=(comp.x + config.incoming_label_x, comp.y - config.cable_annotation_y),
+                        char_height=config.label_ch_breaker_sub,
                     )
 
     def _draw_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
