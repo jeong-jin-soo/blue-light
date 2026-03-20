@@ -663,6 +663,7 @@ class RealBIConnector(BaseSymbol):
 
     def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
         cx = x + self.width / 2
+        cy = y + self.height / 2
 
         backend.set_layer(self.layer)
         # Rectangular block
@@ -672,8 +673,17 @@ class RealBIConnector(BaseSymbol):
             close=True,
         )
 
-        # Connection stubs (vertical)
+        # Internal diagonal line (bottom-left to top-right) — reference DWG pattern
+        backend.add_line((x, y), (x + self.width, y + self.height))
+
+        # Horizontal pass-through line (left ↔ right)
+        # Reference: BI connector has a horizontal line extending left and right
+        _h_ext = self.width * 0.6  # horizontal extension beyond box
         backend.set_layer("SLD_CONNECTIONS")
+        backend.add_line((x - _h_ext, cy), (x, cy))  # left arm
+        backend.add_line((x + self.width, cy), (x + self.width + _h_ext, cy))  # right arm
+
+        # Connection stubs (vertical)
         backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
         backend.add_line((cx, y), (cx, y - self._stub))
 

@@ -149,6 +149,52 @@ def _validate_and_correct(requirements: dict) -> dict:
     return requirements
 
 
+def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
+                           requirements: dict) -> None:
+    """Multi-DB에서 수직 간격을 줄여 A3에 맞춘다.
+
+    레퍼런스 DWG에서 multi-DB SLD는 단일 DB보다 컴포넌트 간 간격이 좁다.
+    CT metering + hierarchical + protection groups가 모두 있으면 가장 압축한다.
+    """
+    has_ct = requirements.get("metering") == "ct_meter"
+    has_pg = any(db.get("protection_groups") for db in dbs)
+    total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
+
+    # Estimate vertical pressure: more DBs/circuits → more compression
+    pressure = len(dbs)
+    if has_ct:
+        pressure += 1
+    if has_pg:
+        pressure += 1
+    if total_circuits > 25:
+        pressure += 1
+
+    if pressure >= 3:
+        # Heavy compression: CT metering + multi-DB + PG
+        # Balance: tight enough to fit A3, loose enough for readability
+        config.spine_component_gap = 2.0       # was 5.0 (readable min)
+        config.isolator_to_db_gap = 5.0        # was 14.0
+        config.busbar_to_breaker_gap = 7.0     # was 12.0
+        config.db_box_busbar_margin = 4.0      # was 8.0
+        config.db_box_tail_margin = 2.0        # was 4.0
+        config.db_box_label_margin = 4.0       # was 8.0
+        config.leader_margin_above_db = 4.0    # was 10.0
+        config.leader_bend_height = 3.0        # was 5.0
+        config.tail_length = 6.0               # was 8.0
+        config.ct_to_ct_gap = 1.5              # was 3.0
+        config.ct_to_branch_gap = 1.5          # was 3.0
+        config.ct_entry_gap = 0.0              # was 0.5
+        config.symbol_label_gap = 1.0          # was 0.5 — more space for labels
+    elif pressure >= 2:
+        # Moderate compression
+        config.spine_component_gap = 3.0       # was 5.0
+        config.isolator_to_db_gap = 8.0        # was 14.0
+        config.busbar_to_breaker_gap = 10.0    # was 12.0
+        config.db_box_busbar_margin = 6.0      # was 8.0
+        config.db_box_label_margin = 6.0       # was 8.0
+        config.leader_margin_above_db = 7.0    # was 10.0
+
+
 def compute_layout(
     requirements: dict,
     config: LayoutConfig | None = None,
@@ -186,6 +232,10 @@ def compute_layout(
     if config is None:
         config = LayoutConfig.from_page_config(page_config) if page_config else LayoutConfig()
 
+    # Apply requirements-level config overrides
+    if requirements.get("default_wiring_method"):
+        config.default_wiring_method = requirements["default_wiring_method"]
+
     # -- Input validation gate (defense in depth) --
     if not skip_validation:
         requirements = _validate_and_correct(requirements)
@@ -194,7 +244,9 @@ def compute_layout(
     cx = config.start_x
 
     # Start from BOTTOM -- above title block with clearance for supply label
-    y = config.min_y + 15  # ~77mm (extra clearance for 3-line supply label)
+    _dbs_check = requirements.get("distribution_boards")
+    _start_margin = 5 if (_dbs_check and len(_dbs_check) > 1) else 15
+    y = config.min_y + _start_margin
 
     ctx = _LayoutContext(
         result=result,
@@ -209,6 +261,11 @@ def compute_layout(
 
     dbs = requirements.get("distribution_boards")
     is_multi_db = dbs and len(dbs) > 1
+
+    # Multi-DB compact mode: reduce vertical spacing to fit A3
+    if is_multi_db:
+        _apply_compact_spacing(config, dbs, requirements)
+
     if is_multi_db:
         topology = requirements.get("db_topology")
         if not topology:
@@ -295,8 +352,11 @@ def compute_layout(
             # places the CT metering section INSIDE the board (not incoming).
             if db_idx == root_idx and incoming_ctx.metering == "ct_meter":
                 # Merge metering_config (manual) with metering_detail (from extraction)
+                # Also propagate top-level ct_ratio if not in metering_config
                 mc = {**requirements.get("metering_detail", {}),
                       **requirements.get("metering_config", {})}
+                if "ct_ratio" not in mc and requirements.get("ct_ratio"):
+                    mc["ct_ratio"] = requirements["ct_ratio"]
                 db = {
                     **db,
                     "_ct_metering": True,
@@ -416,44 +476,77 @@ def compute_layout(
         return ctx.result
 
 
-def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
-    """Shift all content vertically to center it in the drawing area.
+def _collect_content_extents(
+    result: LayoutResult, config: LayoutConfig,
+) -> tuple[list[float], list[float]]:
+    """Collect all X/Y coordinates from layout elements.
 
-    Measures the actual Y extent of all components (including vertical text
-    rendering height), connections, and dots, then applies a uniform vertical
-    shift to center the content between min_y and max_y.
-
-    Vertical text (rotation=90°) extends UPWARD from comp.y, so its top
-    extent = comp.y + len(text) * char_width_estimate.
+    Includes rendered text extents for vertical labels.
+    Returns: (all_xs, all_ys)
     """
-    # Collect all Y coordinates (including rendered text extents)
+    all_xs: list[float] = []
     all_ys: list[float] = []
     for comp in result.components:
+        all_xs.append(comp.x)
         all_ys.append(comp.y)
-        # Vertical text extends upward from comp.y
         if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
-            # Handle \\P line breaks: only longest line contributes to Y extent
             lines = comp.label.split("\\P")
             max_line_len = max(len(line) for line in lines)
-            text_extent = max_line_len * config.char_w_label
-            all_ys.append(comp.y + text_extent)
+            all_ys.append(comp.y + max_line_len * config.char_w_label)
     for jx, jy, jdir in result.junction_arrows:
+        all_xs.append(jx)
         all_ys.append(jy)
-    for (sx, sy), (ex, ey) in result.connections:
-        all_ys.extend([sy, ey])
-    for (sx, sy), (ex, ey) in result.dashed_connections:
-        all_ys.extend([sy, ey])
-    for (sx, sy), (ex, ey) in result.thick_connections:
-        all_ys.extend([sy, ey])
-    for (sx, sy), (ex, ey) in result.fixed_connections:
-        all_ys.extend([sy, ey])
+    for collection in (result.connections, result.dashed_connections,
+                       result.thick_connections, result.fixed_connections):
+        for (sx, sy), (ex, ey) in collection:
+            all_xs.extend([sx, ex])
+            all_ys.extend([sy, ey])
     for x1, y1, x2, y2 in result.solid_boxes:
+        all_xs.extend([x1, x2])
         all_ys.extend([y1, y2])
     for dx, dy in result.junction_dots:
+        all_xs.append(dx)
         all_ys.append(dy)
     for ax, ay in result.arrow_points:
+        all_xs.append(ax)
         all_ys.append(ay)
+    return all_xs, all_ys
 
+
+def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
+    """Apply uniform vertical shift to all layout elements."""
+    for comp in result.components:
+        comp.y += shift
+        if comp.label_y_override is not None:
+            comp.label_y_override += shift
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
+        result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
+        result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
+        result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
+        result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
+        result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
+    for i, (dx, dy) in enumerate(result.junction_dots):
+        result.junction_dots[i] = (dx, dy + shift)
+    for i, (ax, ay) in enumerate(result.arrow_points):
+        result.arrow_points[i] = (ax, ay + shift)
+    for i, (jx, jy, jdir) in enumerate(result.junction_arrows):
+        result.junction_arrows[i] = (jx, jy + shift, jdir)
+    result.busbar_y += shift
+    result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
+    result.fanout_groups = [
+        (cx, by + shift, sxs) for cx, by, sxs in result.fanout_groups
+    ]
+    result.db_box_start_y += shift
+    result.db_box_end_y += shift
+
+
+def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
+    """Shift all content vertically to center it in the drawing area."""
+    _, all_ys = _collect_content_extents(result, config)
     if not all_ys:
         return
 
@@ -496,36 +589,7 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     if abs(shift) < 1.0:
         return  # Already centered enough
 
-    # Apply vertical shift to all elements
-    for comp in result.components:
-        comp.y += shift
-        if comp.label_y_override is not None:
-            comp.label_y_override += shift
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
-        result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
-        result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
-        result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
-        result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
-        result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
-    for i, (dx, dy) in enumerate(result.junction_dots):
-        result.junction_dots[i] = (dx, dy + shift)
-    for i, (ax, ay) in enumerate(result.arrow_points):
-        result.arrow_points[i] = (ax, ay + shift)
-    for i, (jx, jy, jdir) in enumerate(result.junction_arrows):
-        result.junction_arrows[i] = (jx, jy + shift, jdir)
-
-    # Update stored Y references
-    result.busbar_y += shift
-    result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
-    result.fanout_groups = [
-        (cx, by + shift, sxs) for cx, by, sxs in result.fanout_groups
-    ]
-    result.db_box_start_y += shift
-    result.db_box_end_y += shift
+    _apply_vertical_shift(result, shift)
 
 
 def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "parallel") -> "LayoutPlan":
@@ -856,12 +920,33 @@ def _parse_board_requirements(
         ctx.elcb_config = {}
         ctx.elcb_rating = 0
 
-    # Circuits: merge sub_circuits + protection_group circuits
-    all_circuits = list(board.get("sub_circuits", []))
+    # ── Resolve PG circuit_id references → actual circuit dicts ──
+    # PG.circuits can be circuit_id strings (references to sub_circuits) or dicts.
+    # Resolve strings to the actual circuit dicts from sub_circuits so that
+    # downstream code (_place_protection_groups, _place_per_phase_busbars)
+    # always gets circuit dicts.
+    sub_circuits_list = board.get("sub_circuits", [])
+    circuit_by_id = {c["circuit_id"]: c for c in sub_circuits_list if isinstance(c, dict) and "circuit_id" in c}
     for pg in board.get("protection_groups", []):
-        all_circuits.extend(pg.get("circuits", []))
+        pg_circuits = pg.get("circuits", [])
+        if pg_circuits and isinstance(pg_circuits[0], str):
+            # Resolve circuit_id strings → actual dicts
+            resolved = [circuit_by_id[cid] for cid in pg_circuits if cid in circuit_by_id]
+            pg["circuits"] = resolved
+
+    # Circuits: merge sub_circuits + protection_group circuits
+    all_circuits = list(sub_circuits_list)
+    for pg in board.get("protection_groups", []):
+        pg_circuits = pg.get("circuits", [])
+        if pg_circuits and isinstance(pg_circuits[0], dict):
+            # Only extend if PG has circuits NOT already in sub_circuits
+            existing_ids = {c.get("circuit_id") for c in all_circuits}
+            for c in pg_circuits:
+                if c.get("circuit_id") not in existing_ids:
+                    all_circuits.append(c)
     for c in all_circuits:
-        c["_skip_section_pad"] = True
+        if isinstance(c, dict):
+            c["_skip_section_pad"] = True
     ctx.sub_circuits = all_circuits
     ctx.busbar_rating = board.get("busbar_rating", 100)
 
@@ -1066,6 +1151,10 @@ def render_board(
         ctx.elr_spec = mc.get("elr_spec", "")
         ctx.voltmeter_range = mc.get("voltmeter_range", "")
         ctx.ammeter_range = mc.get("ammeter_range", "")
+        # Auto-derive ammeter range from CT ratio if not explicit
+        if not ctx.ammeter_range and ctx.ct_ratio:
+            from app.sld.layout.sections import _derive_ammeter_range
+            ctx.ammeter_range = _derive_ammeter_range(ctx.ct_ratio)
         # Add the standard gap BEFORE CT metering — this ensures cable annotation
         # (tick mark + text) and location text from the incoming isolator stay
         # clearly OUTSIDE and BELOW the DB dashed box with proper spacing.
@@ -1739,8 +1828,10 @@ def _place_protection_groups(
 
     # ── Place each protection group ──
     topmost_y = main_busbar_y
-    rccb_h = config.rccb_h  # RCCB symbol height
-    rccb_w = config.rccb_w  # RCCB symbol width
+    from app.sld.catalog import get_catalog as _gc
+    _rccb_def = _gc().get("RCCB")
+    rccb_h = _rccb_def.height  # RCCB symbol height
+    rccb_w = _rccb_def.width   # RCCB symbol width
 
     for pg_idx, (pg, pg_cx, pg_width) in enumerate(
         zip(pgroups, group_cxs, group_widths)
@@ -1924,8 +2015,10 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
         else:
             box_start_y = start_y - config.db_info_height(db_info_text)
 
+        from app.sld.catalog import get_catalog as _gc2
+        _mcb_def2 = _gc2().get("MCB")
         box_end_y = (busbar_y_row + config.db_box_busbar_margin
-                     + config.mcb_h + config.stub_len
+                     + _mcb_def2.height + _mcb_def2.stub
                      + config.db_box_tail_margin + config.db_box_label_margin)
 
         # Horizontal extents — region-based (preferred) or midpoint-based
@@ -1960,9 +2053,13 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
 
         # Place per-DB earth bar (outside each DB box, right side)
         _saved_busbar_y = result.busbar_y
+        _saved_db_box_start_y = getattr(result, "db_box_start_y", None)
         result.busbar_y = busbar_y_row  # Earth bar relative to THIS DB's busbar
+        result.db_box_start_y = box_start_y  # Earth bar below THIS DB's box
         _place_earth_bar(ctx, box_right)
         result.busbar_y = _saved_busbar_y
+        if _saved_db_box_start_y is not None:
+            result.db_box_start_y = _saved_db_box_start_y
 
     return rightmost_x
 
@@ -1980,34 +2077,7 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
 
     metrics = OverflowMetrics()
 
-    all_xs: list[float] = []
-    all_ys: list[float] = []
-
-    for comp in result.components:
-        all_xs.append(comp.x)
-        all_ys.append(comp.y)
-        # Vertical text extends upward from comp.y
-        if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
-            lines = comp.label.split("\\P")
-            max_line_len = max(len(line) for line in lines)
-            all_ys.append(comp.y + max_line_len * config.char_w_label)
-
-    for collection in (result.connections, result.dashed_connections, result.thick_connections, result.fixed_connections):
-        for (sx, sy), (ex, ey) in collection:
-            all_xs.extend([sx, ex])
-            all_ys.extend([sy, ey])
-    for x1, y1, x2, y2 in result.solid_boxes:
-        all_xs.extend([x1, x2])
-        all_ys.extend([y1, y2])
-    for dx, dy in result.junction_dots:
-        all_xs.append(dx)
-        all_ys.append(dy)
-    for ax, ay in result.arrow_points:
-        all_xs.append(ax)
-        all_ys.append(ay)
-    for jx, jy, jdir in result.junction_arrows:
-        all_xs.append(jx)
-        all_ys.append(jy)
+    all_xs, all_ys = _collect_content_extents(result, config)
 
     if not all_xs or not all_ys:
         result.overflow_metrics = metrics

@@ -355,14 +355,12 @@ class DxfBackend:
         center_x: float,
         busbar_y: float,
         side_xs: list[float],
-        mcb_bottom_y: float,
+        mcb_entry_y: float,
     ) -> None:
         """Create and insert a 3-phase fan-out block at the given busbar position.
 
-        Generates a unique block definition for this fan-out geometry, matching
-        the reference DXF pattern (63A TPN SLD 14):
-          - Center: vertical line from busbar to MCB
-          - Sides: diagonal from center busbar to intermediate, then vertical to MCB
+        mcb_entry_y = MCB busbar-side entry pin. Lines stop here;
+        MCB symbol draws its own body and exit stub internally.
 
         Reference ratio: fan_height / spacing = 193 / 727 ≈ 0.266
         """
@@ -374,7 +372,7 @@ class DxfBackend:
         avg_sp = sum(spacings) / len(spacings) if spacings else 0
         block_name = f"FANOUT_3P_{side_count}S_{avg_sp:.1f}"
 
-        total_h = mcb_bottom_y - busbar_y  # total height from busbar to MCB
+        total_h = mcb_entry_y - busbar_y  # height from busbar to MCB entry pin
 
         if block_name not in self._doc.blocks:
             # Block origin = (0, 0) at center busbar junction
@@ -382,7 +380,7 @@ class DxfBackend:
             layer = "E-SLD-LINE"
             attribs = {"layer": layer, "lineweight": 25}
 
-            # Center vertical: busbar to MCB
+            # Center vertical: busbar → MCB entry pin
             block.add_line((0, 0), (0, total_h), dxfattribs=attribs)
 
             for sx in side_xs:
@@ -391,7 +389,7 @@ class DxfBackend:
 
                 # Diagonal: center busbar → side intermediate
                 block.add_line((0, 0), (dx, fan_h), dxfattribs=attribs)
-                # Side vertical: intermediate → MCB bottom
+                # Side vertical: intermediate → MCB entry pin
                 block.add_line((dx, fan_h), (dx, total_h), dxfattribs=attribs)
 
         # Insert the block

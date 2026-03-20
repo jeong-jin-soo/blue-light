@@ -67,16 +67,16 @@
   <line x1="189.00" y1="160.50" x2="189.00" y2="162.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="147.15" x2="210.00" y2="148.65" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="144.85" x2="210.00" y2="143.35" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="214.25" y="141.28" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="214.25">200/5A</tspan><tspan x="214.25" dy="2.2">CL1 5VA</tspan></text>
-  <circle cx="199.00" cy="143.00" r="2.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="200.41" y1="141.59" x2="197.59" y2="144.41" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="201.00" y1="143.00" x2="203.00" y2="143.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="197.00" y1="143.00" x2="195.00" y2="143.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="197.56" y="140.18" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">ASS</text>
-  <circle cx="188.00" cy="143.00" r="2.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="187.28" y="143.96" font-family="Arial, Helvetica, sans-serif" font-size="2.4" fill="#000000">A</text>
-  <line x1="190.00" y1="143.00" x2="192.00" y2="143.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="179.74" y="143.64" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0-200A</text>
+  <text x="214.25" y="131.53" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="214.25">200/5A</tspan><tspan x="214.25" dy="2.2">CL1 5VA</tspan></text>
+  <circle cx="199.00" cy="133.25" r="2.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="200.41" y1="131.84" x2="197.59" y2="134.66" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="201.00" y1="133.25" x2="203.00" y2="133.25" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="197.00" y1="133.25" x2="195.00" y2="133.25" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="197.56" y="130.43" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">ASS</text>
+  <circle cx="188.00" cy="133.25" r="2.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="187.28" y="134.21" font-family="Arial, Helvetica, sans-serif" font-size="2.4" fill="#000000">A</text>
+  <line x1="190.00" y1="133.25" x2="192.00" y2="133.25" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="177.82" y="133.89" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0 - 200A</text>
   <polygon points="225.00,142.50 237.00,142.50 237.00,148.50 225.00,148.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="228.60" y="146.81" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000">KWH</text>
   <text x="239.50" y="143.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="239.50">SPPG</tspan><tspan x="239.50" dy="2.2">KWH METER</tspan></text>
@@ -113,12 +113,15 @@
   <line x1="248.75" y1="131.00" x2="246.75" y2="131.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="255.75" y="131.64" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0-500V</text>
   <polygon points="206.50,117.00 213.50,117.00 213.50,111.50 206.50,111.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="206.50" y1="117.00" x2="213.50" y2="111.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="202.30" y1="114.25" x2="206.50" y2="114.25" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="213.50" y1="114.25" x2="217.70" y2="114.25" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="111.50" x2="210.00" y2="110.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="117.00" x2="210.00" y2="118.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="216.50" y="113.53" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">200A BI CONNECTOR</text>
   <line x1="49.27" y1="110.00" x2="375.00" y2="110.00" stroke="#000000" stroke-width="0.50" fill="none" />
-  <text x="52.27" y="115.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A BUSBAR</text>
-  <text x="64.27" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,64.27,107.38)">L1P1</text>
+  <text x="52.27" y="115.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A COMB BAR</text>
+  <text x="64.27" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,64.27,105.38)">L1P1</text>
   <path d="M 63.62,97.34 A 3.75,3.75 0 0,0 63.62,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="62.58" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="62.59" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -132,7 +135,7 @@
   <text x="54.27" y="97.60" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">MCB</text>
   <text x="54.27" y="100.10" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">6kA</text>
   <text x="62.77" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,62.77,64.12)">1 NO. CIRCUIT 1</text>
-  <text x="75.75" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,75.75,107.38)">L2P1</text>
+  <text x="75.75" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,75.75,105.38)">L2P1</text>
   <path d="M 75.10,97.34 A 3.75,3.75 0 0,0 75.10,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="74.06" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="74.07" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -142,7 +145,7 @@
   <line x1="77.14" y1="94.00" x2="75.94" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="77.14" y1="94.00" x2="75.94" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="74.25" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,74.25,64.12)">1 NO. CIRCUIT 2</text>
-  <text x="87.23" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,87.23,107.38)">L3P1</text>
+  <text x="87.23" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,87.23,105.38)">L3P1</text>
   <path d="M 86.58,97.34 A 3.75,3.75 0 0,0 86.58,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="85.54" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="85.55" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -152,7 +155,7 @@
   <line x1="88.62" y1="94.00" x2="87.42" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="88.62" y1="94.00" x2="87.42" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="85.73" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,85.73,64.12)">1 NO. CIRCUIT 3</text>
-  <text x="98.71" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,98.71,107.38)">L1P2</text>
+  <text x="98.71" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,98.71,105.38)">L1P2</text>
   <path d="M 98.07,97.34 A 3.75,3.75 0 0,0 98.06,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="97.02" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="97.03" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -162,7 +165,7 @@
   <line x1="100.11" y1="94.00" x2="98.91" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="100.11" y1="94.00" x2="98.91" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="97.21" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,97.21,64.12)">1 NO. CIRCUIT 4</text>
-  <text x="110.19" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,110.19,107.38)">L2P2</text>
+  <text x="110.19" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,110.19,105.38)">L2P2</text>
   <path d="M 109.55,97.34 A 3.75,3.75 0 0,0 109.55,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="108.50" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="108.51" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -172,7 +175,7 @@
   <line x1="111.59" y1="94.00" x2="110.39" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="111.59" y1="94.00" x2="110.39" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="108.69" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,108.69,64.12)">1 NO. CIRCUIT 5</text>
-  <text x="121.67" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,121.67,107.38)">L3P2</text>
+  <text x="121.67" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,121.67,105.38)">L3P2</text>
   <path d="M 121.03,97.34 A 3.75,3.75 0 0,0 121.03,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="119.98" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="119.99" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -182,7 +185,7 @@
   <line x1="123.07" y1="94.00" x2="121.87" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="123.07" y1="94.00" x2="121.87" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="120.17" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,120.17,64.12)">1 NO. CIRCUIT 6</text>
-  <text x="133.16" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,133.16,107.38)">L1P3</text>
+  <text x="133.16" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,133.16,105.38)">L1P3</text>
   <path d="M 132.51,97.34 A 3.75,3.75 0 0,0 132.51,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="131.46" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="131.47" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -192,7 +195,7 @@
   <line x1="134.55" y1="94.00" x2="133.35" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="134.55" y1="94.00" x2="133.35" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="131.66" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,131.66,64.12)">1 NO. CIRCUIT 7</text>
-  <text x="144.64" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,144.64,107.38)">L2P3</text>
+  <text x="144.64" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,144.64,105.38)">L2P3</text>
   <path d="M 143.99,97.34 A 3.75,3.75 0 0,0 143.99,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="142.95" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="142.96" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -202,7 +205,7 @@
   <line x1="146.03" y1="94.00" x2="144.83" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="146.03" y1="94.00" x2="144.83" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="143.14" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,143.14,64.12)">1 NO. CIRCUIT 8</text>
-  <text x="156.12" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,156.12,107.38)">L3P3</text>
+  <text x="156.12" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,156.12,105.38)">L3P3</text>
   <path d="M 155.47,97.34 A 3.75,3.75 0 0,0 155.47,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="154.43" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="154.44" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -212,7 +215,7 @@
   <line x1="157.51" y1="94.00" x2="156.31" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="157.51" y1="94.00" x2="156.31" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="154.62" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,154.62,64.12)">1 NO. CIRCUIT 9</text>
-  <text x="167.60" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,167.60,107.38)">L1P4</text>
+  <text x="167.60" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,167.60,105.38)">L1P4</text>
   <path d="M 166.95,97.34 A 3.75,3.75 0 0,0 166.95,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="165.91" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="165.92" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -222,7 +225,7 @@
   <line x1="168.99" y1="94.00" x2="167.79" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="168.99" y1="94.00" x2="167.79" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="166.10" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,166.10,64.12)">1 NO. CIRCUIT 10</text>
-  <text x="179.08" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,179.08,107.38)">L2P4</text>
+  <text x="179.08" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,179.08,105.38)">L2P4</text>
   <path d="M 178.44,97.34 A 3.75,3.75 0 0,0 178.43,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="177.39" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="177.40" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -232,7 +235,7 @@
   <line x1="180.48" y1="94.00" x2="179.28" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="180.48" y1="94.00" x2="179.28" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="177.58" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,177.58,64.12)">1 NO. CIRCUIT 11</text>
-  <text x="190.56" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,190.56,107.38)">L3P4</text>
+  <text x="190.56" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,190.56,105.38)">L3P4</text>
   <path d="M 189.92,97.34 A 3.75,3.75 0 0,0 189.92,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="188.87" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="188.88" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -242,7 +245,7 @@
   <line x1="191.96" y1="94.00" x2="190.76" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="191.96" y1="94.00" x2="190.76" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="189.06" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,189.06,64.12)">1 NO. CIRCUIT 12</text>
-  <text x="202.04" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,202.04,107.38)">L1P5</text>
+  <text x="202.04" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,202.04,105.38)">L1P5</text>
   <path d="M 201.40,97.34 A 3.75,3.75 0 0,0 201.40,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="200.35" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="200.36" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -252,7 +255,7 @@
   <line x1="203.44" y1="94.00" x2="202.24" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="203.44" y1="94.00" x2="202.24" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="200.54" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,200.54,64.12)">1 NO. CIRCUIT 13</text>
-  <text x="213.53" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,213.53,107.38)">L2P5</text>
+  <text x="213.53" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,213.53,105.38)">L2P5</text>
   <path d="M 212.88,97.34 A 3.75,3.75 0 0,0 212.88,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="211.83" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="211.84" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -262,7 +265,7 @@
   <line x1="214.92" y1="94.00" x2="213.72" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="214.92" y1="94.00" x2="213.72" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="212.03" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,212.03,64.12)">1 NO. CIRCUIT 14</text>
-  <text x="225.01" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,225.01,107.38)">L3P5</text>
+  <text x="225.01" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,225.01,105.38)">L3P5</text>
   <path d="M 224.36,97.34 A 3.75,3.75 0 0,0 224.36,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="223.32" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="223.33" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -272,7 +275,7 @@
   <line x1="226.40" y1="94.00" x2="225.20" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="226.40" y1="94.00" x2="225.20" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="223.51" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,223.51,64.12)">1 NO. CIRCUIT 15</text>
-  <text x="236.49" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,236.49,107.38)">L1P6</text>
+  <text x="236.49" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,236.49,105.38)">L1P6</text>
   <path d="M 235.84,97.34 A 3.75,3.75 0 0,0 235.84,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="234.80" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="234.81" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -282,7 +285,7 @@
   <line x1="237.88" y1="94.00" x2="236.68" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="237.88" y1="94.00" x2="236.68" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="234.99" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,234.99,64.12)">1 NO. CIRCUIT 16</text>
-  <text x="247.97" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,247.97,107.38)">L2P6</text>
+  <text x="247.97" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,247.97,105.38)">L2P6</text>
   <path d="M 247.32,97.34 A 3.75,3.75 0 0,0 247.32,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="246.28" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="246.29" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -292,7 +295,7 @@
   <line x1="249.36" y1="94.00" x2="248.16" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="249.36" y1="94.00" x2="248.16" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="246.47" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,246.47,64.12)">1 NO. CIRCUIT 17</text>
-  <text x="259.45" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,259.45,107.38)">L3P6</text>
+  <text x="259.45" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,259.45,105.38)">L3P6</text>
   <path d="M 258.81,97.34 A 3.75,3.75 0 0,0 258.81,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="257.76" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="257.77" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -302,7 +305,7 @@
   <line x1="260.85" y1="94.00" x2="259.65" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="260.85" y1="94.00" x2="259.65" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="257.95" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,257.95,64.12)">1 NO. CIRCUIT 18</text>
-  <text x="270.93" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,270.93,107.38)">L1P7</text>
+  <text x="270.93" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,270.93,105.38)">L1P7</text>
   <path d="M 270.29,97.34 A 3.75,3.75 0 0,0 270.29,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="269.24" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="269.25" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -312,7 +315,7 @@
   <line x1="272.33" y1="94.00" x2="271.13" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="272.33" y1="94.00" x2="271.13" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="269.43" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,269.43,64.12)">1 NO. CIRCUIT 19</text>
-  <text x="282.42" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,282.42,107.38)">L2P7</text>
+  <text x="282.42" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,282.42,105.38)">L2P7</text>
   <path d="M 281.77,97.34 A 3.75,3.75 0 0,0 281.77,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="280.72" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="280.73" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -322,7 +325,7 @@
   <line x1="283.81" y1="94.00" x2="282.61" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="283.81" y1="94.00" x2="282.61" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="280.92" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,280.92,64.12)">1 NO. CIRCUIT 20</text>
-  <text x="293.90" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,293.90,107.38)">L3P7</text>
+  <text x="293.90" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,293.90,105.38)">L3P7</text>
   <path d="M 293.25,97.34 A 3.75,3.75 0 0,0 293.25,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="292.20" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="292.22" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -332,7 +335,7 @@
   <line x1="295.29" y1="94.00" x2="294.09" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="295.29" y1="94.00" x2="294.09" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="292.40" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,292.40,64.12)">1 NO. CIRCUIT 21</text>
-  <text x="305.38" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,305.38,107.38)">L1P8</text>
+  <text x="305.38" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,305.38,105.38)">L1P8</text>
   <path d="M 304.73,97.34 A 3.75,3.75 0 0,0 304.73,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="303.69" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="303.70" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -342,7 +345,7 @@
   <line x1="306.77" y1="94.00" x2="305.57" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="306.77" y1="94.00" x2="305.57" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="303.88" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,303.88,64.12)">1 NO. CIRCUIT 22</text>
-  <text x="316.86" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,316.86,107.38)">L2P8</text>
+  <text x="316.86" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,316.86,105.38)">L2P8</text>
   <path d="M 316.21,97.34 A 3.75,3.75 0 0,0 316.21,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="315.17" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="315.18" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -352,7 +355,7 @@
   <line x1="318.25" y1="94.00" x2="317.05" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="318.25" y1="94.00" x2="317.05" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="315.36" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,315.36,64.12)">1 NO. CIRCUIT 23</text>
-  <text x="328.34" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,328.34,107.38)">L3P8</text>
+  <text x="328.34" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,328.34,105.38)">L3P8</text>
   <path d="M 327.69,97.34 A 3.75,3.75 0 0,0 327.69,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="326.65" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="326.66" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -362,7 +365,7 @@
   <line x1="329.74" y1="94.00" x2="328.54" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="329.74" y1="94.00" x2="328.54" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="326.84" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,326.84,64.12)">1 NO. CIRCUIT 24</text>
-  <text x="339.82" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,339.82,107.38)">L1P9</text>
+  <text x="339.82" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,339.82,105.38)">L1P9</text>
   <path d="M 339.18,97.34 A 3.75,3.75 0 0,0 339.18,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="338.13" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="338.14" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -372,7 +375,7 @@
   <line x1="341.22" y1="94.00" x2="340.02" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="341.22" y1="94.00" x2="340.02" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="338.32" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,338.32,64.12)">1 NO. CIRCUIT 25</text>
-  <text x="351.30" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,351.30,107.38)">L2P9</text>
+  <text x="351.30" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,351.30,105.38)">L2P9</text>
   <path d="M 350.66,97.34 A 3.75,3.75 0 0,0 350.66,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="349.61" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="349.62" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -382,7 +385,7 @@
   <line x1="352.70" y1="94.00" x2="351.50" y2="93.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="352.70" y1="94.00" x2="351.50" y2="94.60" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="349.80" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,349.80,64.12)">1 NO. CIRCUIT 26</text>
-  <text x="362.79" y="108.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,362.79,107.38)">L3P9</text>
+  <text x="362.79" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,362.79,105.38)">L3P9</text>
   <path d="M 362.14,97.34 A 3.75,3.75 0 0,0 362.14,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="361.09" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="361.10" cy="97.34" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -395,7 +398,7 @@
   <text x="49.77" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,49.77,64.12)">2 x 1C 2.5sqmm PVC +</text>
   <text x="53.69" y="65.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,53.69,64.12)">2.5sqmm PVC CPC</text>
   <text x="45.27" y="184.40" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">100A DB</text>
-  <text x="45.27" y="187.44" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 60 kVA</text>
+  <text x="45.27" y="187.44" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 60 KVA AT 400V</text>
   <line x1="361.81" y1="198.00" x2="361.81" y2="199.80" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="359.56" y1="199.80" x2="364.06" y2="199.80" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="360.31" y1="200.93" x2="363.31" y2="200.93" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -408,18 +411,22 @@
   <line x1="204.00" y1="211.00" x2="216.00" y2="211.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="211.00" x2="210.00" y2="207.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="207.00" x2="210.00" y2="205.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="207.00" x2="210.00" y2="205.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="198.00" x2="210.00" y2="196.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="196.00" x2="210.00" y2="194.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="194.00" x2="210.00" y2="180.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="176.00" x2="218.00" y2="176.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="223.50" y1="176.00" x2="229.50" y2="176.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="180.00" x2="210.00" y2="175.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="177.00" x2="210.00" y2="175.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="166.00" x2="210.00" y2="164.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="164.00" x2="210.00" y2="159.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="159.00" x2="210.00" y2="110.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="157.50" x2="195.00" y2="157.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.00" y1="162.50" x2="189.00" y2="170.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.00" y1="170.50" x2="209.00" y2="170.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="143.00" x2="201.00" y2="143.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="197.00" y1="143.00" x2="190.00" y2="143.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="133.25" x2="201.00" y2="133.25" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="197.00" y1="133.25" x2="190.00" y2="133.25" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="145.50" x2="225.00" y2="145.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="231.00" y1="148.50" x2="231.00" y2="154.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="231.00" y1="154.50" x2="210.00" y2="154.50" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -427,60 +434,86 @@
   <line x1="223.50" y1="121.00" x2="233.50" y2="121.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="227.75" y1="121.00" x2="237.75" y2="131.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="245.75" y1="131.00" x2="246.75" y2="131.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="112.00" x2="210.00" y2="110.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="62.77" y1="106.95" x2="62.77" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="62.77" y1="90.00" x2="62.77" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="62.77" y1="88.00" x2="62.77" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="74.25" y1="110.00" x2="74.25" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="74.25" y1="90.00" x2="74.25" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="74.25" y1="88.00" x2="74.25" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="85.73" y1="106.95" x2="85.73" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="85.73" y1="90.00" x2="85.73" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="85.73" y1="88.00" x2="85.73" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="97.21" y1="106.95" x2="97.21" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="97.21" y1="90.00" x2="97.21" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="97.21" y1="88.00" x2="97.21" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="108.69" y1="110.00" x2="108.69" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="108.69" y1="90.00" x2="108.69" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="108.69" y1="88.00" x2="108.69" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="120.17" y1="106.95" x2="120.17" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="120.17" y1="90.00" x2="120.17" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="120.17" y1="88.00" x2="120.17" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="131.66" y1="106.95" x2="131.66" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="131.66" y1="90.00" x2="131.66" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="131.66" y1="88.00" x2="131.66" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="143.14" y1="110.00" x2="143.14" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="143.14" y1="90.00" x2="143.14" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="143.14" y1="88.00" x2="143.14" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="154.62" y1="106.95" x2="154.62" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="154.62" y1="90.00" x2="154.62" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="154.62" y1="88.00" x2="154.62" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="166.10" y1="106.95" x2="166.10" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="166.10" y1="90.00" x2="166.10" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="166.10" y1="88.00" x2="166.10" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="177.58" y1="110.00" x2="177.58" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="177.58" y1="90.00" x2="177.58" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="177.58" y1="88.00" x2="177.58" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.06" y1="106.95" x2="189.06" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="189.06" y1="90.00" x2="189.06" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.06" y1="88.00" x2="189.06" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="200.54" y1="106.95" x2="200.54" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="200.54" y1="90.00" x2="200.54" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="200.54" y1="88.00" x2="200.54" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="110.00" x2="210.00" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="90.00" x2="210.00" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="88.00" x2="210.00" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="223.51" y1="106.95" x2="223.51" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="223.51" y1="90.00" x2="223.51" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="223.51" y1="88.00" x2="223.51" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="234.99" y1="106.95" x2="234.99" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="234.99" y1="90.00" x2="234.99" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="234.99" y1="88.00" x2="234.99" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="246.47" y1="110.00" x2="246.47" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="246.47" y1="90.00" x2="246.47" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="246.47" y1="88.00" x2="246.47" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="257.95" y1="106.95" x2="257.95" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="257.95" y1="90.00" x2="257.95" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="257.95" y1="88.00" x2="257.95" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="269.43" y1="106.95" x2="269.43" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="269.43" y1="90.00" x2="269.43" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="269.43" y1="88.00" x2="269.43" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="280.92" y1="110.00" x2="280.92" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="280.92" y1="90.00" x2="280.92" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="280.92" y1="88.00" x2="280.92" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="292.40" y1="106.95" x2="292.40" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="292.40" y1="90.00" x2="292.40" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="292.40" y1="88.00" x2="292.40" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="303.88" y1="106.95" x2="303.88" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="303.88" y1="90.00" x2="303.88" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="303.88" y1="88.00" x2="303.88" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="315.36" y1="110.00" x2="315.36" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="315.36" y1="90.00" x2="315.36" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="315.36" y1="88.00" x2="315.36" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="326.84" y1="106.95" x2="326.84" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="326.84" y1="90.00" x2="326.84" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="326.84" y1="88.00" x2="326.84" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="338.32" y1="106.95" x2="338.32" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="338.32" y1="90.00" x2="338.32" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="338.32" y1="88.00" x2="338.32" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="349.80" y1="110.00" x2="349.80" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="349.80" y1="90.00" x2="349.80" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="349.80" y1="88.00" x2="349.80" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="361.29" y1="106.95" x2="361.29" y2="98.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="361.29" y1="90.00" x2="361.29" y2="88.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="361.29" y1="88.00" x2="361.29" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="52.77" y1="70.00" x2="361.29" y2="70.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="52.77" y1="70.00" x2="52.77" y2="65.00" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -512,51 +545,51 @@
   <line x1="337.07" y1="71.25" x2="339.57" y2="68.75" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="348.55" y1="71.25" x2="351.05" y2="68.75" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="360.04" y1="71.25" x2="362.54" y2="68.75" stroke="#000000" stroke-width="0.50" fill="none" />
-  <line x1="74.25" y1="110.00" x2="74.25" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="74.25" y1="110.00" x2="74.25" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="74.25" y1="110.00" x2="62.77" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="62.77" y1="106.95" x2="62.77" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="62.77" y1="106.95" x2="62.77" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="74.25" y1="110.00" x2="85.73" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="85.73" y1="106.95" x2="85.73" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="108.69" y1="110.00" x2="108.69" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="85.73" y1="106.95" x2="85.73" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="108.69" y1="110.00" x2="108.69" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="108.69" y1="110.00" x2="97.21" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="97.21" y1="106.95" x2="97.21" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="97.21" y1="106.95" x2="97.21" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="108.69" y1="110.00" x2="120.17" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="120.17" y1="106.95" x2="120.17" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="143.14" y1="110.00" x2="143.14" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="120.17" y1="106.95" x2="120.17" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="143.14" y1="110.00" x2="143.14" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="143.14" y1="110.00" x2="131.66" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="131.66" y1="106.95" x2="131.66" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="131.66" y1="106.95" x2="131.66" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="143.14" y1="110.00" x2="154.62" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="154.62" y1="106.95" x2="154.62" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="177.58" y1="110.00" x2="177.58" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="154.62" y1="106.95" x2="154.62" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="177.58" y1="110.00" x2="177.58" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="177.58" y1="110.00" x2="166.10" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="166.10" y1="106.95" x2="166.10" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="166.10" y1="106.95" x2="166.10" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="177.58" y1="110.00" x2="189.06" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="189.06" y1="106.95" x2="189.06" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="212.03" y1="110.00" x2="212.03" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="189.06" y1="106.95" x2="189.06" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="212.03" y1="110.00" x2="212.03" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="212.03" y1="110.00" x2="200.54" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="200.54" y1="106.95" x2="200.54" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="200.54" y1="106.95" x2="200.54" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="212.03" y1="110.00" x2="223.51" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="223.51" y1="106.95" x2="223.51" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="246.47" y1="110.00" x2="246.47" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="223.51" y1="106.95" x2="223.51" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="246.47" y1="110.00" x2="246.47" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="246.47" y1="110.00" x2="234.99" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="234.99" y1="106.95" x2="234.99" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="234.99" y1="106.95" x2="234.99" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="246.47" y1="110.00" x2="257.95" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="257.95" y1="106.95" x2="257.95" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="280.92" y1="110.00" x2="280.92" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="257.95" y1="106.95" x2="257.95" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="280.92" y1="110.00" x2="280.92" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="280.92" y1="110.00" x2="269.43" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="269.43" y1="106.95" x2="269.43" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="269.43" y1="106.95" x2="269.43" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="280.92" y1="110.00" x2="292.40" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="292.40" y1="106.95" x2="292.40" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="315.36" y1="110.00" x2="315.36" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="292.40" y1="106.95" x2="292.40" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="315.36" y1="110.00" x2="315.36" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="315.36" y1="110.00" x2="303.88" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="303.88" y1="106.95" x2="303.88" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="303.88" y1="106.95" x2="303.88" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="315.36" y1="110.00" x2="326.84" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="326.84" y1="106.95" x2="326.84" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="349.80" y1="110.00" x2="349.80" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="326.84" y1="106.95" x2="326.84" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="349.80" y1="110.00" x2="349.80" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="349.80" y1="110.00" x2="338.32" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="338.32" y1="106.95" x2="338.32" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="338.32" y1="106.95" x2="338.32" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="349.80" y1="110.00" x2="361.29" y2="106.95" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="361.29" y1="106.95" x2="361.29" y2="98.52" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="361.29" y1="106.95" x2="361.29" y2="100.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="39.27" y1="190.00" x2="47.27" y2="190.00" stroke="#808080" stroke-width="0.25" fill="none" />
   <line x1="49.27" y1="190.00" x2="50.77" y2="190.00" stroke="#808080" stroke-width="0.25" fill="none" />
   <line x1="52.77" y1="190.00" x2="60.77" y2="190.00" stroke="#808080" stroke-width="0.25" fill="none" />
@@ -723,12 +756,12 @@
   <circle cx="349.80" cy="110.00" r="0.50" fill="rgb(0,0,0)" stroke="none" />
   <circle cx="349.80" cy="110.00" r="0.50" fill="rgb(0,0,0)" stroke="none" />
   <circle cx="361.81" cy="190.00" r="0.50" fill="rgb(0,0,0)" stroke="none" />
-  <polyline points="209.40,157.50 209.63,157.49 209.86,157.48 210.07,157.45 210.25,157.41 210.40,157.37 210.51,157.31 210.58,157.26 210.60,157.20 210.58,157.14 210.51,157.09 210.40,157.03 210.25,156.99 210.07,156.95 209.86,156.92 209.63,156.91 209.40,156.90" stroke="#000000" stroke-width="0.25" fill="none" />
-  <polyline points="209.40,158.10 209.63,158.09 209.86,158.08 210.07,158.05 210.25,158.01 210.40,157.97 210.51,157.91 210.58,157.86 210.60,157.80 210.58,157.74 210.51,157.69 210.40,157.63 210.25,157.59 210.07,157.55 209.86,157.52 209.63,157.51 209.40,157.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <polyline points="209.40,143.00 209.63,142.99 209.86,142.98 210.07,142.95 210.25,142.91 210.40,142.87 210.51,142.81 210.58,142.76 210.60,142.70 210.58,142.64 210.51,142.59 210.40,142.53 210.25,142.49 210.07,142.45 209.86,142.42 209.63,142.41 209.40,142.40" stroke="#000000" stroke-width="0.25" fill="none" />
-  <polyline points="209.40,143.60 209.63,143.59 209.86,143.58 210.07,143.55 210.25,143.51 210.40,143.47 210.51,143.41 210.58,143.36 210.60,143.30 210.58,143.24 210.51,143.19 210.40,143.13 210.25,143.09 210.07,143.05 209.86,143.02 209.63,143.01 209.40,143.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <polyline points="210.60,145.50 210.37,145.49 210.14,145.48 209.93,145.45 209.75,145.41 209.60,145.37 209.49,145.31 209.42,145.26 209.40,145.20 209.42,145.14 209.49,145.09 209.60,145.03 209.75,144.99 209.93,144.95 210.14,144.92 210.37,144.91 210.60,144.90" stroke="#000000" stroke-width="0.25" fill="none" />
-  <polyline points="210.60,146.10 210.37,146.09 210.14,146.08 209.93,146.05 209.75,146.01 209.60,145.97 209.49,145.91 209.42,145.86 209.40,145.80 209.42,145.74 209.49,145.69 209.60,145.63 209.75,145.59 209.93,145.55 210.14,145.52 210.37,145.51 210.60,145.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="209.70,157.50 209.82,157.49 209.93,157.48 210.03,157.45 210.12,157.41 210.20,157.37 210.25,157.31 210.29,157.26 210.30,157.20 210.29,157.14 210.25,157.09 210.20,157.03 210.12,156.99 210.03,156.95 209.93,156.92 209.82,156.91 209.70,156.90" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="209.70,158.10 209.82,158.09 209.93,158.08 210.03,158.05 210.12,158.01 210.20,157.97 210.25,157.91 210.29,157.86 210.30,157.80 210.29,157.74 210.25,157.69 210.20,157.63 210.12,157.59 210.03,157.55 209.93,157.52 209.82,157.51 209.70,157.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="209.70,133.25 209.82,133.24 209.93,133.23 210.03,133.20 210.12,133.16 210.20,133.12 210.25,133.06 210.29,133.01 210.30,132.95 210.29,132.89 210.25,132.84 210.20,132.78 210.12,132.74 210.03,132.70 209.93,132.67 209.82,132.66 209.70,132.65" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="209.70,133.85 209.82,133.84 209.93,133.83 210.03,133.80 210.12,133.76 210.20,133.72 210.25,133.66 210.29,133.61 210.30,133.55 210.29,133.49 210.25,133.44 210.20,133.38 210.12,133.34 210.03,133.30 209.93,133.27 209.82,133.26 209.70,133.25" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="210.30,145.50 210.18,145.49 210.07,145.48 209.97,145.45 209.88,145.41 209.80,145.37 209.75,145.31 209.71,145.26 209.70,145.20 209.71,145.14 209.75,145.09 209.80,145.03 209.88,144.99 209.97,144.95 210.07,144.92 210.18,144.91 210.30,144.90" stroke="#000000" stroke-width="0.25" fill="none" />
+  <polyline points="210.30,146.10 210.18,146.09 210.07,146.08 209.97,146.05 209.88,146.01 209.80,145.97 209.75,145.91 209.71,145.86 209.70,145.80 209.71,145.74 209.75,145.69 209.80,145.63 209.88,145.59 209.97,145.55 210.07,145.52 210.18,145.51 210.30,145.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="13.00" y="264.40" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">Electrical Installation</text>
   <text x="153.00" y="264.40" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">LicenseKaki</text>
   <text x="225.00" y="263.80" font-family="Arial, Helvetica, sans-serif" font-size="3.5" fill="#000000"><tspan x="225.00">SINGLE LINE DIAGRAM</tspan><tspan x="225.00" dy="4.9">(SLD)</tspan></text>

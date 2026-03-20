@@ -784,12 +784,19 @@ def _parse_circuit_data(circuit: dict, supply_type: str) -> dict:
 
 
 def _get_breaker_dimensions(breaker_type: str, config: LayoutConfig) -> tuple[float, float]:
-    """Return (width, height) for a breaker type from config."""
-    if breaker_type in ("RCCB", "ELCB"):
-        return config.rccb_w, config.rccb_h
-    if breaker_type in ("MCCB", "ACB"):
-        return config.breaker_w, config.breaker_h
-    return config.mcb_w, config.mcb_h
+    """Return (width, height) for a breaker type from catalog.
+
+    The catalog resolves type → dimensions polymorphically,
+    eliminating the need for type-based branching.
+    """
+    from app.sld.catalog import get_catalog
+    catalog = get_catalog()
+    if catalog.has(breaker_type):
+        comp = catalog.get(breaker_type)
+        return comp.width, comp.height
+    # Fallback: MCB from catalog (breaker_type not recognized)
+    mcb = catalog.get("MCB")
+    return mcb.width, mcb.height
 
 
 def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, config: LayoutConfig) -> str:
@@ -852,9 +859,10 @@ def _place_sub_circuits_upward(
         else:
             circuit_id = f"C{global_idx + 1}"
 
-        # Circuit ID box at busbar tap
+        # Circuit ID box at busbar tap — offset must clear the busbar-to-breaker
+        # connection line to prevent label overlap (Vision AI P1 fix)
         result.components.append(PlacedComponent(
-            symbol_name="CIRCUIT_ID_BOX", x=tap_x, y=busbar_y + 3.5,
+            symbol_name="CIRCUIT_ID_BOX", x=tap_x, y=busbar_y + 5.5,
             circuit_id=circuit_id, rotation=90.0,
         ))
 
@@ -891,7 +899,7 @@ def _place_sub_circuits_upward(
                 symbol_name=_symbol_name,
                 x=tap_x - sc_cb_w / 2, y=sc_y,
                 label=cd["name"], rating=f"{cd['breaker_rating']}A",
-                cable_annotation=format_cable_spec(cd["cable"]), circuit_id=circuit_id,
+                cable_annotation=format_cable_spec(cd["cable"], default_method=config.default_wiring_method), circuit_id=circuit_id,
                 load_info=cd["load_info"], rotation=90.0,
                 poles=cd["poles"], breaker_type_str=_btype_str,
                 fault_kA=cd["fault_kA"], label_style="breaker_block",
@@ -900,12 +908,24 @@ def _place_sub_circuits_upward(
             result.symbols_used.add(cd["breaker_type"])
 
         # Conductor tail (extends upward past cable leader line)
-        breaker_top_y = sc_y + sc_cb_h + config.stub_len
-        _leader_y_from_busbar = (config.db_box_busbar_margin + sc_cb_h
-                                 + config.stub_len + config.db_box_tail_margin
+        # Use catalog pin("top").y for exit pin offset (= height + stub)
+        from app.sld.catalog import get_catalog as _gc_h
+        _sc_comp = _gc_h().get(cd["breaker_type"]) if _gc_h().has(cd["breaker_type"]) else _gc_h().get("MCB")
+        _exit_pin_offset = _sc_comp.pin("top").y  # = height + stub (relative to body bottom)
+        breaker_top_y = sc_y + _exit_pin_offset
+
+        # Draw stub connections to close gaps at breaker pin tips.
+        # Bottom stub is covered by busbar-to-breaker connection (overshoots to body).
+        # Top stub: body top → top pin tip (closes the gap before conductor tail).
+        _sc_stub = _sc_comp.stub
+        if _sc_stub > 0:
+            _body_top_y = sc_y + _sc_comp.height
+            result.connections.append(((tap_x, _body_top_y), (tap_x, breaker_top_y)))
+        _leader_y_from_busbar = (config.db_box_busbar_margin + _exit_pin_offset
+                                 + config.db_box_tail_margin
                                  + config.db_box_label_margin
                                  + config.leader_margin_above_db)
-        _breaker_top_from_busbar = config.busbar_to_breaker_gap + sc_cb_h + config.stub_len
+        _breaker_top_from_busbar = config.busbar_to_breaker_gap + _exit_pin_offset
         effective_tail = max(config.tail_length,
                              _leader_y_from_busbar - _breaker_top_from_busbar + 5)
         tail_end_y = breaker_top_y + effective_tail

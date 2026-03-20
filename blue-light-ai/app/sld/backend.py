@@ -164,7 +164,7 @@ class DrawingBackend(Protocol):
         center_x: float,
         busbar_y: float,
         side_xs: list[float],
-        mcb_bottom_y: float,
+        mcb_entry_y: float,
     ) -> None:
         """Draw a 3-phase fan-out from busbar to sub-circuit MCBs.
 

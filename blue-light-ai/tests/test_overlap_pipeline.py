@@ -102,7 +102,7 @@ def _make_simple_layout(num_circuits: int = 3, spacing: float = 26.0) -> LayoutR
 
         # CIRCUIT_ID_BOX
         result.components.append(_make_circuit_id_box(
-            tap_x, busbar_y + 3.5, f"L{(i % 3) + 1}P{(i // 3) + 1}",
+            tap_x, busbar_y + 5.5, f"L{(i % 3) + 1}P{(i // 3) + 1}",
         ))
 
         # LABEL (circuit name)

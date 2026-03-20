@@ -1082,7 +1082,7 @@ def _compute_safe_leader_bounds(
     Returns:
         (safe_left, safe_right) — horizontal bounds for leader extension.
     """
-    _SPARE_GAP = 5.0  # mm gap before SPARE circuit
+    _SPARE_GAP = config.spare_circuit_gap
     safe_left = config.min_x
     safe_right = config.max_x
 
@@ -1096,7 +1096,7 @@ def _compute_safe_leader_bounds(
     # Clamp to adjacent cable group boundaries
     # Margin accounts for cable text extending beyond leader endpoint:
     # text offset (3mm) + text half_width (~2.8mm) + clearance (0.2mm) = 6mm
-    _CABLE_TEXT_MARGIN = 6.0
+    _CABLE_TEXT_MARGIN = config.cable_text_margin
     all_group_ranges = [(min(txs), max(txs)) for txs in cable_groups.values()]
     for gj, (g_min, g_max) in enumerate(all_group_ranges):
         if gj == gi:
@@ -1257,7 +1257,9 @@ def _add_cable_leader_lines(
         return
 
     # DB box top offset from any busbar Y
-    db_box_top_offset = (config.db_box_busbar_margin + config.mcb_h + config.stub_len
+    from app.sld.catalog import get_catalog as _gc
+    _mcb_d = _gc().get("MCB")
+    db_box_top_offset = (config.db_box_busbar_margin + _mcb_d.height + _mcb_d.stub
                          + config.db_box_tail_margin + config.db_box_label_margin)
 
     # Determine which row each group belongs to (by breaker Y proximity to busbar)
@@ -1338,7 +1340,9 @@ def _add_cable_leader_lines(
                 continue
             comp = layout_result.components[g.name_label_idx]
             n_lines = max(len((comp.label or "").split("\\P")), 1)
-            hw = n_lines * config.label_char_height / 2
+            _ls = config.label_char_height * 1.4
+            x_span = config.label_char_height + (n_lines - 1) * _ls
+            hw = x_span / 2
             name_label_bbs.append((comp.x - hw, comp.x + hw, comp.x))
 
         # Track placed cable text bounding boxes for sequential collision avoidance
@@ -1407,9 +1411,15 @@ def _add_cable_leader_lines(
 
             # --- BB-based collision detection + correction ---
             cable_num_lines = _estimate_cable_text_num_lines(cable_spec)
-            cable_hw = cable_num_lines * config.label_char_height / 2
+            # SVG line_spacing = char_height * 1.4
+            # 다중 행 수직 텍스트: anchor(x)에서 +X 방향으로 각 행 추가
+            _line_spacing = config.label_char_height * 1.4
+            cable_x_span = config.label_char_height + (cable_num_lines - 1) * _line_spacing
+            cable_hw = cable_x_span / 2  # 대칭 hw (collision avoidance용)
+            cable_hw_right = cable_x_span  # 비대칭: anchor에서 우측으로 전체 확장
             text_x = (leader_start_x - 3) if text_on_left else leader_end_x
-            cable_bb = (text_x - cable_hw, text_x + cable_hw)
+            # 비대칭 bb: text_x 기준 좌측은 char_h/2, 우측은 cable_x_span
+            cable_bb = (text_x - config.label_char_height / 2, text_x + cable_x_span)
 
             collision = _has_collision(cable_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=text_x)
 
@@ -1424,7 +1434,7 @@ def _add_cable_leader_lines(
                     alt_ext = min(leader_extension, effective_right)
                     alt_end = rightmost_x + alt_ext
                     alt_text_x = alt_end
-                alt_bb = (alt_text_x - cable_hw, alt_text_x + cable_hw)
+                alt_bb = (alt_text_x - config.label_char_height / 2, alt_text_x + cable_x_span)
 
                 if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=alt_text_x):
                     # Flip resolved the collision
@@ -1460,17 +1470,18 @@ def _add_cable_leader_lines(
                             _stagger_resolved = True
                             break
                     if not _stagger_resolved:
-                        # Attempt 3: extend leader further to push text clear
-                        # Try both directions with incremental extension
+                        # Attempt 3: extend leader beyond SPARE to drawing border
+                        # Use absolute drawing bounds, not safe_left/safe_right
                         _resolved = False
+                        _abs_max_right = config.max_x - 1  # drawing border with margin
+                        _abs_min_left = config.min_x + 1
                         for _try_left in (text_on_left, not text_on_left):
-                            for _extra in (4.0, 8.0, 12.0, 16.0):
+                            for _extra in (4.0, 8.0, 12.0, 16.0, 24.0, 32.0):
                                 if _try_left:
-                                    _ext2 = min(leader_extension + _extra, effective_left + _extra)
-                                    _start2 = leftmost_x - _ext2
+                                    _start2 = max(leftmost_x - leader_extension - _extra, _abs_min_left)
                                     _tx2 = _start2 - 3
-                                    _bb2 = (_tx2 - cable_hw, _tx2 + cable_hw)
-                                    if _bb2[0] < config.min_x:
+                                    _bb2 = (_tx2 - config.label_char_height / 2, _tx2 + cable_x_span)
+                                    if _bb2[0] < _abs_min_left:
                                         continue
                                     if not _has_collision(_bb2, effective_leader_y, own_tap_xs=tap_xs, text_x=_tx2):
                                         text_on_left = True
@@ -1480,11 +1491,10 @@ def _add_cable_leader_lines(
                                         _resolved = True
                                         break
                                 else:
-                                    _ext2 = min(leader_extension + _extra, effective_right + _extra)
-                                    _end2 = rightmost_x + _ext2
+                                    _end2 = min(rightmost_x + leader_extension + _extra, _abs_max_right)
                                     _tx2 = _end2
-                                    _bb2 = (_tx2 - cable_hw, _tx2 + cable_hw)
-                                    if _bb2[1] > config.max_x:
+                                    _bb2 = (_tx2 - config.label_char_height / 2, _tx2 + cable_x_span)
+                                    if _bb2[1] > _abs_max_right + cable_hw:
                                         continue
                                     if not _has_collision(_bb2, effective_leader_y, own_tap_xs=tap_xs, text_x=_tx2):
                                         text_on_left = False
@@ -1508,7 +1518,7 @@ def _add_cable_leader_lines(
 
             # Register final cable text BB for subsequent collision checks
             final_text_x = (leader_start_x - 3) if text_on_left else leader_end_x
-            final_bb = (final_text_x - cable_hw, final_text_x + cable_hw)
+            final_bb = (final_text_x - config.label_char_height / 2, final_text_x + cable_x_span)
             placed_cable_bbs.append((final_bb[0], final_bb[1], effective_leader_y))
 
             # Draw this cable group's leader lines

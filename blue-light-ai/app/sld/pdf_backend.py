@@ -338,22 +338,23 @@ class PdfBackend:
         center_x: float,
         busbar_y: float,
         side_xs: list[float],
-        mcb_bottom_y: float,
+        mcb_entry_y: float,
     ) -> None:
-        """Draw 3-phase fan-out procedurally: center vertical + diagonals + side verticals."""
+        """Draw 3-phase fan-out: center vertical + diagonals + side verticals.
+
+        mcb_entry_y = MCB busbar-side entry pin. Lines stop here.
+        """
         _FAN_RATIO = 0.266
 
-        # Center vertical: busbar → MCB bottom
-        self.add_line((center_x, busbar_y), (center_x, mcb_bottom_y))
+        # Center vertical: busbar → MCB entry pin
+        self.add_line((center_x, busbar_y), (center_x, mcb_entry_y))
 
         for sx in side_xs:
             dx = sx - center_x
             fan_h = abs(dx) * _FAN_RATIO
             intermediate_y = busbar_y + fan_h
-            # Diagonal: center busbar → side intermediate
             self.add_line((center_x, busbar_y), (sx, intermediate_y))
-            # Side vertical: intermediate → MCB bottom
-            self.add_line((sx, intermediate_y), (sx, mcb_bottom_y))
+            self.add_line((sx, intermediate_y), (sx, mcb_entry_y))
 
     # -- Output --
 

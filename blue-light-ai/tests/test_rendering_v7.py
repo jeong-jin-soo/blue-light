@@ -13,6 +13,8 @@ Verifies:
 - Breaker block label spacing
 """
 
+from pathlib import Path
+
 import pytest
 
 from app.sld.layout import (
@@ -28,7 +30,7 @@ from app.sld.layout import (
     compute_layout,
     resolve_overlaps,
 )
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 from app.sld.svg_backend import SvgBackend
 from app.sld.title_block import (
     ROW_MID,
@@ -125,9 +127,9 @@ class TestCircuitIdBox:
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
         for box in id_boxes:
-            assert box.y == pytest.approx(result.busbar_y + 3.5, abs=1.0), (
+            assert box.y == pytest.approx(result.busbar_y + 5.5, abs=1.0), (
                 f"CIRCUIT_ID_BOX at x={box.x} has y={box.y}, "
-                f"expected near busbar_y+3.5={result.busbar_y + 3.5}"
+                f"expected near busbar_y+5.5={result.busbar_y + 5.5}"
             )
 
     def test_circuit_id_box_has_valid_ids(self):
@@ -156,7 +158,7 @@ class TestDbInfoBox:
         result = compute_layout(BASIC_3PHASE_REQ)
         db_box = _get_components_by_type(result, "DB_INFO_BOX")[0]
         assert "APPROVED LOAD" in db_box.rating
-        assert "kVA" in db_box.rating  # lowercase k per reference DXF (I2R-ETR-NLB-SLD-1)
+        assert "KVA" in db_box.rating  # uppercase per LEW reference (63A TPN SLD 14)
 
     def test_db_info_box_contains_db_rating(self):
         """DB_INFO_BOX label should show DB rating."""
@@ -269,33 +271,38 @@ class TestGeneratePdfBytes:
 
     def test_returns_valid_pdf_bytes(self):
         """generate_pdf_bytes() should return bytes starting with PDF header."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
+        _r = SldPipeline().run(BASIC_3PHASE_REQ)
+        pdf_bytes = _r.pdf_bytes
         assert isinstance(pdf_bytes, bytes)
         assert pdf_bytes[:5] == b"%PDF-"
         assert len(pdf_bytes) > 1000  # Non-trivial PDF
 
     def test_returns_svg_string(self):
         """generate_pdf_bytes() should also return a valid SVG string."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
+        _r = SldPipeline().run(BASIC_3PHASE_REQ)
+        svg_string = _r.svg_string
         assert isinstance(svg_string, str)
         assert svg_string.startswith("<svg")
         assert "</svg>" in svg_string
 
     def test_returns_dxf_bytes(self):
         """generate_pdf_bytes() should return DXF bytes when backend_type='dxf'."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ, backend_type="dxf")
+        _r = SldPipeline().run(BASIC_3PHASE_REQ, backend_type="dxf")
+        dxf_bytes = _r.dxf_bytes
         assert isinstance(dxf_bytes, bytes)
         assert len(dxf_bytes) > 1000
 
     def test_single_phase_pdf_bytes(self):
         """generate_pdf_bytes() should work with single-phase requirements."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_1PHASE_REQ)
+        _r = SldPipeline().run(BASIC_1PHASE_REQ)
+        pdf_bytes = _r.pdf_bytes
         assert isinstance(pdf_bytes, bytes)
         assert pdf_bytes[:5] == b"%PDF-"
 
     def test_legacy_pdf_backend(self):
         """generate_pdf_bytes() with backend_type='pdf' should return None for DXF."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ, backend_type="pdf")
+        _r = SldPipeline().run(BASIC_3PHASE_REQ, backend_type="pdf")
+        pdf_bytes, dxf_bytes = _r.pdf_bytes, _r.dxf_bytes
         assert isinstance(pdf_bytes, bytes)
         assert dxf_bytes is None
 
@@ -385,26 +392,20 @@ class TestFullGeneration:
 
     def test_generate_3phase_no_error(self, tmp_path):
         """Full generation of a 3-phase SLD should succeed."""
-        gen = SldGenerator()
+        result = SldPipeline().run(BASIC_3PHASE_REQ)
+        assert result.component_count > 0
+        assert len(result.svg_string) > 100
         pdf_path = str(tmp_path / "test.pdf")
-        svg_path = str(tmp_path / "test.svg")
-        result = gen.generate(BASIC_3PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
-        assert result["pdf_path"] == pdf_path
-        assert len(result["svg_string"]) > 100
+        result.save(pdf_path)
+        assert Path(pdf_path).exists()
 
     def test_generate_1phase_no_error(self, tmp_path):
         """Full generation of a 1-phase SLD should succeed."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "test.pdf")
-        svg_path = str(tmp_path / "test.svg")
-        result = gen.generate(BASIC_1PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(BASIC_1PHASE_REQ)
+        assert result.component_count > 0
 
     def test_generate_with_application_info(self, tmp_path):
         """Generation with full application info should succeed."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "test.pdf")
         app_info = {
             "address": "200 PANDAN LOOP",
             "postalCode": "128388",
@@ -412,8 +413,8 @@ class TestFullGeneration:
             "assignedLewName": "John Doe",
             "assignedLewLicenceNo": "8/12345",
         }
-        result = gen.generate(BASIC_3PHASE_REQ, app_info, pdf_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(BASIC_3PHASE_REQ, app_info)
+        assert result.component_count > 0
 
 
 # -- Test fixtures: Dense circuit configurations --
@@ -675,19 +676,13 @@ class TestResolveOverlaps:
 
     def test_dense_3phase_pdf_generation(self, tmp_path):
         """Dense 3-phase layout should generate valid PDF."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "dense_test.pdf")
-        svg_path = str(tmp_path / "dense_test.svg")
-        result = gen.generate(DENSE_3PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(DENSE_3PHASE_REQ)
+        assert result.component_count > 0
 
     def test_dense_1phase_pdf_generation(self, tmp_path):
         """Dense 1-phase layout should generate valid PDF."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "dense_1p_test.pdf")
-        svg_path = str(tmp_path / "dense_1p_test.svg")
-        result = gen.generate(DENSE_1PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(DENSE_1PHASE_REQ)
+        assert result.component_count > 0
 
 
 # -- Test: Connection Alignment --

@@ -111,7 +111,7 @@ def _cable_smart_case(s: str) -> str:
     return s
 
 
-def format_cable_spec(cable_input, multiline: bool = False) -> str:
+def format_cable_spec(cable_input, multiline: bool = False, default_method: str = "") -> str:
     """
     Format cable specification into Singapore SLD standard format.
 
@@ -145,6 +145,8 @@ def format_cable_spec(cable_input, multiline: bool = False) -> str:
     if isinstance(cable_input, str):
         parsed = _parse_cable_string(cable_input)
         if parsed:
+            if default_method and not parsed.get('method'):
+                parsed['method'] = default_method
             return format_cable_spec(parsed, multiline=multiline)
         result = _cable_smart_case(cable_input)
         # Apply multiline split at "+" boundary even for unparseable strings
@@ -276,6 +278,9 @@ class LayoutConfig:
     char_advance: float = 1.7             # Vertical char advance for label wrapping
     preferred_max_label_chars: int = 25   # Preferred max chars before line wrapping
 
+    # -- Wiring method default (conduit/trunking) --
+    default_wiring_method: str = ""       # e.g., "METAL TRUNKING/G.I. CONDUIT" — auto-appended if cable has no method
+
     # -- Meter board constants (D2) --
     meter_board_comp_spacing: float = 25.0  # Horizontal spacing between MB components
     meter_board_inset: float = 4.0          # Inset margin for meter board box
@@ -291,6 +296,8 @@ class LayoutConfig:
     overlap_margin: float = 2.0           # Margin in bounding box computation
     busbar_end_margin: float = 10.0       # Margin at busbar ends for final positions
     db_box_overlap_margin: float = 12.0   # DB box margin in overlap resolution
+    spare_circuit_gap: float = 5.0        # Gap before SPARE circuit (overlap resolution)
+    cable_text_margin: float = 6.0        # Cable leader text margin (overlap resolution)
 
     # -- CT metering spine spacing (calibrated from DXF reference) --
     ct_entry_gap: float = 0.5        # Gap from spine entry point to first CT component
@@ -313,7 +320,7 @@ class LayoutConfig:
     breaker_label_x_wide: float = 7.0       # MCCB/ACB 라벨 X 오프셋
     incoming_label_x: float = 8.0           # 인커밍 브레이커 라벨 X 오프셋
     incoming_label_y: float = 6.0           # 인커밍 브레이커 라벨 Y 오프셋
-    cable_annotation_y: float = 2.0         # 케이블 어노테이션 Y 오프셋
+    cable_annotation_y: float = 4.0         # 케이블 어노테이션 Y 오프셋 (Vision AI P1: 2→4)
     busbar_rating_x_inset: float = 30.0     # 부스바 등급 우측 인셋
     busbar_rating_y: float = 5.0            # 부스바 등급 Y 오프셋
 
@@ -366,39 +373,73 @@ class LayoutConfig:
 
         return cls(**derived)
 
-    def __post_init__(self):
-        """Sync symbol dimensions from real_symbol_paths.json (single source of truth)."""
+    @classmethod
+    def from_reference(
+        cls,
+        requirements: dict,
+        page_config: "PageConfig | None" = None,
+        **overrides: Any,
+    ) -> "LayoutConfig":
+        """레퍼런스 DXF 간격으로 LayoutConfig 생성.
+
+        매직넘버 대신 가장 유사한 레퍼런스의 실측 간격 적용.
+        매칭 실패 시 기본값(from_page_config) 반환.
+        """
+        base = cls.from_page_config(page_config, **overrides)
         try:
-            from app.sld.real_symbols import get_symbol_dimensions
+            from app.sld.reference_matcher import get_reference_spacing
+            matched = get_reference_spacing(requirements)
+            if matched:
+                ref_overrides = matched.to_overrides()
+                for key, value in ref_overrides.items():
+                    if hasattr(base, key):
+                        setattr(base, key, value)
+                logger.info(
+                    "LayoutConfig: applied reference spacing from %s (score=%.2f): %s",
+                    matched.reference_file, matched.match_score, ref_overrides,
+                )
+        except Exception as exc:
+            logger.warning("Reference spacing matching failed, using defaults: %s", exc)
+        return base
+
+    def __post_init__(self):
+        """Sync symbol dimensions from ComponentCatalog (single source of truth).
+
+        Loads all symbol dimensions from catalog.py → component_catalog.json.
+        Existing field names preserved for backward compatibility with sections.py.
+        """
+        try:
+            from app.sld.catalog import get_catalog
+            cat = get_catalog()
             # MCCB
-            mccb = get_symbol_dimensions("MCCB")
-            self.breaker_w = mccb["width_mm"]
-            self.breaker_h = mccb["height_mm"]
+            mccb = cat.get("MCCB")
+            self.breaker_w = mccb.width
+            self.breaker_h = mccb.height
             # MCB
-            mcb = get_symbol_dimensions("MCB")
-            self.mcb_w = mcb["width_mm"]
-            self.mcb_h = mcb["height_mm"]
+            mcb = cat.get("MCB")
+            self.mcb_w = mcb.width
+            self.mcb_h = mcb.height
             # RCCB
-            rccb = get_symbol_dimensions("RCCB")
-            self.rccb_w = rccb["width_mm"]
-            self.rccb_h = rccb["height_mm"]
+            rccb = cat.get("RCCB")
+            self.rccb_w = rccb.width
+            self.rccb_h = rccb.height
             # Isolator
-            iso = get_symbol_dimensions("ISOLATOR")
-            self.isolator_w = iso["width_mm"]
-            self.isolator_h = iso["height_mm"]
-            self.stub_len = iso["stub_mm"]
+            iso = cat.get("ISOLATOR")
+            self.isolator_w = iso.width
+            self.isolator_h = iso.height
+            self.stub_len = iso.stub
             # KWH Meter
-            kwh = get_symbol_dimensions("KWH_METER")
-            self.meter_size = kwh["width_mm"]
-            kwh_rect_h = kwh["height_mm"] * 0.6           # rect_h = height * 0.6
-            kwh_rect_w = kwh_rect_h * kwh.get("rect_ratio", 2.0)  # rect_w = rect_h * ratio
+            kwh = cat.get("KWH_METER")
+            self.meter_size = kwh.width
+            kwh_rect_h = kwh.height * 0.6           # rect_h = height * 0.6
+            kwh_rect_w = kwh_rect_h * kwh.render_params.get("rect_ratio", 2.0)
             self.kwh_rect_w = kwh_rect_w
             self.kwh_rect_h = kwh_rect_h
             # CT
-            ct = get_symbol_dimensions("CT")
-            self.ct_size = ct["width_mm"]
+            ct = cat.get("CT")
+            self.ct_size = ct.width
         except Exception as exc:
-            logger.warning("Symbol dimension load from JSON failed, using defaults: %s", exc)
+            logger.warning("Symbol dimension load from catalog failed, using defaults: %s", exc)
 
 
 @dataclass

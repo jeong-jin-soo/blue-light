@@ -1,0 +1,4507 @@
+{
+  "meta": {
+    "total_files": 28,
+    "errors": 0,
+    "error_details": [],
+    "sld_type_distribution": {
+      "direct_metering_1phase": 8,
+      "direct_metering_3phase": 15,
+      "ct_metering_3phase": 2,
+      "cable_extension": 3
+    }
+  },
+  "specs": [
+    {
+      "filename": "100A Single Phase DB 1 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {},
+      "total_subcircuits": 0,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [],
+      "has_phase_labels": false,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        4702.71,
+        29926.74
+      ],
+      "extent_y": [
+        1418.3,
+        10234.55
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 7,
+        "SLD-TXT": 44,
+        "SLD": 13,
+        "SLD-LINE": 16,
+        "0": 41,
+        "E-SLD-T1": 2
+      }
+    },
+    {
+      "filename": "100A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 46,
+        "RCCB": 3,
+        "DP ISOL": 16
+      },
+      "total_subcircuits": 43,
+      "num_dbs": 3,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 9613.1,
+          "scale": 1.029
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10516.3,
+          "scale": 1.0208
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12586.84,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 12586.84,
+          "count": 43,
+          "x_spacings": [
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            2035.15,
+            726.75,
+            1075.84,
+            819.5,
+            1096.92,
+            882.84,
+            1018.72,
+            726.76,
+            726.76,
+            792.1,
+            945.52,
+            726.76,
+            1123.5,
+            929.2,
+            713.75,
+            2208.01,
+            726.76,
+            726.76,
+            851.25,
+            726.76,
+            726.76,
+            851.25,
+            726.76,
+            726.76,
+            851.25,
+            726.76,
+            726.76,
+            2099.05,
+            726.76,
+            726.76,
+            726.76,
+            726.76,
+            726.76,
+            726.76,
+            726.76,
+            726.76,
+            726.76
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        2953.52,
+        44006.77
+      ],
+      "extent_y": [
+        1312.72,
+        19414.43
+      ],
+      "layer_usage": {
+        "0": 68,
+        "E-SLD-FRAME": 5,
+        "TXT": 66,
+        "SLD": 76,
+        "E-SLD-T1": 2,
+        "SLD-TXT": 220,
+        "E-SLD-LEGENDF": 17,
+        "SLD-LINE": 126
+      }
+    },
+    {
+      "filename": "125A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 39,
+        "RCCB": 3,
+        "DP ISOL": 10
+      },
+      "total_subcircuits": 36,
+      "num_dbs": 3,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 3702.96,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 10193.7,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 12410.28,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14548.12,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 14548.12,
+          "count": 36,
+          "x_spacings": [
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            829.77,
+            726.76,
+            726.76,
+            2129.49,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            730.98,
+            726.76,
+            726.76,
+            723.34,
+            726.76,
+            726.76,
+            772.07,
+            726.76,
+            726.76,
+            2157.06,
+            688.7,
+            985.29,
+            2123.22,
+            1462.12,
+            726.76
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L2S3",
+            "L3S3",
+            "L3S3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        3956.89,
+        37764.32
+      ],
+      "extent_y": [
+        2354.81,
+        20025.05
+      ],
+      "layer_usage": {
+        "SLD": 64,
+        "SLD-LINE": 98,
+        "SLD-TXT": 183,
+        "0": 38,
+        "E-SLD-LEGENDF": 3,
+        "TXT": 47,
+        "E-_-------_R-": 4,
+        "E-SLD-FRAME": 5,
+        "E-SLD-T1": 1
+      }
+    },
+    {
+      "filename": "150A TPN SLD 1 DWG.dxf",
+      "sld_type": "ct_metering_3phase",
+      "block_counts": {
+        "MCCB": 59,
+        "RCCB": 10,
+        "SS": 2,
+        "LED IND LTG": 2,
+        "2A FUSE": 3,
+        "VOLTMETER": 1,
+        "SLD-CT": 3,
+        "EF": 1,
+        "DP ISOL": 13
+      },
+      "total_subcircuits": 57,
+      "num_dbs": 10,
+      "has_rccb": true,
+      "has_ct": true,
+      "has_fuse": true,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "SLD-CT",
+          "SLD-CT"
+        ],
+        [
+          "2A FUSE",
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 14933.64,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16050.53,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14924.66,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16041.55,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14888.76,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16005.65,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14949.93,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16066.82,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 7244.02,
+          "scale": 1.1622
+        },
+        {
+          "block_name": "SLD-CT",
+          "y": 8866.03,
+          "scale": 6.067
+        },
+        {
+          "block_name": "SLD-CT",
+          "y": 10016.44,
+          "scale": 6.067
+        },
+        {
+          "block_name": "2A FUSE",
+          "y": 10999.6,
+          "scale": 1.1622
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14888.27,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16005.16,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10930.32,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12254.92,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10930.32,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12254.92,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10930.32,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12254.92,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14888.27,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16005.16,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14888.27,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16005.16,
+          "scale": 1.2778
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 17872.13,
+          "count": 47,
+          "x_spacings": [
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            10304.15,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            716.62,
+            700.0,
+            700.0,
+            700.0,
+            2755.66,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            1963.59
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L2S3",
+            "L3S3",
+            "L1S4",
+            "L2S4",
+            "L3S4",
+            "L1S5",
+            "L2S5",
+            "L3S5",
+            "L1S6",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 14933.64,
+          "count": 7,
+          "x_spacings": [
+            7830.06,
+            2089.61,
+            2127.44,
+            7207.04,
+            11542.33,
+            6410.84
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 12254.92,
+          "count": 3,
+          "x_spacings": [
+            1947.19,
+            1983.37
+          ],
+          "phase_labels": [
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": true,
+      "has_cable_annotations": false,
+      "extent_x": [
+        3414.18,
+        53762.02
+      ],
+      "extent_y": [
+        1460.2,
+        26306.22
+      ],
+      "layer_usage": {
+        "SLD": 212,
+        "SLD-TXT": 219,
+        "SLD-LINE": 210,
+        "E-SLD-LEGENDF": 14,
+        "0": 18,
+        "E-SLD-OUTGOING-CCT": 1,
+        "TXT": 4,
+        "E-SLD-FRAME": 5,
+        "E-SLD-T1": 17,
+        "E-SLD-DB-TXT": 2
+      }
+    },
+    {
+      "filename": "150A TPN SLD 3 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 48,
+        "RCCB": 8,
+        "DP ISOL": 13
+      },
+      "total_subcircuits": 46,
+      "num_dbs": 8,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 12460.29,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 13693.64,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12460.29,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 13693.64,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12460.29,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 13693.64,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12460.29,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 13693.64,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12944.7,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 14178.04,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12944.7,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 14178.04,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12944.7,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 14178.04,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12460.29,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 13693.64,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 15831.48,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 12460.29,
+          "count": 6,
+          "x_spacings": [
+            7785.41,
+            7891.94,
+            5044.18,
+            6941.06,
+            8225.08
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 15831.48,
+          "count": 37,
+          "x_spacings": [
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            1771.19,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            2043.29,
+            726.76,
+            726.76,
+            713.84,
+            726.76,
+            2150.05,
+            726.76,
+            726.76,
+            713.85,
+            726.76,
+            11010.85,
+            726.76,
+            726.76,
+            1452.44,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L2S3",
+            "L3S3",
+            "L3S3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S4",
+            "L2S4",
+            "L3S4",
+            "L3S4",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 12944.7,
+          "count": 3,
+          "x_spacings": [
+            594.51,
+            601.12
+          ],
+          "phase_labels": [
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        4647.61,
+        49515.39
+      ],
+      "extent_y": [
+        1802.92,
+        18904.04
+      ],
+      "layer_usage": {
+        "SLD": 84,
+        "TXT": 77,
+        "E-SLD-FRAME": 12,
+        "0": 55,
+        "SLD-TXT": 231,
+        "SLD-LINE": 102,
+        "E-SLD-LEGENDF": 8
+      }
+    },
+    {
+      "filename": "200A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 30,
+        "RCCB": 4,
+        "DP ISOL": 3
+      },
+      "total_subcircuits": 26,
+      "num_dbs": 4,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 25566.09,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 26499.36,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27079.5,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28917.34,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 22656.85,
+          "count": 3,
+          "x_spacings": [
+            1493.37,
+            2355.16
+          ],
+          "phase_labels": [
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 28337.2,
+          "count": 4,
+          "x_spacings": [
+            726.76,
+            1534.81,
+            726.76
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 28917.34,
+          "count": 19,
+          "x_spacings": [
+            726.76,
+            726.76,
+            726.73,
+            726.76,
+            726.76,
+            2276.66,
+            726.76,
+            726.76,
+            726.73,
+            1820.0,
+            726.76,
+            1744.67,
+            4587.78,
+            726.76,
+            726.76,
+            726.74,
+            726.76,
+            726.76
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2"
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        51570.55,
+        89346.21
+      ],
+      "extent_y": [
+        13388.98,
+        32528.94
+      ],
+      "layer_usage": {
+        "SLD": 55,
+        "TXT": 82,
+        "E-SLD-FRAME": 23,
+        "0": 66,
+        "SLD-TXT": 157,
+        "E-SLD-LEGENDF": 4,
+        "SLD-LINE": 66
+      }
+    },
+    {
+      "filename": "200A TPN SLD 3 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 47,
+        "RCCB": 6,
+        "DP ISOL": 7
+      },
+      "total_subcircuits": 45,
+      "num_dbs": 6,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 10434.88,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 17765.26,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14994.15,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 15927.42,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14994.15,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 15927.42,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 15045.79,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16004.65,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 15045.79,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16004.65,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 15045.75,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16004.62,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 15045.79,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 16004.65,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 14994.15,
+          "count": 6,
+          "x_spacings": [
+            14464.01,
+            13278.47,
+            7060.33,
+            1876.4,
+            1844.44
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 17765.26,
+          "count": 39,
+          "x_spacings": [
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            3161.34,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            2292.59,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            1596.71,
+            1964.45,
+            726.76,
+            726.76,
+            2116.1,
+            726.37
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L2S3",
+            "L3S3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        9527.13,
+        55382.95
+      ],
+      "extent_y": [
+        5808.02,
+        24709.19
+      ],
+      "layer_usage": {
+        "SLD": 115,
+        "TXT": 89,
+        "E-SLD-FRAME": 8,
+        "0": 116,
+        "SLD-TXT": 277,
+        "SLD-LINE": 132,
+        "E-SLD-LEGENDF": 6
+      }
+    },
+    {
+      "filename": "300A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "RCCB": 9,
+        "MCCB": 63,
+        "DP ISOL": 30
+      },
+      "total_subcircuits": 63,
+      "num_dbs": 9,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB",
+          "RCCB",
+          "RCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 845.95,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 912.7,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 845.95,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 912.7,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1044.17,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 849.64,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 918.23,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 849.64,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 918.23,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1061.97,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1049.92,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1049.92,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1049.92,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 1111.21,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 1111.22,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 1111.32,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1049.92,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 1111.51,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1049.92,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "RCCB",
+          "y": 1111.21,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        },
+        {
+          "block_name": "MCCB",
+          "y": 1063.48,
+          "scale": 0.0747
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 845.95,
+          "count": 63,
+          "x_spacings": [
+            51.98,
+            51.99,
+            61.7,
+            51.98,
+            30.7,
+            21.29,
+            61.69,
+            51.99,
+            51.99,
+            61.69,
+            51.99,
+            51.98,
+            121.29,
+            51.99,
+            51.98,
+            61.7,
+            51.98,
+            51.99,
+            36.03,
+            25.66,
+            51.99,
+            51.99,
+            61.69,
+            51.99,
+            51.98,
+            61.7,
+            51.98,
+            51.99,
+            143.87,
+            51.99,
+            51.98,
+            61.7,
+            51.99,
+            51.98,
+            61.7,
+            51.98,
+            51.99,
+            55.18,
+            6.51,
+            51.99,
+            51.99,
+            61.69,
+            51.99,
+            51.98,
+            61.7,
+            51.99,
+            51.98,
+            146.91,
+            51.99,
+            51.98,
+            61.7,
+            51.99,
+            51.98,
+            28.2,
+            33.5,
+            51.98,
+            51.99,
+            138.6,
+            148.94,
+            51.98,
+            51.99,
+            61.69
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L2S3",
+            "L3S3",
+            "L1S4",
+            "L2S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "L3S4",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        799.42,
+        4630.74
+      ],
+      "extent_y": [
+        353.59,
+        1367.77
+      ],
+      "layer_usage": {
+        "SLD": 106,
+        "TXT": 16,
+        "E-SLD-FRAME": 4,
+        "0": 10,
+        "SLD-TXT": 262,
+        "SLD-LINE": 168,
+        "E-SLD-LEGENDF": 9,
+        "PDF_02": 212,
+        "PDF_04": 11,
+        "PDF_IEC": 67,
+        "PDF_01": 52
+      }
+    },
+    {
+      "filename": "32A Single Phase DB 1 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {},
+      "total_subcircuits": 0,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [],
+      "has_phase_labels": false,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        1995.63,
+        11577.14
+      ],
+      "extent_y": [
+        1142.85,
+        9961.51
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 7,
+        "SLD-TXT": 58,
+        "SLD": 22,
+        "SLD-LINE": 26,
+        "0": 60,
+        "E-SLD-T1": 2
+      }
+    },
+    {
+      "filename": "32A Single Phase DB 3 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {
+        "MCCB": 7
+      },
+      "total_subcircuits": 6,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [
+        {
+          "y": 8177.48,
+          "count": 6,
+          "x_spacings": [
+            256.94,
+            256.94,
+            256.93,
+            256.94,
+            256.94
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        21308.22,
+        37558.71
+      ],
+      "extent_y": [
+        5866.68,
+        9293.44
+      ],
+      "layer_usage": {
+        "0": 111,
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 14,
+        "SLD-TXT": 34,
+        "SLD-LINE": 13,
+        "E-SLD-T1": 2,
+        "SLD": 29
+      }
+    },
+    {
+      "filename": "32A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 7
+      },
+      "total_subcircuits": 6,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [
+        {
+          "y": 5714.27,
+          "count": 6,
+          "x_spacings": [
+            256.94,
+            256.94,
+            256.94,
+            256.94,
+            256.93
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        1800.45,
+        19871.83
+      ],
+      "extent_y": [
+        2422.31,
+        7422.31
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 14,
+        "SLD-TXT": 30,
+        "0": 171,
+        "SLD-LINE": 13,
+        "E-SLD-T1": 2,
+        "SLD": 27,
+        "TXT": 2
+      }
+    },
+    {
+      "filename": "400A TPN SLD 1 DWG.dxf",
+      "sld_type": "ct_metering_3phase",
+      "block_counts": {
+        "MCCB": 81,
+        "RCCB": 7,
+        "SS": 2,
+        "LED IND LTG": 2,
+        "2A FUSE": 3,
+        "VOLTMETER": 1,
+        "SLD-CT": 4,
+        "EF": 1,
+        "DP ISOL": 33
+      },
+      "total_subcircuits": 79,
+      "num_dbs": 7,
+      "has_rccb": true,
+      "has_ct": true,
+      "has_fuse": true,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "SLD-CT",
+          "SLD-CT"
+        ],
+        [
+          "MCCB",
+          "SLD-CT"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 14730.55,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 15847.44,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 17669.04,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14730.55,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 15847.44,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14730.55,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 15847.44,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10730.6,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12055.2,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 17669.04,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10730.6,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12055.2,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 17669.04,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14730.55,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 15847.44,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 7144.4,
+          "scale": 1.1622
+        },
+        {
+          "block_name": "SLD-CT",
+          "y": 8766.41,
+          "scale": 6.067
+        },
+        {
+          "block_name": "SLD-CT",
+          "y": 9916.81,
+          "scale": 6.067
+        },
+        {
+          "block_name": "MCCB",
+          "y": 14825.98,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "SLD-CT",
+          "y": 16198.58,
+          "scale": 6.067
+        },
+        {
+          "block_name": "RCCB",
+          "y": 10730.6,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12055.2,
+          "scale": 1.2778
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 17669.04,
+          "count": 71,
+          "x_spacings": [
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            1550.29,
+            1961.81,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            700.0,
+            1396.04,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            1224.8,
+            1417.75,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            1254.14,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0,
+            600.0
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L2S3",
+            "L3S3",
+            "L1S4",
+            "L2S4",
+            "L3S4",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 14730.55,
+          "count": 5,
+          "x_spacings": [
+            12149.79,
+            10896.63,
+            12599.61,
+            6492.15
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 12055.2,
+          "count": 3,
+          "x_spacings": [
+            1947.18,
+            2469.94
+          ],
+          "phase_labels": [
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": true,
+      "has_cable_annotations": false,
+      "extent_x": [
+        3829.42,
+        56292.79
+      ],
+      "extent_y": [
+        1452.65,
+        21641.94
+      ],
+      "layer_usage": {
+        "SLD": 309,
+        "SLD-TXT": 219,
+        "SLD-LINE": 195,
+        "E-SLD-LEGENDF": 28,
+        "0": 20,
+        "E-SLD-OUTGOING-CCT": 1,
+        "TXT": 4,
+        "E-SLD-FRAME": 4,
+        "E-SLD-T1": 17,
+        "E-SLD-DB-TXT": 2
+      }
+    },
+    {
+      "filename": "40A Single Phase DB 1 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {
+        "MCCB": 21,
+        "RCCB": 1
+      },
+      "total_subcircuits": 19,
+      "num_dbs": 1,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 6120.46,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "RCCB",
+          "y": 7520.75,
+          "scale": 1.4056
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 9763.56,
+          "count": 19,
+          "x_spacings": [
+            1091.2,
+            1091.21,
+            1091.2,
+            1091.21,
+            2040.6,
+            1012.53,
+            1305.42,
+            1415.37,
+            1485.1,
+            1004.34,
+            943.98,
+            1012.53,
+            1014.97,
+            1041.91,
+            1091.21,
+            1091.2,
+            1043.06,
+            1091.21
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        2175.48,
+        27940.81
+      ],
+      "extent_y": [
+        1606.98,
+        18089.99
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 8,
+        "SLD-TXT": 92,
+        "E-SLD-DB-TXT": 2,
+        "SLD": 47,
+        "SLD-LINE": 46,
+        "0": 14,
+        "A-_COL----_E": 1,
+        "E-SLD-T1": 2
+      }
+    },
+    {
+      "filename": "40A Single Phase DB 3 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {
+        "MCCB": 10
+      },
+      "total_subcircuits": 9,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [
+        {
+          "y": 4558.29,
+          "count": 9,
+          "x_spacings": [
+            256.94,
+            256.94,
+            243.4,
+            256.94,
+            256.94,
+            829.45,
+            256.94,
+            256.94
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        3045.83,
+        6897.84
+      ],
+      "extent_y": [
+        2463.02,
+        5674.25
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 14,
+        "SLD-TXT": 35,
+        "0": 25,
+        "SLD-LINE": 19,
+        "E-SLD-T1": 2,
+        "SLD": 31
+      }
+    },
+    {
+      "filename": "40A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 15,
+        "DP ISOL": 3
+      },
+      "total_subcircuits": 15,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [
+        {
+          "y": 32164.37,
+          "count": 15,
+          "x_spacings": [
+            2376.77,
+            2376.78,
+            2290.11,
+            2376.78,
+            2376.77,
+            6743.8,
+            2376.77,
+            2376.78,
+            2347.75,
+            2376.77,
+            2376.78,
+            7234.96,
+            5361.63,
+            2376.77
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        2076.51,
+        68901.53
+      ],
+      "extent_y": [
+        2168.91,
+        42515.3
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 14,
+        "SLD-TXT": 80,
+        "SLD": 25,
+        "0": 37,
+        "E-SLD-T1": 3,
+        "SLD-LINE": 38
+      }
+    },
+    {
+      "filename": "40A TPN SLD 3 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 18,
+        "RCCB": 2,
+        "DP ISOL": 2
+      },
+      "total_subcircuits": 13,
+      "num_dbs": 2,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 9607.88,
+          "scale": 1.1898
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12046.33,
+          "scale": 1.029
+        },
+        {
+          "block_name": "RCCB",
+          "y": 12949.52,
+          "scale": 1.0208
+        },
+        {
+          "block_name": "MCCB",
+          "y": 13372.54,
+          "scale": 1.029
+        },
+        {
+          "block_name": "RCCB",
+          "y": 14275.74,
+          "scale": 1.0208
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 15020.06,
+          "count": 9,
+          "x_spacings": [
+            726.76,
+            726.76,
+            1215.69,
+            726.76,
+            726.76,
+            727.71,
+            726.76,
+            726.76
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L3S1",
+            "L3S1",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 15948.83,
+          "count": 4,
+          "x_spacings": [
+            1542.35,
+            726.76,
+            726.76
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        7567.91,
+        29079.65
+      ],
+      "extent_y": [
+        4972.67,
+        19662.96
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 9,
+        "TXT": 30,
+        "0": 47,
+        "SLD": 26,
+        "SLD-TXT": 78,
+        "E-SLD-T1": 1,
+        "E-SLD-LEGENDF": 23,
+        "SLD-LINE": 32
+      }
+    },
+    {
+      "filename": "500A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 134,
+        "RCCB": 12,
+        "DP ISOL": 19
+      },
+      "total_subcircuits": 134,
+      "num_dbs": 12,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 25969.71,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27003.0,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.69,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 25969.71,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27003.0,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 25969.71,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27003.0,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 24544.5,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.74,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.74,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.74,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 24637.68,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 13385.51,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.74,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 24637.68,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27003.0,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27003.0,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.74,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 27003.0,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 28732.74,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 20014.78,
+          "scale": 1.366
+        },
+        {
+          "block_name": "MCCB",
+          "y": 24691.74,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 26206.84,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 13385.51,
+          "count": 5,
+          "x_spacings": [
+            60946.99,
+            64032.43,
+            61966.87,
+            47290.12
+          ],
+          "phase_labels": [
+            "L1",
+            "L1",
+            "L1",
+            "L1",
+            "L1"
+          ]
+        },
+        {
+          "y": 28732.69,
+          "count": 84,
+          "x_spacings": [
+            726.76,
+            726.76,
+            763.99,
+            726.76,
+            726.76,
+            807.07,
+            1877.9,
+            726.76,
+            797.85,
+            726.76,
+            2147.14,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            2034.15,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            2316.88,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            779.49,
+            1765.39,
+            726.76,
+            862.48,
+            726.76,
+            44460.87,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            2771.35,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            51027.44,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            3230.62,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            1846.22,
+            726.76,
+            726.76,
+            44820.58,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            3360.25,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            2686.82,
+            726.76,
+            726.76,
+            38859.82,
+            3103.7,
+            3613.41
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 20014.78,
+          "count": 35,
+          "x_spacings": [
+            1658.28,
+            1837.28,
+            1753.84,
+            1568.62,
+            1758.65,
+            1643.86,
+            50726.46,
+            1658.28,
+            1837.28,
+            1753.84,
+            1568.62,
+            1758.65,
+            1643.86,
+            53811.9,
+            1658.28,
+            1837.28,
+            1753.84,
+            1568.62,
+            1758.65,
+            1643.86,
+            51746.34,
+            1658.28,
+            1837.28,
+            1753.84,
+            1568.61,
+            1758.66,
+            1643.86,
+            37069.59,
+            1658.28,
+            1837.28,
+            1753.84,
+            1568.61,
+            1758.66,
+            1643.86
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 25969.71,
+          "count": 6,
+          "x_spacings": [
+            13026.97,
+            9369.64,
+            7792.31,
+            1956.3,
+            1704.13
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 24544.5,
+          "count": 4,
+          "x_spacings": [
+            62274.36,
+            56806.77,
+            55851.97
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        16251.04,
+        283766.94
+      ],
+      "extent_y": [
+        9472.8,
+        36092.29
+      ],
+      "layer_usage": {
+        "TXT": 538,
+        "SLD-TXT": 564,
+        "E-_-------_R-": 38,
+        "SLD": 198,
+        "SLD-LINE": 179,
+        "0": 162,
+        "E-SLD-LEGENDF": 47,
+        "E-SLD-FRAME": 65,
+        "E-SLD-T1": 5
+      }
+    },
+    {
+      "filename": "63A Single Phase DB 3 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {
+        "MCCB": 16,
+        "RCCB": 2
+      },
+      "total_subcircuits": 14,
+      "num_dbs": 2,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [
+        [
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "RCCB",
+          "y": 8965.31,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "MCCB",
+          "y": 11208.11,
+          "scale": 1.4056
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 11208.11,
+          "count": 14,
+          "x_spacings": [
+            1091.21,
+            1091.2,
+            1091.21,
+            1091.2,
+            2474.64,
+            1020.34,
+            1010.73,
+            1091.21,
+            1026.84,
+            2424.76,
+            2287.92,
+            1091.2,
+            1030.98
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        2109.86,
+        24291.78
+      ],
+      "extent_y": [
+        1278.39,
+        15347.32
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 9,
+        "SLD-TXT": 65,
+        "E-SLD-DB-TXT": 2,
+        "SLD": 36,
+        "SLD-LINE": 52,
+        "0": 9,
+        "A-_COL----_E": 1,
+        "E-SLD-T1": 3,
+        "PDF_SLD": 1,
+        "PDF_SLD-TXT": 185
+      }
+    },
+    {
+      "filename": "63A Single Phase DB 6 DWG.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {},
+      "total_subcircuits": 0,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [],
+      "has_phase_labels": false,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        7716.05,
+        100311.09
+      ],
+      "extent_y": [
+        6479.88,
+        41345.52
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 4,
+        "E-SLD-LEGENDF": 7,
+        "SLD-TXT": 119,
+        "SLD": 37,
+        "SLD-LINE": 84,
+        "0": 112
+      }
+    },
+    {
+      "filename": "63A TPN SLD 1 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 18,
+        "RCCB": 2
+      },
+      "total_subcircuits": 15,
+      "num_dbs": 2,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 8277.77,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "RCCB",
+          "y": 9678.06,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "MCCB",
+          "y": 12641.26,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "MCCB",
+          "y": 8269.43,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "RCCB",
+          "y": 9669.72,
+          "scale": 1.4056
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 12641.26,
+          "count": 15,
+          "x_spacings": [
+            1091.2,
+            1091.21,
+            1091.2,
+            1091.21,
+            1095.75,
+            2915.49,
+            1012.53,
+            958.12,
+            979.72,
+            900.9,
+            1004.34,
+            943.98,
+            1012.53,
+            1014.96
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": true,
+      "has_cable_annotations": true,
+      "extent_x": [
+        1739.2,
+        22898.35
+      ],
+      "extent_y": [
+        1110.74,
+        16780.47
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 9,
+        "SLD-TXT": 72,
+        "E-SLD-DB-TXT": 2,
+        "SLD": 41,
+        "SLD-LINE": 39,
+        "0": 23,
+        "A-_COL----_E": 1,
+        "E-SLD-T1": 3
+      }
+    },
+    {
+      "filename": "63A TPN SLD 14.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 29,
+        "RCCB": 1,
+        "DP ISOL": 3
+      },
+      "total_subcircuits": 27,
+      "num_dbs": 1,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 19619.39,
+          "scale": 1.366
+        },
+        {
+          "block_name": "RCCB",
+          "y": 20935.26,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 23055.99,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 23055.99,
+          "count": 27,
+          "x_spacings": [
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            829.77,
+            726.76,
+            726.76,
+            2129.49,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            730.98,
+            726.76,
+            726.76,
+            723.34,
+            726.76,
+            726.76
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "L1S3",
+            "L1S3",
+            "L1S3",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        72524.76,
+        95302.08
+      ],
+      "extent_y": [
+        15621.38,
+        25569.34
+      ],
+      "layer_usage": {
+        "SLD": 40,
+        "SLD-LINE": 73,
+        "SLD-TXT": 123,
+        "0": 12,
+        "TXT": 9,
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 8,
+        "E-SLD-T1": 1
+      }
+    },
+    {
+      "filename": "63A TPN SLD 16 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 33,
+        "RCCB": 3,
+        "3P ISOL": 4
+      },
+      "total_subcircuits": 30,
+      "num_dbs": 3,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 7155.74,
+          "scale": 1.4056
+        },
+        {
+          "block_name": "RCCB",
+          "y": 9627.38,
+          "scale": 1.4056
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 12019.37,
+          "count": 30,
+          "x_spacings": [
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            930.13,
+            900.0,
+            900.0,
+            3361.28,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            880.08,
+            900.0,
+            900.0,
+            854.27,
+            900.0,
+            900.0,
+            2967.71,
+            1005.82,
+            1000.0,
+            983.48,
+            981.56,
+            1001.45
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        3323.73,
+        39337.59
+      ],
+      "extent_y": [
+        2281.75,
+        22399.5
+      ],
+      "layer_usage": {
+        "SLD": 113,
+        "SLD-TXT": 104,
+        "SLD-LINE": 89,
+        "E-SLD-LEGENDF": 17,
+        "E-SLD-FRAME": 10,
+        "E-SLD-DB-TXT": 2,
+        "0": 32,
+        "E-SLD-T1": 4
+      }
+    },
+    {
+      "filename": "63A TPN SLD 8 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 24,
+        "3P ISOL": 1
+      },
+      "total_subcircuits": 23,
+      "num_dbs": 1,
+      "has_rccb": false,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [],
+      "spine_components": [],
+      "subcircuit_rows": [
+        {
+          "y": 11820.54,
+          "count": 23,
+          "x_spacings": [
+            900.0,
+            900.0,
+            2600.96,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            3083.66,
+            4055.39,
+            900.0,
+            900.0,
+            2600.96,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            900.0,
+            1895.14
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S2",
+            "L2S2",
+            "L3S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        5317.13,
+        39793.89
+      ],
+      "extent_y": [
+        2770.88,
+        15815.24
+      ],
+      "layer_usage": {
+        "E-SLD-FRAME": 5,
+        "E-SLD-LEGENDF": 14,
+        "SLD-TXT": 78,
+        "0": 39,
+        "SLD-LINE": 61,
+        "E-SLD-T1": 2,
+        "SLD": 80
+      }
+    },
+    {
+      "filename": "80A TPN SLD 2 DWG.dxf",
+      "sld_type": "direct_metering_3phase",
+      "block_counts": {
+        "MCCB": 26,
+        "RCCB": 2,
+        "DP ISOL": 5
+      },
+      "total_subcircuits": 22,
+      "num_dbs": 2,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ],
+        [
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 6780.14,
+          "scale": 1.1898
+        },
+        {
+          "block_name": "MCCB",
+          "y": 11266.98,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 8293.43,
+          "scale": 1.029
+        },
+        {
+          "block_name": "RCCB",
+          "y": 9196.63,
+          "scale": 1.0208
+        },
+        {
+          "block_name": "RCCB",
+          "y": 8706.02,
+          "scale": 1.0208
+        },
+        {
+          "block_name": "MCCB",
+          "y": 11266.98,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 11267.16,
+          "count": 22,
+          "x_spacings": [
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            4563.24,
+            726.76,
+            726.76,
+            862.48,
+            726.76,
+            726.76,
+            851.25,
+            726.76,
+            726.76,
+            851.25,
+            726.76,
+            726.76,
+            1768.94,
+            726.76,
+            1599.18,
+            756.49
+          ],
+          "phase_labels": [
+            "L1S1",
+            "L2S1",
+            "L3S1",
+            "L1S2",
+            "L1S2",
+            "L1S2",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        2625.67,
+        27237.2
+      ],
+      "extent_y": [
+        1116.22,
+        18472.61
+      ],
+      "layer_usage": {
+        "0": 93,
+        "E-SLD-FRAME": 5,
+        "TXT": 24,
+        "SLD": 58,
+        "E-SLD-T1": 2,
+        "SLD-TXT": 145,
+        "E-SLD-LEGENDF": 16,
+        "SLD-LINE": 71
+      }
+    },
+    {
+      "filename": "Cable Extension SLD 2 DWG.dxf",
+      "sld_type": "cable_extension",
+      "block_counts": {
+        "MCCB": 1,
+        "RCCB": 1
+      },
+      "total_subcircuits": 0,
+      "num_dbs": 1,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 5497.6,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 7036.29,
+          "scale": 1.2778
+        }
+      ],
+      "subcircuit_rows": [],
+      "has_phase_labels": false,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        6726.73,
+        41235.75
+      ],
+      "extent_y": [
+        3899.38,
+        17006.45
+      ],
+      "layer_usage": {
+        "SLD": 4,
+        "SLD-LINE": 10,
+        "SLD-TXT": 25,
+        "0": 132,
+        "E-SLD-LEGENDF": 1
+      }
+    },
+    {
+      "filename": "Cable Extension SLD 4 DWG.dxf",
+      "sld_type": "cable_extension",
+      "block_counts": {
+        "MCCB": 10,
+        "RCCB": 1,
+        "3P SOCKET": 9
+      },
+      "total_subcircuits": 9,
+      "num_dbs": 1,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB",
+          "MCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 3423.07,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 4649.45,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "MCCB",
+          "y": 7322.5,
+          "scale": 1.2778
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 7322.5,
+          "count": 9,
+          "x_spacings": [
+            1237.18,
+            1244.67,
+            1258.6,
+            1244.4,
+            1250.41,
+            1253.21,
+            1253.97,
+            1242.13
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        3421.19,
+        59828.28
+      ],
+      "extent_y": [
+        1479.76,
+        16394.61
+      ],
+      "layer_usage": {
+        "SLD": 31,
+        "SLD-TXT": 68,
+        "SLD-LINE": 21,
+        "E-SLD-LEGENDF": 8,
+        "E-SLD-FRAME": 4,
+        "E-SLD-DB-TXT": 2,
+        "0": 152
+      }
+    },
+    {
+      "filename": "Cable Extension SLD 5 DWG.dxf",
+      "sld_type": "cable_extension",
+      "block_counts": {
+        "RCCB": 1,
+        "MCCB": 6,
+        "3P SOCKET": 4
+      },
+      "total_subcircuits": 5,
+      "num_dbs": 1,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": false,
+      "spine_orders": [
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 4267.99,
+          "scale": 1.2778
+        },
+        {
+          "block_name": "RCCB",
+          "y": 5494.37,
+          "scale": 1.2778
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 8167.42,
+          "count": 5,
+          "x_spacings": [
+            2538.73,
+            1240.68,
+            1536.56,
+            1433.51
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": false,
+      "has_rating_labels": false,
+      "has_cable_annotations": true,
+      "extent_x": [
+        3582.84,
+        20427.07
+      ],
+      "extent_y": [
+        2324.69,
+        12566.77
+      ],
+      "layer_usage": {
+        "SLD": 19,
+        "SLD-LINE": 13,
+        "E-SLD-LEGENDF": 8,
+        "SLD-TXT": 17,
+        "E-SLD-FRAME": 4,
+        "E-SLD-DB-TXT": 2,
+        "0": 13
+      }
+    },
+    {
+      "filename": "I2R-ETR-NLB-SLD-1.dxf",
+      "sld_type": "direct_metering_1phase",
+      "block_counts": {
+        "MCCB": 37,
+        "RCCB": 4,
+        "DP ISOL": 4
+      },
+      "total_subcircuits": 35,
+      "num_dbs": 4,
+      "has_rccb": true,
+      "has_ct": false,
+      "has_fuse": false,
+      "has_isolator": true,
+      "spine_orders": [
+        [
+          "MCCB",
+          "MCCB"
+        ],
+        [
+          "MCCB",
+          "RCCB"
+        ]
+      ],
+      "spine_components": [
+        {
+          "block_name": "MCCB",
+          "y": 6349.06,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 13679.44,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "MCCB",
+          "y": 10908.33,
+          "scale": 1.0439
+        },
+        {
+          "block_name": "RCCB",
+          "y": 11841.6,
+          "scale": 1.0439
+        }
+      ],
+      "subcircuit_rows": [
+        {
+          "y": 10908.33,
+          "count": 3,
+          "x_spacings": [
+            11085.09,
+            2014.68
+          ],
+          "phase_labels": [
+            "",
+            "",
+            ""
+          ]
+        },
+        {
+          "y": 13679.44,
+          "count": 32,
+          "x_spacings": [
+            726.76,
+            726.76,
+            1016.65,
+            726.76,
+            1613.57,
+            970.61,
+            970.62,
+            970.62,
+            1558.92,
+            726.76,
+            970.61,
+            970.62,
+            3158.26,
+            10294.49,
+            970.62,
+            719.88,
+            719.88,
+            719.88,
+            719.88,
+            1989.88,
+            970.62,
+            719.88,
+            719.88,
+            719.88,
+            719.88,
+            2153.68,
+            970.61,
+            719.88,
+            719.88,
+            719.88,
+            719.88
+          ],
+          "phase_labels": [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "L1S1",
+            "L1S1",
+            "L1S1",
+            "",
+            "",
+            "",
+            "L2S1",
+            "L2S1",
+            "L2S1",
+            "",
+            "",
+            "",
+            "L3S1",
+            "L3S1",
+            "L3S1",
+            "",
+            "",
+            ""
+          ]
+        }
+      ],
+      "has_phase_labels": true,
+      "has_rating_labels": false,
+      "has_cable_annotations": false,
+      "extent_x": [
+        5752.39,
+        50618.47
+      ],
+      "extent_y": [
+        2791.93,
+        18688.41
+      ],
+      "layer_usage": {
+        "SLD": 63,
+        "TXT": 69,
+        "E-SLD-FRAME": 12,
+        "0": 54,
+        "SLD-TXT": 202,
+        "SLD-LINE": 68,
+        "E-SLD-LEGENDF": 4
+      }
+    }
+  ]
+}

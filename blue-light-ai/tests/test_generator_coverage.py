@@ -1,5 +1,5 @@
 """
-Characterization tests for SldGenerator._draw_components() and related methods.
+Characterization tests for SldPipeline._draw_components() and related methods.
 
 Goal: Lock generator.py behavior to raise coverage from 61% to ~75%.
 Tests exercise previously-uncovered branches in _draw_components(),
@@ -9,7 +9,7 @@ _draw_breaker_block_label(), and generate_pdf_bytes().
 import pytest
 
 from app.sld.layout import compute_layout, LayoutResult, PlacedComponent
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 from app.sld.svg_backend import SvgBackend
 
 
@@ -151,7 +151,7 @@ LANDLORD_SUPPLY = {
 
 def _generate_svg(requirements: dict) -> str:
     """Helper: generate SLD and return SVG string."""
-    _, svg_string, _ = SldGenerator.generate_pdf_bytes(requirements, backend_type="pdf")
+    svg_string = SldPipeline().run(requirements, backend_type="pdf").svg_string
     return svg_string
 
 
@@ -264,7 +264,7 @@ class TestSymbolRendering:
 
     def test_unknown_symbol_graceful(self):
         """Unknown symbol name should not crash, just log warning."""
-        gen = SldGenerator()
+        gen = SldPipeline()
         result = gen._get_symbol("NONEXISTENT_SYMBOL_XYZ")
         assert result is None
 
@@ -391,38 +391,43 @@ class TestGeneratePaths:
 
     def test_generate_with_isolator_circuit(self):
         """generate_pdf_bytes() should handle ISOLATOR circuits."""
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             THREE_PHASE_WITH_ISOLATOR, backend_type="pdf"
         )
+        pdf_bytes, svg_string = _r.pdf_bytes, _r.svg_string
         assert len(pdf_bytes) > 100
         assert len(svg_string) > 1000
 
     def test_generate_with_ct_metering(self):
         """generate_pdf_bytes() should handle CT metering."""
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             SINGLE_PHASE_WITH_CT, backend_type="pdf"
         )
+        pdf_bytes = _r.pdf_bytes
         assert len(pdf_bytes) > 100
 
     def test_generate_with_ditto_circuits(self):
         """generate_pdf_bytes() should handle ditto pattern circuits."""
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             SINGLE_PHASE_DITTO, backend_type="pdf"
         )
+        pdf_bytes = _r.pdf_bytes
         assert len(pdf_bytes) > 100
 
     def test_generate_with_mixed_breakers(self):
         """generate_pdf_bytes() should handle mixed MCB/MCCB circuits."""
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             THREE_PHASE_MIXED_BREAKERS, backend_type="pdf"
         )
+        pdf_bytes = _r.pdf_bytes
         assert len(pdf_bytes) > 100
 
     def test_generate_landlord_supply(self):
         """generate_pdf_bytes() should handle landlord supply source."""
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             LANDLORD_SUPPLY, backend_type="pdf"
         )
+        pdf_bytes = _r.pdf_bytes
         assert len(pdf_bytes) > 100
 
     def test_generate_with_application_info(self):
@@ -433,11 +438,12 @@ class TestGeneratePaths:
             "postalCode": "123456",
             "drawing_number": "SLD-TEST-001",
         }
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             THREE_PHASE_WITH_ISOLATOR,
             application_info=app_info,
             backend_type="pdf",
         )
+        pdf_bytes, svg_string = _r.pdf_bytes, _r.svg_string
         assert len(pdf_bytes) > 100
         assert "TEST CLIENT" in svg_string or len(svg_string) > 1000
 
@@ -447,9 +453,10 @@ class TestGeneratePaths:
             "client_name": "TEST CLIENT",
             "sld_only_mode": True,
         }
-        pdf_bytes, svg_string, _ = SldGenerator.generate_pdf_bytes(
+        _r = SldPipeline().run(
             THREE_PHASE_WITH_ISOLATOR,
             application_info=app_info,
             backend_type="pdf",
         )
+        pdf_bytes = _r.pdf_bytes
         assert len(pdf_bytes) > 100

@@ -543,7 +543,6 @@ def generate_sld(
             requirements["supply_type"] = corrected["supply_type"]
         logger.info(f"Applied {len(spec_result.corrections)} spec corrections to requirements")
 
-    from app.sld.generator import SldGenerator
     from app.sld.track_router import decide_track
 
     file_id = uuid.uuid4().hex[:12]
@@ -576,18 +575,21 @@ def generate_sld(
                 })
                 editor.save(pdf_path)
             component_count = 0
+            sld_result = None
             track_info = "Track A (template reuse)"
         else:
-            # Track B: Generate new SLD with DXF + ReportLab + SVG
-            generator = SldGenerator()
-            result = generator.generate(
+            # Track B: SldPipeline — 생성 + Vision AI 검증 (파이프라인 내부 처리)
+            from app.sld.generator import SldPipeline
+
+            sld_result = SldPipeline().run(
                 requirements=requirements,
                 application_info=application_info or {},
-                pdf_output_path=pdf_path,
-                svg_output_path=svg_path,
                 backend_type="dxf",
+                api_key=settings.gemini_api_key,
             )
-            component_count = result.get("component_count", 0)
+            dxf_path = pdf_path.replace(".pdf", ".dxf")
+            sld_result.save(pdf_path, svg_path, dxf_path)
+            component_count = sld_result.component_count
             track_info = "Track B (generated)"
 
         # Generation succeeded — clean up template cache
@@ -605,17 +607,41 @@ def generate_sld(
                        "The user can review it there. Do NOT include or describe any SVG code in your response.",
         }
 
-        # Add layout warnings if overflow or compression was detected
-        layout_warnings = result.get("layout_warnings", []) if isinstance(result, dict) else []
-        if layout_warnings:
-            response["layout_warnings"] = layout_warnings
-            response["message"] += (
-                f" WARNING: {len(layout_warnings)} layout issue(s) detected. "
-                "Some content may be compressed or extend beyond page boundaries."
-            )
-        overflow_metrics = result.get("overflow_metrics") if isinstance(result, dict) else None
-        if overflow_metrics:
-            response["overflow_metrics"] = overflow_metrics
+        # Add layout warnings and overflow metrics from pipeline result
+        if sld_result:
+            if sld_result.layout_warnings:
+                response["layout_warnings"] = sld_result.layout_warnings
+                response["message"] += (
+                    f" WARNING: {len(sld_result.layout_warnings)} layout issue(s) detected. "
+                    "Some content may be compressed or extend beyond page boundaries."
+                )
+            if sld_result.overflow_metrics:
+                response["overflow_metrics"] = sld_result.overflow_metrics.to_dict()
+
+            # Vision AI 결과 포함
+            if sld_result.vision_report is not None:
+                vr = sld_result.vision_report
+                response["vision_review"] = {
+                    "severity": vr.severity,
+                    "score": vr.score,
+                    "issue_count": vr.issue_count,
+                    "summary": vr.summary,
+                    "issues": [
+                        {"category": i.category, "description": i.description,
+                         "severity": i.severity, "location": i.location}
+                        for i in vr.issues
+                    ],
+                }
+                if vr.severity == "fail":
+                    response["message"] += (
+                        f" VISION REVIEW: FAIL (score={vr.score:.2f}, "
+                        f"{vr.issue_count} issues). Review needed."
+                    )
+                elif vr.severity == "warning":
+                    response["message"] += (
+                        f" Vision review: {vr.issue_count} minor issue(s), "
+                        f"score={vr.score:.2f}."
+                    )
 
         return json.dumps(response, ensure_ascii=False)
 
@@ -624,6 +650,79 @@ def generate_sld(
         return json.dumps({
             "success": False,
             "error": f"Generation failed: {str(e)}",
+        })
+
+
+# ── Tool 4b: Vision AI Validation ────────────────────
+
+@tool
+def validate_sld_vision(file_id: str, api_key: str | None = None) -> str:
+    """
+    Vision AI로 생성된 SLD의 시각적 품질을 검증합니다.
+    generate_sld 호출 후 반드시 이 도구로 검증하세요.
+
+    겹침, 끊김, 비정상 심볼, 라벨 누락 등 시각적 문제를 자동 탐지합니다.
+
+    Args:
+        file_id: generate_sld가 반환한 file_id
+        api_key: Gemini API key (DB에서 관리, 미지정 시 settings fallback)
+    """
+    import asyncio
+
+    svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg")
+    if not os.path.exists(svg_path):
+        return json.dumps({
+            "success": False,
+            "error": f"SVG file not found for file_id={file_id}. Generate SLD first.",
+        })
+
+    try:
+        from app.sld.vision_validator import self_review
+
+        # Run async self_review in sync context
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            # Inside an existing event loop (LangGraph agent context)
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                report = pool.submit(
+                    lambda: asyncio.run(self_review(svg_path, api_key=api_key))
+                ).result(timeout=30)
+        else:
+            report = asyncio.run(self_review(svg_path, api_key=api_key))
+
+        result = {
+            "success": True,
+            "severity": report.severity,
+            "score": report.score,
+            "summary": report.summary,
+            "issue_count": report.issue_count,
+            "issues": [
+                {
+                    "category": i.category,
+                    "description": i.description,
+                    "severity": i.severity,
+                    "location": i.location,
+                    "suggestion": i.suggestion,
+                }
+                for i in report.issues
+            ],
+        }
+
+        if report.adjustments:
+            result["adjustments"] = report.adjustments
+
+        return json.dumps(result, ensure_ascii=False)
+
+    except Exception as e:
+        logger.error(f"Vision validation failed: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"Vision validation failed: {str(e)}",
         })
 
 
@@ -905,6 +1004,7 @@ ALL_TOOLS = [
     get_standard_specs,
     validate_sld_requirements,
     generate_sld,
+    validate_sld_vision,
     generate_preview,
     extract_sld_data,
     find_matching_templates,

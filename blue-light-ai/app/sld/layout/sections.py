@@ -463,19 +463,22 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
 
     Returns a _MeterBoardGeom with all coordinates needed for placement.
     """
+    from app.sld.catalog import get_catalog
+    _cat = get_catalog()
+
     comp_spacing = config.meter_board_comp_spacing
-    _stub = config.stub_len
+    _stub = _cat.get("ISOLATOR").stub
     _mb_inset = config.meter_board_inset
 
-    # Horizontal extents (symbol.height → h_extent when rotated 90°)
-    iso_h_extent = config.isolator_h
-    kwh_h_extent = config.kwh_rect_w
-    mcb_h_extent = config.mcb_h
+    # Horizontal extents from catalog (symbol height → h_extent when rotated 90°)
+    iso_h_extent = _cat.get("ISOLATOR").effective_h_extent
+    kwh_h_extent = _cat.get("KWH_METER").effective_h_extent
+    mcb_h_extent = _cat.get("MCB").effective_h_extent
 
     # Vertical half-extents (symbol.width/2 → v_half when rotated 90°)
-    iso_v_half = config.isolator_w / 2
-    kwh_v_half = config.kwh_rect_h / 2
-    mcb_v_half = config.mcb_w / 2
+    iso_v_half = _cat.get("ISOLATOR").width / 2
+    kwh_v_half = _cat.get("KWH_METER").height * 0.6 / 2  # kwh_rect_h = height * 0.6
+    mcb_v_half = _cat.get("MCB").width / 2
     max_v_half = max(iso_v_half, kwh_v_half, mcb_v_half)
 
     # Text sizes (must match generator.py)
@@ -557,7 +560,8 @@ def _place_meter_board_symbols(
     # CT (between ISO and KWH) — ct_meter + non-landlord only
     if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
         ct_mid_x = (g.iso_cx + g.kwh_cx) / 2
-        ct_r = ctx.config.ct_size / 2
+        from app.sld.catalog import get_catalog as _get_cat_ct
+        ct_r = _get_cat_ct().get("CT").width / 2
         ct_label = f"{ctx.ct_ratio} CT" if ctx.ct_ratio else SG_LOCALE.meter_board.ct_by_sp
         result.components.append(PlacedComponent(
             symbol_name="CT", x=ct_mid_x - ct_r, y=g.mb_center_y - ct_r, label=ct_label,
@@ -793,13 +797,14 @@ CT_METERING_SPINE_ORDER: list[tuple[str, str]] = [
 def _derive_ammeter_range(ct_ratio: str) -> str:
     """Derive ammeter range from CT ratio primary current.
 
-    '100/5A' → '0-100A', '200/5A' → '0-200A'.
-    Falls back to '0-500A' when ratio is absent or unparseable.
+    '100/5A' → '0 - 100A', '200/5A' → '0 - 200A'.
+    Falls back to '0 - 500A' when ratio is absent or unparseable.
+    Reference format uses spaces around hyphen: '0 - 100A'.
     """
     if not ct_ratio:
-        return "0-500A"
+        return "0 - 500A"
     m = re.match(r"(\d+)/", ct_ratio)
-    return f"0-{m.group(1)}A" if m else "0-500A"
+    return f"0 - {m.group(1)}A" if m else "0 - 500A"
 
 
 def _place_ct_metering_section(ctx: _LayoutContext) -> None:
@@ -855,10 +860,14 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     entry_gap = ctx.config.ct_entry_gap
     ct_to_ct_gap = ctx.config.ct_to_ct_gap
     ct_to_branch_gap = ctx.config.ct_to_branch_gap
-    branch_arm_len = 15.0    # horizontal arm from spine to first component
-    branch_gap = 3.0         # gap between components on a branch
-    ct_to_pf_gap = 1.0       # gap between metering CT and potential fuse
-    pf_to_bi_gap = 1.0       # gap between potential fuse and BI connector
+    # Compact mode (multi-DB): tighter branch spacing
+    _compact = ct_to_ct_gap < 2.0
+    branch_arm_len = 10.0 if _compact else 15.0  # horizontal arm from spine
+    branch_gap = 2.0 if _compact else 3.0        # gap between components on a branch
+    # Branch direction: ELR/ASS always LEFT, KWH/VSS/fuse always RIGHT.
+    # This matches reference DWG convention regardless of single/multi-DB.
+    ct_to_pf_gap = 0.5 if _compact else 1.0      # gap between metering CT and potential fuse
+    pf_to_bi_gap = 0.5 if _compact else 1.0      # gap between potential fuse and BI connector
 
     # ═══════════════════════════════════════════════════════════════════════
     # Correct flow order (bottom → top, supply → load):
@@ -886,6 +895,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     from app.sld.real_symbols import get_real_symbol as _get_kwh_pre
     _kwh_pre = _get_kwh_pre("KWH_METER")
     _kwh_rect_h_pre = getattr(_kwh_pre, '_rect_h', 3.9)
+    # KWH branch Y needs enough clearance from Protection CT hooks
     _kwh_arm_y_pre = prot_ct_center_y + 3.0 + _kwh_rect_h_pre / 2 + 1.5
     _min_metering_start = _kwh_arm_y_pre + ct_stub + 1.0
     cursor = max(cursor, _min_metering_start)
@@ -896,7 +906,8 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     cursor += ct_h
 
     # Advance past branches — reserve enough height for fuse + VSS + ASS branches
-    highest_branch = metering_ct_center_y + ct_to_branch_gap * 2 + 20
+    _branch_reserve = 14.0 if _compact else 20.0
+    highest_branch = metering_ct_center_y + ct_to_branch_gap * 2 + _branch_reserve
     cursor = max(cursor, highest_branch)
     cursor += ct_to_ct_gap
 
@@ -958,7 +969,23 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # --- 4. Branches from Metering CT ---
     # Reference DWG order (bottom → top): VSS/Voltmeter, ASS/Ammeter, 2A fuse, BI.
     branch_y = metering_ct_center_y
-    ass_branch_y = branch_y + ct_to_branch_gap  # ASS above metering CT
+
+    # Pre-compute KWH and instrument fuse Y to place ASS at midpoint.
+    # KWH branch Y (same formula as below, computed early for ASS positioning):
+    from app.sld.real_symbols import get_real_symbol as _get_kwh_pre_calc
+    _kwh_pre_calc = _get_kwh_pre_calc("KWH_METER")
+    _kwh_rect_h_pre_calc = getattr(_kwh_pre_calc, '_rect_h', 3.9)
+    _kwh_return_y_pre = prot_ct_center_y + 3.0
+    _elr_box_h_pre = 6.0
+    _kwh_branch_y_pre = _kwh_return_y_pre + _kwh_rect_h_pre_calc / 2 + _elr_box_h_pre
+    # Instrument fuse Y:
+    _inst_fuse_y_pre = bi_y - 4.0
+
+    # ASS branch Y: midpoint between KWH (below) and instrument fuse (above)
+    # This evenly spaces hooks to prevent overlap.
+    ass_branch_y = (_kwh_branch_y_pre + _inst_fuse_y_pre) / 2
+    # Fallback: at least ct_to_branch_gap above metering CT
+    ass_branch_y = max(ass_branch_y, branch_y + ct_to_branch_gap)
     # VSS Y: default fallback (overridden below when instrument fuse is present)
     vss_branch_y = ass_branch_y + ct_to_branch_gap
 
@@ -978,12 +1005,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # (See "VSS diagonal branch" section below the instrument fuse.)
 
     # Branch 2 (LEFT): ASS → Ammeter (circle with "A" inside + range label)
-    # Placed just above VSS — per reference DWG.
-    # ASS is positioned at the midpoint between ammeter and CT hook (spine).
-    # Both ASS and ammeter have r=2mm (body width=4mm).
-    # Midpoint condition: arm = gap + 2 → arm=9, gap=7 gives
-    #   ASS center = -(9+2)= -11,  Ammeter center = -(9+4+7+2)= -22
-    #   midpoint(0, -22) = -11 = ASS center ✓
+    # Always LEFT — reference DWG shows ASS/Ammeter on left side of spine.
     if ctx.has_ammeter:
         _place_metering_branch(
             result, cx, ass_branch_y, direction="left",
@@ -1318,7 +1340,10 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         ctx.y = y
         return
 
-    _iso_w = config.isolator_w  # Isolator symbol width — needed for centering
+    from app.sld.catalog import get_catalog
+    _cat = get_catalog()
+    _iso_def = _cat.get("ISOLATOR")
+    _iso_w = _iso_def.width  # Isolator symbol width — needed for centering
 
     # Flatten nested isolator dict → top-level keys (same as _parse_board_requirements)
     _iso_dict = requirements.get("isolator", {})
@@ -1360,6 +1385,8 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             isolator_rating = _next_standard_rating(breaker_rating)
 
     if isolator_rating:
+        from app.sld.layout.section_base import FunctionSection
+
         result.sections_rendered["unit_isolator"] = True
         result.connections.append(((cx, y), (cx, y + 2)))
         y += 2
@@ -1370,13 +1397,14 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
 
         if supply_source in ("landlord", "building_riser"):
             # Landlord / building riser — enclosed isolator with labels to the LEFT
+            # Manual placement (enclosed + separate label = can't use place_on_spine)
             result.components.append(PlacedComponent(
                 symbol_name="ISOLATOR",
-                x=cx - _iso_w / 2,
+                x=cx - _iso_def.center_x(),
                 y=y,
-                label="",   # labels placed separately to the left
+                label="",
                 rating="",
-                enclosed=True,  # IEC enclosed isolator (standalone unit with housing)
+                enclosed=True,
             ))
             # Position label text right-aligned to the left of enclosure box
             _label_ch = 2.3
@@ -1385,30 +1413,31 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             _lines = _combined.split("\\P")
             _longest = max(len(ln) for ln in _lines)
             _text_w = _longest * _char_w
-            # Gap measured from enclosure box outer edge (pad=1.5 same as RealIsolator.draw)
             _enclosure_pad = 1.5
-            _text_x = cx - _iso_w / 2 - _enclosure_pad - config.isolator_label_gap - _text_w
-            _text_y = y + config.isolator_h * 0.55
+            _text_x = cx - _iso_def.center_x() - _enclosure_pad - config.isolator_label_gap - _text_w
+            _text_y = y + _iso_def.height * 0.55
             result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=_text_x,
-                y=_text_y,
-                label=_combined,
+                symbol_name="LABEL", x=_text_x, y=_text_y, label=_combined,
             ))
+            # Advance cursor past isolator body + gap
+            y += _iso_def.height + 2
         else:
-            # Default: labels to the RIGHT (via symbol's built-in rendering)
-            result.components.append(PlacedComponent(
-                symbol_name="ISOLATOR",
-                x=cx - _iso_w / 2,
-                y=y,
-                label=iso_main_label,
-                rating=iso_rating_text,
-            ))
+            # Default: place_on_spine handles centering + cursor advance
+            ctx.y = y
+            FunctionSection.place_on_spine(
+                ctx, "ISOLATOR", label=iso_main_label, rating=iso_rating_text,
+            )
+            y = ctx.y
+            # place_on_spine advances past stub; add extra gap
+            result.connections.append(((cx, y), (cx, y + 2)))
+            y += 2
+            # Skip the old y += height + 2 + connection + 2 pattern
+            result.symbols_used.add("ISOLATOR")
 
-        y += config.isolator_h + 2
-        result.connections.append(((cx, y), (cx, y + 2)))
-        y += 2
-        result.symbols_used.add("ISOLATOR")
+        if supply_source in ("landlord", "building_riser"):
+            result.connections.append(((cx, y), (cx, y + 2)))
+            y += 2
+            result.symbols_used.add("ISOLATOR")
 
         # Outgoing cable annotation with tick mark (after isolator → DB)
         outgoing_cable = requirements.get("outgoing_cable", "")
@@ -1467,40 +1496,30 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
         y += _gap
     ctx.db_box_start_y = y - 1  # Track DB box bottom (below main breaker, above cable annotation)
 
-    if breaker_type == "ACB":
-        from app.sld.real_symbols import get_symbol_dimensions as _get_acb_dims
-        _acb = _get_acb_dims("ACB")
-        cb_w, cb_h = _acb["width_mm"], _acb["height_mm"]
-    elif breaker_type == "MCB":
-        cb_w, cb_h = config.mcb_w, config.mcb_h
-    else:
-        cb_w, cb_h = config.breaker_w, config.breaker_h
-
     cb_symbol = f"CB_{breaker_type}"
     # Singapore SLD format (matching reference DXF MTEXT):
     #   "63A TPN MCB 6KA TYPE B" or "100A TPN MCCB (35KA)"
-    # LEW convention uses uppercase "KA" — per I2R/ETR reference DWGs.
     _ka_suffix = "KA"
     if main_breaker_char:
         main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} {breaker_fault_kA}{_ka_suffix} TYPE {main_breaker_char}"
     else:
         main_label = f"{breaker_rating}A {breaker_poles} {breaker_type} ({breaker_fault_kA}{_ka_suffix})"
-    result.components.append(PlacedComponent(
-        symbol_name=cb_symbol,
-        x=cx - cb_w / 2,
-        y=y,
-        label=main_label,
-    ))
-    ctx.main_breaker_arc_center_y = y + cb_h / 2  # between contacts
-    y += cb_h + config.stub_len
+
+    # Place via place_on_spine — catalog pins handle centering + cursor advance
+    ctx.y = y  # sync cursor before helper call
+    from app.sld.layout.section_base import FunctionSection, _comp_def
+    comp_y, _, exit_y = FunctionSection.place_on_spine(ctx, cb_symbol, label=main_label)
+
+    # Side-effects that depend on component geometry
+    _cb_def = _comp_def(cb_symbol)
+    ctx.main_breaker_arc_center_y = comp_y + _cb_def.height / 2  # between contacts
     result.symbols_used.add(breaker_type)
 
     # Extra gap with connection line for visual spacing
     gap = config.spine_component_gap
-    result.connections.append(((cx, y), (cx, y + gap)))
-    y += gap
+    FunctionSection.spine_connection(ctx, gap)
 
-    ctx.y = y
+    y = ctx.y  # sync back
 
 
 def _place_elcb(ctx: _LayoutContext) -> None:
@@ -1521,37 +1540,32 @@ def _place_elcb(ctx: _LayoutContext) -> None:
     elcb_type_str = ctx.elcb_type_str
 
     # -- 4a. ELCB/RCCB (inline between Main Breaker and Busbar per LEW guide) --
+    from app.sld.layout.section_base import FunctionSection
+
     elcb_symbol = "CB_RCCB" if elcb_type_str == "RCCB" else "CB_ELCB"
-    elcb_w, elcb_h = config.rccb_w, config.rccb_h  # ELCB/RCCB dims (wider due to RCD bar)
     elcb_poles_raw = elcb_config.get("poles", "") if isinstance(elcb_config, dict) else ""
     if isinstance(elcb_poles_raw, str) and elcb_poles_raw.upper() in ("DP", "SP", "TPN", "4P"):
         elcb_poles_str = elcb_poles_raw.upper()
     elif isinstance(elcb_poles_raw, int):
         elcb_poles_str = {1: "SP", 2: "DP", 3: "TPN", 4: "4P"}.get(elcb_poles_raw, "DP")
     else:
-        # Default based on supply type: DP for single-phase, 4P for three-phase
         elcb_poles_str = "DP" if supply_type == "single_phase" else "4P"
 
-    result.components.append(PlacedComponent(
-        symbol_name=elcb_symbol,
-        x=cx - elcb_w / 2,
-        y=y,
-        label=f"{elcb_rating}A {elcb_poles_str}\\P{elcb_type_str} \\P({elcb_ma}mA)",
-    ))
-    y += elcb_h + config.stub_len
+    elcb_label = f"{elcb_rating}A {elcb_poles_str}\\P{elcb_type_str} \\P({elcb_ma}mA)"
+
+    # Place via place_on_spine — catalog pins handle centering + cursor
+    ctx.y = y
+    FunctionSection.place_on_spine(ctx, elcb_symbol, label=elcb_label)
     result.symbols_used.add(elcb_type_str)
 
     # Extra gap with connection line for visual spacing
-    gap = config.spine_component_gap
-    result.connections.append(((cx, y), (cx, y + gap)))
-    y += gap
+    FunctionSection.spine_connection(ctx, config.spine_component_gap)
 
     # Post-ELCB MCB: RCCB+MCB serial structure (e.g., 63A RCCB → 63A MCB Type B)
     post_mcb = ctx.post_elcb_mcb
     if post_mcb:
         mcb_type = post_mcb.get("type", "MCB")
         mcb_symbol = f"CB_{mcb_type}"
-        mcb_w, mcb_h = config.mcb_w, config.mcb_h
         mcb_rating = post_mcb.get("rating", 0)
         mcb_poles = post_mcb.get("poles", "TPN")
         mcb_char = post_mcb.get("breaker_characteristic", "")
@@ -1562,24 +1576,16 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         else:
             mcb_label = f"{mcb_rating}A {mcb_poles} {mcb_type} ({mcb_fault}KA)"
 
-        result.components.append(PlacedComponent(
-            symbol_name=mcb_symbol,
-            x=cx - mcb_w / 2,
-            y=y,
-            label=mcb_label,
-            rating=f"{mcb_rating}A",
-            poles=mcb_poles,
-            breaker_type_str=mcb_type,
-        ))
-        y += mcb_h + config.stub_len
+        FunctionSection.place_on_spine(
+            ctx, mcb_symbol, label=mcb_label,
+            rating=f"{mcb_rating}A", poles=mcb_poles, breaker_type_str=mcb_type,
+        )
         result.symbols_used.add(mcb_type)
 
         # Extra gap with connection line
-        gap = config.spine_component_gap
-        result.connections.append(((cx, y), (cx, y + gap)))
-        y += gap
+        FunctionSection.spine_connection(ctx, config.spine_component_gap)
 
-    ctx.y = y
+    y = ctx.y
 
 
 def _place_internal_cable(ctx: _LayoutContext) -> None:
@@ -1659,8 +1665,9 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     result.busbar_start_x = bus_start_x
     result.busbar_end_x = bus_end_x
 
-    # Always use "BUSBAR" label regardless of rating (LEW convention)
-    busbar_label = f"{busbar_rating}A {SG_LOCALE.circuit.busbar}"
+    # ≤500A → "COMB BAR", >500A → "BUSBAR" (LEW convention per reference DWGs)
+    busbar_type = SG_LOCALE.circuit.comb_busbar if busbar_rating <= 500 else SG_LOCALE.circuit.busbar
+    busbar_label = f"{busbar_rating}A {busbar_type}"
     result.components.append(PlacedComponent(
         symbol_name="BUSBAR",
         x=bus_start_x,
@@ -1690,7 +1697,8 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
             if _m:
                 unit_number = _m.group(0)
 
-    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} kVA"
+    # Reference format: "APPROVED LOAD: 69.282 KVA AT 400V"
+    db_info_text = f"{SG_LOCALE.incoming.approved_load}: {approved_kva} KVA AT {voltage}V"
 
     # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
     # For landlord supply, DB is always inside the tenant's unit.
@@ -1705,15 +1713,23 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     _is_sub_board = bool(_current_board.get("fed_from"))
     if not _is_sub_board:
         if unit_number:
-            db_location_text = f"{SG_LOCALE.meter_board.located_inside_unit} {unit_number}"
+            # Reference format: "(LOCATED INSIDE UNIT #01-36)"
+            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
         elif application_info and application_info.get("address"):
-            db_location_text = f"LOCATED AT {application_info['address']}"
+            db_location_text = f"(LOCATED AT {application_info['address']})"
         elif ctx.supply_source == "landlord":
             # Landlord supply → DB is inside tenant's unit (no specific unit number)
-            db_location_text = SG_LOCALE.meter_board.located_inside_unit
+            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit})"
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
-    ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"
+    # DB info label: "{rating}A DB" — poles (TPN/SPN) not shown in DB name per LEW convention
+    # If board_name is provided, use it; otherwise generate from rating
+    if ctx.board_name:
+        # Remove poles from board_name if present (e.g., "63A TPN DB" → "63A DB")
+        _db_name_clean = re.sub(r'\s+(TPN|SPN|DP|4P)\s+', ' ', ctx.board_name).strip()
+        ctx.db_info_label = _db_name_clean
+    else:
+        ctx.db_info_label = f"{breaker_rating}A {SG_LOCALE.circuit.db}"
     ctx.db_info_text = db_info_text
     ctx.db_location_text = db_location_text
 
@@ -1726,9 +1742,8 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         label=busbar_label,
     ))
 
-    # Connection from last spine component (main breaker or ELCB) body top to busbar.
-    # y already includes component height + stub_len, so body top = y - stub_len.
-    result.connections.append(((cx, y - config.stub_len), (cx, y)))
+    # Note: Connection from last spine component to busbar is already handled by
+    # place_on_spine() stub drawing — no manual connection needed here.
 
 
 def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
@@ -1955,8 +1970,10 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
 
     # DB box vertical extents
     db_box_start_y = text_anchor_y - config.db_info_height(ctx.db_info_text)
+    from app.sld.catalog import get_catalog as _gc
+    _mcb_def = _gc().get("MCB")
     db_box_end_y = (busbar_y_row + config.db_box_busbar_margin
-                    + config.mcb_h + config.stub_len
+                    + _mcb_def.height + _mcb_def.stub
                     + config.db_box_tail_margin + config.db_box_label_margin)
 
     # DB box horizontal extents

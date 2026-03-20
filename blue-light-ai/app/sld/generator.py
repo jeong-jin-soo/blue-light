@@ -25,10 +25,14 @@ Components drawn:
 Outputs PDF (for EMA submission) and SVG (for web preview).
 """
 
+import asyncio
 import logging
 import math
 import re
+import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from app.sld.backend import DrawingBackend
 from app.sld.block_replayer import BlockReplayer
@@ -50,6 +54,40 @@ from app.sld.title_block import TitleBlockConfig, draw_border, draw_title_block_
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# SldResult — 단일 출력 타입
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SldResult:
+    """SLD 파이프라인 출력. 모든 호출자가 동일한 타입을 받는다."""
+
+    pdf_bytes: bytes = b""
+    svg_string: str = ""
+    dxf_bytes: bytes | None = None
+    vision_report: Any = None  # VisionReport (순환 import 방지)
+    overflow_metrics: Any = None  # OverflowMetrics
+    layout_warnings: list[str] = field(default_factory=list)
+    component_count: int = 0
+
+    def save(
+        self,
+        pdf_path: str | Path | None = None,
+        svg_path: str | Path | None = None,
+        dxf_path: str | Path | None = None,
+    ) -> None:
+        """파일 저장 유틸리티. 경로가 주어진 것만 저장."""
+        if pdf_path and self.pdf_bytes:
+            Path(pdf_path).write_bytes(self.pdf_bytes)
+            logger.info("PDF saved: %s", pdf_path)
+        if svg_path and self.svg_string:
+            Path(svg_path).write_text(self.svg_string, encoding="utf-8")
+            logger.info("SVG saved: %s", svg_path)
+        if dxf_path and self.dxf_bytes:
+            Path(dxf_path).write_bytes(self.dxf_bytes)
+            logger.info("DXF saved: %s", dxf_path)
+
+
 # Reference DXF files for importing native CAD symbol blocks.
 _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 _BLOCK_LIBRARY_DXF = _DATA_DIR / "templates" / "symbols" / "sld_block_library.dxf"
@@ -65,198 +103,116 @@ except Exception as _exc:
     _BLOCK_REPLAYER = None
 
 
-class SldGenerator:
+class SldPipeline:
+    """단일 SLD 생성 파이프라인.
+
+    ❶~❺ compute_layout() → 렌더링 → ❻ Vision AI 검증.
+    어디서 호출하든 동일한 파이프라인을 탄다.
     """
-    Generates complete SLD drawings in PDF format with SVG preview.
-    """
 
-    @staticmethod
-    def _get_breaker_dims(breaker_type: str) -> tuple[float, float]:
-        """Get (width, height) for a breaker type from real_symbol_paths.json.
+    MAX_VISION_RETRIES = 3
 
-        Maps breaker_type_str values to symbol registry keys and returns
-        calibrated dimensions.  Falls back to MCB if type is unknown.
-        """
-        _TYPE_MAP = {
-            "MCB": "MCB",
-            "MCCB": "MCCB",
-            "ACB": "ACB",
-            "RCCB": "RCCB",
-            "ELCB": "ELCB",
-        }
-        sym_key = _TYPE_MAP.get(breaker_type, "MCB")
-        dims = get_symbol_dimensions(sym_key)
-        return dims["width_mm"], dims["height_mm"]
-
-    def generate(
+    def run(
         self,
-        requirements: dict,
-        application_info: dict,
-        pdf_output_path: str,
-        svg_output_path: str | None = None,
-        backend_type: str = "dxf",
-        page_config: PageConfig | None = None,
-    ) -> dict:
-        """
-        Generate the SLD drawing.
-
-        Args:
-            requirements: SLD requirements from the AI agent.
-            application_info: Application details (address, kVA, etc.)
-            pdf_output_path: Path to save the PDF file.
-            svg_output_path: Optional path to save the SVG preview.
-            backend_type: "dxf" (default, real CAD output) or "pdf" (legacy ReportLab).
-
-        Returns:
-            dict with keys: svg_string, component_count, pdf_path, dxf_path (if dxf)
-        """
-        logger.info(
-            f"Generating SLD: kVA={requirements.get('kva')}, "
-            f"sub_circuits={len(requirements.get('sub_circuits', []))}, "
-            f"backend={backend_type}"
-        )
-
-        # Normalize application_info keys (drawing_no→drawing_number, contractor split)
-        try:
-            from app.sld.circuit_normalizer import normalize_application_info
-            application_info = normalize_application_info(application_info)
-        except Exception as exc:
-            logger.warning("application_info normalization failed: %s", exc)
-
-        # Compute layout (pure coordinate computation -- backend-independent)
-        pc = page_config
-        tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
-        layout_result = compute_layout(requirements, application_info=application_info,
-                                       page_config=pc)
-
-        # Title block data (shared across all backends)
-        # Accept both camelCase (from backend API) and snake_case (from direct calls)
-        title_block_kwargs = dict(
-            project_name=application_info.get("project_title", "") or application_info.get("address", "Electrical Installation"),
-            address=application_info.get("client_address", "") or application_info.get("address", ""),
-            postal_code=application_info.get("postalCode", ""),
-            kva=requirements.get("kva", 0),
-            voltage=requirements.get("voltage", 0),
-            supply_type=requirements.get("supply_type", "") or requirements.get("phase_config", ""),
-            lew_name=application_info.get("lew_name", "") or application_info.get("assignedLewName", ""),
-            lew_licence=application_info.get("lew_licence", "") or application_info.get("assignedLewLicenceNo", ""),
-            lew_mobile=application_info.get("lew_mobile", "") or application_info.get("assignedLewMobile", ""),
-            sld_only_mode=application_info.get("sld_only_mode", False),
-            client_name=application_info.get("client_name", "") or application_info.get("clientName", ""),
-            main_contractor=application_info.get("contractor_name", "") or application_info.get("mainContractor", "") or application_info.get("main_contractor", ""),
-            elec_contractor=application_info.get("elec_contractor", "") or application_info.get("electrical_contractor", "") or "LicenseKaki",
-            elec_contractor_addr=application_info.get("elec_contractor_addr", "") or application_info.get("contractor_address", ""),
-            elec_contractor_tel=application_info.get("elec_contractor_tel", ""),
-            drawing_number=application_info.get("drawing_number", ""),
-        )
-
-        result = {}
-        dxf_path = None
-
-        # Create backends
-        if backend_type == "dxf":
-            # DXF backend (primary CAD output) + ReportLab PDF (EMA submission) + SVG (preview)
-            dxf = DxfBackend(page_config=pc)
-            # Import native CAD symbol blocks: consolidated library first, then reference DXFs
-            for ref_path in (_BLOCK_LIBRARY_DXF, _REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
-                if ref_path.exists():
-                    dxf.import_symbol_blocks(str(ref_path))
-            pdf = PdfBackend(pdf_output_path, page_config=pc)
-            svg = SvgBackend(page_config=pc)
-            backends = [dxf, pdf, svg]
-
-            dxf_path = pdf_output_path.replace(".pdf", ".dxf")
-        else:
-            # Legacy: ReportLab PDF + SVG only
-            pdf = PdfBackend(pdf_output_path, page_config=pc)
-            svg = SvgBackend(page_config=pc)
-            backends = [pdf, svg]
-
-        # Draw to all backends simultaneously
-        component_count = 0
-        for backend in backends:
-            draw_border(backend, page_config=pc)
-            draw_title_block_frame(backend, tb_config=tb_config)
-
-            component_count = self._draw_components(backend, layout_result)
-            self._draw_connections(backend, layout_result)
-            self._draw_fanout_groups(backend, layout_result)
-            self._draw_dashed_connections(backend, layout_result)
-            self._draw_junction_dots(backend, layout_result)
-            self._draw_junction_arrows(backend, layout_result)
-            self._draw_arrow_points(backend, layout_result)
-            self._draw_solid_boxes(backend, layout_result)
-
-            fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
-
-        # Save outputs
-        pdf.save()
-        logger.info(f"PDF saved: {pdf_output_path}")
-
-        if backend_type == "dxf" and dxf_path:
-            dxf.save(dxf_path)
-            result["dxf_path"] = dxf_path
-
-        svg_string = svg.get_svg_string()
-        if svg_output_path:
-            with open(svg_output_path, "w", encoding="utf-8") as f:
-                f.write(svg_string)
-            logger.info(f"SVG saved: {svg_output_path}")
-
-        result.update({
-            "svg_string": svg_string,
-            "component_count": component_count,
-            "pdf_path": pdf_output_path,
-        })
-
-        # Include overflow metrics if detected
-        if layout_result.overflow_metrics:
-            result["overflow_metrics"] = layout_result.overflow_metrics.to_dict()
-            result["layout_warnings"] = layout_result.overflow_metrics.warnings
-
-        return result
-
-    @staticmethod
-    def generate_pdf_bytes(
         requirements: dict,
         application_info: dict | None = None,
         backend_type: str = "dxf",
         page_config: PageConfig | None = None,
-    ) -> tuple[bytes, str, bytes | None]:
-        """
-        Generate SLD as PDF bytes in memory (no file I/O).
+        api_key: str | None = None,
+    ) -> SldResult:
+        """SLD 생성 파이프라인 실행.
 
         Args:
-            requirements: SLD requirements dict.
-            application_info: Application details (address, kVA, etc.)
-            backend_type: "dxf" (default) or "pdf" (legacy).
+            requirements: SLD requirements dict
+            application_info: 타이틀 블록 정보 (주소, kVA 등)
+            backend_type: "dxf" (기본) 또는 "pdf" (레거시)
+            page_config: 페이지 설정 (None이면 A3 가로)
+            api_key: Gemini API key (있으면 Vision AI 자동 실행)
 
         Returns:
-            Tuple of (pdf_bytes, svg_string, dxf_bytes_or_none).
+            SldResult with pdf_bytes, svg_string, dxf_bytes, vision_report
         """
-        # Support title block data from both application_info (API) and
-        # requirements['title_block'] (direct/testing calls)
         app_info = application_info or {}
         if not app_info and "title_block" in requirements:
             app_info = requirements["title_block"]
 
-        # Normalize application_info keys (drawing_no→drawing_number, contractor split)
         try:
             from app.sld.circuit_normalizer import normalize_application_info
             app_info = normalize_application_info(app_info)
         except Exception as exc:
             logger.warning("application_info normalization failed: %s", exc)
 
-        generator = SldGenerator()
+        current_requirements = requirements
+        vision_report = None
+
+        for attempt in range(1, self.MAX_VISION_RETRIES + 1):
+            result = self._generate_once(
+                current_requirements, app_info, backend_type, page_config
+            )
+
+            # ❻ Vision AI 검증
+            if not api_key:
+                break
+
+            try:
+                from app.sld.vision_validator import self_review, apply_adjustments
+
+                # SVG를 임시 파일에 저장하여 Vision AI에 전달
+                with tempfile.NamedTemporaryFile(
+                    suffix=".svg", prefix="sld_vision_", delete=False, mode="w"
+                ) as tmp:
+                    tmp.write(result.svg_string)
+                    tmp_svg = tmp.name
+
+                vision_report = asyncio.run(
+                    self_review(tmp_svg, api_key=api_key)
+                )
+                result.vision_report = vision_report
+
+                logger.info(
+                    "Vision review (attempt %d/%d): severity=%s score=%.2f issues=%d",
+                    attempt, self.MAX_VISION_RETRIES,
+                    vision_report.severity, vision_report.score, vision_report.issue_count,
+                )
+
+                # 임시 파일 정리
+                Path(tmp_svg).unlink(missing_ok=True)
+                png_tmp = Path(tmp_svg).with_suffix(".png")
+                png_tmp.unlink(missing_ok=True)
+
+                if vision_report.severity != "fail" or attempt >= self.MAX_VISION_RETRIES:
+                    break
+
+                if vision_report.adjustments:
+                    current_requirements = apply_adjustments(
+                        current_requirements, vision_report.adjustments
+                    )
+                    logger.info("Vision retry %d: adjustments %s", attempt, vision_report.adjustments)
+                else:
+                    break  # 조정할 파라미터 없으면 재시도 불필요
+
+            except Exception as vision_err:
+                logger.warning("Vision review failed (attempt %d): %s", attempt, vision_err)
+                break
+
+        return result
+
+    def _generate_once(
+        self,
+        requirements: dict,
+        app_info: dict,
+        backend_type: str,
+        page_config: PageConfig | None,
+    ) -> SldResult:
+        """단일 생성 (레이아웃 + 렌더링). Vision AI 없이."""
         pc = page_config
         tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
 
-        pdf = PdfBackend(output_path=None, page_config=pc)  # in-memory buffer
-        svg = SvgBackend(page_config=pc)
-
+        # ❶~❺ Layout
         layout_result = compute_layout(requirements, application_info=app_info,
                                        page_config=pc)
 
+        # Title block data
         title_block_kwargs = dict(
             project_name=app_info.get("project_title", "") or app_info.get("client_name", "") or app_info.get("address", "Electrical Installation"),
             address=app_info.get("client_address", "") or app_info.get("address", ""),
@@ -276,10 +232,13 @@ class SldGenerator:
             drawing_number=app_info.get("drawing_number", ""),
         )
 
+        # Create backends
+        pdf = PdfBackend(output_path=None, page_config=pc)
+        svg = SvgBackend(page_config=pc)
         dxf_bytes = None
+
         if backend_type == "dxf":
             dxf = DxfBackend(page_config=pc)
-            # Import native CAD symbol blocks: consolidated library first, then reference DXFs
             for ref_path in (_BLOCK_LIBRARY_DXF, _REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
                 if ref_path.exists():
                     dxf.import_symbol_blocks(str(ref_path))
@@ -287,25 +246,60 @@ class SldGenerator:
         else:
             backends = [pdf, svg]
 
+        # Render
+        component_count = 0
         for backend in backends:
             draw_border(backend, page_config=pc)
             draw_title_block_frame(backend, tb_config=tb_config)
 
-            generator._draw_components(backend, layout_result)
-            generator._draw_connections(backend, layout_result)
-            generator._draw_fanout_groups(backend, layout_result)
-            generator._draw_dashed_connections(backend, layout_result)
-            generator._draw_junction_dots(backend, layout_result)
-            generator._draw_junction_arrows(backend, layout_result)
-            generator._draw_arrow_points(backend, layout_result)
-            generator._draw_solid_boxes(backend, layout_result)
+            component_count = self._draw_components(backend, layout_result)
+            self._draw_connections(backend, layout_result)
+            self._draw_fanout_groups(backend, layout_result)
+            self._draw_dashed_connections(backend, layout_result)
+            self._draw_junction_dots(backend, layout_result)
+            self._draw_junction_arrows(backend, layout_result)
+            self._draw_arrow_points(backend, layout_result)
+            self._draw_solid_boxes(backend, layout_result)
 
             fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
 
         if backend_type == "dxf":
             dxf_bytes = dxf.get_bytes()
 
-        return pdf.get_bytes(), svg.get_svg_string(), dxf_bytes
+        # Overflow metrics
+        overflow = layout_result.overflow_metrics
+        warnings = overflow.warnings if overflow else []
+
+        return SldResult(
+            pdf_bytes=pdf.get_bytes(),
+            svg_string=svg.get_svg_string(),
+            dxf_bytes=dxf_bytes,
+            overflow_metrics=overflow,
+            layout_warnings=warnings,
+            component_count=component_count,
+        )
+
+    # -- Rendering methods --
+
+    @staticmethod
+    def _get_breaker_dims(breaker_type: str) -> tuple[float, float]:
+        """Get (width, height) for a breaker type from real_symbol_paths.json.
+
+        Maps breaker_type_str values to symbol registry keys and returns
+        calibrated dimensions.  Falls back to MCB if type is unknown.
+        """
+        _TYPE_MAP = {
+            "MCB": "MCB",
+            "MCCB": "MCCB",
+            "ACB": "ACB",
+            "RCCB": "RCCB",
+            "ELCB": "ELCB",
+        }
+        sym_key = _TYPE_MAP.get(breaker_type, "MCB")
+        dims = get_symbol_dimensions(sym_key)
+        return dims["width_mm"], dims["height_mm"]
+
+    # -- 이하 모든 _draw_* 메서드는 SldPipeline._generate_once()에서 호출 --
 
     def _get_symbol(self, symbol_name: str) -> Symbol | None:
         """Get a unified Symbol instance (Block or Procedural)."""
@@ -809,20 +803,31 @@ class SldGenerator:
         backend.set_layer("SLD_CONNECTIONS")
 
         for center_x, busbar_y, side_xs in layout_result.fanout_groups:
-            # Resolve MCB stub bottom Y for each circuit in the fanout group.
-            # For each x (center + sides), find the first connection endpoint
-            # above the busbar — this is the MCB stub bottom (pin position).
-            def _find_stub_bottom(target_x: float) -> float:
-                for start, end in layout_result.connections:
-                    (sx, sy), (ex, ey) = start, end
-                    if abs(sx - target_x) < 0.5 and abs(ex - target_x) < 0.5:
-                        lo, hi = min(sy, ey), max(sy, ey)
-                        if lo > busbar_y and hi - lo < 15:  # short segment = busbar→stub
-                            return hi
-                return busbar_y + max(abs(sx - center_x) for sx in side_xs)
+            # Resolve MCB busbar-side entry pin Y for each circuit in the fanout group.
+            # The fanout vertical line must STOP at the MCB entry pin (bottom_pin),
+            # NOT pass through the MCB body to the exit pin (top_pin).
+            #
+            # Coordinate model (Y increases upward from busbar):
+            #   busbar_y (lowest) → bottom_pin → body_bottom → body_top → top_pin (highest)
+            #   Fanout line: busbar_y → bottom_pin (= body_bottom - stub)
+            def _find_mcb_entry_pin_y(target_x: float) -> float:
+                """Find MCB body bottom Y, then subtract stub to get entry pin."""
+                from app.sld.catalog import get_catalog
+                cat = get_catalog()
+                mcb_def = cat.get("MCB")
+                mcb_half_w = mcb_def.width / 2  # 2.5mm
 
-            mcb_bottom_y = _find_stub_bottom(center_x)
-            backend.draw_fanout(center_x, busbar_y, side_xs, mcb_bottom_y)
+                for comp in layout_result.components:
+                    if comp.symbol_name.startswith("CB_") and comp.symbol_name != "CB_SPARE":
+                        comp_cx = comp.x + mcb_half_w
+                        if abs(comp_cx - target_x) < 1.0:
+                            # comp.y = body bottom; entry pin = body bottom - stub
+                            return comp.y - mcb_def.stub  # bottom_pin
+                # Fallback: busbar + gap (shouldn't happen)
+                return busbar_y + 10.0
+
+            mcb_entry_y = _find_mcb_entry_pin_y(center_x)
+            backend.draw_fanout(center_x, busbar_y, side_xs, mcb_entry_y)
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw dashed connection lines (DB box boundary per reference DWG).
@@ -848,10 +853,12 @@ class SldGenerator:
         Left branch → hooks protrude right.  Right branch → hooks protrude left.
         """
         backend.set_layer("SLD_SYMBOLS")
-        r0 = 0.6        # original circle radius (mm) — preserve area (π·r0²)
-        rx = r0 * 2     # horizontal semi-axis — 2x wider
-        ry = r0 / 2     # vertical semi-axis — halved (area = π·rx·ry = π·r0²)
-        offset = ry     # two half-ellipses touch at the center
+        # CT hook: two interlocking half-ellipses straddling the spine.
+        # Reference DWG: small flat half-oval hooks, ring_radius=0.8mm.
+        # Must match reference proportions exactly.
+        rx = 0.6         # horizontal semi-axis (mm) — reference-scale flat hook
+        ry = 0.3         # vertical semi-axis (mm) — very flat half-oval
+        offset = ry      # two half-ellipses touch at the center
         n_pts = 16       # polyline segments per half-ellipse
 
         for cx, cy, direction in layout_result.junction_arrows:

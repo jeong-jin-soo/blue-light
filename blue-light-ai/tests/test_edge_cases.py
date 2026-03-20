@@ -101,10 +101,10 @@ class TestMinimumCircuit:
 # ===========================================================================
 
 class TestBusbarThreshold:
-    """Test busbar labels always use 'BUSBAR' (LEW convention)."""
+    """Test busbar labels: ≤500A → COMB BAR, >500A → BUSBAR (LEW convention)."""
 
-    def test_busbar_63a_is_busbar(self):
-        """busbar_rating=63 should produce 'BUSBAR' label (LEW convention)."""
+    def test_busbar_63a_is_comb_bar(self):
+        """busbar_rating=63 (≤500A) → 'COMB BAR' label."""
         req = _make_req(
             supply_type="single_phase",
             kva=14,
@@ -116,12 +116,12 @@ class TestBusbarThreshold:
         layout = compute_layout(req)
         labels = [c for c in layout.components
                   if c.symbol_name == "LABEL" and "63A" in (c.label or "")]
-        busbar_labels = [l for l in labels if "BUSBAR" in (l.label or "")]
-        assert len(busbar_labels) >= 1, \
-            "63A should use BUSBAR label (LEW convention)"
+        comb_labels = [l for l in labels if "COMB BAR" in (l.label or "")]
+        assert len(comb_labels) >= 1, \
+            "63A should use COMB BAR label (≤500A LEW convention)"
 
-    def test_busbar_100a_is_busbar(self):
-        """busbar_rating=100 should produce 'BUSBAR' label (LEW convention)."""
+    def test_busbar_100a_is_comb_bar(self):
+        """busbar_rating=100 (≤500A) → 'COMB BAR' label."""
         req = _make_req(
             supply_type="three_phase",
             kva=69,
@@ -133,8 +133,8 @@ class TestBusbarThreshold:
         layout = compute_layout(req)
         labels = [c for c in layout.components
                   if c.symbol_name == "LABEL" and "100A" in (c.label or "")]
-        busbar_labels = [l for l in labels if "BUSBAR" in (l.label or "")]
-        assert len(busbar_labels) >= 1, "100A should use BUSBAR label (LEW convention)"
+        comb_labels = [l for l in labels if "COMB BAR" in (l.label or "")]
+        assert len(comb_labels) >= 1, "100A should use COMB BAR label (≤500A LEW convention)"
 
 
 # ===========================================================================

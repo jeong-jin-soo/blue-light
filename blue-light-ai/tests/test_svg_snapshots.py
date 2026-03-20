@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 
 SNAPSHOT_DIR = Path(__file__).parent / "snapshots"
 
@@ -48,9 +48,9 @@ def _normalize_svg(svg: str) -> str:
 
 def _generate_svg(requirements: dict) -> str:
     """Generate SVG from requirements using the full pipeline."""
-    _, svg_string, _ = SldGenerator.generate_pdf_bytes(
+    svg_string = SldPipeline().run(
         requirements, backend_type="pdf",
-    )
+    ).svg_string
     return svg_string
 
 

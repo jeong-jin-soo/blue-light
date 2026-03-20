@@ -112,7 +112,7 @@ class TestAuditIntegration:
         report = result.audit_report
 
         assert report is not None, "audit_report가 LayoutResult에 없음"
-        assert report.total == 11, f"검사 수: {report.total} (기대: 11)"
+        assert report.total == 13, f"검사 수: {report.total} (기대: 13)"
         assert report.score >= 0.9, f"audit 점수 {report.score} < 0.9"
 
     @pytest.mark.parametrize("requirements", ALL_CONFIGS)

@@ -3,9 +3,9 @@ Section base class for the SLD layout engine v2.
 
 Design principles:
 1. Each Section places its own components and advances ctx.y
-2. Symbol dimensions are ALWAYS queried from real_symbols (no magic numbers)
-3. Connections are computed from exact pin positions (no post-hoc snapping)
-4. The orchestrator auto-connects spine gaps between sections
+2. Symbol dimensions come from ComponentCatalog (single source of truth)
+3. Connections use catalog pin coordinates — no manual arithmetic
+4. Y-cursor = last component's exit pin Y
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from app.sld.catalog import ComponentDef, get_catalog
 from app.sld.layout.models import PlacedComponent
 
 if TYPE_CHECKING:
@@ -23,9 +24,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _comp_def(name: str) -> ComponentDef:
+    """Get ComponentDef from catalog (CB_ prefix handled automatically)."""
+    return get_catalog().get(name)
+
+
 @lru_cache(maxsize=32)
 def _cached_sym(name: str):
-    """Get a real symbol object (cached)."""
+    """Get a real symbol object (cached). Used by place_branch for h_pins."""
     from app.sld.real_symbols import get_real_symbol
     return get_real_symbol(name)
 
@@ -33,22 +39,36 @@ def _cached_sym(name: str):
 def sym_dims(name: str) -> tuple[float, float, float]:
     """Return (width, height, stub) for a symbol by name.
 
-    Uses real_symbols as the single source of truth — no hardcoded constants.
+    Uses ComponentCatalog as the single source of truth.
     """
-    sym = _cached_sym(name)
-    return sym.width, sym.height, getattr(sym, '_stub', 2.0)
+    comp = _comp_def(name)
+    return comp.width, comp.height, comp.stub
 
 
 def sym_h_pins(name: str, x: float, y: float) -> dict[str, tuple[float, float]]:
-    """Get horizontal pin positions {left: (x,y), right: (x,y)} for a symbol."""
-    sym = _cached_sym(name)
-    return sym.horizontal_pins(x, y)
+    """Get horizontal pin positions {left: (x,y), right: (x,y)} from catalog."""
+    comp = _comp_def(name)
+    result = {}
+    if "left" in comp.pins:
+        p = comp.pins["left"]
+        result["left"] = (x + p.x, y + p.y)
+    if "right" in comp.pins:
+        p = comp.pins["right"]
+        result["right"] = (x + p.x, y + p.y)
+    return result
 
 
 def sym_v_pins(name: str, x: float, y: float) -> dict[str, tuple[float, float]]:
-    """Get vertical pin positions {top: (x,y), bottom: (x,y)} for a symbol."""
-    sym = _cached_sym(name)
-    return sym.vertical_pins(x, y)
+    """Get vertical pin positions {top: (x,y), bottom: (x,y)} from catalog."""
+    comp = _comp_def(name)
+    result = {}
+    if "top" in comp.pins:
+        p = comp.pins["top"]
+        result["top"] = (x + p.x, y + p.y)
+    if "bottom" in comp.pins:
+        p = comp.pins["bottom"]
+        result["bottom"] = (x + p.x, y + p.y)
+    return result
 
 
 class Section(ABC):
@@ -118,6 +138,9 @@ class FunctionSection(Section):
     ) -> tuple[float, float, float]:
         """Place a symbol centered on the vertical spine.
 
+        Uses catalog pin coordinates — no manual arithmetic.
+        Y-cursor is set to exit pin (top) after placement.
+
         Args:
             ctx: Layout context (cx = spine X, y = current cursor)
             symbol_name: e.g. "CB_MCCB", "ISOLATOR"
@@ -127,11 +150,8 @@ class FunctionSection(Section):
 
         Returns:
             (body_bottom_y, bottom_pin_y, top_pin_y)
-            - body_bottom_y: Y of the symbol body bottom edge
-            - bottom_pin_y: Y of the bottom connection pin tip
-            - top_pin_y: Y of the top connection pin tip
         """
-        w, h, stub = sym_dims(symbol_name)
+        comp = _comp_def(symbol_name)
 
         if gap_before > 0:
             ctx.result.connections.append(
@@ -140,7 +160,7 @@ class FunctionSection(Section):
             ctx.y += gap_before
 
         comp_y = ctx.y
-        comp_x = ctx.cx - w / 2
+        comp_x = ctx.cx - comp.center_x()
 
         ctx.result.components.append(PlacedComponent(
             x=comp_x,
@@ -150,9 +170,26 @@ class FunctionSection(Section):
             **comp_kwargs,
         ))
 
-        bottom_pin_y = comp_y - stub
-        top_pin_y = comp_y + h + stub
-        ctx.y = top_pin_y
+        # Pin coordinates from catalog — no manual h+stub arithmetic
+        bottom_pin_y = comp_y + comp.pin("bottom").y  # = comp_y - stub
+        top_pin_y = comp_y + comp.pin("top").y         # = comp_y + height + stub
+
+        # Draw stub connections to close gaps between pin tips and body edges.
+        # Some symbols (MCCB, RCCB) draw their own stubs via DXF block rendering —
+        # double-drawing is harmless (overlapping lines are invisible in output).
+        stub = comp.stub
+        if stub > 0:
+            body_top_y = comp_y + comp.height
+            # Bottom stub: pin tip → body bottom
+            ctx.result.connections.append(
+                ((ctx.cx, bottom_pin_y), (ctx.cx, comp_y))
+            )
+            # Top stub: body top → pin tip
+            ctx.result.connections.append(
+                ((ctx.cx, body_top_y), (ctx.cx, top_pin_y))
+            )
+
+        ctx.y = top_pin_y  # cursor = exit pin
 
         return comp_y, bottom_pin_y, top_pin_y
 
@@ -225,12 +262,11 @@ class FunctionSection(Section):
         cursor_x = arm_end_x
 
         for idx, (sym_name, label, width_hint) in enumerate(components):
-            w, h, stub = sym_dims(sym_name)
+            comp = _comp_def(sym_name)
 
-            # Get body width from horizontal pins
-            sym = _cached_sym(sym_name)
-            h_pins = sym.horizontal_pins(0, 0)
-            body_w = h_pins["right"][0] - h_pins["left"][0] - 2 * getattr(sym, '_stub', 2.0)
+            # Horizontal body width from catalog h_extent
+            body_w = comp.effective_h_extent
+            stub = comp.stub
             if width_hint and width_hint > body_w:
                 body_w = width_hint
 
