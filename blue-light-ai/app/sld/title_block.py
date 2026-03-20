@@ -113,7 +113,7 @@ def draw_border(backend: DrawingBackend, margin: float = 10, page_config: PageCo
     pc = page_config or A3_LANDSCAPE
     w = pc.page_width - pc.margin
     h = pc.page_height - pc.margin
-    backend.set_layer("SLD_TITLE_BLOCK")
+    backend.set_layer("SLD_FRAME")
     backend.add_lwpolyline(
         [(pc.margin, pc.margin), (w, pc.margin), (w, h), (pc.margin, h)],
         close=True,

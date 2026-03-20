@@ -30,14 +30,38 @@ logger = logging.getLogger(__name__)
 _PAGE_WIDTH = 420.0
 _PAGE_HEIGHT = 297.0
 
-# Layer configuration matching real LEW SLD style
+# DXF layer names following i2R LEW convention (E-SLD-* prefix)
+# Discovered from analysis of 28 DXF templates from LEW submissions.
 # ACI color 7 = white (on black background) / black (on white paper, i.e., print)
 _LAYER_CONFIG: dict[str, dict] = {
-    "SLD_SYMBOLS": {"color": 7, "lineweight": 25},       # 0.25mm
-    "SLD_CONNECTIONS": {"color": 7, "lineweight": 25},    # 0.25mm
-    "SLD_POWER_MAIN": {"color": 7, "lineweight": 50},    # 0.50mm (busbar)
-    "SLD_ANNOTATIONS": {"color": 7, "lineweight": 25},   # 0.25mm
-    "SLD_TITLE_BLOCK": {"color": 7, "lineweight": 25},   # 0.25mm
+    "E-SLD-SYM": {"color": 7, "lineweight": 25},         # symbol/block inserts
+    "E-SLD-LINE": {"color": 7, "lineweight": 25},        # connection lines, spine
+    "E-SLD-BUSBAR": {"color": 7, "lineweight": 50},      # busbar (0.50mm)
+    "E-SLD-TXT": {"color": 7, "lineweight": 25},         # text labels
+    "E-SLD-TITLE": {"color": 7, "lineweight": 25},       # title block
+    "E-SLD-BOX": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # dashed boxes (DB frame)
+    "E-SLD-FRAME": {"color": 7, "lineweight": 25},       # drawing border/frame
+}
+
+# Mapping from logical layer names (used by symbols/generator) to DXF layer names.
+# This allows all backends to share the same set_layer("SLD_*") calls while
+# the DXF backend outputs the i2R-convention layer names.
+_LOGICAL_TO_DXF_LAYER: dict[str, str] = {
+    "SLD_SYMBOLS": "E-SLD-SYM",
+    "SLD_CONNECTIONS": "E-SLD-LINE",
+    "SLD_POWER_MAIN": "E-SLD-BUSBAR",
+    "SLD_ANNOTATIONS": "E-SLD-TXT",
+    "SLD_TITLE_BLOCK": "E-SLD-TITLE",
+    "SLD_DB_FRAME": "E-SLD-BOX",
+    "SLD_FRAME": "E-SLD-FRAME",
+    # Direct E-SLD-* names also accepted (identity mapping)
+    "E-SLD-SYM": "E-SLD-SYM",
+    "E-SLD-LINE": "E-SLD-LINE",
+    "E-SLD-BUSBAR": "E-SLD-BUSBAR",
+    "E-SLD-TXT": "E-SLD-TXT",
+    "E-SLD-TITLE": "E-SLD-TITLE",
+    "E-SLD-BOX": "E-SLD-BOX",
+    "E-SLD-FRAME": "E-SLD-FRAME",
 }
 
 # Text style name
@@ -57,19 +81,28 @@ class DxfBackend:
         self._doc = ezdxf.new("R2013")  # AutoCAD 2013 format for broad compatibility
         self._doc.units = units.MM
         self._msp = self._doc.modelspace()
-        self._current_layer = "SLD_SYMBOLS"
+        self._current_layer = _LOGICAL_TO_DXF_LAYER["SLD_SYMBOLS"]
 
         self._setup_layers()
         self._setup_text_style()
 
     def _setup_layers(self) -> None:
         """Create DXF layers matching real LEW SLD style."""
+        # Register CENTER linetype if any layer needs it (ref: E-SLD-FRAME uses CENTER)
+        if "CENTER" not in self._doc.linetypes:
+            self._doc.linetypes.add(
+                "CENTER",
+                pattern=[1.25, 0.75, -0.125, 0.25, -0.125],
+                description="Center ____ _ ____ _ ____",
+            )
         for name, cfg in _LAYER_CONFIG.items():
-            self._doc.layers.add(
+            layer = self._doc.layers.add(
                 name,
                 color=cfg["color"],
                 lineweight=cfg["lineweight"],
             )
+            if "linetype" in cfg:
+                layer.dxf.linetype = cfg["linetype"]
 
     def _setup_text_style(self) -> None:
         """Set up Arial TrueType text style (matches ArialMT in real samples)."""
@@ -88,7 +121,7 @@ class DxfBackend:
     # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:
-        self._current_layer = layer_name
+        self._current_layer = _LOGICAL_TO_DXF_LAYER.get(layer_name, layer_name)
 
     # -- Drawing primitives --
 
@@ -231,13 +264,13 @@ class DxfBackend:
 
     def import_symbol_blocks(self, reference_dxf_path: str) -> None:
         """
-        Import symbol block definitions (MCCB, RCCB, DP ISOL) from a reference DXF file.
+        Import all SLD symbol block definitions from a reference DXF file.
 
-        These blocks are identical across all 26 SLD template DXF files and represent
-        the authoritative IEC 60617 circuit breaker symbols used in real LEW SLDs.
+        Imports every named block (excluding anonymous *-prefixed and AutoCAD
+        internal A$C-prefixed blocks) from the reference DXF into this document.
 
         Args:
-            reference_dxf_path: Path to a template DXF file (e.g., "100A TPN SLD 1 DWG.dxf")
+            reference_dxf_path: Path to a template DXF file (e.g., "150A TPN SLD 1 DWG.dxf")
         """
         try:
             ref_doc = ezdxf.readfile(reference_dxf_path)
@@ -245,20 +278,24 @@ class DxfBackend:
             logger.warning(f"Failed to read reference DXF for block import: {e}")
             return
 
-        target_blocks = ["MCCB", "RCCB", "DP ISOL"]
         imported = []
 
-        for block_name in target_blocks:
-            if block_name in ref_doc.blocks and block_name not in self._doc.blocks:
-                try:
-                    # Copy block definition from reference to current document
-                    ref_block = ref_doc.blocks.get(block_name)
-                    new_block = self._doc.blocks.new(name=block_name)
-                    for entity in ref_block:
-                        new_block.add_entity(entity.copy())
-                    imported.append(block_name)
-                except Exception as e:
-                    logger.warning(f"Failed to import block '{block_name}': {e}")
+        for block in ref_doc.blocks:
+            block_name = block.name
+            # Skip anonymous, standard, and AutoCAD internal blocks
+            if block_name.startswith("*") or block_name.startswith("_") or block_name.startswith("A$C"):
+                continue
+            # Skip empty blocks and already-imported blocks
+            if not list(block) or block_name in self._doc.blocks:
+                continue
+
+            try:
+                new_block = self._doc.blocks.new(name=block_name)
+                for entity in block:
+                    new_block.add_entity(entity.copy())
+                imported.append(block_name)
+            except Exception as e:
+                logger.warning(f"Failed to import block '{block_name}': {e}")
 
         if imported:
             logger.info(f"Imported DXF symbol blocks: {imported}")
@@ -293,6 +330,76 @@ class DxfBackend:
                 "xscale": scale,
                 "yscale": scale,
                 "rotation": rotation,
+            },
+        )
+
+    # -- Composite drawing methods (DrawingBackend protocol) --
+
+    def draw_center_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        long_dash: float = 8.0,
+        short_dash: float = 1.5,
+        gap: float = 2.0,
+    ) -> None:
+        """Draw IEC CENTER linetype line using native DXF linetype on SLD_DB_FRAME layer."""
+        prev_layer = self._current_layer
+        self.set_layer("SLD_DB_FRAME")
+        self.add_line(start, end)
+        self._current_layer = prev_layer
+
+    def draw_fanout(
+        self,
+        center_x: float,
+        busbar_y: float,
+        side_xs: list[float],
+        mcb_entry_y: float,
+    ) -> None:
+        """Create and insert a 3-phase fan-out block at the given busbar position.
+
+        mcb_entry_y = MCB busbar-side entry pin. Lines stop here;
+        MCB symbol draws its own body and exit stub internally.
+
+        Reference ratio: fan_height / spacing = 193 / 727 ≈ 0.266
+        """
+        _FAN_RATIO = 0.266
+
+        # Build a unique block name based on geometry
+        side_count = len(side_xs)
+        spacings = [abs(sx - center_x) for sx in side_xs]
+        avg_sp = sum(spacings) / len(spacings) if spacings else 0
+        block_name = f"FANOUT_3P_{side_count}S_{avg_sp:.1f}"
+
+        total_h = mcb_entry_y - busbar_y  # height from busbar to MCB entry pin
+
+        if block_name not in self._doc.blocks:
+            # Block origin = (0, 0) at center busbar junction
+            block = self._doc.blocks.new(name=block_name)
+            layer = "E-SLD-LINE"
+            attribs = {"layer": layer, "lineweight": 25}
+
+            # Center vertical: busbar → MCB entry pin
+            block.add_line((0, 0), (0, total_h), dxfattribs=attribs)
+
+            for sx in side_xs:
+                dx = sx - center_x  # signed offset
+                fan_h = abs(dx) * _FAN_RATIO
+
+                # Diagonal: center busbar → side intermediate
+                block.add_line((0, 0), (dx, fan_h), dxfattribs=attribs)
+                # Side vertical: intermediate → MCB entry pin
+                block.add_line((dx, fan_h), (dx, total_h), dxfattribs=attribs)
+
+        # Insert the block
+        self._msp.add_blockref(
+            block_name,
+            insert=(center_x, busbar_y),
+            dxfattribs={
+                "layer": "E-SLD-LINE",
+                "xscale": 1.0,
+                "yscale": 1.0,
             },
         )
 

@@ -123,6 +123,12 @@ INCOMING_SPEC: dict[int, IncomingSpec] = {
         phase="three_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
         requires_ct=True, requires_isolator=True,
     ),
+    500: IncomingSpec(
+        rating_a=500, cable_size="240", cable_cores="1 X 4 CORE",
+        cable_type="XLPE/PVC", poles="TPN", breaker_type="MCCB", breaker_ka=35,
+        phase="three_phase", earth_prot_types=["RCCB", "ELR", "EFR"],
+        requires_ct=True, requires_isolator=True,
+    ),
     630: IncomingSpec(
         rating_a=630, cable_size="300", cable_cores="1 X 4 CORE",
         cable_type="XLPE/PVC", poles="TPN", breaker_type="MCCB", breaker_ka=35,
@@ -213,12 +219,19 @@ INCOMING_SPEC_3PHASE: dict[int, IncomingSpec] = {
 #
 # Sub-breaker rating (A) → minimum cable size (mm²)
 # From Excel columns B (cable size) & E (rating)
+# Cross-validated with 62 real LEW DWG/DXF files (2019-2024).
+# Note: 13A is common in SG for fused socket outlets (BS 1363).
+# Note: 15A/25A seen in older installations and industrial circuits.
 
 OUTGOING_SPEC: dict[int, float] = {
+    5: 1.0,
     6: 1.5,
     10: 1.5,
+    13: 1.5,
+    15: 1.5,
     16: 2.5,
     20: 2.5,
+    25: 4.0,
     32: 6,
     63: 16,
     80: 35,
@@ -228,6 +241,7 @@ OUTGOING_SPEC: dict[int, float] = {
     250: 95,
     300: 120,
     400: 185,
+    500: 240,
     630: 300,
     800: 500,
     1000: 500,
@@ -750,19 +764,33 @@ def _validate_metering(
     supply_source: str,
     effective_rating: int,
     result: ValidationResult,
+    *,
+    is_cable_extension: bool = False,
 ) -> None:
     """Validate / auto-correct metering type (Step 9).
 
     Landlord supply skips metering auto-correction. Otherwise determines
     CT metering (requires_ct) or SP meter based on the effective spec.
     """
-    # Landlord supply: no SP metering — only an isolator inside the unit.
-    if supply_source == "landlord":
-        if metering == "sp_meter":
+    # Cable extension: no meter board — strip any metering (regardless of supply_source).
+    if is_cable_extension:
+        if metering:
             result.add_correction(
-                "metering", "sp_meter", "",
-                "Landlord supply has no SP meter board — removed sp_meter",
+                "metering", metering, "",
+                "Cable extension has no meter board — removed metering",
             )
+        return
+    # Landlord supply: keep sp_meter if explicitly specified (PG KWH meter board).
+    if supply_source == "landlord":
+        if metering:
+            # User explicitly specified metering — keep it as-is.
+            return
+        # No metering specified for landlord — default to sp_meter
+        # (landlord riser → KWH meter board → DB is the standard pattern).
+        result.add_correction(
+            "metering", "", "sp_meter",
+            "Landlord supply: auto-added sp_meter (PG KWH meter board)",
+        )
         return
     if not effective_spec:
         return
@@ -927,7 +955,8 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
             f"Auto-determined: {effective_rating}A → {effective_spec.cable_size}",
         )
     _validate_metering(effective_spec, requirements.get("metering", ""),
-                       requirements.get("supply_source", ""), effective_rating, result)
+                       requirements.get("supply_source", ""), effective_rating, result,
+                       is_cable_extension=bool(requirements.get("is_cable_extension")))
     _validate_sub_circuits(requirements.get("circuits", []), effective_rating, result)
     _log_validation_summary(result)
     return result

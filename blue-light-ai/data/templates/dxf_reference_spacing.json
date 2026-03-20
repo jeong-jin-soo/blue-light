@@ -1,0 +1,244 @@
+{
+  "_meta": {
+    "version": 1,
+    "last_updated": "2026-03-14T12:44:27"
+  },
+  "profiles": {
+    "direct_metering_3phase": {
+      "source_files": [
+        "100A TPN SLD 1 DWG.dxf",
+        "125A TPN SLD 1 DWG.dxf",
+        "150A TPN SLD 3 DWG.dxf",
+        "200A TPN SLD 1 DWG.dxf",
+        "200A TPN SLD 3 DWG.dxf",
+        "300A TPN SLD 1 DWG.dxf",
+        "32A TPN SLD 1 DWG.dxf",
+        "40A TPN SLD 1 DWG.dxf",
+        "40A TPN SLD 3 DWG.dxf",
+        "500A TPN SLD 1 DWG.dxf",
+        "63A TPN SLD 1 DWG.dxf",
+        "63A TPN SLD 14.dxf",
+        "63A TPN SLD 16 DWG.dxf",
+        "63A TPN SLD 8 DWG.dxf",
+        "80A TPN SLD 2 DWG.dxf"
+      ],
+      "total_inserts": 65,
+      "subcircuit_x_spacing_du": {
+        "min": 51.99,
+        "max": 5361.62,
+        "median": 726.76,
+        "samples": 380
+      },
+      "subcircuit_mccb_scale": 1.0439,
+      "subcircuit_y_du": 12586.84,
+      "main_mccb_scale": 1.1898,
+      "busbar_y_du": 6724.92,
+      "rccb_scales": [
+        1.0208
+      ],
+      "scale_usage": {
+        "MCCB": {
+          "1.0439": 308,
+          "1.1898": 2,
+          "1.2877": 6,
+          "1.029": 4,
+          "1.366": 54,
+          "0.0747": 63,
+          "0.4013": 6,
+          "0.3676": 1,
+          "3.4139": 15,
+          "1.4056": 71,
+          "1.2778": 1
+        },
+        "RCCB": {
+          "1.0208": 4,
+          "1.0439": 34,
+          "0.0747": 9,
+          "1.4056": 5
+        },
+        "DP ISOL": {
+          "1.1773": 30,
+          "0.81": 32,
+          "0.0842": 30,
+          "3.1385": 3
+        },
+        "3P ISOL": {
+          "1.2": 5
+        }
+      }
+    },
+    "ct_metering_3phase": {
+      "source_files": [
+        "150A TPN SLD 1 DWG.dxf",
+        "400A TPN SLD 1 DWG.dxf"
+      ],
+      "total_inserts": 94,
+      "subcircuit_x_spacing_du": {
+        "min": 600.0,
+        "max": 1417.75,
+        "median": 600.0,
+        "samples": 103
+      },
+      "subcircuit_mccb_scale": 1.2778,
+      "subcircuit_y_du": 17872.13,
+      "spine_components": [
+        {
+          "name": "MCCB",
+          "y_du": 7144.4,
+          "scale": 1.1622
+        },
+        {
+          "name": "SLD-CT",
+          "y_du": 8766.41,
+          "scale": 6.067,
+          "rotation": 0
+        },
+        {
+          "name": "SLD-CT",
+          "y_du": 9916.81,
+          "scale": 6.067,
+          "rotation": 0
+        },
+        {
+          "name": "SLD-CT",
+          "y_du": 11591.4,
+          "scale": 6.067,
+          "rotation": 180.0
+        },
+        {
+          "name": "SLD-CT",
+          "y_du": 16198.58,
+          "scale": 6.067,
+          "rotation": 0
+        }
+      ],
+      "spine_gaps_du": {
+        "mccb_to_sld-ct": 1622.01,
+        "sld-ct_to_sld-ct": 1150.4,
+        "sld-ct_to_sld-ct_2": 1674.59,
+        "sld-ct_to_sld-ct_3": 4607.18
+      },
+      "main_mccb_scale": 1.1622,
+      "busbar_y_du": 14372.92,
+      "rccb_scales": [
+        1.2778
+      ],
+      "scale_usage": {
+        "MCCB": {
+          "1.2778": 80,
+          "1.1622": 1
+        },
+        "RCCB": {
+          "1.2778": 7
+        },
+        "SS": {
+          "1.1622": 2
+        },
+        "LED IND LTG": {
+          "1.1622": 2
+        },
+        "2A FUSE": {
+          "1.1622": 3
+        },
+        "VOLTMETER": {
+          "1.1622": 1
+        },
+        "SLD-CT": {
+          "6.067": 4
+        },
+        "EF": {
+          "1": 1
+        },
+        "DP ISOL": {
+          "0.9315": 33
+        }
+      }
+    },
+    "direct_metering_1phase": {
+      "source_files": [
+        "32A Single Phase DB 3 DWG.dxf",
+        "40A Single Phase DB 1 DWG.dxf",
+        "40A Single Phase DB 3 DWG.dxf",
+        "63A Single Phase DB 3 DWG.dxf"
+      ],
+      "total_inserts": 7,
+      "subcircuit_x_spacing_du": {
+        "min": 243.4,
+        "max": 2474.64,
+        "median": 256.94,
+        "samples": 43
+      },
+      "subcircuit_mccb_scale": 0.4013,
+      "subcircuit_y_du": 8177.48,
+      "scale_usage": {
+        "MCCB": {
+          "0.4013": 9,
+          "0.3676": 1,
+          "1.4056": 35,
+          "1.2778": 2
+        },
+        "RCCB": {
+          "1.4056": 3
+        }
+      }
+    },
+    "cable_extension": {
+      "source_files": [
+        "Cable Extension SLD 2 DWG.dxf",
+        "Cable Extension SLD 4 DWG.dxf",
+        "Cable Extension SLD 5 DWG.dxf"
+      ],
+      "total_inserts": 2,
+      "main_mccb_scale": 1.2778,
+      "rccb_scales": [
+        1.2778
+      ],
+      "scale_usage": {
+        "MCCB": {
+          "1.2778": 16
+        },
+        "RCCB": {
+          "1.2778": 2
+        },
+        "3P SOCKET": {
+          "0.9": 13
+        }
+      },
+      "subcircuit_x_spacing_du": {
+        "min": 1237.17,
+        "max": 2777.24,
+        "median": 1250.42,
+        "samples": 11
+      }
+    },
+    "unknown": {
+      "source_files": [
+        "I2R-ETR-NLB-SLD-1.dxf"
+      ],
+      "total_inserts": 45,
+      "subcircuit_x_spacing_du": {
+        "min": 719.88,
+        "max": 1613.57,
+        "median": 726.76,
+        "samples": 27
+      },
+      "subcircuit_mccb_scale": 1.0439,
+      "subcircuit_y_du": 13679.44,
+      "busbar_y_du": 5527.79,
+      "rccb_scales": [
+        1.0439
+      ],
+      "scale_usage": {
+        "MCCB": {
+          "1.0439": 37
+        },
+        "RCCB": {
+          "1.0439": 4
+        },
+        "DP ISOL": {
+          "1.1773": 4
+        }
+      }
+    }
+  }
+}

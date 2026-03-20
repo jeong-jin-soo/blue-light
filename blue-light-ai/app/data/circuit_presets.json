@@ -1,0 +1,402 @@
+{
+  "version": "1.0",
+  "source": "Extracted from 62 real LEW DWG/DXF files (Singapore commercial/residential installations)",
+  "extraction_date": "2026-03-16",
+  "presets": {
+    "cafe_63a_3phase": {
+      "name": "Cafe / F&B Outlet (63A TPN)",
+      "description": "Typical cafe or F&B outlet with lighting, power outlets, kitchen equipment, water heaters, and AC. Most common configuration in Singapore commercial tenancies.",
+      "category": "commercial",
+      "tags": ["cafe", "fnb", "restaurant", "food", "bakery", "bubble_tea"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "landlord",
+        "kva": 45,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+        "busbar_rating": 200,
+        "metering": "direct",
+        "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting 1", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting 2", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Signage", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Kitchen)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Counter)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Dining)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (General)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Kitchen Equipment 1", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Kitchen Equipment 2", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 2", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Exhaust Fan", "breaker_type": "MCB", "breaker_rating": 16, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"}
+        ]
+      }
+    },
+
+    "office_40a_1phase": {
+      "name": "Small Office (40A SPN)",
+      "description": "Small office or co-working space with basic lighting, power outlets, and aircon. Single-phase supply from landlord.",
+      "category": "commercial",
+      "tags": ["office", "small_office", "coworking", "startup"],
+      "requirements": {
+        "supply_type": "single_phase",
+        "supply_source": "landlord",
+        "kva": 9,
+        "voltage": 230,
+        "main_breaker": {"type": "MCB", "rating": 40, "poles": "DP", "fault_kA": 10},
+        "busbar_rating": 100,
+        "elcb": {"rating": 40, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting 1", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Lighting 2", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Office 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Office 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Pantry)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Water Heater", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "Aircon 2", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6}
+        ]
+      }
+    },
+
+    "office_63a_3phase": {
+      "name": "Medium Office (63A TPN)",
+      "description": "Medium-sized office with multiple zones, server room power, aircon units, and pantry. Three-phase supply from building riser.",
+      "category": "commercial",
+      "tags": ["office", "medium_office", "corporate"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "building_riser",
+        "kva": 45,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+        "busbar_rating": 200,
+        "metering": "direct",
+        "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting (Zone A)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Zone B)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Zone A)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Zone B)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Server Room)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Meeting Room)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Pantry)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater (Pantry)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 2", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 3", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3"}
+        ]
+      }
+    },
+
+    "retail_40a_1phase": {
+      "name": "Retail Shop (40A SPN)",
+      "description": "Small retail shop with display lighting, power outlets, and basic aircon. Single-phase landlord supply.",
+      "category": "commercial",
+      "tags": ["retail", "shop", "boutique", "store"],
+      "requirements": {
+        "supply_type": "single_phase",
+        "supply_source": "landlord",
+        "kva": 9,
+        "voltage": 230,
+        "main_breaker": {"type": "MCB", "rating": 40, "poles": "DP", "fault_kA": 10},
+        "busbar_rating": 100,
+        "elcb": {"rating": 40, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Display Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "General Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Signage", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Sales Floor)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Back Office)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Storeroom)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Aircon", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6}
+        ]
+      }
+    },
+
+    "retail_63a_3phase": {
+      "name": "Retail Shop (63A TPN)",
+      "description": "Medium retail outlet with multiple lighting zones, power outlets, display equipment, and multiple aircon units. Three-phase landlord supply.",
+      "category": "commercial",
+      "tags": ["retail", "shop", "mall", "showroom"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "landlord",
+        "kva": 45,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+        "busbar_rating": 200,
+        "metering": "direct",
+        "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Display Lighting 1", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Display Lighting 2", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "General Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Signage", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Sales Floor 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Sales Floor 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Store Room)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Back Office)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 1", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon 2", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"}
+        ]
+      }
+    },
+
+    "restaurant_100a_3phase": {
+      "name": "Large Restaurant (100A TPN)",
+      "description": "Full-service restaurant with extensive kitchen equipment, multiple lighting zones, heavy power loads, water heaters, and multiple aircon units. Three-phase landlord supply with CT metering.",
+      "category": "commercial",
+      "tags": ["restaurant", "fnb", "kitchen", "large_fnb", "hawker"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "landlord",
+        "kva": 69,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+        "busbar_rating": 200,
+        "metering": "ct_meter",
+        "ct_ratio": "200/5A",
+        "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting (Dining 1)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Dining 2)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Kitchen)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Signage", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Kitchen 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Kitchen 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Counter)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Dining)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Bar)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Kitchen Equipment (Oven)", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Kitchen Equipment (Fryer)", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Kitchen Equipment (Steamer)", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater 1", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater 2", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Exhaust Fan", "breaker_type": "MCB", "breaker_rating": 16, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Dining 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Dining 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Kitchen)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (VIP Room)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Wash Area)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3"}
+        ]
+      }
+    },
+
+    "warehouse_100a_3phase": {
+      "name": "Warehouse / Light Industrial (100A TPN)",
+      "description": "Warehouse or light industrial space with high-bay lighting, power outlets for equipment, loading dock power, and basic amenities.",
+      "category": "industrial",
+      "tags": ["warehouse", "industrial", "logistics", "storage", "workshop"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "building_riser",
+        "kva": 69,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+        "busbar_rating": 200,
+        "metering": "ct_meter",
+        "ct_ratio": "200/5A",
+        "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "High Bay Lighting 1", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "High Bay Lighting 2", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "High Bay Lighting 3", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Office Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Warehouse 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Warehouse 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Office)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Loading Dock)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Motor (Roller Shutter 1)", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Motor (Roller Shutter 2)", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater (Toilet)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Ventilation Fan", "breaker_type": "MCB", "breaker_rating": 16, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Office 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Office 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3"}
+        ]
+      }
+    },
+
+    "residential_40a_1phase": {
+      "name": "HDB Flat (40A SPN)",
+      "description": "Standard HDB flat with lighting, power outlets, water heater, and aircon isolators. Single-phase SP Group supply with direct metering.",
+      "category": "residential",
+      "tags": ["hdb", "flat", "residential", "apartment"],
+      "requirements": {
+        "supply_type": "single_phase",
+        "supply_source": "sp_group",
+        "kva": 9,
+        "voltage": 230,
+        "main_breaker": {"type": "MCB", "rating": 40, "poles": "DP", "fault_kA": 10},
+        "busbar_rating": 100,
+        "metering": "sp_meter",
+        "elcb": {"rating": 40, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting (Living/Dining)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Lighting (Bedrooms)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Lighting (Kitchen/Toilet)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Living)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Bedrooms)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Kitchen)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Water Heater (Master Bath)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Water Heater (Common Bath)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Aircon Isolator (Master BR)", "breaker_type": "ISOLATOR", "breaker_rating": 20, "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "Aircon Isolator (BR 2)", "breaker_type": "ISOLATOR", "breaker_rating": 20, "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6}
+        ]
+      }
+    },
+
+    "residential_63a_1phase": {
+      "name": "Condo / Landed House (63A SPN)",
+      "description": "Condominium unit or landed house with multiple bedrooms, kitchen appliances, multiple water heaters, and aircon isolators. Single-phase SP Group supply.",
+      "category": "residential",
+      "tags": ["condo", "landed", "residential", "house", "condominium"],
+      "requirements": {
+        "supply_type": "single_phase",
+        "supply_source": "sp_group",
+        "kva": 14,
+        "voltage": 230,
+        "main_breaker": {"type": "MCB", "rating": 63, "poles": "DP", "fault_kA": 10},
+        "busbar_rating": 100,
+        "metering": "sp_meter",
+        "elcb": {"rating": 63, "sensitivity_ma": 30, "poles": 2, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting (Living/Dining)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Lighting (Bedrooms)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Lighting (Kitchen/Service)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Lighting (External/Balcony)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Living/Dining)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Master Bedroom)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Bedrooms)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Kitchen)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Hob and Hood)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "13A S/S/O (Fridge)", "breaker_type": "MCB", "breaker_rating": 13, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 1.5sqmm PVC/PVC"},
+          {"name": "Water Heater (Master Bath)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Water Heater (Common Bath)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Dish Washer", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "cable": "2C 2.5sqmm PVC/PVC"},
+          {"name": "Aircon Isolator (Master BR)", "breaker_type": "ISOLATOR", "breaker_rating": 20, "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "Aircon Isolator (BR 2)", "breaker_type": "ISOLATOR", "breaker_rating": 20, "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "Aircon Isolator (BR 3)", "breaker_type": "ISOLATOR", "breaker_rating": 20, "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "Aircon Isolator (Living)", "breaker_type": "ISOLATOR", "breaker_rating": 20, "fault_kA": 6, "cable": "2C 4.0sqmm PVC/PVC"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6}
+        ]
+      }
+    },
+
+    "factory_150a_3phase": {
+      "name": "Small Factory (150A TPN)",
+      "description": "Small factory with production floor lighting, heavy machinery power, office amenities, and ventilation. Three-phase supply with MCCB main breaker and CT metering.",
+      "category": "industrial",
+      "tags": ["factory", "manufacturing", "production", "industrial"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "building_riser",
+        "kva": 104,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 150, "poles": "TPN", "fault_kA": 36},
+        "busbar_rating": 200,
+        "metering": "ct_meter",
+        "ct_ratio": "200/5A",
+        "elcb": {"rating": 100, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting (Production 1)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Production 2)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Production 3)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Office)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Store/Toilet)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Production 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Production 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Production 3)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Office)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Pantry)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 1", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 2", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 3", "breaker_type": "MCB", "breaker_rating": 40, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 10.0sqmm PVC + 10.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Compressor", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater (Toilet)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater (Pantry)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Ventilation Fan", "breaker_type": "MCB", "breaker_rating": 16, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Office)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"}
+        ]
+      }
+    },
+
+    "factory_200a_3phase": {
+      "name": "Factory (200A TPN)",
+      "description": "Medium factory with heavy machinery, multiple production zones, office block, and extensive ventilation. Three-phase supply with MCCB main breaker.",
+      "category": "industrial",
+      "tags": ["factory", "manufacturing", "heavy_industry", "production"],
+      "requirements": {
+        "supply_type": "three_phase",
+        "supply_source": "building_riser",
+        "kva": 138,
+        "voltage": 400,
+        "main_breaker": {"type": "MCCB", "rating": 200, "poles": "TPN", "fault_kA": 36},
+        "busbar_rating": 400,
+        "metering": "ct_meter",
+        "ct_ratio": "400/5A",
+        "elcb": {"rating": 100, "sensitivity_ma": 30, "poles": 4, "type": "RCCB"},
+        "sub_circuits": [
+          {"name": "Lighting (Production A1)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Production A2)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Production B1)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Production B2)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Office)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Lighting (Store/Canteen)", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Emergency Lighting", "breaker_type": "MCB", "breaker_rating": 10, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 1.5sqmm PVC + 1.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Production A)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Production B)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Office)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Canteen)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "13A S/S/O (Store)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 1", "breaker_type": "MCB", "breaker_rating": 63, "breaker_characteristic": "C", "fault_kA": 10, "phase": "L1", "cable": "2 x 1C 16.0sqmm PVC + 16.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 2", "breaker_type": "MCB", "breaker_rating": 63, "breaker_characteristic": "C", "fault_kA": 10, "phase": "L2", "cable": "2 x 1C 16.0sqmm PVC + 16.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 3", "breaker_type": "MCB", "breaker_rating": 40, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 10.0sqmm PVC + 10.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Machine Supply 4", "breaker_type": "MCB", "breaker_rating": 40, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 10.0sqmm PVC + 10.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Compressor", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Pump", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Kitchen Equipment (Canteen)", "breaker_type": "MCB", "breaker_rating": 32, "breaker_characteristic": "C", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 6.0sqmm PVC + 6.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater 1", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Water Heater 2", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Ventilation Fan 1", "breaker_type": "MCB", "breaker_rating": 16, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Ventilation Fan 2", "breaker_type": "MCB", "breaker_rating": 16, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2", "cable": "2 x 1C 2.5sqmm PVC + 2.5sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Office 1)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "Aircon (Office 2)", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1", "cable": "2 x 1C 4.0sqmm PVC + 4.0sqmm CPC IN METAL TRUNKING"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L3"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L1"},
+          {"name": "SPARE", "breaker_type": "MCB", "breaker_rating": 20, "breaker_characteristic": "B", "fault_kA": 6, "phase": "L2"}
+        ]
+      }
+    }
+  }
+}

@@ -86,10 +86,16 @@ export function AdminSidebar({
             </div>
           )}
 
-          {application.status === 'PENDING_PAYMENT' && (
+          {application.status === 'PENDING_PAYMENT' && isAdmin && (
             <Button variant="outline" fullWidth size="sm" onClick={onPaymentClick} loading={actionLoading}>
               💳 Confirm Payment
             </Button>
+          )}
+
+          {application.status === 'PENDING_PAYMENT' && !isAdmin && (
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-center">
+              <p className="text-xs text-gray-500">Waiting for admin to confirm payment.</p>
+            </div>
           )}
 
           {application.status === 'PAID' && (

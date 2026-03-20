@@ -223,21 +223,12 @@ class TestGeneratorOverflowIntegration:
     """Generator.generate() returns overflow_metrics in result dict."""
 
     def test_generate_includes_overflow_metrics(self, tmp_path):
-        from app.sld.generator import SldGenerator
+        from app.sld.generator import SldPipeline
 
-        pdf_path = str(tmp_path / "test.pdf")
-        svg_path = str(tmp_path / "test.svg")
+        result = SldPipeline().run(requirements=SINGLE_PHASE_3CKT)
 
-        generator = SldGenerator()
-        result = generator.generate(
-            requirements=SINGLE_PHASE_3CKT,
-            application_info={},
-            pdf_output_path=pdf_path,
-            svg_output_path=svg_path,
-        )
-
-        assert "overflow_metrics" in result
-        assert "layout_warnings" in result
-        assert isinstance(result["overflow_metrics"], dict)
-        assert "has_overflow" in result["overflow_metrics"]
-        assert "quality_score" in result["overflow_metrics"]
+        assert result.overflow_metrics is not None
+        assert result.layout_warnings is not None
+        om = result.overflow_metrics
+        assert hasattr(om, "has_overflow")
+        assert hasattr(om, "quality_score")

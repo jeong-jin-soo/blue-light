@@ -34,8 +34,8 @@ from app.sld.sld_spec import (
 class TestIncomingSpecTable:
     """Verify INCOMING_SPEC matches Excel 'Table form' data exactly."""
 
-    def test_all_15_tiers_present(self):
-        expected = [32, 40, 63, 80, 100, 150, 200, 250, 300, 400, 630, 800, 1000, 1200, 1600]
+    def test_all_16_tiers_present(self):
+        expected = [32, 40, 63, 80, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1200, 1600]
         assert sorted(INCOMING_SPEC.keys()) == expected
 
     def test_cable_sizes_match_excel(self):
@@ -51,6 +51,7 @@ class TestIncomingSpecTable:
             250: "95",
             300: "120",
             400: "185",
+            500: "240",
             630: "300",
             800: "500",
             1000: "500",
@@ -118,8 +119,8 @@ class TestIncomingSpecTable:
 class TestOutgoingSpecTable:
     """Verify OUTGOING_SPEC matches Excel 'Table form' OUTGOING section."""
 
-    def test_all_18_tiers_present(self):
-        expected = [6, 10, 16, 20, 32, 63, 80, 100, 150, 200, 250, 300, 400, 630, 800, 1000, 1200, 1600]
+    def test_all_23_tiers_present(self):
+        expected = [5, 6, 10, 13, 15, 16, 20, 25, 32, 63, 80, 100, 150, 200, 250, 300, 400, 500, 630, 800, 1000, 1200, 1600]
         assert sorted(OUTGOING_SPEC.keys()) == expected
 
     def test_cable_sizes_match_excel(self):
@@ -140,7 +141,7 @@ class TestOutgoingSpecTable:
 
     def test_lookup_non_standard_rounds_up(self):
         """Non-standard ratings should round up to next tier."""
-        assert lookup_outgoing_cable(15) == 2.5   # next ≥ 15 is 16 → 2.5
+        assert lookup_outgoing_cable(14) == 1.5    # next ≥ 14 is 15 → 1.5
         assert lookup_outgoing_cable(50) == 16     # next ≥ 50 is 63 → 16
 
     def test_lookup_exceeds_max_raises(self):
@@ -592,11 +593,11 @@ class TestValidateSubCircuits:
 class TestValidateMetering:
     """Test _validate_metering() for metering type validation."""
 
-    def test_validate_metering_landlord_skip(self):
-        """Landlord supply with no metering → no auto-correction.
+    def test_validate_metering_landlord_auto_sp_meter(self):
+        """Landlord supply with no metering → auto-add sp_meter (PG KWH meter board).
 
         When supply_source is 'landlord' and metering is empty,
-        the function should NOT auto-determine metering type.
+        the function should auto-add sp_meter for PG KWH meter board.
         """
         result = ValidationResult()
         effective_spec = INCOMING_SPEC[150]  # 150A, requires_ct=True
@@ -607,9 +608,36 @@ class TestValidateMetering:
             effective_rating=150,
             result=result,
         )
-        # No metering correction should be applied for landlord supply
+        # Landlord supply should auto-add sp_meter
+        assert "metering" in result.corrections
+        assert result.corrections["metering"]["corrected"] == "sp_meter"
+
+    def test_validate_metering_landlord_explicit_preserved(self):
+        """Landlord supply with explicit sp_meter → preserved as-is."""
+        result = ValidationResult()
+        _validate_metering(
+            INCOMING_SPEC[63],
+            metering="sp_meter",
+            supply_source="landlord",
+            effective_rating=63,
+            result=result,
+        )
+        # Explicit metering should not be auto-corrected
         assert "metering" not in result.corrections
-        assert len(result.warnings) == 0
+
+    def test_validate_metering_cable_extension_no_meter(self):
+        """Cable extension (landlord) with metering → strip metering."""
+        result = ValidationResult()
+        _validate_metering(
+            INCOMING_SPEC[63],
+            metering="sp_meter",
+            supply_source="landlord",
+            effective_rating=63,
+            result=result,
+            is_cable_extension=True,
+        )
+        assert "metering" in result.corrections
+        assert result.corrections["metering"]["corrected"] == ""
 
 
 # ── Top-Level Key Fallback (engine.py) ───────────────────────────
@@ -672,8 +700,8 @@ class TestTopLevelKeyFallback:
             "Metering correction should propagate to requirements dict"
         )
 
-    def test_metering_not_forced_for_landlord(self):
-        """Landlord supply should NOT auto-set metering."""
+    def test_metering_auto_set_for_landlord(self):
+        """Landlord supply should auto-set sp_meter (PG KWH meter board)."""
         from app.sld.layout.engine import _validate_and_correct
 
         req = {
@@ -686,8 +714,8 @@ class TestTopLevelKeyFallback:
             ],
         }
         result = _validate_and_correct(req)
-        assert not result.get("metering"), (
-            "Landlord supply should not auto-set metering"
+        assert result.get("metering") == "sp_meter", (
+            "Landlord supply should auto-set sp_meter (PG KWH meter board)"
         )
 
     def test_metering_not_forced_for_cable_extension(self):

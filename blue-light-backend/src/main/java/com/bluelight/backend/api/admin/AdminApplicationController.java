@@ -110,6 +110,7 @@ public class AdminApplicationController {
      * Confirm offline payment
      * POST /api/admin/applications/:id/payments/confirm
      */
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYSTEM_ADMIN')")
     @Auditable(action = AuditAction.PAYMENT_CONFIRMED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/payments/confirm")
     public ResponseEntity<PaymentResponse> confirmPayment(

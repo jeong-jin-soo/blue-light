@@ -1,0 +1,555 @@
+{
+  "meta": {
+    "source_files": 28,
+    "total_rules": 35,
+    "categories": {
+      "structural": 21,
+      "order": 5,
+      "spacing": 4,
+      "semantic": 5
+    }
+  },
+  "rules": [
+    {
+      "name": "required_blocks_direct_metering_1phase",
+      "description": "direct_metering_1phase SLD에서 모든 레퍼런스에 공통으로 존재하는 블록",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "required_blocks": [
+          "MCCB"
+        ]
+      },
+      "evidence_count": 8
+    },
+    {
+      "name": "rccb_presence_direct_metering_1phase",
+      "description": "direct_metering_1phase에서 RCCB 존재 비율: 3/8",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "required": false,
+        "ratio": 0.38
+      },
+      "evidence_count": 3
+    },
+    {
+      "name": "isolator_presence_direct_metering_1phase",
+      "description": "direct_metering_1phase에서 아이솔레이터 존재 비율: 1/8",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "required": false,
+        "ratio": 0.12
+      },
+      "evidence_count": 1
+    },
+    {
+      "name": "subcircuit_count_range_direct_metering_1phase",
+      "description": "direct_metering_1phase 서브회로 개수 범위: 6~35",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "min": 6,
+        "max": 35
+      },
+      "evidence_count": 5
+    },
+    {
+      "name": "num_dbs_range_direct_metering_1phase",
+      "description": "direct_metering_1phase DB 수 범위: 1~4",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "min": 1,
+        "max": 4
+      },
+      "evidence_count": 8
+    },
+    {
+      "name": "required_blocks_direct_metering_3phase",
+      "description": "direct_metering_3phase SLD에서 모든 레퍼런스에 공통으로 존재하는 블록",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "required_blocks": [
+          "MCCB"
+        ]
+      },
+      "evidence_count": 15
+    },
+    {
+      "name": "rccb_presence_direct_metering_3phase",
+      "description": "direct_metering_3phase에서 RCCB 존재 비율: 12/15",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "required": false,
+        "ratio": 0.8
+      },
+      "evidence_count": 12
+    },
+    {
+      "name": "isolator_presence_direct_metering_3phase",
+      "description": "direct_metering_3phase에서 아이솔레이터 존재 비율: 13/15",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "required": false,
+        "ratio": 0.87
+      },
+      "evidence_count": 13
+    },
+    {
+      "name": "subcircuit_count_range_direct_metering_3phase",
+      "description": "direct_metering_3phase 서브회로 개수 범위: 6~134",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "min": 6,
+        "max": 134
+      },
+      "evidence_count": 15
+    },
+    {
+      "name": "num_dbs_range_direct_metering_3phase",
+      "description": "direct_metering_3phase DB 수 범위: 1~12",
+      "category": "structural",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "min": 1,
+        "max": 12
+      },
+      "evidence_count": 15
+    },
+    {
+      "name": "required_blocks_ct_metering_3phase",
+      "description": "ct_metering_3phase SLD에서 모든 레퍼런스에 공통으로 존재하는 블록",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "required_blocks": [
+          "2A FUSE",
+          "DP ISOL",
+          "EF",
+          "LED IND LTG",
+          "MCCB",
+          "RCCB",
+          "SLD-CT",
+          "SS",
+          "VOLTMETER"
+        ]
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "rccb_presence_ct_metering_3phase",
+      "description": "ct_metering_3phase에서 RCCB 존재 비율: 2/2",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "required": true,
+        "ratio": 1.0
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "isolator_presence_ct_metering_3phase",
+      "description": "ct_metering_3phase에서 아이솔레이터 존재 비율: 2/2",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "required": true,
+        "ratio": 1.0
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "subcircuit_count_range_ct_metering_3phase",
+      "description": "ct_metering_3phase 서브회로 개수 범위: 57~79",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "min": 57,
+        "max": 79
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "num_dbs_range_ct_metering_3phase",
+      "description": "ct_metering_3phase DB 수 범위: 7~10",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "min": 7,
+        "max": 10
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "required_blocks_cable_extension",
+      "description": "cable_extension SLD에서 모든 레퍼런스에 공통으로 존재하는 블록",
+      "category": "structural",
+      "applies_to": [
+        "cable_extension"
+      ],
+      "params": {
+        "required_blocks": [
+          "MCCB",
+          "RCCB"
+        ]
+      },
+      "evidence_count": 3
+    },
+    {
+      "name": "rccb_presence_cable_extension",
+      "description": "cable_extension에서 RCCB 존재 비율: 3/3",
+      "category": "structural",
+      "applies_to": [
+        "cable_extension"
+      ],
+      "params": {
+        "required": true,
+        "ratio": 1.0
+      },
+      "evidence_count": 3
+    },
+    {
+      "name": "subcircuit_count_range_cable_extension",
+      "description": "cable_extension 서브회로 개수 범위: 5~9",
+      "category": "structural",
+      "applies_to": [
+        "cable_extension"
+      ],
+      "params": {
+        "min": 5,
+        "max": 9
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "num_dbs_range_cable_extension",
+      "description": "cable_extension DB 수 범위: 1~1",
+      "category": "structural",
+      "applies_to": [
+        "cable_extension"
+      ],
+      "params": {
+        "min": 1,
+        "max": 1
+      },
+      "evidence_count": 3
+    },
+    {
+      "name": "ct_blocks_required",
+      "description": "CT 계측 SLD에 SLD-CT 블록 필수: 3~4개",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "min_count": 3,
+        "max_count": 4
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "ct_fuse_required",
+      "description": "CT 계측 SLD에 2A FUSE 존재: 2/2",
+      "category": "structural",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "required": true
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "spine_order_direct_metering_1phase",
+      "description": "direct_metering_1phase 스파인 컴포넌트 Y순서 패턴 (전원→부하)",
+      "category": "order",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "observed_orders": [
+          [
+            "MCCB",
+            "RCCB"
+          ],
+          [
+            "RCCB",
+            "MCCB"
+          ],
+          [
+            "MCCB",
+            "MCCB"
+          ]
+        ],
+        "frequencies": [
+          2,
+          1,
+          1
+        ],
+        "total_samples": 4
+      },
+      "evidence_count": 4
+    },
+    {
+      "name": "spine_order_direct_metering_3phase",
+      "description": "direct_metering_3phase 스파인 컴포넌트 Y순서 패턴 (전원→부하)",
+      "category": "order",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "observed_orders": [
+          [
+            "MCCB",
+            "RCCB"
+          ],
+          [
+            "MCCB",
+            "MCCB"
+          ],
+          [
+            "MCCB",
+            "MCCB",
+            "MCCB"
+          ]
+        ],
+        "frequencies": [
+          23,
+          14,
+          9
+        ],
+        "total_samples": 63
+      },
+      "evidence_count": 63
+    },
+    {
+      "name": "spine_order_ct_metering_3phase",
+      "description": "ct_metering_3phase 스파인 컴포넌트 Y순서 패턴 (전원→부하)",
+      "category": "order",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "observed_orders": [
+          [
+            "MCCB",
+            "RCCB"
+          ],
+          [
+            "RCCB",
+            "MCCB"
+          ],
+          [
+            "MCCB",
+            "SLD-CT",
+            "SLD-CT"
+          ]
+        ],
+        "frequencies": [
+          9,
+          4,
+          2
+        ],
+        "total_samples": 20
+      },
+      "evidence_count": 20
+    },
+    {
+      "name": "spine_order_cable_extension",
+      "description": "cable_extension 스파인 컴포넌트 Y순서 패턴 (전원→부하)",
+      "category": "order",
+      "applies_to": [
+        "cable_extension"
+      ],
+      "params": {
+        "observed_orders": [
+          [
+            "MCCB",
+            "RCCB"
+          ],
+          [
+            "MCCB",
+            "RCCB",
+            "MCCB"
+          ]
+        ],
+        "frequencies": [
+          2,
+          1
+        ],
+        "total_samples": 3
+      },
+      "evidence_count": 3
+    },
+    {
+      "name": "subcircuit_above_spine",
+      "description": "서브회로는 스파인 컴포넌트보다 높은 Y에 위치: 4/17",
+      "category": "order",
+      "applies_to": [
+        "direct_metering_3phase",
+        "ct_metering_3phase",
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "ratio": 0.24
+      },
+      "evidence_count": 4
+    },
+    {
+      "name": "subcircuit_x_spacing_direct_metering_1phase",
+      "description": "direct_metering_1phase 서브회로 X간격 (DU): 243~2475",
+      "category": "spacing",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "min_du": 243.4,
+        "max_du": 2474.6,
+        "median_du": 970.6,
+        "samples": 74
+      },
+      "evidence_count": 5
+    },
+    {
+      "name": "subcircuit_x_spacing_direct_metering_3phase",
+      "description": "direct_metering_3phase 서브회로 X간격 (DU): 7~2157",
+      "category": "spacing",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "min_du": 6.5,
+        "max_du": 2157.1,
+        "median_du": 726.8,
+        "samples": 457
+      },
+      "evidence_count": 15
+    },
+    {
+      "name": "subcircuit_x_spacing_ct_metering_3phase",
+      "description": "ct_metering_3phase 서브회로 X간격 (DU): 600~1550",
+      "category": "spacing",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "min_du": 600.0,
+        "max_du": 1550.3,
+        "median_du": 600.0,
+        "samples": 112
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "subcircuit_x_spacing_cable_extension",
+      "description": "cable_extension 서브회로 X간격 (DU): 1237~2539",
+      "category": "spacing",
+      "applies_to": [
+        "cable_extension"
+      ],
+      "params": {
+        "min_du": 1237.2,
+        "max_du": 2538.7,
+        "median_du": 1253.2,
+        "samples": 12
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "phase_labels_direct_metering_1phase",
+      "description": "direct_metering_1phase에서 위상 라벨 존재: 1/8",
+      "category": "semantic",
+      "applies_to": [
+        "direct_metering_1phase"
+      ],
+      "params": {
+        "ratio": 0.12
+      },
+      "evidence_count": 1
+    },
+    {
+      "name": "phase_labels_direct_metering_3phase",
+      "description": "direct_metering_3phase에서 위상 라벨 존재: 14/15",
+      "category": "semantic",
+      "applies_to": [
+        "direct_metering_3phase"
+      ],
+      "params": {
+        "ratio": 0.93
+      },
+      "evidence_count": 14
+    },
+    {
+      "name": "phase_labels_ct_metering_3phase",
+      "description": "ct_metering_3phase에서 위상 라벨 존재: 2/2",
+      "category": "semantic",
+      "applies_to": [
+        "ct_metering_3phase"
+      ],
+      "params": {
+        "ratio": 1.0
+      },
+      "evidence_count": 2
+    },
+    {
+      "name": "rating_labels_universal",
+      "description": "전체 SLD에서 정격 라벨 존재: 10/28",
+      "category": "semantic",
+      "applies_to": [
+        "*"
+      ],
+      "params": {
+        "ratio": 0.36
+      },
+      "evidence_count": 10
+    },
+    {
+      "name": "cable_annotations_universal",
+      "description": "전체 SLD에서 케이블 사양 존재: 25/28",
+      "category": "semantic",
+      "applies_to": [
+        "*"
+      ],
+      "params": {
+        "ratio": 0.89
+      },
+      "evidence_count": 25
+    }
+  ]
+}

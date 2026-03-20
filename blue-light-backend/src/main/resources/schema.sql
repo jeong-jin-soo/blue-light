@@ -419,3 +419,24 @@ CREATE TABLE IF NOT EXISTS sample_files (
     PRIMARY KEY (sample_file_seq),
     UNIQUE KEY uk_sample_files_category (category_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 15. 알림
+CREATE TABLE IF NOT EXISTS notifications (
+    notification_seq  BIGINT       NOT NULL AUTO_INCREMENT,
+    recipient_seq     BIGINT       NOT NULL,
+    type              VARCHAR(50)  NOT NULL,
+    title             VARCHAR(200) NOT NULL,
+    message           VARCHAR(1000) NOT NULL,
+    reference_type    VARCHAR(50),
+    reference_id      BIGINT,
+    is_read           BOOLEAN      NOT NULL DEFAULT FALSE,
+    read_at           DATETIME(6),
+    created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    created_by        BIGINT,
+    updated_by        BIGINT,
+    deleted_at        DATETIME(6),
+    PRIMARY KEY (notification_seq),
+    CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_seq) REFERENCES users (user_seq),
+    INDEX idx_notification_recipient_read (recipient_seq, is_read, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

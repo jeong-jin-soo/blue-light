@@ -1,0 +1,579 @@
+"""
+Unified Symbol interface for the SLD generator (A1 Architecture Fix).
+
+Replaces the dual procedural/DXF-block rendering paths in generator.py with
+a single Symbol ABC.  The generator calls symbol.render() and never needs to
+know whether the underlying implementation is procedural or DXF-block-based.
+
+Architecture:
+                        Symbol (ABC)
+                       /            \\
+          ProceduralSymbol        BlockSymbol
+          (wraps BaseSymbol)      (wraps BlockReplayer + BaseSymbol metadata)
+
+    create_symbol(name, replayer) → best available Symbol
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.sld.backend import DrawingBackend
+    from app.sld.base_symbol import BaseSymbol
+    from app.sld.block_replayer import BlockReplayer
+
+logger = logging.getLogger(__name__)
+
+
+# Map symbol type names → DXF block names.
+# Moved from generator.py to be the single source of truth.
+SYMBOL_TO_DXF_BLOCK: dict[str, str] = {
+    # Circuit breakers
+    "MCCB": "MCCB",
+    "CB_MCCB": "MCCB",
+    "MCB": "MCCB",         # MCB = MCCB block at different scale
+    "CB_MCB": "MCCB",
+    "RCCB": "RCCB",
+    "CB_RCCB": "RCCB",
+    "ELCB": "RCCB",        # ELCB uses RCCB block (same IEC symbol)
+    "CB_ELCB": "RCCB",
+    # Isolators
+    "ISOLATOR": "IEC ISOLATOR",
+    "DP_ISOL_DEVICE": "DP ISOL",
+    "3P_ISOLATOR": "3P ISOL",
+    # CT: procedural rendering only — DXF block "SLD-CT" renders incorrectly (not hook shape).
+    # Meters
+    "KWH_METER": "KWH_METER",
+    # VOLTMETER: procedural rendering only — consistent body-edge convention with AMMETER.
+    # "VOLTMETER": "VOLTMETER",
+    # Protection / auxiliaries
+    "EARTH": "EARTH",
+    "FUSE": "2A FUSE",
+    "POTENTIAL_FUSE": "2A FUSE",
+    # SELECTOR_SWITCH: procedural rendering only — DXF block "SS" renders dual-arc instead of circle+slash.
+    # "SELECTOR_SWITCH": "SS",
+    # ELR: procedural rendering only — DXF block "EF" has wrong dimensions.
+    # INDICATOR_LIGHTS: procedural rendering only — DXF block "LED IND LTG" has wrong dimensions.
+}
+
+# DXF block names that represent circuit breakers needing stub lines + trip arrows.
+_CB_BLOCK_NAMES = {"MCCB", "RCCB"}
+
+# Legacy fallback heights (used only when BlockReplayer.compute_scale fails)
+_DXF_BLOCK_HEIGHTS = {
+    "MCCB": 597.82,
+    "RCCB": 597.82,
+    "DP ISOL": 430.63,
+}
+
+
+class Symbol(ABC):
+    """Unified symbol interface consumed by generator.py.
+
+    Coordinate Contract (A2):
+        All coordinates follow the PlacedComponent anchor convention:
+        - x = left edge of symbol body bounding box
+        - y = bottom edge of symbol body bounding box
+        - Body bbox excludes connection stubs
+
+        Diagram (vertical symbol, default orientation):
+
+            +--- y + height  (body top)
+            |  [symbol body]
+            +--- y           (body bottom) ← anchor point
+            |  (stub line)
+            +--- y - stub    (pin tip, connects to busbar/spine)
+
+        Horizontal extent:  x to x + width (or x + h_extent for
+        symbols wider than their core body, e.g., DP ISOL centering).
+    """
+
+    @property
+    @abstractmethod
+    def name(self) -> str: ...
+
+    @property
+    @abstractmethod
+    def width(self) -> float: ...
+
+    @property
+    @abstractmethod
+    def height(self) -> float: ...
+
+    @property
+    @abstractmethod
+    def h_extent(self) -> float: ...
+
+    @property
+    @abstractmethod
+    def stub(self) -> float: ...
+
+    @property
+    def is_circuit_breaker(self) -> bool:
+        return False
+
+    @property
+    def is_isolator(self) -> bool:
+        return False
+
+    @property
+    def needs_stub_lines(self) -> bool:
+        """Whether generator should draw separate stub lines after rendering."""
+        return False
+
+    # ── Rendering ────────────────────────────────────────────
+
+    @abstractmethod
+    def render(
+        self,
+        backend: DrawingBackend,
+        x: float,
+        y: float,
+        *,
+        horizontal: bool = False,
+        skip_trip_arrow: bool = False,
+        enclosed: bool = False,
+        no_right_stub: bool = False,
+        no_left_stub: bool = False,
+    ) -> None:
+        """Draw the symbol onto *backend* at the given position.
+
+        Args:
+            x: Left edge of symbol body (see Coordinate Contract in class docstring).
+            y: Bottom edge of symbol body.
+            horizontal: If True, draw in horizontal orientation (rotated 90°).
+            skip_trip_arrow: If True, omit the trip arrow (for ditto marks).
+            enclosed: If True, draw enclosure box around symbol.
+            no_right_stub: If True, skip the right-side connection stub.
+            no_left_stub: If True, skip the left-side connection stub.
+        """
+        ...
+
+    # ── Arc midpoint (for trip / chain arrows) ───────────────
+
+    @abstractmethod
+    def get_arc_midpoint(
+        self, x: float, y: float,
+    ) -> tuple[float, float] | None:
+        """Return the arc midpoint for trip/chain arrows.  None if not a CB."""
+        ...
+
+    # ── Label offset ─────────────────────────────────────────
+
+    def label_offset_x(self, backend: DrawingBackend | None = None) -> float:
+        """X offset from comp.x for label/cable annotation placement."""
+        return self.width + 3
+
+    # ── Underlying procedural symbol (for callers that need metadata) ──
+
+    @property
+    def procedural(self) -> BaseSymbol:
+        """Access the underlying BaseSymbol.  Used for backward-compat
+        metadata reads (e.g. _rect_w on KwhMeter)."""
+        raise AttributeError("No procedural symbol available")
+
+
+# ═══════════════════════════════════════════════════════════════
+# ProceduralSymbol — wraps BaseSymbol (existing real_symbols.py)
+# ═══════════════════════════════════════════════════════════════
+
+class ProceduralSymbol(Symbol):
+    """Renders symbols via the procedural draw() path."""
+
+    def __init__(self, sym: BaseSymbol) -> None:
+        self._sym = sym
+
+    # ── Properties ───────────────────────────────────────────
+
+    @property
+    def name(self) -> str:
+        return self._sym.name
+
+    @property
+    def width(self) -> float:
+        return self._sym.width
+
+    @property
+    def height(self) -> float:
+        return self._sym.height
+
+    @property
+    def h_extent(self) -> float:
+        return self._sym.h_extent
+
+    @property
+    def stub(self) -> float:
+        return getattr(self._sym, '_stub', 2.0)
+
+    @property
+    def is_circuit_breaker(self) -> bool:
+        from app.sld.real_symbols import RealCircuitBreaker
+        return isinstance(self._sym, RealCircuitBreaker)
+
+    @property
+    def is_isolator(self) -> bool:
+        from app.sld.real_symbols import RealIsolator
+        return isinstance(self._sym, RealIsolator)
+
+    @property
+    def procedural(self) -> BaseSymbol:
+        return self._sym
+
+    # ── Rendering ────────────────────────────────────────────
+
+    def render(self, backend, x, y, *, horizontal=False,
+               skip_trip_arrow=False, enclosed=False,
+               no_right_stub=False, no_left_stub=False):
+        kwargs: dict = {}
+        if self.is_circuit_breaker and skip_trip_arrow:
+            kwargs["skip_trip_arrow"] = True
+        if self.is_isolator and enclosed:
+            kwargs["enclosed"] = True
+
+        if horizontal:
+            # Only pass stub suppression kwargs if the symbol's draw_horizontal accepts them
+            import inspect
+            sig = inspect.signature(self._sym.draw_horizontal)
+            if no_right_stub and "no_right_stub" in sig.parameters:
+                kwargs["no_right_stub"] = True
+            if no_left_stub and "no_left_stub" in sig.parameters:
+                kwargs["no_left_stub"] = True
+            self._sym.draw_horizontal(backend, x, y, **kwargs)
+        else:
+            self._sym.draw(backend, x, y, **kwargs)
+
+    # ── Arc midpoint ─────────────────────────────────────────
+
+    def get_arc_midpoint(self, x, y):
+        if not self.is_circuit_breaker:
+            return None
+        sym = self._sym
+        cx = x + sym.width / 2
+        cy = y + sym.height / 2
+        # Use procedural arc geometry
+        arc_extent = sym._arc_r
+        return (cx + arc_extent, cy)
+
+
+# ═══════════════════════════════════════════════════════════════
+# BlockSymbol — wraps BlockReplayer for a specific DXF block
+# ═══════════════════════════════════════════════════════════════
+
+class BlockSymbol(Symbol):
+    """Renders symbols via DXF block replay.
+
+    Encapsulates all insertion-point, scale, rotation, stub-line, and
+    trip-arrow logic that was previously scattered across generator.py.
+    """
+
+    def __init__(
+        self,
+        block_name: str,
+        replayer: BlockReplayer,
+        proc: BaseSymbol,
+    ) -> None:
+        self._block_name = block_name
+        self._replayer = replayer
+        self._proc = proc  # for dimensions, metadata, fallback
+
+    # ── Properties ───────────────────────────────────────────
+
+    @property
+    def name(self) -> str:
+        return self._proc.name
+
+    @property
+    def width(self) -> float:
+        return self._proc.width
+
+    @property
+    def height(self) -> float:
+        return self._proc.height
+
+    @property
+    def h_extent(self) -> float:
+        return self._proc.h_extent
+
+    @property
+    def stub(self) -> float:
+        return getattr(self._proc, '_stub', 2.0)
+
+    @property
+    def is_circuit_breaker(self) -> bool:
+        from app.sld.real_symbols import RealCircuitBreaker
+        return isinstance(self._proc, RealCircuitBreaker)
+
+    @property
+    def is_isolator(self) -> bool:
+        from app.sld.real_symbols import RealIsolator
+        return isinstance(self._proc, RealIsolator)
+
+    @property
+    def needs_stub_lines(self) -> bool:
+        return self._block_name in _CB_BLOCK_NAMES
+
+    @property
+    def procedural(self) -> BaseSymbol:
+        return self._proc
+
+    # ── Rendering ────────────────────────────────────────────
+
+    def render(self, backend, x, y, *, horizontal=False,
+               skip_trip_arrow=False, enclosed=False,
+               no_right_stub=False, no_left_stub=False):
+        native_horiz = self._replayer.is_native_horizontal(self._block_name)
+
+        if horizontal:
+            target_pin, pin_name, rotation = self._horizontal_params(
+                x, y, native_horiz)
+        else:
+            target_pin, pin_name, rotation = self._vertical_params(
+                x, y, native_horiz)
+
+        # Compute insertion point + scale
+        ix, iy, scale = self._compute_insertion(
+            target_pin, pin_name, rotation, native_horiz, horizontal)
+
+        # Draw block
+        self._replayer.draw(
+            backend, self._block_name, ix, iy,
+            scale=scale, rotation=rotation, layer="SLD_SYMBOLS",
+        )
+
+        # Stub lines for CB blocks
+        if self.needs_stub_lines:
+            self._draw_stub_lines(backend, x, y, horizontal)
+
+        # Trip arrow for sub-circuit MCBs (vertical only)
+        if (self.needs_stub_lines and not horizontal
+                and self.is_circuit_breaker and not skip_trip_arrow):
+            self._draw_trip_arrow(backend, x, y)
+
+        # Enclosed isolator box
+        if enclosed:
+            self._draw_enclosure(backend, x, y)
+
+    # ── Arc midpoint ─────────────────────────────────────────
+
+    def get_arc_midpoint(self, x, y):
+        if not self.is_circuit_breaker:
+            return None
+        cx = x + self._proc.width / 2
+        cy = y + self._proc.height / 2
+        arc_extent = self._compute_arc_extent()
+        return (cx + arc_extent, cy)
+
+    # ── Label offset ─────────────────────────────────────────
+
+    def label_offset_x(self, backend=None) -> float:
+        """X offset from comp.x for label placement (uses block library dimensions)."""
+        scaled_w, _ = self._replayer.get_scaled_size(
+            self._block_name, target_height_mm=self.height)
+        return self.width / 2 + scaled_w / 2 + 3
+
+    # ── Private helpers ──────────────────────────────────────
+
+    def _horizontal_params(self, x, y, native_horiz):
+        """Compute (target_pin, pin_name, rotation) for horizontal placement."""
+        target_pin = (x, y)
+        pin_name = "left"
+        rotation = 0.0 if native_horiz else 90.0
+
+        # DP ISOL: align rendered block bottom with comp.y
+        if self._block_name == "DP ISOL" and not native_horiz:
+            blk_data = self._replayer._blocks.get(self._block_name, {})
+            ents = blk_data.get("entities", [])
+            all_x: list[float] = []
+            for ent in ents:
+                if ent["type"] == "LWPOLYLINE":
+                    all_x.extend(p[0] for p in ent["points"])
+                elif ent["type"] in ("LINE", "CIRCLE"):
+                    if "start" in ent:
+                        all_x.extend([ent["start"][0], ent["end"][0]])
+                    if "center" in ent:
+                        all_x.append(ent["center"][0])
+            if all_x:
+                top_pin_x = blk_data.get("pins", {}).get("top", [0, 0])[0]
+                pre_scale = self._replayer.compute_scale(
+                    self._block_name, self._proc.height)
+                offset_y = (top_pin_x - min(all_x)) * pre_scale
+                target_pin = (x, y + offset_y)
+
+        return target_pin, pin_name, rotation
+
+    def _vertical_params(self, x, y, native_horiz):
+        """Compute (target_pin, pin_name, rotation) for vertical placement."""
+        proc_pins = self._proc.vertical_pins(x, y)
+        cx_center = x + self._proc.width / 2
+        if "bottom" in proc_pins:
+            target_pin = (cx_center, y)
+            pin_name = "bottom"
+        elif "top" in proc_pins:
+            target_pin = (cx_center, y + self._proc.height)
+            pin_name = "top"
+        else:
+            target_pin = (x, y)
+            pin_name = "bottom"
+        rotation = 90.0 if native_horiz else 0.0
+        return target_pin, pin_name, rotation
+
+    def _compute_insertion(self, target_pin, pin_name, rotation,
+                           native_horiz, horizontal):
+        """Compute (ix, iy, scale) for block insertion."""
+        try:
+            if native_horiz and horizontal:
+                block_w = self._replayer.pin_span_horizontal_du(self._block_name)
+                scale_override = (
+                    self._proc.h_extent / block_w if block_w > 0 else None)
+            else:
+                scale_override = None
+
+            if scale_override is not None:
+                return self._replayer.compute_aligned_insertion(
+                    self._block_name, target_pin, pin_name,
+                    scale=scale_override, rotation=rotation,
+                )
+            else:
+                return self._replayer.compute_aligned_insertion(
+                    self._block_name, target_pin, pin_name,
+                    target_height_mm=self._proc.height, rotation=rotation,
+                )
+        except ValueError:
+            ix, iy = target_pin
+            block_height_du = self._replayer.block_height_du(self._block_name)
+            scale = self._proc.height / (
+                block_height_du
+                or _DXF_BLOCK_HEIGHTS.get(self._block_name, 597.82)
+            )
+            return ix, iy, scale
+
+    def _draw_stub_lines(self, backend, x, y, horizontal):
+        """Draw stub lines for CB blocks (body-edge-to-pin lines).
+
+        Stubs connect from body boundary outward to pin positions.
+        No line enters the body — the block handles contacts + arc internally.
+        """
+        stub = self.stub
+        backend.set_layer("SLD_CONNECTIONS")
+        if not horizontal:
+            cx_stub = x + self._proc.width / 2
+            backend.add_line((cx_stub, y), (cx_stub, y - stub))
+            backend.add_line(
+                (cx_stub, y + self._proc.height),
+                (cx_stub, y + self._proc.height + stub),
+            )
+        else:
+            cy_stub = y
+            h_ext = self._proc.h_extent
+            backend.add_line((x, cy_stub), (x - stub, cy_stub))
+            backend.add_line((x + h_ext, cy_stub), (x + h_ext + stub, cy_stub))
+
+    def _draw_trip_arrow(self, backend, comp_x, comp_y):
+        """Draw trip mechanism arrow for DXF-block-rendered circuit breaker."""
+        cx = comp_x + self._proc.width / 2
+        arc_center_y = comp_y + self._proc.height / 2
+        arc_extent = self._compute_arc_extent()
+
+        arc_mx = cx + arc_extent
+        arc_my = arc_center_y
+
+        shaft = 6.0
+        sx = arc_mx - shaft
+
+        backend.set_layer("SLD_SYMBOLS")
+        backend.add_line((sx, arc_my), (arc_mx, arc_my))
+
+        hl = 1.2
+        backend.add_line((arc_mx, arc_my), (arc_mx - hl, arc_my + 0.6))
+        backend.add_line((arc_mx, arc_my), (arc_mx - hl, arc_my - 0.6))
+
+    def _draw_enclosure(self, backend, x, y):
+        """Draw enclosure box around an isolator block.
+
+        Uses the actual scaled block dimensions so the enclosure matches
+        the rendered symbol size (not just the procedural fallback dims).
+        """
+        pad = 1.5
+        # Use actual scaled block size for proper enclosure fit
+        try:
+            scaled_w, scaled_h = self._replayer.get_scaled_size(
+                self._block_name, target_height_mm=self._proc.height)
+            sw = max(scaled_w, self._proc.width)
+            sh = self._proc.height
+        except Exception:
+            sw = self._proc.width
+            sh = self._proc.height
+        cx = x + self._proc.width / 2
+        backend.set_layer("SLD_SYMBOLS")
+        backend.add_lwpolyline([
+            (cx - sw / 2 - pad, y - pad),
+            (cx + sw / 2 + pad, y - pad),
+            (cx + sw / 2 + pad, y + sh + pad),
+            (cx - sw / 2 - pad, y + sh + pad),
+        ], close=True)
+
+    def _compute_arc_extent(self) -> float:
+        """Compute arc extent from DXF block LWPOLYLINE bulge geometry.
+
+        This is the single source of truth for trip/chain arrow arc midpoint
+        computation, replacing the duplicated logic in _draw_trip_arrow and
+        _draw_chain_arrow.
+        """
+        # Fallback to procedural arc_r
+        arc_extent = self._proc._arc_r
+
+        blk_data = self._replayer._blocks.get(self._block_name, {})
+        if not blk_data:
+            return arc_extent
+
+        pin_x = blk_data.get("pins", {}).get("bottom", [0, 0])[0]
+        scale = self._replayer.compute_scale(self._block_name, self._proc.height)
+
+        for ent in blk_data.get("entities", []):
+            if ent["type"] == "LWPOLYLINE" and ent.get("bulges"):
+                bulge = ent["bulges"][0]
+                if abs(bulge) > 0.01:
+                    pts = ent["points"]
+                    chord = math.sqrt(
+                        (pts[1][0] - pts[0][0]) ** 2
+                        + (pts[1][1] - pts[0][1]) ** 2
+                    )
+                    sagitta = abs(bulge) * chord / 2
+                    chord_mid_x = (pts[0][0] + pts[1][0]) / 2
+                    arc_mid_x = chord_mid_x + sagitta
+                    arc_extent = (arc_mid_x - pin_x) * scale
+                    break
+
+        return arc_extent
+
+
+# ═══════════════════════════════════════════════════════════════
+# Factory function
+# ═══════════════════════════════════════════════════════════════
+
+def create_symbol(
+    symbol_name: str,
+    replayer: BlockReplayer | None = None,
+) -> Symbol | None:
+    """Create the best available Symbol for a given symbol type.
+
+    Returns BlockSymbol if a DXF block exists, ProceduralSymbol otherwise.
+    Returns None if the symbol type is completely unknown.
+    """
+    from app.sld.real_symbols import get_real_symbol
+
+    try:
+        real_sym = get_real_symbol(symbol_name)
+    except ValueError:
+        return None
+
+    if replayer is not None:
+        dxf_name = SYMBOL_TO_DXF_BLOCK.get(symbol_name)
+        if dxf_name and replayer.has_block(dxf_name):
+            return BlockSymbol(dxf_name, replayer, real_sym)
+
+    return ProceduralSymbol(real_sym)

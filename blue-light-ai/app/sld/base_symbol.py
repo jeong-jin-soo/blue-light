@@ -96,6 +96,18 @@ class BaseSymbol(ABC):
         ax, ay = self.anchors[anchor_name]
         return (x + ax, y + ay)
 
+    @property
+    def h_extent(self) -> float:
+        """Horizontal extent when placed horizontally (rotation=90°).
+
+        For vertical-native symbols (MCCB, MCB, RCCB): height becomes h_extent.
+        Override for symbols whose horizontal rendering size differs from height
+        (e.g., KWH_METER uses rect_w, not overall height).
+
+        Used by the generator for DXF block scaling.
+        """
+        return self.height
+
     def horizontal_pins(self, x: float, y: float) -> dict[str, tuple[float, float]]:
         """Absolute pin positions for horizontal placement (rotation=90°).
 

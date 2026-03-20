@@ -28,6 +28,7 @@ from app.sld.layout.sections import (
     _place_earth_bar,
     _place_elcb,
     _place_incoming_supply,
+    _place_internal_cable,
     _place_main_breaker,
     _place_main_busbar,
     _place_meter_board,
@@ -80,6 +81,7 @@ def _validate_and_correct(requirements: dict) -> dict:
             or requirements.get("fault_kA", 0)
         ),
         "metering": requirements.get("metering", ""),
+        "is_cable_extension": bool(requirements.get("is_cable_extension")),
         "circuits": [
             {
                 "name": sc.get("name", ""),
@@ -147,6 +149,52 @@ def _validate_and_correct(requirements: dict) -> dict:
     return requirements
 
 
+def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
+                           requirements: dict) -> None:
+    """Multi-DB에서 수직 간격을 줄여 A3에 맞춘다.
+
+    레퍼런스 DWG에서 multi-DB SLD는 단일 DB보다 컴포넌트 간 간격이 좁다.
+    CT metering + hierarchical + protection groups가 모두 있으면 가장 압축한다.
+    """
+    has_ct = requirements.get("metering") == "ct_meter"
+    has_pg = any(db.get("protection_groups") for db in dbs)
+    total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
+
+    # Estimate vertical pressure: more DBs/circuits → more compression
+    pressure = len(dbs)
+    if has_ct:
+        pressure += 1
+    if has_pg:
+        pressure += 1
+    if total_circuits > 25:
+        pressure += 1
+
+    if pressure >= 3:
+        # Heavy compression: CT metering + multi-DB + PG
+        # Balance: tight enough to fit A3, loose enough for readability
+        config.spine_component_gap = 2.0       # was 5.0 (readable min)
+        config.isolator_to_db_gap = 5.0        # was 14.0
+        config.busbar_to_breaker_gap = 7.0     # was 12.0
+        config.db_box_busbar_margin = 4.0      # was 8.0
+        config.db_box_tail_margin = 2.0        # was 4.0
+        config.db_box_label_margin = 4.0       # was 8.0
+        config.leader_margin_above_db = 4.0    # was 10.0
+        config.leader_bend_height = 3.0        # was 5.0
+        config.tail_length = 6.0               # was 8.0
+        config.ct_to_ct_gap = 1.5              # was 3.0
+        config.ct_to_branch_gap = 1.5          # was 3.0
+        config.ct_entry_gap = 0.0              # was 0.5
+        config.symbol_label_gap = 1.0          # was 0.5 — more space for labels
+    elif pressure >= 2:
+        # Moderate compression
+        config.spine_component_gap = 3.0       # was 5.0
+        config.isolator_to_db_gap = 8.0        # was 14.0
+        config.busbar_to_breaker_gap = 10.0    # was 12.0
+        config.db_box_busbar_margin = 6.0      # was 8.0
+        config.db_box_label_margin = 6.0       # was 8.0
+        config.leader_margin_above_db = 7.0    # was 10.0
+
+
 def compute_layout(
     requirements: dict,
     config: LayoutConfig | None = None,
@@ -184,6 +232,10 @@ def compute_layout(
     if config is None:
         config = LayoutConfig.from_page_config(page_config) if page_config else LayoutConfig()
 
+    # Apply requirements-level config overrides
+    if requirements.get("default_wiring_method"):
+        config.default_wiring_method = requirements["default_wiring_method"]
+
     # -- Input validation gate (defense in depth) --
     if not skip_validation:
         requirements = _validate_and_correct(requirements)
@@ -192,7 +244,9 @@ def compute_layout(
     cx = config.start_x
 
     # Start from BOTTOM -- above title block with clearance for supply label
-    y = config.min_y + 15  # ~77mm (extra clearance for 3-line supply label)
+    _dbs_check = requirements.get("distribution_boards")
+    _start_margin = 5 if (_dbs_check and len(_dbs_check) > 1) else 15
+    y = config.min_y + _start_margin
 
     ctx = _LayoutContext(
         result=result,
@@ -207,7 +261,22 @@ def compute_layout(
 
     dbs = requirements.get("distribution_boards")
     is_multi_db = dbs and len(dbs) > 1
-    topology = requirements.get("db_topology", "parallel") if is_multi_db else "parallel"
+
+    # Multi-DB compact mode: reduce vertical spacing to fit A3
+    if is_multi_db:
+        _apply_compact_spacing(config, dbs, requirements)
+
+    if is_multi_db:
+        topology = requirements.get("db_topology")
+        if not topology:
+            # Auto-detect: if any DB has fed_from, use hierarchical topology
+            topology = "parallel"
+            for db in dbs:
+                if db.get("fed_from"):
+                    topology = "hierarchical"
+                    break
+    else:
+        topology = "parallel"
 
     if is_multi_db:
         # ═══ MULTI-DB PATH: Board-Unit Independent Rendering ═══
@@ -249,6 +318,7 @@ def compute_layout(
         if topology != "hierarchical":
             _place_main_breaker(incoming_ctx)
             _place_elcb(incoming_ctx)
+            _place_internal_cable(incoming_ctx)
             _place_main_busbar(incoming_ctx)
             main_busbar_y = incoming_result.busbar_y
 
@@ -259,20 +329,38 @@ def compute_layout(
             board_start_y = main_busbar_y + 5 + 10 + 3  # bi_gap + bi_h + gap
 
         # 2. Render each board independently
-        # Propagate top-level kVA to first board (MSB) if it doesn't have its own
+        # Propagate top-level keys to root board (MSB) so _parse_board_requirements
+        # can find main_breaker, elcb, post_elcb_mcb, internal_cable, isolator, etc.
+        _PROPAGATE_KEYS = (
+            "main_breaker", "breaker", "elcb", "post_elcb_mcb",
+            "internal_cable", "isolator", "isolator_rating",
+            "busbar_rating",
+        )
         top_kva = requirements.get("kva", 0)
         root_idx = plan.root_db_idx
         board_results: list["BoardResult"] = []
         for db_idx, db in enumerate(dbs):
             if db_idx == 0 and top_kva and not db.get("kva"):
                 db = {**db, "kva": top_kva}
+            # Propagate top-level requirement keys into root board dict
+            # so that render_board → _parse_board_requirements can consume them.
+            if db_idx == root_idx:
+                for key in _PROPAGATE_KEYS:
+                    if key not in db and key in requirements:
+                        db = {**db, key: requirements[key]}
             # Inject CT metering config into root board so render_board
             # places the CT metering section INSIDE the board (not incoming).
             if db_idx == root_idx and incoming_ctx.metering == "ct_meter":
+                # Merge metering_config (manual) with metering_detail (from extraction)
+                # Also propagate top-level ct_ratio if not in metering_config
+                mc = {**requirements.get("metering_detail", {}),
+                      **requirements.get("metering_config", {})}
+                if "ct_ratio" not in mc and requirements.get("ct_ratio"):
+                    mc["ct_ratio"] = requirements["ct_ratio"]
                 db = {
                     **db,
                     "_ct_metering": True,
-                    "_metering_config": requirements.get("metering_config", {}),
+                    "_metering_config": mc,
                 }
             region = plan.db_regions[db_idx] if db_idx < len(plan.db_regions) else None
             br = render_board(
@@ -280,6 +368,7 @@ def compute_layout(
                 global_supply_type=ctx.supply_type,
                 start_y=board_start_y,
                 application_info=application_info,
+                distribution_boards=dbs,
             )
             board_results.append(br)
 
@@ -300,7 +389,7 @@ def compute_layout(
                 c for c in dbs[root_idx].get("sub_circuits", [])
                 if c.get("_is_feeder")
             ]
-            _add_hierarchical_connections(merged, root_br, child_brs, feeder_circuits)
+            _add_hierarchical_connections(merged, root_br, child_brs, feeder_circuits, dbs)
         else:
             assert main_busbar_y is not None
             _add_parallel_connections(merged, board_results, main_busbar_y)
@@ -321,57 +410,39 @@ def compute_layout(
 
         db_box_right = _place_multi_db_boxes(final_ctx, dbs, topmost)
 
-        # Set merged.busbar_y from root board so _place_earth_bar positions
-        # the earth symbol relative to the actual busbar, not the default 0.
+        # Earth bars are now placed per-DB inside _place_multi_db_boxes.
+        # Set merged.busbar_y from root board for other layout operations.
         root_br = board_results[plan.root_db_idx]
         merged.busbar_y = root_br.layout.busbar_y
-
-        _place_earth_bar(final_ctx, db_box_right)
-
-        from app.sld.layout.connectivity import validate_connectivity
-        validate_connectivity(merged, config)
 
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
 
+        # Post-layout: audit quality (read-only, no coordinate changes)
+        from app.sld.layout.audit import audit_layout
+        merged.audit_report = audit_layout(merged, config, requirements)
+
         return merged
 
     else:
-        # ═══ SINGLE-DB PATH ═══
-        _place_incoming_supply(ctx)
-        if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
-            # CT metering: spine order (supply → load):
-            #   MCCB → Protection CT → Metering CT → BI
-            # Fuses are horizontal RIGHT branches (not on spine).
-            # Ref: CT_METERING_SPINE_ORDER in sections.py, 150A/400A TPN DWGs
-            _place_unit_isolator(ctx)
-            # Add isolator-to-DB gap before CT metering section
-            _gap = config.isolator_to_db_gap
-            result.connections.append(((cx, ctx.y), (cx, ctx.y + _gap)))
-            ctx.y += _gap
-            _ct_box_start_y = ctx.y - 1
-            # Pre-MCCB fuse as horizontal RIGHT branch from spine
-            ctx._ct_pre_mccb_fuse = True
-            _place_ct_pre_mccb_fuse(ctx)
-            _place_main_breaker(ctx, skip_gap=True)
-            _place_ct_metering_section(ctx)
-            # Detect and resolve CT metering branch/label overlaps.
-            from app.sld.layout.ct_overlap import validate_ct_metering_overlaps
-            validate_ct_metering_overlaps(ctx.result, ctx.config)
-            # Override db_box_start_y to include CT metering in DB box
-            ctx.db_box_start_y = _ct_box_start_y
-        else:
-            _place_meter_board(ctx)
-            _place_unit_isolator(ctx)
-            _place_main_breaker(ctx)
-            _place_ct_pre_mccb_fuse(ctx)
-        _place_elcb(ctx)
-        _place_main_busbar(ctx)
+        # ═══ SINGLE-DB PATH (v2 architecture) ═══
+        # Section sequence is determined by the template registry based on
+        # requirements (metering type, supply source, etc.).
+        from app.sld.layout.section_registry import get_section_sequence
+
+        section_sequence = get_section_sequence(requirements)
+        for section in section_sequence:
+            section.execute(ctx)
+
+        # Sub-circuits (always present, placed after busbar)
         busbar_y_row = _place_sub_circuits_rows(ctx)
 
         # Store spine_x BEFORE resolve_overlaps for deterministic incoming chain detection
         ctx.result.spine_x = cx
 
+        # Sub-circuit post-processing (these only ADD new elements or
+        # reposition sub-circuit X coordinates — they don't modify spine
+        # or branch connection coordinates)
         resolve_overlaps(ctx.result, ctx.config)
         _add_phase_fanout(ctx.result, ctx.config, ctx.supply_type)
         _add_cable_leader_lines(ctx.result, ctx.config)
@@ -380,55 +451,102 @@ def compute_layout(
         db_box_right = _place_db_box(ctx, busbar_y_row)
         _place_earth_bar(ctx, db_box_right)
 
-        # Post-layout: snap connection endpoints to actual symbol pin positions
-        from app.sld.layout.connectivity import validate_connectivity
-        validate_connectivity(ctx.result, ctx.config)
-
         # Post-layout: center content vertically in drawing area
         _center_vertically(ctx.result, ctx.config)
 
         # Post-layout: detect overflow beyond drawing boundaries
         _detect_overflow(ctx.result, ctx.config)
 
+        # Post-layout: validate spine label overlaps (warning-only, no position changes)
+        from app.sld.layout.overlap import validate_spine_labels
+        spine_label_warnings = validate_spine_labels(ctx.result, ctx.config)
+        if spine_label_warnings:
+            for w in spine_label_warnings:
+                logger.warning("Label validation: %s", w)
+            if hasattr(ctx.result, 'overflow_metrics') and ctx.result.overflow_metrics:
+                ctx.result.overflow_metrics.warnings.extend(spine_label_warnings)
+
+        # Post-layout: audit quality (read-only, no coordinate changes)
+        from app.sld.layout.audit import audit_layout
+        ctx.result.audit_report = audit_layout(ctx.result, ctx.config, requirements)
+
+        # Attach config for renderer access (label constants, etc.)
+        ctx.result.config = ctx.config
+
         return ctx.result
 
 
-def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
-    """Shift all content vertically to center it in the drawing area.
+def _collect_content_extents(
+    result: LayoutResult, config: LayoutConfig,
+) -> tuple[list[float], list[float]]:
+    """Collect all X/Y coordinates from layout elements.
 
-    Measures the actual Y extent of all components (including vertical text
-    rendering height), connections, and dots, then applies a uniform vertical
-    shift to center the content between min_y and max_y.
-
-    Vertical text (rotation=90°) extends UPWARD from comp.y, so its top
-    extent = comp.y + len(text) * char_width_estimate.
+    Includes rendered text extents for vertical labels.
+    Returns: (all_xs, all_ys)
     """
-    # Collect all Y coordinates (including rendered text extents)
+    all_xs: list[float] = []
     all_ys: list[float] = []
     for comp in result.components:
+        all_xs.append(comp.x)
         all_ys.append(comp.y)
-        # Vertical text extends upward from comp.y
         if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
-            # Handle \\P line breaks: only longest line contributes to Y extent
             lines = comp.label.split("\\P")
             max_line_len = max(len(line) for line in lines)
-            text_extent = max_line_len * config.char_w_label
-            all_ys.append(comp.y + text_extent)
+            all_ys.append(comp.y + max_line_len * config.char_w_label)
     for jx, jy, jdir in result.junction_arrows:
+        all_xs.append(jx)
         all_ys.append(jy)
-    for (sx, sy), (ex, ey) in result.connections:
-        all_ys.extend([sy, ey])
-    for (sx, sy), (ex, ey) in result.dashed_connections:
-        all_ys.extend([sy, ey])
-    for (sx, sy), (ex, ey) in result.thick_connections:
-        all_ys.extend([sy, ey])
+    for collection in (result.connections, result.dashed_connections,
+                       result.thick_connections, result.fixed_connections):
+        for (sx, sy), (ex, ey) in collection:
+            all_xs.extend([sx, ex])
+            all_ys.extend([sy, ey])
     for x1, y1, x2, y2 in result.solid_boxes:
+        all_xs.extend([x1, x2])
         all_ys.extend([y1, y2])
     for dx, dy in result.junction_dots:
+        all_xs.append(dx)
         all_ys.append(dy)
     for ax, ay in result.arrow_points:
+        all_xs.append(ax)
         all_ys.append(ay)
+    return all_xs, all_ys
 
+
+def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
+    """Apply uniform vertical shift to all layout elements."""
+    for comp in result.components:
+        comp.y += shift
+        if comp.label_y_override is not None:
+            comp.label_y_override += shift
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
+        result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
+        result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
+        result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
+        result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
+        result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
+    for i, (dx, dy) in enumerate(result.junction_dots):
+        result.junction_dots[i] = (dx, dy + shift)
+    for i, (ax, ay) in enumerate(result.arrow_points):
+        result.arrow_points[i] = (ax, ay + shift)
+    for i, (jx, jy, jdir) in enumerate(result.junction_arrows):
+        result.junction_arrows[i] = (jx, jy + shift, jdir)
+    result.busbar_y += shift
+    result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
+    result.fanout_groups = [
+        (cx, by + shift, sxs) for cx, by, sxs in result.fanout_groups
+    ]
+    result.db_box_start_y += shift
+    result.db_box_end_y += shift
+
+
+def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
+    """Shift all content vertically to center it in the drawing area."""
+    _, all_ys = _collect_content_extents(result, config)
     if not all_ys:
         return
 
@@ -456,49 +574,22 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
     else:
         # Content doesn't fit in drawing area.  Position content so that:
         # 1. TOP (circuit labels) stays within page — most critical for readability
-        # 2. BOTTOM overflow goes into title block area (OK) but try to stay
-        #    above y=0 (content below y=0 is invisible in SVG/PDF)
+        # 2. BOTTOM stays above title block (min_y) as much as possible
         #
-        # Strategy: anchor content_max at page_height - 1 (top of page in layout
-        # coords), letting the overflow extend downward.  If content fits within
-        # the page (0 to page_height), center it.
-        page_height = 297.0  # A3 height
-        # Anchor top: content_max_y + shift = page_height - 1
-        shift = page_height - 1 - content_max_y
-        # Check bottom: if content fits on page, shift to center on page
-        if content_min_y + shift >= 1.0:
-            # Fits on page — center within page
-            page_center = page_height / 2
-            shift = page_center - current_center
+        # Strategy: center within drawing area, then clamp so top doesn't
+        # exceed max_y and bottom doesn't go below min_y (title block).
+        # If content is too tall for even that, prioritise keeping the top
+        # within bounds (top is circuit labels — most readable), letting
+        # the bottom overflow into the title block zone.
+        if content_max_y + shift > config.max_y - 2:
+            shift = config.max_y - 2 - content_max_y
+        if content_min_y + shift < config.min_y:
+            shift = config.min_y - content_min_y
 
     if abs(shift) < 1.0:
         return  # Already centered enough
 
-    # Apply vertical shift to all elements
-    for comp in result.components:
-        comp.y += shift
-        if comp.label_y_override is not None:
-            comp.label_y_override += shift
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
-        result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
-        result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
-        result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
-        result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
-    for i, (dx, dy) in enumerate(result.junction_dots):
-        result.junction_dots[i] = (dx, dy + shift)
-    for i, (ax, ay) in enumerate(result.arrow_points):
-        result.arrow_points[i] = (ax, ay + shift)
-    for i, (jx, jy, jdir) in enumerate(result.junction_arrows):
-        result.junction_arrows[i] = (jx, jy + shift, jdir)
-
-    # Update stored Y references
-    result.busbar_y += shift
-    result.busbar_y_per_row = [by + shift for by in result.busbar_y_per_row]
-    result.db_box_start_y += shift
-    result.db_box_end_y += shift
+    _apply_vertical_shift(result, shift)
 
 
 def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "parallel") -> "LayoutPlan":
@@ -601,15 +692,21 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     allocable = avail_width - gap_space
 
     # --- Helper: compute DB width at a given spacing ---
-    PG_GAP = 8.0         # mm gap between protection groups (synced with _place_protection_groups)
-    PG_MARGIN = 3.0      # mm margin per PG side (much smaller than busbar_margin)
+    # LEW reference: PG boundaries use ~3mm extra spacing (same as phase gaps),
+    # not large physical gaps.  Keep tight to avoid inflating DB2 width.
+    PG_GAP = 3.0         # mm gap between protection groups (synced with _place_protection_groups)
+    PG_MARGIN = 1.0      # mm margin per PG side (minimal busbar-end clearance)
 
     def _db_width_at_spacing(p: DBPlan, spacing: float) -> float:
         if p.protection_groups:
+            # PG circuits are bounded within their group, so they can be tighter
+            # than top-level circuits.  Cap PG spacing at 9mm (LEW practice:
+            # PG circuits ~8-9mm vs main board ~12-14mm).
+            pg_spacing = min(spacing, 9.0)
             num_pg = len(p.protection_groups)
             pg_overhead = max(0, num_pg - 1) * PG_GAP + num_pg * 2 * PG_MARGIN
             total_pg_circuits = sum(pg.circuit_count for pg in p.protection_groups)
-            return max(total_pg_circuits * spacing + pg_overhead, 60)
+            return max(total_pg_circuits * pg_spacing + pg_overhead, 60)
         else:
             return max(p.circuit_count * spacing + 2 * config.busbar_margin, 60)
 
@@ -629,6 +726,33 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # Assign widths at chosen spacing
     for p in db_plans:
         p.estimated_width = _db_width_at_spacing(p, chosen_spacing)
+
+    # When root DB has fewer circuits than children combined (common for
+    # main board + PG sub-boards), boost root width for readability.
+    # Only apply when child DBs use protection groups (PG circuits can be
+    # tighter because they're bounded within their group).
+    # IMPORTANT: Don't over-allocate to root when child has comparable or
+    # more circuits — use proportional allocation instead of fixed 52%.
+    if len(db_plans) >= 2:
+        child_has_pg = any(p.protection_groups for p in db_plans[1:])
+        child_total_circuits = sum(p.circuit_count for p in db_plans[1:])
+        root_circuits = db_plans[0].circuit_count
+        total_all_circuits = root_circuits + child_total_circuits
+        if child_has_pg and child_total_circuits > root_circuits * 2:
+            # Only boost root when children have significantly more circuits
+            # (e.g., root=8, children=20). When comparable (root=16, children=18),
+            # let natural proportional allocation handle it.
+            root_share = root_circuits / max(total_all_circuits, 1)
+            root_min = allocable * min(root_share + 0.08, 0.50)
+            if db_plans[0].estimated_width < root_min:
+                deficit = root_min - db_plans[0].estimated_width
+                db_plans[0].estimated_width = root_min
+                # Shrink child boards proportionally to compensate
+                child_total_w = sum(p.estimated_width for p in db_plans[1:])
+                if child_total_w > 0:
+                    shrink = deficit / child_total_w
+                    for p in db_plans[1:]:
+                        p.estimated_width = max(p.estimated_width * (1 - shrink), 60)
 
     # Scale proportionally if still over budget
     total_w = sum(p.estimated_width for p in db_plans)
@@ -666,6 +790,16 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
                     p.circuits_per_row = ((p.circuits_per_row + 2) // 3) * 3
             else:
                 p.circuits_per_row = min(p.circuit_count, max_per_row)
+
+    # Distribute remaining space proportionally to all DBs based on circuit count.
+    total_width = sum(p.estimated_width for p in db_plans) + gap_space
+    if total_width < avail_width and len(db_plans) >= 2:
+        surplus = avail_width - total_width
+        total_circuits_all = sum(p.circuit_count for p in db_plans)
+        if total_circuits_all > 0 and surplus > 0:
+            for p in db_plans:
+                share = p.circuit_count / total_circuits_all
+                p.estimated_width += surplus * share
 
     # Final scaling if total still exceeds available
     total_width = sum(p.estimated_width for p in db_plans) + gap_space
@@ -761,8 +895,14 @@ def _parse_board_requirements(
     Extracts breaker, ELCB, circuits, and busbar info from a board dict
     into the shared context.  Used by render_board() for per-board setup.
     """
-    # Breaker
-    breaker = board.get("breaker", board.get("main_breaker", {}))
+    # Breaker — priority chain: incoming_breaker > main_mcb > breaker > main_breaker
+    breaker = (
+        board.get("incoming_breaker")
+        or board.get("main_mcb")
+        or board.get("breaker")
+        or board.get("main_breaker")
+        or {}
+    )
     ctx.breaker_type = breaker.get("type", "MCCB")
     ctx.breaker_rating = breaker.get("rating", 100)
     ctx.breaker_poles = breaker.get("poles", "TPN")
@@ -773,19 +913,40 @@ def _parse_board_requirements(
     elcb = board.get("elcb", {})
     if elcb:
         ctx.elcb_config = elcb
-        ctx.elcb_rating = elcb.get("rating", 0)
-        ctx.elcb_ma = elcb.get("sensitivity_ma", 30)
+        ctx.elcb_rating = elcb.get("rating", 0) or elcb.get("rating_A", 0)
+        ctx.elcb_ma = elcb.get("sensitivity_ma", 0) or elcb.get("sensitivity_mA", 0) or 30
         ctx.elcb_type_str = elcb.get("type", "ELCB")
     else:
         ctx.elcb_config = {}
         ctx.elcb_rating = 0
 
-    # Circuits: merge sub_circuits + protection_group circuits
-    all_circuits = list(board.get("sub_circuits", []))
+    # ── Resolve PG circuit_id references → actual circuit dicts ──
+    # PG.circuits can be circuit_id strings (references to sub_circuits) or dicts.
+    # Resolve strings to the actual circuit dicts from sub_circuits so that
+    # downstream code (_place_protection_groups, _place_per_phase_busbars)
+    # always gets circuit dicts.
+    sub_circuits_list = board.get("sub_circuits", [])
+    circuit_by_id = {c["circuit_id"]: c for c in sub_circuits_list if isinstance(c, dict) and "circuit_id" in c}
     for pg in board.get("protection_groups", []):
-        all_circuits.extend(pg.get("circuits", []))
+        pg_circuits = pg.get("circuits", [])
+        if pg_circuits and isinstance(pg_circuits[0], str):
+            # Resolve circuit_id strings → actual dicts
+            resolved = [circuit_by_id[cid] for cid in pg_circuits if cid in circuit_by_id]
+            pg["circuits"] = resolved
+
+    # Circuits: merge sub_circuits + protection_group circuits
+    all_circuits = list(sub_circuits_list)
+    for pg in board.get("protection_groups", []):
+        pg_circuits = pg.get("circuits", [])
+        if pg_circuits and isinstance(pg_circuits[0], dict):
+            # Only extend if PG has circuits NOT already in sub_circuits
+            existing_ids = {c.get("circuit_id") for c in all_circuits}
+            for c in pg_circuits:
+                if c.get("circuit_id") not in existing_ids:
+                    all_circuits.append(c)
     for c in all_circuits:
-        c["_skip_section_pad"] = True
+        if isinstance(c, dict):
+            c["_skip_section_pad"] = True
     ctx.sub_circuits = all_circuits
     ctx.busbar_rating = board.get("busbar_rating", 100)
 
@@ -796,6 +957,28 @@ def _parse_board_requirements(
     ctx.supply_type = global_supply_type
     ctx.voltage = 400 if global_supply_type == "three_phase" else 230
 
+    # Post-ELCB MCB (RCCB+MCB serial structure)
+    ctx.post_elcb_mcb = board.get("post_elcb_mcb", {})
+
+    # Feeder connection metadata (hierarchical topology)
+    ctx.feeder_breaker = board.get("feeder_breaker", {})
+    ctx.feeder_cable = board.get("feeder_cable", "")
+
+    # Internal cable (MCCB→busbar segment label)
+    ctx.internal_cable = board.get("internal_cable", "")
+
+    # Meter board label
+    ctx.meter_board_label = board.get("meter_board", "")
+
+    # Isolator — flatten dict form {"rating": N, "type": "4P", "location_text": ...}
+    # into flat keys that _place_unit_isolator reads from ctx.requirements
+    isolator = board.get("isolator", {})
+    if isinstance(isolator, dict) and isolator:
+        if "isolator_rating" not in board:
+            board["isolator_rating"] = isolator.get("rating", 0)
+        if "isolator_label" not in board:
+            board["isolator_label"] = isolator.get("location_text", "")
+
 
 def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     """Append all elements from source into target (no coordinate transform)."""
@@ -803,6 +986,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.connections.extend(source.connections)
     target.thick_connections.extend(source.thick_connections)
     target.dashed_connections.extend(source.dashed_connections)
+    target.fixed_connections.extend(source.fixed_connections)
     target.junction_dots.extend(source.junction_dots)
     target.junction_arrows.extend(source.junction_arrows)
     target.solid_boxes.extend(source.solid_boxes)
@@ -810,6 +994,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.symbols_used.update(source.symbols_used)
     target.busbar_y_per_row.extend(source.busbar_y_per_row)
     target.busbar_x_per_row.update(source.busbar_x_per_row)
+    target.fanout_groups.extend(source.fanout_groups)
 
 
 def _compose_boards(
@@ -880,6 +1065,7 @@ def render_board(
     global_supply_type: str = "three_phase",
     start_y: float | None = None,
     application_info: dict | None = None,
+    distribution_boards: list[dict] | None = None,
 ) -> "BoardResult":
     """Render a single distribution board independently.
 
@@ -898,6 +1084,7 @@ def render_board(
         _place_ct_metering_section,
         _place_ct_pre_mccb_fuse,
         _place_elcb,
+        _place_internal_cable,
         _place_main_breaker,
         _place_main_busbar,
         _place_sub_circuits_rows,
@@ -932,6 +1119,8 @@ def render_board(
         ctx.constrained_width = region.width
 
     ctx.current_db_idx = board_idx
+    if distribution_boards:
+        ctx.distribution_boards = distribution_boards
 
     # Parse board-level requirements
     _parse_board_requirements(ctx, board, global_supply_type=global_supply_type)
@@ -958,9 +1147,14 @@ def render_board(
         ctx.has_ammeter = mc.get("has_ammeter", True)
         ctx.has_voltmeter = mc.get("has_voltmeter", True)
         ctx.has_elr = mc.get("has_elr", True)
+        ctx.has_indicator_lights = mc.get("has_indicator_lights", True)
         ctx.elr_spec = mc.get("elr_spec", "")
         ctx.voltmeter_range = mc.get("voltmeter_range", "")
         ctx.ammeter_range = mc.get("ammeter_range", "")
+        # Auto-derive ammeter range from CT ratio if not explicit
+        if not ctx.ammeter_range and ctx.ct_ratio:
+            from app.sld.layout.sections import _derive_ammeter_range
+            ctx.ammeter_range = _derive_ammeter_range(ctx.ct_ratio)
         # Add the standard gap BEFORE CT metering — this ensures cable annotation
         # (tick mark + text) and location text from the incoming isolator stay
         # clearly OUTSIDE and BELOW the DB dashed box with proper spacing.
@@ -977,13 +1171,11 @@ def render_board(
         _place_ct_pre_mccb_fuse(ctx)
         _place_main_breaker(ctx, skip_gap=True)
         _place_ct_metering_section(ctx)
-        # Detect and resolve CT metering branch/label overlaps.
-        from app.sld.layout.ct_overlap import validate_ct_metering_overlaps
-        validate_ct_metering_overlaps(ctx.result, ctx.config)
     else:
         _place_main_breaker(ctx)
         _place_ct_pre_mccb_fuse(ctx)
     _place_elcb(ctx)
+    _place_internal_cable(ctx)
     _place_main_busbar(ctx)
 
     # Override db_box_start_y to include CT metering section inside the DB box.
@@ -1016,7 +1208,7 @@ def render_board(
         layout=result,
         board_spec=board,
         board_idx=board_idx,
-        board_name=board.get("name", f"DB{board_idx + 1}"),
+        board_name=board.get("name") or board.get("db_name") or f"DB{board_idx + 1}",
         effective_supply_type=ctx.supply_type,
         spine_x=cx,
         region=region,
@@ -1037,11 +1229,23 @@ def _add_hierarchical_connections(
     root_result: "BoardResult",
     child_results: list["BoardResult"],
     feeder_circuits: list[dict],
+    dbs: list[dict] | None = None,
 ) -> None:
     """Add feeder connections from root board busbar to child boards.
 
-    Places junction dots, cable runs, SUPPLY FROM labels, and BI_CONNECTORs
-    between root board and each child board.
+    Places junction dots, cable runs, feeder MCBs, BI_CONNECTORs, incoming MCBs,
+    SUPPLY FROM labels, and cable spec labels between root board and each child board.
+
+    Reference layout (top→bottom, Y increases upward):
+        root busbar
+            ↓ junction dot
+        feeder MCB (from root's feeder_breaker)
+            ↓
+        BI_CONNECTOR
+            ↓
+        incoming MCB (from child's incoming_breaker)
+            ↓ cable + label
+        child board top
     """
     from app.sld.layout.models import PlacedComponent
 
@@ -1051,6 +1255,11 @@ def _add_hierarchical_connections(
     root_name = root_result.board_name
     bi_h = 10
     bi_w = 16
+    from app.sld.layout.models import LayoutConfig as _LC
+    _cfg = _LC()  # C4: use LayoutConfig (synced from JSON via __post_init__)
+    mcb_w = _cfg.mcb_w
+    mcb_h = _cfg.mcb_h
+    stub = _cfg.stub_len
 
     for child in child_results:
         child_cx = child.spine_x
@@ -1062,6 +1271,15 @@ def _add_hierarchical_connections(
                 feeder_ckt = fc
                 break
 
+        # Find child DB dict for incoming_breaker
+        child_db = None
+        if dbs:
+            for db in dbs:
+                db_name = (db.get("name") or db.get("db_name") or "").upper()
+                if db_name == child.board_name.upper():
+                    child_db = db
+                    break
+
         # Junction on root busbar
         tap_x = max(root_busbar_sx + 2, min(child_cx, root_busbar_ex - 2))
         merged.junction_dots.append((tap_x, root_busbar_y))
@@ -1071,41 +1289,122 @@ def _add_hierarchical_connections(
             cable_run_y = root_busbar_y - 8
             merged.connections.append(((tap_x, root_busbar_y), (tap_x, cable_run_y)))
             merged.connections.append(((tap_x, cable_run_y), (child_cx, cable_run_y)))
-            cable_bottom_y = cable_run_y
+            connect_y = cable_run_y
         else:
-            cable_bottom_y = root_busbar_y
+            connect_y = root_busbar_y
 
-        # Labels
+        # ── Feeder MCB (root side) ──
+        # Priority: feeder circuit → root board dict → child DB dict
+        feeder_brk = feeder_ckt.get("feeder_breaker", {}) if feeder_ckt else {}
+        if not feeder_brk:
+            # Check root board dict (MSB) for feeder_breaker
+            root_db = dbs[root_result.board_idx] if dbs and root_result.board_idx < len(dbs) else None
+            if root_db:
+                feeder_brk = root_db.get("feeder_breaker", {})
+        if not feeder_brk and child_db:
+            feeder_brk = child_db.get("feeder_breaker", {})
+        # Normalize feeder_brk: may be a string like "63A Type C MCB 10kA"
+        if feeder_brk and isinstance(feeder_brk, str):
+            import re as _re
+            _fb = {}
+            _rm = _re.search(r'(\d+)\s*[Aa]', feeder_brk)
+            if _rm:
+                _fb['rating'] = int(_rm.group(1))
+            _tm = _re.search(r'(MCB|MCCB|ACB)', feeder_brk, _re.I)
+            if _tm:
+                _fb['type'] = _tm.group(1).upper()
+            _cm = _re.search(r'Type\s*([A-D])', feeder_brk, _re.I)
+            if _cm:
+                _fb['breaker_characteristic'] = _cm.group(1).upper()
+            _km = _re.search(r'(\d+)\s*[Kk][Aa]', feeder_brk)
+            if _km:
+                _fb['fault_kA'] = int(_km.group(1))
+            _pm = _re.search(r'(TPN|SPN|DP|4P)', feeder_brk, _re.I)
+            if _pm:
+                _fb['poles'] = _pm.group(1).upper()
+            feeder_brk = _fb
+        if feeder_brk and feeder_brk.get("rating"):
+            fmcb_y = connect_y - stub - mcb_h
+            merged.connections.append(((child_cx, connect_y), (child_cx, fmcb_y + mcb_h)))
+            f_type = feeder_brk.get("type", "MCB")
+            f_char = feeder_brk.get("breaker_characteristic", "")
+            f_rating = feeder_brk.get("rating", 0)
+            f_poles = feeder_brk.get("poles", "TPN")
+            f_kA = feeder_brk.get("fault_kA", 10)
+            if f_char:
+                f_label = f"{f_rating}A {f_poles} Type {f_char} {f_type} ({f_kA}kA)"
+            else:
+                f_label = f"{f_rating}A {f_poles} {f_type} ({f_kA}kA)"
+            merged.components.append(PlacedComponent(
+                symbol_name=f"CB_{f_type}",
+                x=child_cx - mcb_w / 2,
+                y=fmcb_y,
+                label=f_label,
+                rating=f"{f_rating}A",
+                poles=f_poles,
+                breaker_type_str=f_type,
+            ))
+            merged.symbols_used.add(f_type)
+            connect_y = fmcb_y - stub
+        else:
+            # No feeder MCB — direct connection to BI_CONNECTOR
+            pass
+
+        # ── Direct connection (no BI_CONNECTOR for hierarchical feeders) ──
+        # LEW reference: feeder MCB → cable → child DB incoming breaker, no BI connector.
+        connect_y = connect_y - stub
+
+        # ── Incoming MCB (child side) ──
+        # Skip: render_board() already renders incoming_breaker as the board's
+        # main breaker.  Drawing it here too would duplicate it on the diagram.
+        # (LEW reference: only feeder MCB on connection path, incoming MCB inside DB.)
+
+        # ── Labels ──
+        # Position supply labels to the right of the connection spine,
+        # BELOW the child board's main breaker (near DB box top).
+        # Reference: text sits between incoming MCB and DB box, to the right.
+        _label_x = child_cx + 5
+        if child.region:
+            _label_x = max(child_cx + 5, child.region.max_x - 55)
+
+        # Y: use child's busbar_y (or db_box_start_y) so labels are BELOW
+        # the busbar where circuits are placed ABOVE.
+        _label_y = connect_y - 3
+        if child.busbar_y > 0:
+            # Place label between incoming breaker and busbar — below busbar level
+            _label_y = child.busbar_y + 3
+        elif child.db_box_start_y > 0:
+            _label_y = child.db_box_start_y - 8
+
         merged.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=child_cx + 5,
-            y=cable_bottom_y - 3,
+            x=_label_x,
+            y=_label_y,
             label=f"SUPPLY FROM {root_name}",
         ))
+
+        # Cable spec label
+        cable_spec = ""
         if feeder_ckt:
             cable_spec = feeder_ckt.get("cable_size", "") or feeder_ckt.get("cable", "")
-            if cable_spec:
-                merged.components.append(PlacedComponent(
-                    symbol_name="LABEL",
-                    x=child_cx + 5,
-                    y=cable_bottom_y - 6,
-                    label=str(cable_spec),
-                ))
+        if not cable_spec:
+            # Check root board dict (MSB) for feeder_cable
+            root_db = dbs[root_result.board_idx] if dbs and root_result.board_idx < len(dbs) else None
+            if root_db:
+                cable_spec = root_db.get("feeder_cable", "")
+        if not cable_spec and child_db:
+            cable_spec = child_db.get("feeder_cable", "")
+        if cable_spec:
+            from app.sld.layout.models import format_cable_spec
+            merged.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=_label_x,
+                y=_label_y - 3,
+                label=format_cable_spec(str(cable_spec), multiline=True),
+            ))
 
-        # BI_CONNECTOR
-        bi_y = cable_bottom_y - 12
-        merged.connections.append(((child_cx, cable_bottom_y), (child_cx, bi_y)))
-        merged.components.append(PlacedComponent(
-            symbol_name="BI_CONNECTOR",
-            x=child_cx - bi_w / 2,
-            y=bi_y,
-            label="BI CONN.",
-        ))
-        merged.symbols_used.add("BI_CONNECTOR")
-
-        # Connection from BI_CONNECTOR to child board top
-        child_top_y = bi_y + bi_h
-        merged.connections.append(((child_cx, child_top_y), (child_cx, child_top_y + 3)))
+        # Connection to child board top
+        merged.connections.append(((child_cx, connect_y), (child_cx, connect_y - 3)))
 
 
 def _add_parallel_connections(
@@ -1147,6 +1446,245 @@ def _add_parallel_connections(
         merged.connections.append(((db_cx, sub_start_y), (db_cx, sub_start_y + 3)))
 
 
+def _is_per_phase_busbar_mode(db: dict, ctx: _LayoutContext) -> bool:
+    """Detect per-phase busbar pattern: phase-grouped circuits with single board-level RCCB.
+
+    Returns True when:
+    - Board has protection_groups (phase-organized circuits)
+    - Protection groups do NOT have per-group RCCBs (missing or empty rccb spec)
+    - Board has a board-level ELCB/RCCB (placed on spine by _place_elcb)
+
+    This pattern produces 3 separate busbar segments at the same Y coordinate,
+    each serving one phase's circuits, with a single 4P RCCB on the spine above.
+
+    Reference DXF: 3 horizontal busbar lines at same Y, single 4P RCCB above.
+    MCB spacing: 8.6mm within group, 11.5mm between phase groups.
+    """
+    pgroups = db.get("protection_groups", [])
+    if not pgroups:
+        return False
+
+    # Check if ANY group has its own RCCB spec with a rating
+    has_per_group_rccb = any(
+        pg.get("rccb", {}).get("rating", 0) > 0
+        for pg in pgroups
+    )
+    if has_per_group_rccb:
+        return False
+
+    # Board must have a board-level ELCB/RCCB
+    return ctx.elcb_rating > 0
+
+
+def _place_per_phase_busbars(
+    ctx: _LayoutContext,
+    db: dict,
+    db_cx: float,
+    pgroups: list[dict],
+    db_available_width: float,
+) -> float:
+    """Place 3 separate busbar segments at the same Y for per-phase layout.
+
+    Layout (single 4P RCCB pattern):
+
+        [circuits L1]  [circuits L2]  [circuits L3]
+              |              |              |
+        [busbar L1]    [busbar L2]    [busbar L3]   ← 3 segments, same Y
+              └──────────────┼──────────────┘
+                       [main busbar]   ← result.busbar_y (already placed)
+                             |
+                       [4P RCCB]       ← already placed by _place_elcb()
+
+    The single 4P RCCB is placed on the spine by _place_elcb() before this
+    function is called. This function only creates the 3 busbar segments and
+    their circuits.
+
+    Reference DXF spacing:
+    - 8.6mm between MCBs within a phase group
+    - 11.5mm gap between phase groups
+
+    Returns the topmost Y (for DB box sizing).
+    """
+    from app.sld.layout.models import LayoutRegion, PlacedComponent
+    from app.sld.layout.sections import _place_sub_circuits_rows
+
+    result = ctx.result
+    config = ctx.config
+    main_busbar_y = result.busbar_y
+    num_groups = len(pgroups)
+
+    # ── Calculate per-group widths and positions ──
+    group_circuit_counts = []
+    for pg in pgroups:
+        n = len(pg.get("circuits", []))
+        group_circuit_counts.append(max(n, 1))
+
+    total_circuits = sum(group_circuit_counts)
+
+    # Reference DXF spacing constants
+    INTRA_GROUP_SPACING = 8.6   # mm between MCBs within a phase group
+    INTER_GROUP_GAP = 11.5      # mm gap between phase groups
+    pg_margin = 1               # mm per side for busbar end caps
+
+    margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * INTER_GROUP_GAP
+    usable_for_circuits = max(db_available_width - margin_overhead, total_circuits * 3)
+
+    # Use reference spacing if it fits, otherwise scale down
+    direct_spacing = usable_for_circuits / max(total_circuits, 1)
+    overall_spacing = max(3.0, min(direct_spacing, INTRA_GROUP_SPACING))
+
+    # Distribute width proportionally per group
+    group_widths = []
+    for n in group_circuit_counts:
+        w = n * overall_spacing + 2 * pg_margin
+        group_widths.append(max(w, 25))
+
+    # Ensure total groups width fits within DB allocation
+    total_groups_width = sum(group_widths) + max(0, num_groups - 1) * INTER_GROUP_GAP
+    if total_groups_width > db_available_width:
+        compress = db_available_width / total_groups_width
+        group_widths = [w * compress for w in group_widths]
+        total_groups_width = db_available_width
+        overall_spacing *= compress
+
+    groups_start_x = db_cx - total_groups_width / 2
+
+    # Clamp to active region
+    if ctx.active_region:
+        clamp_left = ctx.active_region.min_x
+        clamp_right = ctx.active_region.max_x
+        region_width = clamp_right - clamp_left
+        if total_groups_width > region_width:
+            compress = region_width / total_groups_width
+            group_widths = [w * compress for w in group_widths]
+            total_groups_width = region_width
+            overall_spacing *= compress
+        if groups_start_x < clamp_left:
+            groups_start_x = clamp_left
+        if groups_start_x + total_groups_width > clamp_right:
+            groups_start_x = clamp_right - total_groups_width
+
+    # Page-level clamping
+    if groups_start_x < config.min_x:
+        groups_start_x = config.min_x
+    if groups_start_x + total_groups_width > config.max_x:
+        groups_start_x = config.max_x - total_groups_width
+
+    # Group center X positions
+    group_cxs: list[float] = []
+    x_cursor = groups_start_x
+    for w in group_widths:
+        group_cxs.append(x_cursor + w / 2)
+        x_cursor += w + INTER_GROUP_GAP
+
+    # ── Place each phase's busbar segment and circuits ──
+    # All busbars at the SAME Y (directly above main busbar)
+    per_phase_busbar_y = main_busbar_y  # Same Y as main busbar — segments replace it
+    topmost_y = main_busbar_y
+
+    for pg_idx, (pg, pg_cx, pg_width) in enumerate(
+        zip(pgroups, group_cxs, group_widths)
+    ):
+        phase = pg.get("phase", f"L{pg_idx + 1}")
+        pg_circuits = pg.get("circuits", [])
+
+        # Junction dot on main busbar at group center
+        result.junction_dots.append((pg_cx, main_busbar_y))
+
+        # Vertical connection from main busbar to per-phase busbar
+        # (They are at the same Y, so this is just a junction — no visible line needed
+        # unless the per-phase busbar is offset. For visual clarity, draw a short stub.)
+        result.connections.append(((pg_cx, main_busbar_y), (pg_cx, per_phase_busbar_y)))
+
+        # ── Place sub-circuits for this group ──
+        saved_cx = ctx.cx
+        saved_y = ctx.y
+        saved_sub_circuits = ctx.sub_circuits
+        saved_busbar_y = result.busbar_y
+        saved_bus_sx = result.busbar_start_x
+        saved_bus_ex = result.busbar_end_x
+        saved_active_region = ctx.active_region
+        saved_constrained_width = ctx.constrained_width
+
+        ctx.cx = pg_cx
+        ctx.y = per_phase_busbar_y
+
+        # PG circuits are single-phase — no triplet padding needed
+        pg_padded = list(pg_circuits)
+        for c in pg_padded:
+            c["_skip_section_pad"] = True
+        ctx.sub_circuits = pg_padded
+
+        # Per-phase busbar extents
+        half_w = pg_width / 2
+        sub_bus_sx = pg_cx - half_w
+        sub_bus_ex = pg_cx + half_w
+
+        # Set per-group region constraint
+        ctx.active_region = LayoutRegion(
+            min_x=sub_bus_sx, max_x=sub_bus_ex,
+            name=f"PG-{phase}",
+        )
+        ctx.constrained_width = pg_width
+
+        result.busbar_y = per_phase_busbar_y
+        result.busbar_start_x = sub_bus_sx
+        result.busbar_end_x = sub_bus_ex
+
+        # Per-phase busbar component
+        phase_upper = phase.upper() if phase else f"L{pg_idx + 1}"
+        sub_busbar_label = f"{db.get('busbar_rating', 80)}A BUSBAR"
+        result.components.append(PlacedComponent(
+            symbol_name="BUSBAR",
+            x=sub_bus_sx,
+            y=per_phase_busbar_y,
+            label=sub_busbar_label,
+            rating="",
+            cable_annotation=f"{sub_bus_ex:.1f}",
+        ))
+
+        # Place sub-circuits within constrained busbar range
+        ctx.skip_row_bi_connector = True
+        sub_busbar_y = _place_sub_circuits_rows(ctx)
+        ctx.skip_row_bi_connector = False
+        topmost_y = max(topmost_y, sub_busbar_y)
+
+        # Restore context
+        ctx.cx = saved_cx
+        ctx.y = saved_y
+        ctx.sub_circuits = saved_sub_circuits
+        result.busbar_y = saved_busbar_y
+        ctx.active_region = saved_active_region
+        ctx.constrained_width = saved_constrained_width
+        result.busbar_start_x = saved_bus_sx
+        result.busbar_end_x = saved_bus_ex
+
+    # Register PG-level regions for overlap resolution
+    db_idx = ctx.current_db_idx
+    if db_idx >= 0 and result.layout_regions:
+        db_name = db.get("name", "")
+        result.layout_regions = [
+            r for r in result.layout_regions if r.name != db_name
+        ]
+    for pg_idx, (pg_cx, pg_width) in enumerate(zip(group_cxs, group_widths)):
+        pg_region = LayoutRegion(
+            min_x=pg_cx - pg_width / 2,
+            max_x=pg_cx + pg_width / 2,
+            name=f"PG-{pgroups[pg_idx].get('phase', f'L{pg_idx + 1}')}",
+        )
+        result.layout_regions.append(pg_region)
+
+    # Update DB busbar_start_x/end_x to span all groups
+    if group_cxs:
+        result.busbar_start_x = min(group_cxs) - group_widths[0] / 2
+        result.busbar_end_x = max(group_cxs) + group_widths[-1] / 2
+        if ctx.active_region:
+            result.busbar_start_x = max(result.busbar_start_x, ctx.active_region.min_x)
+            result.busbar_end_x = min(result.busbar_end_x, ctx.active_region.max_x)
+
+    return topmost_y
+
+
 def _place_protection_groups(
     ctx: _LayoutContext,
     db: dict,
@@ -1154,7 +1692,18 @@ def _place_protection_groups(
 ) -> float:
     """Place per-phase RCCB protection groups within a sub-DB.
 
-    Layout (DB2 pattern with 3 per-phase RCCBs):
+    Two modes:
+
+    1. Per-group RCCB mode (existing, default):
+       Each phase group has its own 2P RCCB between the main busbar and
+       the group's sub-busbar. 3 separate vertical chains.
+
+    2. Per-phase busbar mode (new):
+       A single 4P RCCB sits on the spine (placed by _place_elcb()),
+       and 3 separate busbar segments at the same Y serve each phase's
+       circuits directly. No per-group RCCBs.
+
+    Layout mode 1 (per-group RCCBs):
 
         [circuits L1]  [circuits L2]  [circuits L3]
               |              |              |
@@ -1164,8 +1713,15 @@ def _place_protection_groups(
               └──────────────┼──────────────┘
                        [DB main busbar]   ← result.busbar_y (already placed)
 
-    Each group gets: junction dot on main busbar → vertical line → RCCB →
-    sub-busbar → sub-circuits placed upward.
+    Layout mode 2 (per-phase busbars, single 4P RCCB):
+
+        [circuits L1]  [circuits L2]  [circuits L3]
+              |              |              |
+        [busbar L1]    [busbar L2]    [busbar L3]   ← 3 segments, same Y
+              └──────────────┼──────────────┘
+                       [main busbar]   ← result.busbar_y (already placed)
+                             |
+                       [4P RCCB]       ← already on spine
 
     Returns the topmost Y (for DB box sizing).
     """
@@ -1195,6 +1751,16 @@ def _place_protection_groups(
     if not db_available_width:
         db_available_width = (config.max_x - config.min_x) / max(result.db_count, 1)
 
+    # ── Dispatch: per-phase busbar mode vs per-group RCCB mode ──
+    if _is_per_phase_busbar_mode(db, ctx):
+        logger.info(
+            "Per-phase busbar mode: %d groups, single %dA %s on spine",
+            num_groups, ctx.elcb_rating, ctx.elcb_type_str,
+        )
+        return _place_per_phase_busbars(ctx, db, db_cx, pgroups, db_available_width)
+
+    # ── Per-group RCCB mode (existing behavior) ──
+
     # ── Calculate per-group widths and positions ──
     group_circuit_counts = []
     for pg in pgroups:
@@ -1204,8 +1770,8 @@ def _place_protection_groups(
 
     total_circuits = sum(group_circuit_counts)
     gap = 8  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
-    # Minimal margins for protection groups (3mm per side = 6mm total per group)
-    pg_margin = 3  # mm per side for each group busbar
+    # Minimal margins for protection groups (1mm per side = 2mm total per group)
+    pg_margin = 1  # mm per side for each group busbar
     margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * gap
     # STRICT: never exceed actual available width (no inflation by min_spacing)
     usable_for_circuits = max(db_available_width - margin_overhead, total_circuits * 3)
@@ -1231,14 +1797,27 @@ def _place_protection_groups(
         overall_spacing *= compress
 
     groups_start_x = db_cx - total_groups_width / 2
-    # Clamp to active region
+    # Clamp to active region (strict: never exceed boundaries)
     if ctx.active_region:
         clamp_left = ctx.active_region.min_x
         clamp_right = ctx.active_region.max_x
+        region_width = clamp_right - clamp_left
+        if total_groups_width > region_width:
+            # Compress groups to fit within region
+            compress = region_width / total_groups_width
+            group_widths = [w * compress for w in group_widths]
+            total_groups_width = region_width
+            overall_spacing *= compress
         if groups_start_x < clamp_left:
             groups_start_x = clamp_left
         if groups_start_x + total_groups_width > clamp_right:
             groups_start_x = clamp_right - total_groups_width
+
+    # Page-level clamping (even without active_region)
+    if groups_start_x < config.min_x:
+        groups_start_x = config.min_x
+    if groups_start_x + total_groups_width > config.max_x:
+        groups_start_x = config.max_x - total_groups_width
 
     # Group center X positions
     group_cxs: list[float] = []
@@ -1249,8 +1828,10 @@ def _place_protection_groups(
 
     # ── Place each protection group ──
     topmost_y = main_busbar_y
-    rccb_h = config.rccb_h  # RCCB symbol height
-    rccb_w = config.rccb_w  # RCCB symbol width
+    from app.sld.catalog import get_catalog as _gc
+    _rccb_def = _gc().get("RCCB")
+    rccb_h = _rccb_def.height  # RCCB symbol height
+    rccb_w = _rccb_def.width   # RCCB symbol width
 
     for pg_idx, (pg, pg_cx, pg_width) in enumerate(
         zip(pgroups, group_cxs, group_widths)
@@ -1341,10 +1922,14 @@ def _place_protection_groups(
             y=sub_busbar_y_pos,
             label=sub_busbar_label,
             rating="",
+            cable_annotation=f"{sub_bus_ex:.1f}",  # encode bus_end_x for renderer
         ))
 
         # Place sub-circuits within constrained busbar range
+        # Protection groups don't use BI connectors between multi-row busbars
+        ctx.skip_row_bi_connector = True
         sub_busbar_y = _place_sub_circuits_rows(ctx)
+        ctx.skip_row_bi_connector = False
         topmost_y = max(topmost_y, sub_busbar_y)
 
         # NOTE: PG sub-busbars all share the same Y, so we use
@@ -1430,8 +2015,10 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
         else:
             box_start_y = start_y - config.db_info_height(db_info_text)
 
+        from app.sld.catalog import get_catalog as _gc2
+        _mcb_def2 = _gc2().get("MCB")
         box_end_y = (busbar_y_row + config.db_box_busbar_margin
-                     + config.mcb_h + config.stub_len
+                     + _mcb_def2.height + _mcb_def2.stub
                      + config.db_box_tail_margin + config.db_box_label_margin)
 
         # Horizontal extents — region-based (preferred) or midpoint-based
@@ -1464,6 +2051,16 @@ def _place_multi_db_boxes(ctx: _LayoutContext, dbs: list[dict],
 
         rightmost_x = max(rightmost_x, box_right)
 
+        # Place per-DB earth bar (outside each DB box, right side)
+        _saved_busbar_y = result.busbar_y
+        _saved_db_box_start_y = getattr(result, "db_box_start_y", None)
+        result.busbar_y = busbar_y_row  # Earth bar relative to THIS DB's busbar
+        result.db_box_start_y = box_start_y  # Earth bar below THIS DB's box
+        _place_earth_bar(ctx, box_right)
+        result.busbar_y = _saved_busbar_y
+        if _saved_db_box_start_y is not None:
+            result.db_box_start_y = _saved_db_box_start_y
+
     return rightmost_x
 
 
@@ -1480,34 +2077,7 @@ def _detect_overflow(result: LayoutResult, config: LayoutConfig) -> None:
 
     metrics = OverflowMetrics()
 
-    all_xs: list[float] = []
-    all_ys: list[float] = []
-
-    for comp in result.components:
-        all_xs.append(comp.x)
-        all_ys.append(comp.y)
-        # Vertical text extends upward from comp.y
-        if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
-            lines = comp.label.split("\\P")
-            max_line_len = max(len(line) for line in lines)
-            all_ys.append(comp.y + max_line_len * config.char_w_label)
-
-    for collection in (result.connections, result.dashed_connections, result.thick_connections):
-        for (sx, sy), (ex, ey) in collection:
-            all_xs.extend([sx, ex])
-            all_ys.extend([sy, ey])
-    for x1, y1, x2, y2 in result.solid_boxes:
-        all_xs.extend([x1, x2])
-        all_ys.extend([y1, y2])
-    for dx, dy in result.junction_dots:
-        all_xs.append(dx)
-        all_ys.append(dy)
-    for ax, ay in result.arrow_points:
-        all_xs.append(ax)
-        all_ys.append(ay)
-    for jx, jy, jdir in result.junction_arrows:
-        all_xs.append(jx)
-        all_ys.append(jy)
+    all_xs, all_ys = _collect_content_extents(result, config)
 
     if not all_xs or not all_ys:
         result.overflow_metrics = metrics

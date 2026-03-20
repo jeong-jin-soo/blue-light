@@ -99,4 +99,15 @@ public interface EmailService {
      * @param applicantName 신청자 이름
      */
     void sendLewAssignedEmail(String to, String lewName, Long appSeq, String address, String applicantName);
+
+    /**
+     * 결제 확인 알림 이메일 (LEW에게 발송)
+     *
+     * @param to       LEW 이메일
+     * @param lewName  LEW 이름
+     * @param appSeq   신청서 번호
+     * @param address  설치 주소
+     * @param amount   결제 금액
+     */
+    void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount);
 }

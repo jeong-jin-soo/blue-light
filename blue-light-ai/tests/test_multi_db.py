@@ -489,6 +489,203 @@ class TestProtectionGroups:
 
 
 # ---------------------------------------------------------------------------
+# Per-phase busbar mode fixtures & tests
+# ---------------------------------------------------------------------------
+
+# Multi-DB board where DB2 has protection_groups with NO per-group RCCBs,
+# but a single board-level 4P RCCB. This triggers per-phase busbar mode.
+PER_PHASE_BUSBAR_BOARD = {
+    "supply_type": "three_phase",
+    "kva": 69,
+    "voltage": 400,
+    "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+    "busbar_rating": 100,
+    "metering": "non_metered",
+    "supply_source": "sp_powergrid",
+    "distribution_boards": [
+        {
+            "name": "MSB",
+            "breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            "busbar_rating": 100,
+            "sub_circuits": [
+                {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+            ],
+        },
+        {
+            "name": "DB2",
+            "breaker": {"type": "MCCB", "rating": 63, "poles": "TPN", "fault_kA": 25},
+            "busbar_rating": 80,
+            "elcb": {"type": "RCCB", "rating": 63, "sensitivity_ma": 30, "poles": "4P"},
+            "protection_groups": [
+                {
+                    "phase": "L1",
+                    "circuits": [
+                        {"name": "L1 Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L1 Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L1 Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L1 Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L1 Aircon", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L1 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "phase": "L2",
+                    "circuits": [
+                        {"name": "L2 Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L2 Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L2 Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L2 Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L2 Aircon", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L2 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "phase": "L3",
+                    "circuits": [
+                        {"name": "L3 Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L3 Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "L3 Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L3 Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L3 Aircon", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "L3 Spare", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+            ],
+        },
+    ],
+}
+
+# Same structure but with per-group RCCBs — should NOT trigger per-phase busbar mode.
+# Uses the existing MULTI_DB_WITH_PROTECTION_GROUPS fixture (DB2 has per-group RCCBs).
+
+
+class TestPerPhaseBusbars:
+    """Tests for per-phase busbar rendering (single 4P RCCB pattern)."""
+
+    def test_per_phase_busbar_produces_result(self):
+        """Per-phase busbar board should produce a valid layout."""
+        result = compute_layout(PER_PHASE_BUSBAR_BOARD)
+        assert result.db_count == 2
+        assert len(result.components) > 0
+
+    def test_per_phase_busbar_has_three_busbar_segments(self):
+        """DB2 with per-phase busbars should produce 3 BUSBAR segments for phase groups."""
+        result = compute_layout(PER_PHASE_BUSBAR_BOARD)
+        busbars = [c for c in result.components if c.symbol_name == "BUSBAR"]
+        # DB2 has 3 per-phase busbar segments + MSB has 1 + main busbar = at least 4
+        phase_busbars = [b for b in busbars if "80A BUSBAR" in b.label]
+        assert len(phase_busbars) >= 3, \
+            f"Expected >=3 per-phase BUSBAR segments (80A BUSBAR), found {len(phase_busbars)}: " \
+            f"{[(b.label, b.x) for b in busbars]}"
+
+    def test_per_phase_busbars_at_same_y(self):
+        """All 3 per-phase busbar segments should be at the same Y coordinate."""
+        result = compute_layout(PER_PHASE_BUSBAR_BOARD)
+        busbars = [c for c in result.components if c.symbol_name == "BUSBAR"]
+        phase_busbars = [b for b in busbars if "80A BUSBAR" in b.label]
+        assert len(phase_busbars) >= 3, \
+            f"Expected >=3 phase busbars, found {len(phase_busbars)}"
+        y_values = {b.y for b in phase_busbars}
+        assert len(y_values) == 1, \
+            f"Per-phase busbars should be at same Y, got: {y_values}"
+
+    def test_per_phase_busbar_single_board_level_rccb(self):
+        """Per-phase busbar mode should place exactly 1 board-level RCCB for DB2."""
+        result = compute_layout(PER_PHASE_BUSBAR_BOARD)
+        rccb_components = [
+            c for c in result.components
+            if c.symbol_name in ("RCCB", "CB_RCCB")
+        ]
+        # DB2 should have exactly 1 board-level 4P RCCB (placed by _place_elcb)
+        # NOT 3 per-group RCCBs
+        assert len(rccb_components) == 1, \
+            f"Expected 1 board-level RCCB for DB2, found {len(rccb_components)}: " \
+            f"{[(r.symbol_name, r.label) for r in rccb_components]}"
+
+    def test_per_phase_busbar_all_circuits_placed(self):
+        """All circuits should be placed: MSB 3 + DB2 18 = 21 circuit breakers."""
+        result = compute_layout(PER_PHASE_BUSBAR_BOARD)
+        sub_breakers = [
+            c for c in result.components
+            if c.symbol_name.startswith("CB_") and c.symbol_name not in ("CB_RCCB", "CB_ELCB")
+        ]
+        # MSB: 3 circuits + DB2: 18 circuits + 2 main MCCBs = at least 23
+        assert len(sub_breakers) >= 23, \
+            f"Expected >=23 breakers, found {len(sub_breakers)}"
+
+    def test_per_phase_busbar_has_inter_group_spacing(self):
+        """Per-phase busbar segments should have gaps between them (non-contiguous)."""
+        result = compute_layout(PER_PHASE_BUSBAR_BOARD)
+        busbars = [c for c in result.components if c.symbol_name == "BUSBAR"]
+        phase_busbars = [b for b in busbars if "80A BUSBAR" in b.label]
+        if len(phase_busbars) >= 3:
+            sorted_busbars = sorted(phase_busbars, key=lambda b: b.x)
+            for i in range(len(sorted_busbars) - 1):
+                end_x = float(sorted_busbars[i].cable_annotation)
+                next_start_x = sorted_busbars[i + 1].x
+                gap = next_start_x - end_x
+                assert gap > 0, \
+                    f"Busbar segments should have gaps, but segment {i} ends at " \
+                    f"{end_x} and segment {i+1} starts at {next_start_x}"
+
+    def test_per_group_rccb_backward_compat(self):
+        """Board with per-group RCCBs should still use the per-group RCCB mode."""
+        result = compute_layout(MULTI_DB_WITH_PROTECTION_GROUPS)
+        rccb_components = [
+            c for c in result.components
+            if c.symbol_name == "RCCB"
+        ]
+        # DB2 has 3 per-group RCCBs
+        assert len(rccb_components) >= 3, \
+            f"Expected >=3 per-group RCCBs, found {len(rccb_components)}"
+
+    def test_detection_function(self):
+        """Test _is_per_phase_busbar_mode detection logic directly."""
+        from app.sld.layout.engine import _is_per_phase_busbar_mode
+        from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
+
+        config = LayoutConfig()
+
+        # Case 1: per-phase busbar mode (no per-group RCCBs, board-level RCCB)
+        ctx1 = _LayoutContext(
+            result=LayoutResult(), config=config, cx=210, y=100,
+            elcb_rating=100, elcb_type_str="RCCB",
+        )
+        db1 = {
+            "protection_groups": [
+                {"phase": "L1", "circuits": [{"name": "c1"}]},
+                {"phase": "L2", "circuits": [{"name": "c2"}]},
+                {"phase": "L3", "circuits": [{"name": "c3"}]},
+            ],
+        }
+        assert _is_per_phase_busbar_mode(db1, ctx1) is True
+
+        # Case 2: per-group RCCB mode (groups have their own RCCBs)
+        ctx2 = _LayoutContext(
+            result=LayoutResult(), config=config, cx=210, y=100,
+            elcb_rating=0,
+        )
+        db2 = {
+            "protection_groups": [
+                {"phase": "L1", "rccb": {"rating": 40}, "circuits": [{"name": "c1"}]},
+                {"phase": "L2", "rccb": {"rating": 40}, "circuits": [{"name": "c2"}]},
+                {"phase": "L3", "rccb": {"rating": 40}, "circuits": [{"name": "c3"}]},
+            ],
+        }
+        assert _is_per_phase_busbar_mode(db2, ctx2) is False
+
+        # Case 3: no protection groups at all
+        ctx3 = _LayoutContext(
+            result=LayoutResult(), config=config, cx=210, y=100,
+            elcb_rating=100,
+        )
+        db3 = {}
+        assert _is_per_phase_busbar_mode(db3, ctx3) is False
+
+
+# ---------------------------------------------------------------------------
 # Layout Plan tests
 # ---------------------------------------------------------------------------
 
@@ -920,3 +1117,215 @@ class TestFeederDetection:
         ]
         topology = _build_db_hierarchy(db_list)
         assert topology == "parallel"
+
+
+# ---------------------------------------------------------------------------
+# B1: DistributionBoardData 5-field extraction (incoming_breaker, etc.)
+# ---------------------------------------------------------------------------
+
+class TestB1FieldExtraction:
+    """B1 fix: 5 fields in DistributionBoardData are extracted and propagated."""
+
+    def test_distribution_board_data_has_new_fields(self):
+        """DistributionBoardData schema includes 5 new fields."""
+        from app.sld.extraction_schema import DistributionBoardData
+        fields = set(DistributionBoardData.model_fields.keys())
+        assert "incoming_breaker" in fields
+        assert "feeder_breaker" in fields
+        assert "feeder_cable" in fields
+        assert "main_mcb" in fields
+        assert "meter_board" in fields
+
+    def test_normalize_populates_incoming_breaker(self):
+        """normalize_to_generation_format propagates incoming_breaker."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    incoming_breaker=BreakerSpec(type="MCCB", rating_a=150, poles="TPN", ka_rating=35),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        assert len(dbs) == 1
+        assert "incoming_breaker" in dbs[0]
+        assert dbs[0]["incoming_breaker"]["rating"] == 150
+        assert dbs[0]["incoming_breaker"]["type"] == "MCCB"
+
+    def test_normalize_populates_feeder_breaker(self):
+        """normalize_to_generation_format propagates feeder_breaker."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+                DistributionBoardData(
+                    name="DB2",
+                    fed_from="MSB",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    feeder_breaker=BreakerSpec(type="MCCB", rating_a=80, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        db2 = next(d for d in dbs if d["name"] == "DB2")
+        assert "feeder_breaker" in db2
+        assert db2["feeder_breaker"]["rating"] == 80
+
+    def test_normalize_populates_meter_board(self):
+        """normalize_to_generation_format propagates meter_board."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    meter_board="CT METER BOARD",
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        assert dbs[0].get("meter_board") == "CT METER BOARD"
+
+    def test_missing_fields_not_in_output(self):
+        """If DistributionBoardData field is None, it should not appear in output dict."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        dbs = result.get("distribution_boards", [])
+        # None fields should not appear in the dict
+        assert "incoming_breaker" not in dbs[0]
+        assert "feeder_breaker" not in dbs[0]
+        assert "feeder_cable" not in dbs[0]
+
+
+# ---------------------------------------------------------------------------
+# B2: Topology auto-detection fallback
+# ---------------------------------------------------------------------------
+
+class TestB2TopologyAutoDetect:
+    """B2 fix: db_topology omitted for parallel → engine auto-detects."""
+
+    def test_parallel_topology_not_set(self):
+        """When no hierarchy detected, db_topology should be absent."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="DB1",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+                DistributionBoardData(
+                    name="DB2",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        # No hierarchy → db_topology should be absent (let engine auto-detect)
+        assert "db_topology" not in result
+
+    def test_hierarchical_topology_set(self):
+        """When hierarchy detected (fed_from set), db_topology = 'hierarchical'."""
+        from app.sld.extraction_schema import (
+            BreakerSpec, DistributionBoardData, SldExtractedData,
+            IncomingData, normalize_to_generation_format, OutgoingCircuit,
+        )
+        extracted = SldExtractedData(
+            incoming=IncomingData(supply_type="three_phase", kva=100, voltage=400),
+            distribution_boards=[
+                DistributionBoardData(
+                    name="MSB",
+                    breaker=BreakerSpec(type="MCCB", rating_a=100, poles="TPN"),
+                    outgoing_circuits=[
+                        OutgoingCircuit(description="Feeder to DB2", breaker=BreakerSpec(type="MCB", rating_a=63)),
+                    ],
+                ),
+                DistributionBoardData(
+                    name="DB2",
+                    breaker=BreakerSpec(type="MCB", rating_a=63, poles="TPN"),
+                    outgoing_circuits=[],
+                ),
+            ],
+        )
+        result = normalize_to_generation_format(extracted)
+        assert result.get("db_topology") == "hierarchical"
+
+    def test_engine_auto_detects_from_fed_from(self):
+        """Engine auto-detects hierarchy when db_topology is absent."""
+        reqs = {
+            "supply_type": "three_phase",
+            "kva": 100,
+            "voltage": 400,
+            "main_breaker": {"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            "metering": "ct_meter",
+            "busbar_rating": 200,
+            # Note: no db_topology key — engine should auto-detect
+            "distribution_boards": [
+                {
+                    "name": "MSB",
+                    "breaker": {"type": "MCCB", "rating": 100, "poles": "TPN"},
+                    "busbar_rating": 100,
+                    "sub_circuits": [
+                        {"name": "Light 1", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "Light 2", "breaker_type": "MCB", "breaker_rating": 10},
+                        {"name": "Light 3", "breaker_type": "MCB", "breaker_rating": 10},
+                    ],
+                },
+                {
+                    "name": "DB2",
+                    "fed_from": "MSB",
+                    "breaker": {"type": "MCB", "rating": 63, "poles": "TPN"},
+                    "busbar_rating": 100,
+                    "sub_circuits": [
+                        {"name": "Power 1", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "Power 2", "breaker_type": "MCB", "breaker_rating": 20},
+                        {"name": "Power 3", "breaker_type": "MCB", "breaker_rating": 20},
+                    ],
+                },
+            ],
+        }
+        result = compute_layout(reqs)
+        assert result.db_count == 2
+        assert len(result.components) > 0

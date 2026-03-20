@@ -101,7 +101,8 @@ class IncomingData(BaseModel):
     kva: Optional[float] = Field(None, description="Total load capacity in kVA")
     phase: Optional[str] = Field(None, description="single_phase or three_phase")
     voltage: Optional[int] = Field(None, description="Supply voltage (230 or 400)")
-    supply_source: Optional[str] = Field(None, description="sp_powergrid or landlord")
+    supply_source: Optional[str] = Field(None, description="sp_powergrid, landlord, or building_riser")
+    incoming_label: Optional[str] = Field(None, description="Supply source label for SLD diagram, e.g. 'FROM LANDLORD RISER'")
     main_breaker: Optional[BreakerSpec] = Field(None, description="[A] Main Breaker")
     cable: Optional[CableSpec] = Field(None, description="[B] Incoming Cable")
     elcb: Optional[ElcbSpec] = Field(None, description="[G] ELCB/RCCB")
@@ -173,6 +174,27 @@ class DistributionBoardData(BaseModel):
     outgoing_circuits: Optional[list[OutgoingCircuit]] = Field(
         default=None,
         description="Circuits not in a protection group",
+    )
+    # B1 fix: 5 fields consumed by engine.py but previously missing from schema
+    incoming_breaker: Optional[BreakerSpec] = Field(
+        None,
+        description="Incoming breaker at the board entry (distinct from outgoing main breaker).",
+    )
+    feeder_breaker: Optional[BreakerSpec] = Field(
+        None,
+        description="Feeder breaker on the parent board side that feeds this DB.",
+    )
+    feeder_cable: Optional[CableSpec] = Field(
+        None,
+        description="Cable connecting parent board to this DB.",
+    )
+    main_mcb: Optional[BreakerSpec] = Field(
+        None,
+        description="Main MCB if distinct from the incoming breaker (e.g., post-isolator MCB).",
+    )
+    meter_board: Optional[str] = Field(
+        None,
+        description="Meter board label/type (e.g., 'SP METER BOARD', 'CT METER BOARD').",
     )
 
     @model_validator(mode="after")
@@ -689,9 +711,16 @@ def normalize_to_generation_format(
         # kVA
         requirements["kva"] = inc.kva or 0
 
-        # Supply source (landlord vs sp_powergrid)
+        # Supply source (landlord vs building_riser vs sp_powergrid)
         if inc.supply_source:
             requirements["supply_source"] = inc.supply_source
+        if inc.incoming_label:
+            requirements["incoming_label"] = inc.incoming_label
+            # Auto-correct supply_source from incoming_label when Gemini returns
+            # generic "landlord" but the label explicitly says "BUILDING RISER".
+            _label_upper = inc.incoming_label.upper()
+            if "BUILDING RISER" in _label_upper and requirements.get("supply_source") != "building_riser":
+                requirements["supply_source"] = "building_riser"
 
         # Main breaker
         mb = inc.main_breaker
@@ -766,6 +795,34 @@ def normalize_to_generation_format(
             metering_type = ""  # Landlord supply: no SP meter board
         if metering_type:
             requirements["metering"] = metering_type
+            # Propagate detailed metering fields for CT/SP metering sections
+            if inc.metering:
+                m = inc.metering
+                metering_detail: dict = {}
+                if m.ct_ratio:
+                    metering_detail["ct_ratio"] = m.ct_ratio
+                if m.protection_ct_ratio:
+                    metering_detail["protection_ct_ratio"] = m.protection_ct_ratio
+                if m.protection_ct_class:
+                    metering_detail["protection_ct_class"] = m.protection_ct_class
+                if m.metering_ct_class:
+                    metering_detail["metering_ct_class"] = m.metering_ct_class
+                if m.has_ammeter is not None:
+                    metering_detail["has_ammeter"] = m.has_ammeter
+                if m.has_voltmeter is not None:
+                    metering_detail["has_voltmeter"] = m.has_voltmeter
+                if m.has_elr is not None:
+                    metering_detail["has_elr"] = m.has_elr
+                if m.has_indicator_lights is not None:
+                    metering_detail["has_indicator_lights"] = m.has_indicator_lights
+                if m.elr_spec:
+                    metering_detail["elr_spec"] = m.elr_spec
+                if m.voltmeter_range:
+                    metering_detail["voltmeter_range"] = m.voltmeter_range
+                if m.ammeter_range:
+                    metering_detail["ammeter_range"] = m.ammeter_range
+                if metering_detail:
+                    requirements["metering_detail"] = metering_detail
 
         # Incoming cable
         if inc.cable and inc.cable.description:
@@ -820,30 +877,107 @@ def normalize_to_generation_format(
 
             # Protection groups (per-phase RCCB)
             if db_data.protection_groups:
-                pg_list = []
-                for pg in db_data.protection_groups:
-                    pg_req: dict[str, Any] = {
-                        "phase": normalize_phase_name(pg.phase or ""),
-                    }
-                    if pg.rccb:
-                        pg_req["rccb"] = {
-                            "type": pg.rccb.type or "RCCB",
-                            "rating": pg.rccb.rating_a or 0,
-                            "sensitivity_ma": pg.rccb.sensitivity_ma or 30,
-                            "poles": pg.rccb.poles or 2,
+                # Safety net: if all protection_groups share the same 4P RCCB,
+                # merge them back — a 4P RCCB is a single device, not per-phase.
+                _all_4p = (
+                    len(db_data.protection_groups) >= 2
+                    and all(
+                        pg.rccb and pg.rccb.poles in (4, "4P")
+                        for pg in db_data.protection_groups
+                    )
+                )
+                _first_rccb = db_data.protection_groups[0].rccb if db_data.protection_groups else None
+                _all_same_spec = _all_4p and _first_rccb and all(
+                    pg.rccb
+                    and pg.rccb.rating_a == _first_rccb.rating_a
+                    and pg.rccb.sensitivity_ma == _first_rccb.sensitivity_ma
+                    for pg in db_data.protection_groups
+                )
+
+                if _all_same_spec and _first_rccb:
+                    # Merge: flatten all protection_group circuits into outgoing
+                    merged = []
+                    for pg in db_data.protection_groups:
+                        for c in pg.circuits:
+                            if pg.phase and not c.phase:
+                                c.phase = pg.phase
+                            merged.append(c)
+                    # Prepend merged circuits to existing outgoing
+                    db_data.outgoing_circuits = merged + list(db_data.outgoing_circuits or [])
+                    db_data.protection_groups = []
+                    # Restore board-level ELCB
+                    if not db_data.elcb:
+                        db_data.elcb = ElcbSpec(
+                            type=_first_rccb.type or "RCCB",
+                            rating_a=_first_rccb.rating_a,
+                            poles=4,
+                            sensitivity_ma=_first_rccb.sensitivity_ma,
+                        )
+                    logger.info(
+                        "normalize: merged 4P RCCB protection_groups for DB '%s' (%d circuits)",
+                        db_data.name or "?",
+                        len(merged),
+                    )
+
+                else:
+                    pg_list = []
+                    for pg in db_data.protection_groups:
+                        pg_req: dict[str, Any] = {
+                            "phase": normalize_phase_name(pg.phase or ""),
                         }
-                    pg_req["circuits"] = _convert_circuits(pg.circuits)
-                    pg_list.append(pg_req)
-                db_req["protection_groups"] = pg_list
+                        if pg.rccb:
+                            pg_req["rccb"] = {
+                                "type": pg.rccb.type or "RCCB",
+                                "rating": pg.rccb.rating_a or 0,
+                                "sensitivity_ma": pg.rccb.sensitivity_ma or 30,
+                                "poles": pg.rccb.poles or 2,
+                            }
+                        pg_req["circuits"] = _convert_circuits(pg.circuits)
+                        pg_list.append(pg_req)
+                    db_req["protection_groups"] = pg_list
 
             # DB outgoing circuits (not in protection groups)
             if db_data.outgoing_circuits:
                 db_req["sub_circuits"] = _convert_circuits(db_data.outgoing_circuits)
 
+            # B1 fix: populate 5 fields consumed by engine.py
+            if db_data.incoming_breaker:
+                db_req["incoming_breaker"] = {
+                    "type": db_data.incoming_breaker.type or "MCB",
+                    "rating": db_data.incoming_breaker.rating_a or 0,
+                    "poles": db_data.incoming_breaker.poles or "",
+                    "fault_kA": db_data.incoming_breaker.ka_rating or 10,
+                }
+                if db_data.incoming_breaker.characteristic:
+                    db_req["incoming_breaker"]["breaker_characteristic"] = db_data.incoming_breaker.characteristic
+            if db_data.feeder_breaker:
+                db_req["feeder_breaker"] = {
+                    "type": db_data.feeder_breaker.type or "MCB",
+                    "rating": db_data.feeder_breaker.rating_a or 0,
+                    "poles": db_data.feeder_breaker.poles or "",
+                    "fault_kA": db_data.feeder_breaker.ka_rating or 10,
+                }
+            if db_data.feeder_cable:
+                db_req["feeder_cable"] = db_data.feeder_cable.description or ""
+            if db_data.main_mcb:
+                db_req["main_mcb"] = {
+                    "type": db_data.main_mcb.type or "MCB",
+                    "rating": db_data.main_mcb.rating_a or 0,
+                    "poles": db_data.main_mcb.poles or "",
+                    "fault_kA": db_data.main_mcb.ka_rating or 10,
+                }
+            if db_data.meter_board:
+                db_req["meter_board"] = db_data.meter_board
+
             db_list.append(db_req)
 
         requirements["distribution_boards"] = db_list
-        requirements["db_topology"] = _build_db_hierarchy(db_list)
+        # B2 fix: only set db_topology if hierarchy was actually detected;
+        # otherwise let engine.py auto-detect from fed_from fields
+        detected_topology = _build_db_hierarchy(db_list)
+        if detected_topology == "hierarchical":
+            requirements["db_topology"] = "hierarchical"
+        # else: omit db_topology → engine.py will auto-detect
         return requirements
 
     # -- Single-DB path (backward compatible) --
@@ -988,7 +1122,7 @@ async def extract_sld_from_text(user_input: str) -> dict:
         system_instruction=SLD_EXTRACTION_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.0,
         ),
     )
 

@@ -79,7 +79,7 @@ class TestCableExtension:
         req["requires_isolator"] = True
         result = compute_layout(req, skip_validation=True)
         isolators = [c for c in result.components if c.symbol_name == "ISOLATOR"]
-        assert len(isolators) > 0, "Regular landlord supply should have ISOLATOR"
+        assert len(isolators) > 0, "Regular landlord supply should have an isolator component"
 
 
 # ===========================================================================

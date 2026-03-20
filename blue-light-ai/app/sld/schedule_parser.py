@@ -72,13 +72,27 @@ Extract EVERY row from the circuit table:
 - Common cable: "2 x 1C 2.5mm² PVC + 2.5mm² CPC in G.I. conduit / metal trunking"
 
 ## Supply Source & Metering Rules
+- supply_source and metering are INDEPENDENT properties:
+  - supply_source: WHERE the power comes from → determines incoming_label, isolator type
+  - metering: HOW metering is done → determines CT metering section rendering
 - supply_source: "sp_powergrid" (SP PowerGrid direct supply) or "landlord" (building riser / landlord supply)
-- **Landlord supply** (supply from building riser): NO SP metering. Set metering to null.
-  - Landlord installations have their own isolator inside the unit, NOT an SP meter board.
-  - Keywords: "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
+- **IMPORTANT — supply_source and metering are determined independently**:
+  - supply_source is determined ONLY from supply text keywords (building riser → "landlord", SP/HDB → "sp_powergrid"). Do NOT change supply_source based on metering equipment.
+  - metering is determined from explicit metering equipment in the schedule:
+    - "SPPG kWh meter" with CT ratio (e.g. "100/5A CT") → metering type = "ct_meter"
+    - "SPPG kWh meter" without CT → metering type = "sp_meter"
+    - No metering equipment mentioned → metering = null
+  - A landlord supply CAN have CT metering (e.g., SPPG kWh + CT in a building riser installation). This is common for larger commercial tenants.
+- **Landlord supply**: Keywords: "SUPPLY FROM BUILDING RISER", "LANDLORD", "FROM RISER"
+  - Landlord installations have their own isolator inside the unit (enclosed type), NOT an SP meter board.
 - **SP PowerGrid supply** (direct SP supply): metering is "sp_meter" (residential) or "ct_meter" (≥125A three-phase).
   - Keywords: "INCOMING FROM HDB", "SP POWERGRID", "FROM SP"
 - If supply source is unclear, default to "sp_powergrid".
+- **incoming_label**: Extract from supply source text for the SLD diagram label. Common patterns:
+  - "Landlord riser ..." → "FROM LANDLORD RISER"
+  - "HDB electrical riser ..." → "INCOMING FROM HDB ELECTRICAL RISER"
+  - "Building riser ..." → "FROM BUILDING RISER"
+  - If the supply source text explicitly states the label, use it as-is (uppercased).
 
 ## Output JSON Schema
 
@@ -90,6 +104,7 @@ Extract EVERY row from the circuit table:
     "phase": "<single_phase|three_phase or null>",
     "voltage": <230|400 or null>,
     "supply_source": "<sp_powergrid|landlord|null>",
+    "incoming_label": "<supply source label for SLD diagram, e.g. 'FROM LANDLORD RISER', 'INCOMING FROM HDB ELECTRICAL RISER', or null>",
     "main_breaker": {
       "type": "<MCB|MCCB|ACB or null>",
       "rating_a": <int or null>,
@@ -110,13 +125,30 @@ Extract EVERY row from the circuit table:
       "poles": <2|4 or null>,
       "sensitivity_ma": <30|100|300 or null>
     },
+    "post_elcb_mcb": {
+      "type": "<MCB|MCCB or null — secondary breaker in series with RCCB, e.g. '63A TPN Type B MCB' after '63A 4P RCCB'>",
+      "rating_a": <int or null>,
+      "poles": "<SPN|DP|TPN or null>",
+      "ka_rating": <int or null>,
+      "characteristic": "<B|C|D or null>"
+    },
     "busbar": {
       "rating_a": <int or null>,
       "type": "<COMB|COPPER or null>"
     },
     "metering": {
       "type": "<ct_meter|sp_meter or null>",
-      "ct_ratio": "<string e.g. '100/5A' or null>"
+      "ct_ratio": "<string e.g. '100/5A' or null>",
+      "protection_ct_ratio": "<string e.g. '100/5A' — ratio for PROTECTION CT, or null if not specified>",
+      "protection_ct_class": "<string e.g. '5P10 20VA' — class for protection CT, or null>",
+      "metering_ct_class": "<string e.g. 'CL1 5VA' — class for metering CT, or null>",
+      "has_indicator_lights": "<bool — true if L1/L2/L3 indicator lights on potential fuse branch, default true for ct_meter>",
+      "has_elr": "<bool — true if ELR (Earth Leakage Relay) present, default true for ct_meter>",
+      "elr_spec": "<string e.g. '0-3A 0.2 SEC' — ELR specification, or null>",
+      "has_ammeter": "<bool — true if ammeter with selector switch (ASS) present, default true for ct_meter>",
+      "has_voltmeter": "<bool — true if voltmeter with selector switch (VSS) present, default true for ct_meter>",
+      "voltmeter_range": "<string e.g. '0-500V' or null>",
+      "ammeter_range": "<string e.g. '0-500A' or null>"
     },
     "outgoing_cable": {
       "size_mm2": "<string or null>",
@@ -157,6 +189,7 @@ Extract EVERY row from the circuit table:
     "phase": "<single_phase|three_phase or null>",
     "voltage": <230|400 or null>,
     "supply_source": "<sp_powergrid|landlord|null>",
+    "incoming_label": "<supply source label for SLD diagram or null>",
     "main_breaker": { ... },
     "cable": { ... },
     "metering": { ... },
@@ -177,6 +210,13 @@ Extract EVERY row from the circuit table:
         "rating_a": <int or null>,
         "poles": <2|4 or null>,
         "sensitivity_ma": <30|100|300 or null>
+      },
+      "post_elcb_mcb": {
+        "type": "<MCB|MCCB or null — secondary breaker in series after RCCB>",
+        "rating_a": <int or null>,
+        "poles": "<SPN|DP|TPN or null>",
+        "ka_rating": <int or null>,
+        "characteristic": "<B|C|D or null>"
       },
       "busbar": {
         "rating_a": <int or null>,
@@ -237,10 +277,16 @@ Extract EVERY row from the circuit table:
 8. Preserve the original circuit ordering from the file.
 9. Output ONLY valid JSON — no markdown, no explanation, no code fences.
 10. **Multi-DB detection**: If the file has multiple sheets/tabs each representing a distribution board, OR has separate sections for different boards, use `distribution_boards` array. Otherwise use flat `outgoing_circuits`.
-11. **Protection groups**: If a board has a "Protection Group" column (e.g., "RCCB L1", "RCCB L2", "RCCB L3"), group those circuits into `protection_groups` array with per-phase RCCB details. Circuits without protection groups go into the board's `outgoing_circuits`.
+11. **Protection groups**: Group circuits into `protection_groups` when ANY of these conditions is met:
+    a) The file has a "Protection Group" column (e.g., "RCCB L1", "RCCB L2", "RCCB L3").
+    b) A three-phase DB has circuits assigned to specific phases (L1/L2/L3 or R/Y/B) AND has per-phase RCCBs.
+    c) A three-phase DB has many circuits (≥9) with clear per-phase distribution — in Singapore practice, such boards typically use per-phase 2P RCCBs (40A 2P RCCB per phase with separate busbar).
+    When creating protection_groups, each group has its own RCCB (typically 2P for single-phase groups within a 3-phase board) and its own busbar segment. Circuits NOT assigned to a specific phase go into the board's `outgoing_circuits`.
+    **IMPORTANT — 4P RCCB rule**: If the schedule shows a SINGLE 4P RCCB (e.g., "63A 4P RCCB 30mA") for the entire board, do NOT split it into per-phase 2P RCCB groups. Instead, put ALL circuits into the board's `outgoing_circuits` (with their phase assignments) and set the board-level `elcb` to that 4P RCCB. Only create separate per-phase `protection_groups` when the schedule explicitly shows different/separate RCCBs per phase (e.g., "40A 2P RCCB" for each phase).
 12. **Phase normalization**: Always normalize phase names to L1/L2/L3. Convert R→L1, Y→L2, B→L3, RED→L1, YELLOW→L2, BLUE→L3.
-13. **Metering**: For landlord supply (supply_source="landlord"), metering MUST be null. Only SP PowerGrid direct supplies have SP meters.
-14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations."""
+13. **Metering**: supply_source and metering are INDEPENDENT. For landlord supply with NO metering equipment mentioned → metering = null. If the schedule explicitly lists metering equipment (kWh meter, CT, SPPG, ammeter, voltmeter, ELR) → set metering accordingly (ct_meter or sp_meter). Do NOT change supply_source — a landlord supply can have CT metering.
+14. **Outgoing cable**: If there are two different cables (e.g., one from riser to isolator, another from isolator to DB), capture the second cable in `outgoing_cable`. This is common in landlord supply installations.
+15. **RCCB + MCB serial structure**: When the schedule shows RCCB/ELCB followed by a separate MCB in series (e.g., "63A 4P RCCB (30mA) + 63A TPN Type B MCB"), extract the RCCB into `elcb` and the MCB into `post_elcb_mcb`. This is common in Singapore commercial installations where an additional MCB provides overcurrent protection after the RCCB. Keywords: "RCCB + MCB", "RCCB ... MCB", "RCCB (30mA) + ... MCB"."""
 
 
 # ── File Type Detection ─────────────────────────────
@@ -355,7 +401,7 @@ async def _call_gemini_text(text_content: str, api_key: str | None = None) -> di
         config=types.GenerateContentConfig(
             system_instruction=SCHEDULE_EXTRACTION_PROMPT,
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.0,
         ),
     )
     return json.loads(response.text)
@@ -395,10 +441,181 @@ async def _call_gemini_vision(
         config=types.GenerateContentConfig(
             system_instruction=SCHEDULE_EXTRACTION_PROMPT,
             response_mime_type="application/json",
-            temperature=0.1,
+            temperature=0.0,
         ),
     )
     return json.loads(response.text)
+
+
+# ── Post-processing: Auto-detect Protection Groups ──
+
+
+def _auto_detect_protection_groups(data: dict) -> dict:
+    """Post-process Gemini output: detect and create per-phase RCCB protection groups.
+
+    For three-phase distribution boards where circuits are assigned to specific phases
+    (L1/L2/L3) but Gemini did not create protection_groups, this function auto-groups
+    them — matching Singapore LEW practice of per-phase 2P RCCB grouping.
+    """
+    dbs = data.get("distribution_boards")
+    if not dbs:
+        return data
+
+    # Check if incoming is three-phase
+    incoming = data.get("incoming", {})
+    is_three_phase = incoming.get("phase") == "three_phase"
+    if not is_three_phase:
+        return data
+
+    for db in dbs:
+        # Skip if protection_groups already populated
+        if db.get("protection_groups"):
+            continue
+
+        circuits = db.get("outgoing_circuits", [])
+        if not circuits:
+            continue
+
+        # Count circuits per phase
+        phase_map: dict[str, list[dict]] = {"L1": [], "L2": [], "L3": []}
+        unassigned: list[dict] = []
+        _PHASE_NORM = {
+            "L1": "L1", "L2": "L2", "L3": "L3",
+            "R": "L1", "Y": "L2", "B": "L3",
+            "RED": "L1", "YELLOW": "L2", "BLUE": "L3",
+        }
+
+        for c in circuits:
+            phase_raw = (c.get("phase") or "").upper().strip()
+            phase = _PHASE_NORM.get(phase_raw)
+            if phase:
+                phase_map[phase].append(c)
+            else:
+                # Try to infer from circuit ID (e.g., L1P1, L2S1)
+                cid = (c.get("id") or "").upper()
+                inferred = None
+                for prefix in ("L1", "L2", "L3"):
+                    if cid.startswith(prefix):
+                        inferred = prefix
+                        break
+                if inferred:
+                    phase_map[inferred].append(c)
+                else:
+                    unassigned.append(c)
+
+        # Only create protection groups if ≥2 phases have circuits and
+        # total phase-assigned circuits ≥ 6 (typical 3-phase DB threshold)
+        phases_with_circuits = sum(1 for v in phase_map.values() if v)
+        total_assigned = sum(len(v) for v in phase_map.values())
+
+        if phases_with_circuits >= 2 and total_assigned >= 6:
+            # Determine per-phase RCCB rating from board's ELCB or default
+            board_elcb = db.get("elcb", {}) or {}
+            per_phase_rating = board_elcb.get("rating_a", 40)
+            sensitivity = board_elcb.get("sensitivity_ma", 30)
+
+            # Do NOT split into per-phase groups if the board has a 4P RCCB —
+            # a 4P RCCB protects all phases together as a single device.
+            board_elcb_poles = board_elcb.get("poles")
+            if board_elcb_poles == 4 or board_elcb_poles == "4P":
+                logger.info(
+                    "Skipping auto protection-group split for DB '%s': board has 4P RCCB",
+                    db.get("name", "?"),
+                )
+                continue
+
+            protection_groups = []
+            for phase in ("L1", "L2", "L3"):
+                if not phase_map[phase]:
+                    continue
+                protection_groups.append({
+                    "phase": phase,
+                    "rccb": {
+                        "type": "RCCB",
+                        "rating_a": per_phase_rating,
+                        "poles": 2,
+                        "sensitivity_ma": sensitivity,
+                    },
+                    "circuits": phase_map[phase],
+                })
+
+            if protection_groups:
+                db["protection_groups"] = protection_groups
+                db["outgoing_circuits"] = unassigned
+                # Remove board-level ELCB since it's now per-phase
+                if db.get("elcb"):
+                    del db["elcb"]
+                logger.info(
+                    "Auto-detected protection groups for DB '%s': %d groups, %d circuits",
+                    db.get("name", "?"),
+                    len(protection_groups),
+                    total_assigned,
+                )
+
+    return data
+
+
+def _merge_identical_4p_rccb_groups(data: dict) -> dict:
+    """Safety net: merge protection_groups back when they all share the same 4P RCCB.
+
+    If Gemini incorrectly split a single 4P RCCB into per-phase groups (each with
+    the same RCCB spec and poles=4), merge them back into the board's outgoing_circuits
+    and restore the board-level elcb.
+    """
+    dbs = data.get("distribution_boards")
+    if not dbs:
+        return data
+
+    for db in dbs:
+        pgs = db.get("protection_groups")
+        if not pgs or len(pgs) < 2:
+            continue
+
+        # Check if ALL protection groups have the same RCCB spec with poles=4
+        first_rccb = pgs[0].get("rccb", {})
+        first_poles = first_rccb.get("poles")
+        if first_poles not in (4, "4P"):
+            continue
+
+        all_same = all(
+            pg.get("rccb", {}).get("type") == first_rccb.get("type")
+            and pg.get("rccb", {}).get("rating_a") == first_rccb.get("rating_a")
+            and pg.get("rccb", {}).get("poles") in (4, "4P")
+            and pg.get("rccb", {}).get("sensitivity_ma") == first_rccb.get("sensitivity_ma")
+            for pg in pgs
+        )
+        if not all_same:
+            continue
+
+        # Merge: collect all circuits from protection groups into outgoing_circuits
+        merged_circuits: list[dict] = []
+        for pg in pgs:
+            phase = pg.get("phase")
+            for c in pg.get("circuits", []):
+                if phase and not c.get("phase"):
+                    c["phase"] = phase
+                merged_circuits.append(c)
+
+        existing_circuits = db.get("outgoing_circuits", [])
+        db["outgoing_circuits"] = merged_circuits + existing_circuits
+        db["protection_groups"] = []
+
+        # Restore board-level ELCB from the merged RCCB spec
+        db["elcb"] = {
+            "type": first_rccb.get("type", "RCCB"),
+            "rating_a": first_rccb.get("rating_a"),
+            "poles": 4,
+            "sensitivity_ma": first_rccb.get("sensitivity_ma"),
+        }
+
+        logger.info(
+            "Merged %d identical 4P RCCB protection_groups back into board-level ELCB for DB '%s' (%d circuits)",
+            len(pgs),
+            db.get("name", "?"),
+            len(merged_circuits),
+        )
+
+    return data
 
 
 # ── Public API ──────────────────────────────────────
@@ -497,13 +714,25 @@ async def extract_schedule_from_file(
             "error": str(e),
         }
 
-    # Validate basic structure
-    if not extracted_data.get("outgoing_circuits"):
+    # Post-process: merge incorrectly-split 4P RCCB groups (safety net — runs first)
+    extracted_data = _merge_identical_4p_rccb_groups(extracted_data)
+    # Post-process: auto-detect per-phase RCCB protection groups
+    extracted_data = _auto_detect_protection_groups(extracted_data)
+
+    # Validate basic structure (check both single-DB and multi-DB paths)
+    has_circuits = bool(extracted_data.get("outgoing_circuits"))
+    has_dbs = bool(extracted_data.get("distribution_boards"))
+    if not has_circuits and not has_dbs:
         warnings.append("No outgoing circuits found in the file")
     if not extracted_data.get("incoming"):
         warnings.append("No incoming supply information found in the file")
 
+    # Count total circuits across all paths
     circuit_count = len(extracted_data.get("outgoing_circuits", []))
+    for _db in extracted_data.get("distribution_boards", []):
+        circuit_count += len(_db.get("outgoing_circuits") or [])
+        for _pg in (_db.get("protection_groups") or []):
+            circuit_count += len(_pg.get("circuits") or [])
     logger.info(
         "Schedule extraction complete: file_type=%s, circuits=%d, warnings=%d",
         file_type, circuit_count, len(warnings),
@@ -582,24 +811,51 @@ def format_extracted_schedule(result: dict) -> str:
         if metering and metering.get("type"):
             lines.append(f"- Metering: {metering['type']}")
 
-    # Outgoing circuits
+    # Helper to format a circuit line
+    def _fmt_circuit(oc: dict, idx: int) -> str:
+        cid = oc.get("id", f"#{idx}")
+        desc = oc.get("description", "Unknown")
+        breaker = oc.get("breaker", {})
+        br_parts = [p for p in [
+            breaker.get("type"),
+            f"{breaker['rating_a']}A" if breaker.get("rating_a") else None,
+            breaker.get("poles"),
+            f"Type {breaker['characteristic']}" if breaker.get("characteristic") else None,
+        ] if p]
+        br_str = " ".join(br_parts) if br_parts else "—"
+        cable_str = oc.get("cable", "—") or "—"
+        room_str = f" [{oc['room']}]" if oc.get("room") else ""
+        return f"  {cid}: {desc}{room_str} | Breaker: {br_str} | Cable: {cable_str}"
+
+    # Distribution boards (multi-DB)
+    dbs = data.get("distribution_boards", [])
+    if dbs:
+        for db in dbs:
+            db_name = db.get("name", "DB")
+            pg_list = db.get("protection_groups", [])
+            db_circuits = db.get("outgoing_circuits", [])
+            total = len(db_circuits) + sum(len(pg.get("circuits", [])) for pg in pg_list)
+            lines.append(f"\n## {db_name} ({total} circuits)")
+
+            if pg_list:
+                for pg in pg_list:
+                    phase = pg.get("phase", "?")
+                    rccb = pg.get("rccb", {})
+                    rccb_str = f"{rccb.get('rating_a', '?')}A {rccb.get('poles', '?')}P RCCB ({rccb.get('sensitivity_ma', '?')}mA)"
+                    pg_circuits = pg.get("circuits", [])
+                    lines.append(f"  ### Protection Group {phase} — {rccb_str} ({len(pg_circuits)} circuits)")
+                    for j, c in enumerate(pg_circuits, 1):
+                        lines.append(f"  {_fmt_circuit(c, j)}")
+
+            for j, oc in enumerate(db_circuits, 1):
+                lines.append(_fmt_circuit(oc, j))
+
+    # Outgoing circuits (single-DB)
     circuits = data.get("outgoing_circuits", [])
     if circuits:
         lines.append(f"\n## Circuit Schedule ({len(circuits)} circuits)")
         for i, oc in enumerate(circuits, 1):
-            cid = oc.get("id", f"#{i}")
-            desc = oc.get("description", "Unknown")
-            breaker = oc.get("breaker", {})
-            br_parts = [p for p in [
-                breaker.get("type"),
-                f"{breaker['rating_a']}A" if breaker.get("rating_a") else None,
-                breaker.get("poles"),
-                f"Type {breaker['characteristic']}" if breaker.get("characteristic") else None,
-            ] if p]
-            br_str = " ".join(br_parts) if br_parts else "—"
-            cable_str = oc.get("cable", "—") or "—"
-            room_str = f" [{oc['room']}]" if oc.get("room") else ""
-            lines.append(f"  {cid}: {desc}{room_str} | Breaker: {br_str} | Cable: {cable_str}")
+            lines.append(_fmt_circuit(oc, i))
 
     # Client info
     client = data.get("client_info", {})

@@ -82,12 +82,16 @@ def _normalize_load_quantity(text: str) -> str:
     if not text or text.upper() == "SPARE":
         return text
 
-    # Split on '+' separator for multi-item descriptions
+    # Split on '+' separator for multi-item descriptions.
+    # Each part is normalized independently (quantity prefix added).
+    # Max 2 lines per LEW reference: line 1 = first item, line 2 = remaining items joined.
     if "+" in text:
         parts = [p.strip() for p in text.split("+")]
         normalized = [_normalize_single_quantity(p) for p in parts if p]
-        # Join with \\P (DXF/SVG line break) so each item starts on its own line
-        return "\\P".join(normalized)
+        if len(normalized) <= 2:
+            return "\\P".join(normalized)
+        # 3+ items: first item on line 1, rest joined with ", " on line 2
+        return normalized[0] + "\\P" + ", ".join(normalized[1:])
 
     return _normalize_single_quantity(text)
 
@@ -122,6 +126,10 @@ def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
     if len(lines) > max_lines:
         target = len(text) // max_lines + 1
         lines = _split_words(target)
+
+    # Hard cap: never exceed max_lines (truncate with "..." if necessary)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
 
     return "\\P".join(lines)
 
@@ -182,7 +190,13 @@ def _should_use_triplets(sub_circuits: list[dict], supply_type: str) -> bool:
             phases.append(phase)
 
     if len(phases) < 3:
-        return True  # Not enough data → default to current behavior (triplets)
+        # No explicit phase data available.
+        # For TPN DBs (three_phase), default to interleaved triplets
+        # since standard residential/commercial TPN distribution boards
+        # use round-robin L1→L2→L3 phase allocation.
+        # Phase-grouped mode is only used when explicit phase data
+        # shows grouped arrangement (e.g., MSB with RL1,RL2,RL3,RS1,...).
+        return True
 
     # Count transitions between different phases
     transitions = 0
@@ -459,14 +473,13 @@ def _assign_circuit_ids(
         categories.append(cat)
         user_ids.append(uid)
 
-    # Normalize isolator circuits: force breaker_type/poles regardless of
-    # what the schedule file (Excel/Gemini) specified.  Without this, an
-    # Excel row like "ISOL1 | 20A DP isolator | 20A SPN MCB …" would keep
-    # breaker_type="MCB" and render with a full MCB label instead of the
-    # isolator symbol.
+    # Mark isolator circuits for DP ISOL device rendering at conductor top.
+    # Per LEW reference: the BREAKER is still MCB (not isolator symbol);
+    # only the LOAD DEVICE at the conductor end is a DP ISOL box.
+    # breaker_type stays as-is ("MCB") to render MCB symbol at busbar.
     for i, cat in enumerate(categories):
         if cat == "isolator":
-            sub_circuits[i]["breaker_type"] = "ISOLATOR"
+            sub_circuits[i]["_is_isolator_load"] = True
             sub_circuits[i].setdefault("breaker_poles", "DP")
             if sub_circuits[i].get("breaker_poles", "").upper() == "SPN":
                 sub_circuits[i]["breaker_poles"] = "DP"
@@ -754,7 +767,7 @@ def _parse_circuit_data(circuit: dict, supply_type: str) -> dict:
         or circuit.get("breaker_char", "")
     ).upper()
 
-    return {
+    result = {
         "name": sc_name,
         "breaker_type": sc_breaker_type,
         "breaker_rating": sc_breaker_rating,
@@ -764,15 +777,26 @@ def _parse_circuit_data(circuit: dict, supply_type: str) -> dict:
         "fault_kA": sc_fault_kA,
         "breaker_char": sc_breaker_char,
     }
+    # Propagate isolator-load flag for DP ISOL device rendering
+    if circuit.get("_is_isolator_load"):
+        result["_is_isolator_load"] = True
+    return result
 
 
 def _get_breaker_dimensions(breaker_type: str, config: LayoutConfig) -> tuple[float, float]:
-    """Return (width, height) for a breaker type from config."""
-    if breaker_type in ("RCCB", "ELCB"):
-        return config.rccb_w, config.rccb_h
-    if breaker_type in ("MCCB", "ACB"):
-        return config.breaker_w, config.breaker_h
-    return config.mcb_w, config.mcb_h
+    """Return (width, height) for a breaker type from catalog.
+
+    The catalog resolves type → dimensions polymorphically,
+    eliminating the need for type-based branching.
+    """
+    from app.sld.catalog import get_catalog
+    catalog = get_catalog()
+    if catalog.has(breaker_type):
+        comp = catalog.get(breaker_type)
+        return comp.width, comp.height
+    # Fallback: MCB from catalog (breaker_type not recognized)
+    mcb = catalog.get("MCB")
+    return mcb.width, mcb.height
 
 
 def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, config: LayoutConfig) -> str:
@@ -785,8 +809,14 @@ def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, co
     else:
         sc_display_name = sc_name
     sc_display_name = _normalize_load_quantity(sc_display_name)
+    # Singapore LEW convention: load descriptions in ALL UPPERCASE
+    # Reference: "3 Nos LIGHTING POINTS", "1 No. 20A DP ISOLATOR"
+    sc_display_name = sc_display_name.upper()
+    # Restore "No." / "Nos" convention (capital N, singular with period)
+    sc_display_name = re.sub(r'\b(\d+)\s+NOS\.?\s+', r'\1 Nos ', sc_display_name)
+    sc_display_name = re.sub(r'\b1\s+Nos\s+', r'1 No. ', sc_display_name)
     if sc_room:
-        sc_display_name = f"{sc_display_name} — {sc_room}"
+        sc_display_name = f"{sc_display_name} — {sc_room.upper()}"
 
     _CHAR_ADVANCE = config.char_advance
     _PREFERRED_MAX_CHARS = config.preferred_max_label_chars
@@ -810,6 +840,7 @@ def _place_sub_circuits_upward(
     supply_type: str = "three_phase",
     circuit_ids: list[str] | None = None,
     use_triplets: bool = True,
+    row_start_idx: int | None = None,
 ) -> None:
     """Place a row of sub-circuits branching UPWARD from busbar with vertical labels."""
     group_breaks = _detect_section_breaks(
@@ -819,7 +850,7 @@ def _place_sub_circuits_upward(
     )
 
     for i, circuit in enumerate(row_circuits):
-        global_idx = row_idx * config.max_circuits_per_row + i
+        global_idx = (row_start_idx + i) if row_start_idx is not None else (row_idx * config.max_circuits_per_row + i)
         tap_x = _compute_tap_x(i, row_count, bus_start_x, bus_end_x, group_breaks, config)
 
         # Circuit ID
@@ -828,9 +859,10 @@ def _place_sub_circuits_upward(
         else:
             circuit_id = f"C{global_idx + 1}"
 
-        # Circuit ID box at busbar tap
+        # Circuit ID box at busbar tap — offset must clear the busbar-to-breaker
+        # connection line to prevent label overlap (Vision AI P1 fix)
         result.components.append(PlacedComponent(
-            symbol_name="CIRCUIT_ID_BOX", x=tap_x, y=busbar_y + 3.5,
+            symbol_name="CIRCUIT_ID_BOX", x=tap_x, y=busbar_y + 5.5,
             circuit_id=circuit_id, rotation=90.0,
         ))
 
@@ -844,41 +876,78 @@ def _place_sub_circuits_upward(
         result.connections.append(((tap_x, busbar_y), (tap_x, sc_y)))
         result.junction_dots.append((tap_x, busbar_y))
 
-        # Place breaker
-        _render_type = "MCB" if cd["breaker_type"] == "ISOLATOR" else cd["breaker_type"]
-        result.components.append(PlacedComponent(
-            symbol_name=f"CB_{_render_type}",
-            x=tap_x - sc_cb_w / 2, y=sc_y,
-            label=cd["name"], rating=f"{cd['breaker_rating']}A",
-            cable_annotation=cd["cable"], circuit_id=circuit_id,
-            load_info=cd["load_info"], rotation=90.0,
-            poles=cd["poles"], breaker_type_str=cd["breaker_type"],
-            fault_kA=cd["fault_kA"], label_style="breaker_block",
-            breaker_characteristic=cd["breaker_char"],
-        ))
-        result.symbols_used.add(cd["breaker_type"])
+        # Place breaker (SPARE circuits: no breaker symbol, just stub line)
+        if cd["breaker_type"] == "SPARE":
+            # SPARE: extend stub line and place "SPARE" label only
+            result.components.append(PlacedComponent(
+                symbol_name="CB_SPARE",
+                x=tap_x - sc_cb_w / 2, y=sc_y,
+                label="SPARE", rating="",
+                cable_annotation="", circuit_id=circuit_id,
+                load_info="", rotation=90.0,
+                poles="", breaker_type_str="SPARE",
+                fault_kA=0, label_style="breaker_block",
+            ))
+        else:
+            # Per LEW reference: all sub-circuit breakers use MCB symbol (CB_MCB),
+            # even isolator-load circuits. The DP ISOL device box is added separately
+            # at the conductor top by _add_isolator_device_symbols().
+            _is_isol = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
+            _symbol_name = "CB_MCB" if _is_isol else f"CB_{cd['breaker_type']}"
+            _btype_str = "ISOLATOR" if _is_isol else cd["breaker_type"]
+            result.components.append(PlacedComponent(
+                symbol_name=_symbol_name,
+                x=tap_x - sc_cb_w / 2, y=sc_y,
+                label=cd["name"], rating=f"{cd['breaker_rating']}A",
+                cable_annotation=format_cable_spec(cd["cable"], default_method=config.default_wiring_method), circuit_id=circuit_id,
+                load_info=cd["load_info"], rotation=90.0,
+                poles=cd["poles"], breaker_type_str=_btype_str,
+                fault_kA=cd["fault_kA"], label_style="breaker_block",
+                breaker_characteristic=cd["breaker_char"],
+            ))
+            result.symbols_used.add(cd["breaker_type"])
 
         # Conductor tail (extends upward past cable leader line)
-        breaker_top_y = sc_y + sc_cb_h + config.stub_len
-        _leader_y_from_busbar = (config.db_box_busbar_margin + config.mcb_h
-                                 + config.stub_len + config.db_box_tail_margin
+        # Use catalog pin("top").y for exit pin offset (= height + stub)
+        from app.sld.catalog import get_catalog as _gc_h
+        _sc_comp = _gc_h().get(cd["breaker_type"]) if _gc_h().has(cd["breaker_type"]) else _gc_h().get("MCB")
+        _exit_pin_offset = _sc_comp.pin("top").y  # = height + stub (relative to body bottom)
+        breaker_top_y = sc_y + _exit_pin_offset
+
+        # Draw stub connections to close gaps at breaker pin tips.
+        # Bottom stub is covered by busbar-to-breaker connection (overshoots to body).
+        # Top stub: body top → top pin tip (closes the gap before conductor tail).
+        _sc_stub = _sc_comp.stub
+        if _sc_stub > 0:
+            _body_top_y = sc_y + _sc_comp.height
+            result.connections.append(((tap_x, _body_top_y), (tap_x, breaker_top_y)))
+        _leader_y_from_busbar = (config.db_box_busbar_margin + _exit_pin_offset
+                                 + config.db_box_tail_margin
                                  + config.db_box_label_margin
                                  + config.leader_margin_above_db)
-        _breaker_top_from_busbar = config.busbar_to_breaker_gap + sc_cb_h + config.stub_len
+        _breaker_top_from_busbar = config.busbar_to_breaker_gap + _exit_pin_offset
         effective_tail = max(config.tail_length,
                              _leader_y_from_busbar - _breaker_top_from_busbar + 5)
         tail_end_y = breaker_top_y + effective_tail
 
-        # ISOLATOR: extra space for device box
+        # Conductor ends at tail_end_y.  ISOLATOR device box (3.8mm) is added
+        # later by _add_isolator_device_symbols() sitting ON TOP of the conductor end.
         _ISOL_DEVICE_BOX_H = 3.8
-        _isol_extra = _ISOL_DEVICE_BOX_H if cd["breaker_type"] == "ISOLATOR" else 0.0
-        conductor_top_y = tail_end_y + _isol_extra
+        _is_isol_circuit = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
+        conductor_top_y = tail_end_y + (_ISOL_DEVICE_BOX_H if _is_isol_circuit else 0.0)
         result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
 
-        # Circuit name label
-        display_label = _build_display_label(circuit, cd["name"], conductor_top_y, config)
+        # Circuit name label — above device box for ISOLATOR, above conductor for MCB.
+        # When row has ISOLATORs, all labels align at the ISOLATOR label height.
+        _has_any_isol = any(
+            c.get("_is_isolator_load") or str(c.get("breaker_type", "")).upper() == "ISOLATOR"
+            for c in row_circuits
+        )
+        _ISOL_LABEL_GAP = 4.0  # gap above device box top to clear the symbol
+        label_y = tail_end_y + (_ISOL_DEVICE_BOX_H + _ISOL_LABEL_GAP if _has_any_isol else 2)
+        display_label = _build_display_label(circuit, cd["name"], label_y, config)
         result.components.append(PlacedComponent(
-            symbol_name="LABEL", x=tap_x, y=conductor_top_y + 2,
+            symbol_name="LABEL", x=tap_x, y=label_y,
             label=display_label, rotation=90.0,
         ))
 

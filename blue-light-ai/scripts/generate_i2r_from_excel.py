@@ -102,7 +102,7 @@ def build_requirements() -> dict:
         "supply_type": "three_phase",
         "kva": 69.282,
         "voltage": 400,
-        "supply_source": "landlord",
+        "supply_source": "building_riser",
         "incoming_cable": "4 x 50mm² PVC/PVC cable + 50mm² CPC in metal trunking",
         "outgoing_cable": "4 x 35mm² PVC cable + 50mm² CPC in cable tray",
         "main_breaker": {

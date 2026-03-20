@@ -3,7 +3,9 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.PaymentConfirmRequest;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
@@ -31,6 +33,7 @@ public class AdminPaymentService {
     private final ApplicationRepository applicationRepository;
     private final PaymentRepository paymentRepository;
     private final EmailService emailService;
+    private final NotificationService notificationService;
 
     /**
      * Confirm offline payment (creates Payment record + changes status to PAID)
@@ -76,6 +79,25 @@ public class AdminPaymentService {
                 applicationSeq,
                 application.getAddress(),
                 savedPayment.getAmount());
+
+        // 배정된 LEW에게 알림 (인앱 + 이메일)
+        User lew = application.getAssignedLew();
+        if (lew != null) {
+            notificationService.createNotification(
+                    lew.getUserSeq(),
+                    NotificationType.PAYMENT_CONFIRMED,
+                    "Payment Confirmed",
+                    "Payment of $" + savedPayment.getAmount() + " confirmed for Application #" + applicationSeq + " at " + application.getAddress(),
+                    "APPLICATION",
+                    applicationSeq
+            );
+            emailService.sendPaymentConfirmedToLewEmail(
+                    lew.getEmail(),
+                    lew.getFirstName() + " " + lew.getLastName(),
+                    applicationSeq,
+                    application.getAddress(),
+                    savedPayment.getAmount());
+        }
 
         return PaymentResponse.from(savedPayment);
     }

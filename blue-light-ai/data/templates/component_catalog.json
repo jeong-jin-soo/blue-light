@@ -1,0 +1,371 @@
+{
+  "_meta": {
+    "version": 1,
+    "description": "SLD Component Catalog — 18종 컴포넌트 단일 정의원",
+    "source": "real_symbol_paths.json + DWG calibration data (26 samples)",
+    "pin_convention": "origin (0,0) = body 좌하단 (stubs 제외). top/bottom = vertical pins, left/right = horizontal pins."
+  },
+  "components": {
+    "MCB": {
+      "category": "breaker",
+      "width": 5.0,
+      "height": 8.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 2.5, "y": 10.0},
+        "bottom": {"x": 2.5, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 10.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 7.0, "y": 4.0}
+      },
+      "render_params": {
+        "arc_radius": 1.7,
+        "contact_radius": 0.35,
+        "arc_start_deg": 283.8,
+        "arc_end_deg": 75.2
+      },
+      "dxf_block": "MCCB",
+      "h_extent": 8.0
+    },
+    "MCCB": {
+      "category": "breaker",
+      "width": 5.5,
+      "height": 9.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 2.75, "y": 11.0},
+        "bottom": {"x": 2.75, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 11.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 8.0, "y": 4.5}
+      },
+      "render_params": {
+        "arc_radius": 2.0,
+        "contact_radius": 0.35,
+        "arc_start_deg": 297.1,
+        "arc_end_deg": 62.9
+      },
+      "dxf_block": "MCCB",
+      "h_extent": 9.0
+    },
+    "ACB": {
+      "category": "breaker",
+      "width": 7.0,
+      "height": 11.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 3.5, "y": 13.0},
+        "bottom": {"x": 3.5, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 13.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 10.0, "y": 5.5}
+      },
+      "render_params": {
+        "arc_radius": 2.4,
+        "contact_radius": 0.45,
+        "arc_start_deg": 297.1,
+        "arc_end_deg": 62.9,
+        "crossbar_extend": 1.5
+      },
+      "dxf_block": null,
+      "h_extent": 11.0
+    },
+    "RCCB": {
+      "category": "breaker",
+      "width": 6.5,
+      "height": 9.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 3.25, "y": 11.0},
+        "bottom": {"x": 3.25, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 11.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 9.0, "y": 4.5}
+      },
+      "render_params": {
+        "arc_radius": 2.0,
+        "contact_radius": 0.35,
+        "arc_start_deg": 297.1,
+        "arc_end_deg": 62.9,
+        "rcd_h_ratio": 0.4298,
+        "rcd_v_ratio": 0.7777
+      },
+      "dxf_block": "RCCB",
+      "h_extent": 9.0
+    },
+    "ELCB": {
+      "category": "breaker",
+      "width": 6.5,
+      "height": 9.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 3.25, "y": 11.0},
+        "bottom": {"x": 3.25, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 11.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 9.0, "y": 4.5}
+      },
+      "render_params": {
+        "arc_radius": 2.0,
+        "contact_radius": 0.35,
+        "arc_start_deg": 297.1,
+        "arc_end_deg": 62.9,
+        "rcd_h_ratio": 0.4298,
+        "rcd_v_ratio": 0.7777
+      },
+      "dxf_block": "RCCB",
+      "h_extent": 9.0
+    },
+    "KWH_METER": {
+      "category": "meter",
+      "width": 14.0,
+      "height": 10.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 7.0, "y": 12.0},
+        "bottom": {"x": 7.0, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 14.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_below": {"x": 7.0, "y": -4.0}
+      },
+      "render_params": {
+        "circle_radius": 4.5,
+        "rect_ratio": 2.0
+      },
+      "dxf_block": "KWH_METER",
+      "h_extent": 12.0
+    },
+    "CT": {
+      "category": "protection",
+      "width": 2.5,
+      "height": 3.0,
+      "stub": 1.5,
+      "pins": {
+        "top": {"x": 1.25, "y": 4.5},
+        "bottom": {"x": 1.25, "y": -1.5},
+        "left": {"x": -1.5, "y": 0.0},
+        "right": {"x": 4.5, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 5.0, "y": 1.5}
+      },
+      "render_params": {
+        "ring_radius": 0.8,
+        "ring_offset": 0.7
+      },
+      "dxf_block": null,
+      "h_extent": 3.0
+    },
+    "ISOLATOR": {
+      "category": "breaker",
+      "width": 5.5,
+      "height": 7.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 2.75, "y": 9.0},
+        "bottom": {"x": 2.75, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 9.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 8.0, "y": 3.5}
+      },
+      "render_params": {
+        "blade_length": 7.0,
+        "contact_radius": 0.4
+      },
+      "dxf_block": "IEC ISOLATOR",
+      "h_extent": 7.0
+    },
+    "BI_CONNECTOR": {
+      "category": "connector",
+      "width": 7.0,
+      "height": 5.5,
+      "stub": 1.5,
+      "pins": {
+        "top": {"x": 3.5, "y": 7.0},
+        "bottom": {"x": 3.5, "y": -1.5},
+        "left": {"x": -1.5, "y": 0.0},
+        "right": {"x": 8.5, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 9.0, "y": 2.75}
+      },
+      "render_params": {},
+      "dxf_block": null,
+      "h_extent": 5.5
+    },
+    "EARTH": {
+      "category": "auxiliary",
+      "width": 5.5,
+      "height": 4.5,
+      "stub": 0.0,
+      "pins": {
+        "top": {"x": 2.75, "y": 4.5},
+        "bottom": {"x": 2.75, "y": 0.0}
+      },
+      "anchors": {
+        "label_below": {"x": 2.75, "y": -2.0}
+      },
+      "render_params": {
+        "line_count": 3
+      },
+      "dxf_block": "EARTH",
+      "h_extent": 4.5
+    },
+    "FUSE": {
+      "category": "protection",
+      "width": 3.5,
+      "height": 8.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 1.75, "y": 10.0},
+        "bottom": {"x": 1.75, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 10.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 6.0, "y": 4.0}
+      },
+      "render_params": {
+        "rect_width": 3.5,
+        "rect_height": 6.5
+      },
+      "dxf_block": "2A FUSE",
+      "h_extent": 8.0
+    },
+    "POTENTIAL_FUSE": {
+      "category": "protection",
+      "width": 2.0,
+      "height": 5.5,
+      "stub": 1.5,
+      "pins": {
+        "top": {"x": 1.0, "y": 7.0},
+        "bottom": {"x": 1.0, "y": -1.5},
+        "left": {"x": -1.5, "y": 0.0},
+        "right": {"x": 7.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_right": {"x": 4.0, "y": 2.75}
+      },
+      "render_params": {
+        "circle_radius": 0.6,
+        "cross_gap": 2.5
+      },
+      "dxf_block": "2A FUSE",
+      "h_extent": 5.5
+    },
+    "ELR": {
+      "category": "protection",
+      "width": 12.0,
+      "height": 6.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 6.0, "y": 8.0},
+        "bottom": {"x": 6.0, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 14.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_below": {"x": 6.0, "y": -4.0}
+      },
+      "render_params": {},
+      "dxf_block": null,
+      "h_extent": 12.0
+    },
+    "AMMETER": {
+      "category": "meter",
+      "width": 4.0,
+      "height": 4.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 2.0, "y": 6.0},
+        "bottom": {"x": 2.0, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 6.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_below": {"x": 2.0, "y": -4.0}
+      },
+      "render_params": {
+        "radius": 2.0,
+        "letter": "A"
+      },
+      "dxf_block": null,
+      "h_extent": 4.0
+    },
+    "VOLTMETER": {
+      "category": "meter",
+      "width": 4.0,
+      "height": 4.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 2.0, "y": 6.0},
+        "bottom": {"x": 2.0, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 6.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_below": {"x": 2.0, "y": -4.0}
+      },
+      "render_params": {
+        "radius": 2.0,
+        "letter": "V"
+      },
+      "dxf_block": null,
+      "h_extent": 4.0
+    },
+    "SELECTOR_SWITCH": {
+      "category": "auxiliary",
+      "width": 4.0,
+      "height": 4.0,
+      "stub": 2.0,
+      "pins": {
+        "top": {"x": 2.0, "y": 6.0},
+        "bottom": {"x": 2.0, "y": -2.0},
+        "left": {"x": -2.0, "y": 0.0},
+        "right": {"x": 6.0, "y": 0.0}
+      },
+      "anchors": {
+        "label_below": {"x": 2.0, "y": -4.0}
+      },
+      "render_params": {
+        "radius": 2.0
+      },
+      "dxf_block": null,
+      "h_extent": 4.0
+    },
+    "INDICATOR_LIGHTS": {
+      "category": "auxiliary",
+      "width": 16.0,
+      "height": 6.0,
+      "stub": 0.0,
+      "pins": {
+        "left": {"x": 0.0, "y": 3.0},
+        "right": {"x": 16.0, "y": 3.0}
+      },
+      "anchors": {
+        "label_below": {"x": 8.0, "y": -2.0}
+      },
+      "render_params": {
+        "circle_radius": 2.0,
+        "circle_count": 3,
+        "circle_spacing": 6.0
+      },
+      "dxf_block": null,
+      "h_extent": 16.0
+    }
+  }
+}

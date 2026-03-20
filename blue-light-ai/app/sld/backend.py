@@ -32,11 +32,13 @@ class DrawingBackend(Protocol):
         Set the current drawing layer.
 
         Layers (calibrated from real LEW SLD samples):
-        - SLD_SYMBOLS: Main symbol outlines (0.25mm)
-        - SLD_CONNECTIONS: Connection lines between symbols (0.25mm)
-        - SLD_POWER_MAIN: Main power supply lines / busbar (0.50mm)
-        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.25mm)
-        - SLD_TITLE_BLOCK: Border and title block elements (0.25mm)
+        - SLD_SYMBOLS: Main symbol outlines (0.25mm) → DXF: E-SLD-SYM
+        - SLD_CONNECTIONS: Connection lines between symbols (0.25mm) → DXF: E-SLD-LINE
+        - SLD_POWER_MAIN: Main power supply lines / busbar (0.50mm) → DXF: E-SLD-BUSBAR
+        - SLD_ANNOTATIONS: Text labels, ratings, annotations (0.25mm) → DXF: E-SLD-TXT
+        - SLD_TITLE_BLOCK: Title block elements (0.25mm) → DXF: E-SLD-TITLE
+        - SLD_FRAME: Drawing border (0.25mm) → DXF: E-SLD-FRAME
+        - SLD_DB_FRAME: DB dashed boxes (0.25mm, gray) → DXF: E-SLD-BOX
         """
         ...
 
@@ -136,5 +138,44 @@ class DrawingBackend(Protocol):
             center: Center point (x, y) in mm.
             radius: Radius in mm.
             fill_color: Fill color as (r, g, b) floats 0-1 or hex string.
+        """
+        ...
+
+    def draw_center_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+        *,
+        long_dash: float = 8.0,
+        short_dash: float = 1.5,
+        gap: float = 2.0,
+    ) -> None:
+        """Draw an IEC CENTER linetype line (long dash, gap, short dash, gap).
+
+        Used for DB box frame boundaries.
+
+        DXF: single LINE entity on SLD_DB_FRAME layer with native CENTER linetype.
+        PDF/SVG: procedural dash pattern on SLD_DB_FRAME layer with gray color.
+        """
+        ...
+
+    def draw_fanout(
+        self,
+        center_x: float,
+        busbar_y: float,
+        side_xs: list[float],
+        mcb_entry_y: float,
+    ) -> None:
+        """Draw a 3-phase fan-out from busbar to sub-circuit MCBs.
+
+        DXF: creates a named editable block (FANOUT_3P_*).
+        PDF/SVG: draws all three line types procedurally —
+          center vertical (busbar→MCB), diagonals, side verticals.
+
+        Args:
+            center_x: X of center circuit on busbar.
+            busbar_y: Y of busbar.
+            side_xs: X coords of side circuits (1 or 2 elements).
+            mcb_bottom_y: Y of MCB bottom contact.
         """
         ...

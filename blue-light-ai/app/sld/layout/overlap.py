@@ -104,16 +104,17 @@ class BoundingBox:
 
 
 # Fallback symbol dimensions used when real_symbol_paths.json is unavailable.
+# Values match real_symbol_paths.json as of 2026-03-16 (C4 sync fix).
 _FALLBACK_SYMBOL_DIMS: dict[str, tuple[float, float]] = {
-    "CB_MCB": (7.2, 13.0),
-    "CB_MCCB": (8.4, 15.0),
-    "CB_ACB": (10, 17),
-    "CB_ELCB": (10.0, 15.0),
-    "CB_RCCB": (10.0, 15.0),
-    "ISOLATOR": (8, 14),
-    "KWH_METER": (14, 10),
-    "CT": (12, 12),
-    "EARTH": (8, 6.7),
+    "CB_MCB": (5.0, 8.0),
+    "CB_MCCB": (5.5, 9.0),
+    "CB_ACB": (7.0, 11.0),
+    "CB_ELCB": (6.5, 9.0),
+    "CB_RCCB": (6.5, 9.0),
+    "ISOLATOR": (5.5, 7.0),
+    "KWH_METER": (14.0, 10.0),
+    "CT": (2.5, 3.0),
+    "EARTH": (5.5, 4.5),
     "CIRCUIT_ID_BOX": (8, 5),
     "DB_INFO_BOX": (80, 18),
     "FLOW_ARROW_UP": (8, 10),
@@ -282,20 +283,53 @@ class SubCircuitGroup:
     row_busbar_y: float = 0.0            # Busbar Y of this circuit's row
 
 
-def _breaker_half_width(comp: PlacedComponent) -> float:
-    """Return half the breaker symbol width for tap_x calculation.
+# Map symbol_name → real_symbol_paths.json key for pin half-width lookup.
+_SYMBOL_TO_JSON_KEY_FOR_PINS: dict[str, str] = {
+    "CB_MCB": "MCB",
+    "CB_MCCB": "MCCB",
+    "CB_RCCB": "RCCB",
+    "CB_ELCB": "ELCB",
+    "CB_ACB": "ACB",
+    "ISOLATOR": "ISOLATOR",
+}
 
-    Values synced with real_symbol_paths.json (DWG-calibrated).
+# Cached pin half-widths loaded from real_symbol_paths.json.
+# {json_key: width_mm / 2}
+_PIN_HALF_WIDTHS: dict[str, float] | None = None
+
+
+def _load_pin_half_widths() -> dict[str, float]:
+    """Load pin half-widths from real_symbol_paths.json (once)."""
+    global _PIN_HALF_WIDTHS
+    if _PIN_HALF_WIDTHS is not None:
+        return _PIN_HALF_WIDTHS
+    try:
+        from app.sld.real_symbols import get_symbol_dimensions
+        result: dict[str, float] = {}
+        for json_key in ("MCB", "MCCB", "RCCB", "ELCB", "ACB"):
+            dims = get_symbol_dimensions(json_key)
+            result[json_key] = dims["width_mm"] / 2.0
+        _PIN_HALF_WIDTHS = result
+    except Exception:
+        # Fallback to hardcoded values if JSON unavailable
+        _PIN_HALF_WIDTHS = {
+            "MCB": 2.5, "MCCB": 2.75, "RCCB": 3.25, "ELCB": 3.25, "ACB": 3.5,
+        }
+    return _PIN_HALF_WIDTHS
+
+
+def _breaker_half_width(comp: PlacedComponent) -> float:
+    """Return pin X offset from comp.x for tap_x calculation.
+
+    Data-driven: reads width_mm / 2 from real_symbol_paths.json.
+    Must match the actual symbol pin position so that connection lines
+    align with the symbol's top/bottom pins (pin is at horizontal center).
     """
-    if comp.symbol_name == "CB_MCB":
-        return 3.6   # 7.2mm / 2
-    elif comp.symbol_name == "CB_MCCB":
-        return 4.2   # 8.4mm / 2
-    elif comp.symbol_name in ("CB_RCCB", "CB_ELCB"):
-        return 5.0   # 10.0mm / 2
-    elif comp.symbol_name == "CB_ACB":
-        return 5.0   # 10.0mm / 2
-    return 4.2
+    hw = _load_pin_half_widths()
+    json_key = _SYMBOL_TO_JSON_KEY_FOR_PINS.get(comp.symbol_name)
+    if json_key and json_key in hw:
+        return hw[json_key]
+    return hw.get("MCCB", 2.75)  # default fallback
 
 
 def _compute_dynamic_spacing(
@@ -344,7 +378,9 @@ def _create_groups_from_breakers(
     """Create initial groups from breaker_block components (pure)."""
     groups: list[SubCircuitGroup] = []
     for i, comp in enumerate(components):
-        if comp.label_style == "breaker_block" and comp.symbol_name.startswith("CB_"):
+        if comp.label_style == "breaker_block" and (
+            comp.symbol_name.startswith("CB_") or comp.symbol_name == "ISOLATOR"
+        ):
             tap_x = comp.x + _breaker_half_width(comp)
             groups.append(SubCircuitGroup(tap_x=tap_x, breaker_idx=i))
     return groups
@@ -1046,7 +1082,7 @@ def _compute_safe_leader_bounds(
     Returns:
         (safe_left, safe_right) — horizontal bounds for leader extension.
     """
-    _SPARE_GAP = 5.0  # mm gap before SPARE circuit
+    _SPARE_GAP = config.spare_circuit_gap
     safe_left = config.min_x
     safe_right = config.max_x
 
@@ -1060,7 +1096,7 @@ def _compute_safe_leader_bounds(
     # Clamp to adjacent cable group boundaries
     # Margin accounts for cable text extending beyond leader endpoint:
     # text offset (3mm) + text half_width (~2.8mm) + clearance (0.2mm) = 6mm
-    _CABLE_TEXT_MARGIN = 6.0
+    _CABLE_TEXT_MARGIN = config.cable_text_margin
     all_group_ranges = [(min(txs), max(txs)) for txs in cable_groups.values()]
     for gj, (g_min, g_max) in enumerate(all_group_ranges):
         if gj == gi:
@@ -1073,10 +1109,15 @@ def _compute_safe_leader_bounds(
     # Clamp to circuit name label bounding boxes (rotated 90° vertical text)
     # Cable text half_w estimate for 2-line text (most cable specs split into 2 lines)
     if groups and components:
+        # Collect tap_xs for the current cable group to skip own labels
+        current_group_taps = list(cable_groups.values())[gi]
         _CABLE_TEXT_HALF_W = config.label_char_height  # 2.8mm for 2-line text
         _LABEL_GAP = _CABLE_TEXT_HALF_W + 1.5  # 4.3mm total clearance
         for g in groups:
             if g.name_label_idx is None:
+                continue
+            # Skip labels belonging to circuits in the current cable group
+            if any(abs(g.tap_x - tx) < 0.5 for tx in current_group_taps):
                 continue
             label_comp = components[g.name_label_idx]
             # 90° rotated label: horizontal extent = num_lines × char_height
@@ -1122,11 +1163,17 @@ def _draw_cable_leader_group(
     bend_height: float,
     tick_size: float,
     layout_result: LayoutResult,
+    config: "LayoutConfig | None" = None,
+    label_y_override: float | None = None,
 ) -> None:
     """Draw one cable leader group: horizontal line, ticker marks, L-bend, and text.
 
     Appends connections (leader line, L-bend), thick_connections (tickers),
     and a LABEL component (cable spec text) to layout_result.
+
+    Args:
+        label_y_override: If set, cable text label starts at this Y instead of
+            bend_top_y + 1. Used to align cable labels with sub-circuit labels.
     """
     # Horizontal leader line
     layout_result.connections.append((
@@ -1152,27 +1199,33 @@ def _draw_cable_leader_group(
 
     # L-shaped bend + cable spec text at leader end
     bend_top_y = leader_y + bend_height
+    text_y = label_y_override if label_y_override is not None else (bend_top_y + 1)
+    # Clamp leader endpoints to drawing boundaries
+    _max_x = config.max_x if config else 395.0
+    _min_x = config.min_x if config else 25.0
     if text_on_left:
+        _bend_x = max(leader_start_x, _min_x)
         layout_result.connections.append((
-            (leader_start_x, leader_y),
-            (leader_start_x, bend_top_y),
+            (_bend_x, leader_y),
+            (_bend_x, bend_top_y),
         ))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=leader_start_x - 3,
-            y=bend_top_y + 1,
+            x=max(_bend_x - 3, _min_x),
+            y=text_y,
             label=cable_text,
             rotation=90.0,
         ))
     else:
+        _bend_x = min(leader_end_x, _max_x - 3)
         layout_result.connections.append((
-            (leader_end_x, leader_y),
-            (leader_end_x, bend_top_y),
+            (_bend_x, leader_y),
+            (_bend_x, bend_top_y),
         ))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=leader_end_x,
-            y=bend_top_y + 1,
+            x=_bend_x,
+            y=text_y,
             label=cable_text,
             rotation=90.0,
         ))
@@ -1204,7 +1257,9 @@ def _add_cable_leader_lines(
         return
 
     # DB box top offset from any busbar Y
-    db_box_top_offset = (config.db_box_busbar_margin + config.mcb_h + config.stub_len
+    from app.sld.catalog import get_catalog as _gc
+    _mcb_d = _gc().get("MCB")
+    db_box_top_offset = (config.db_box_busbar_margin + _mcb_d.height + _mcb_d.stub
                          + config.db_box_tail_margin + config.db_box_label_margin)
 
     # Determine which row each group belongs to (by breaker Y proximity to busbar)
@@ -1245,8 +1300,19 @@ def _add_cable_leader_lines(
 
     tick_size = 1.25  # Half-length of diagonal tick (matches meter board)
 
+    # Find sub-circuit label Y to align cable labels with (if available)
+    _subcircuit_label_y = None
+    for comp in layout_result.components:
+        if (comp.symbol_name == "LABEL" and comp.rotation == 90.0
+                and comp.label and "sqmm" not in comp.label.lower()
+                and comp.label != "SPARE"
+                and not comp.label.startswith("2C ")
+                and not comp.label.startswith("4 x")):
+            _subcircuit_label_y = comp.y
+            break
+
     for row_busbar_y, row_entries in rows_map.items():
-        # Leader Y for this row
+        # Leader Y for this row (original position — not shifted by ISOLATOR)
         leader_y = row_busbar_y + db_box_top_offset + config.leader_margin_above_db
 
         # Group by cable spec within this row
@@ -1267,13 +1333,16 @@ def _add_cable_leader_lines(
         # Build circuit name label bounding boxes for collision detection
         # (X range only; at same Y zone, vertical ranges always overlap for 90° text)
         # Store (x_min, x_max, center_x) to allow filtering own-group names
+        # Include SPARE labels — they occupy space and cable text must not overlap them.
         name_label_bbs: list[tuple[float, float, float]] = []
         for g in groups:
-            if g.name_label_idx is None or g.is_spare:
+            if g.name_label_idx is None:
                 continue
             comp = layout_result.components[g.name_label_idx]
             n_lines = max(len((comp.label or "").split("\\P")), 1)
-            hw = n_lines * config.label_char_height / 2
+            _ls = config.label_char_height * 1.4
+            x_span = config.label_char_height + (n_lines - 1) * _ls
+            hw = x_span / 2
             name_label_bbs.append((comp.x - hw, comp.x + hw, comp.x))
 
         # Track placed cable text bounding boxes for sequential collision avoidance
@@ -1282,18 +1351,24 @@ def _add_cable_leader_lines(
         def _has_collision(
             bb: tuple[float, float], y: float,
             own_tap_xs: list[float] | None = None,
+            text_x: float | None = None,
         ) -> bool:
-            """Check if cable text BB collides with EXTERNAL name labels or placed cable texts.
+            """Check if cable text BB collides with name labels or placed cable texts.
 
             own_tap_xs: tap positions of the current cable group — names at these
-            positions are excluded (cable leader passes over its own group's names,
-            so moderate overlap is expected and acceptable).
+            positions are excluded ONLY if they are far from the cable text anchor
+            (i.e., they are mid-leader names that the leader line passes over).
+            Names near text_x (the cable text placement point) are always checked.
             """
             _MARGIN = 0.5  # extra clearance to catch near-misses
+            _TEXT_PROXIMITY = 8.0  # mm — labels within this distance of text_x are always checked
             for nx_min, nx_max, nx_center in name_label_bbs:
-                # Skip names that belong to the current cable group
+                # Skip own-group names ONLY if far from text placement point
                 if own_tap_xs and any(abs(nx_center - tx) < 0.5 for tx in own_tap_xs):
-                    continue
+                    if text_x is not None and abs(nx_center - text_x) < _TEXT_PROXIMITY:
+                        pass  # Near text anchor — do NOT skip, check collision
+                    else:
+                        continue  # Mid-leader — safe to skip
                 if bb[1] > nx_min - _MARGIN and bb[0] < nx_max + _MARGIN:
                     return True
             for px_min, px_max, py in placed_cable_bbs:
@@ -1336,11 +1411,17 @@ def _add_cable_leader_lines(
 
             # --- BB-based collision detection + correction ---
             cable_num_lines = _estimate_cable_text_num_lines(cable_spec)
-            cable_hw = cable_num_lines * config.label_char_height / 2
+            # SVG line_spacing = char_height * 1.4
+            # 다중 행 수직 텍스트: anchor(x)에서 +X 방향으로 각 행 추가
+            _line_spacing = config.label_char_height * 1.4
+            cable_x_span = config.label_char_height + (cable_num_lines - 1) * _line_spacing
+            cable_hw = cable_x_span / 2  # 대칭 hw (collision avoidance용)
+            cable_hw_right = cable_x_span  # 비대칭: anchor에서 우측으로 전체 확장
             text_x = (leader_start_x - 3) if text_on_left else leader_end_x
-            cable_bb = (text_x - cable_hw, text_x + cable_hw)
+            # 비대칭 bb: text_x 기준 좌측은 char_h/2, 우측은 cable_x_span
+            cable_bb = (text_x - config.label_char_height / 2, text_x + cable_x_span)
 
-            collision = _has_collision(cable_bb, effective_leader_y, own_tap_xs=tap_xs)
+            collision = _has_collision(cable_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=text_x)
 
             if collision:
                 # Attempt 1: flip text direction
@@ -1353,9 +1434,9 @@ def _add_cable_leader_lines(
                     alt_ext = min(leader_extension, effective_right)
                     alt_end = rightmost_x + alt_ext
                     alt_text_x = alt_end
-                alt_bb = (alt_text_x - cable_hw, alt_text_x + cable_hw)
+                alt_bb = (alt_text_x - config.label_char_height / 2, alt_text_x + cable_x_span)
 
-                if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs):
+                if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=alt_text_x):
                     # Flip resolved the collision
                     text_on_left = alt_on_left
                     if text_on_left:
@@ -1366,33 +1447,78 @@ def _add_cable_leader_lines(
                         leader_end_x = rightmost_x + alt_ext
                     cable_bb = alt_bb
                 else:
-                    # Attempt 2: Y stagger (+4mm)
-                    stagger_y = min(effective_leader_y + 4.0, max_leader_y)
-                    # Try original direction with stagger
-                    if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs):
-                        effective_leader_y = stagger_y
-                    # Try flipped direction with stagger
-                    elif not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs):
-                        effective_leader_y = stagger_y
-                        text_on_left = alt_on_left
-                        if text_on_left:
-                            leader_start_x = leftmost_x - alt_ext
-                            leader_end_x = rightmost_x
-                        else:
-                            leader_start_x = leftmost_x
-                            leader_end_x = rightmost_x + alt_ext
-                        cable_bb = alt_bb
-                    else:
-                        # Best-effort: apply stagger even if not fully resolved
-                        effective_leader_y = stagger_y
+                    # Attempt 2: Progressive Y stagger (+4, +8, +12mm)
+                    _stagger_resolved = False
+                    for _stagger_offset in (4.0, 8.0, 12.0):
+                        stagger_y = min(effective_leader_y + _stagger_offset, max_leader_y)
+                        # Try original direction with stagger
+                        if not _has_collision(cable_bb, stagger_y, own_tap_xs=tap_xs, text_x=text_x):
+                            effective_leader_y = stagger_y
+                            _stagger_resolved = True
+                            break
+                        # Try flipped direction with stagger
+                        if not _has_collision(alt_bb, stagger_y, own_tap_xs=tap_xs, text_x=alt_text_x):
+                            effective_leader_y = stagger_y
+                            text_on_left = alt_on_left
+                            if text_on_left:
+                                leader_start_x = leftmost_x - alt_ext
+                                leader_end_x = rightmost_x
+                            else:
+                                leader_start_x = leftmost_x
+                                leader_end_x = rightmost_x + alt_ext
+                            cable_bb = alt_bb
+                            _stagger_resolved = True
+                            break
+                    if not _stagger_resolved:
+                        # Attempt 3: extend leader beyond SPARE to drawing border
+                        # Use absolute drawing bounds, not safe_left/safe_right
+                        _resolved = False
+                        _abs_max_right = config.max_x - 1  # drawing border with margin
+                        _abs_min_left = config.min_x + 1
+                        for _try_left in (text_on_left, not text_on_left):
+                            for _extra in (4.0, 8.0, 12.0, 16.0, 24.0, 32.0):
+                                if _try_left:
+                                    _start2 = max(leftmost_x - leader_extension - _extra, _abs_min_left)
+                                    _tx2 = _start2 - 3
+                                    _bb2 = (_tx2 - config.label_char_height / 2, _tx2 + cable_x_span)
+                                    if _bb2[0] < _abs_min_left:
+                                        continue
+                                    if not _has_collision(_bb2, effective_leader_y, own_tap_xs=tap_xs, text_x=_tx2):
+                                        text_on_left = True
+                                        leader_start_x = _start2
+                                        leader_end_x = rightmost_x
+                                        cable_bb = _bb2
+                                        _resolved = True
+                                        break
+                                else:
+                                    _end2 = min(rightmost_x + leader_extension + _extra, _abs_max_right)
+                                    _tx2 = _end2
+                                    _bb2 = (_tx2 - config.label_char_height / 2, _tx2 + cable_x_span)
+                                    if _bb2[1] > _abs_max_right + cable_hw:
+                                        continue
+                                    if not _has_collision(_bb2, effective_leader_y, own_tap_xs=tap_xs, text_x=_tx2):
+                                        text_on_left = False
+                                        leader_start_x = leftmost_x
+                                        leader_end_x = _end2
+                                        cable_bb = _bb2
+                                        _resolved = True
+                                        break
+                            if _resolved:
+                                break
+                        if not _resolved:
+                            # Best-effort: apply stagger even if not fully resolved
+                            effective_leader_y = stagger_y
 
             # Clamp to drawing bounds
             if effective_leader_y > max_leader_y:
                 effective_leader_y = max_leader_y
+            # Clamp leader endpoints to drawing X boundaries
+            leader_start_x = max(leader_start_x, config.min_x)
+            leader_end_x = min(leader_end_x, config.max_x - 1)
 
             # Register final cable text BB for subsequent collision checks
             final_text_x = (leader_start_x - 3) if text_on_left else leader_end_x
-            final_bb = (final_text_x - cable_hw, final_text_x + cable_hw)
+            final_bb = (final_text_x - config.label_char_height / 2, final_text_x + cable_x_span)
             placed_cable_bbs.append((final_bb[0], final_bb[1], effective_leader_y))
 
             # Draw this cable group's leader lines
@@ -1400,6 +1526,8 @@ def _add_cable_leader_lines(
                 tap_xs, cable_spec, effective_leader_y, text_on_left,
                 leader_start_x, leader_end_x,
                 config.leader_bend_height, tick_size, layout_result,
+                config=config,
+                label_y_override=_subcircuit_label_y,
             )
 
 
@@ -1462,26 +1590,14 @@ def _add_isolator_device_symbols(
         box_bottom = conductor_top_y
         box_top = conductor_top_y + _BOX_SIZE
 
-        # 1. Outline rectangle (4 line segments, no internal lines)
-        layout_result.connections.append(
-            ((tap_x - _BOX_HW, box_bottom), (tap_x + _BOX_HW, box_bottom)))  # bottom
-        layout_result.connections.append(
-            ((tap_x - _BOX_HW, box_top), (tap_x + _BOX_HW, box_top)))        # top
-        layout_result.connections.append(
-            ((tap_x - _BOX_HW, box_bottom), (tap_x - _BOX_HW, box_top)))     # left
-        layout_result.connections.append(
-            ((tap_x + _BOX_HW, box_bottom), (tap_x + _BOX_HW, box_top)))     # right
-
-        # 2. L-shaped connection stub (right edge middle → right → down)
-        stub_start_x = tap_x + _BOX_HW
-        stub_mid_y = (box_bottom + box_top) / 2
-        stub_corner_x = stub_start_x + _STUB_RIGHT
-        stub_end_y = stub_mid_y - _STUB_DOWN
-
-        layout_result.connections.append(
-            ((stub_start_x, stub_mid_y), (stub_corner_x, stub_mid_y)))        # horizontal
-        layout_result.connections.append(
-            ((stub_corner_x, stub_mid_y), (stub_corner_x, stub_end_y)))       # vertical down
+        # Place DP ISOL device as a component (DXF block INSERT, matching reference)
+        # Reference DXF: DP ISOL blocks at circuit tops, rot=90°, scale=0.81
+        layout_result.components.append(PlacedComponent(
+            symbol_name="DP_ISOL_DEVICE",
+            x=tap_x - _BOX_HW,
+            y=box_bottom,
+            rotation=90.0,
+        ))
 
 
 def _get_circuit_id(group: SubCircuitGroup, components: list) -> str:
@@ -1583,18 +1699,20 @@ def _add_phase_fanout(
     config: LayoutConfig,
     supply_type: str,
 ) -> None:
-    """Add 3-phase fan-out lines at busbar (post-resolve_overlaps).
+    """Add 3-phase fan-out at busbar (post-resolve_overlaps).
 
     Position-based triplet grouping: every 3 consecutive busbar positions
     form one fan-out group. ALL circuit types participate (MCB, ISOLATOR,
     SPARE) since they all occupy physical positions on the comb bar.
 
-    Reference pattern (63A TPN SLD 14):
-        Triplet:        Pair:
-        |    /|\\          /|
-        |   / | \\        / |
-        |  /  |  \\      /  |
-      ━━━━━━(●)━━━━━━  ━(●)━━━━
+    Reference pattern (63A TPN SLD 14 DXF):
+      - Center circuit: straight vertical from busbar to MCB
+      - Side circuits: diagonal from (center_x, busbar_y) to (side_x, busbar_y + fan_h),
+        then vertical from (side_x, busbar_y + fan_h) to MCB
+      - Fan-out height ratio: dy/dx ≈ 0.266 (193 DU / 727 DU spacing)
+
+    Fan-out geometry is stored in layout_result.fanout_groups for backend-specific
+    rendering (DXF block INSERT or procedural lines).
     """
     if supply_type != "three_phase":
         return
@@ -1611,39 +1729,36 @@ def _add_phase_fanout(
     # --- Group ALL circuits (including SPARE and ISOL) PER ROW ---
     rows: dict[int, list[tuple[SubCircuitGroup, float]]] = {}
     for g in groups:
-        # Include all circuits: breaker circuits AND spares
         if g.breaker_idx is not None or g.is_spare:
             row_idx = g.row_idx
             by = g.row_busbar_y if g.row_busbar_y else busbar_ys[0]
             rows.setdefault(row_idx, []).append((g, by))
 
-    _FAN_HEIGHT = 2.5  # mm above busbar where diagonals meet side verticals
+    # Reference: 63A TPN SLD 14 → dy/dx = 193/727 ≈ 0.266
+    _FAN_RATIO = 0.266
 
     connections = layout_result.connections
 
     for row_idx in sorted(rows.keys()):
         all_circuits = rows[row_idx]
-        # all_circuits is sorted by tap_x (from _identify_groups sort)
 
         phase_groups = _build_phase_groups(all_circuits, components)
 
         for pg in phase_groups:
             if len(pg) == 3:
-                # Triplet: LEFT / CENTER / RIGHT
                 left_g, _ = pg[0]
                 center_g, center_by = pg[1]
                 right_g, _ = pg[2]
                 by = center_by
             elif len(pg) == 2:
-                # Pair: first is center, second is side
                 center_g, center_by = pg[0]
                 side_g, _ = pg[1]
                 by = center_by
             else:
-                continue  # Single or unexpected — no fan-out
+                continue
 
-            intermediate_y = by + _FAN_HEIGHT
             center_x = center_g.tap_x
+            side_xs: list[float] = []
 
             if len(pg) == 3:
                 sides = [left_g, right_g]
@@ -1651,17 +1766,26 @@ def _add_phase_fanout(
                 sides = [side_g]
 
             for s_g in sides:
+                side_xs.append(s_g.tap_x)
+                spacing = abs(s_g.tap_x - center_x)
+                fan_h = spacing * _FAN_RATIO
+                intermediate_y = by + fan_h
+
+                # Modify side vertical connections: start from intermediate_y
+                # (original starts from busbar_y — truncate to start from fan-out tip)
                 for ci in s_g.connection_indices:
                     (sx, sy), (ex, ey) = connections[ci]
                     if abs(sy - by) < 1.0 and abs(sx - ex) < 0.5:
                         connections[ci] = ((sx, intermediate_y), (ex, ey))
 
+                # Relocate junction dot to center busbar position
                 if s_g.junction_dot_idx is not None:
                     layout_result.junction_dots[s_g.junction_dot_idx] = (center_x, by)
                     layout_result.fanout_relocated_dots.add(s_g.junction_dot_idx)
 
-                # Diagonal from center busbar junction to side intermediate
-                connections.append(((center_x, by), (s_g.tap_x, intermediate_y)))
+            # Store fan-out group data for rendering
+            # (center vertical + diagonals + side verticals rendered by generator)
+            layout_result.fanout_groups.append((center_x, by, side_xs))
 
 
 def _normalize_row_spacing(
@@ -2037,3 +2161,122 @@ def resolve_overlaps(
         )
 
     return layout_result
+
+
+# =============================================
+# Spine Label Post-Placement Validation
+# =============================================
+
+# Utility types that have no user-visible labels
+_SKIP_SYMBOL_NAMES = frozenset({
+    "BUSBAR", "LABEL", "FLOW_ARROW_UP", "CIRCUIT_ID_BOX", "DB_INFO_BOX",
+    "CONNECTION", "JUNCTION_DOT", "EARTH", "TICK_MARK",
+})
+
+
+def _estimate_spine_label_bbox(
+    comp: PlacedComponent,
+    config: LayoutConfig,
+) -> BoundingBox | None:
+    """Estimate label bounding box for a horizontal spine component.
+
+    Returns None if the component has no label text.
+    """
+    label_text = ""
+    if comp.circuit_id:
+        label_text = f"{comp.circuit_id}\\P{comp.label} {comp.rating}"
+    elif comp.rating:
+        label_text = f"{comp.label}\\P{comp.rating}"
+    elif comp.label:
+        label_text = comp.label
+
+    if not label_text:
+        return None
+
+    ch = config.label_ch_horizontal
+    wr = config.text_width_ratio
+    lines = label_text.split("\\P")
+    max_len = max(len(ln) for ln in lines) if lines else 1
+    text_w = max_len * ch * wr
+    text_h = len(lines) * ch * 1.3  # approx line height
+
+    dims = _get_symbol_dims()
+    sym_dims = dims.get(comp.symbol_name, (8.0, 14.0))
+    sym_w, sym_h = sym_dims  # width (vertical extent), height (horizontal extent)
+
+    if comp.symbol_name in ("POTENTIAL_FUSE", "FUSE"):
+        v_half = sym_w / 2
+        label_x = comp.x + sym_h / 2 - text_w / 2
+        label_y = comp.y + v_half + config.fuse_label_gap_above
+        return BoundingBox(label_x, label_y, text_w, text_h)
+    elif comp.symbol_name == "ELR":
+        v_half = sym_h / 2
+        label_x = comp.x - text_w - config.symbol_label_gap
+        return BoundingBox(label_x, comp.y + v_half - text_h / 2, text_w, text_h)
+    elif comp.symbol_name == "KWH_METER":
+        label_x = comp.x + sym_h + 2
+        return BoundingBox(label_x, comp.y, text_w, text_h)
+    elif comp.symbol_name == "SELECTOR_SWITCH":
+        r = 2.0  # default radius
+        label_x = comp.x + r - text_w / 2
+        label_y = comp.y + r + ch + config.symbol_label_gap
+        return BoundingBox(label_x, label_y, text_w, text_h)
+    elif comp.symbol_name in ("AMMETER", "VOLTMETER"):
+        r = 2.5
+        if comp.symbol_name == "AMMETER":
+            label_x = comp.x - text_w - config.symbol_label_gap
+        else:
+            label_x = comp.x + 2 * r + 2.0 + 1.0
+        label_y = comp.y + ch * 0.4 - text_h / 2
+        return BoundingBox(label_x, label_y, text_w, text_h)
+    else:
+        # Generic: label below symbol, centered
+        v_half = sym_w / 2
+        h_extent = sym_h
+        label_x = comp.x + h_extent / 2 - text_w / 2
+        label_y = comp.y - v_half - config.generic_label_gap_below - text_h
+        return BoundingBox(label_x, label_y, text_w, text_h)
+
+
+def validate_spine_labels(
+    result: LayoutResult,
+    config: LayoutConfig,
+) -> list[str]:
+    """Post-placement validation: check spine component labels don't overlap.
+
+    Returns list of warning strings (empty = all clear).
+    Does NOT modify positions — warnings only.
+    """
+    warnings: list[str] = []
+
+    # Collect horizontal spine components (rotation=90, not breaker_block, not utility)
+    spine_comps = [
+        c for c in result.components
+        if c.rotation == 90.0
+        and c.label_style != "breaker_block"
+        and c.symbol_name not in _SKIP_SYMBOL_NAMES
+        and (c.label or c.rating or c.circuit_id)
+    ]
+
+    # Build label bounding boxes
+    label_entries: list[tuple[str, BoundingBox]] = []
+    for comp in spine_comps:
+        bbox = _estimate_spine_label_bbox(comp, config)
+        if bbox:
+            name = f"{comp.symbol_name}({comp.label or comp.rating or ''})"
+            label_entries.append((name, bbox))
+
+    # Check all pairs for overlap
+    for i in range(len(label_entries)):
+        for j in range(i + 1, len(label_entries)):
+            name_a, bb_a = label_entries[i]
+            name_b, bb_b = label_entries[j]
+            if bb_a.overlaps(bb_b):
+                area = bb_a.overlap_area(bb_b)
+                if area > 1.0:  # 1 sq mm tolerance
+                    warnings.append(
+                        f"Spine label overlap: {name_a} ↔ {name_b} "
+                        f"(overlap area: {area:.1f}mm²)"
+                    )
+
+    return warnings

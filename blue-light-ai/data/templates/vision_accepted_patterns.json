@@ -1,0 +1,104 @@
+{
+  "_description": "Vision AI 오탐 방지 패턴. 싱가포르 SLD 도메인 규칙상 정상인 항목들. 새 오탐 발견 시 여기에 추가.",
+  "_updated": "2026-03-19",
+  "accepted_patterns": [
+    {
+      "id": "single_line_representation",
+      "category": "label",
+      "pattern": "L1.*L2.*L3.*separate|multi.?line|distinct.*lines|explicit.*L1",
+      "reason": "SLD는 Single-Line Diagram — 단선 표기가 정상. L1/L2/L3 별도 선은 multi-line diagram이며, SLD 규격이 아님.",
+      "source": "IEC 61082, SS 638:2018"
+    },
+    {
+      "id": "sp_abbreviation",
+      "category": "label",
+      "pattern": "SP.*ambiguous|SP.*not.*standard|unclear.*SP|meaning.*SP",
+      "reason": "SP = SP Group (Singapore Power), 싱가포르 전력 공급사. 업계 표준 약어.",
+      "source": "SP Group §1.1"
+    },
+    {
+      "id": "spn_pole_designation",
+      "category": "label",
+      "pattern": "SPN.*non.?standard|SPN.*less.*explicit|SPN.*unclear",
+      "reason": "SPN = Single Pole + Neutral. 싱가포르 및 영연방 전기 표기 표준. 1P+N과 동의어.",
+      "source": "SS 638:2018, BS EN 60898"
+    },
+    {
+      "id": "circuit_id_naming",
+      "category": "label",
+      "pattern": "S1.*P1.*non.?standard|circuit.*number|S\\d.*P\\d.*SP\\d.*unclear",
+      "reason": "S = Lighting, P = Power, SP = Spare, W = Water Heater, A = Aircon. 싱가포르 LEW 표준 회로 식별 체계. 위상 라벨(L1/L2/L3)과는 별개.",
+      "source": "Singapore LEW practice, SP Group SLD template"
+    },
+    {
+      "id": "spare_no_cable_spec",
+      "category": "missing",
+      "pattern": "spare.*cable.*spec|spare.*provision|spare.*missing.*cable",
+      "reason": "Spare 회로는 미배선 예비 회로. 케이블 사양이 없는 것이 정상. 향후 증설 시 결정.",
+      "source": "Industry practice"
+    },
+    {
+      "id": "kwh_meter_by_sp",
+      "category": "label",
+      "pattern": "KWH.*BY.*SP.*ambiguous|meter.*by.*SP.*unclear",
+      "reason": "'KWH METER BY SP'는 SP Group이 설치/관리하는 전력량계를 의미. 싱가포르 표준 표기.",
+      "source": "SP Group §6.9.6"
+    },
+    {
+      "id": "sppg_kwh_meter",
+      "category": "label",
+      "pattern": "SPPG.*unclear|SPPG.*ambiguous|SPPG.*non.?standard",
+      "reason": "'SPPG KWH METER' = SP PowerGrid kWh Meter. 싱가포르 CT 계량 표준 표기.",
+      "source": "SP Group metering code"
+    },
+    {
+      "id": "tpn_designation",
+      "category": "label",
+      "pattern": "TPN.*non.?standard|TPN.*unclear|TPN.*ambiguous",
+      "reason": "TPN = Triple Pole + Neutral. 영연방 전기 표준 표기 (3P+N과 동의어).",
+      "source": "BS EN 60898, SS 638:2018"
+    },
+    {
+      "id": "section_group_gap",
+      "category": "spacing",
+      "pattern": "uneven.*spacing.*subcircuit|wider.*gap.*lighting.*power|inconsistent.*horizontal.*spacing.*subcircuit",
+      "reason": "3-phase SLD에서 Lighting↔Power 그룹 사이 추가 갭은 의도된 섹션 구분. 그룹 내부 간격과 다른 것이 정상.",
+      "source": "Singapore LEW practice — phase group visual separation"
+    },
+    {
+      "id": "subcircuit_group_label",
+      "category": "label",
+      "pattern": "individual.*breaker.*rating|each.*breaker.*label|missing.*individual.*label|group.*label.*once|per.?circuit.*rating",
+      "reason": "싱가포르 SLD에서 동일 사양의 서브회로 MCB는 그룹당 1개 라벨만 표시. 각 MCB에 개별 라벨을 다는 것은 싱가포르 LEW 관행이 아님.",
+      "source": "Singapore LEW practice — grouped subcircuit labeling"
+    },
+    {
+      "id": "spare_no_phase_label",
+      "category": "label",
+      "pattern": "spare.*phase.*label|spare.*missing.*phase|phase.*label.*spare",
+      "reason": "Spare 회로는 미배선 예비 회로. 위상 라벨이 없는 것이 정상. 향후 증설 시 위상 배정.",
+      "source": "Industry practice — spare circuits are unassigned"
+    },
+    {
+      "id": "title_block_date_current",
+      "category": "label",
+      "pattern": "future.*date|date.*future|date.*2026|date.*not.*valid",
+      "reason": "SLD 생성 날짜는 현재 날짜가 자동 입력됨. 미래 날짜처럼 보여도 현재 작업 날짜.",
+      "source": "System — auto-generated date"
+    },
+    {
+      "id": "title_block_optional_fields",
+      "category": "label",
+      "pattern": "missing.*LEW.*name|missing.*contractor|missing.*main.*contractor|LEW.*not.*filled|contractor.*blank|empty.*title.*block",
+      "reason": "타이틀 블록의 LEW 이름, Main Contractor, Electrical Contractor는 선택적 입력 필드. 미입력 상태는 정상 (할당 전 또는 테스트 생성).",
+      "source": "Application workflow — fields populated at assignment stage"
+    },
+    {
+      "id": "bi_connector_line_through",
+      "category": "line_through_symbol",
+      "pattern": "line.*through.*BI.*connector|BI.*connector.*pass.*through|connection.*through.*BI",
+      "reason": "BI Connector(Bus Interface Connector)는 스파인 선이 관통하는 것이 정상. BI Connector는 스파인 위에 오버레이되는 심볼이며, 연결점 역할.",
+      "source": "Singapore LEW practice — BI connector on spine"
+    }
+  ]
+}

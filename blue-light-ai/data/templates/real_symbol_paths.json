@@ -66,12 +66,12 @@
     "description": "Earth Leakage Circuit Breaker (same symbol as RCCB). Viewport-corrected."
   },
   "KWH_METER": {
-    "width_mm": 9.0,
-    "height_mm": 6.5,
+    "width_mm": 14.0,
+    "height_mm": 10.0,
     "circle_radius_mm": 4.5,
     "rect_ratio": 2.0,
     "stub_mm": 2.0,
-    "description": "kWh Energy Meter — rectangle w/h=2.0. Viewport-corrected."
+    "description": "kWh Energy Meter — rectangle w/h=2.0. Ref 63A TPN SLD 14: KWH box 1.52x isolator width."
   },
   "CT": {
     "width_mm": 2.5,
@@ -118,31 +118,29 @@
     "description": "BI Connector — rectangular block (IEC busbar interconnect). Viewport-corrected."
   },
   "AMMETER": {
-    "radius_mm": 2.5,
+    "radius_mm": 2.0,
     "stub_mm": 2.0,
     "letter": "A",
-    "description": "Ammeter — circle with letter A (IEC 60617). Viewport-corrected."
+    "description": "Ammeter — circle with letter A (IEC 60617). Same radius as selector switch (r=2mm)."
   },
   "VOLTMETER": {
-    "radius_mm": 2.5,
+    "radius_mm": 2.0,
     "stub_mm": 2.0,
     "letter": "V",
-    "description": "Voltmeter — circle with letter V (IEC 60617). Viewport-corrected."
+    "description": "Voltmeter — circle with letter V (IEC 60617). Same radius as selector switch (r=2mm)."
   },
   "SELECTOR_SWITCH": {
     "width_mm": 4.0,
-    "height_mm": 5.5,
-    "arc_radius_mm": 0.6,
-    "arc_start_deg": 304,
-    "arc_end_deg": 56,
+    "height_mm": 4.0,
+    "radius_mm": 2.0,
     "stub_mm": 2.0,
-    "description": "Selector Switch (ASS/VSS) — two opposing arcs. Viewport-corrected."
+    "description": "Selector Switch (ASS/VSS) — circle with diagonal slash (top-right to bottom-left). Same radius as LED indicator (r=2mm)."
   },
   "ELR": {
-    "width_mm": 7.8,
-    "height_mm": 3.9,
+    "width_mm": 12.0,
+    "height_mm": 6.0,
     "stub_mm": 2.0,
-    "description": "Earth Leakage Relay — rectangular device block. Sized to match KWH meter box."
+    "description": "Earth Leakage Relay — rectangular device block. Enlarged to match reference DWG proportions (ELR box is visually prominent)."
   },
   "POTENTIAL_FUSE": {
     "width_mm": 2.0,
@@ -153,11 +151,11 @@
     "description": "Potential fuse / 2A fuse link (○×○ pattern). Viewport-corrected."
   },
   "INDICATOR_LIGHTS": {
-    "width_mm": 9.0,
-    "height_mm": 3.0,
-    "circle_radius_mm": 0.8,
+    "width_mm": 16.0,
+    "height_mm": 6.0,
+    "circle_radius_mm": 2.0,
     "circle_count": 3,
-    "circle_spacing_mm": 3.6,
-    "description": "3-phase indicator lights (○-○-○). Viewport-corrected. circle_spacing_mm is center-to-center (edge gap = 3.6 - 2*0.8 = 2.0mm)."
+    "circle_spacing_mm": 6.0,
+    "description": "3-phase indicator lights (○-○-○). LED circles ~4x fuse circle radius (0.6mm). circle_spacing_mm is center-to-center (edge gap = 7.5 - 2*2.5 = 2.5mm)."
   }
 }

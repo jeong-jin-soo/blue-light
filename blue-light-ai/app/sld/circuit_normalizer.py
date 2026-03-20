@@ -4,8 +4,14 @@ SLD Circuit Input Normalizer.
 Layer 1 of the 3-Layer Architecture:
   Input Normalizer → Circuit Resolver → Layout Engine
 
-Transforms diverse input formats into a standardized flat dict
-that the layout engine can consistently consume.
+Transforms diverse input formats into a standardized NormalizedCircuit
+dataclass that the layout engine can consistently consume.
+
+NormalizedCircuit (A3 Architecture Fix):
+    Single typed contract for circuit data.  Every consumer reads
+    typed attributes (e.g., `circuit.breaker_rating`) instead of
+    dict.get() with ad-hoc key fallbacks.  The dataclass also acts
+    as a dict (via asdict()) for backward compatibility.
 
 Handles:
 - Nested breaker dict → flat keys (breaker_rating, breaker_type, etc.)
@@ -18,8 +24,101 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field, asdict
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================
+# NormalizedCircuit — single typed contract (A3)
+# =============================================================
+
+@dataclass
+class NormalizedCircuit:
+    """Typed representation of a sub-circuit after input normalization.
+
+    Every consumer (helpers._parse_circuit_data, engine.py, sections.py)
+    should read from this dataclass instead of raw dict.get() calls.
+
+    The class supports dict-like access via __getitem__ and .get() for
+    backward compatibility during the migration period.
+
+    Field Naming Convention (canonical keys):
+        breaker_rating        — NOT 'rating', 'rating_A', 'rating_a'
+        breaker_type          — NOT 'type'
+        breaker_poles         — NOT 'poles'
+        breaker_characteristic — NOT 'char', 'trip_curve', 'breaker_char'
+        fault_kA              — NOT 'breaker_ka', 'ka_rating'
+        name                  — NOT 'circuit_name', 'description'
+    """
+
+    name: str = ""
+    breaker_rating: int = 0
+    breaker_type: str = "MCB"
+    breaker_poles: str = ""
+    breaker_characteristic: str = ""
+    fault_kA: int = 0
+    cable: Any = ""           # str | dict — normalized by resolve_circuit
+    phase: str = ""           # L1 | L2 | L3 (normalized from R/Y/B)
+    circuit_id: str = ""
+    load_kw: float = 0.0
+    load_type: str = ""       # lighting | socket | aircon | spare | ...
+    # Pass-through: any extra keys from the original dict
+    _extra: dict = field(default_factory=dict, repr=False)
+
+    # -- Dict compatibility (migration period) --
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Dict-like .get() for backward compatibility."""
+        if hasattr(self, key) and key != "_extra":
+            val = getattr(self, key)
+            # Return the actual value; only fall back to default if the field
+            # is at its empty sentinel AND caller provided a default.
+            if val == "" and default is not None:
+                return default
+            return val
+        return self._extra.get(key, default)
+
+    def __getitem__(self, key: str) -> Any:
+        if hasattr(self, key) and key != "_extra":
+            return getattr(self, key)
+        return self._extra[key]
+
+    def __contains__(self, key: str) -> bool:
+        """Check if a key exists and has a non-default/empty value.
+
+        Mimics dict behavior: 'key in circuit' is True only if the
+        field has been explicitly set to a non-empty value.
+        """
+        if hasattr(self, key) and key != "_extra":
+            val = getattr(self, key)
+            # 0 is falsy but valid for breaker_rating=0 meaning "not set"
+            if isinstance(val, (int, float)):
+                return val != 0
+            return bool(val)
+        return key in self._extra
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        if hasattr(self, key) and key != "_extra":
+            object.__setattr__(self, key, value)
+        else:
+            self._extra[key] = value
+
+    def setdefault(self, key: str, value: Any) -> Any:
+        """Dict-like setdefault for backward compatibility."""
+        current = self.get(key)
+        if current is None or current == "" or current == 0:
+            self[key] = value
+            return value
+        return current
+
+    def to_dict(self) -> dict:
+        """Convert to plain dict (for serialization or legacy code)."""
+        d = asdict(self)
+        extra = d.pop("_extra", {})
+        d.update(extra)
+        return d
 
 
 # -- Phase name normalization (R/Y/B → L1/L2/L3) --
@@ -43,10 +142,10 @@ def normalize_phase_name(phase: str) -> str:
     return _PHASE_ALIAS.get(phase.upper().strip(), phase)
 
 
-def normalize_circuit(raw: dict) -> dict:
-    """Normalize a single sub-circuit dict to flat keys.
+def normalize_circuit(raw: dict) -> NormalizedCircuit:
+    """Normalize a single sub-circuit dict to a typed NormalizedCircuit.
 
-    Ensures the layout engine always finds:
+    Ensures the layout engine always finds typed attributes:
       - breaker_rating (int)
       - breaker_type (str)
       - breaker_characteristic (str)
@@ -55,19 +154,22 @@ def normalize_circuit(raw: dict) -> dict:
 
     Priority: explicit flat keys > nested breaker dict > parsed MCB text.
     Never overwrites a value that already exists.
+
+    Returns NormalizedCircuit, which supports dict-like access for
+    backward compatibility (circuit.get("key"), circuit["key"]).
     """
-    if not isinstance(raw, dict):
+    if isinstance(raw, NormalizedCircuit):
         return raw
+    if not isinstance(raw, dict):
+        return raw  # type: ignore[return-value]  # passthrough for non-dict input
 
     # -- 1. Flatten nested "breaker" dict --
     breaker = raw.get("breaker", {})
     if isinstance(breaker, dict) and breaker:
-        # Map nested keys to flat keys (setdefault = won't overwrite existing)
         if "rating" in breaker:
             raw.setdefault("breaker_rating", breaker["rating"])
         if "type" in breaker:
             raw.setdefault("breaker_type", breaker["type"])
-        # Characteristic: multiple key names in the wild
         char_val = (
             breaker.get("breaker_characteristic")
             or breaker.get("characteristic")
@@ -101,7 +203,6 @@ def normalize_circuit(raw: dict) -> dict:
     if isinstance(cable, dict):
         cable.setdefault("method", "METAL TRUNKING")
         cable.setdefault("cpc_type", "PVC")
-        # Normalize size_mm2 to numeric string
         size = cable.get("size_mm2", "")
         if isinstance(size, (int, float)):
             cable["size_mm2"] = str(size)
@@ -117,7 +218,52 @@ def normalize_circuit(raw: dict) -> dict:
     if isinstance(phase, str) and phase:
         raw["phase"] = normalize_phase_name(phase)
 
-    return raw
+    # -- 7. Name alias resolution --
+    name = str(raw.get("name", "") or raw.get("circuit_name", "") or raw.get("description", ""))
+
+    # -- 8. Characteristic alias resolution --
+    breaker_char = str(
+        raw.get("breaker_characteristic", "")
+        or raw.get("breaker_char", "")
+        or raw.get("characteristic", "")
+        or raw.get("char", "")
+        or raw.get("trip_curve", "")
+    )
+
+    # -- 9. Fault kA alias resolution --
+    fault_kA_val = raw.get("fault_kA") or raw.get("breaker_ka") or raw.get("ka_rating") or 0
+    if isinstance(fault_kA_val, str):
+        m = re.match(r"(\d+)", fault_kA_val)
+        fault_kA_val = int(m.group(1)) if m else 0
+
+    # -- Collect known fields into NormalizedCircuit --
+    _KNOWN_KEYS = {
+        "name", "circuit_name", "description",
+        "breaker_rating", "rating", "rating_A", "rating_a",
+        "breaker_type", "type",
+        "breaker_poles", "poles",
+        "breaker_characteristic", "breaker_char", "characteristic", "char", "trip_curve",
+        "fault_kA", "breaker_ka", "ka_rating",
+        "cable", "cable_size", "cable_type", "cable_cores", "wiring_method",
+        "phase", "circuit_id", "load_kw", "load_type",
+        "breaker", "mcb", "MCB",
+    }
+    extra = {k: v for k, v in raw.items() if k not in _KNOWN_KEYS}
+
+    return NormalizedCircuit(
+        name=name,
+        breaker_rating=int(raw.get("breaker_rating", 0) or 0),
+        breaker_type=str(raw.get("breaker_type", "MCB")).upper(),
+        breaker_poles=str(raw.get("breaker_poles", "")),
+        breaker_characteristic=breaker_char.upper(),
+        fault_kA=int(fault_kA_val),
+        cable=raw.get("cable", ""),
+        phase=str(raw.get("phase", "")),
+        circuit_id=str(raw.get("circuit_id", "")),
+        load_kw=float(raw.get("load_kw", 0) or 0),
+        load_type=str(raw.get("load_type", "")),
+        _extra=extra,
+    )
 
 
 def normalize_application_info(raw: dict) -> dict:

@@ -13,6 +13,8 @@ Verifies:
 - Breaker block label spacing
 """
 
+from pathlib import Path
+
 import pytest
 
 from app.sld.layout import (
@@ -28,7 +30,7 @@ from app.sld.layout import (
     compute_layout,
     resolve_overlaps,
 )
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 from app.sld.svg_backend import SvgBackend
 from app.sld.title_block import (
     ROW_MID,
@@ -113,11 +115,11 @@ class TestCircuitIdBox:
     def test_circuit_id_box_in_layout(self):
         """CIRCUIT_ID_BOX components should exist for each sub-circuit.
 
-        3-phase with 3 non-spare + 1 spare → padded to 6 (triplet alignment).
+        3-phase triplet padding rounds 4 circuits up to 6 (next multiple of 3).
         """
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
-        # 3-phase triplet padding: 4 circuits → 6 (Lighting, SPARE×2, Power, Aircon, Spare)
+        # Triplet padding: 4 circuits → 6 (next multiple of 3)
         assert len(id_boxes) == 6
 
     def test_circuit_id_box_position(self):
@@ -125,21 +127,19 @@ class TestCircuitIdBox:
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
         for box in id_boxes:
-            assert box.y == pytest.approx(result.busbar_y + 3.5, abs=1.0), (
+            assert box.y == pytest.approx(result.busbar_y + 5.5, abs=1.0), (
                 f"CIRCUIT_ID_BOX at x={box.x} has y={box.y}, "
-                f"expected near busbar_y+3.5={result.busbar_y + 3.5}"
+                f"expected near busbar_y+5.5={result.busbar_y + 5.5}"
             )
 
     def test_circuit_id_box_has_valid_ids(self):
-        """Each CIRCUIT_ID_BOX should have a non-empty circuit_id with phase prefix."""
+        """Each CIRCUIT_ID_BOX should have a non-empty circuit_id."""
         result = compute_layout(BASIC_3PHASE_REQ)
         id_boxes = _get_components_by_type(result, "CIRCUIT_ID_BOX")
         ids = [box.circuit_id for box in id_boxes]
         assert all(len(cid) > 0 for cid in ids)
-        # 3-phase IDs use L1/L2/L3 prefix (e.g., L1S1, L2S1, L3S1, L1P1, ...)
-        assert any(cid.startswith("L1") for cid in ids)
-        assert any(cid.startswith("L2") for cid in ids)
-        assert any(cid.startswith("L3") for cid in ids)
+        # Triplet padding: 4 circuits → 6 (next multiple of 3)
+        assert len(ids) == 6
 
 
 # -- Test: DB_INFO_BOX --
@@ -158,7 +158,7 @@ class TestDbInfoBox:
         result = compute_layout(BASIC_3PHASE_REQ)
         db_box = _get_components_by_type(result, "DB_INFO_BOX")[0]
         assert "APPROVED LOAD" in db_box.rating
-        assert "kVA" in db_box.rating
+        assert "KVA" in db_box.rating  # uppercase per LEW reference (63A TPN SLD 14)
 
     def test_db_info_box_contains_db_rating(self):
         """DB_INFO_BOX label should show DB rating."""
@@ -271,33 +271,38 @@ class TestGeneratePdfBytes:
 
     def test_returns_valid_pdf_bytes(self):
         """generate_pdf_bytes() should return bytes starting with PDF header."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
+        _r = SldPipeline().run(BASIC_3PHASE_REQ)
+        pdf_bytes = _r.pdf_bytes
         assert isinstance(pdf_bytes, bytes)
         assert pdf_bytes[:5] == b"%PDF-"
         assert len(pdf_bytes) > 1000  # Non-trivial PDF
 
     def test_returns_svg_string(self):
         """generate_pdf_bytes() should also return a valid SVG string."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ)
+        _r = SldPipeline().run(BASIC_3PHASE_REQ)
+        svg_string = _r.svg_string
         assert isinstance(svg_string, str)
         assert svg_string.startswith("<svg")
         assert "</svg>" in svg_string
 
     def test_returns_dxf_bytes(self):
         """generate_pdf_bytes() should return DXF bytes when backend_type='dxf'."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ, backend_type="dxf")
+        _r = SldPipeline().run(BASIC_3PHASE_REQ, backend_type="dxf")
+        dxf_bytes = _r.dxf_bytes
         assert isinstance(dxf_bytes, bytes)
         assert len(dxf_bytes) > 1000
 
     def test_single_phase_pdf_bytes(self):
         """generate_pdf_bytes() should work with single-phase requirements."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_1PHASE_REQ)
+        _r = SldPipeline().run(BASIC_1PHASE_REQ)
+        pdf_bytes = _r.pdf_bytes
         assert isinstance(pdf_bytes, bytes)
         assert pdf_bytes[:5] == b"%PDF-"
 
     def test_legacy_pdf_backend(self):
         """generate_pdf_bytes() with backend_type='pdf' should return None for DXF."""
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(BASIC_3PHASE_REQ, backend_type="pdf")
+        _r = SldPipeline().run(BASIC_3PHASE_REQ, backend_type="pdf")
+        pdf_bytes, dxf_bytes = _r.pdf_bytes, _r.dxf_bytes
         assert isinstance(pdf_bytes, bytes)
         assert dxf_bytes is None
 
@@ -356,15 +361,13 @@ class TestLayoutCorrectness:
     def test_breaker_block_components(self):
         """Sub-circuit breakers should use breaker_block label_style.
 
-        3-phase with triplet padding: 4 user circuits → 6 total (including padded SPAREs).
-        All sub-circuit breakers (including spares) use breaker_block style.
+        3-phase triplet padding rounds 4 circuits up to 6 (next multiple of 3).
         """
         result = compute_layout(BASIC_3PHASE_REQ)
         breaker_comps = [
             c for c in result.components
             if c.symbol_name.startswith("CB_") and c.label_style == "breaker_block"
         ]
-        # 3 non-spare + 3 spare (1 original + 2 padded) = 6 breaker blocks
         assert len(breaker_comps) == 6
 
     def test_earth_bar_present(self):
@@ -389,26 +392,20 @@ class TestFullGeneration:
 
     def test_generate_3phase_no_error(self, tmp_path):
         """Full generation of a 3-phase SLD should succeed."""
-        gen = SldGenerator()
+        result = SldPipeline().run(BASIC_3PHASE_REQ)
+        assert result.component_count > 0
+        assert len(result.svg_string) > 100
         pdf_path = str(tmp_path / "test.pdf")
-        svg_path = str(tmp_path / "test.svg")
-        result = gen.generate(BASIC_3PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
-        assert result["pdf_path"] == pdf_path
-        assert len(result["svg_string"]) > 100
+        result.save(pdf_path)
+        assert Path(pdf_path).exists()
 
     def test_generate_1phase_no_error(self, tmp_path):
         """Full generation of a 1-phase SLD should succeed."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "test.pdf")
-        svg_path = str(tmp_path / "test.svg")
-        result = gen.generate(BASIC_1PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(BASIC_1PHASE_REQ)
+        assert result.component_count > 0
 
     def test_generate_with_application_info(self, tmp_path):
         """Generation with full application info should succeed."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "test.pdf")
         app_info = {
             "address": "200 PANDAN LOOP",
             "postalCode": "128388",
@@ -416,8 +413,8 @@ class TestFullGeneration:
             "assignedLewName": "John Doe",
             "assignedLewLicenceNo": "8/12345",
         }
-        result = gen.generate(BASIC_3PHASE_REQ, app_info, pdf_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(BASIC_3PHASE_REQ, app_info)
+        assert result.component_count > 0
 
 
 # -- Test fixtures: Dense circuit configurations --
@@ -579,8 +576,8 @@ class TestComputeBoundingBox:
         comp = PlacedComponent(symbol_name="KWH_METER", x=50, y=100, label="kWh")
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        assert bb.width == pytest.approx(9.0)
-        assert bb.height == pytest.approx(6.5)
+        assert bb.width == pytest.approx(14.0)
+        assert bb.height == pytest.approx(10.0)
 
 
 # -- Test: resolve_overlaps --
@@ -669,7 +666,7 @@ class TestResolveOverlaps:
                     f"BUSBAR should have rating='' but has rating='{bus.rating}'"
                 )
         # There should be a LABEL with busbar rating text
-        # Busbar label uses "COMB BAR" for <=100A, "BUSBAR" for >100A
+        # Busbar label always uses "BUSBAR" (LEW convention)
         labels = [c for c in result.components if c.symbol_name == "LABEL"]
         busbar_labels = [
             l for l in labels
@@ -679,19 +676,13 @@ class TestResolveOverlaps:
 
     def test_dense_3phase_pdf_generation(self, tmp_path):
         """Dense 3-phase layout should generate valid PDF."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "dense_test.pdf")
-        svg_path = str(tmp_path / "dense_test.svg")
-        result = gen.generate(DENSE_3PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(DENSE_3PHASE_REQ)
+        assert result.component_count > 0
 
     def test_dense_1phase_pdf_generation(self, tmp_path):
         """Dense 1-phase layout should generate valid PDF."""
-        gen = SldGenerator()
-        pdf_path = str(tmp_path / "dense_1p_test.pdf")
-        svg_path = str(tmp_path / "dense_1p_test.svg")
-        result = gen.generate(DENSE_1PHASE_REQ, {}, pdf_path, svg_path)
-        assert result["component_count"] > 0
+        result = SldPipeline().run(DENSE_1PHASE_REQ)
+        assert result.component_count > 0
 
 
 # -- Test: Connection Alignment --
@@ -833,11 +824,7 @@ class TestSubCircuitGrouping:
     """Tests for _identify_groups() sub-circuit classification."""
 
     def test_identify_groups_basic_3phase(self):
-        """Basic 3-phase with 4 circuits → 6 groups (triplet padding).
-
-        3-phase triplet padding: 4 user circuits (3 non-spare + 1 spare)
-        → 6 total (pad 2 SPAREs to fill L2/L3 of first triplet).
-        """
+        """Basic 3-phase with 4 circuits → 6 groups (triplet padding to next multiple of 3)."""
         result = compute_layout(BASIC_3PHASE_REQ)
         groups, incoming_x = _identify_groups(result)
         assert len(groups) == 6

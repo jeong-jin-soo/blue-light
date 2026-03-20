@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { ErrorBoundary } from './ErrorBoundary';
+import { NotificationBell } from './NotificationBell';
 import Footer from './Footer';
 
 /**
@@ -151,6 +152,7 @@ export default function Layout() {
 
           {/* User menu */}
           <div className="flex items-center gap-4">
+            <NotificationBell />
             <span className="text-sm text-gray-600 hidden sm:block">{[user?.firstName, user?.lastName].filter(Boolean).join(' ')}</span>
             <button
               onClick={handleLogout}

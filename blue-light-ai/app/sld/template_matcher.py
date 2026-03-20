@@ -371,6 +371,8 @@ def normalize_template_to_requirements(detail: dict) -> dict:
 
     # supply_source (landlord vs sp_powergrid)
     req["supply_source"] = detail.get("supply_source", "sp_powergrid")
+    if detail.get("incoming_label"):
+        req["incoming_label"] = detail["incoming_label"]
 
     # metering
     metering_info = detail.get("metering", {})

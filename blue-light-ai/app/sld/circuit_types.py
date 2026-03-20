@@ -92,8 +92,11 @@ CIRCUIT_TYPE_REGISTRY: dict[str, CircuitTypeSpec] = {
 
 # Breaker Rating → Cable Size mapping (SS 638 / training dataset)
 BREAKER_TO_CABLE: dict[int, float] = {
+    5: 1.0,
     6: 1.5,
     10: 1.5,
+    13: 1.5,
+    15: 1.5,
     16: 2.5,
     20: 2.5,
     25: 4.0,
@@ -134,10 +137,11 @@ _CLASSIFIERS: list[tuple[str, list[str]]] = [
 def classify_circuit(circuit: dict) -> str:
     """Classify a circuit by its name/load keywords.
 
+    Accepts NormalizedCircuit or plain dict.
     Returns one of: "lighting", "socket", "aircon", "heater", "motor", "spare", "power"
     """
     # Check explicit type field first
-    explicit_type = str(circuit.get("type", "") or circuit.get("circuit_type", "")).lower()
+    explicit_type = str(circuit.get("type", "") or circuit.get("circuit_type", "") or circuit.get("load_type", "")).lower()
     if explicit_type in CIRCUIT_TYPE_REGISTRY:
         return explicit_type
 
@@ -159,16 +163,16 @@ def classify_circuit(circuit: dict) -> str:
 # Circuit Resolver
 # =============================================================
 
-def resolve_circuit(circuit: dict, premises_type: str = "") -> dict:
+def resolve_circuit(circuit, premises_type: str = ""):
     """Apply domain rules to fill missing circuit specifications.
 
     Priority: user explicit value > domain rule > system default.
 
     Args:
-        circuit: Normalized circuit dict (after normalize_circuit).
+        circuit: NormalizedCircuit or dict (after normalize_circuit).
         premises_type: "residential" or "commercial" (affects ISOLATOR auto-conversion).
     """
-    if not isinstance(circuit, dict):
+    if not hasattr(circuit, "get"):
         return circuit
 
     circuit_type = classify_circuit(circuit)
@@ -190,7 +194,13 @@ def resolve_circuit(circuit: dict, premises_type: str = "") -> dict:
             circuit.setdefault("breaker_type", "ISOLATOR")
             circuit.setdefault("breaker_poles", "DP")
         else:
-            circuit.setdefault("breaker_type", spec.default_type)
+            # MCB max 100A per SS 638; >100A sub-breakers → MCCB
+            # (Cross-validated with 62 real LEW DWG files: MCB≤100A, MCCB≥125A)
+            rating = circuit.get("breaker_rating", 0)
+            if isinstance(rating, (int, float)) and rating > 100:
+                circuit.setdefault("breaker_type", "MCCB")
+            else:
+                circuit.setdefault("breaker_type", spec.default_type)
 
     # -- Breaker poles (sub-circuit default = SPN) --
     if not circuit.get("breaker_poles"):

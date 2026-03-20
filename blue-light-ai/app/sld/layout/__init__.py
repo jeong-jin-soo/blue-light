@@ -28,7 +28,10 @@ from app.sld.layout.overlap import (
     _compute_group_width,
     _identify_groups,
     resolve_overlaps,
+    validate_spine_labels,
 )
+from app.sld.layout.section_base import FunctionSection, Section
+from app.sld.layout.section_registry import get_section_sequence
 
 __all__ = [
     # models
@@ -40,6 +43,10 @@ __all__ = [
     "format_cable_spec",
     # engine
     "compute_layout",
+    # section architecture
+    "Section",
+    "FunctionSection",
+    "get_section_sequence",
     # overlap
     "BoundingBox",
     "SubCircuitGroup",
