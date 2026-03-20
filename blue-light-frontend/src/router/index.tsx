@@ -44,6 +44,9 @@ import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPag
 import SldManagerOrderListPage from '../pages/sld-manager/SldManagerOrderListPage';
 import SldManagerOrderDetailPage from '../pages/sld-manager/SldManagerOrderDetailPage';
 
+// Common pages
+import NotificationsPage from '../pages/NotificationsPage';
+
 /**
  * 애플리케이션 라우터 설정
  */
@@ -105,6 +108,7 @@ const router = createBrowserRouter([
           { path: '/sld-orders/new', element: <NewSldOrderPage /> },
           { path: '/sld-orders/:id', element: <SldOrderDetailPage /> },
           { path: '/profile', element: <ProfilePage /> },
+          { path: '/notifications', element: <NotificationsPage /> },
         ],
       },
     ],
@@ -122,6 +126,7 @@ const router = createBrowserRouter([
           { path: '/admin/applications/:id', element: <AdminApplicationDetailPage /> },
           { path: '/admin/users', element: <AdminUserListPage /> },
           { path: '/admin/prices', element: <AdminPriceManagementPage /> },
+          { path: '/admin/notifications', element: <NotificationsPage /> },
         ],
       },
     ],
@@ -137,6 +142,7 @@ const router = createBrowserRouter([
           { path: '/admin/system', element: <SystemSettingsPage /> },
           { path: '/admin/audit-logs', element: <AuditLogPage /> },
           { path: '/admin/data-breaches', element: <DataBreachPage /> },
+          { path: '/admin/notifications', element: <NotificationsPage /> },
         ],
       },
     ],
@@ -152,6 +158,7 @@ const router = createBrowserRouter([
           { path: '/lew/dashboard', element: <AdminDashboardPage /> },
           { path: '/lew/applications', element: <AdminApplicationListPage /> },
           { path: '/lew/applications/:id', element: <AdminApplicationDetailPage /> },
+          { path: '/lew/notifications', element: <NotificationsPage /> },
         ],
       },
     ],
@@ -167,6 +174,7 @@ const router = createBrowserRouter([
           { path: '/sld-manager/dashboard', element: <SldManagerDashboardPage /> },
           { path: '/sld-manager/orders', element: <SldManagerOrderListPage /> },
           { path: '/sld-manager/orders/:id', element: <SldManagerOrderDetailPage /> },
+          { path: '/sld-manager/notifications', element: <NotificationsPage /> },
         ],
       },
     ],

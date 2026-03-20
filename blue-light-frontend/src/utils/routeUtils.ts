@@ -5,7 +5,14 @@ import type { UserRole } from '../types';
  * - ADMIN → /admin
  * - SYSTEM_ADMIN → /admin
  * - LEW → /lew
- * - 기타(APPLICANT 등) → /admin (fallback)
+ * - SLD_MANAGER → /sld-manager
+ * - APPLICANT → (empty)
  */
-export const getBasePath = (role?: UserRole | string): string =>
-  role === 'LEW' ? '/lew' : '/admin';
+export const getBasePath = (role?: UserRole | string): string => {
+  switch (role) {
+    case 'LEW': return '/lew';
+    case 'SLD_MANAGER': return '/sld-manager';
+    case 'APPLICANT': return '';
+    default: return '/admin';
+  }
+};

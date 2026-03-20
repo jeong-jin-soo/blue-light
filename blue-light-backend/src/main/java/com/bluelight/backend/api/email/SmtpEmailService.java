@@ -188,6 +188,23 @@ public class SmtpEmailService implements EmailService {
         }
     }
 
+    @Override
+    @Async
+    public void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("Payment Confirmed for Application #" + appSeq + " - LicenseKaki");
+            helper.setText(buildPaymentConfirmedToLewHtml(lewName, appSeq, address, amount), true);
+            mailSender.send(message);
+            log.info("Payment confirmed (LEW) email sent to: {}, appSeq={}", to, appSeq);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send payment confirmed (LEW) email to: {}", to, e);
+        }
+    }
+
     // ── HTML 템플릿 빌더 ──────────────────────
 
     private String buildPasswordResetHtml(String userName, String resetLink) {
@@ -514,5 +531,51 @@ public class SmtpEmailService implements EmailService {
                 </body>
                 </html>
                 """.formatted(lewName, appSeq, address, applicantName);
+    }
+
+    private String buildPaymentConfirmedToLewHtml(String lewName, Long appSeq, String address, BigDecimal amount) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">Payment Confirmed</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        Payment of <strong>$%s</strong> has been confirmed for an application assigned to you.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Application</td>
+                            <td style="padding: 6px 0;">#%d</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Address</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Amount</td>
+                            <td style="padding: 6px 0;">$%s</td>
+                          </tr>
+                        </table>
+                      </div>
+                      <p style="color: #555555; line-height: 1.6;">
+                        You can now proceed with processing this application. Please log in to your LicenseKaki account to continue.
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px;">
+                        This is an automated notification from LicenseKaki.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(lewName, amount, appSeq, address, amount);
     }
 }

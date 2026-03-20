@@ -111,4 +111,16 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Applicant: {}", applicantName);
         log.info("==================================================");
     }
+
+    @Override
+    public void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount) {
+        log.info("==================================================");
+        log.info("[DEV] Payment Confirmed to LEW Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Address: {}", address);
+        log.info("  Amount: ${}", amount);
+        log.info("==================================================");
+    }
 }

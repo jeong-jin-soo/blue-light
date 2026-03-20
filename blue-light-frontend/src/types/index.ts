@@ -823,3 +823,20 @@ export interface AuditLog {
   httpStatus?: number;
   createdAt: string;
 }
+
+// ── Notification ──────────────────────────────
+
+export type NotificationType = 'PAYMENT_CONFIRMED';
+
+export interface AppNotification {
+  notificationSeq: number;
+  type: NotificationType;
+  title: string;
+  message: string;
+  referenceType?: string;
+  referenceId?: number;
+  isRead: boolean;
+  read: boolean;
+  readAt?: string;
+  createdAt: string;
+}
