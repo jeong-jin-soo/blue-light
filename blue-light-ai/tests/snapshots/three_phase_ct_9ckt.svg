@@ -18,7 +18,7 @@
   <text x="388.00" y="258.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">DATE :</text>
   <text x="364.00" y="273.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">DRAWING NO. :</text>
   <text x="388.00" y="273.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">REV :</text>
-  <text x="130.00" y="212.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">FROM LANDLORD RISER</text>
+  <text x="130.00" y="212.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">SUPPLY FROM BUILDING RISER</text>
   <text x="208.00" y="223.50" font-family="Arial, Helvetica, sans-serif" font-size="5.0" fill="#000000">~</text>
   <text x="202.00" y="226.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">L1</text>
   <text x="206.00" y="226.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">L2</text>
@@ -113,10 +113,7 @@
   <line x1="248.75" y1="135.50" x2="246.75" y2="135.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="255.75" y="136.14" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0-500V</text>
   <polygon points="206.50,121.50 213.50,121.50 213.50,116.00 206.50,116.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="206.50" y1="121.50" x2="213.50" y2="116.00" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="202.30" y1="118.75" x2="206.50" y2="118.75" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="213.50" y1="118.75" x2="217.70" y2="118.75" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="116.00" x2="210.00" y2="114.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="202.30" y1="118.75" x2="217.70" y2="118.75" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="121.50" x2="210.00" y2="123.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="216.50" y="118.03" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">200A BI CONNECTOR</text>
   <line x1="64.50" y1="114.50" x2="375.00" y2="114.50" stroke="#000000" stroke-width="0.50" fill="none" />
@@ -231,11 +228,11 @@
   <text x="272.92" y="69.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,272.92,68.62)">PVC CPC IN METAL TRUNKING</text>
   <text x="60.50" y="188.90" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">100A DB</text>
   <text x="60.50" y="191.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 69 KVA AT 400V</text>
-  <line x1="349.95" y1="202.50" x2="349.95" y2="204.30" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="347.70" y1="204.30" x2="352.20" y2="204.30" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="348.45" y1="205.43" x2="351.45" y2="205.43" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="349.20" y1="206.55" x2="350.70" y2="206.55" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="355.20" y="204.03" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
+  <line x1="349.95" y1="197.50" x2="349.95" y2="199.30" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="347.70" y1="199.30" x2="352.20" y2="199.30" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="348.45" y1="200.43" x2="351.45" y2="200.43" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="349.20" y1="201.55" x2="350.70" y2="201.55" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="355.20" y="199.03" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
   <line x1="204.00" y1="221.50" x2="204.00" y2="215.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="208.00" y1="221.50" x2="208.00" y2="215.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="212.00" y1="221.50" x2="212.00" y2="215.50" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -253,7 +250,7 @@
   <line x1="210.00" y1="181.50" x2="210.00" y2="179.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="170.50" x2="210.00" y2="168.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="168.50" x2="210.00" y2="163.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="163.50" x2="210.00" y2="114.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="163.50" x2="210.00" y2="118.75" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="162.00" x2="195.00" y2="162.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.00" y1="167.00" x2="189.00" y2="175.00" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="189.00" y1="175.00" x2="209.00" y2="175.00" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -299,7 +296,7 @@
   <line x1="325.00" y1="74.50" x2="325.00" y2="69.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="272.00" y1="74.50" x2="282.00" y2="74.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="272.00" y1="74.50" x2="272.00" y2="69.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="349.95" y1="194.50" x2="349.95" y2="202.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="349.95" y1="194.50" x2="349.95" y2="197.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="76.75" y1="75.75" x2="79.25" y2="73.25" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="109.75" y1="75.75" x2="112.25" y2="73.25" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="142.75" y1="75.75" x2="145.25" y2="73.25" stroke="#000000" stroke-width="0.50" fill="none" />

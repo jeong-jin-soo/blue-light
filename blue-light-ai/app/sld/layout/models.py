@@ -489,6 +489,7 @@ class PlacedComponent:
     label_y_override: float | None = None  # Absolute Y for label (bypasses default calculation)
     no_right_stub: bool = False  # True = skip right connection stub (e.g., KWH in CT metering)
     no_left_stub: bool = False   # True = skip left connection stub (e.g., last component on left branch)
+    crossbar_extend: float = 0   # >0 = draw extended horizontal crossbar through BI_CONNECTOR center (mm right)
     # -- DB_INFO_BOX sub-anchors (layout determines, renderer uses as-is) --
     rating_offset_y: float = -4.0    # Y offset for rating text relative to title
     title_char_height: float = 3.0   # Title text char_height (mm)
@@ -505,6 +506,8 @@ class LayoutResult:
     dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     # Fixed connections: not affected by resolve_overlaps (e.g., VSS diagonal)
     fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
+    # Thick fixed connections: busbar-weight lines (lineweight=50), e.g., BI crossbar
+    thick_fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     junction_dots: list[tuple[float, float]] = field(default_factory=list)
     # CT branch junction arrows: (x, y, direction) — triangular connectors at CT branch points
     # direction: "left" or "right" (branch direction from spine)
@@ -573,6 +576,10 @@ class LayoutResult:
     # each region independently. This prevents circuits from one DB
     # being repositioned across another DB's region.
     layout_regions: list["LayoutRegion"] = field(default_factory=list)
+
+    # BI Connector crossbar feeder exit points — maps board name → (x, y)
+    # Used by hierarchical connections to tap from crossbar instead of main busbar.
+    crossbar_feeder_exits: dict[str, tuple[float, float]] = field(default_factory=dict)
 
 
 @dataclass
@@ -888,3 +895,11 @@ class _LayoutContext:
 
     # Skip BI connector between multi-row busbars (protection groups don't use BI connectors)
     skip_row_bi_connector: bool = False
+
+    # BI Connector crossbar circuits (CT metering section)
+    # Circuits that branch upward from the BI Connector's horizontal crossbar
+    # e.g., DB2 feeder MCB, SPARE position
+    bi_crossbar_circuits: list[dict] = field(default_factory=list)
+
+    # BI Connector center Y (set by _place_ct_metering_section, used after busbar placement)
+    bi_center_y: float = 0

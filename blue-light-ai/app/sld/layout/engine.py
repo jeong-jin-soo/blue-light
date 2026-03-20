@@ -52,6 +52,30 @@ def _validate_and_correct(requirements: dict) -> dict:
     """
     from app.sld.sld_spec import apply_corrections, validate_sld_requirements
 
+    # ── Normalise metering field ──
+    # metering MUST be a string ("ct_meter", "sp_meter", "none", "").
+    # If a dict is passed (common mis-specification), extract its "type" key
+    # and move the rest to metering_config so downstream CT/SP logic works.
+    _raw_metering = requirements.get("metering")
+    if isinstance(_raw_metering, dict):
+        _m_type = (_raw_metering.get("type") or "").lower().strip()
+        # Normalise common aliases → canonical string
+        if _m_type in ("ct", "ct_meter", "ct meter"):
+            requirements["metering"] = "ct_meter"
+        elif _m_type in ("sp", "sp_meter", "sp meter"):
+            requirements["metering"] = "sp_meter"
+        else:
+            requirements["metering"] = _m_type or ""
+        # Merge dict contents into metering_config (preserving existing)
+        _existing_mc = requirements.get("metering_config", {})
+        _merged_mc = {**{k: v for k, v in _raw_metering.items() if k != "type"}, **_existing_mc}
+        if _merged_mc:
+            requirements["metering_config"] = _merged_mc
+        logger.warning(
+            "metering was dict — normalised to string %r + metering_config",
+            requirements["metering"],
+        )
+
     # Build flat validation input from nested requirements
     main_breaker = requirements.get("main_breaker", {})
     if not isinstance(main_breaker, dict):
@@ -173,7 +197,7 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
         # Heavy compression: CT metering + multi-DB + PG
         # Balance: tight enough to fit A3, loose enough for readability
         config.spine_component_gap = 2.0       # was 5.0 (readable min)
-        config.isolator_to_db_gap = 5.0        # was 14.0
+        config.isolator_to_db_gap = 10.0       # was 5.0 — need room for outgoing cable tick
         config.busbar_to_breaker_gap = 7.0     # was 12.0
         config.db_box_busbar_margin = 4.0      # was 8.0
         config.db_box_tail_margin = 2.0        # was 4.0
@@ -357,10 +381,60 @@ def compute_layout(
                       **requirements.get("metering_config", {})}
                 if "ct_ratio" not in mc and requirements.get("ct_ratio"):
                     mc["ct_ratio"] = requirements["ct_ratio"]
+
+                # Extract BI crossbar circuits: SPARE + DB feeder MCBs
+                # These circuits move from the main busbar to the BI Connector crossbar.
+                _bi_xbar_circuits = []
+                _remaining_circuits = []
+                _sub_ckt_list = db.get("sub_circuits", [])
+
+                # Collect child DB names for feeder detection
+                _child_db_names = set()
+                for _cdb in dbs:
+                    _cdn = (_cdb.get("name") or _cdb.get("db_name") or "").upper()
+                    if _cdn and _cdn != (db.get("name") or db.get("db_name") or "").upper():
+                        _child_db_names.add(_cdn)
+
+                for sc in _sub_ckt_list:
+                    sc_type = (sc.get("type") or "").upper()
+                    sc_id = (sc.get("id") or "").upper()
+                    # DB feeder: circuit whose id matches a child DB name
+                    _is_feeder = sc_id in _child_db_names
+                    if _is_feeder:
+                        for _cdb in dbs:
+                            _cdn = (_cdb.get("name") or _cdb.get("db_name") or "").upper()
+                            if _cdn == sc_id:
+                                sc = {**sc, "_is_feeder": True, "_feeds_db": _cdn,
+                                      "feeder_breaker": _cdb.get("feeder_breaker", {}),
+                                      "cable": _cdb.get("incoming_cable", "")}
+                                break
+                    if _is_feeder or sc_type == "SPARE":
+                        _bi_xbar_circuits.append(sc)
+                    else:
+                        _remaining_circuits.append(sc)
+
+                # Auto-create feeder entries for child DBs not found in sub_circuits
+                _found_feeders = {sc.get("_feeds_db", "").upper() for sc in _bi_xbar_circuits if sc.get("_is_feeder")}
+                for _cdb in dbs:
+                    _cdn = (_cdb.get("name") or _cdb.get("db_name") or "").upper()
+                    if _cdn in _child_db_names and _cdn not in _found_feeders:
+                        _fb = _cdb.get("feeder_breaker", {})
+                        _bi_xbar_circuits.append({
+                            "id": _cdn,
+                            "_is_feeder": True,
+                            "_feeds_db": _cdn,
+                            "feeder_breaker": _fb,
+                            "cable": _cdb.get("incoming_cable", ""),
+                            "type": _fb.get("type", "MCB") if _fb else "MCB",
+                            "rating": _fb.get("rating", 0) if _fb else 0,
+                        })
+
                 db = {
                     **db,
                     "_ct_metering": True,
                     "_metering_config": mc,
+                    "_bi_crossbar_circuits": _bi_xbar_circuits,
+                    "sub_circuits": _remaining_circuits,
                 }
             region = plan.db_regions[db_idx] if db_idx < len(plan.db_regions) else None
             br = render_board(
@@ -527,6 +601,8 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
         result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
         result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_fixed_connections):
+        result.thick_fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
         result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
     for i, (dx, dy) in enumerate(result.junction_dots):
@@ -987,6 +1063,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.thick_connections.extend(source.thick_connections)
     target.dashed_connections.extend(source.dashed_connections)
     target.fixed_connections.extend(source.fixed_connections)
+    target.thick_fixed_connections.extend(source.thick_fixed_connections)
     target.junction_dots.extend(source.junction_dots)
     target.junction_arrows.extend(source.junction_arrows)
     target.solid_boxes.extend(source.solid_boxes)
@@ -1137,6 +1214,8 @@ def render_board(
     # CT metering section — placed INSIDE the root board for ct_meter installations.
     # The _ct_metering flag is injected by the multi-DB orchestrator for the root board.
     _has_ct_metering = board.get("_ct_metering")
+    # BI Connector crossbar circuits (SPARE + DB feeder MCBs)
+    ctx.bi_crossbar_circuits = board.get("_bi_crossbar_circuits", [])
     if _has_ct_metering:
         mc = board.get("_metering_config", {})
         ctx.metering = "ct_meter"
@@ -1174,9 +1253,69 @@ def render_board(
     else:
         _place_main_breaker(ctx)
         _place_ct_pre_mccb_fuse(ctx)
+    # CT metering boards: the spine terminates at the crossbar (BI connector).
+    # RCCB + MCB branch from the crossbar, shifted left by 3× BI width.
+    # ctx.y stays at spine_top (above BI connector) so RCCB is placed above crossbar.
+    # The BI connector top stub is already removed (real_symbols.py), so visually
+    # the spine ends at the crossbar.  The RCCB connects from a junction on the
+    # crossbar at the shifted cx.
+    _saved_cx_for_elcb = None
+    if _has_ct_metering and ctx.bi_center_y > 0:
+        from app.sld.real_symbols import get_symbol_dimensions as _gsd_elcb
+        _bi_w_elcb = _gsd_elcb("BI_CONNECTOR")["width_mm"]
+        _saved_cx_for_elcb = ctx.cx
+        _elcb_cx = ctx.cx - _bi_w_elcb * 3
+        ctx.cx = _elcb_cx
+        # Junction dot on crossbar where RCCB branch starts
+        result.junction_dots.append((_elcb_cx, ctx.bi_center_y))
+        # Connection from crossbar junction up to RCCB start position
+        result.connections.append(((_elcb_cx, ctx.bi_center_y), (_elcb_cx, ctx.y)))
     _place_elcb(ctx)
     _place_internal_cable(ctx)
+    if _saved_cx_for_elcb is not None:
+        ctx.cx = _saved_cx_for_elcb
+    # Per-group RCCB boards: suppress main busbar label — sub-busbars carry the label.
+    # Reference: DB2 shows "80A BUSBAR" on each sub-busbar, no label on main busbar.
+    if pgroups and any(pg.get("rccb", {}).get("rating", 0) > 0 for pg in pgroups):
+        ctx._suppress_busbar_label = True
     _place_main_busbar(ctx)
+
+    # BI Connector crossbar line + circuits — placed AFTER busbar so crossbar
+    # can reference DB box boundaries for positioning.
+    # Crossbar extent: DB box left + 20% inset  ~  DB box right - 5% inset
+    # SPARE + DB feeder circuits at the RIGHT end of the crossbar.
+    if _has_ct_metering and ctx.bi_center_y > 0:
+        _bi_cy = ctx.bi_center_y
+        # DB box boundaries (same formula as _place_db_box)
+        _db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
+        from app.sld.real_symbols import get_symbol_dimensions as _gsd_xbar
+        _earth_w = _gsd_xbar("EARTH")["width_mm"]
+        _earth_reserve = config.earth_x_from_db + _earth_w + 5
+        _db_box_right = min(result.busbar_end_x + 10, config.max_x - _earth_reserve)
+        _db_box_width = _db_box_right - _db_box_left
+
+        # Crossbar extent: 20% from left edge, 5% from right edge,
+        # then shift entire crossbar LEFT by 1.5× BI connector box width.
+        _bi_dims_xbar = _gsd_xbar("BI_CONNECTOR")
+        _bi_shift = _bi_dims_xbar["width_mm"] * 1.5
+        _xbar_sx = _db_box_left + _db_box_width * 0.20 - _bi_shift
+        _xbar_ex = _db_box_right - _db_box_width * 0.05 - _bi_shift
+
+        _xbar_circuits = ctx.bi_crossbar_circuits
+        if _xbar_circuits:
+            from app.sld.layout.sections import _place_bi_crossbar_circuits
+            _bi_dims = _gsd_xbar("BI_CONNECTOR")
+            _place_bi_crossbar_circuits(
+                result, ctx, cx,
+                _bi_cy - _bi_dims["height_mm"] / 2,
+                _bi_dims["width_mm"], _bi_dims["height_mm"],
+                _xbar_circuits, spacing=15.0,
+                busbar_end_x=_xbar_ex,
+                busbar_y=result.busbar_y,
+            )
+
+        # Crossbar line at BI connector center Y — thick (same as busbar)
+        result.thick_fixed_connections.append(((_xbar_sx, _bi_cy), (_xbar_ex, _bi_cy)))
 
     # Override db_box_start_y to include CT metering section inside the DB box.
     # _place_main_breaker sets it at the breaker position, but we need the box
@@ -1263,6 +1402,45 @@ def _add_hierarchical_connections(
 
     for child in child_results:
         child_cx = child.spine_x
+
+        # Check if this child is fed from a BI crossbar circuit
+        # (feeder MCB already placed on crossbar — skip busbar-side feeder)
+        _xbar_exit = root_result.layout.crossbar_feeder_exits.get(child.board_name.upper())
+        if _xbar_exit:
+            # Connection from crossbar feeder exit → child board top
+            xbar_x, xbar_y = _xbar_exit
+            child_top_y = child.db_box_start_y if child.db_box_start_y else child.busbar_y
+            # Diagonal/L-shaped cable run from crossbar exit to child spine
+            if abs(xbar_x - child_cx) > 1.0:
+                # L-shape: down from crossbar, horizontal to child spine, down to child
+                mid_y = xbar_y + 5
+                merged.connections.append(((xbar_x, xbar_y), (xbar_x, mid_y)))
+                merged.connections.append(((xbar_x, mid_y), (child_cx, mid_y)))
+                merged.connections.append(((child_cx, mid_y), (child_cx, child_top_y + 3)))
+            else:
+                merged.connections.append(((xbar_x, xbar_y), (child_cx, child_top_y + 3)))
+
+            # Supply label
+            _label_x = child_cx + 5
+            _label_y = child_top_y + 8
+            merged.components.append(PlacedComponent(
+                symbol_name="LABEL", x=_label_x, y=_label_y,
+                label=f"SUPPLY FROM {root_name}",
+            ))
+            # Cable spec label
+            cable_text = ""
+            if dbs:
+                for db in dbs:
+                    dn = (db.get("name") or db.get("db_name") or "").upper()
+                    if dn == child.board_name.upper():
+                        cable_text = db.get("incoming_cable", "")
+                        break
+            if cable_text:
+                merged.components.append(PlacedComponent(
+                    symbol_name="LABEL", x=_label_x, y=_label_y - 5,
+                    label=cable_text.upper(),
+                ))
+            continue  # Skip normal busbar-side feeder placement
 
         # Find feeder circuit for this child
         feeder_ckt = None
@@ -1913,9 +2091,8 @@ def _place_protection_groups(
         result.busbar_start_x = sub_bus_sx
         result.busbar_end_x = sub_bus_ex
 
-        # Sub-busbar component (phase-specific label matching reference SLD)
-        phase_upper = phase.upper() if phase else f"L{pg_idx + 1}"
-        sub_busbar_label = f"{db.get('busbar_rating', 80)}A BUSBAR ({phase_upper})"
+        # Sub-busbar component — reference shows "80A BUSBAR" (no phase suffix)
+        sub_busbar_label = f"{db.get('busbar_rating', 80)}A BUSBAR"
         result.components.append(PlacedComponent(
             symbol_name="BUSBAR",
             x=sub_bus_sx,

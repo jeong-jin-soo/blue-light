@@ -543,10 +543,11 @@ class TestMeteringCombinations:
         )
 
     def test_landlord_no_metering_default(self):
-        """Landlord supply, no metering field: PG KWH meter board auto-added.
+        """Landlord supply, no metering field: no meter board (just unit isolator).
 
         When supply_source=landlord and no metering is specified, metering
-        defaults to sp_meter — landlord riser → KWH meter board → DB is standard.
+        defaults to none. Many landlord SLDs have no PG meter board — just a
+        unit isolator. Meter board requires explicit metering='sp_meter'.
         """
         req = _make_req(
             supply_type="three_phase",
@@ -556,11 +557,33 @@ class TestMeteringCombinations:
             sub_circuits=_make_circuits(6, breaker_rating=32),
         )
         req["supply_source"] = "landlord"
-        # Deliberately do NOT set req["metering"] — should auto-add sp_meter
+        # Deliberately do NOT set req["metering"] — should NOT auto-add sp_meter
+        layout = compute_layout(req)
+        kwh_components = _get_components_by_type(layout, "KWH_METER")
+        assert len(kwh_components) == 0, (
+            "Landlord supply without explicit metering should NOT have meter board"
+        )
+        # Verify unit isolator is present instead
+        iso_components = _get_components_by_type(layout, "ISOLATOR")
+        assert len(iso_components) >= 1, (
+            "Landlord supply should have unit isolator"
+        )
+
+    def test_landlord_explicit_sp_meter(self):
+        """Landlord supply with explicit metering='sp_meter': meter board present."""
+        req = _make_req(
+            supply_type="three_phase",
+            kva=69,
+            busbar_rating=200,
+            main_breaker={"type": "MCCB", "rating": 100, "poles": "TPN", "fault_kA": 25},
+            sub_circuits=_make_circuits(6, breaker_rating=32),
+        )
+        req["supply_source"] = "landlord"
+        req["metering"] = "sp_meter"
         layout = compute_layout(req)
         kwh_components = _get_components_by_type(layout, "KWH_METER")
         assert len(kwh_components) == 1, (
-            "Landlord supply should auto-add PG KWH meter board"
+            "Landlord supply with explicit sp_meter should have PG KWH meter board"
         )
 
     def test_single_phase_with_elcb(self):

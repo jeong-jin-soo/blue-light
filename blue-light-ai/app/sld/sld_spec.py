@@ -780,17 +780,10 @@ def _validate_metering(
                 "Cable extension has no meter board — removed metering",
             )
         return
-    # Landlord supply: keep sp_meter if explicitly specified (PG KWH meter board).
+    # Landlord supply: keep metering as-is (sp_meter, ct_meter, or none).
+    # Many landlord SLDs have no PG meter board (just unit isolator → DB).
+    # Meter board should only appear when explicitly specified in requirements.
     if supply_source == "landlord":
-        if metering:
-            # User explicitly specified metering — keep it as-is.
-            return
-        # No metering specified for landlord — default to sp_meter
-        # (landlord riser → KWH meter board → DB is the standard pattern).
-        result.add_correction(
-            "metering", "", "sp_meter",
-            "Landlord supply: auto-added sp_meter (PG KWH meter board)",
-        )
         return
     if not effective_spec:
         return

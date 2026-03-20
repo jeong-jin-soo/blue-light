@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 
 
 def main():
@@ -35,21 +35,15 @@ def main():
         "premises_type": "Commercial",
     }
 
-    gen = SldGenerator()
-
     output_dir = Path(__file__).resolve().parent.parent / "output"
     output_dir.mkdir(exist_ok=True)
 
-    pdf_path = output_dir / "test_cable_extension.pdf"
-    svg_path = output_dir / "test_cable_extension.svg"
+    pdf_path = str(output_dir / "test_cable_extension.pdf")
+    svg_path = str(output_dir / "test_cable_extension.svg")
 
-    result = gen.generate(
-        requirements,
-        application_info,
-        pdf_output_path=str(pdf_path),
-        svg_output_path=str(svg_path),
-    )
-    print(f"  Components: {result.get('component_count', '?')}")
+    result = SldPipeline().run(requirements, application_info=application_info)
+    result.save(pdf_path, svg_path, pdf_path.replace(".pdf", ".dxf"))
+    print(f"  Components: {result.component_count}")
     print(f"  PDF: {pdf_path}")
     print(f"  SVG: {svg_path}")
 

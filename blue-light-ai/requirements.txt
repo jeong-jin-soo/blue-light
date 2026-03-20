@@ -35,3 +35,7 @@ pymysql>=1.1.0
 
 # Excel parsing (circuit schedule upload)
 openpyxl>=3.1.0
+
+# Image processing (Vision AI crop detection)
+Pillow>=10.0.0
+numpy>=1.26.0

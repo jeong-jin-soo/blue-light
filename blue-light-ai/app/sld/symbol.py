@@ -227,12 +227,15 @@ class ProceduralSymbol(Symbol):
 
     def render(self, backend, x, y, *, horizontal=False,
                skip_trip_arrow=False, enclosed=False,
-               no_right_stub=False, no_left_stub=False):
+               no_right_stub=False, no_left_stub=False,
+               crossbar_extend=0):
         kwargs: dict = {}
         if self.is_circuit_breaker and skip_trip_arrow:
             kwargs["skip_trip_arrow"] = True
         if self.is_isolator and enclosed:
             kwargs["enclosed"] = True
+        if crossbar_extend > 0:
+            kwargs["crossbar_extend"] = crossbar_extend
 
         if horizontal:
             # Only pass stub suppression kwargs if the symbol's draw_horizontal accepts them

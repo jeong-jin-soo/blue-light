@@ -5,7 +5,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 
 requirements = {
     "supply_type": "three_phase",
@@ -248,15 +248,9 @@ os.makedirs(output_dir, exist_ok=True)
 pdf_path = os.path.join(output_dir, "63A_TPN_test.pdf")
 svg_path = os.path.join(output_dir, "63A_TPN_test.svg")
 
-generator = SldGenerator()
-result = generator.generate(
-    requirements=requirements,
-    application_info=application_info,
-    pdf_output_path=pdf_path,
-    svg_output_path=svg_path,
-    backend_type="dxf",
-)
+result = SldPipeline().run(requirements, application_info=application_info)
+result.save(pdf_path, svg_path, pdf_path.replace(".pdf", ".dxf"))
 
-print(f"PDF: {result['pdf_path']}")
-print(f"Components: {result['component_count']}")
+print(f"PDF: {pdf_path}")
+print(f"Components: {result.component_count}")
 print("Done!")

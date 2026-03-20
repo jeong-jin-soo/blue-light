@@ -206,13 +206,11 @@ def main():
         "sld_only_mode": True,
     }
 
-    from app.sld.generator import SldGenerator
+    from app.sld.generator import SldPipeline
 
     try:
-        pdf_bytes, svg_string, dxf_bytes = SldGenerator.generate_pdf_bytes(
-            requirements=requirements,
-            application_info=application_info,
-        )
+        _r = SldPipeline().run(requirements, application_info=application_info)
+        pdf_bytes, svg_string, dxf_bytes = _r.pdf_bytes, _r.svg_string, _r.dxf_bytes
     except Exception as e:
         print(f"  Generation failed: {e}")
         import traceback

@@ -163,8 +163,8 @@ class TestParseRequirements:
             "supply_source": "landlord",
         }, None)
         assert ctx.supply_source == "landlord"
-        # Landlord: defaults to sp_meter (PG KWH meter board)
-        assert ctx.metering == "sp_meter"
+        # Landlord: no metering by default (just unit isolator, no meter board)
+        assert ctx.metering == ""
 
     def test_landlord_sp_meter_preserved(self):
         """Landlord supply with sp_meter should be preserved (PG KWH meter board)."""
@@ -297,7 +297,7 @@ class TestPlaceIncomingSupply:
         assert "FLOW_ARROW_UP" not in symbols  # No AC symbol for landlord
         assert "LABEL" in symbols
         labels = [c.label for c in ctx.result.components if c.symbol_name == "LABEL"]
-        assert "FROM LANDLORD RISER" in labels
+        assert "SUPPLY FROM BUILDING RISER" in labels
 
     def test_y_advances(self):
         ctx = _make_context(

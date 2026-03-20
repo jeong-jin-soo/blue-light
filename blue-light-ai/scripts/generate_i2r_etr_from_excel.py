@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import openpyxl
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 
 XLSX = "/Users/ringo/Downloads/I2R-ETR-NLB-SLD_Formatted.xlsx"
 wb = openpyxl.load_workbook(XLSX, read_only=True, data_only=True)
@@ -215,15 +215,9 @@ os.makedirs(output_dir, exist_ok=True)
 pdf_path = os.path.join(output_dir, "I2R_ETR_NLB_SLD_from_excel.pdf")
 svg_path = os.path.join(output_dir, "I2R_ETR_NLB_SLD_from_excel.svg")
 
-generator = SldGenerator()
-result = generator.generate(
-    requirements=requirements,
-    application_info=application_info,
-    pdf_output_path=pdf_path,
-    svg_output_path=svg_path,
-    backend_type="dxf",
-)
+result = SldPipeline().run(requirements, application_info=application_info)
+result.save(pdf_path, svg_path, pdf_path.replace(".pdf", ".dxf"))
 
-print(f"\nPDF: {result['pdf_path']}")
-print(f"Components: {result['component_count']}")
+print(f"\nPDF: {pdf_path}")
+print(f"Components: {result.component_count}")
 print("Done!")
