@@ -120,7 +120,7 @@ def _parse_main_breaker(ctx: _LayoutContext, requirements: dict) -> None:
     if is_cable_ext:
         ctx.metering = None
     else:
-        raw_metering = requirements.get("metering", "sp_meter")
+        raw_metering = requirements.get("metering", "")
         # Normalize common variants: "ct_metered" → "ct_meter"
         if isinstance(raw_metering, str) and raw_metering.lower().replace("_", "").replace("-", "") in (
             "ctmetered", "ctmeter", "ct",
@@ -635,8 +635,9 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
 
     # Incoming cable tick + leader line
     # For landlord supply, the outgoing cable tick (DB→meter board) already labels
-    # the same cable — skip here to avoid duplication (ref DXF has only 1 cable label)
-    if ctx.supply_source == "landlord":
+    # the same cable — skip here to avoid duplication (ref DXF has only 1 cable label).
+    # Exception: if outgoing_cable differs from incoming_cable, show both.
+    if ctx.supply_source == "landlord" and not ctx.requirements.get("outgoing_cable"):
         return
     cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
     if cable_text:
@@ -665,7 +666,10 @@ def _add_outgoing_cable_tick(
     """Add outgoing cable tick mark and annotation on vertical exit line."""
     result = ctx.result
     cx = ctx.cx
-    outgoing_cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
+    # Use outgoing_cable from requirements if specified; fall back to incoming_cable.
+    _out_cable = ctx.requirements.get("outgoing_cable", "")
+    _cable_source = _out_cable if _out_cable else ctx.incoming_cable
+    outgoing_cable_text = format_cable_spec(_cable_source, multiline=True)
     if not outgoing_cable_text:
         return
 
@@ -753,7 +757,8 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         _add_incoming_supply_line(ctx, g)
 
         # Vertical exit line from spine
-        outgoing_cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
+        _out_cable_mb = ctx.requirements.get("outgoing_cable", "") or ctx.incoming_cable
+        outgoing_cable_text = format_cable_spec(_out_cable_mb, multiline=True)
         y_exit = g.mb_box_top + (16 if outgoing_cable_text else 8)
         ctx.result.connections.append(((ctx.cx, g.mb_center_y), (ctx.cx, y_exit)))
 
@@ -913,10 +918,14 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
 
     # BI Connector (on spine, closest to distribution busbar/load)
     bi_y = cursor
+    bi_center_y = bi_y + bi_h / 2
+    # Spine backbone terminates at crossbar (BI center), not BI top + stub.
+    spine_line_top = bi_center_y
+    # But ctx.y (next component start) stays above BI connector for proper spacing.
     spine_top = bi_y + bi_h + bi_stub
 
-    # --- 2. Spine backbone — ONE straight line, MCCB exit → BI top ---
-    result.connections.append(((cx, spine_bottom), (cx, spine_top)))
+    # --- 2. Spine backbone — ONE straight line, MCCB exit → crossbar ---
+    result.connections.append(((cx, spine_bottom), (cx, spine_line_top)))
 
     # --- 3. Place components on spine ---
 
@@ -1171,14 +1180,171 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             result.symbols_used.add("VOLTMETER")
 
     # BI Connector — include isolator/busbar rating (e.g., "100A BI CONNECTOR")
+    # Reference: crossbar line through BI connector matches busbar length.
+    # The crossbar line is drawn AFTER busbar placement (in render_board) so it
+    # can match busbar_start_x/busbar_end_x exactly.
     _bi_rating = ctx.busbar_rating or ctx.breaker_rating or 0
     _bi_label = f"{_bi_rating}A BI CONNECTOR" if _bi_rating else "BI CONNECTOR"
     result.components.append(PlacedComponent(
         symbol_name="BI_CONNECTOR", x=cx - bi_w / 2, y=bi_y, label=_bi_label,
+        crossbar_extend=0,  # crossbar drawn separately after busbar placement
     ))
     result.symbols_used.add("BI_CONNECTOR")
 
+    # Store BI connector center Y for post-busbar crossbar line
+    ctx.bi_center_y = bi_y + bi_h / 2
+
     ctx.y = spine_top
+
+
+def _place_bi_crossbar_circuits(
+    result: LayoutResult,
+    ctx,
+    spine_cx: float,
+    bi_y: float, bi_w: float, bi_h: float,
+    circuits: list[dict],
+    spacing: float = 15.0,
+    busbar_end_x: float = 0,
+    busbar_y: float = 0,
+) -> float:
+    """Place circuits branching UPWARD from BI Connector crossbar.
+
+    Reference: The BI Connector crossbar acts as a secondary sub-busbar.
+    Circuits (SPARE, DB2 feeder) branch upward from it at the RIGHT END
+    of the crossbar, beyond the main busbar sub-circuits.  Their vertical
+    lines extend upward past the DB box top so they can connect to child
+    boards positioned to the right of the MSB.
+
+    Returns the rightmost X coordinate used (for crossbar line extension).
+    """
+    from app.sld.real_symbols import get_symbol_dimensions
+    config = ctx.config
+
+    bi_center_y = bi_y + bi_h / 2
+    mcb_dims = get_symbol_dimensions("MCB")
+    mcb_w = mcb_dims["width_mm"]
+    mcb_h = mcb_dims["height_mm"]
+    mcb_stub = mcb_dims["stub_mm"]
+
+    # Position crossbar circuits at the RIGHT END of the crossbar,
+    # WITHIN the busbar range (reference: SPARE + DB feeder are under
+    # the busbar, not beyond it).  Place them right-aligned at busbar_end_x.
+    n_circuits = len(circuits)
+    _right_margin = 3.0
+    if busbar_end_x:
+        crossbar_start_x = busbar_end_x - n_circuits * spacing - _right_margin
+    else:
+        crossbar_start_x = spine_cx + bi_w / 2 + 3
+
+    # Height target: circuits go up past the DB box top (above busbar + circuit area).
+    # busbar_y is the main busbar Y.  Busbar circuits go ~40-50mm above it.
+    # Crossbar circuit tails should reach a similar height.
+    _target_top_y = busbar_y + 45.0 if busbar_y else bi_center_y + 80.0
+
+    rightmost_x = crossbar_start_x
+
+    for i, ckt in enumerate(circuits):
+        ckt_x = crossbar_start_x + i * spacing
+        rightmost_x = ckt_x
+        ckt_type = (ckt.get("type") or "MCB").upper()
+        ckt_rating = ckt.get("rating", 0)
+        ckt_id = ckt.get("id", "")
+        is_spare = ckt_type == "SPARE" or ckt_id.upper() == "SPARE"
+        is_feeder = ckt.get("_is_feeder", False)
+
+        # Junction dot on crossbar
+        result.junction_dots.append((ckt_x, bi_center_y))
+
+        if is_spare:
+            # SPARE: vertical stub up to target height + "SPARE" label
+            result.connections.append(((ckt_x, bi_center_y), (ckt_x, _target_top_y)))
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=ckt_x - 3,
+                y=_target_top_y + 2,
+                label="SPARE",
+            ))
+            continue
+
+        # MCB placement (branching upward from crossbar)
+        mcb_bottom_y = bi_center_y + mcb_stub + 1
+        result.connections.append(((ckt_x, bi_center_y), (ckt_x, mcb_bottom_y)))
+
+        # Build MCB label
+        feeder_brk = ckt.get("feeder_breaker", {})
+        if feeder_brk and feeder_brk.get("rating"):
+            f_rating = feeder_brk["rating"]
+            f_type = feeder_brk.get("type", "MCB")
+            f_char = feeder_brk.get("characteristic", feeder_brk.get("breaker_characteristic", ""))
+            f_poles = feeder_brk.get("poles", "TPN")
+            f_kA = feeder_brk.get("fault_kA", 10)
+        else:
+            f_rating = ckt_rating
+            f_type = ckt_type if ckt_type != "SPARE" else "MCB"
+            f_char = ckt.get("characteristic", ckt.get("breaker_characteristic", ""))
+            f_poles = ckt.get("poles", "SPN")
+            f_kA = ckt.get("fault_kA", 6)
+
+        sym_name = f"CB_{f_type}"
+        result.components.append(PlacedComponent(
+            symbol_name=sym_name,
+            x=ckt_x - mcb_w / 2,
+            y=mcb_bottom_y,
+            label=f"{f_rating}A",
+            rating=f"{f_rating}A",
+            poles=f_poles,
+            breaker_type_str=f_type,
+            fault_kA=f_kA,
+            breaker_characteristic=f_char,
+            label_style="breaker_block",
+        ))
+        result.symbols_used.add(f_type)
+
+        # Conductor tail above MCB — extends to target height (past DB box top)
+        mcb_top_y = mcb_bottom_y + mcb_h
+        tail_top_y = max(mcb_top_y + mcb_stub + 12, _target_top_y)
+        result.connections.append(((ckt_x, mcb_top_y + mcb_stub), (ckt_x, tail_top_y)))
+
+        # Cable tick + cable spec label
+        cable_spec = ckt.get("cable", "")
+        if not cable_spec and is_feeder:
+            cable_spec = ckt.get("incoming_cable", "")
+        if cable_spec:
+            _tick_y = mcb_top_y + mcb_stub + 4
+            _tick_half = 1.5
+            result.connections.append(((ckt_x - _tick_half, _tick_y - _tick_half),
+                                       (ckt_x + _tick_half, _tick_y + _tick_half)))
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=ckt_x - 5,
+                y=_tick_y + 2,
+                label=cable_spec.upper(),
+                rotation=90.0,
+            ))
+
+        # Load label at top (DB name for feeders, load description for others)
+        if is_feeder:
+            feeds_db = ckt.get("_feeds_db", ckt_id)
+            result.components.append(PlacedComponent(
+                symbol_name="LABEL",
+                x=ckt_x - 3,
+                y=tail_top_y + 2,
+                label=feeds_db,
+            ))
+            result.arrow_points.append((ckt_x, tail_top_y))
+            result.crossbar_feeder_exits[feeds_db.upper()] = (ckt_x, tail_top_y)
+        else:
+            load_desc = ckt.get("load", "")
+            if load_desc:
+                result.components.append(PlacedComponent(
+                    symbol_name="LABEL",
+                    x=ckt_x - 5,
+                    y=tail_top_y + 2,
+                    label=load_desc,
+                    rotation=90.0,
+                ))
+
+    return rightmost_x + spacing / 2  # return rightmost extent for crossbar line
 
 
 def _place_metering_branch(
@@ -1444,14 +1610,14 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         out_cable_text = format_cable_spec(outgoing_cable, multiline=True) if outgoing_cable else ""
         if out_cable_text:
             # Position tick between isolator enclosure box top and DB box bottom.
-            # Place tick between isolator box top and DB box bottom.
-            # Position at 2/3 from isolator (closer to DB box / higher up)
-            # to leave vertical space for the location text below the DB box.
+            # Must be clearly above the isolator enclosure (min 3mm clearance).
             _enclosure_pad = 1.5  # same as RealIsolator.draw()
-            _db_info_height = config.db_info_height("x")  # 1 info line estimate
             _iso_box_top = y - (4 - _enclosure_pad)
-            _db_box_bottom = y + config.isolator_to_db_gap - 1 - _db_info_height
-            tick_y = _iso_box_top + (_db_box_bottom - _iso_box_top) * 0.67
+            _db_box_bottom = y + config.isolator_to_db_gap - 1
+            # Place tick at midpoint between isolator top and DB box bottom,
+            # but never closer than 3mm above isolator enclosure.
+            _mid = (_iso_box_top + _db_box_bottom) / 2
+            tick_y = max(_mid, _iso_box_top + 3.0)
             tick_size = 1.25
             result.thick_connections.append((
                 (cx - tick_size, tick_y - tick_size),
@@ -1702,24 +1868,17 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
 
     # Location text — placed BELOW the DB box (outside), per LEW guide Rule 9
     # For landlord supply, DB is always inside the tenant's unit.
-    # Sub-boards (fed_from is set) should NOT show location text — only the root
-    # board (MSB) shows it.
+    # Location text — ALL boards (root and sub-boards) show location.
+    # Reference: I2R multi-DB has "(LOCATED INSIDE UNIT #05-26)" below both MSB and DB2.
     db_location_text = ""
-    _current_board = (
-        ctx.distribution_boards[ctx.current_db_idx]
-        if ctx.distribution_boards and 0 <= ctx.current_db_idx < len(ctx.distribution_boards)
-        else {}
-    )
-    _is_sub_board = bool(_current_board.get("fed_from"))
-    if not _is_sub_board:
-        if unit_number:
-            # Reference format: "(LOCATED INSIDE UNIT #01-36)"
-            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
-        elif application_info and application_info.get("address"):
-            db_location_text = f"(LOCATED AT {application_info['address']})"
-        elif ctx.supply_source == "landlord":
-            # Landlord supply → DB is inside tenant's unit (no specific unit number)
-            db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit})"
+    if unit_number:
+        # Reference format: "(LOCATED INSIDE UNIT #01-36)"
+        db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit} {unit_number})"
+    elif application_info and application_info.get("address"):
+        db_location_text = f"(LOCATED AT {application_info['address']})"
+    elif ctx.supply_source == "landlord":
+        # Landlord supply → DB is inside tenant's unit (no specific unit number)
+        db_location_text = f"({SG_LOCALE.meter_board.located_inside_unit})"
 
     # Store in ctx — will be placed at DB box bottom-left by _place_db_box()
     # DB info label: "{rating}A DB" — poles (TPN/SPN) not shown in DB name per LEW convention
@@ -1734,13 +1893,15 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     ctx.db_location_text = db_location_text
 
     # Busbar rating label — left-aligned below busbar (per reference DWG)
-    busbar_label_x = bus_start_x + 3  # 3mm from busbar left edge
-    result.components.append(PlacedComponent(
-        symbol_name="LABEL",
-        x=busbar_label_x,
-        y=y - 3,
-        label=busbar_label,
-    ))
+    # Suppress label when board has per-group RCCBs: sub-busbars carry the label instead.
+    if not getattr(ctx, '_suppress_busbar_label', False):
+        busbar_label_x = bus_start_x + 3  # 3mm from busbar left edge
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=busbar_label_x,
+            y=y - 3,
+            label=busbar_label,
+        ))
 
     # Note: Connection from last spine component to busbar is already handled by
     # place_on_spine() stub drawing — no manual connection needed here.
@@ -2024,7 +2185,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     # Position earth bar BELOW the DB box, slightly left of the right edge.
     # Connection is a straight vertical line from DB box bottom to earth top pin.
     db_box_bottom = getattr(result, "db_box_start_y", None)
-    earth_drop = 8.0  # mm below DB box bottom to earth top pin
+    earth_drop = 3.0  # mm below DB box bottom to earth top pin
     # Place earth bar at ~90% along the DB box bottom (right-biased)
     db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
     db_box_width = db_box_right - db_box_left

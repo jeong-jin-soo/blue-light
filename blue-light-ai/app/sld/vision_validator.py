@@ -193,72 +193,69 @@ def _crop_png(png_path: str, bbox_mm: tuple[float, float, float, float],
     return buf.getvalue()
 
 
-def _get_detail_crop_regions(layout_result) -> list[dict]:
-    """LayoutResult에서 정밀 검사가 필요한 영역을 자동 추출.
+def _build_crop_prompt_focus(region_name: str, bbox_mm: tuple) -> str:
+    """크롭 영역의 페이지 위치 기반으로 동적 prompt_focus 생성.
 
-    작은 심볼이 밀집된 영역만 선택 — 전체 비교에서 놓칠 가능성이 높은 곳.
+    SLD 좌표 기준: y가 작으면 하단(전원측), y가 크면 상단(부하측).
     """
-    regions = []
-    margin = 15.0  # mm
+    _, y_min, _, y_max = bbox_mm
+    y_center = (y_min + y_max) / 2
 
-    # 1. CT metering (작은 hook 심볼)
-    ct_names = {'CT', 'ELR', 'KWH_METER', 'SELECTOR_SWITCH', 'AMMETER',
-                'VOLTMETER', 'BI_CONNECTOR', 'POTENTIAL_FUSE', 'INDICATOR_LIGHTS'}
-    ct_comps = [(c.x, c.y) for c in layout_result.components if c.symbol_name in ct_names]
-    if ct_comps:
-        xs = [x for x, y in ct_comps]
-        ys = [y for x, y in ct_comps]
-        # Tight crop around CT hooks only — focused on hook shape/overlap
-        regions.append({
-            "name": "CT_HOOKS",
-            "bbox": (min(xs) - margin, min(ys) - margin / 2, max(xs) + margin, max(ys) + margin / 2),
-            "dpi": 400,
-            "prompt_focus": """Examine the REFERENCE (Image 2) FIRST:
-1. How many CT hook symbols are on the vertical spine line? What SHAPE are they (circles, half-ovals, flat hooks)?
-2. What is their SIZE relative to other symbols?
-3. Are all hooks clearly SEPARATED with gaps between them?
+    # A3 기준 297mm: 하단 1/3 (~100mm) = 전원/미터, 중단 = 메인차단기/CT, 상단 = 부하/서브회로
+    if y_center < 100:
+        zone = "INCOMING/METER zone (power supply side)"
+        focus = (
+            "This region is near the INCOMING SUPPLY / METER area.\n"
+            "Focus on: supply labels, cable tick marks, meter board layout, "
+            "isolator symbols, and incoming cable specifications."
+        )
+    elif y_center < 190:
+        zone = "MAIN BREAKER/CT METERING zone"
+        focus = (
+            "This region is in the MAIN BREAKER / CT METERING area.\n"
+            "Focus on: breaker symbol type (MCB/MCCB/ACB), CT hook shapes "
+            "(should be small flat half-ovals, NOT circles), ELR, ammeter/voltmeter, "
+            "BI connector structure, and ELCB/RCCB symbols."
+        )
+    else:
+        zone = "BUSBAR/SUBCIRCUIT zone (load side)"
+        focus = (
+            "This region is in the BUSBAR / SUBCIRCUIT / DB BOX area.\n"
+            "Focus on: busbar labels, DB info box, subcircuit breaker symbols, "
+            "circuit ID labels, phase group spacing, earth bar symbol, "
+            "and cable leader line routing."
+        )
 
-Now examine the GENERATED (Image 1):
-4. Same questions — shape, size, separation.
-5. Do ANY hooks overlap or touch each other in the generated?
-6. Compare CT ratio labels, ELR label, ammeter/voltmeter range labels.""",
-        })
+    return (
+        f"**Region**: {region_name} — {zone}\n\n"
+        f"{focus}\n\n"
+        "Examine the REFERENCE (Image 2) FIRST, then check if "
+        "the GENERATED (Image 1) matches in this cropped area."
+    )
 
-    # BI Connector area — focused on left/right structure
-    bi_comps = [(c.x, c.y) for c in layout_result.components if c.symbol_name == 'BI_CONNECTOR']
-    if bi_comps:
-        bi_x, bi_y = bi_comps[0]
-        regions.append({
-            "name": "BI_CONNECTOR",
-            "bbox": (bi_x - 30, bi_y - 25, bi_x + 30, bi_y + 25),
-            "dpi": 400,
-            "prompt_focus": """Examine the REFERENCE (Image 2) FIRST:
-1. Does the BI connector have a HORIZONTAL line passing through it (left to right)?
-2. What components/connections are on the LEFT side of the BI connector horizontal line?
-3. What components/connections are on the RIGHT side of the BI connector horizontal line?
 
-Now examine the GENERATED (Image 1):
-4. Does the BI connector have the same horizontal line structure?
-5. Are the same components on left and right sides?
-6. Report ANY structural difference in how the BI connector connects to surrounding components.""",
-        })
+def _save_debug_crops(
+    gen_crop: bytes,
+    ref_crop: bytes,
+    region_name: str,
+    output_dir: Path | None = None,
+) -> None:
+    """디버그용 크롭 이미지를 디스크에 저장."""
+    from datetime import datetime
 
-    # 2. MSB↔DB2 연결 (feeder connection)
-    if hasattr(layout_result, 'db_box_ranges') and len(layout_result.db_box_ranges) >= 2:
-        r0 = layout_result.db_box_ranges[0]
-        r1 = layout_result.db_box_ranges[1]
-        # 두 DB 사이 영역
-        x_min = r0.get('busbar_end_x', 180) - 20
-        x_max = r1.get('busbar_start_x', 220) + 20
-        y_min = min(r0.get('db_box_start_y', 80), r1.get('db_box_start_y', 80)) - margin
-        y_max = max(r0.get('busbar_y_row', 170), r1.get('busbar_y_row', 130)) + margin
-        regions.append({
-            "name": "FEEDER_CONNECTION",
-            "bbox": (x_min, y_min, x_max, y_max),
-            "prompt_focus": "Feeder cable connection between MSB and DB2. Check: how the cable routes from MSB busbar to DB2 incoming, feeder MCB symbol, cable labels, 'SUPPLY FROM MSB' text, and connection line path. Compare route and layout with reference.",
-        })
+    if output_dir is None:
+        output_dir = Path(__file__).resolve().parents[2] / "output" / "vision_crops"
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    return regions
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_name = region_name.replace(" ", "_")
+
+    gen_path = output_dir / f"{ts}_{safe_name}_gen.png"
+    ref_path = output_dir / f"{ts}_{safe_name}_ref.png"
+
+    gen_path.write_bytes(gen_crop)
+    ref_path.write_bytes(ref_crop)
+    logger.info("Debug crops saved: %s, %s", gen_path.name, ref_path.name)
 
 
 _CROP_COMPARE_TEMPLATE = """\
@@ -270,7 +267,7 @@ You are an expert Singapore SLD inspector doing a DETAIL COMPARISON of a specifi
 ## Focus Area: {region_name}
 
 {prompt_focus}
-
+{domain_context}
 ## CRITICAL: Analyze the REFERENCE (Image 2) FIRST
 Study the reference crop thoroughly, then check if the generated crop matches.
 
@@ -777,45 +774,65 @@ async def reference_compare(
                        sum(1 for i in self_report.issues if i.severity == "critical"),
                        compare_report.score)
 
-    # Step 3: Detail crop comparison (small symbol regions)
-    if layout_result is not None:
-        crop_regions = _get_detail_crop_regions(layout_result)
+    # Step 3: Smart crop comparison (Image Diff + Pixel Density)
+    # layout_result 불필요 — 이미지 기반 자동 탐지
+    try:
+        from app.sld.crop_detector import CropDetectorConfig, detect_crop_regions as detect_crops
+
+        # Reference 페이지 크기 감지
+        ref_page_w, ref_page_h = 420.0, 297.0  # A3 default
+        try:
+            import fitz as _fitz
+            _rdoc = _fitz.open(str(ref_path))
+            _rpage = _rdoc.load_page(0)
+            ref_page_w = _rpage.rect.width / 72 * 25.4
+            ref_page_h = _rpage.rect.height / 72 * 25.4
+            _rdoc.close()
+        except Exception:
+            pass
+
+        crop_config = CropDetectorConfig(
+            page_w_mm=420.0,
+            page_h_mm=297.0,
+        )
+        crop_regions = detect_crops(
+            gen_png, ref_png, config=crop_config,
+            ref_page_mm=(ref_page_w, ref_page_h),
+        )
+
         if crop_regions:
-            logger.info("Vision Reference Compare: Step 3 - %d detail crop region(s)", len(crop_regions))
+            logger.info("Vision Reference Compare: Step 3 - %d smart crop region(s)", len(crop_regions))
 
-            # Determine reference page dimensions (for crop coordinate mapping)
-            ref_page_w, ref_page_h = 420.0, 297.0  # A3 default
-            try:
-                import fitz as _fitz
-                _rdoc = _fitz.open(str(ref_path))
-                _rpage = _rdoc.load_page(0)
-                ref_page_w = _rpage.rect.width / 72 * 25.4
-                ref_page_h = _rpage.rect.height / 72 * 25.4
-                _rdoc.close()
-            except Exception:
-                pass
-
-            # Pre-generate high-DPI PNGs if any region needs it
-            _hi_dpi = max((r.get("dpi", _dpi) for r in crop_regions), default=_dpi)
-            if _hi_dpi > _dpi:
-                _hi_gen_png = svg_to_png(gen_path, dpi=_hi_dpi) if gen_path.suffix.lower() == ".svg" else gen_png
-                _hi_ref_png = pdf_to_png(ref_path, dpi=_hi_dpi) if ref_path.suffix.lower() == ".pdf" else ref_png
+            # 고해상도 PNG 생성 (크롭 비교용 400 DPI)
+            _crop_dpi = 400
+            _hi_gen_png = svg_to_png(gen_path, dpi=_crop_dpi) if gen_path.suffix.lower() == ".svg" else gen_png
+            if ref_path.suffix.lower() == ".pdf":
+                _hi_ref_png = pdf_to_png(ref_path, dpi=_crop_dpi)
+            elif ref_path.suffix.lower() == ".svg":
+                _hi_ref_png = svg_to_png(ref_path, dpi=_crop_dpi)
             else:
-                _hi_gen_png, _hi_ref_png = gen_png, ref_png
+                _hi_ref_png = ref_png
+
+            step2_score = compare_report.score
 
             for region in crop_regions:
                 try:
-                    _rdpi = region.get("dpi", _dpi)
-                    _use_gen = _hi_gen_png if _rdpi > _dpi else gen_png
-                    _use_ref = _hi_ref_png if _rdpi > _dpi else ref_png
-                    gen_crop = _crop_png(_use_gen, region["bbox"], dpi=_rdpi)
-                    ref_crop = _crop_png(_use_ref, region["bbox"],
-                                        page_w_mm=ref_page_w, page_h_mm=ref_page_h,
-                                        dpi=_rdpi)
+                    gen_crop = _crop_png(_hi_gen_png, region.bbox_mm, dpi=_crop_dpi)
+                    ref_crop = _crop_png(
+                        _hi_ref_png, region.bbox_mm,
+                        page_w_mm=ref_page_w, page_h_mm=ref_page_h,
+                        dpi=_crop_dpi,
+                    )
 
+                    # 디버그 이미지 저장
+                    _save_debug_crops(gen_crop, ref_crop, region.name)
+
+                    # 동적 prompt 생성 (위치 기반) + domain context 포함
+                    prompt_focus = _build_crop_prompt_focus(region.name, region.bbox_mm)
                     prompt = _CROP_COMPARE_TEMPLATE.format(
-                        region_name=region["name"],
-                        prompt_focus=region["prompt_focus"],
+                        region_name=region.name,
+                        prompt_focus=prompt_focus,
+                        domain_context=_build_domain_context(),
                     )
 
                     raw_crop = await _call_gemini_vision(
@@ -824,24 +841,46 @@ async def reference_compare(
                     )
                     crop_report = _parse_vision_response(raw_crop)
 
-                    # Merge crop issues into main report
+                    # 크롭 이슈를 메인 리포트에 병합
                     for issue in crop_report.issues:
-                        issue.location = f"[DETAIL:{region['name']}] {issue.location}"
-                        # Avoid duplicates (same description already in main report)
+                        issue.location = f"[CROP:{region.name}/P{region.priority}] {issue.location}"
+                        # 중복 방지
                         if not any(issue.description in existing.description
-                                  for existing in compare_report.issues):
+                                   for existing in compare_report.issues):
                             compare_report.issues.append(issue)
 
-                    logger.info("Crop %s: score=%.2f issues=%d",
-                               region["name"], crop_report.score, crop_report.issue_count)
+                    logger.info(
+                        "Crop %s (P%d): score=%.2f issues=%d diff=%.3f density=%.3f",
+                        region.name, region.priority, crop_report.score,
+                        crop_report.issue_count, region.diff_score, region.density_score,
+                    )
 
                 except Exception as crop_err:
-                    logger.warning("Crop comparison failed for %s: %s", region["name"], crop_err)
+                    logger.warning("Crop comparison failed for %s: %s", region.name, crop_err)
 
-            # Recalculate severity after crop additions
-            if any(i.severity == "critical" for i in compare_report.issues):
+            # Step 2 ↔ Step 3 교차검증
+            crop_critical = sum(
+                1 for i in compare_report.issues
+                if i.severity == "critical" and "[CROP:" in i.location
+            )
+            if crop_critical > 0:
                 compare_report.severity = "fail"
-                compare_report.score = min(compare_report.score, 0.4)
+                # Step 2가 좋았어도 크롭에서 critical 발견 시 점수 하향
+                if step2_score >= 0.8:
+                    compare_report.score = min(compare_report.score, max(0.5, step2_score - 0.3))
+                else:
+                    compare_report.score = min(compare_report.score, 0.4)
+                logger.warning(
+                    "Crop comparison found %d critical issue(s) — score adjusted to %.2f",
+                    crop_critical, compare_report.score,
+                )
+        else:
+            logger.info("Vision Reference Compare: Step 3 - No significant diff regions detected, skipping crops")
+
+    except ImportError:
+        logger.warning("crop_detector not available — skipping Step 3 smart crop comparison")
+    except Exception as step3_err:
+        logger.warning("Step 3 smart crop comparison failed: %s", step3_err)
 
     return compare_report
 

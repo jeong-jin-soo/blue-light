@@ -139,11 +139,11 @@
   <text x="78.00" y="167.90" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
   <text x="78.00" y="170.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 45 KVA AT 400V</text>
   <text x="78.00" y="180.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">(LOCATED INSIDE UNIT)</text>
-  <line x1="334.20" y1="181.50" x2="334.20" y2="183.30" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="331.95" y1="183.30" x2="336.45" y2="183.30" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="332.70" y1="184.43" x2="335.70" y2="184.43" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="333.45" y1="185.55" x2="334.95" y2="185.55" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="339.45" y="183.03" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
+  <line x1="334.20" y1="176.50" x2="334.20" y2="178.30" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="331.95" y1="178.30" x2="336.45" y2="178.30" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="332.70" y1="179.43" x2="335.70" y2="179.43" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="333.45" y1="180.55" x2="334.95" y2="180.55" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="339.45" y="178.03" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
   <line x1="210.00" y1="191.50" x2="215.00" y2="191.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="191.50" x2="210.00" y2="177.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="182.40" x2="201.00" y2="182.40" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -184,7 +184,7 @@
   <line x1="226.00" y1="107.50" x2="226.00" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="244.62" y1="107.50" x2="283.25" y2="107.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="283.25" y1="107.50" x2="283.25" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="334.20" y1="173.50" x2="334.20" y2="181.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="334.20" y1="173.50" x2="334.20" y2="176.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="208.75" y1="183.65" x2="211.25" y2="181.15" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="94.25" y1="108.75" x2="96.75" y2="106.25" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="186.12" y1="108.75" x2="188.62" y2="106.25" stroke="#000000" stroke-width="0.50" fill="none" />

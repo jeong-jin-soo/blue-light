@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.sld.generator import SldGenerator
+from app.sld.generator import SldPipeline
 
 
 def build_circuits() -> list[dict]:
@@ -183,26 +183,18 @@ def main():
         "drawing_no": "",
     }
 
-    gen = SldGenerator()
-
     output_dir = Path(__file__).resolve().parent.parent / "output"
     output_dir.mkdir(exist_ok=True)
 
-    pdf_path = output_dir / "test_63a_user_request.pdf"
-    svg_path = output_dir / "test_63a_user_request.svg"
+    pdf_path = str(output_dir / "test_63a_user_request.pdf")
+    svg_path = str(output_dir / "test_63a_user_request.svg")
 
     print(f"Generating SLD with {len(requirements['sub_circuits'])} circuits...")
-    result = gen.generate(
-        requirements,
-        application_info,
-        pdf_output_path=str(pdf_path),
-        svg_output_path=str(svg_path),
-    )
-    print(f"  Components: {result.get('component_count', '?')}")
+    result = SldPipeline().run(requirements, application_info=application_info)
+    result.save(pdf_path, svg_path, pdf_path.replace(".pdf", ".dxf"))
+    print(f"  Components: {result.component_count}")
     print(f"  PDF: {pdf_path}")
     print(f"  SVG: {svg_path}")
-    if result.get("dxf_path"):
-        print(f"  DXF: {result['dxf_path']}")
     print("Done!")
 
 

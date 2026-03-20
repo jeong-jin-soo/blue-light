@@ -455,13 +455,19 @@ class SldPipeline:
             skip_trip = True  # horizontal CBs: no trip arrow
 
         # Unified render — Symbol handles block vs procedural internally
-        symbol.render(
-            backend, comp.x, comp.y,
+        render_kwargs: dict = dict(
             horizontal=use_horizontal,
             skip_trip_arrow=skip_trip if symbol.is_circuit_breaker else False,
             enclosed=comp.enclosed if symbol.is_isolator else False,
             no_right_stub=getattr(comp, 'no_right_stub', False),
             no_left_stub=getattr(comp, 'no_left_stub', False),
+        )
+        # BI_CONNECTOR crossbar extension (CT metering reference style)
+        if comp.symbol_name == "BI_CONNECTOR" and getattr(comp, 'crossbar_extend', 0) > 0:
+            render_kwargs["crossbar_extend"] = comp.crossbar_extend
+        symbol.render(
+            backend, comp.x, comp.y,
+            **render_kwargs,
         )
 
         # Chain arrow for ditto MCBs
@@ -785,6 +791,9 @@ class SldPipeline:
         # Fixed connections — not affected by resolve_overlaps (e.g., VSS diagonal)
         for start, end in layout_result.fixed_connections:
             backend.add_line(start, end)
+        # Thick fixed connections — busbar-weight lines (e.g., BI crossbar)
+        for start, end in layout_result.thick_fixed_connections:
+            backend.add_line(start, end, lineweight=50)
 
     def _draw_fanout_groups(
         self, backend: DrawingBackend, layout_result: LayoutResult,

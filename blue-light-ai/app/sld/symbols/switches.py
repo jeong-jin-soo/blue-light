@@ -272,7 +272,15 @@ class BIConnector(BaseSymbol):
             "label_above": (cx, self.height + 3),
         }
 
-    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float,
+             crossbar_extend: float = 0) -> None:
+        """Draw BI Connector symbol.
+
+        Args:
+            crossbar_extend: if > 0, draw an extended horizontal crossbar
+                through the center (right-biased), matching reference DWG style
+                where a busbar-like line passes through the BI connector.
+        """
         w, h = self.width, self.height
         cy = y + h / 2
 
@@ -301,10 +309,20 @@ class BIConnector(BaseSymbol):
         # Connecting bar between arrowheads
         backend.add_line((x + 6, cy), (x + w - 6, cy))
 
+        # Extended crossbar through center (reference: long horizontal line
+        # through BI connector, slightly right-biased)
+        if crossbar_extend > 0:
+            bar_left = x - 3                       # slight left extension
+            bar_right = x + w + crossbar_extend    # right-biased extension
+            backend.add_line((bar_left, cy), (x + 1, cy))        # left extension
+            backend.add_line((x + w - 1, cy), (bar_right, cy))   # right extension
+
         # Connection stubs (left and right for horizontal use)
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((x, cy), (x + 1, cy))
-        backend.add_line((x + w - 1, cy), (x + w, cy))
+        if crossbar_extend == 0:
+            # Standard stubs only when no crossbar (avoid doubling)
+            backend.add_line((x, cy), (x + 1, cy))
+            backend.add_line((x + w - 1, cy), (x + w, cy))
 
         # Vertical stubs (for optional vertical use)
         cx = x + w / 2

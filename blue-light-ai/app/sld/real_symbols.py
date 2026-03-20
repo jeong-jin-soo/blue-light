@@ -661,7 +661,14 @@ class RealBIConnector(BaseSymbol):
             "label_right": (self.width + 2, self.height / 2),
         }
 
-    def draw(self, backend: DrawingBackend, x: float, y: float) -> None:
+    def draw(self, backend: DrawingBackend, x: float, y: float,
+             crossbar_extend: float = 0) -> None:
+        """Draw BI Connector symbol.
+
+        Args:
+            crossbar_extend: if > 0, extend right arm by this many mm
+                (reference DWG: long horizontal line through BI, right-biased).
+        """
         cx = x + self.width / 2
         cy = y + self.height / 2
 
@@ -673,18 +680,18 @@ class RealBIConnector(BaseSymbol):
             close=True,
         )
 
-        # Internal diagonal line (bottom-left to top-right) — reference DWG pattern
-        backend.add_line((x, y), (x + self.width, y + self.height))
+        # Horizontal pass-through line — crosses THROUGH the box from left outside to right outside.
+        # Reference: NOT a diagonal; a single horizontal line that enters from the left,
+        # passes through the box center, and exits to the right.
+        _h_ext_left = self.width * 0.6      # left extension beyond box
+        _h_ext_right = max(self.width * 0.6, crossbar_extend)  # right: use crossbar if larger
+        # One continuous line from far-left through box to far-right
+        backend.add_line((x - _h_ext_left, cy), (x + self.width + _h_ext_right, cy))
 
-        # Horizontal pass-through line (left ↔ right)
-        # Reference: BI connector has a horizontal line extending left and right
-        _h_ext = self.width * 0.6  # horizontal extension beyond box
+        # Bottom stub only — the crossbar terminates the spine.
+        # Connections above the crossbar (RCCB, MCB) branch from the
+        # crossbar line, not from the BI connector top.
         backend.set_layer("SLD_CONNECTIONS")
-        backend.add_line((x - _h_ext, cy), (x, cy))  # left arm
-        backend.add_line((x + self.width, cy), (x + self.width + _h_ext, cy))  # right arm
-
-        # Connection stubs (vertical)
-        backend.add_line((cx, y + self.height), (cx, y + self.height + self._stub))
         backend.add_line((cx, y), (cx, y - self._stub))
 
 

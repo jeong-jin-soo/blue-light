@@ -593,11 +593,12 @@ class TestValidateSubCircuits:
 class TestValidateMetering:
     """Test _validate_metering() for metering type validation."""
 
-    def test_validate_metering_landlord_auto_sp_meter(self):
-        """Landlord supply with no metering → auto-add sp_meter (PG KWH meter board).
+    def test_validate_metering_landlord_no_auto_add(self):
+        """Landlord supply with no metering → no auto-correction.
 
         When supply_source is 'landlord' and metering is empty,
-        the function should auto-add sp_meter for PG KWH meter board.
+        the function should NOT auto-add sp_meter. Many landlord SLDs
+        have no PG meter board — just a unit isolator.
         """
         result = ValidationResult()
         effective_spec = INCOMING_SPEC[150]  # 150A, requires_ct=True
@@ -608,9 +609,8 @@ class TestValidateMetering:
             effective_rating=150,
             result=result,
         )
-        # Landlord supply should auto-add sp_meter
-        assert "metering" in result.corrections
-        assert result.corrections["metering"]["corrected"] == "sp_meter"
+        # Landlord supply should NOT auto-add metering
+        assert "metering" not in result.corrections
 
     def test_validate_metering_landlord_explicit_preserved(self):
         """Landlord supply with explicit sp_meter → preserved as-is."""
@@ -700,8 +700,8 @@ class TestTopLevelKeyFallback:
             "Metering correction should propagate to requirements dict"
         )
 
-    def test_metering_auto_set_for_landlord(self):
-        """Landlord supply should auto-set sp_meter (PG KWH meter board)."""
+    def test_metering_not_auto_set_for_landlord(self):
+        """Landlord supply should NOT auto-set sp_meter (no meter board by default)."""
         from app.sld.layout.engine import _validate_and_correct
 
         req = {
@@ -714,8 +714,8 @@ class TestTopLevelKeyFallback:
             ],
         }
         result = _validate_and_correct(req)
-        assert result.get("metering") == "sp_meter", (
-            "Landlord supply should auto-set sp_meter (PG KWH meter board)"
+        assert not result.get("metering"), (
+            "Landlord supply should NOT auto-set metering (no meter board by default)"
         )
 
     def test_metering_not_forced_for_cable_extension(self):
