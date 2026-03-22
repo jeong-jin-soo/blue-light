@@ -7,6 +7,7 @@ import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminPriceResponse, BatchUpdatePricesRequest } from '../../types';
 import { generateUUID } from '../../utils/uuid';
+import * as XLSX from 'xlsx';
 
 // ── Editable Tier 타입 ──────────────────────────────
 
@@ -167,6 +168,39 @@ export default function AdminPriceManagementPage() {
 
   const handleDiscardChanges = () => {
     initializeTiers(originalPrices);
+  };
+
+  // ── Excel 다운로드 ──────────────────────────────
+
+  const handleDownloadExcel = () => {
+    const rows = editableTiers.map((tier, idx) => ({
+      'No.': idx + 1,
+      'Description': tier.description || `Tier ${idx + 1}`,
+      'kVA Min': Number(tier.kvaMin) || 0,
+      'kVA Max': Number(tier.kvaMax) || 0,
+      'Price (SGD)': Number(tier.price) || 0,
+      'SLD Price (SGD)': Number(tier.sldPrice) || 0,
+      'Active': tier.isActive ? 'Yes' : 'No',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // 컬럼 너비 설정
+    ws['!cols'] = [
+      { wch: 5 },   // No.
+      { wch: 25 },  // Description
+      { wch: 10 },  // kVA Min
+      { wch: 10 },  // kVA Max
+      { wch: 14 },  // Price
+      { wch: 14 },  // SLD Price
+      { wch: 8 },   // Active
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Price Tiers');
+
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `price-tiers-${today}.xlsx`);
   };
 
   // ── 변경 감지 ──────────────────────────────
@@ -486,6 +520,18 @@ export default function AdminPriceManagementPage() {
             {hasUnsavedPriceChanges && (
               <span className="text-xs text-warning-600 mr-1">Unsaved changes</span>
             )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadExcel}
+              disabled={editableTiers.length === 0}
+              title="Download as Excel"
+            >
+              <svg className="w-4 h-4 mr-1 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Excel
+            </Button>
             {hasUnsavedPriceChanges && (
               <Button variant="outline" size="sm" onClick={handleDiscardChanges}>
                 Discard
