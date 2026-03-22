@@ -39,12 +39,33 @@ class MatchedSpacing:
 
     # 적용할 오버라이드
     horizontal_spacing: float | None = None   # 서브회로 간격 (mm)
+    breaker_to_rccb_gap: float | None = None  # 스파인: breaker→RCCB 간격 (mm)
+    rccb_to_busbar_gap: float | None = None   # 스파인: RCCB→busbar 간격 (mm)
+    isolator_to_breaker_gap: float | None = None  # 스파인: isolator→breaker 간격 (mm, CT only)
+
+    # Spine gap 유효 범위 (이상치 clamp)
+    _MIN_SPINE_GAP: float = 5.0
+    _MAX_SPINE_GAP: float = 80.0
+
+    def _clamp_gap(self, value: float | None) -> float | None:
+        if value is None or value <= 0:
+            return None
+        return max(self._MIN_SPINE_GAP, min(value, self._MAX_SPINE_GAP))
 
     def to_overrides(self) -> dict[str, float]:
         """LayoutConfig에 적용할 오버라이드 dict 반환."""
         overrides = {}
         if self.horizontal_spacing is not None and self.horizontal_spacing > 0:
             overrides["horizontal_spacing"] = self.horizontal_spacing
+        gap = self._clamp_gap(self.breaker_to_rccb_gap)
+        if gap is not None:
+            overrides["ref_breaker_to_rccb_gap"] = gap
+        gap = self._clamp_gap(self.rccb_to_busbar_gap)
+        if gap is not None:
+            overrides["ref_rccb_to_busbar_gap"] = gap
+        gap = self._clamp_gap(self.isolator_to_breaker_gap)
+        if gap is not None:
+            overrides["ref_isolator_to_breaker_gap"] = gap
         return overrides
 
 
@@ -132,10 +153,11 @@ def get_reference_spacing(requirements: dict) -> MatchedSpacing | None:
         return None
 
     spacing_mm = best_prof.get("subcircuit_spacing_mm", 0)
+    spine = best_prof.get("spine_gaps_mm", {})
 
     logger.info(
-        "Reference spacing: %s (score=%.2f, circuits=%d→%d, spacing=%.1fmm)",
-        best_file, best_score, best_prof.get("circuits", 0), circuits, spacing_mm,
+        "Reference spacing: %s (score=%.2f, circuits=%d→%d, spacing=%.1fmm, spine_gaps=%s)",
+        best_file, best_score, best_prof.get("circuits", 0), circuits, spacing_mm, spine,
     )
 
     return MatchedSpacing(
@@ -143,4 +165,7 @@ def get_reference_spacing(requirements: dict) -> MatchedSpacing | None:
         match_score=best_score,
         circuits_ref=best_prof.get("circuits", 0),
         horizontal_spacing=spacing_mm if spacing_mm > 0 else None,
+        breaker_to_rccb_gap=spine.get("breaker_to_rccb"),
+        rccb_to_busbar_gap=spine.get("rccb_to_busbar"),
+        isolator_to_breaker_gap=spine.get("isolator_to_breaker"),
     )

@@ -66,3 +66,36 @@ jobs:
         run: npm run build
         env:
           VITE_API_BASE_URL: /api
+
+  # ============================================
+  # AI Service: Test
+  # ============================================
+  ai-test:
+    name: AI Service Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blue-light-ai
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('blue-light-ai/requirements.txt', 'blue-light-ai/requirements-dev.txt') }}
+          restore-keys: pip-
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run tests (excluding vision)
+        run: pytest tests/ -m "not vision" --timeout=60 -x -q

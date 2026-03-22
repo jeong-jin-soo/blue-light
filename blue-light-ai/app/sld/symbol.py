@@ -228,7 +228,7 @@ class ProceduralSymbol(Symbol):
     def render(self, backend, x, y, *, horizontal=False,
                skip_trip_arrow=False, enclosed=False,
                no_right_stub=False, no_left_stub=False,
-               crossbar_extend=0):
+               crossbar_extend=0, render_scale=1.0):
         kwargs: dict = {}
         if self.is_circuit_breaker and skip_trip_arrow:
             kwargs["skip_trip_arrow"] = True
@@ -327,7 +327,8 @@ class BlockSymbol(Symbol):
 
     def render(self, backend, x, y, *, horizontal=False,
                skip_trip_arrow=False, enclosed=False,
-               no_right_stub=False, no_left_stub=False):
+               no_right_stub=False, no_left_stub=False,
+               render_scale=1.0):
         native_horiz = self._replayer.is_native_horizontal(self._block_name)
 
         if horizontal:
@@ -340,6 +341,9 @@ class BlockSymbol(Symbol):
         # Compute insertion point + scale
         ix, iy, scale = self._compute_insertion(
             target_pin, pin_name, rotation, native_horiz, horizontal)
+
+        # Apply render_scale (visual scaling without changing layout)
+        scale *= render_scale
 
         # Draw block
         self._replayer.draw(
