@@ -35,6 +35,7 @@ public class DatabaseMigrationRunner {
             migrateApplicationsLoaColumns(conn);
             migrateSldTemplatesTable(conn);
             migrateSampleFilesTable(conn);
+            migrateNotificationsTable(conn);
             seedSystemSettings(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
@@ -175,6 +176,43 @@ public class DatabaseMigrationRunner {
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
             log.info("Migration [sample-files-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: notifications 테이블 생성
+     * - 인앱 알림 저장용 테이블
+     */
+    private void migrateNotificationsTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "notifications")) {
+            log.debug("Migration [notifications-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [notifications-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE notifications (" +
+                "  notification_seq  BIGINT       NOT NULL AUTO_INCREMENT," +
+                "  recipient_seq     BIGINT       NOT NULL," +
+                "  type              VARCHAR(50)  NOT NULL," +
+                "  title             VARCHAR(200) NOT NULL," +
+                "  message           VARCHAR(1000) NOT NULL," +
+                "  reference_type    VARCHAR(50)," +
+                "  reference_id      BIGINT," +
+                "  is_read           BOOLEAN      NOT NULL DEFAULT FALSE," +
+                "  read_at           DATETIME(6)," +
+                "  created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)," +
+                "  updated_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6)," +
+                "  created_by        BIGINT," +
+                "  updated_by        BIGINT," +
+                "  deleted_at        DATETIME(6)," +
+                "  PRIMARY KEY (notification_seq)," +
+                "  CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_seq) REFERENCES users (user_seq)," +
+                "  INDEX idx_notification_recipient_read (recipient_seq, is_read, deleted_at)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [notifications-table]: table created");
         }
     }
 
