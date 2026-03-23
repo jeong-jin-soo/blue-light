@@ -31,6 +31,8 @@ from app.models.schemas import (
     FileInfo,
     HealthResponse,
     ResetRequest,
+    SldGenerateRequest,
+    SldGenerateResponse,
 )
 from app.sld.dxf_ingest.router import router as dxf_ingest_router
 
@@ -405,6 +407,67 @@ async def chat_reset(
         "checkpoint_cleared": checkpoint_cleared,
         "temp_files_cleaned": temp_files_cleaned,
     }
+
+
+# ── Direct SLD Generation (Track A — no LLM) ────────
+
+
+@app.post("/api/sld/generate", response_model=SldGenerateResponse)
+async def generate_sld_direct(
+    request: SldGenerateRequest,
+    _: str = Depends(verify_service_key),
+):
+    """Generate SLD directly from structured requirements — no LLM needed.
+
+    Track A: For form/Excel inputs where requirements are already structured.
+    Bypasses the LangGraph agent entirely, calling SldPipeline directly.
+
+    The existing /api/chat/stream (Track B) remains for natural-language
+    conversations where Gemini interprets free-text into requirements.
+    """
+    from app.sld.generator import SldPipeline
+
+    requirements = request.requirements
+    application_info = request.application_info or {}
+
+    # Ensure sld_only_mode (no LEW info required)
+    application_info.setdefault("sld_only_mode", True)
+
+    try:
+        pipeline = SldPipeline()
+        result = pipeline.run(requirements, application_info=application_info)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"SLD generation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"SLD generation failed: {e}")
+
+    # Save to temp files
+    file_id = str(uuid.uuid4())[:8]
+    pdf_path = os.path.join(settings.temp_file_dir, f"{file_id}.pdf")
+    svg_path = os.path.join(settings.temp_file_dir, f"{file_id}.svg")
+    dxf_path = os.path.join(settings.temp_file_dir, f"{file_id}.dxf")
+    result.save(pdf_path, svg_path, dxf_path)
+
+    # Extract matched reference info if available
+    matched_ref = None
+    if hasattr(result, 'vision_report') and result.vision_report:
+        matched_ref = result.vision_report.get("matched_reference")
+
+    overflow = bool(
+        result.overflow_metrics
+        and (result.overflow_metrics.overflow_left > 0
+             or result.overflow_metrics.overflow_right > 0
+             or result.overflow_metrics.overflow_top > 0
+             or result.overflow_metrics.overflow_bottom > 0)
+    )
+
+    return SldGenerateResponse(
+        file_id=file_id,
+        component_count=result.component_count,
+        overflow=overflow,
+        matched_reference=matched_ref,
+    )
 
 
 # ── File Endpoints ───────────────────────────────────

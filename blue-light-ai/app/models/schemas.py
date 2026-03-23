@@ -56,6 +56,22 @@ class FileInfo(BaseModel):
     file_size: int
 
 
+class SldGenerateRequest(BaseModel):
+    """Direct SLD generation request — no LLM, structured input only."""
+
+    requirements: dict = Field(..., description="SLD requirements (supply_type, main_breaker, sub_circuits, etc.)")
+    application_info: dict | None = Field(None, description="Application details (address, drawing_number, etc.)")
+
+
+class SldGenerateResponse(BaseModel):
+    """Direct SLD generation response."""
+
+    file_id: str
+    component_count: int
+    overflow: bool = False
+    matched_reference: str | None = None
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
 

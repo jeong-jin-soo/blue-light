@@ -194,6 +194,27 @@ class FunctionSection(Section):
         return comp_y, bottom_pin_y, top_pin_y
 
     @staticmethod
+    def place_batch_on_spine(
+        ctx: _LayoutContext,
+        components: list[dict],
+    ) -> list[tuple[float, float, float]]:
+        """Place multiple symbols on the vertical spine sequentially.
+
+        Each dict in *components*: {"symbol": str, "label": str, "gap_before": float}
+        Returns list of (body_bottom_y, bottom_pin_y, top_pin_y) per component.
+        """
+        results = []
+        for spec in components:
+            result = FunctionSection.place_on_spine(
+                ctx,
+                spec["symbol"],
+                label=spec.get("label", ""),
+                gap_before=spec.get("gap_before", 0),
+            )
+            results.append(result)
+        return results
+
+    @staticmethod
     def spine_connection(ctx: _LayoutContext, distance: float) -> None:
         """Add a vertical spine connection and advance cursor."""
         if distance > 0:

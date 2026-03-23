@@ -38,139 +38,8 @@ from app.sld.layout.sections import (
 
 logger = logging.getLogger(__name__)
 
-
-def _validate_and_correct(requirements: dict) -> dict:
-    """Validate requirements against SS 638 and apply auto-corrections.
-
-    Converts from compute_layout's nested format to sld_spec's flat format,
-    runs validation, and propagates corrections back.
-
-    Returns a (possibly corrected) copy of requirements. Never mutates the original.
-
-    Raises:
-        ValueError: If validation finds hard errors (missing kVA + breaker rating, etc.).
-    """
-    from app.sld.sld_spec import apply_corrections, validate_sld_requirements
-
-    # ── Normalise metering field ──
-    # metering MUST be a string ("ct_meter", "sp_meter", "none", "").
-    # If a dict is passed (common mis-specification), extract its "type" key
-    # and move the rest to metering_config so downstream CT/SP logic works.
-    _raw_metering = requirements.get("metering")
-    if isinstance(_raw_metering, dict):
-        _m_type = (_raw_metering.get("type") or "").lower().strip()
-        # Normalise common aliases → canonical string
-        if _m_type in ("ct", "ct_meter", "ct meter"):
-            requirements["metering"] = "ct_meter"
-        elif _m_type in ("sp", "sp_meter", "sp meter"):
-            requirements["metering"] = "sp_meter"
-        else:
-            requirements["metering"] = _m_type or ""
-        # Merge dict contents into metering_config (preserving existing)
-        _existing_mc = requirements.get("metering_config", {})
-        _merged_mc = {**{k: v for k, v in _raw_metering.items() if k != "type"}, **_existing_mc}
-        if _merged_mc:
-            requirements["metering_config"] = _merged_mc
-        logger.warning(
-            "metering was dict — normalised to string %r + metering_config",
-            requirements["metering"],
-        )
-
-    # Build flat validation input from nested requirements
-    main_breaker = requirements.get("main_breaker", {})
-    if not isinstance(main_breaker, dict):
-        main_breaker = {}
-    breaker_rating = (
-        main_breaker.get("rating", 0)
-        or main_breaker.get("rating_A", 0)
-        or requirements.get("breaker_rating", 0)  # top-level fallback
-    )
-    sub_circuits = requirements.get("sub_circuits", []) or requirements.get("circuits", [])
-
-    # Cable extension uses landlord supply path for validation
-    supply_source = requirements.get("supply_source", "")
-    if requirements.get("is_cable_extension") and supply_source != "landlord":
-        supply_source = "landlord"
-
-    spec_input = {
-        "kva": requirements.get("kva", 0),
-        "supply_type": requirements.get("supply_type", ""),
-        "supply_source": supply_source,
-        "breaker_rating": breaker_rating,
-        "breaker_type": main_breaker.get("type", "") or requirements.get("breaker_type", ""),
-        "breaker_poles": main_breaker.get("poles", "") or requirements.get("breaker_poles", ""),
-        "breaker_ka": (
-            main_breaker.get("fault_kA", 0)
-            or requirements.get("breaker_ka", 0)
-            or requirements.get("fault_kA", 0)
-        ),
-        "metering": requirements.get("metering", ""),
-        "is_cable_extension": bool(requirements.get("is_cable_extension")),
-        "circuits": [
-            {
-                "name": sc.get("name", ""),
-                "breaker_rating": sc.get("breaker_rating", 0),
-                "breaker_type": sc.get("breaker_type", "MCB"),
-            }
-            for sc in (sub_circuits if isinstance(sub_circuits, list) else [])
-        ],
-    }
-
-    result = validate_sld_requirements(spec_input)
-
-    # Hard errors → raise ValueError
-    if result.errors:
-        error_msg = "; ".join(result.errors)
-        logger.error("SLD validation failed: %s", error_msg)
-        raise ValueError(f"SLD requirements validation failed: {error_msg}")
-
-    # Log warnings (non-blocking)
-    for w in result.warnings:
-        logger.warning("SLD validation: %s", w)
-
-    # Apply corrections + ensure validated values propagate to main_breaker
-    corrected_spec = apply_corrections(spec_input, result) if result.corrections else spec_input
-    requirements = dict(requirements)  # Shallow copy
-    mb = dict(main_breaker)  # Copy main_breaker too
-
-    # Ensure main_breaker dict has validated values (from corrections or user input)
-    mb.setdefault("rating", 0)
-    mb.setdefault("type", "")
-    mb.setdefault("fault_kA", 0)
-    mb.setdefault("poles", "")
-
-    if result.corrections:
-        if "breaker_rating" in result.corrections:
-            mb["rating"] = corrected_spec["breaker_rating"]
-            if "rating_A" in mb:
-                mb["rating_A"] = corrected_spec["breaker_rating"]
-        if "breaker_type" in result.corrections:
-            mb["type"] = corrected_spec["breaker_type"]
-        if "breaker_ka" in result.corrections:
-            mb["fault_kA"] = corrected_spec["breaker_ka"]
-        if "breaker_poles" in result.corrections:
-            mb["poles"] = corrected_spec["breaker_poles"]
-        # Propagate metering correction to requirements
-        if "metering" in result.corrections:
-            requirements["metering"] = corrected_spec["metering"]
-
-    # Fill from validated spec_input for fields not already set in main_breaker
-    if not mb["rating"] and corrected_spec.get("breaker_rating"):
-        mb["rating"] = corrected_spec["breaker_rating"]
-    if not mb["type"] and corrected_spec.get("breaker_type"):
-        mb["type"] = corrected_spec["breaker_type"]
-    if not mb["fault_kA"] and corrected_spec.get("breaker_ka"):
-        mb["fault_kA"] = corrected_spec["breaker_ka"]
-    if not mb["poles"] and corrected_spec.get("breaker_poles"):
-        mb["poles"] = corrected_spec["breaker_poles"]
-
-    # Fill metering from validated spec if not already set
-    if not requirements.get("metering") and corrected_spec.get("metering"):
-        requirements["metering"] = corrected_spec["metering"]
-
-    requirements["main_breaker"] = mb
-
-    return requirements
+# Extracted to validation.py — re-import for backward compatibility
+from app.sld.layout.validation import _validate_and_correct  # noqa: E402
 
 
 def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
@@ -254,11 +123,40 @@ def compute_layout(
         ValueError: If validation finds hard errors (e.g., missing kVA + breaker rating).
     """
     if config is None:
-        config = LayoutConfig.from_page_config(page_config) if page_config else LayoutConfig()
+        config = (
+            LayoutConfig.from_reference(requirements, page_config)
+            if requirements
+            else LayoutConfig.from_page_config(page_config) if page_config else LayoutConfig()
+        )
 
     # Apply requirements-level config overrides
     if requirements.get("default_wiring_method"):
         config.default_wiring_method = requirements["default_wiring_method"]
+    if requirements.get("busbar_width_ratio"):
+        config.busbar_width_ratio = float(requirements["busbar_width_ratio"])
+    if requirements.get("db_width_ratios"):
+        config.db_width_ratios = requirements["db_width_ratios"]
+    if requirements.get("component_scale"):
+        s = float(requirements["component_scale"])
+        config.component_scale = s
+        if s != 1.0:
+            # Scale symbol dimensions (layout spacing)
+            config.breaker_w *= s; config.breaker_h *= s
+            config.mcb_w *= s; config.mcb_h *= s
+            config.rccb_w *= s; config.rccb_h *= s
+            config.isolator_w *= s; config.isolator_h *= s
+            config.meter_size *= s; config.ct_size *= s
+            config.kwh_rect_w *= s; config.kwh_rect_h *= s
+            config.spine_component_gap *= s
+            config.busbar_to_breaker_gap *= s
+            config.tail_length *= s
+            config.horizontal_spacing *= s
+            config.min_horizontal_spacing *= s
+            config.max_horizontal_spacing *= s
+            config.vertical_spacing *= s
+            # Label sizes (layout collision detection uses these)
+            config.label_char_height *= s
+            config.char_w_label *= s
 
     # -- Input validation gate (defense in depth) --
     if not skip_validation:
@@ -396,8 +294,9 @@ def compute_layout(
                         _child_db_names.add(_cdn)
 
                 for sc in _sub_ckt_list:
-                    sc_type = (sc.get("type") or "").upper()
-                    sc_id = (sc.get("id") or "").upper()
+                    sc_type = (sc.get("type") or sc.get("breaker_type") or "").upper()
+                    sc_id = (sc.get("id") or sc.get("circuit_id") or "").upper()
+                    sc_name = (sc.get("name") or "").upper()
                     # DB feeder: circuit whose id matches a child DB name
                     _is_feeder = sc_id in _child_db_names
                     if _is_feeder:
@@ -408,7 +307,8 @@ def compute_layout(
                                       "feeder_breaker": _cdb.get("feeder_breaker", {}),
                                       "cable": _cdb.get("incoming_cable", "")}
                                 break
-                    if _is_feeder or sc_type == "SPARE":
+                    _is_spare = sc_type == "SPARE" or sc_id == "SPARE" or sc_name == "SPARE"
+                    if _is_feeder or _is_spare:
                         _bi_xbar_circuits.append(sc)
                     else:
                         _remaining_circuits.append(sc)
@@ -418,16 +318,28 @@ def compute_layout(
                 for _cdb in dbs:
                     _cdn = (_cdb.get("name") or _cdb.get("db_name") or "").upper()
                     if _cdn in _child_db_names and _cdn not in _found_feeders:
+                        # feeder_breaker can be on the child DB or on the parent DB
                         _fb = _cdb.get("feeder_breaker", {})
+                        if not _fb:
+                            # Check parent (current) DB for feeder_breaker to this child
+                            _fb = db.get("feeder_breaker", {})
+                        _cable = _cdb.get("incoming_cable", "") or _cdb.get("feeder_cable", "") or db.get("feeder_cable", "")
                         _bi_xbar_circuits.append({
                             "id": _cdn,
                             "_is_feeder": True,
                             "_feeds_db": _cdn,
                             "feeder_breaker": _fb,
-                            "cable": _cdb.get("incoming_cable", ""),
+                            "cable": _cable,
                             "type": _fb.get("type", "MCB") if _fb else "MCB",
                             "rating": _fb.get("rating", 0) if _fb else 0,
                         })
+
+                # Sort: spares first (left), feeders last (right, outermost)
+                _bi_xbar_circuits.sort(key=lambda sc: 0 if (
+                    (sc.get("type") or sc.get("breaker_type") or "").upper() == "SPARE"
+                    or (sc.get("id") or sc.get("circuit_id") or "").upper() == "SPARE"
+                    or (sc.get("name") or "").upper() == "SPARE"
+                ) else 1)
 
                 db = {
                     **db,
@@ -728,6 +640,20 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
             n += 3 - (n % 3)
         n = max(n, 3)
 
+        # CT metering crossbar weight: crossbar occupies extra space (SPARE + feeders)
+        # so count it as additional circuits for width allocation.
+        # Detect CT metering from requirements (metering field) since _ct_metering
+        # flag is set after _plan_layout.
+        _CROSSBAR_WEIGHT = 5
+        _metering = db.get("metering", "") or ctx.requirements.get("metering", "")
+        _is_ct = _metering in ("ct_meter", "ct_metering")
+        _has_children = any(
+            (d.get("fed_from") or d.get("supply_source", "")).upper() == (db.get("name") or db.get("db_name") or "").upper()
+            for d in dbs if d is not db
+        )
+        if _is_ct or _has_children:
+            n += _CROSSBAR_WEIGHT
+
         has_elcb = bool(db.get("elcb"))
 
         # Build ProtectionGroupPlan list
@@ -765,7 +691,9 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # style where all circuits fit in one row with tight but readable spacing).
 
     gap_space = max(0, len(db_plans) - 1) * GAP_BETWEEN_DBS
-    allocable = avail_width - gap_space
+    # Apply component_scale to available width — smaller components use less page
+    _cs = config.component_scale
+    allocable = (avail_width - gap_space) * _cs
 
     # --- Helper: compute DB width at a given spacing ---
     # LEW reference: PG boundaries use ~3mm extra spacing (same as phase gaps),
@@ -867,19 +795,28 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
             else:
                 p.circuits_per_row = min(p.circuit_count, max_per_row)
 
-    # Distribute remaining space proportionally to all DBs based on circuit count.
-    total_width = sum(p.estimated_width for p in db_plans) + gap_space
-    if total_width < avail_width and len(db_plans) >= 2:
-        surplus = avail_width - total_width
-        total_circuits_all = sum(p.circuit_count for p in db_plans)
-        if total_circuits_all > 0 and surplus > 0:
-            for p in db_plans:
-                share = p.circuit_count / total_circuits_all
-                p.estimated_width += surplus * share
+    # Distribute remaining space proportionally to all DBs.
+    # If db_width_ratios is specified, use fixed ratios (e.g., [0.6, 0.4])
+    if config.db_width_ratios and len(config.db_width_ratios) == len(db_plans):
+        allocable_for_dbs = avail_width - gap_space
+        for pi, p in enumerate(db_plans):
+            p.estimated_width = allocable_for_dbs * config.db_width_ratios[pi]
+    else:
+        # Use scaled allocable (not full avail_width) for surplus distribution
+        _effective_avail = allocable + gap_space
+        total_width = sum(p.estimated_width for p in db_plans) + gap_space
+        if total_width < _effective_avail and len(db_plans) >= 2:
+            surplus = _effective_avail - total_width
+            total_circuits_all = sum(p.circuit_count for p in db_plans)
+            if total_circuits_all > 0 and surplus > 0:
+                for p in db_plans:
+                    share = p.circuit_count / total_circuits_all
+                    p.estimated_width += surplus * share
 
     # Final scaling if total still exceeds available
+    _effective_avail = allocable + gap_space
     total_width = sum(p.estimated_width for p in db_plans) + gap_space
-    scale = min(1.0, avail_width / total_width) if total_width > 0 else 1.0
+    scale = min(1.0, _effective_avail / total_width) if total_width > 0 else 1.0
 
     # Allocate strict non-overlapping regions
     scaled_total = total_width * scale
@@ -1287,15 +1224,16 @@ def render_board(
     if _has_ct_metering and ctx.bi_center_y > 0:
         _bi_cy = ctx.bi_center_y
         # DB box boundaries (same formula as _place_db_box)
+        # Use full (pre-ratio) busbar extent for crossbar positioning
+        _full_end_x = result.busbar_full_end_x or result.busbar_end_x
         _db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
         from app.sld.real_symbols import get_symbol_dimensions as _gsd_xbar
         _earth_w = _gsd_xbar("EARTH")["width_mm"]
         _earth_reserve = config.earth_x_from_db + _earth_w + 5
-        _db_box_right = min(result.busbar_end_x + 10, config.max_x - _earth_reserve)
+        _db_box_right = min(_full_end_x + 10, config.max_x - _earth_reserve)
         _db_box_width = _db_box_right - _db_box_left
 
-        # Crossbar extent: 20% from left edge, 5% from right edge,
-        # then shift entire crossbar LEFT by 1.5× BI connector box width.
+        # Crossbar extent: aligned with BI connector, within DB box
         _bi_dims_xbar = _gsd_xbar("BI_CONNECTOR")
         _bi_shift = _bi_dims_xbar["width_mm"] * 1.5
         _xbar_sx = _db_box_left + _db_box_width * 0.20 - _bi_shift
@@ -1305,14 +1243,17 @@ def render_board(
         if _xbar_circuits:
             from app.sld.layout.sections import _place_bi_crossbar_circuits
             _bi_dims = _gsd_xbar("BI_CONNECTOR")
-            _place_bi_crossbar_circuits(
+            # Place circuits at crossbar right end (beyond busbar to avoid overlap)
+            _circuit_end_x = _xbar_ex
+            _rightmost = _place_bi_crossbar_circuits(
                 result, ctx, cx,
                 _bi_cy - _bi_dims["height_mm"] / 2,
                 _bi_dims["width_mm"], _bi_dims["height_mm"],
                 _xbar_circuits, spacing=15.0,
-                busbar_end_x=_xbar_ex,
+                busbar_end_x=_circuit_end_x,
                 busbar_y=result.busbar_y,
             )
+            # Crossbar line stays at original extent (not extended by circuit positions)
 
         # Crossbar line at BI connector center Y — thick (same as busbar)
         result.thick_fixed_connections.append(((_xbar_sx, _bi_cy), (_xbar_ex, _bi_cy)))
@@ -1340,7 +1281,7 @@ def render_board(
     # Key fix: each board gets its own resolve_overlaps with correct spine_x
     resolve_overlaps(result, config)
     _add_phase_fanout(result, config, ctx.supply_type)
-    _add_cable_leader_lines(result, config)
+    _add_cable_leader_lines(result, config, region=region, busbar_end_x=result.busbar_end_x)
     _add_isolator_device_symbols(result, config)
 
     return BoardResult(
@@ -1394,11 +1335,8 @@ def _add_hierarchical_connections(
     root_name = root_result.board_name
     bi_h = 10
     bi_w = 16
-    from app.sld.layout.models import LayoutConfig as _LC
-    _cfg = _LC()  # C4: use LayoutConfig (synced from JSON via __post_init__)
-    mcb_w = _cfg.mcb_w
-    mcb_h = _cfg.mcb_h
-    stub = _cfg.stub_len
+    from app.sld.layout.section_base import sym_dims as _sym_dims
+    mcb_w, mcb_h, stub = _sym_dims("MCB")
 
     for child in child_results:
         child_cx = child.spine_x

@@ -211,7 +211,10 @@ class LayoutConfig:
 
     # Sub-circuit row layout
     max_circuits_per_row: int = 30    # Single busbar row (reference: 26 circuits on 1 busbar)
-    row_spacing: float = 40           # Vertical spacing between sub-circuit rows (reduced for 18/row fit)
+    row_spacing: float = 65           # Vertical spacing between sub-circuit rows (room for cable leader text)
+    busbar_width_ratio: float = 1.0   # Busbar width multiplier (shrink from right side, left edge fixed)
+    db_width_ratios: list[float] | None = None  # Per-DB width ratios (e.g., [0.6, 0.4] for MSB:DB2=6:4)
+    component_scale: float = 1.0     # Global scale for symbols + labels (e.g., 0.75 = 25% smaller)
 
     # Starting position
     start_x: float = 210             # Center of drawing
@@ -238,8 +241,13 @@ class LayoutConfig:
     isolator_w: float = 5.5          # Isolator width
     isolator_h: float = 7.0          # Isolator height
     ct_size: float = 2.5             # CT diameter
-    stub_len: float = 3.0            # Connection stub length
     spine_component_gap: float = 5.0  # Extra gap between spine components (with connection line)
+
+    # Spine section gaps — populated by reference matcher (Phase 3)
+    # None = use existing computed gaps (backward compatible)
+    ref_breaker_to_rccb_gap: float | None = None    # mm, from reference DXF
+    ref_rccb_to_busbar_gap: float | None = None      # mm, from reference DXF
+    ref_isolator_to_breaker_gap: float | None = None  # mm, from reference DXF (CT only)
     # KWH meter rectangle dimensions (for horizontal meter board layout)
     kwh_rect_w: float = 12.0         # KWH inner rectangle width (horizontal span)
     kwh_rect_h: float = 6.0          # KWH inner rectangle height (vertical span)
@@ -427,7 +435,6 @@ class LayoutConfig:
             iso = cat.get("ISOLATOR")
             self.isolator_w = iso.width
             self.isolator_h = iso.height
-            self.stub_len = iso.stub
             # KWH Meter
             kwh = cat.get("KWH_METER")
             self.meter_size = kwh.width
@@ -440,6 +447,9 @@ class LayoutConfig:
             self.ct_size = ct.width
         except Exception as exc:
             logger.warning("Symbol dimension load from catalog failed, using defaults: %s", exc)
+
+        # component_scale is applied in engine.py after config creation
+        # (because __post_init__ runs before the scale value is set from requirements)
 
 
 @dataclass
@@ -489,6 +499,8 @@ class PlacedComponent:
     label_y_override: float | None = None  # Absolute Y for label (bypasses default calculation)
     no_right_stub: bool = False  # True = skip right connection stub (e.g., KWH in CT metering)
     no_left_stub: bool = False   # True = skip left connection stub (e.g., last component on left branch)
+    no_trip_arrow: bool = False  # True = skip trip mechanism arrow (e.g., BI crossbar feeder MCB)
+    label_side: str = ""         # "left" = label on left side (CT metering spine/crossbar MCBs)
     crossbar_extend: float = 0   # >0 = draw extended horizontal crossbar through BI_CONNECTOR center (mm right)
     # -- DB_INFO_BOX sub-anchors (layout determines, renderer uses as-is) --
     rating_offset_y: float = -4.0    # Y offset for rating text relative to title
@@ -517,6 +529,8 @@ class LayoutResult:
     busbar_y: float = 0
     busbar_start_x: float = 0
     busbar_end_x: float = 0
+    busbar_full_end_x: float = 0  # Pre-ratio busbar right edge (for crossbar reference)
+    busbar_visual_end_x: float = 0  # Visual busbar right edge (shortened for BI crossbar clearance)
     busbar_y_per_row: list[float] = field(default_factory=list)  # Per-row busbar Y values
 
     # DB box dashed line indices (for updating after busbar changes)
