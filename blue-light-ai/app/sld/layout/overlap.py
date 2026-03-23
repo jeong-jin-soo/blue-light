@@ -835,7 +835,10 @@ def _determine_final_positions(
         sc_bus_end = row_busbar_extent[1] - _MARGIN
     else:
         sc_bus_start = layout_result.busbar_start_x + _MARGIN
-        sc_bus_end = layout_result.busbar_end_x - _MARGIN
+        # Respect BI crossbar visual clearance when computing sub-circuit span
+        _ve = layout_result.busbar_visual_end_x
+        _be = _ve if _ve else layout_result.busbar_end_x
+        sc_bus_end = _be - _MARGIN
 
     # Compute total needed span using asymmetric extents
     n = len(groups)
@@ -912,6 +915,18 @@ def _determine_final_positions(
 
     # Fit within drawing bounds
     new_tap_xs = _fit_positions_to_bounds(new_tap_xs, config)
+
+    # Clamp to visual busbar extent: when BI crossbar clearance shortened
+    # the busbar, ensure sub-circuit taps don't extend past the visual end.
+    # Only active when busbar_visual_end_x < busbar_end_x (i.e., actually shortened).
+    _ve = layout_result.busbar_visual_end_x
+    _be = layout_result.busbar_end_x
+    if _ve and _be and _ve < _be - 1 and len(new_tap_xs) > 1:
+        _ve_bus_end = _ve - config.busbar_end_margin
+        t_max = max(new_tap_xs)
+        if t_max > _ve_bus_end:
+            shift = t_max - _ve_bus_end
+            new_tap_xs = [t - shift for t in new_tap_xs]
 
     return new_tap_xs
 
@@ -1009,6 +1024,16 @@ def _fit_busbar_to_groups(
     needed_start = max(needed_start, config.min_x)
     needed_end = min(needed_end, config.max_x)
 
+    # BI crossbar clearance: keep busbar visual end shortened so that
+    # crossbar circuits (SPARE, DB feeder) have clear vertical space.
+    _visual_end = layout_result.busbar_visual_end_x
+    _visual_end_applied = False
+    if (_visual_end and layout_result.busbar_end_x
+            and _visual_end < layout_result.busbar_end_x - 1
+            and needed_end > _visual_end):
+        needed_end = _visual_end
+        _visual_end_applied = True
+
     start_changed = abs(needed_start - layout_result.busbar_start_x) > 0.1
     end_changed = abs(needed_end - layout_result.busbar_end_x) > 0.1
 
@@ -1023,6 +1048,14 @@ def _fit_busbar_to_groups(
         for comp in components:
             if comp.symbol_name == "BUSBAR" and comp.label:
                 comp.x = layout_result.busbar_start_x
+                break
+
+    # Update BUSBAR visual end (cable_annotation) only when BI crossbar
+    # clearance was applied — otherwise leave the original value intact.
+    if _visual_end_applied:
+        for comp in components:
+            if comp.symbol_name == "BUSBAR" and comp.label:
+                comp.cable_annotation = f"{needed_end:.1f}"
                 break
 
     # Update busbar rating LABEL position — left-aligned below busbar
@@ -1431,7 +1464,14 @@ def resolve_overlaps(
                     region_width=region.width,
                 )
 
-                row_busbar_extent = (region.min_x, region.max_x)
+                # Respect BI crossbar visual clearance: if this region's
+                # right edge extends past the visual busbar end, shrink it.
+                _region_max = region.max_x
+                _ve = layout_result.busbar_visual_end_x
+                if _ve and ri == 0 and _ve < _region_max:
+                    _region_max = _ve
+
+                row_busbar_extent = (region.min_x, _region_max)
                 new_tap_xs = _determine_final_positions(
                     r_groups, layout_result.components, layout_result, config,
                     incoming_chain_x=incoming_chain_x if ri == 0 else 0.0,
@@ -1442,9 +1482,9 @@ def resolve_overlaps(
                 # the strict region bounds. If _determine_final_positions
                 # produced positions outside the region (due to centering or
                 # bound fitting), clamp them proportionally.
-                _MARGIN_R = min(config.busbar_end_margin, max(2.0, region.width * 0.05))
+                _MARGIN_R = min(config.busbar_end_margin, max(2.0, (_region_max - region.min_x) * 0.05))
                 r_min = region.min_x + _MARGIN_R
-                r_max = region.max_x - _MARGIN_R
+                r_max = _region_max - _MARGIN_R
                 if new_tap_xs and len(new_tap_xs) > 1:
                     t_min = min(new_tap_xs)
                     t_max = max(new_tap_xs)

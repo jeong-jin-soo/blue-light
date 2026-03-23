@@ -530,6 +530,7 @@ class LayoutResult:
     busbar_start_x: float = 0
     busbar_end_x: float = 0
     busbar_full_end_x: float = 0  # Pre-ratio busbar right edge (for crossbar reference)
+    busbar_visual_end_x: float = 0  # Visual busbar right edge (shortened for BI crossbar clearance)
     busbar_y_per_row: list[float] = field(default_factory=list)  # Per-row busbar Y values
 
     # DB box dashed line indices (for updating after busbar changes)

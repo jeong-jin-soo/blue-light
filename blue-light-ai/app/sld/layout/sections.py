@@ -905,14 +905,29 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     # Store full busbar extent before ratio adjustment (for crossbar reference)
     result.busbar_full_end_x = bus_end_x
 
+    # ── BI crossbar circuit clearance ──
+    # When CT metering is active, SPARE + feeder circuits branch upward from
+    # the BI Connector crossbar.  Their vertical lines must NOT pass through
+    # the busbar.  Shrink the VISUAL busbar right edge only; circuit tap
+    # positions still use the full bus_end_x so sub-circuit spacing is not
+    # compressed.
+    _xbar_ckts = getattr(ctx, "bi_crossbar_circuits", [])
+    _visual_bus_end_x = bus_end_x  # default: same as logical
+    if _xbar_ckts:
+        _xbar_spacing = 15.0  # must match spacing used in _place_bi_crossbar_circuits
+        _xbar_clearance = len(_xbar_ckts) * _xbar_spacing + _xbar_spacing / 2
+        _visual_bus_end_x = bus_end_x - _xbar_clearance
+
     # Apply busbar width ratio (shrink from right side, left edge fixed)
     if config.busbar_width_ratio < 1.0:
         full_width = bus_end_x - bus_start_x
         bus_end_x = bus_start_x + full_width * config.busbar_width_ratio
+        _visual_bus_end_x = min(_visual_bus_end_x, bus_end_x)
 
     result.busbar_y = y
     result.busbar_start_x = bus_start_x
     result.busbar_end_x = bus_end_x
+    result.busbar_visual_end_x = _visual_bus_end_x
 
     # ≤500A → "COMB BAR", >500A → "BUSBAR" (LEW convention per reference DWGs)
     busbar_type = SG_LOCALE.circuit.comb_busbar if busbar_rating <= 500 else SG_LOCALE.circuit.busbar
@@ -923,7 +938,7 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         y=y,
         label=f"{breaker_rating}A {SG_LOCALE.circuit.db}",
         rating="",
-        cable_annotation=f"{bus_end_x:.1f}",  # encode bus_end_x for renderer
+        cable_annotation=f"{_visual_bus_end_x:.1f}",  # encode visual bus_end_x for renderer
     ))
     # -- DB Info: compute text, defer placement to _place_db_box() --
     # Reference format: "APPROVED LOAD: 69.282 kVA" (raw value, space + kVA, no voltage)
@@ -1018,7 +1033,13 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
     num_circuits = max(len(sub_circuits), 1)
 
     bus_start_x = result.busbar_start_x
-    bus_end_x = result.busbar_end_x
+    # Use visual busbar end when available (shortened for BI crossbar clearance)
+    # so sub-circuits sit directly above the drawn busbar line.
+    bus_end_x = result.busbar_visual_end_x if result.busbar_visual_end_x else result.busbar_end_x
+    _visual_bus_width = bus_end_x - bus_start_x  # effective width for circuit placement
+    _busbar_shortened = (result.busbar_visual_end_x
+                         and result.busbar_end_x
+                         and result.busbar_visual_end_x < result.busbar_end_x - 1)
 
     # ── Region-aware row splitting ──
     # When constrained to a region (multi-DB or protection group), compute
@@ -1034,6 +1055,9 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
 
     if ctx.active_region or ctx.constrained_width:
         avail = ctx.active_region.width if ctx.active_region else ctx.constrained_width
+        # When BI crossbar clearance shortened the busbar, use the visual width
+        if _busbar_shortened and _visual_bus_width < avail:
+            avail = _visual_bus_width
         # Region already has margins built in — use nearly full width.
         # Only subtract a tiny margin (2mm per side) for busbar end caps.
         usable = avail - 4  # 2mm per side for busbar end caps
@@ -1071,9 +1095,12 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
 
     rows = _split_into_rows(sub_circuits, effective_max_per_row)
 
-    # Use region width for spacing computation (more accurate than constrained_width)
+    # Use visual busbar width for spacing computation when BI crossbar clearance
+    # actually shortened the busbar; otherwise fall back to region width.
     spacing_avail = None
-    if ctx.active_region:
+    if _busbar_shortened and _visual_bus_width > 0:
+        spacing_avail = _visual_bus_width
+    elif ctx.active_region:
         spacing_avail = ctx.active_region.width
     elif ctx.constrained_width:
         spacing_avail = ctx.constrained_width
