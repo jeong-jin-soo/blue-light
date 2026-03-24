@@ -79,6 +79,31 @@ class SvgBackend:
     def _text_color(self) -> str:
         return _LAYER_COLORS.get(self._current_layer, "#262626")
 
+    # -- Content scaling --
+
+    def begin_content_scale(self, scale: float, page_cx: float, page_cy: float) -> None:
+        """Wrap subsequent elements in a <g> with uniform scale transform.
+
+        Scales around the page center so content stays centered on A3.
+        Must be paired with end_content_scale().
+        """
+        if abs(scale - 1.0) < 0.001:
+            return
+        self._content_scale = scale
+        # SVG scale around center: translate to center, scale, translate back
+        sy = self._page_height - page_cy  # flip Y for SVG
+        self._elements.append(
+            f'<g transform="translate({page_cx:.1f},{sy:.1f}) '
+            f'scale({scale}) '
+            f'translate({-page_cx:.1f},{-sy:.1f})">'
+        )
+
+    def end_content_scale(self) -> None:
+        """Close the content scale group."""
+        if hasattr(self, '_content_scale') and abs(self._content_scale - 1.0) >= 0.001:
+            self._elements.append('</g>')
+            self._content_scale = 1.0
+
     # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:

@@ -247,10 +247,18 @@ class SldPipeline:
             backends = [pdf, svg]
 
         # Render
+        _scale = layout_result.config.component_scale if layout_result.config else 1.0
+        _cx = pc.page_width / 2 if pc else 210.0
+        _cy = pc.page_height / 2 if pc else 148.5
         component_count = 0
         for backend in backends:
             draw_border(backend, page_config=pc)
             draw_title_block_frame(backend, tb_config=tb_config)
+
+            # Scale SLD content (symbols, connections, labels) uniformly.
+            # Border and title block are drawn at full size BEFORE this.
+            if hasattr(backend, 'begin_content_scale'):
+                backend.begin_content_scale(_scale, _cx, _cy)
 
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
@@ -260,6 +268,9 @@ class SldPipeline:
             self._draw_junction_arrows(backend, layout_result)
             self._draw_arrow_points(backend, layout_result)
             self._draw_solid_boxes(backend, layout_result)
+
+            if hasattr(backend, 'end_content_scale'):
+                backend.end_content_scale()
 
             fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
 

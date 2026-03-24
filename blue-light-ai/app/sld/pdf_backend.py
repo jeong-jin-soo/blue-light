@@ -80,6 +80,26 @@ class PdfBackend:
     def canvas(self) -> Canvas:
         return self._canvas
 
+    # -- Content scaling --
+
+    def begin_content_scale(self, scale: float, page_cx: float, page_cy: float) -> None:
+        """Apply uniform scale transform to subsequent drawing operations."""
+        self._content_scaled = abs(scale - 1.0) >= 0.001
+        if not self._content_scaled:
+            return
+        c = self._canvas
+        c.saveState()
+        c.translate(page_cx * mm, page_cy * mm)
+        c.scale(scale, scale)
+        c.translate(-page_cx * mm, -page_cy * mm)
+
+    def end_content_scale(self) -> None:
+        """Restore canvas state after content scaling."""
+        if getattr(self, '_content_scaled', False):
+            self._canvas.restoreState()
+            self._apply_layer_style()
+            self._content_scaled = False
+
     # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:

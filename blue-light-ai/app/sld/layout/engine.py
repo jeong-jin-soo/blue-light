@@ -88,6 +88,65 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
         config.leader_margin_above_db = 7.0    # was 10.0
 
 
+def _auto_component_scale(requirements: dict) -> float:
+    """Compute component scale for multi-DB layouts.
+
+    Dense multi-DB drawings need smaller symbols and text to fit on A3.
+    Only applies to multi-DB; single-DB uses multi-row for overflow.
+
+    Returns 1.0 for single-DB, <1.0 for multi-DB (e.g. 0.65 = 65% size).
+    """
+    dbs = requirements.get("distribution_boards", [])
+    if len(dbs) <= 1:
+        return 1.0
+
+    total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
+    total_circuits += sum(len(db.get("feeder_circuits", [])) for db in dbs)
+    has_ct = requirements.get("metering") == "ct_meter"
+    total_pgs = sum(len(db.get("protection_groups", [])) for db in dbs)
+
+    density = total_circuits + (len(dbs) - 1) * 8 + (10 if has_ct else 0) + total_pgs * 3
+
+    if density <= 30:
+        return 1.0
+    elif density <= 45:
+        return 0.9
+    elif density <= 60:
+        return 0.85
+    else:
+        return 0.8
+
+
+def _expand_layout_for_scale(config: "LayoutConfig", s: float) -> None:
+    """Expand layout boundaries so content fills A3 after render-time scaling.
+
+    The renderer shrinks all SLD content by factor `s` (e.g. 0.8 = 80%).
+    If we don't compensate, content only fills s² of the page area.
+    By expanding layout boundaries by 1/s, the content uses more virtual
+    space, and after scaling it maps back to full A3.
+
+    The scale transform is centered on the page center, so we expand
+    symmetrically from the center.
+    """
+    inv = 1.0 / s  # e.g. s=0.8 → inv=1.25
+
+    # Page center (the scale pivot point)
+    cx = (config.min_x + config.max_x) / 2
+    cy = (config.min_y + config.max_y) / 2
+
+    # Expand drawing boundaries symmetrically around center
+    half_w = (config.max_x - config.min_x) / 2
+    half_h = (config.max_y - config.min_y) / 2
+    config.min_x = cx - half_w * inv
+    config.max_x = cx + half_w * inv
+    config.min_y = cy - half_h * inv
+    config.max_y = cy + half_h * inv
+    config.start_x = cx  # keep centered
+    config.start_y = config.max_y - 7 * inv
+    config.drawing_width = config.max_x - config.min_x
+    config.drawing_height = config.max_y - config.min_y
+
+
 def compute_layout(
     requirements: dict,
     config: LayoutConfig | None = None,
@@ -136,27 +195,17 @@ def compute_layout(
         config.busbar_width_ratio = float(requirements["busbar_width_ratio"])
     if requirements.get("db_width_ratios"):
         config.db_width_ratios = requirements["db_width_ratios"]
+    # -- Component scale: smaller symbols/text for dense multi-DB layouts --
+    # The renderer applies a uniform scale(s) transform to all SLD content.
+    # To compensate, we EXPAND the layout boundaries by 1/s so that after
+    # rendering at scale s, the content fills the full A3 page.
     if requirements.get("component_scale"):
         s = float(requirements["component_scale"])
+    else:
+        s = _auto_component_scale(requirements)
+    if s != 1.0:
         config.component_scale = s
-        if s != 1.0:
-            # Scale symbol dimensions (layout spacing)
-            config.breaker_w *= s; config.breaker_h *= s
-            config.mcb_w *= s; config.mcb_h *= s
-            config.rccb_w *= s; config.rccb_h *= s
-            config.isolator_w *= s; config.isolator_h *= s
-            config.meter_size *= s; config.ct_size *= s
-            config.kwh_rect_w *= s; config.kwh_rect_h *= s
-            config.spine_component_gap *= s
-            config.busbar_to_breaker_gap *= s
-            config.tail_length *= s
-            config.horizontal_spacing *= s
-            config.min_horizontal_spacing *= s
-            config.max_horizontal_spacing *= s
-            config.vertical_spacing *= s
-            # Label sizes (layout collision detection uses these)
-            config.label_char_height *= s
-            config.char_w_label *= s
+        _expand_layout_for_scale(config, s)
 
     # -- Input validation gate (defense in depth) --
     if not skip_validation:
@@ -403,6 +452,9 @@ def compute_layout(
 
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
+
+        # Attach config for renderer access (component_scale, label constants)
+        merged.config = config
 
         # Post-layout: audit quality (read-only, no coordinate changes)
         from app.sld.layout.audit import audit_layout
@@ -691,9 +743,9 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # style where all circuits fit in one row with tight but readable spacing).
 
     gap_space = max(0, len(db_plans) - 1) * GAP_BETWEEN_DBS
-    # Apply component_scale to available width — smaller components use less page
-    _cs = config.component_scale
-    allocable = (avail_width - gap_space) * _cs
+    # Use FULL page width for allocation — component_scale shrinks symbols/text
+    # vertically but we want circuits to spread across the entire page width.
+    allocable = avail_width - gap_space
 
     # --- Helper: compute DB width at a given spacing ---
     # LEW reference: PG boundaries use ~3mm extra spacing (same as phase gaps),
