@@ -153,6 +153,15 @@ class DxfBackend:
         if close:
             pline.close()
 
+    def add_filled_polygon(
+        self,
+        points: list[tuple[float, float]],
+    ) -> None:
+        """Draw a filled polygon using HATCH with SOLID pattern."""
+        hatch = self._msp.add_hatch(dxfattribs={"layer": self._current_layer})
+        hatch.set_solid_fill()
+        hatch.paths.add_polyline_path([(p[0], p[1]) for p in points], is_closed=True)
+
     def add_circle(
         self,
         center: tuple[float, float],
@@ -349,6 +358,16 @@ class DxfBackend:
         self.set_layer("SLD_DB_FRAME")
         self.add_line(start, end)
         self._current_layer = prev_layer
+
+    def draw_short_dashed_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+    ) -> None:
+        """Draw a regular short-dashed line (e.g., SPARE conductor tails)."""
+        attribs = self._dxfattribs()
+        attribs["linetype"] = "DASHED"
+        self._msp.add_line(start, end, dxfattribs=attribs)
 
     def draw_fanout(
         self,

@@ -859,6 +859,11 @@ class SldPipeline:
         for start, end in layout_result.dashed_connections:
             backend.draw_center_line(start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
 
+        # Short-dashed lines (SPARE conductor tails etc.) — regular short dashes
+        backend.set_layer("SLD_POWER_MAIN")
+        for start, end in layout_result.short_dashed_connections:
+            backend.draw_short_dashed_line(start, end)
+
     def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw filled junction dots at busbar tap points."""
         backend.set_layer("SLD_SYMBOLS")

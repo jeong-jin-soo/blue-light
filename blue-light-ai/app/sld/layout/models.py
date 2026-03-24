@@ -516,6 +516,8 @@ class LayoutResult:
     connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     thick_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
+    # Short-dashed connections: regular short dashes (e.g., SPARE conductor tails)
+    short_dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     # Fixed connections: not affected by resolve_overlaps (e.g., VSS diagonal)
     fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     # Thick fixed connections: busbar-weight lines (lineweight=50), e.g., BI crossbar

@@ -362,17 +362,34 @@ def compute_layout(
                     else:
                         _remaining_circuits.append(sc)
 
-                # Auto-create feeder entries for child DBs not found in sub_circuits
+                # Auto-create feeder entries for child DBs not found in sub_circuits.
+                # Breaker spec comes from: child DB's feeder_breaker, parent DB's
+                # feeder_circuits list, or parent DB's feeder_breaker (in that order).
                 _found_feeders = {sc.get("_feeds_db", "").upper() for sc in _bi_xbar_circuits if sc.get("_is_feeder")}
+                _parent_feeder_circuits = db.get("feeder_circuits", [])
                 for _cdb in dbs:
                     _cdn = (_cdb.get("name") or _cdb.get("db_name") or "").upper()
                     if _cdn in _child_db_names and _cdn not in _found_feeders:
-                        # feeder_breaker can be on the child DB or on the parent DB
+                        # Try child DB's feeder_breaker first
                         _fb = _cdb.get("feeder_breaker", {})
+                        _cable = _cdb.get("incoming_cable", "")
                         if not _fb:
-                            # Check parent (current) DB for feeder_breaker to this child
+                            # Try parent DB's feeder_circuits for this target
+                            for _fc in _parent_feeder_circuits:
+                                _fc_target = (_fc.get("target_db") or "").upper()
+                                if _fc_target == _cdn:
+                                    _fb = {
+                                        "type": _fc.get("breaker_type", "MCB"),
+                                        "rating": _fc.get("breaker_rating", 0),
+                                        "characteristic": _fc.get("breaker_characteristic", ""),
+                                        "poles": _fc.get("poles", "TPN"),
+                                        "fault_kA": _fc.get("fault_kA", 10),
+                                    }
+                                    _cable = _cable or _fc.get("cable", "")
+                                    break
+                        if not _fb:
                             _fb = db.get("feeder_breaker", {})
-                        _cable = _cdb.get("incoming_cable", "") or _cdb.get("feeder_cable", "") or db.get("feeder_cable", "")
+                        _cable = _cable or db.get("feeder_cable", "")
                         _bi_xbar_circuits.append({
                             "id": _cdn,
                             "_is_feeder": True,
@@ -535,6 +552,7 @@ def _collect_content_extents(
         all_xs.append(jx)
         all_ys.append(jy)
     for collection in (result.connections, result.dashed_connections,
+                       result.short_dashed_connections,
                        result.thick_connections, result.fixed_connections):
         for (sx, sy), (ex, ey) in collection:
             all_xs.extend([sx, ex])
@@ -561,6 +579,8 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
         result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
         result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.short_dashed_connections):
+        result.short_dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
         result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
@@ -1051,6 +1071,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.connections.extend(source.connections)
     target.thick_connections.extend(source.thick_connections)
     target.dashed_connections.extend(source.dashed_connections)
+    target.short_dashed_connections.extend(source.short_dashed_connections)
     target.fixed_connections.extend(source.fixed_connections)
     target.thick_fixed_connections.extend(source.thick_fixed_connections)
     target.junction_dots.extend(source.junction_dots)
@@ -1394,30 +1415,26 @@ def _add_hierarchical_connections(
         child_cx = child.spine_x
 
         # Check if this child is fed from a BI crossbar circuit
-        # (feeder MCB already placed on crossbar — skip busbar-side feeder)
+        # (feeder MCB already placed on crossbar — skip busbar-side feeder).
+        # Per reference DWG: NO direct line between MSB feeder and DB2.
+        # Instead, DB2 shows independent incoming supply from below with
+        # "SUPPLY FROM MSB" label, cable tick, and cable spec.
         _xbar_exit = root_result.layout.crossbar_feeder_exits.get(child.board_name.upper())
         if _xbar_exit:
-            # Connection from crossbar feeder exit → child board top
-            xbar_x, xbar_y = _xbar_exit
+            # DB2 incoming supply: vertical line below DB box + labels
             child_top_y = child.db_box_start_y if child.db_box_start_y else child.busbar_y
-            # Diagonal/L-shaped cable run from crossbar exit to child spine
-            if abs(xbar_x - child_cx) > 1.0:
-                # L-shape: down from crossbar, horizontal to child spine, down to child
-                mid_y = xbar_y + 5
-                merged.connections.append(((xbar_x, xbar_y), (xbar_x, mid_y)))
-                merged.connections.append(((xbar_x, mid_y), (child_cx, mid_y)))
-                merged.connections.append(((child_cx, mid_y), (child_cx, child_top_y + 3)))
-            else:
-                merged.connections.append(((xbar_x, xbar_y), (child_cx, child_top_y + 3)))
+            _supply_line_bottom = child_top_y - 25  # line extends 25mm below DB box
 
-            # Supply label
-            _label_x = child_cx + 5
-            _label_y = child_top_y + 8
-            merged.components.append(PlacedComponent(
-                symbol_name="LABEL", x=_label_x, y=_label_y,
-                label=f"SUPPLY FROM {root_name}",
-            ))
-            # Cable spec label
+            # Vertical incoming line into DB2 box
+            merged.connections.append(((child_cx, _supply_line_bottom), (child_cx, child_top_y + 3)))
+
+            # Cable tick mark
+            _tick_y = _supply_line_bottom + 8
+            _tick_half = 1.5
+            merged.connections.append(((child_cx - _tick_half, _tick_y - _tick_half),
+                                       (child_cx + _tick_half, _tick_y + _tick_half)))
+
+            # Cable spec label (horizontal, right of tick)
             cable_text = ""
             if dbs:
                 for db in dbs:
@@ -1425,11 +1442,23 @@ def _add_hierarchical_connections(
                     if dn == child.board_name.upper():
                         cable_text = db.get("incoming_cable", "")
                         break
+            if not cable_text:
+                # Try feeder_circuits on parent
+                for fc in (dbs[root_result.board_idx].get("feeder_circuits", []) if dbs else []):
+                    if (fc.get("target_db") or "").upper() == child.board_name.upper():
+                        cable_text = fc.get("cable", "")
+                        break
             if cable_text:
                 merged.components.append(PlacedComponent(
-                    symbol_name="LABEL", x=_label_x, y=_label_y - 5,
+                    symbol_name="LABEL", x=child_cx + 5, y=_tick_y,
                     label=cable_text.upper(),
                 ))
+
+            # "SUPPLY FROM MSB" label below
+            merged.components.append(PlacedComponent(
+                symbol_name="LABEL", x=child_cx - 5, y=_supply_line_bottom - 3,
+                label=f"SUPPLY FROM {root_name}",
+            ))
             continue  # Skip normal busbar-side feeder placement
 
         # Find feeder circuit for this child

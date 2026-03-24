@@ -158,6 +158,15 @@ class SvgBackend:
         else:
             self._elements.append(f'<polyline points="{pts_str}" {stroke_attr} />')
 
+    def add_filled_polygon(
+        self,
+        points: list[tuple[float, float]],
+    ) -> None:
+        """Draw a filled polygon (solid black fill)."""
+        pts_str = " ".join(f"{p[0]:.2f},{self._flip_y(p[1]):.2f}" for p in points)
+        color = _LAYER_COLORS.get(self._current_layer, "#000000")
+        self._elements.append(f'<polygon points="{pts_str}" stroke="{color}" stroke-width="0.25" fill="{color}" />')
+
     def add_circle(
         self,
         center: tuple[float, float],
@@ -372,6 +381,20 @@ class SvgBackend:
             step_idx += 1
 
         self.set_layer(prev_layer)
+
+    def draw_short_dashed_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+    ) -> None:
+        """Draw a regular short-dashed line (e.g., SPARE conductor tails)."""
+        x1, y1 = start[0], self._flip_y(start[1])
+        x2, y2 = end[0], self._flip_y(end[1])
+        color = _LAYER_COLORS.get(self._current_layer, "#000000")
+        self._elements.append(
+            f'<line x1="{x1:.2f}" y1="{y1:.2f}" x2="{x2:.2f}" y2="{y2:.2f}" '
+            f'stroke="{color}" stroke-width="0.25" stroke-dasharray="2,2" />'
+        )
 
     def draw_fanout(
         self,

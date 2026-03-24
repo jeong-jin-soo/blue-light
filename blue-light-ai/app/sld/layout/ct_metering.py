@@ -560,45 +560,85 @@ def _place_bi_crossbar_circuits(
         tail_top_y = max(mcb_top_pin_y + 12, _target_top_y)
 
         if is_spare:
-            # SPARE: dashed tail line + "SPARE" label (no cable tick)
-            result.dashed_connections.append(((ckt_x, mcb_top_pin_y), (ckt_x, tail_top_y)))
+            # SPARE: short-dashed tail line + "SPARE" label (no cable tick)
+            result.short_dashed_connections.append(((ckt_x, mcb_top_pin_y), (ckt_x, tail_top_y)))
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
                 x=ckt_x - 3,
-                y=tail_top_y + 2,
+                y=tail_top_y + 5,
                 label="SPARE",
             ))
         else:
-            # Solid tail line
-            result.connections.append(((ckt_x, mcb_top_pin_y), (ckt_x, tail_top_y)))
+            # Solid tail line — stop at feeder symbol bottom if present
+            _tail_end = tail_top_y
+            if is_feeder:
+                _tail_end = tail_top_y  # feeder symbol sits ON tail_top_y; its stub connects
+            result.connections.append(((ckt_x, mcb_top_pin_y), (ckt_x, _tail_end)))
 
             # Cable tick + cable spec label
             cable_spec = ckt.get("cable", "")
             if not cable_spec and is_feeder:
                 cable_spec = ckt.get("incoming_cable", "")
             if cable_spec:
-                _tick_y = mcb_top_pin_y + 4
-                _tick_half = 1.5
-                result.connections.append(((ckt_x - _tick_half, _tick_y - _tick_half),
-                                           (ckt_x + _tick_half, _tick_y + _tick_half)))
-                result.components.append(PlacedComponent(
-                    symbol_name="LABEL",
-                    x=ckt_x - 5,
-                    y=_tick_y + 2,
-                    label=cable_spec.upper(),
-                    rotation=90.0,
-                ))
+                if is_feeder:
+                    # Feeder: tick + leader line below feeder symbol,
+                    # between symbol bottom and DB box top boundary
+                    _tick_y = tail_top_y - 4
+                    _tick_half = 1.5
+                    result.connections.append(((ckt_x - _tick_half, _tick_y - _tick_half),
+                                               (ckt_x + _tick_half, _tick_y + _tick_half)))
+                    # Horizontal leader line from tick to the right
+                    _leader_len = 8.0
+                    result.connections.append(((ckt_x, _tick_y),
+                                               (ckt_x + _leader_len, _tick_y)))
+                    # Cable spec text above leader line
+                    result.components.append(PlacedComponent(
+                        symbol_name="LABEL",
+                        x=ckt_x + _leader_len + 1,
+                        y=_tick_y,
+                        label=cable_spec.upper(),
+                        rotation=90.0,
+                    ))
+                else:
+                    # Normal crossbar circuit: tick near MCB with rotated label
+                    _tick_y = mcb_top_pin_y + 4
+                    _tick_half = 1.5
+                    result.connections.append(((ckt_x - _tick_half, _tick_y - _tick_half),
+                                               (ckt_x + _tick_half, _tick_y + _tick_half)))
+                    result.components.append(PlacedComponent(
+                        symbol_name="LABEL",
+                        x=ckt_x - 5,
+                        y=_tick_y + 2,
+                        label=cable_spec.upper(),
+                        rotation=90.0,
+                    ))
 
-            # Load label at top (DB name for feeders, load description for others)
+            # Feeder destination: FEEDER_POINT symbol + DB name label
+            # Per reference DXF: rectangle with half-filled triangle (7×3.2mm),
+            # positioned on conductor with "DB2" label to the left.
             if is_feeder:
                 feeds_db = ckt.get("_feeds_db", ckt_id)
+                _fp_w = 7.0
+                _fp_h = 3.2
+                # Place at top of feeder line — bottom edge at tail_top_y
+                _fp_y = tail_top_y
+                result.components.append(PlacedComponent(
+                    symbol_name="FEEDER_POINT",
+                    x=ckt_x - _fp_w / 2,
+                    y=_fp_y,
+                    label="",
+                ))
+                result.symbols_used.add("FEEDER_POINT")
+                # DB name label above feeder symbol, vertical (90° rotation)
+                # Offset x by -char_height so label center aligns with symbol center
+                _label_ch = 2.5  # approx LayoutConfig.label_char_height
                 result.components.append(PlacedComponent(
                     symbol_name="LABEL",
-                    x=ckt_x - 3,
-                    y=tail_top_y + 2,
+                    x=ckt_x - _label_ch,
+                    y=_fp_y + _fp_h + 2,
                     label=feeds_db,
+                    rotation=90.0,
                 ))
-                result.arrow_points.append((ckt_x, tail_top_y))
                 result.crossbar_feeder_exits[feeds_db.upper()] = (ckt_x, tail_top_y)
             else:
                 load_desc = ckt.get("load", "")
