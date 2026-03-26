@@ -102,6 +102,10 @@ def _auto_component_scale(requirements: dict) -> float:
 
     total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
     total_circuits += sum(len(db.get("feeder_circuits", [])) for db in dbs)
+    # Include circuits inside protection_groups (not counted in sub_circuits)
+    for db in dbs:
+        for pg in db.get("protection_groups", []):
+            total_circuits += len(pg.get("circuits", []))
     has_ct = requirements.get("metering") == "ct_meter"
     total_pgs = sum(len(db.get("protection_groups", [])) for db in dbs)
 
