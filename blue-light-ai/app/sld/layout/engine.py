@@ -770,7 +770,7 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # --- Helper: compute DB width at a given spacing ---
     # LEW reference: PG boundaries use ~3mm extra spacing (same as phase gaps),
     # not large physical gaps.  Keep tight to avoid inflating DB2 width.
-    PG_GAP = 3.0         # mm gap between protection groups (synced with _place_protection_groups)
+    PG_GAP = 15.0        # mm gap between protection groups (ref I2R-ETR-NLB: ~15mm)
     PG_MARGIN = 1.0      # mm margin per PG side (minimal busbar-end clearance)
 
     def _db_width_at_spacing(p: DBPlan, spacing: float) -> float:
@@ -1966,7 +1966,8 @@ def _place_protection_groups(
         group_circuit_counts.append(max(n, 1))
 
     total_circuits = sum(group_circuit_counts)
-    gap = 8  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
+    # Inter-group gap: reference shows ~15mm between PG sub-busbars
+    gap = 15  # mm gap between groups (ref I2R-ETR-NLB: 14.8~16mm)
     # Minimal margins for protection groups (1mm per side = 2mm total per group)
     pg_margin = 1  # mm per side for each group busbar
     margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * gap
@@ -1976,6 +1977,12 @@ def _place_protection_groups(
     # Direct spacing: divide available space among circuits
     direct_spacing = usable_for_circuits / max(total_circuits, 1)
     overall_spacing = max(3.0, min(direct_spacing, config.max_horizontal_spacing))
+    logger.info(
+        "PG allocation: db_avail=%.1fmm, %d groups, %d circuits, "
+        "gap=%dmm, spacing=%.1fmm, usable=%.1fmm",
+        db_available_width, num_groups, total_circuits,
+        gap, overall_spacing, usable_for_circuits,
+    )
 
     # Distribute width proportionally per group
     group_widths = []
