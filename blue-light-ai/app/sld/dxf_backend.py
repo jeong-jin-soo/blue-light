@@ -440,32 +440,42 @@ class DxfBackend:
         Convert DXF to PDF using ezdxf's PyMuPDF rendering backend.
 
         Returns PDF bytes suitable for EMA submission.
+        White background, black foreground, A3 landscape.
         """
         try:
-            from ezdxf.addons.drawing import Frontend, RenderContext
+            from ezdxf.addons.drawing import Frontend, RenderContext, layout
             from ezdxf.addons.drawing.pymupdf import PyMuPdfBackend
+            from ezdxf.addons.drawing.config import (
+                Configuration, ColorPolicy, LinePolicy, BackgroundPolicy,
+            )
         except ImportError:
-            logger.error("ezdxf PyMuPDF backend not available. Install with: pip install ezdxf[draw]")
+            logger.error(
+                "ezdxf drawing backends not available. "
+                "Install with: pip install 'ezdxf[draw]' PyMuPDF"
+            )
             raise
 
-        import fitz  # PyMuPDF
+        config = Configuration(
+            color_policy=ColorPolicy.BLACK,
+            background_policy=BackgroundPolicy.WHITE,
+            custom_bg_color="#FFFFFF",
+            custom_fg_color="#000000",
+            lineweight_scaling=1.0,
+            line_policy=LinePolicy.ACCURATE,
+        )
 
         ctx = RenderContext(self._doc)
-        # Page dimensions → points (1mm = 2.8346pt)
-        page_width_pt = self._page_config.page_width * 2.8346
-        page_height_pt = self._page_config.page_height * 2.8346
-
-        pdf_doc = fitz.open()
-        page = pdf_doc.new_page(width=page_width_pt, height=page_height_pt)
-
-        out = PyMuPdfBackend(page)
-        frontend = Frontend(ctx, out)
+        backend = PyMuPdfBackend()
+        frontend = Frontend(ctx, backend, config=config)
         frontend.draw_layout(self._msp)
-        out.finalize()
 
-        pdf_bytes = pdf_doc.tobytes()
-        pdf_doc.close()
-        return pdf_bytes
+        page = layout.Page(
+            self._page_config.page_width,
+            self._page_config.page_height,
+            layout.Units.mm,
+        )
+        settings = layout.Settings(fit_page=True)
+        return backend.get_pdf_bytes(page, settings=settings)
 
     def to_svg_string(self) -> str:
         """
@@ -474,23 +484,34 @@ class DxfBackend:
         Returns SVG string for web preview.
         """
         try:
-            from ezdxf.addons.drawing import Frontend, RenderContext
-            from ezdxf.addons.drawing.svg import SVGBackend
+            from ezdxf.addons.drawing import Frontend, RenderContext, layout
+            from ezdxf.addons.drawing.svg import SVGBackend as EzdxfSVGBackend
+            from ezdxf.addons.drawing.config import (
+                Configuration, ColorPolicy, BackgroundPolicy,
+            )
         except ImportError:
             logger.error("ezdxf SVG backend not available.")
             raise
 
+        config = Configuration(
+            color_policy=ColorPolicy.BLACK,
+            background_policy=BackgroundPolicy.WHITE,
+            custom_bg_color="#FFFFFF",
+            custom_fg_color="#000000",
+        )
+
         ctx = RenderContext(self._doc)
-        out = SVGBackend()
-        frontend = Frontend(ctx, out)
+        backend = EzdxfSVGBackend()
+        frontend = Frontend(ctx, backend, config=config)
         frontend.draw_layout(self._msp)
 
-        # Get SVG element from backend
-        svg_element = out.get_svg_document(
-            width=_PAGE_WIDTH,
-            height=_PAGE_HEIGHT,
+        page = layout.Page(
+            self._page_config.page_width,
+            self._page_config.page_height,
+            layout.Units.mm,
         )
-        return svg_element.tostring().decode("utf-8") if hasattr(svg_element, 'tostring') else str(svg_element)
+        settings = layout.Settings(fit_page=True)
+        return backend.get_string(page, settings=settings)
 
     @property
     def doc(self) -> ezdxf.document.Drawing:
