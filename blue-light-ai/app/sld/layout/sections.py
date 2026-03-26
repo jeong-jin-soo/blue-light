@@ -929,8 +929,14 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
     result.busbar_end_x = bus_end_x
     result.busbar_visual_end_x = _visual_bus_end_x
 
-    # ≤500A → "COMB BAR", >500A → "BUSBAR" (LEW convention per reference DWGs)
-    busbar_type = SG_LOCALE.circuit.comb_busbar if busbar_rating <= 500 else SG_LOCALE.circuit.busbar
+    # Busbar label: requirements can override with busbar_label_type
+    # Default "BUSBAR" (matches majority of real LEW DWGs).
+    # Legacy "COMB BAR" available via busbar_label_type="COMB BAR".
+    _custom_type = ctx.requirements.get("busbar_label_type", "")
+    if _custom_type:
+        busbar_type = _custom_type
+    else:
+        busbar_type = SG_LOCALE.circuit.busbar  # "BUSBAR"
     busbar_label = f"{busbar_rating}A {busbar_type}"
     result.components.append(PlacedComponent(
         symbol_name="BUSBAR",

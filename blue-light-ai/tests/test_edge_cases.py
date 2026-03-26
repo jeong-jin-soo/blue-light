@@ -27,6 +27,7 @@ def _make_req(
     main_breaker: dict | None = None,
     elcb: dict | None = None,
     sub_circuits: list[dict] | None = None,
+    **kwargs,
 ) -> dict:
     """Build a minimal requirements dict."""
     if main_breaker is None:
@@ -38,6 +39,7 @@ def _make_req(
         "main_breaker": main_breaker,
         "busbar_rating": busbar_rating,
         "sub_circuits": sub_circuits or [],
+        **kwargs,
     }
     if elcb:
         req["elcb"] = elcb
@@ -103,8 +105,8 @@ class TestMinimumCircuit:
 class TestBusbarThreshold:
     """Test busbar labels: ≤500A → COMB BAR, >500A → BUSBAR (LEW convention)."""
 
-    def test_busbar_63a_is_comb_bar(self):
-        """busbar_rating=63 (≤500A) → 'COMB BAR' label."""
+    def test_busbar_63a_default_label(self):
+        """busbar_rating=63 → 'BUSBAR' label (default per real LEW DWGs)."""
         req = _make_req(
             supply_type="single_phase",
             kva=14,
@@ -116,12 +118,12 @@ class TestBusbarThreshold:
         layout = compute_layout(req)
         labels = [c for c in layout.components
                   if c.symbol_name == "LABEL" and "63A" in (c.label or "")]
-        comb_labels = [l for l in labels if "COMB BAR" in (l.label or "")]
-        assert len(comb_labels) >= 1, \
-            "63A should use COMB BAR label (≤500A LEW convention)"
+        busbar_labels = [l for l in labels if "BUSBAR" in (l.label or "")]
+        assert len(busbar_labels) >= 1, \
+            "63A should use BUSBAR label (default)"
 
-    def test_busbar_100a_is_comb_bar(self):
-        """busbar_rating=100 (≤500A) → 'COMB BAR' label."""
+    def test_busbar_100a_default_label(self):
+        """busbar_rating=100 → 'BUSBAR' label (default per real LEW DWGs)."""
         req = _make_req(
             supply_type="three_phase",
             kva=69,
@@ -133,8 +135,25 @@ class TestBusbarThreshold:
         layout = compute_layout(req)
         labels = [c for c in layout.components
                   if c.symbol_name == "LABEL" and "100A" in (c.label or "")]
+        busbar_labels = [l for l in labels if "BUSBAR" in (l.label or "")]
+        assert len(busbar_labels) >= 1, "100A should use BUSBAR label (default)"
+
+    def test_busbar_comb_bar_override(self):
+        """busbar_label_type='COMB BAR' → uses 'COMB BAR' label."""
+        req = _make_req(
+            supply_type="single_phase",
+            kva=14,
+            voltage=230,
+            busbar_rating=63,
+            busbar_label_type="COMB BAR",
+            main_breaker={"type": "MCB", "rating": 63, "poles": "DP", "fault_kA": 6},
+            sub_circuits=_make_circuits(3),
+        )
+        layout = compute_layout(req)
+        labels = [c for c in layout.components
+                  if c.symbol_name == "LABEL" and "63A" in (c.label or "")]
         comb_labels = [l for l in labels if "COMB BAR" in (l.label or "")]
-        assert len(comb_labels) >= 1, "100A should use COMB BAR label (≤500A LEW convention)"
+        assert len(comb_labels) >= 1, "Should use COMB BAR when explicitly specified"
 
 
 # ===========================================================================

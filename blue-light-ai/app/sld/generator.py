@@ -408,12 +408,14 @@ class SldPipeline:
             (bus_end, comp.y),
             lineweight=50,
         )
-        if comp.rating:
+        # Busbar label: use comp.rating (legacy) or comp.label (PG sub-busbars)
+        _busbar_text = comp.rating or comp.label or ""
+        if _busbar_text:
             _cfg = layout_result.config or LayoutConfig()
             backend.set_layer("SLD_ANNOTATIONS")
             backend.add_mtext(
-                comp.rating,
-                insert=(bus_end - _cfg.busbar_rating_x_inset, comp.y + _cfg.busbar_rating_y),
+                _busbar_text,
+                insert=(bus_start + 3, comp.y + _cfg.busbar_rating_y),
                 char_height=_cfg.label_ch_busbar_rating,
             )
 
