@@ -30,42 +30,45 @@ logger = logging.getLogger(__name__)
 _PAGE_WIDTH = 420.0
 _PAGE_HEIGHT = 297.0
 
-# DXF layer names following i2R LEW convention (E-SLD-* prefix)
-# Discovered from analysis of 28 DXF templates from LEW submissions.
-# ACI color 7 = white (on black background) / black (on white paper, i.e., print)
+# DXF layer names matching AutoCAD LEW reference (I2R-ETR-NLB-SLD-1.dxf)
+# ACI color 2 = yellow (symbol blocks), ACI 7 = white/black, ACI 8 = gray
 _LAYER_CONFIG: dict[str, dict] = {
-    "E-SLD-SYM": {"color": 7, "lineweight": 25},         # symbol/block inserts
-    "E-SLD-LINE": {"color": 7, "lineweight": 25},        # connection lines, spine
-    "E-SLD-BUSBAR": {"color": 7, "lineweight": 50},      # busbar (0.50mm)
-    "E-SLD-TXT": {"color": 7, "lineweight": 25},         # text labels
-    "E-SLD-TITLE": {"color": 7, "lineweight": 25},       # title block
-    "E-SLD-BOX": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # dashed boxes (DB frame)
-    "E-SLD-FRAME": {"color": 7, "lineweight": 25},       # drawing border/frame
+    "SLD": {"color": 2, "lineweight": 25},                # symbol/block inserts (yellow)
+    "SLD-LINE": {"color": 7, "lineweight": 25},           # connection lines, spine
+    "SLD-TXT": {"color": 7, "lineweight": 25},            # text labels
+    "TXT": {"color": 7, "lineweight": 25},                # title block text
+    "E-SLD-LEGENDF": {"color": 2, "lineweight": 25},      # symbol legend (yellow)
+    "E-SLD-BOX": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # dashed boxes
+    "E-SLD-FRAME": {"color": 8, "lineweight": 25},        # drawing border/frame
 }
 
-# Mapping from logical layer names (used by symbols/generator) to DXF layer names.
-# This allows all backends to share the same set_layer("SLD_*") calls while
-# the DXF backend outputs the i2R-convention layer names.
+# Mapping from logical layer names to DXF layer names.
 _LOGICAL_TO_DXF_LAYER: dict[str, str] = {
-    "SLD_SYMBOLS": "E-SLD-SYM",
-    "SLD_CONNECTIONS": "E-SLD-LINE",
-    "SLD_POWER_MAIN": "E-SLD-BUSBAR",
-    "SLD_ANNOTATIONS": "E-SLD-TXT",
-    "SLD_TITLE_BLOCK": "E-SLD-TITLE",
+    "SLD_SYMBOLS": "SLD",
+    "SLD_CONNECTIONS": "SLD-LINE",
+    "SLD_POWER_MAIN": "SLD-LINE",          # busbar uses SLD-LINE with heavier lineweight
+    "SLD_ANNOTATIONS": "SLD-TXT",
+    "SLD_TITLE_BLOCK": "TXT",
     "SLD_DB_FRAME": "E-SLD-BOX",
     "SLD_FRAME": "E-SLD-FRAME",
-    # Direct E-SLD-* names also accepted (identity mapping)
-    "E-SLD-SYM": "E-SLD-SYM",
-    "E-SLD-LINE": "E-SLD-LINE",
-    "E-SLD-BUSBAR": "E-SLD-BUSBAR",
-    "E-SLD-TXT": "E-SLD-TXT",
-    "E-SLD-TITLE": "E-SLD-TITLE",
+    # Direct names accepted
+    "SLD": "SLD",
+    "SLD-LINE": "SLD-LINE",
+    "SLD-TXT": "SLD-TXT",
+    "TXT": "TXT",
+    "E-SLD-LEGENDF": "E-SLD-LEGENDF",
     "E-SLD-BOX": "E-SLD-BOX",
     "E-SLD-FRAME": "E-SLD-FRAME",
+    # Legacy names for backward compat
+    "E-SLD-SYM": "SLD",
+    "E-SLD-LINE": "SLD-LINE",
+    "E-SLD-BUSBAR": "SLD-LINE",
+    "E-SLD-TXT": "SLD-TXT",
+    "E-SLD-TITLE": "TXT",
 }
 
-# Text style name
-_TEXT_STYLE = "REAL_SLD"
+# Text style name — matches LEW AutoCAD reference (romans.shx, width 0.75)
+_TEXT_STYLE = "SLD-TXT"
 
 
 class DxfBackend:
@@ -78,8 +81,10 @@ class DxfBackend:
 
     def __init__(self, page_config: PageConfig | None = None):
         self._page_config = page_config or A3_LANDSCAPE
-        self._doc = ezdxf.new("R2013")  # AutoCAD 2013 format for broad compatibility
+        self._doc = ezdxf.new("R2018")  # AutoCAD 2018 (AC1032, matches LEW reference)
         self._doc.units = units.MM
+        self._doc.header['$PSLTSCALE'] = 0    # Paper space linetype scale disabled
+        self._doc.header['$TEXTSIZE'] = 2.5
         self._msp = self._doc.modelspace()
         self._current_layer = _LOGICAL_TO_DXF_LAYER["SLD_SYMBOLS"]
         # Content scale: virtual→physical coordinate transform
@@ -89,15 +94,28 @@ class DxfBackend:
 
         self._setup_layers()
         self._setup_text_style()
+        self._setup_dimstyle()
+
+    def _setup_dimstyle(self) -> None:
+        """Set up dimension style for LEADER entities (matches reference dimstyle 'A')."""
+        ds = self._doc.dimstyles.new("A")
+        ds.dxf.dimasz = 1.5
+        ds.dxf.dimtxt = 1.8
+        ds.dxf.dimgap = 0.9
 
     def _setup_layers(self) -> None:
-        """Create DXF layers matching real LEW SLD style."""
-        # Register CENTER linetype if any layer needs it (ref: E-SLD-FRAME uses CENTER)
+        """Create DXF layers matching AutoCAD LEW reference."""
         if "CENTER" not in self._doc.linetypes:
             self._doc.linetypes.add(
                 "CENTER",
                 pattern=[1.25, 0.75, -0.125, 0.25, -0.125],
                 description="Center ____ _ ____ _ ____",
+            )
+        if "DASHED" not in self._doc.linetypes:
+            self._doc.linetypes.add(
+                "DASHED",
+                pattern=[0.75, 0.5, -0.25],
+                description="Dashed __ __ __ __ __",
             )
         for name, cfg in _LAYER_CONFIG.items():
             layer = self._doc.layers.add(
@@ -109,12 +127,15 @@ class DxfBackend:
                 layer.dxf.linetype = cfg["linetype"]
 
     def _setup_text_style(self) -> None:
-        """Set up Arial TrueType text style (matches ArialMT in real samples)."""
-        self._doc.styles.add(
-            _TEXT_STYLE,
-            font="Arial",
-            dxfattribs={"flags": 0},
-        )
+        """Set up text styles matching LEW AutoCAD reference."""
+        styles = self._doc.styles
+        styles.add("SLD-TXT", font="romans.shx", dxfattribs={"width": 0.75})
+        styles.add("ARIAL", font="arial.ttf", dxfattribs={"width": 0.95})
+        styles.add("SIMPLEX", font="simplex.shx", dxfattribs={"width": 0.75})
+        styles.add("TAHOMA", font="tahoma.ttf", dxfattribs={"width": 0.9})
+        std = styles.get("Standard")
+        std.dxf.font = "arial.ttf"
+        self._doc.header['$TEXTSTYLE'] = _TEXT_STYLE
 
     def _dxfattribs(self, **extra) -> dict:
         """Build common dxfattribs dict for current layer."""
@@ -160,6 +181,9 @@ class DxfBackend:
         *,
         lineweight: int | None = None,
     ) -> None:
+        # Guard against zero-length lines (causes AutoCAD AUDIT warnings)
+        if abs(start[0]-end[0]) < 0.001 and abs(start[1]-end[1]) < 0.001:
+            return
         attribs = self._dxfattribs()
         if lineweight is not None:
             attribs["lineweight"] = lineweight
@@ -221,6 +245,7 @@ class DxfBackend:
         char_height: float = 3.0,
         rotation: float = 0.0,
         center_across: bool = False,
+        width_factor: float = 0.0,
     ) -> None:
         """
         Draw multiline text using MTEXT entity.
@@ -230,13 +255,14 @@ class DxfBackend:
             insert: Position (x, y) in mm — top-left anchor.
             char_height: Character height in mm.
             rotation: Text rotation in degrees CCW.
-            center_across: If True, center text block across the rotation axis
-                (MIDDLE_LEFT attachment). For rotation=90° with 1 line,
-                the line center aligns with insert_x. For 2 lines, the
-                midpoint between lines aligns with insert_x.
+            center_across: If True, center text block across the rotation axis.
+            width_factor: If > 0, wrap text in \\W code (e.g., 0.65 = 65% width).
         """
         if not isinstance(text, str):
             text = str(text)
+
+        if width_factor > 0:
+            text = f"{{\\W{width_factor};{text}}}"
 
         attribs = self._dxfattribs()
 
@@ -259,20 +285,9 @@ class DxfBackend:
         *,
         fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
     ) -> None:
-        """Draw a filled rectangle using HATCH entity."""
-        attribs = self._dxfattribs()
-        s = self._content_scale
-        hatch = self._msp.add_hatch(color=0, dxfattribs=attribs)  # ACI 0 = BYBLOCK
-        hatch.set_solid_fill()
-        hatch.paths.add_polyline_path(
-            [
-                self._tx(x, y),
-                self._tx(x + width, y),
-                self._tx(x + width, y + height),
-                self._tx(x, y + height),
-            ],
-            is_closed=True,
-        )
+        """Draw a filled rectangle — DXF uses outline only (minimize HATCH for AutoCAD)."""
+        pts = [(x, y), (x + width, y), (x + width, y + height), (x, y + height)]
+        self.add_lwpolyline(pts, close=True)
 
     def add_filled_circle(
         self,
@@ -281,18 +296,8 @@ class DxfBackend:
         *,
         fill_color: tuple[float, float, float] | str = (0.0, 0.0, 0.0),
     ) -> None:
-        """Draw a filled circle using HATCH entity."""
-        attribs = self._dxfattribs()
-
-        hatch = self._msp.add_hatch(color=0, dxfattribs=attribs)
-        hatch.set_solid_fill()
-        edge_path = hatch.paths.add_edge_path()
-        edge_path.add_arc(
-            center=self._tx(*center),
-            radius=radius * self._content_scale,
-            start_angle=0,
-            end_angle=360,
-        )
+        """Draw a filled circle — DXF uses outline only (minimize HATCH for AutoCAD)."""
+        self.add_circle(center, radius)
 
     # -- DXF block import (native CAD symbol quality) --
 
@@ -423,7 +428,7 @@ class DxfBackend:
         if block_name not in self._doc.blocks:
             # Block origin = (0, 0) at center busbar junction
             block = self._doc.blocks.new(name=block_name)
-            layer = "E-SLD-LINE"
+            layer = "SLD-LINE"
             attribs = {"layer": layer, "lineweight": 25}
 
             # Center vertical: busbar → MCB entry pin
@@ -445,21 +450,67 @@ class DxfBackend:
             block_name,
             insert=(tx, ty),
             dxfattribs={
-                "layer": "E-SLD-LINE",
+                "layer": "SLD-LINE",
                 "xscale": s,
                 "yscale": s,
             },
+        )
+
+    # -- Paper Space --
+
+    def setup_paper_space(self) -> None:
+        """Create A3 landscape Paper Space layout with viewport into Model Space."""
+        try:
+            layout = self._doc.layouts.get("Layout1")
+        except KeyError:
+            layout = self._doc.layouts.new("Layout1")
+
+        min_x, min_y = float('inf'), float('inf')
+        max_x, max_y = float('-inf'), float('-inf')
+        for e in self._msp:
+            if e.dxftype() == 'LINE':
+                for pt in [e.dxf.start, e.dxf.end]:
+                    min_x, min_y = min(min_x, pt[0]), min(min_y, pt[1])
+                    max_x, max_y = max(max_x, pt[0]), max(max_y, pt[1])
+            elif hasattr(e.dxf, 'insert'):
+                min_x = min(min_x, e.dxf.insert[0])
+                min_y = min(min_y, e.dxf.insert[1])
+                max_x = max(max_x, e.dxf.insert[0])
+                max_y = max(max_y, e.dxf.insert[1])
+
+        if min_x == float('inf'):
+            return
+
+        ms_cx = (min_x + max_x) / 2
+        ms_cy = (min_y + max_y) / 2
+        ms_h = max_y - min_y
+        ms_w = max_x - min_x
+
+        pw = self._page_config.page_width
+        ph = self._page_config.page_height
+        margin = 10.0
+        vp_w, vp_h = pw - 2 * margin, ph - 2 * margin
+
+        scale_x = ms_w / vp_w if ms_w > 0 else 1
+        scale_y = ms_h / vp_h if ms_h > 0 else 1
+        view_height = ms_h * max(scale_x / scale_y, 1.0) if scale_y > scale_x else ms_h
+
+        layout.add_viewport(
+            center=(pw / 2, ph / 2), size=(vp_w, vp_h),
+            view_center_point=(ms_cx, ms_cy), view_height=view_height, status=1,
         )
 
     # -- Output --
 
     def save(self, path: str) -> None:
         """Save the DXF document to a file."""
+        self.setup_paper_space()
         self._doc.saveas(path)
         logger.info(f"DXF saved: {path}")
 
     def get_bytes(self) -> bytes:
         """Get the DXF document as bytes (in-memory)."""
+        self.setup_paper_space()
         stream = io.StringIO()
         self._doc.write(stream)
         return stream.getvalue().encode("utf-8")
