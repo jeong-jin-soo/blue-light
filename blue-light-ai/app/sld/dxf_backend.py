@@ -82,6 +82,10 @@ class DxfBackend:
         self._doc.units = units.MM
         self._msp = self._doc.modelspace()
         self._current_layer = _LOGICAL_TO_DXF_LAYER["SLD_SYMBOLS"]
+        # Content scale: virtual→physical coordinate transform
+        self._content_scale = 1.0
+        self._scale_cx = 210.0
+        self._scale_cy = 148.5
 
         self._setup_layers()
         self._setup_text_style()
@@ -118,6 +122,30 @@ class DxfBackend:
         attribs.update(extra)
         return attribs
 
+    # -- Content scale (virtual→physical coordinate transform) --
+
+    def begin_content_scale(self, scale: float, page_cx: float, page_cy: float) -> None:
+        """Apply uniform scale transform for SLD content.
+
+        The layout engine expands boundaries by 1/scale so content fills A3 after scaling.
+        SVG/PDF backends use a group transform; DXF applies per-entity coordinate transform.
+        """
+        self._content_scale = scale
+        self._scale_cx = page_cx
+        self._scale_cy = page_cy
+
+    def end_content_scale(self) -> None:
+        """Reset content scale to 1:1."""
+        self._content_scale = 1.0
+
+    def _tx(self, x: float, y: float) -> tuple[float, float]:
+        """Transform virtual coordinates to physical page coordinates."""
+        s = self._content_scale
+        if abs(s - 1.0) < 0.001:
+            return (x, y)
+        cx, cy = self._scale_cx, self._scale_cy
+        return (cx + (x - cx) * s, cy + (y - cy) * s)
+
     # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:
@@ -135,7 +163,7 @@ class DxfBackend:
         attribs = self._dxfattribs()
         if lineweight is not None:
             attribs["lineweight"] = lineweight
-        self._msp.add_line(start, end, dxfattribs=attribs)
+        self._msp.add_line(self._tx(*start), self._tx(*end), dxfattribs=attribs)
 
     def add_lwpolyline(
         self,
@@ -149,7 +177,7 @@ class DxfBackend:
         attribs = self._dxfattribs()
         if lineweight is not None:
             attribs["lineweight"] = lineweight
-        pline = self._msp.add_lwpolyline(points, dxfattribs=attribs)
+        pline = self._msp.add_lwpolyline([self._tx(*p) for p in points], dxfattribs=attribs)
         if close:
             pline.close()
 
@@ -160,14 +188,14 @@ class DxfBackend:
         """Draw a filled polygon using HATCH with SOLID pattern."""
         hatch = self._msp.add_hatch(dxfattribs={"layer": self._current_layer})
         hatch.set_solid_fill()
-        hatch.paths.add_polyline_path([(p[0], p[1]) for p in points], is_closed=True)
+        hatch.paths.add_polyline_path([self._tx(p[0], p[1]) for p in points], is_closed=True)
 
     def add_circle(
         self,
         center: tuple[float, float],
         radius: float,
     ) -> None:
-        self._msp.add_circle(center, radius, dxfattribs=self._dxfattribs())
+        self._msp.add_circle(self._tx(*center), radius * self._content_scale, dxfattribs=self._dxfattribs())
 
     def add_arc(
         self,
@@ -178,8 +206,8 @@ class DxfBackend:
     ) -> None:
         """Draw an arc. Angles in degrees, CCW from positive X-axis (DXF native convention)."""
         self._msp.add_arc(
-            center,
-            radius,
+            self._tx(*center),
+            radius * self._content_scale,
             start_angle,
             end_angle,
             dxfattribs=self._dxfattribs(),
@@ -213,8 +241,8 @@ class DxfBackend:
         attribs = self._dxfattribs()
 
         mtext = self._msp.add_mtext(text, dxfattribs=attribs)
-        mtext.dxf.insert = insert
-        mtext.dxf.char_height = char_height
+        mtext.dxf.insert = self._tx(*insert)
+        mtext.dxf.char_height = char_height * self._content_scale
         mtext.dxf.style = _TEXT_STYLE
         # MIDDLE_LEFT (4) centers the text block across the rotation axis
         mtext.dxf.attachment_point = 4 if center_across else 1
@@ -233,17 +261,15 @@ class DxfBackend:
     ) -> None:
         """Draw a filled rectangle using HATCH entity."""
         attribs = self._dxfattribs()
-
+        s = self._content_scale
         hatch = self._msp.add_hatch(color=0, dxfattribs=attribs)  # ACI 0 = BYBLOCK
-        # Set solid fill
         hatch.set_solid_fill()
-        # Add rectangular boundary
         hatch.paths.add_polyline_path(
             [
-                (x, y),
-                (x + width, y),
-                (x + width, y + height),
-                (x, y + height),
+                self._tx(x, y),
+                self._tx(x + width, y),
+                self._tx(x + width, y + height),
+                self._tx(x, y + height),
             ],
             is_closed=True,
         )
@@ -260,11 +286,10 @@ class DxfBackend:
 
         hatch = self._msp.add_hatch(color=0, dxfattribs=attribs)
         hatch.set_solid_fill()
-        # Add circular boundary using edge path
         edge_path = hatch.paths.add_edge_path()
         edge_path.add_arc(
-            center=center,
-            radius=radius,
+            center=self._tx(*center),
+            radius=radius * self._content_scale,
             start_angle=0,
             end_angle=360,
         )
@@ -331,13 +356,15 @@ class DxfBackend:
             scale: Uniform scale factor (xscale = yscale).
             rotation: Rotation in degrees CCW.
         """
+        tx, ty = self._tx(x, y)
+        s = self._content_scale
         self._msp.add_blockref(
             block_name,
-            insert=(x, y),
+            insert=(tx, ty),
             dxfattribs={
                 "layer": self._current_layer,
-                "xscale": scale,
-                "yscale": scale,
+                "xscale": scale * s,
+                "yscale": scale * s,
                 "rotation": rotation,
             },
         )
@@ -367,7 +394,7 @@ class DxfBackend:
         """Draw a regular short-dashed line (e.g., SPARE conductor tails)."""
         attribs = self._dxfattribs()
         attribs["linetype"] = "DASHED"
-        self._msp.add_line(start, end, dxfattribs=attribs)
+        self._msp.add_line(self._tx(*start), self._tx(*end), dxfattribs=attribs)
 
     def draw_fanout(
         self,
@@ -411,14 +438,16 @@ class DxfBackend:
                 # Side vertical: intermediate → MCB entry pin
                 block.add_line((dx, fan_h), (dx, total_h), dxfattribs=attribs)
 
-        # Insert the block
+        # Insert the block (apply content scale transform)
+        tx, ty = self._tx(center_x, busbar_y)
+        s = self._content_scale
         self._msp.add_blockref(
             block_name,
-            insert=(center_x, busbar_y),
+            insert=(tx, ty),
             dxfattribs={
                 "layer": "E-SLD-LINE",
-                "xscale": 1.0,
-                "yscale": 1.0,
+                "xscale": s,
+                "yscale": s,
             },
         )
 
@@ -469,10 +498,12 @@ class DxfBackend:
         frontend = Frontend(ctx, backend, config=config)
         frontend.draw_layout(self._msp)
 
+        # Outer margins so border frame doesn't touch paper edge
         page = layout.Page(
             self._page_config.page_width,
             self._page_config.page_height,
             layout.Units.mm,
+            margins=layout.Margins(top=5, right=5, bottom=5, left=5),
         )
         settings = layout.Settings(fit_page=True)
         return backend.get_pdf_bytes(page, settings=settings)
@@ -509,6 +540,7 @@ class DxfBackend:
             self._page_config.page_width,
             self._page_config.page_height,
             layout.Units.mm,
+            margins=layout.Margins(top=5, right=5, bottom=5, left=5),
         )
         settings = layout.Settings(fit_page=True)
         return backend.get_string(page, settings=settings)
