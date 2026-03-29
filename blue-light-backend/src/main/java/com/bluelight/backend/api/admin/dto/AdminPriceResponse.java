@@ -19,6 +19,7 @@ public class AdminPriceResponse {
     private Integer kvaMin;
     private Integer kvaMax;
     private BigDecimal price;
+    private BigDecimal renewalPrice;
     private BigDecimal sldPrice;
     private Boolean isActive;
     private LocalDateTime updatedAt;
@@ -30,6 +31,7 @@ public class AdminPriceResponse {
                 .kvaMin(masterPrice.getKvaMin())
                 .kvaMax(masterPrice.getKvaMax())
                 .price(masterPrice.getPrice())
+                .renewalPrice(masterPrice.getRenewalPrice())
                 .sldPrice(masterPrice.getSldPrice())
                 .isActive(masterPrice.getIsActive())
                 .updatedAt(masterPrice.getUpdatedAt())

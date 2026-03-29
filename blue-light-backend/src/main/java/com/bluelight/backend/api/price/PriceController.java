@@ -42,9 +42,10 @@ public class PriceController {
     public ResponseEntity<PriceCalculationResponse> calculatePrice(
             @RequestParam Integer kva,
             @RequestParam(required = false) Integer months,
-            @RequestParam(required = false) String sldOption) {
-        log.info("Price calculation requested: kva={}, months={}, sldOption={}", kva, months, sldOption);
-        PriceCalculationResponse result = priceService.calculatePrice(kva, months, sldOption);
+            @RequestParam(required = false) String sldOption,
+            @RequestParam(required = false) String applicationType) {
+        log.info("Price calculation requested: kva={}, months={}, sldOption={}, applicationType={}", kva, months, sldOption, applicationType);
+        PriceCalculationResponse result = priceService.calculatePrice(kva, months, sldOption, applicationType);
         return ResponseEntity.ok(result);
     }
 }

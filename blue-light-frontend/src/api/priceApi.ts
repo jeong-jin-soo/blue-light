@@ -12,10 +12,11 @@ export const getPrices = async (): Promise<MasterPrice[]> => {
 /**
  * Calculate price for a given kVA (with optional SLD option and licence period)
  */
-export const calculatePrice = async (kva: number, months?: number, sldOption?: string): Promise<PriceCalculation> => {
+export const calculatePrice = async (kva: number, months?: number, sldOption?: string, applicationType?: string): Promise<PriceCalculation> => {
   const params: Record<string, string | number> = { kva };
   if (months) params.months = months;
   if (sldOption) params.sldOption = sldOption;
+  if (applicationType) params.applicationType = applicationType;
   const response = await axiosClient.get<PriceCalculation>('/prices/calculate', { params });
   return response.data;
 };

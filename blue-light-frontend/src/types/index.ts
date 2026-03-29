@@ -222,6 +222,7 @@ export interface MasterPrice {
   kvaMin: number;
   kvaMax: number;
   price: number;
+  renewalPrice: number;
   isActive: boolean;
 }
 
@@ -551,6 +552,7 @@ export interface AdminPriceResponse {
   kvaMin: number;
   kvaMax: number;
   price: number;
+  renewalPrice: number;
   sldPrice: number;
   isActive: boolean;
   updatedAt: string;
@@ -576,6 +578,7 @@ export interface BatchPriceTierItem {
   kvaMin: number;
   kvaMax: number;
   price: number;
+  renewalPrice: number;
   sldPrice: number;
   isActive: boolean;
 }

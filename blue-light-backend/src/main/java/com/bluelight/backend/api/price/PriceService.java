@@ -45,7 +45,7 @@ public class PriceService {
      * @param sldOption SLD option ("REQUEST_LEW" or "SELF_UPLOAD"), null defaults to SELF_UPLOAD
      * @return calculation result with tier, price, SLD fee, EMA fee, and total
      */
-    public PriceCalculationResponse calculatePrice(Integer kva, Integer months, String sldOption) {
+    public PriceCalculationResponse calculatePrice(Integer kva, Integer months, String sldOption, String applicationType) {
         if (kva == null || kva < 1) {
             throw new BusinessException("kVA must be a positive number", HttpStatus.BAD_REQUEST, "INVALID_KVA");
         }
@@ -57,21 +57,26 @@ public class PriceService {
                         "PRICE_TIER_NOT_FOUND"
                 ));
 
+        // New License vs Renewal: 다른 가격 적용
+        BigDecimal tierPrice = "RENEWAL".equals(applicationType)
+                ? masterPrice.getRenewalPrice()
+                : masterPrice.getPrice();
+
         // SLD fee: only when REQUEST_LEW
         BigDecimal sldFee = "REQUEST_LEW".equals(sldOption)
                 ? masterPrice.getSldPrice()
                 : BigDecimal.ZERO;
 
         BigDecimal emaFee = (months != null) ? calculateEmaFee(months) : BigDecimal.ZERO;
-        BigDecimal totalAmount = masterPrice.getPrice().add(sldFee).add(emaFee);
+        BigDecimal totalAmount = tierPrice.add(sldFee).add(emaFee);
 
-        log.info("Price calculated: kva={}, tier={}, price={}, sldFee={}, emaFee={}, total={}",
-                kva, masterPrice.getDescription(), masterPrice.getPrice(), sldFee, emaFee, totalAmount);
+        log.info("Price calculated: kva={}, type={}, tier={}, price={}, sldFee={}, emaFee={}, total={}",
+                kva, applicationType, masterPrice.getDescription(), tierPrice, sldFee, emaFee, totalAmount);
 
         return PriceCalculationResponse.builder()
                 .kva(kva)
                 .tierDescription(masterPrice.getDescription())
-                .price(masterPrice.getPrice())
+                .price(tierPrice)
                 .sldFee(sldFee)
                 .emaFee(emaFee)
                 .totalAmount(totalAmount)
@@ -82,7 +87,7 @@ public class PriceService {
      * Calculate price (backward compatible — no SLD option)
      */
     public PriceCalculationResponse calculatePrice(Integer kva) {
-        return calculatePrice(kva, null, null);
+        return calculatePrice(kva, null, null, null);
     }
 
     /**
