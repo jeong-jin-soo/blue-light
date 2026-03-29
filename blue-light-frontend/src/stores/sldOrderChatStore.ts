@@ -22,7 +22,7 @@ interface SldOrderChatState {
 
 let messageSeq = 0;
 
-export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
+export const useSldOrderChatStore = create<SldOrderChatState>((set) => ({
   messages: [],
   isLoading: false,
   isStreaming: false,
@@ -118,7 +118,7 @@ export const useSldOrderChatStore = create<SldOrderChatState>((set, _get) => ({
           set({ generatedFileId: fileId });
         },
 
-        onDone: (_fullMessage) => {
+        onDone: () => {
           set({
             isStreaming: false,
             isLoading: false,

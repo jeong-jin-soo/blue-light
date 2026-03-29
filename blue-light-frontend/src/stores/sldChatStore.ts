@@ -25,7 +25,7 @@ interface SldChatState {
 
 let messageSeq = 0;
 
-export const useSldChatStore = create<SldChatState>((set, _get) => ({
+export const useSldChatStore = create<SldChatState>((set) => ({
   messages: [],
   isLoading: false,
   isStreaming: false,
@@ -127,7 +127,7 @@ export const useSldChatStore = create<SldChatState>((set, _get) => ({
           set({ progressStage: stage, progressMessage: message });
         },
 
-        onDone: (_fullMessage) => {
+        onDone: () => {
           set({
             isStreaming: false,
             isLoading: false,

@@ -7,11 +7,10 @@ import { acceptSld } from '../../../api/sldChatApi';
 import { getSldAiGeneration } from '../../../api/systemAdminApi';
 import axiosClient from '../../../api/axiosClient';
 import fileApi from '../../../api/fileApi';
-import type { FileInfo, SldRequest } from '../../../types';
+import type { FileInfo } from '../../../types';
 
 interface Props {
   applicationSeq: number;
-  sldRequest: SldRequest;
   onSldUpdated: () => void;
   existingSldFiles?: FileInfo[];
   onFileDelete?: (fileId: number) => Promise<void>;
@@ -20,7 +19,7 @@ interface Props {
 /**
  * SLD AI 채팅 패널 — 2분할 레이아웃 (좌: 채팅, 우: SVG 미리보기)
  */
-export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpdated, existingSldFiles = [], onFileDelete }: Props) {
+export function SldChatPanel({ applicationSeq, onSldUpdated, existingSldFiles = [], onFileDelete }: Props) {
   const [inputValue, setInputValue] = useState('');
   const [acceptLoading, setAcceptLoading] = useState(false);
   const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
@@ -94,7 +93,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
-  }, [applicationSeq]);
+  }, [applicationSeq, toast]);
 
   // 메시지 전송
   const handleSend = useCallback(async () => {
@@ -126,7 +125,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     } else {
       doAccept(false);
     }
-  }, [generatedFileId, existingSldFiles]);
+  }, [generatedFileId, existingSldFiles, doAccept]);
 
   const doAccept = useCallback(async (replaceExisting: boolean) => {
     if (!generatedFileId) return;
@@ -153,7 +152,7 @@ export function SldChatPanel({ applicationSeq, sldRequest: _sldRequest, onSldUpd
     } finally {
       setAcceptLoading(false);
     }
-  }, [applicationSeq, generatedFileId, existingSldFiles, onFileDelete, onSldUpdated]);
+  }, [applicationSeq, generatedFileId, existingSldFiles, onFileDelete, onSldUpdated, toast]);
 
   // 대화 초기화
   const handleReset = useCallback(async () => {
