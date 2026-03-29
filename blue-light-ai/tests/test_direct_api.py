@@ -1,5 +1,6 @@
 """Tests for the direct SLD generation API (Track A — no LLM)."""
 
+import os
 import pytest
 from fastapi.testclient import TestClient
 
@@ -9,6 +10,10 @@ def client():
     """Create test client with service key auth bypassed via dependency override."""
     from app.main import app
     from app.dependencies import verify_service_key
+    from app.config import settings
+
+    # Ensure temp directory exists (lifespan may not run in all test contexts)
+    os.makedirs(settings.temp_file_dir, exist_ok=True)
 
     async def _no_auth():
         return "test"

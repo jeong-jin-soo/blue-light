@@ -155,7 +155,7 @@ export const sldOrderStreamChat = async (
     if (!receivedDone) {
       callbacks.onError('Connection closed unexpectedly. Please try again.');
     }
-  } catch (err) {
+  } catch {
     if (!receivedDone) {
       callbacks.onError('Connection lost. Please try again.');
     }
