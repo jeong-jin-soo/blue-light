@@ -24,7 +24,7 @@ import {
   validateApplicationStep1,
   validateApplicationStep2,
 } from '../../utils/validation';
-import type { MasterPrice, PriceCalculation, Application, ApplicationType, SampleFileInfo } from '../../types';
+import type { MasterPrice, PriceCalculation, Application, ApplicationType, CreateApplicationRequest, SampleFileInfo } from '../../types';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
@@ -249,7 +249,7 @@ export default function NewApplicationPage() {
     setShowSubmitConfirm(false);
     setSubmitting(true);
     try {
-      const payload: Record<string, unknown> = {
+      const payload: CreateApplicationRequest = {
         address: formData.address.trim(),
         postalCode: formData.postalCode.trim(),
         buildingType: formData.buildingType || undefined,
@@ -270,7 +270,7 @@ export default function NewApplicationPage() {
           payload.existingExpiryDate = formData.existingExpiryDate;
         }
       }
-      const result = await applicationApi.createApplication(payload as any);
+      const result = await applicationApi.createApplication(payload);
       clearDraft(); // 신청서 생성 성공 → draft 삭제
 
       // Upload SLD file if attached
