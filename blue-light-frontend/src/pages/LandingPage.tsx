@@ -89,7 +89,7 @@ export default function LandingPage() {
             <Link to="/login">
               <Button variant="ghost" size="sm">Sign In</Button>
             </Link>
-            <Link to="/signup">
+            <Link to="/signup?role=APPLICANT">
               <Button size="sm">Get Started</Button>
             </Link>
           </div>
@@ -115,10 +115,13 @@ export default function LandingPage() {
                 For building, business, and shop owners, LEWs, and SLD professionals.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link to="/signup">
+                <Link to="/signup?role=APPLICANT">
                   <Button size="lg">Apply for a Licence</Button>
                 </Link>
-                <Button variant="outline" size="lg" onClick={scrollToFeatures}>
+                <Link to="/signup?role=LEW">
+                  <Button variant="outline" size="lg">Join as LEW</Button>
+                </Link>
+                <Button variant="ghost" size="lg" onClick={scrollToFeatures}>
                   Learn More
                 </Button>
               </div>
@@ -271,15 +274,26 @@ export default function LandingPage() {
           <p className="text-blue-200 mb-8 max-w-2xl mx-auto">
             Join building, business, and shop owners and electrical professionals across Singapore who trust LicenseKaki.
           </p>
-          <Link to="/signup">
-            <Button
-              size="lg"
-              variant="outline"
-              className="!bg-white !text-primary !border-white hover:!bg-gray-100"
-            >
-              Create Free Account
-            </Button>
-          </Link>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Link to="/signup?role=APPLICANT">
+              <Button
+                size="lg"
+                variant="outline"
+                className="!bg-white !text-primary !border-white hover:!bg-gray-100"
+              >
+                Apply for a Licence
+              </Button>
+            </Link>
+            <Link to="/signup?role=LEW">
+              <Button
+                size="lg"
+                variant="outline"
+                className="!bg-transparent !text-white !border-white/60 hover:!bg-white/10"
+              >
+                Join as LEW
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
 

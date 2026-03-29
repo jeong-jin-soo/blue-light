@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
 import { Input } from '../../components/ui/Input';
@@ -41,9 +41,17 @@ const INITIAL_FORM: SignupForm = {
 
 export default function SignupPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { signup, isLoading, error, clearError, isAuthenticated, user } = useAuthStore();
 
-  const [form, setForm] = useState<SignupForm>(INITIAL_FORM);
+  // URL query parameter로 역할이 지정된 경우 (랜딩페이지에서 진입)
+  const presetRole = searchParams.get('role');
+  const isRolePreset = presetRole === 'APPLICANT' || presetRole === 'LEW';
+
+  const [form, setForm] = useState<SignupForm>({
+    ...INITIAL_FORM,
+    role: isRolePreset ? presetRole : INITIAL_FORM.role,
+  });
   const [localError, setLocalError] = useState('');
 
   // 가입 가능한 역할 목록 (동적 로드)
@@ -59,8 +67,12 @@ export default function SignupPage() {
     authApi.getSignupOptions()
       .then((options) => {
         setAvailableRoles(options.availableRoles);
-        // 역할이 1개뿐이면 자동 선택
-        if (options.availableRoles.length === 1) {
+        // URL에서 LEW로 지정했는데 백엔드에서 LEW 가입이 불가능한 경우
+        if (isRolePreset && presetRole === 'LEW' && !options.availableRoles.includes('LEW')) {
+          updateField('role', 'APPLICANT');
+        }
+        // 역할이 1개뿐이고 URL 지정이 없으면 자동 선택
+        if (!isRolePreset && options.availableRoles.length === 1) {
           updateField('role', options.availableRoles[0]);
         }
       })
@@ -147,7 +159,9 @@ export default function SignupPage() {
 
   return (
     <AuthLayout>
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">Create your account</h2>
+      <h2 className="text-xl font-semibold text-gray-800 mb-6">
+        {isRolePreset && form.role === 'LEW' ? 'Register as LEW' : 'Create your account'}
+      </h2>
 
       {displayError && (
         <div className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg text-sm text-error-600">
@@ -230,8 +244,31 @@ export default function SignupPage() {
           </div>
         )}
 
-        {/* Role selection — 역할이 2개 이상일 때만 표시 */}
-        {availableRoles.length > 1 && (
+        {/* Role indicator — 랜딩에서 역할이 지정된 경우 */}
+        {isRolePreset && (
+          <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <span className="text-lg">{form.role === 'LEW' ? '⚡' : '🏢'}</span>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-primary">
+                {form.role === 'LEW' ? 'LEW (Licensed Electrical Worker)' : 'Building Owner'}
+              </div>
+              <div className="text-xs text-gray-500">
+                {form.role === 'LEW'
+                  ? 'Signing up as a Licensed Electrical Worker'
+                  : 'Signing up as a building / business / shop owner'}
+              </div>
+            </div>
+            <Link
+              to="/signup"
+              className="text-xs text-primary hover:underline whitespace-nowrap"
+            >
+              Change
+            </Link>
+          </div>
+        )}
+
+        {/* Role selection — 역할이 미지정이고 2개 이상일 때만 표시 */}
+        {!isRolePreset && availableRoles.length > 1 && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Account Type<span className="text-error-500 ml-0.5">*</span>
@@ -266,51 +303,51 @@ export default function SignupPage() {
                 </button>
               )}
             </div>
-            {form.role === 'LEW' && (
-              <>
-                <p className="text-xs text-warning-600 mt-1.5">
-                  ⚠ LEW accounts require administrator approval before access.
-                </p>
-                <div className="mt-3">
-                  <Input
-                    label="LEW Licence Number"
-                    required
-                    maxLength={50}
-                    value={form.lewLicenceNo}
-                    onChange={(e) => updateField('lewLicenceNo', e.target.value)}
-                    placeholder="e.g., LEW-2026-XXXXX"
-                    hint="Your EMA-issued LEW licence number"
-                  />
-                </div>
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    LEW Grade<span className="text-error-500 ml-0.5">*</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
-                      { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
-                      { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
-                    ].map((g) => (
-                      <button
-                        key={g.value}
-                        type="button"
-                        onClick={() => updateField('lewGrade', g.value)}
-                        className={`p-2.5 border-2 rounded-lg text-center transition-all ${
-                          form.lewGrade === g.value
-                            ? 'border-primary bg-primary/5 text-primary'
-                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                        }`}
-                      >
-                        <div className="text-sm font-medium">{g.label}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">{g.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Select the grade on your EMA licence</p>
-                </div>
-              </>
-            )}
+          </div>
+        )}
+
+        {/* LEW additional fields */}
+        {form.role === 'LEW' && (
+          <div className="space-y-3">
+            <p className="text-xs text-warning-600">
+              ⚠ LEW accounts require administrator approval before access.
+            </p>
+            <Input
+              label="LEW Licence Number"
+              required
+              maxLength={50}
+              value={form.lewLicenceNo}
+              onChange={(e) => updateField('lewLicenceNo', e.target.value)}
+              placeholder="e.g., LEW-2026-XXXXX"
+              hint="Your EMA-issued LEW licence number"
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                LEW Grade<span className="text-error-500 ml-0.5">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
+                  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
+                  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
+                ].map((g) => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => updateField('lewGrade', g.value)}
+                    className={`p-2.5 border-2 rounded-lg text-center transition-all ${
+                      form.lewGrade === g.value
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{g.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{g.desc}</div>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Select the grade on your EMA licence</p>
+            </div>
           </div>
         )}
 
