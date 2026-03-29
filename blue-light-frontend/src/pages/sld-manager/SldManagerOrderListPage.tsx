@@ -60,6 +60,7 @@ export default function SldManagerOrderListPage() {
   const [statusFilter, setStatusFilter] = useState(initialStatus);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     sldManagerApi
       .getOrders({
