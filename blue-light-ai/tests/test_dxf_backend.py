@@ -20,13 +20,13 @@ _REFERENCE_DXF_PATH = (
     / "data" / "sld-info" / "slds-dxf" / "100A TPN SLD 1 DWG.dxf"
 )
 
-# Expected DXF layers matching i2R LEW convention (_LAYER_CONFIG in dxf_backend.py)
+# Expected DXF layers matching AutoCAD LEW reference (_LAYER_CONFIG in dxf_backend.py)
 _EXPECTED_DXF_LAYERS = [
-    "E-SLD-SYM",
-    "E-SLD-LINE",
-    "E-SLD-BUSBAR",
-    "E-SLD-TXT",
-    "E-SLD-TITLE",
+    "SLD",
+    "SLD-LINE",
+    "SLD-TXT",
+    "TXT",
+    "E-SLD-LEGENDF",
     "E-SLD-BOX",
     "E-SLD-FRAME",
 ]
@@ -53,26 +53,26 @@ class TestDxfBackendBasics:
             assert expected in layer_names, f"Missing layer: {expected}"
 
     def test_text_style_exists(self):
-        """REAL_SLD text style is created on init."""
+        """SLD-TXT text style is created on init."""
         dxf = DxfBackend()
         style_names = [s.dxf.name for s in dxf.doc.styles]
-        assert "REAL_SLD" in style_names
+        assert "SLD-TXT" in style_names
 
     def test_set_layer(self):
-        """set_layer maps logical name to i2R DXF layer name."""
+        """set_layer maps logical name to AutoCAD DXF layer name."""
         dxf = DxfBackend()
         dxf.set_layer("SLD_CONNECTIONS")
         dxf.add_line((0, 0), (10, 10))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-LINE"
+        assert entities[-1].dxf.layer == "SLD-LINE"
 
     def test_set_layer_direct_dxf_name(self):
-        """set_layer accepts E-SLD-* names directly."""
+        """set_layer accepts direct layer names (backward compat)."""
         dxf = DxfBackend()
-        dxf.set_layer("E-SLD-TXT")
+        dxf.set_layer("SLD-TXT")
         dxf.add_line((0, 0), (10, 10))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-TXT"
+        assert entities[-1].dxf.layer == "SLD-TXT"
 
 
 # ── TestDxfBackendPageConfig ─────────────────────────────────────
@@ -164,19 +164,21 @@ class TestDxfBackendDrawing:
         plines = [e for e in entities if e.dxftype() == "LWPOLYLINE"]
         assert len(plines) >= 1
 
-    def test_add_filled_rect_creates_hatch(self):
+    def test_add_filled_rect_creates_outline(self):
+        """DXF: filled rect → LWPOLYLINE outline (HATCH minimized)."""
         dxf = DxfBackend()
         dxf.add_filled_rect(0, 0, 10, 5)
         entities = list(dxf.doc.modelspace())
-        hatches = [e for e in entities if e.dxftype() == "HATCH"]
-        assert len(hatches) >= 1
+        plines = [e for e in entities if e.dxftype() == "LWPOLYLINE"]
+        assert len(plines) >= 1
 
-    def test_add_filled_circle_creates_hatch(self):
+    def test_add_filled_circle_creates_outline(self):
+        """DXF: filled circle → CIRCLE outline (HATCH minimized)."""
         dxf = DxfBackend()
         dxf.add_filled_circle((50, 50), radius=5.0)
         entities = list(dxf.doc.modelspace())
-        hatches = [e for e in entities if e.dxftype() == "HATCH"]
-        assert len(hatches) >= 1
+        circles = [e for e in entities if e.dxftype() == "CIRCLE"]
+        assert len(circles) >= 1
 
     def test_lineweight_override(self):
         """add_line with explicit lineweight sets it on the entity."""
@@ -429,11 +431,11 @@ class TestDxfLayerConvention:
         from app.sld.dxf_backend import _LOGICAL_TO_DXF_LAYER
 
         expected = {
-            "SLD_SYMBOLS": "E-SLD-SYM",
-            "SLD_CONNECTIONS": "E-SLD-LINE",
-            "SLD_POWER_MAIN": "E-SLD-BUSBAR",
-            "SLD_ANNOTATIONS": "E-SLD-TXT",
-            "SLD_TITLE_BLOCK": "E-SLD-TITLE",
+            "SLD_SYMBOLS": "SLD",
+            "SLD_CONNECTIONS": "SLD-LINE",
+            "SLD_POWER_MAIN": "SLD-LINE",
+            "SLD_ANNOTATIONS": "SLD-TXT",
+            "SLD_TITLE_BLOCK": "TXT",
             "SLD_DB_FRAME": "E-SLD-BOX",
         }
         for logical, dxf_name in expected.items():
@@ -460,7 +462,7 @@ class TestDxfLayerConvention:
         dxf.set_layer("SLD_SYMBOLS")
         dxf.add_circle((50, 50), 10)
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-SYM"
+        assert entities[-1].dxf.layer == "SLD"
 
     def test_connections_on_line_layer(self):
         """Entities drawn on SLD_CONNECTIONS end up on E-SLD-LINE layer."""
@@ -468,7 +470,7 @@ class TestDxfLayerConvention:
         dxf.set_layer("SLD_CONNECTIONS")
         dxf.add_line((0, 0), (100, 0))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-LINE"
+        assert entities[-1].dxf.layer == "SLD-LINE"
 
     def test_annotations_on_txt_layer(self):
         """MTEXT drawn on SLD_ANNOTATIONS ends up on E-SLD-TXT layer."""
@@ -477,7 +479,7 @@ class TestDxfLayerConvention:
         dxf.add_mtext("20A", insert=(10, 20))
         entities = list(dxf.doc.modelspace())
         mtexts = [e for e in entities if e.dxftype() == "MTEXT"]
-        assert mtexts[-1].dxf.layer == "E-SLD-TXT"
+        assert mtexts[-1].dxf.layer == "SLD-TXT"
 
     def test_title_block_on_title_layer(self):
         """Entities drawn on SLD_TITLE_BLOCK end up on E-SLD-TITLE layer."""
@@ -485,7 +487,7 @@ class TestDxfLayerConvention:
         dxf.set_layer("SLD_TITLE_BLOCK")
         dxf.add_line((0, 0), (420, 0))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-TITLE"
+        assert entities[-1].dxf.layer == "TXT"
 
     def test_db_frame_on_box_layer(self):
         """Entities drawn on SLD_DB_FRAME end up on E-SLD-BOX layer."""
@@ -501,7 +503,7 @@ class TestDxfLayerConvention:
         dxf.set_layer("SLD_POWER_MAIN")
         dxf.add_line((0, 100), (420, 100))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-BUSBAR"
+        assert entities[-1].dxf.layer == "SLD-LINE"
 
     def test_box_layer_has_center_linetype(self):
         """E-SLD-BOX layer uses CENTER linetype for dashed boxes."""
@@ -520,7 +522,7 @@ class TestDxfLayerConvention:
         dxf = DxfBackend()
         dxf.add_line((0, 0), (10, 10))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-SYM"
+        assert entities[-1].dxf.layer == "SLD"
 
     def test_no_old_layer_names_in_document(self):
         """Old SLD_* layer names should NOT exist as DXF layers."""

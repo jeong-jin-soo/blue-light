@@ -99,8 +99,11 @@ public class ApplicationService {
             emaFee = calculateEmaFee(appType, renewalPeriodMonths);
         }
 
-        // Calculate total: kVA price + SLD fee (if REQUEST_LEW) + EMA fee (if applicable)
-        BigDecimal quoteAmount = masterPrice.getPrice();
+        // Calculate total: New License vs Renewal 다른 가격 적용
+        BigDecimal tierPrice = (appType == ApplicationType.RENEWAL)
+                ? masterPrice.getRenewalPrice()
+                : masterPrice.getPrice();
+        BigDecimal quoteAmount = tierPrice;
         if (sldFee != null) {
             quoteAmount = quoteAmount.add(sldFee);
         }
@@ -244,8 +247,11 @@ public class ApplicationService {
             application.updateRenewalPeriod(months, currentEmaFee);
         }
 
-        // Calculate total: kVA price + SLD fee (if REQUEST_LEW) + EMA fee (if applicable)
-        BigDecimal quoteAmount = masterPrice.getPrice();
+        // Calculate total: New License vs Renewal 다른 가격 적용
+        BigDecimal tierPrice = (application.getApplicationType() == ApplicationType.RENEWAL)
+                ? masterPrice.getRenewalPrice()
+                : masterPrice.getPrice();
+        BigDecimal quoteAmount = tierPrice;
         if (sldFee != null) {
             quoteAmount = quoteAmount.add(sldFee);
         }

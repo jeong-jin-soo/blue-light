@@ -16,6 +16,7 @@ interface TierErrors {
   kvaMin?: string;
   kvaMax?: string;
   price?: string;
+  renewalPrice?: string;
   sldPrice?: string;
 }
 
@@ -26,6 +27,7 @@ interface EditableTier {
   kvaMin: string;
   kvaMax: string;
   price: string;
+  renewalPrice: string;
   sldPrice: string;
   isActive: boolean;
   errors: TierErrors;
@@ -39,6 +41,7 @@ function toEditableTier(price: AdminPriceResponse): EditableTier {
     kvaMin: String(price.kvaMin),
     kvaMax: String(price.kvaMax),
     price: String(price.price),
+    renewalPrice: String(price.renewalPrice ?? 0),
     sldPrice: String(price.sldPrice ?? 0),
     isActive: price.isActive,
     errors: {},
@@ -53,6 +56,7 @@ function createEmptyTier(): EditableTier {
     kvaMin: '',
     kvaMax: '',
     price: '',
+    renewalPrice: '0',
     sldPrice: '0',
     isActive: true,
     errors: {},
@@ -178,7 +182,8 @@ export default function AdminPriceManagementPage() {
       'Description': tier.description || `Tier ${idx + 1}`,
       'kVA Min': Number(tier.kvaMin) || 0,
       'kVA Max': Number(tier.kvaMax) || 0,
-      'Price (SGD)': Number(tier.price) || 0,
+      'New Price (SGD)': Number(tier.price) || 0,
+      'Renewal Price (SGD)': Number(tier.renewalPrice) || 0,
       'SLD Price (SGD)': Number(tier.sldPrice) || 0,
       'Active': tier.isActive ? 'Yes' : 'No',
     }));
@@ -191,7 +196,8 @@ export default function AdminPriceManagementPage() {
       { wch: 25 },  // Description
       { wch: 10 },  // kVA Min
       { wch: 10 },  // kVA Max
-      { wch: 14 },  // Price
+      { wch: 14 },  // New Price
+      { wch: 14 },  // Renewal Price
       { wch: 14 },  // SLD Price
       { wch: 8 },   // Active
     ];
@@ -216,6 +222,7 @@ export default function AdminPriceManagementPage() {
         tier.kvaMin !== String(orig.kvaMin) ||
         tier.kvaMax !== String(orig.kvaMax) ||
         tier.price !== String(orig.price) ||
+        tier.renewalPrice !== String(orig.renewalPrice ?? 0) ||
         tier.sldPrice !== String(orig.sldPrice ?? 0) ||
         tier.isActive !== orig.isActive
       );
@@ -234,6 +241,7 @@ export default function AdminPriceManagementPage() {
       const kvaMin = parseInt(tier.kvaMin);
       const kvaMax = parseInt(tier.kvaMax);
       const price = parseFloat(tier.price);
+      const renewalPrice = parseFloat(tier.renewalPrice);
       const sldPrice = parseFloat(tier.sldPrice);
 
       if (!tier.kvaMin || isNaN(kvaMin) || kvaMin < 1) {
@@ -250,6 +258,10 @@ export default function AdminPriceManagementPage() {
       }
       if (tier.price === '' || isNaN(price) || price < 0) {
         tier.errors.price = 'Required (min: 0)';
+        isValid = false;
+      }
+      if (tier.renewalPrice === '' || isNaN(renewalPrice) || renewalPrice < 0) {
+        tier.errors.renewalPrice = 'Required (min: 0)';
         isValid = false;
       }
       if (tier.sldPrice === '' || isNaN(sldPrice) || sldPrice < 0) {
@@ -303,6 +315,7 @@ export default function AdminPriceManagementPage() {
           kvaMin: parseInt(t.kvaMin),
           kvaMax: parseInt(t.kvaMax),
           price: parseFloat(t.price),
+          renewalPrice: parseFloat(t.renewalPrice),
           sldPrice: parseFloat(t.sldPrice),
           isActive: t.isActive,
         })),
@@ -570,11 +583,12 @@ export default function AdminPriceManagementPage() {
         ) : (
           <>
             {/* 데스크톱 테이블 헤더 */}
-            <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_70px_44px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+            <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_110px_70px_44px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
               <span>Description</span>
               <span>kVA Min</span>
               <span>kVA Max</span>
-              <span>Price (SGD)</span>
+              <span>New (SGD)</span>
+              <span>Renewal (SGD)</span>
               <span>SLD Price</span>
               <span>Active</span>
               <span />
@@ -592,7 +606,7 @@ export default function AdminPriceManagementPage() {
                 {editableTiers.map((tier, index) => (
                   <div key={tier.tempId}>
                     {/* 데스크톱 레이아웃 */}
-                    <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_70px_44px] gap-2 px-3 py-2.5 items-start">
+                    <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_110px_70px_44px] gap-2 px-3 py-2.5 items-start">
                       <Input
                         value={tier.description}
                         onChange={(e) => updateTier(tier.tempId, 'description', e.target.value)}
@@ -623,6 +637,15 @@ export default function AdminPriceManagementPage() {
                         onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
                         placeholder="0.00"
                         error={tier.errors.price}
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tier.renewalPrice}
+                        onChange={(e) => updateTier(tier.tempId, 'renewalPrice', e.target.value)}
+                        placeholder="0.00"
+                        error={tier.errors.renewalPrice}
                       />
                       <Input
                         type="number"
@@ -716,16 +739,28 @@ export default function AdminPriceManagementPage() {
                           error={tier.errors.kvaMax}
                         />
                       </div>
-                      <Input
-                        label="Price (SGD)"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={tier.price}
-                        onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
-                        placeholder="0.00"
-                        error={tier.errors.price}
-                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="New Price (SGD)"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={tier.price}
+                          onChange={(e) => updateTier(tier.tempId, 'price', e.target.value)}
+                          placeholder="0.00"
+                          error={tier.errors.price}
+                        />
+                        <Input
+                          label="Renewal Price (SGD)"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={tier.renewalPrice}
+                          onChange={(e) => updateTier(tier.tempId, 'renewalPrice', e.target.value)}
+                          placeholder="0.00"
+                          error={tier.errors.renewalPrice}
+                        />
+                      </div>
                       <Input
                         label="SLD Price (SGD)"
                         type="number"

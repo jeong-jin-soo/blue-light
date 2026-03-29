@@ -282,7 +282,7 @@ class TestGeneratePdfBytes:
         _r = SldPipeline().run(BASIC_3PHASE_REQ)
         svg_string = _r.svg_string
         assert isinstance(svg_string, str)
-        assert svg_string.startswith("<svg")
+        assert "<svg" in svg_string[:200]  # May start with <?xml declaration
         assert "</svg>" in svg_string
 
     def test_returns_dxf_bytes(self):

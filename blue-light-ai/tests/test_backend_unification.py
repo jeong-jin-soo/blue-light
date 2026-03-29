@@ -69,7 +69,7 @@ class TestDrawCenterLine:
         dxf = DxfBackend()
         dxf.set_layer("SLD_CONNECTIONS")
         dxf.draw_center_line((0, 0), (40, 0))
-        assert dxf._current_layer == "E-SLD-LINE"
+        assert dxf._current_layer == "SLD-LINE"
 
     def test_short_line_skipped(self):
         """길이 < 0.1mm인 선은 무시."""

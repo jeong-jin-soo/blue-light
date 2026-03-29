@@ -1215,6 +1215,71 @@ class RealIndicatorLights(BaseSymbol):
         }
 
 
+class RealFeederPoint(BaseSymbol):
+    """Feeder point symbol: rectangle with half-filled diagonal triangle.
+
+    Reference DXF analysis: 7.0mm × 3.2mm rectangle, lower-right triangle filled.
+    Used at the top of crossbar feeder conductors to indicate DB destination.
+
+    Vertical orientation (default): conductor enters bottom, exits top.
+    """
+
+    name: str = "FEEDER_POINT"
+    layer: str = "SLD_SYMBOLS"
+
+    def __init__(self):
+        self.width = 7.0
+        self.height = 3.2
+        self._stub = 2.0  # connection stub length
+        self.pins = {
+            "top": (self.width / 2, self.height + self._stub),
+            "bottom": (self.width / 2, -self._stub),
+        }
+        self.procedural = self
+
+    def draw(self, backend, x, y, **kw):
+        """Default draw — delegates to vertical."""
+        self.draw_vertical(backend, x, y, **kw)
+
+    def draw_vertical(self, backend, x, y, **kw):
+        """Draw feeder point in vertical orientation (on a vertical conductor).
+
+        No stubs — the external conductor line connects directly to the
+        rectangle edges.  This is a terminal symbol (no conductor exits top).
+        """
+        w, h = self.width, self.height
+
+        # Rectangle outline
+        backend.add_line((x, y), (x + w, y))         # bottom
+        backend.add_line((x + w, y), (x + w, y + h))  # right
+        backend.add_line((x + w, y + h), (x, y + h))  # top
+        backend.add_line((x, y + h), (x, y))           # left
+
+        # Filled triangle (lower-right half): diagonal from top-left to bottom-right
+        # Triangle: (x, y+h) → (x, y) → (x+w, y)
+        backend.add_filled_polygon([(x, y + h), (x, y), (x + w, y)])
+
+    def draw_horizontal(self, backend, x, y, **kw):
+        """Draw feeder point in horizontal orientation (on a horizontal conductor)."""
+        # Rotate 90°: width becomes height, height becomes width
+        w, h = self.height, self.width
+        cy = y
+
+        # Left stub
+        backend.add_line((x - self._stub, cy), (x, cy))
+        # Right stub
+        backend.add_line((x + w, cy), (x + w + self._stub, cy))
+
+        # Rectangle outline
+        backend.add_line((x, y - h/2), (x + w, y - h/2))
+        backend.add_line((x + w, y - h/2), (x + w, y + h/2))
+        backend.add_line((x + w, y + h/2), (x, y + h/2))
+        backend.add_line((x, y + h/2), (x, y - h/2))
+
+        # Filled triangle
+        backend.add_filled_polygon([(x, y + h/2), (x + w, y + h/2), (x + w, y - h/2)])
+
+
 # ---------------------------------------------------------------------------
 # Symbol registry — maps type names to real-proportion symbol classes
 # ---------------------------------------------------------------------------
@@ -1236,6 +1301,7 @@ REAL_SYMBOL_MAP: dict[str, type | object] = {
     "SELECTOR_SWITCH": RealSelectorSwitch,
     "ELR": RealELR,
     "INDICATOR_LIGHTS": RealIndicatorLights,
+    "FEEDER_POINT": RealFeederPoint,
 }
 
 # Meter symbols are instances (parameterized by letter), not classes

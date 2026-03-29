@@ -232,25 +232,37 @@ class SldPipeline:
             drawing_number=app_info.get("drawing_number", ""),
         )
 
-        # Create backends
-        pdf = PdfBackend(output_path=None, page_config=pc)
-        svg = SvgBackend(page_config=pc)
-        dxf_bytes = None
+        # ── DXF-first pipeline ──────────────────────────────────
+        # DXF is the single source of truth.  PDF and SVG are
+        # derived from the DXF document after rendering.
+        # Legacy PdfBackend / SvgBackend kept only as fallback.
+        dxf = DxfBackend(page_config=pc)
+        for ref_path in (_BLOCK_LIBRARY_DXF, _REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
+            if ref_path.exists():
+                dxf.import_symbol_blocks(str(ref_path))
 
         if backend_type == "dxf":
-            dxf = DxfBackend(page_config=pc)
-            for ref_path in (_BLOCK_LIBRARY_DXF, _REFERENCE_DXF_PATH, _REFERENCE_DXF_FALLBACK):
-                if ref_path.exists():
-                    dxf.import_symbol_blocks(str(ref_path))
-            backends = [dxf, pdf, svg]
+            # DXF-first: render once into DXF, convert to PDF/SVG
+            backends = [dxf]
         else:
+            # Legacy fallback: PDF + SVG only (no DXF)
+            pdf = PdfBackend(output_path=None, page_config=pc)
+            svg = SvgBackend(page_config=pc)
             backends = [pdf, svg]
 
-        # Render
+        # Render into selected backends
+        _scale = layout_result.config.component_scale if layout_result.config else 1.0
+        _cx = pc.page_width / 2 if pc else 210.0
+        _cy = pc.page_height / 2 if pc else 148.5
         component_count = 0
         for backend in backends:
             draw_border(backend, page_config=pc)
             draw_title_block_frame(backend, tb_config=tb_config)
+
+            # Scale SLD content (symbols, connections, labels) uniformly.
+            # Border and title block are drawn at full size BEFORE this.
+            if hasattr(backend, 'begin_content_scale'):
+                backend.begin_content_scale(_scale, _cx, _cy)
 
             component_count = self._draw_components(backend, layout_result)
             self._draw_connections(backend, layout_result)
@@ -261,23 +273,36 @@ class SldPipeline:
             self._draw_arrow_points(backend, layout_result)
             self._draw_solid_boxes(backend, layout_result)
 
-            fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
+            if hasattr(backend, 'end_content_scale'):
+                backend.end_content_scale()
 
-        if backend_type == "dxf":
-            dxf_bytes = dxf.get_bytes()
+            fill_title_block_data(backend, **title_block_kwargs, tb_config=tb_config)
 
         # Overflow metrics
         overflow = layout_result.overflow_metrics
         warnings = overflow.warnings if overflow else []
 
-        return SldResult(
-            pdf_bytes=pdf.get_bytes(),
-            svg_string=svg.get_svg_string(),
-            dxf_bytes=dxf_bytes,
-            overflow_metrics=overflow,
-            layout_warnings=warnings,
-            component_count=component_count,
-        )
+        if backend_type == "dxf":
+            # DXF-first: derive PDF/SVG from the DXF document
+            logger.info("DXF-first pipeline: converting DXF → PDF + SVG")
+            return SldResult(
+                pdf_bytes=dxf.to_pdf_bytes(),
+                svg_string=dxf.to_svg_string(),
+                dxf_bytes=dxf.get_bytes(),
+                overflow_metrics=overflow,
+                layout_warnings=warnings,
+                component_count=component_count,
+            )
+        else:
+            # Legacy fallback
+            return SldResult(
+                pdf_bytes=pdf.get_bytes(),
+                svg_string=svg.get_svg_string(),
+                dxf_bytes=None,
+                overflow_metrics=overflow,
+                layout_warnings=warnings,
+                component_count=component_count,
+            )
 
     # -- Rendering methods --
 
@@ -383,12 +408,14 @@ class SldPipeline:
             (bus_end, comp.y),
             lineweight=50,
         )
-        if comp.rating:
+        # Busbar label: use comp.rating (legacy) or comp.label (PG sub-busbars)
+        _busbar_text = comp.rating or comp.label or ""
+        if _busbar_text:
             _cfg = layout_result.config or LayoutConfig()
             backend.set_layer("SLD_ANNOTATIONS")
             backend.add_mtext(
-                comp.rating,
-                insert=(bus_end - _cfg.busbar_rating_x_inset, comp.y + _cfg.busbar_rating_y),
+                _busbar_text,
+                insert=(bus_start + 3, comp.y + _cfg.busbar_rating_y),
                 char_height=_cfg.label_ch_busbar_rating,
             )
 
@@ -847,6 +874,11 @@ class SldPipeline:
         """
         for start, end in layout_result.dashed_connections:
             backend.draw_center_line(start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
+
+        # Short-dashed lines (SPARE conductor tails etc.) — regular short dashes
+        backend.set_layer("SLD_POWER_MAIN")
+        for start, end in layout_result.short_dashed_connections:
+            backend.draw_short_dashed_line(start, end)
 
     def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw filled junction dots at busbar tap points."""

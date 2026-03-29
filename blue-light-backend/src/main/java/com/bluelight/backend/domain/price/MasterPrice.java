@@ -52,6 +52,12 @@ public class MasterPrice extends BaseEntity {
     private BigDecimal price;
 
     /**
+     * Renewal 가격 (SGD) — 갱신 신청 시 적용
+     */
+    @Column(name = "renewal_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal renewalPrice = BigDecimal.ZERO;
+
+    /**
      * SLD 작성 비용 (SGD) — LEW에게 SLD 요청 시 추가 비용
      */
     @Column(name = "sld_price", nullable = false, precision = 10, scale = 2)
@@ -64,11 +70,12 @@ public class MasterPrice extends BaseEntity {
     private Boolean isActive = true;
 
     @Builder
-    public MasterPrice(String description, Integer kvaMin, Integer kvaMax, BigDecimal price, BigDecimal sldPrice, Boolean isActive) {
+    public MasterPrice(String description, Integer kvaMin, Integer kvaMax, BigDecimal price, BigDecimal renewalPrice, BigDecimal sldPrice, Boolean isActive) {
         this.description = description;
         this.kvaMin = kvaMin;
         this.kvaMax = kvaMax;
         this.price = price;
+        this.renewalPrice = renewalPrice != null ? renewalPrice : BigDecimal.ZERO;
         this.sldPrice = sldPrice != null ? sldPrice : BigDecimal.ZERO;
         this.isActive = isActive != null ? isActive : true;
     }
@@ -78,6 +85,13 @@ public class MasterPrice extends BaseEntity {
      */
     public void updatePrice(BigDecimal price) {
         this.price = price;
+    }
+
+    /**
+     * Renewal 가격 수정
+     */
+    public void updateRenewalPrice(BigDecimal renewalPrice) {
+        this.renewalPrice = renewalPrice != null ? renewalPrice : BigDecimal.ZERO;
     }
 
     /**

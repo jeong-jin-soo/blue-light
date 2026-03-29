@@ -35,6 +35,8 @@ public class DatabaseMigrationRunner {
             migrateApplicationsLoaColumns(conn);
             migrateSldTemplatesTable(conn);
             migrateSampleFilesTable(conn);
+            migrateSampleFilesMultiFile(conn);
+            migrateMasterPricesRenewalPrice(conn);
             migrateNotificationsTable(conn);
             seedSystemSettings(conn);
             log.info("Database migration check completed");
@@ -176,6 +178,69 @@ public class DatabaseMigrationRunner {
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
             log.info("Migration [sample-files-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: sample_files 다중 파일 지원
+     * - unique 제약 제거 (카테고리당 여러 파일 허용)
+     * - sort_order 컬럼 추가
+     */
+    private void migrateSampleFilesMultiFile(Connection conn) throws SQLException {
+        if (!tableExists(conn, "sample_files")) return;
+
+        // sort_order 컬럼이 이미 있으면 마이그레이션 완료 상태
+        if (columnExists(conn, "sample_files", "sort_order")) {
+            log.debug("Migration [sample-files-multi]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [sample-files-multi]: enabling multi-file support...");
+        try (Statement stmt = conn.createStatement()) {
+            // 1. unique 제약 제거
+            try {
+                stmt.executeUpdate("ALTER TABLE sample_files DROP INDEX uk_sample_files_category");
+                log.info("Migration [sample-files-multi]: dropped unique constraint");
+            } catch (SQLException e) {
+                log.debug("Migration [sample-files-multi]: unique constraint already absent");
+            }
+
+            // 2. sort_order 컬럼 추가
+            stmt.executeUpdate(
+                "ALTER TABLE sample_files ADD COLUMN sort_order INT NOT NULL DEFAULT 0"
+            );
+
+            // 3. category_key + sort_order 인덱스 추가
+            stmt.executeUpdate(
+                "CREATE INDEX idx_sample_files_category ON sample_files (category_key, sort_order)"
+            );
+
+            log.info("Migration [sample-files-multi]: completed");
+        }
+    }
+
+    /**
+     * 마이그레이션: master_prices에 renewal_price 컬럼 추가
+     * - New License / Renewal 가격 분리
+     */
+    private void migrateMasterPricesRenewalPrice(Connection conn) throws SQLException {
+        if (!tableExists(conn, "master_prices")) return;
+
+        if (columnExists(conn, "master_prices", "renewal_price")) {
+            log.debug("Migration [master-prices-renewal]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [master-prices-renewal]: adding renewal_price column...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE master_prices ADD COLUMN renewal_price DECIMAL(10,2) NOT NULL DEFAULT 0.00"
+            );
+            // 기존 데이터: renewal_price = price (동일 가격으로 초기화)
+            stmt.executeUpdate(
+                "UPDATE master_prices SET renewal_price = price WHERE renewal_price = 0.00 AND deleted_at IS NULL"
+            );
+            log.info("Migration [master-prices-renewal]: completed");
         }
     }
 

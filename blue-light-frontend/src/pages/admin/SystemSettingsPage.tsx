@@ -51,9 +51,13 @@ export default function SystemSettingsPage() {
   // ── Sample Files ──────────────────────────────
   const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
-  const [deletingCategory, setDeletingCategory] = useState<string | null>(null);
+  const [deletingSeq, setDeletingSeq] = useState<number | null>(null);
   const [showDeleteSampleConfirm, setShowDeleteSampleConfirm] = useState(false);
-  const [deleteCategoryTarget, setDeleteCategoryTarget] = useState<string>('');
+  const [deleteSeqTarget, setDeleteSeqTarget] = useState<number>(0);
+  const [previewSeq, setPreviewSeq] = useState<number | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewFilename, setPreviewFilename] = useState('');
+  const [previewLoading, setPreviewLoading] = useState(false);
   const sampleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // 신청자 업로드 대상 카테고리만 (sld, loa, sp_account, photo)
@@ -239,13 +243,12 @@ export default function SystemSettingsPage() {
 
   // ── Sample File Handlers ──────────────────────────────
 
-  const getSampleForCategory = (categoryKey: string): SampleFileInfo | undefined =>
-    sampleFiles.find((f) => f.categoryKey === categoryKey);
+  const getSamplesForCategory = (categoryKey: string): SampleFileInfo[] =>
+    sampleFiles.filter((f) => f.categoryKey === categoryKey);
 
   const handleSampleUpload = async (categoryKey: string, e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Reset input value
     if (sampleInputRefs.current[categoryKey]) {
       sampleInputRefs.current[categoryKey]!.value = '';
     }
@@ -265,10 +268,10 @@ export default function SystemSettingsPage() {
   };
 
   const handleSampleDelete = async () => {
-    if (!deleteCategoryTarget) return;
-    setDeletingCategory(deleteCategoryTarget);
+    if (!deleteSeqTarget) return;
+    setDeletingSeq(deleteSeqTarget);
     try {
-      await sampleFileApi.deleteSampleFile(deleteCategoryTarget);
+      await sampleFileApi.deleteSampleFile(deleteSeqTarget);
       const updated = await sampleFileApi.getSampleFiles();
       setSampleFiles(updated);
       toast.success('Sample file deleted');
@@ -276,10 +279,32 @@ export default function SystemSettingsPage() {
       const message = (err as { message?: string })?.message || 'Failed to delete sample file';
       toast.error(message);
     } finally {
-      setDeletingCategory(null);
+      setDeletingSeq(null);
       setShowDeleteSampleConfirm(false);
-      setDeleteCategoryTarget('');
+      setDeleteSeqTarget(0);
     }
+  };
+
+  const handleSamplePreview = async (sample: SampleFileInfo) => {
+    setPreviewSeq(sample.sampleFileSeq);
+    setPreviewFilename(sample.originalFilename);
+    setPreviewLoading(true);
+    try {
+      const url = await sampleFileApi.getSampleFilePreviewUrl(sample.sampleFileSeq);
+      setPreviewBlobUrl(url);
+    } catch {
+      toast.error('Failed to load preview');
+      setPreviewSeq(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closeSamplePreview = () => {
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    setPreviewSeq(null);
+    setPreviewBlobUrl(null);
+    setPreviewFilename('');
   };
 
   // ── Render ──────────────────────────────
@@ -345,65 +370,106 @@ export default function SystemSettingsPage() {
         <h2 className="text-lg font-semibold text-gray-800 mb-1">Document Sample Files</h2>
         <p className="text-xs text-gray-500 mb-4">
           Upload sample files for applicants to reference when preparing their documents.
-          Each category supports one sample file at a time.
+          Multiple files can be uploaded per category.
         </p>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {sampleCategories.map((category) => {
-            const sample = getSampleForCategory(category.key);
+            const samples = getSamplesForCategory(category.key);
             const isUploading = uploadingCategory === category.key;
-            const isDeleting = deletingCategory === category.key;
 
             return (
               <div
                 key={category.key}
-                className={`flex items-center justify-between p-3 rounded-lg border ${category.borderColor} ${category.bgColor}`}
+                className={`rounded-lg border ${category.borderColor} ${category.bgColor}`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-lg flex-shrink-0">{category.icon}</span>
-                  <div className="min-w-0">
-                    <p className={`text-sm font-medium ${category.headerColor}`}>{category.label}</p>
-                    {sample ? (
-                      <p className="text-xs text-gray-500 truncate" title={sample.originalFilename}>
-                        {sample.originalFilename} ({formatFileSize(sample.fileSize)})
+                {/* Category header */}
+                <div className="flex items-center justify-between p-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-lg flex-shrink-0">{category.icon}</span>
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium ${category.headerColor}`}>{category.label}</p>
+                      <p className="text-xs text-gray-400">
+                        {samples.length > 0
+                          ? `${samples.length} file${samples.length !== 1 ? 's' : ''} uploaded`
+                          : 'No samples uploaded'}
                       </p>
-                    ) : (
-                      <p className="text-xs text-gray-400">No sample uploaded</p>
-                    )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <input
+                      ref={(el) => { sampleInputRefs.current[category.key] = el; }}
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
+                      onChange={(e) => handleSampleUpload(category.key, e)}
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => sampleInputRefs.current[category.key]?.click()}
+                      loading={isUploading}
+                      disabled={isUploading}
+                    >
+                      Add File
+                    </Button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <input
-                    ref={(el) => { sampleInputRefs.current[category.key] = el; }}
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
-                    onChange={(e) => handleSampleUpload(category.key, e)}
-                    className="hidden"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => sampleInputRefs.current[category.key]?.click()}
-                    loading={isUploading}
-                    disabled={isUploading || isDeleting}
-                  >
-                    {sample ? 'Replace' : 'Upload'}
-                  </Button>
-                  {sample && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setDeleteCategoryTarget(category.key);
-                        setShowDeleteSampleConfirm(true);
-                      }}
-                      disabled={isUploading || isDeleting}
-                    >
-                      Delete
-                    </Button>
-                  )}
-                </div>
+                {/* File list */}
+                {samples.length > 0 && (
+                  <div className="border-t border-gray-200/60 divide-y divide-gray-100">
+                    {samples.map((sample) => {
+                      const isDeletingThis = deletingSeq === sample.sampleFileSeq;
+                      return (
+                        <div
+                          key={sample.sampleFileSeq}
+                          className="flex items-center justify-between px-3 py-2 hover:bg-white/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <span className="text-xs text-gray-700 truncate" title={sample.originalFilename}>
+                              {sample.originalFilename}
+                            </span>
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              ({formatFileSize(sample.fileSize)})
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleSamplePreview(sample)}
+                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                              title="Preview"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeleteSeqTarget(sample.sampleFileSeq);
+                                setShowDeleteSampleConfirm(true);
+                              }}
+                              disabled={isDeletingThis}
+                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                              title="Delete"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -683,13 +749,89 @@ export default function SystemSettingsPage() {
 
       <ConfirmDialog
         isOpen={showDeleteSampleConfirm}
-        onClose={() => { setShowDeleteSampleConfirm(false); setDeleteCategoryTarget(''); }}
+        onClose={() => { setShowDeleteSampleConfirm(false); setDeleteSeqTarget(0); }}
         onConfirm={handleSampleDelete}
         title="Delete Sample File"
         message="This will permanently remove the sample file. Applicants will no longer be able to view this sample."
         confirmLabel="Delete"
         variant="danger"
       />
+
+      {/* Sample File Preview Modal (Admin) */}
+      {previewSeq !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) closeSamplePreview(); }}
+        >
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 flex-shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <svg className="w-5 h-5 text-blue-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <h3 className="text-base font-semibold text-gray-800 truncate">
+                  Preview: {previewFilename || 'Loading...'}
+                </h3>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {previewBlobUrl && (
+                  <a
+                    href={previewBlobUrl}
+                    download={previewFilename}
+                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                    title="Download file"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Download
+                  </a>
+                )}
+                <button
+                  onClick={closeSamplePreview}
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            {/* Body */}
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50 min-h-[300px]">
+              {previewLoading ? (
+                <div className="flex items-center gap-2 text-gray-500">
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Loading preview...
+                </div>
+              ) : previewBlobUrl ? (
+                /\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff?)$/i.test(previewFilename) ? (
+                  <img src={previewBlobUrl} alt={previewFilename} className="max-w-full max-h-[70vh] object-contain rounded shadow-sm" />
+                ) : /\.pdf$/i.test(previewFilename) ? (
+                  <iframe src={previewBlobUrl} title={previewFilename} className="w-full h-[70vh] rounded border border-gray-200" />
+                ) : (
+                  <div className="text-center text-gray-500 space-y-3">
+                    <svg className="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm">This file type cannot be previewed in the browser.</p>
+                    <a href={previewBlobUrl} download={previewFilename} className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+                      Download to view
+                    </a>
+                  </div>
+                )
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

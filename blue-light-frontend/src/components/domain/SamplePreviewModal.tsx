@@ -21,27 +21,33 @@ export function SamplePreviewModal({
   const toast = useToastStore();
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filename, setFilename] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
 
+  // 해당 카테고리의 파일 목록
+  const categorySamples = categoryKey
+    ? sampleFiles.filter((f) => f.categoryKey === categoryKey)
+    : [];
+
+  const activeSample = categorySamples[activeIndex];
+
+  // 파일 로드
   useEffect(() => {
-    if (!isOpen || !categoryKey) {
+    if (!isOpen || !activeSample) {
       setBlobUrl(null);
       return;
     }
 
-    const sample = sampleFiles.find((f) => f.categoryKey === categoryKey);
-    if (!sample) {
+    if (categorySamples.length === 0) {
       toast.info('No sample file available for this category yet.');
       onClose();
       return;
     }
 
-    setFilename(sample.originalFilename);
     setLoading(true);
-
     let revoked = false;
+
     sampleFileApi
-      .getSampleFilePreviewUrl(categoryKey)
+      .getSampleFilePreviewUrl(activeSample.sampleFileSeq)
       .then((url) => {
         if (!revoked) setBlobUrl(url);
         else URL.revokeObjectURL(url);
@@ -55,15 +61,19 @@ export function SamplePreviewModal({
     return () => {
       revoked = true;
     };
-  }, [isOpen, categoryKey]);
+  }, [isOpen, activeSample?.sampleFileSeq]);
 
-  // Revoke blob URL on close
+  // Reset index when category changes
   useEffect(() => {
-    if (!isOpen && blobUrl) {
-      URL.revokeObjectURL(blobUrl);
-      setBlobUrl(null);
-    }
-  }, [isOpen]);
+    setActiveIndex(0);
+  }, [categoryKey]);
+
+  // Revoke blob URL on close or file change
+  useEffect(() => {
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [blobUrl]);
 
   // Escape key
   useEffect(() => {
@@ -83,10 +93,18 @@ export function SamplePreviewModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !categoryKey) return null;
 
+  const filename = activeSample?.originalFilename || '';
   const isImage = /\.(png|jpe?g|gif|webp|bmp|heic|heif|tiff?)$/i.test(filename);
   const isPdf = /\.pdf$/i.test(filename);
+  const hasMultiple = categorySamples.length > 1;
+
+  const switchFile = (index: number) => {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    setBlobUrl(null);
+    setActiveIndex(index);
+  };
 
   return createPortal(
     <div
@@ -109,6 +127,11 @@ export function SamplePreviewModal({
             </svg>
             <h3 className="text-base font-semibold text-gray-800 truncate">
               Sample: {filename || 'Loading...'}
+              {hasMultiple && (
+                <span className="text-xs font-normal text-gray-400 ml-2">
+                  ({activeIndex + 1}/{categorySamples.length})
+                </span>
+              )}
             </h3>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -136,6 +159,28 @@ export function SamplePreviewModal({
             </button>
           </div>
         </div>
+
+        {/* File list tabs (when multiple files) */}
+        {hasMultiple && (
+          <div className="flex gap-1 px-4 pt-3 pb-1 overflow-x-auto flex-shrink-0">
+            {categorySamples.map((sample, idx) => (
+              <button
+                key={sample.sampleFileSeq}
+                onClick={() => switchFile(idx)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition-colors ${
+                  idx === activeIndex
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                {sample.originalFilename}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Body */}
         <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-gray-50 min-h-[300px]">
@@ -172,6 +217,8 @@ export function SamplePreviewModal({
                 </a>
               </div>
             )
+          ) : categorySamples.length === 0 ? (
+            <p className="text-sm text-gray-400">No sample files available for this category.</p>
           ) : null}
         </div>
       </div>

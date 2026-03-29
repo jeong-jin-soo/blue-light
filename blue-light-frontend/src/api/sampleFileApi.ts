@@ -10,7 +10,7 @@ export const getSampleFiles = async (): Promise<SampleFileInfo[]> => {
 };
 
 /**
- * 샘플 파일 업로드/교체 (관리자 전용)
+ * 샘플 파일 업로드 (카테고리에 추가)
  */
 export const uploadSampleFile = async (
   categoryKey: string,
@@ -28,17 +28,17 @@ export const uploadSampleFile = async (
 };
 
 /**
- * 샘플 파일 삭제 (관리자 전용)
+ * 샘플 파일 개별 삭제 (seq 기반)
  */
-export const deleteSampleFile = async (categoryKey: string): Promise<void> => {
-  await axiosClient.delete(`/admin/sample-files/${categoryKey}`);
+export const deleteSampleFile = async (sampleFileSeq: number): Promise<void> => {
+  await axiosClient.delete(`/admin/sample-files/${sampleFileSeq}`);
 };
 
 /**
- * 샘플 파일 다운로드 (blob)
+ * 샘플 파일 다운로드 (seq 기반)
  */
-export const downloadSampleFile = async (categoryKey: string, filename: string): Promise<void> => {
-  const response = await axiosClient.get(`/sample-files/${categoryKey}/download`, {
+export const downloadSampleFile = async (sampleFileSeq: number, filename: string): Promise<void> => {
+  const response = await axiosClient.get(`/sample-files/${sampleFileSeq}/download`, {
     responseType: 'blob',
   });
 
@@ -53,10 +53,10 @@ export const downloadSampleFile = async (categoryKey: string, filename: string):
 };
 
 /**
- * 샘플 파일 미리보기 URL (blob URL 반환 — 호출 측에서 revokeObjectURL 필요)
+ * 샘플 파일 미리보기 URL (seq 기반, blob URL 반환 — 호출 측에서 revokeObjectURL 필요)
  */
-export const getSampleFilePreviewUrl = async (categoryKey: string): Promise<string> => {
-  const response = await axiosClient.get(`/sample-files/${categoryKey}/download`, {
+export const getSampleFilePreviewUrl = async (sampleFileSeq: number): Promise<string> => {
+  const response = await axiosClient.get(`/sample-files/${sampleFileSeq}/download`, {
     responseType: 'blob',
   });
   const contentType = response.headers['content-type'] || 'application/octet-stream';

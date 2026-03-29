@@ -22,8 +22,8 @@ import java.util.Map;
 
 /**
  * 샘플 파일 API 컨트롤러
- * - 관리자: 업로드/삭제 (POST/DELETE /api/admin/sample-files/{categoryKey})
- * - 일반 사용자: 조회/다운로드 (GET /api/sample-files, /api/sample-files/{categoryKey}/download)
+ * - 관리자: 업로드/삭제
+ * - 일반 사용자: 조회/다운로드
  */
 @Slf4j
 @RestController
@@ -35,7 +35,7 @@ public class SampleFileController {
     // ── Admin Endpoints ──────────────────────────────
 
     /**
-     * 샘플 파일 업로드/교체
+     * 샘플 파일 업로드 (카테고리에 추가)
      * POST /api/admin/sample-files/{categoryKey}
      */
     @PostMapping("/api/admin/sample-files/{categoryKey}")
@@ -49,14 +49,14 @@ public class SampleFileController {
     }
 
     /**
-     * 샘플 파일 삭제
-     * DELETE /api/admin/sample-files/{categoryKey}
+     * 샘플 파일 개별 삭제 (seq 기반)
+     * DELETE /api/admin/sample-files/{sampleFileSeq}
      */
-    @DeleteMapping("/api/admin/sample-files/{categoryKey}")
+    @DeleteMapping("/api/admin/sample-files/{sampleFileSeq}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SYSTEM_ADMIN')")
-    public ResponseEntity<Map<String, String>> deleteSampleFile(@PathVariable String categoryKey) {
-        log.info("Admin delete sample file: category={}", categoryKey);
-        sampleFileService.delete(categoryKey);
+    public ResponseEntity<Map<String, String>> deleteSampleFile(@PathVariable Long sampleFileSeq) {
+        log.info("Admin delete sample file: seq={}", sampleFileSeq);
+        sampleFileService.delete(sampleFileSeq);
         return ResponseEntity.ok(Map.of("message", "Sample file deleted successfully"));
     }
 
@@ -73,14 +73,14 @@ public class SampleFileController {
     }
 
     /**
-     * 샘플 파일 다운로드
-     * GET /api/sample-files/{categoryKey}/download
+     * 샘플 파일 다운로드 (seq 기반)
+     * GET /api/sample-files/{sampleFileSeq}/download
      */
-    @GetMapping("/api/sample-files/{categoryKey}/download")
-    public ResponseEntity<Resource> downloadSampleFile(@PathVariable String categoryKey) {
-        log.info("Download sample file: category={}", categoryKey);
-        SampleFile entity = sampleFileService.getEntity(categoryKey);
-        Resource resource = sampleFileService.download(categoryKey);
+    @GetMapping("/api/sample-files/{sampleFileSeq}/download")
+    public ResponseEntity<Resource> downloadSampleFile(@PathVariable Long sampleFileSeq) {
+        log.info("Download sample file: seq={}", sampleFileSeq);
+        SampleFile entity = sampleFileService.getEntity(sampleFileSeq);
+        Resource resource = sampleFileService.download(sampleFileSeq);
 
         String encodedFilename = URLEncoder.encode(
                 entity.getOriginalFilename(), StandardCharsets.UTF_8).replaceAll("\\+", "%20");

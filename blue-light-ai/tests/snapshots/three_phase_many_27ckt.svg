@@ -117,7 +117,8 @@
   <line x1="210.00" y1="117.00" x2="210.00" y2="118.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="216.50" y="113.53" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">200A BI CONNECTOR</text>
   <line x1="49.27" y1="110.00" x2="375.00" y2="110.00" stroke="#000000" stroke-width="0.50" fill="none" />
-  <text x="52.27" y="115.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A COMB BAR</text>
+  <text x="52.27" y="107.00" font-family="Arial, Helvetica, sans-serif" font-size="2.5" fill="#000000">100A DB</text>
+  <text x="52.27" y="115.24" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">200A BUSBAR</text>
   <text x="64.27" y="106.26" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,64.27,105.38)">L1P1</text>
   <path d="M 63.62,97.34 A 3.75,3.75 0 0,0 63.62,90.66" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="62.58" cy="90.66" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />

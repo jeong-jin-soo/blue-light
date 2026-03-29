@@ -18,6 +18,7 @@ public class PriceResponse {
     private Integer kvaMin;
     private Integer kvaMax;
     private BigDecimal price;
+    private BigDecimal renewalPrice;
 
     public static PriceResponse from(MasterPrice masterPrice) {
         return PriceResponse.builder()
@@ -26,6 +27,7 @@ public class PriceResponse {
                 .kvaMin(masterPrice.getKvaMin())
                 .kvaMax(masterPrice.getKvaMax())
                 .price(masterPrice.getPrice())
+                .renewalPrice(masterPrice.getRenewalPrice())
                 .build();
     }
 }

@@ -14,11 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Optional;
 
 /**
  * 샘플 파일 관리 서비스
- * - 관리자가 카테고리별 참고 파일을 업로드/삭제
+ * - 관리자가 카테고리별 참고 파일을 업로드/삭제 (카테고리당 여러 파일 가능)
  * - 신청자가 조회/다운로드
  */
 @Slf4j
@@ -33,49 +32,41 @@ public class SampleFileService {
     private static final String SAMPLE_SUB_DIR = "samples";
 
     /**
-     * 샘플 파일 업로드 (upsert: 기존 있으면 교체)
+     * 샘플 파일 업로드 (카테고리에 추가)
      */
     @Transactional
     public SampleFileResponse upload(String categoryKey, MultipartFile file) {
         String storedPath = fileStorageService.store(file, SAMPLE_SUB_DIR);
 
-        Optional<SampleFile> existing = sampleFileRepository.findByCategoryKey(categoryKey);
-        SampleFile sampleFile;
+        int sortOrder = (int) sampleFileRepository.countByCategoryKey(categoryKey);
 
-        if (existing.isPresent()) {
-            sampleFile = existing.get();
-            // 기존 디스크 파일 삭제
-            fileStorageService.delete(sampleFile.getFileUrl());
-            // DB 레코드 업데이트
-            sampleFile.updateFile(storedPath, file.getOriginalFilename(), file.getSize());
-            log.info("Sample file replaced: category={}, filename={}", categoryKey, file.getOriginalFilename());
-        } else {
-            sampleFile = SampleFile.builder()
-                    .categoryKey(categoryKey)
-                    .fileUrl(storedPath)
-                    .originalFilename(file.getOriginalFilename())
-                    .fileSize(file.getSize())
-                    .build();
-            sampleFileRepository.save(sampleFile);
-            log.info("Sample file uploaded: category={}, filename={}", categoryKey, file.getOriginalFilename());
-        }
+        SampleFile sampleFile = SampleFile.builder()
+                .categoryKey(categoryKey)
+                .fileUrl(storedPath)
+                .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .sortOrder(sortOrder)
+                .build();
+        sampleFileRepository.save(sampleFile);
+        log.info("Sample file uploaded: category={}, filename={}, sortOrder={}",
+                categoryKey, file.getOriginalFilename(), sortOrder);
 
         return SampleFileResponse.from(sampleFile);
     }
 
     /**
-     * 샘플 파일 삭제
+     * 샘플 파일 개별 삭제 (seq 기반)
      */
     @Transactional
-    public void delete(String categoryKey) {
-        SampleFile sampleFile = sampleFileRepository.findByCategoryKey(categoryKey)
+    public void delete(Long sampleFileSeq) {
+        SampleFile sampleFile = sampleFileRepository.findById(sampleFileSeq)
                 .orElseThrow(() -> new BusinessException(
-                        "Sample file not found for category: " + categoryKey,
+                        "Sample file not found: seq=" + sampleFileSeq,
                         HttpStatus.NOT_FOUND, "SAMPLE_NOT_FOUND"));
 
         fileStorageService.delete(sampleFile.getFileUrl());
         sampleFileRepository.delete(sampleFile);
-        log.info("Sample file deleted: category={}", categoryKey);
+        log.info("Sample file deleted: seq={}, category={}", sampleFileSeq, sampleFile.getCategoryKey());
     }
 
     /**
@@ -88,24 +79,24 @@ public class SampleFileService {
     }
 
     /**
-     * 샘플 파일 다운로드 (Resource 반환)
+     * 샘플 파일 다운로드 (seq 기반, Resource 반환)
      */
-    public Resource download(String categoryKey) {
-        SampleFile sampleFile = sampleFileRepository.findByCategoryKey(categoryKey)
+    public Resource download(Long sampleFileSeq) {
+        SampleFile sampleFile = sampleFileRepository.findById(sampleFileSeq)
                 .orElseThrow(() -> new BusinessException(
-                        "Sample file not found for category: " + categoryKey,
+                        "Sample file not found: seq=" + sampleFileSeq,
                         HttpStatus.NOT_FOUND, "SAMPLE_NOT_FOUND"));
 
         return fileStorageService.loadAsResource(sampleFile.getFileUrl());
     }
 
     /**
-     * 카테고리 키로 샘플 파일 엔티티 조회 (다운로드 헤더용)
+     * seq로 샘플 파일 엔티티 조회 (다운로드 헤더용)
      */
-    public SampleFile getEntity(String categoryKey) {
-        return sampleFileRepository.findByCategoryKey(categoryKey)
+    public SampleFile getEntity(Long sampleFileSeq) {
+        return sampleFileRepository.findById(sampleFileSeq)
                 .orElseThrow(() -> new BusinessException(
-                        "Sample file not found for category: " + categoryKey,
+                        "Sample file not found: seq=" + sampleFileSeq,
                         HttpStatus.NOT_FOUND, "SAMPLE_NOT_FOUND"));
     }
 }

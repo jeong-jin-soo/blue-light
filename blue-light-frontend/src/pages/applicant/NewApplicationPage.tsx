@@ -175,14 +175,15 @@ export default function NewApplicationPage() {
       priceApi.calculatePrice(
         formData.selectedKva,
         formData.renewalPeriodMonths || undefined,
-        formData.sldOption
+        formData.sldOption,
+        formData.applicationType
       )
         .then(setPriceResult)
         .catch(() => setPriceResult(null));
     } else {
       setPriceResult(null);
     }
-  }, [formData.selectedKva, formData.renewalPeriodMonths, formData.sldOption]);
+  }, [formData.selectedKva, formData.renewalPeriodMonths, formData.sldOption, formData.applicationType]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));

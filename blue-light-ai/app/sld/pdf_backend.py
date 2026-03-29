@@ -80,6 +80,26 @@ class PdfBackend:
     def canvas(self) -> Canvas:
         return self._canvas
 
+    # -- Content scaling --
+
+    def begin_content_scale(self, scale: float, page_cx: float, page_cy: float) -> None:
+        """Apply uniform scale transform to subsequent drawing operations."""
+        self._content_scaled = abs(scale - 1.0) >= 0.001
+        if not self._content_scaled:
+            return
+        c = self._canvas
+        c.saveState()
+        c.translate(page_cx * mm, page_cy * mm)
+        c.scale(scale, scale)
+        c.translate(-page_cx * mm, -page_cy * mm)
+
+    def end_content_scale(self) -> None:
+        """Restore canvas state after content scaling."""
+        if getattr(self, '_content_scaled', False):
+            self._canvas.restoreState()
+            self._apply_layer_style()
+            self._content_scaled = False
+
     # -- Layer management --
 
     def set_layer(self, layer_name: str) -> None:
@@ -138,6 +158,23 @@ class PdfBackend:
             c.restoreState()
         else:
             c.drawPath(p, stroke=1, fill=0)
+
+    def add_filled_polygon(
+        self,
+        points: list[tuple[float, float]],
+    ) -> None:
+        """Draw a filled polygon (solid black fill)."""
+        from reportlab.lib.units import mm as _mm
+        c = self._canvas
+        p = c.beginPath()
+        p.moveTo(points[0][0] * _mm, points[0][1] * _mm)
+        for pt in points[1:]:
+            p.lineTo(pt[0] * _mm, pt[1] * _mm)
+        p.close()
+        c.saveState()
+        c.setFillColor("black")
+        c.drawPath(p, stroke=1, fill=1)
+        c.restoreState()
 
     def add_circle(
         self,
@@ -332,6 +369,20 @@ class PdfBackend:
             step_idx += 1
 
         self.set_layer(prev_layer)
+
+    def draw_short_dashed_line(
+        self,
+        start: tuple[float, float],
+        end: tuple[float, float],
+    ) -> None:
+        """Draw a regular short-dashed line (e.g., SPARE conductor tails)."""
+        from reportlab.lib.units import mm as _mm
+        c = self._canvas
+        c.saveState()
+        c.setDash(2 * _mm, 2 * _mm)
+        c.setLineWidth(0.25 * _mm)
+        c.line(start[0] * _mm, start[1] * _mm, end[0] * _mm, end[1] * _mm)
+        c.restoreState()
 
     def draw_fanout(
         self,

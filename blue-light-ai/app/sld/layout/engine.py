@@ -88,6 +88,69 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
         config.leader_margin_above_db = 7.0    # was 10.0
 
 
+def _auto_component_scale(requirements: dict) -> float:
+    """Compute component scale for multi-DB layouts.
+
+    Dense multi-DB drawings need smaller symbols and text to fit on A3.
+    Only applies to multi-DB; single-DB uses multi-row for overflow.
+
+    Returns 1.0 for single-DB, <1.0 for multi-DB (e.g. 0.65 = 65% size).
+    """
+    dbs = requirements.get("distribution_boards", [])
+    if len(dbs) <= 1:
+        return 1.0
+
+    total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
+    total_circuits += sum(len(db.get("feeder_circuits", [])) for db in dbs)
+    # Include circuits inside protection_groups (not counted in sub_circuits)
+    for db in dbs:
+        for pg in db.get("protection_groups", []):
+            total_circuits += len(pg.get("circuits", []))
+    has_ct = requirements.get("metering") == "ct_meter"
+    total_pgs = sum(len(db.get("protection_groups", [])) for db in dbs)
+
+    density = total_circuits + (len(dbs) - 1) * 8 + (10 if has_ct else 0) + total_pgs * 3
+
+    if density <= 30:
+        return 1.0
+    elif density <= 45:
+        return 0.9
+    elif density <= 60:
+        return 0.85
+    else:
+        return 0.8
+
+
+def _expand_layout_for_scale(config: "LayoutConfig", s: float) -> None:
+    """Expand layout boundaries so content fills A3 after render-time scaling.
+
+    The renderer shrinks all SLD content by factor `s` (e.g. 0.8 = 80%).
+    If we don't compensate, content only fills s² of the page area.
+    By expanding layout boundaries by 1/s, the content uses more virtual
+    space, and after scaling it maps back to full A3.
+
+    The scale transform is centered on the page center, so we expand
+    symmetrically from the center.
+    """
+    inv = 1.0 / s  # e.g. s=0.8 → inv=1.25
+
+    # Page center (the scale pivot point)
+    cx = (config.min_x + config.max_x) / 2
+    cy = (config.min_y + config.max_y) / 2
+
+    # Expand drawing boundaries symmetrically around center
+    half_w = (config.max_x - config.min_x) / 2
+    half_h = (config.max_y - config.min_y) / 2
+    config.min_x = cx - half_w * inv
+    config.max_x = cx + half_w * inv
+    config.min_y = cy - half_h * inv
+    config.max_y = cy + half_h * inv
+    config.start_x = cx  # keep centered
+    config.start_y = config.max_y - 7 * inv
+    config.drawing_width = config.max_x - config.min_x
+    config.drawing_height = config.max_y - config.min_y
+
+
 def compute_layout(
     requirements: dict,
     config: LayoutConfig | None = None,
@@ -136,27 +199,17 @@ def compute_layout(
         config.busbar_width_ratio = float(requirements["busbar_width_ratio"])
     if requirements.get("db_width_ratios"):
         config.db_width_ratios = requirements["db_width_ratios"]
+    # -- Component scale: smaller symbols/text for dense multi-DB layouts --
+    # The renderer applies a uniform scale(s) transform to all SLD content.
+    # To compensate, we EXPAND the layout boundaries by 1/s so that after
+    # rendering at scale s, the content fills the full A3 page.
     if requirements.get("component_scale"):
         s = float(requirements["component_scale"])
+    else:
+        s = _auto_component_scale(requirements)
+    if s != 1.0:
         config.component_scale = s
-        if s != 1.0:
-            # Scale symbol dimensions (layout spacing)
-            config.breaker_w *= s; config.breaker_h *= s
-            config.mcb_w *= s; config.mcb_h *= s
-            config.rccb_w *= s; config.rccb_h *= s
-            config.isolator_w *= s; config.isolator_h *= s
-            config.meter_size *= s; config.ct_size *= s
-            config.kwh_rect_w *= s; config.kwh_rect_h *= s
-            config.spine_component_gap *= s
-            config.busbar_to_breaker_gap *= s
-            config.tail_length *= s
-            config.horizontal_spacing *= s
-            config.min_horizontal_spacing *= s
-            config.max_horizontal_spacing *= s
-            config.vertical_spacing *= s
-            # Label sizes (layout collision detection uses these)
-            config.label_char_height *= s
-            config.char_w_label *= s
+        _expand_layout_for_scale(config, s)
 
     # -- Input validation gate (defense in depth) --
     if not skip_validation:
@@ -313,17 +366,34 @@ def compute_layout(
                     else:
                         _remaining_circuits.append(sc)
 
-                # Auto-create feeder entries for child DBs not found in sub_circuits
+                # Auto-create feeder entries for child DBs not found in sub_circuits.
+                # Breaker spec comes from: child DB's feeder_breaker, parent DB's
+                # feeder_circuits list, or parent DB's feeder_breaker (in that order).
                 _found_feeders = {sc.get("_feeds_db", "").upper() for sc in _bi_xbar_circuits if sc.get("_is_feeder")}
+                _parent_feeder_circuits = db.get("feeder_circuits", [])
                 for _cdb in dbs:
                     _cdn = (_cdb.get("name") or _cdb.get("db_name") or "").upper()
                     if _cdn in _child_db_names and _cdn not in _found_feeders:
-                        # feeder_breaker can be on the child DB or on the parent DB
+                        # Try child DB's feeder_breaker first
                         _fb = _cdb.get("feeder_breaker", {})
+                        _cable = _cdb.get("incoming_cable", "")
                         if not _fb:
-                            # Check parent (current) DB for feeder_breaker to this child
+                            # Try parent DB's feeder_circuits for this target
+                            for _fc in _parent_feeder_circuits:
+                                _fc_target = (_fc.get("target_db") or "").upper()
+                                if _fc_target == _cdn:
+                                    _fb = {
+                                        "type": _fc.get("breaker_type", "MCB"),
+                                        "rating": _fc.get("breaker_rating", 0),
+                                        "characteristic": _fc.get("breaker_characteristic", ""),
+                                        "poles": _fc.get("poles", "TPN"),
+                                        "fault_kA": _fc.get("fault_kA", 10),
+                                    }
+                                    _cable = _cable or _fc.get("cable", "")
+                                    break
+                        if not _fb:
                             _fb = db.get("feeder_breaker", {})
-                        _cable = _cdb.get("incoming_cable", "") or _cdb.get("feeder_cable", "") or db.get("feeder_cable", "")
+                        _cable = _cable or db.get("feeder_cable", "")
                         _bi_xbar_circuits.append({
                             "id": _cdn,
                             "_is_feeder": True,
@@ -404,6 +474,9 @@ def compute_layout(
         _center_vertically(merged, config)
         _detect_overflow(merged, config)
 
+        # Attach config for renderer access (component_scale, label constants)
+        merged.config = config
+
         # Post-layout: audit quality (read-only, no coordinate changes)
         from app.sld.layout.audit import audit_layout
         merged.audit_report = audit_layout(merged, config, requirements)
@@ -483,6 +556,7 @@ def _collect_content_extents(
         all_xs.append(jx)
         all_ys.append(jy)
     for collection in (result.connections, result.dashed_connections,
+                       result.short_dashed_connections,
                        result.thick_connections, result.fixed_connections):
         for (sx, sy), (ex, ey) in collection:
             all_xs.extend([sx, ex])
@@ -509,6 +583,8 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
         result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
         result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.short_dashed_connections):
+        result.short_dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
         result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
@@ -691,14 +767,14 @@ def _plan_layout(ctx: _LayoutContext, dbs: list[dict], *, topology: str = "paral
     # style where all circuits fit in one row with tight but readable spacing).
 
     gap_space = max(0, len(db_plans) - 1) * GAP_BETWEEN_DBS
-    # Apply component_scale to available width — smaller components use less page
-    _cs = config.component_scale
-    allocable = (avail_width - gap_space) * _cs
+    # Use FULL page width for allocation — component_scale shrinks symbols/text
+    # vertically but we want circuits to spread across the entire page width.
+    allocable = avail_width - gap_space
 
     # --- Helper: compute DB width at a given spacing ---
     # LEW reference: PG boundaries use ~3mm extra spacing (same as phase gaps),
     # not large physical gaps.  Keep tight to avoid inflating DB2 width.
-    PG_GAP = 3.0         # mm gap between protection groups (synced with _place_protection_groups)
+    PG_GAP = 15.0        # mm gap between protection groups (ref I2R-ETR-NLB: ~15mm)
     PG_MARGIN = 1.0      # mm margin per PG side (minimal busbar-end clearance)
 
     def _db_width_at_spacing(p: DBPlan, spacing: float) -> float:
@@ -999,6 +1075,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.connections.extend(source.connections)
     target.thick_connections.extend(source.thick_connections)
     target.dashed_connections.extend(source.dashed_connections)
+    target.short_dashed_connections.extend(source.short_dashed_connections)
     target.fixed_connections.extend(source.fixed_connections)
     target.thick_fixed_connections.extend(source.thick_fixed_connections)
     target.junction_dots.extend(source.junction_dots)
@@ -1342,30 +1419,26 @@ def _add_hierarchical_connections(
         child_cx = child.spine_x
 
         # Check if this child is fed from a BI crossbar circuit
-        # (feeder MCB already placed on crossbar — skip busbar-side feeder)
+        # (feeder MCB already placed on crossbar — skip busbar-side feeder).
+        # Per reference DWG: NO direct line between MSB feeder and DB2.
+        # Instead, DB2 shows independent incoming supply from below with
+        # "SUPPLY FROM MSB" label, cable tick, and cable spec.
         _xbar_exit = root_result.layout.crossbar_feeder_exits.get(child.board_name.upper())
         if _xbar_exit:
-            # Connection from crossbar feeder exit → child board top
-            xbar_x, xbar_y = _xbar_exit
+            # DB2 incoming supply: vertical line below DB box + labels
             child_top_y = child.db_box_start_y if child.db_box_start_y else child.busbar_y
-            # Diagonal/L-shaped cable run from crossbar exit to child spine
-            if abs(xbar_x - child_cx) > 1.0:
-                # L-shape: down from crossbar, horizontal to child spine, down to child
-                mid_y = xbar_y + 5
-                merged.connections.append(((xbar_x, xbar_y), (xbar_x, mid_y)))
-                merged.connections.append(((xbar_x, mid_y), (child_cx, mid_y)))
-                merged.connections.append(((child_cx, mid_y), (child_cx, child_top_y + 3)))
-            else:
-                merged.connections.append(((xbar_x, xbar_y), (child_cx, child_top_y + 3)))
+            _supply_line_bottom = child_top_y - 25  # line extends 25mm below DB box
 
-            # Supply label
-            _label_x = child_cx + 5
-            _label_y = child_top_y + 8
-            merged.components.append(PlacedComponent(
-                symbol_name="LABEL", x=_label_x, y=_label_y,
-                label=f"SUPPLY FROM {root_name}",
-            ))
-            # Cable spec label
+            # Vertical incoming line into DB2 box
+            merged.connections.append(((child_cx, _supply_line_bottom), (child_cx, child_top_y + 3)))
+
+            # Cable tick mark
+            _tick_y = _supply_line_bottom + 8
+            _tick_half = 1.5
+            merged.connections.append(((child_cx - _tick_half, _tick_y - _tick_half),
+                                       (child_cx + _tick_half, _tick_y + _tick_half)))
+
+            # Cable spec label (horizontal, right of tick)
             cable_text = ""
             if dbs:
                 for db in dbs:
@@ -1373,11 +1446,23 @@ def _add_hierarchical_connections(
                     if dn == child.board_name.upper():
                         cable_text = db.get("incoming_cable", "")
                         break
+            if not cable_text:
+                # Try feeder_circuits on parent
+                for fc in (dbs[root_result.board_idx].get("feeder_circuits", []) if dbs else []):
+                    if (fc.get("target_db") or "").upper() == child.board_name.upper():
+                        cable_text = fc.get("cable", "")
+                        break
             if cable_text:
                 merged.components.append(PlacedComponent(
-                    symbol_name="LABEL", x=_label_x, y=_label_y - 5,
+                    symbol_name="LABEL", x=child_cx + 5, y=_tick_y,
                     label=cable_text.upper(),
                 ))
+
+            # "SUPPLY FROM MSB" label below
+            merged.components.append(PlacedComponent(
+                symbol_name="LABEL", x=child_cx - 5, y=_supply_line_bottom - 3,
+                label=f"SUPPLY FROM {root_name}",
+            ))
             continue  # Skip normal busbar-side feeder placement
 
         # Find feeder circuit for this child
@@ -1885,7 +1970,8 @@ def _place_protection_groups(
         group_circuit_counts.append(max(n, 1))
 
     total_circuits = sum(group_circuit_counts)
-    gap = 8  # mm gap between groups — visual PG separation (synced with PG_GAP in _plan_layout)
+    # Inter-group gap: reference shows ~15mm between PG sub-busbars
+    gap = 15  # mm gap between groups (ref I2R-ETR-NLB: 14.8~16mm)
     # Minimal margins for protection groups (1mm per side = 2mm total per group)
     pg_margin = 1  # mm per side for each group busbar
     margin_overhead = num_groups * 2 * pg_margin + max(0, num_groups - 1) * gap
@@ -1895,6 +1981,12 @@ def _place_protection_groups(
     # Direct spacing: divide available space among circuits
     direct_spacing = usable_for_circuits / max(total_circuits, 1)
     overall_spacing = max(3.0, min(direct_spacing, config.max_horizontal_spacing))
+    logger.info(
+        "PG allocation: db_avail=%.1fmm, %d groups, %d circuits, "
+        "gap=%dmm, spacing=%.1fmm, usable=%.1fmm",
+        db_available_width, num_groups, total_circuits,
+        gap, overall_spacing, usable_for_circuits,
+    )
 
     # Distribute width proportionally per group
     group_widths = []
