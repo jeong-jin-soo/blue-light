@@ -153,6 +153,7 @@ export function ApplicationDocuments({
   const [samplePreviewKey, setSamplePreviewKey] = useState<string | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNoteValue(sldRequest?.applicantNote || '');
   }, [sldRequest?.applicantNote]);
 

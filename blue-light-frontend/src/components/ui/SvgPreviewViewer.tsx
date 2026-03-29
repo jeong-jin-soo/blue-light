@@ -61,6 +61,7 @@ export function SvgPreviewViewer({ svg, className = '' }: Props) {
 
   // Fit to container on SVG change
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setScale(1);
     setTranslate({ x: 0, y: 0 });
   }, [svg]);

@@ -33,6 +33,7 @@ export function SamplePreviewModal({
   // 파일 로드
   useEffect(() => {
     if (!isOpen || !activeSample) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setBlobUrl(null);
       return;
     }
@@ -65,6 +66,7 @@ export function SamplePreviewModal({
 
   // Reset index when category changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveIndex(0);
   }, [categoryKey]);
 

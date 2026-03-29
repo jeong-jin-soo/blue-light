@@ -56,6 +56,7 @@ export default function AdminApplicationListPage() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     adminApi
       .getApplications(

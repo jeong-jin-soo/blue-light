@@ -30,6 +30,7 @@ export default function LoginPage() {
     const reason = sessionStorage.getItem('licensekaki_logout_reason');
     if (reason === 'session_expired') {
       sessionStorage.removeItem('licensekaki_logout_reason');
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionExpiredMsg('Your session has expired. Please sign in again.');
     }
   }, []);
