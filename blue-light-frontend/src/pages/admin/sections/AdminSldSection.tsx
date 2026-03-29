@@ -141,7 +141,6 @@ export function AdminSldSection({
           {activeTab === 'ai' && (
             <SldChatPanel
               applicationSeq={applicationSeq}
-              sldRequest={sldRequest}
               onSldUpdated={onSldUpdated}
               existingSldFiles={existingSldFiles}
               onFileDelete={onFileDelete}
