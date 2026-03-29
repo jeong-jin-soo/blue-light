@@ -117,16 +117,6 @@ export function SldChatPanel({ applicationSeq, onSldUpdated, existingSldFiles = 
     [handleSend],
   );
 
-  // SLD 수락 — 기존 파일 존재 시 Replace/Add 선택
-  const handleAcceptClick = useCallback(() => {
-    if (!generatedFileId) return;
-    if (existingSldFiles.length > 0) {
-      setShowReplaceDialog(true);
-    } else {
-      doAccept(false);
-    }
-  }, [generatedFileId, existingSldFiles, doAccept]);
-
   const doAccept = useCallback(async (replaceExisting: boolean) => {
     if (!generatedFileId) return;
     setShowReplaceDialog(false);
@@ -153,6 +143,16 @@ export function SldChatPanel({ applicationSeq, onSldUpdated, existingSldFiles = 
       setAcceptLoading(false);
     }
   }, [applicationSeq, generatedFileId, existingSldFiles, onFileDelete, onSldUpdated, toast]);
+
+  // SLD 수락 — 기존 파일 존재 시 Replace/Add 선택
+  const handleAcceptClick = useCallback(() => {
+    if (!generatedFileId) return;
+    if (existingSldFiles.length > 0) {
+      setShowReplaceDialog(true);
+    } else {
+      doAccept(false);
+    }
+  }, [generatedFileId, existingSldFiles, doAccept]);
 
   // 대화 초기화
   const handleReset = useCallback(async () => {
