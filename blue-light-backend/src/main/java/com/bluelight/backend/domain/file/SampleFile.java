@@ -12,7 +12,7 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 /**
- * 샘플 파일 Entity (카테고리당 1개)
+ * 샘플 파일 Entity (카테고리당 여러 개 가능)
  * - 관리자가 업로드한 참고 파일을 신청자에게 제공
  */
 @Entity
@@ -30,7 +30,7 @@ public class SampleFile {
     /**
      * 카테고리 키 (예: 'photo', 'sld')
      */
-    @Column(name = "category_key", nullable = false, unique = true, length = 30)
+    @Column(name = "category_key", nullable = false, length = 30)
     private String categoryKey;
 
     /**
@@ -51,6 +51,12 @@ public class SampleFile {
     @Column(name = "file_size")
     private Long fileSize;
 
+    /**
+     * 정렬 순서 (카테고리 내)
+     */
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
+
     @Column(name = "uploaded_at")
     private LocalDateTime uploadedAt;
 
@@ -66,11 +72,12 @@ public class SampleFile {
     private Long updatedBy;
 
     @Builder
-    public SampleFile(String categoryKey, String fileUrl, String originalFilename, Long fileSize) {
+    public SampleFile(String categoryKey, String fileUrl, String originalFilename, Long fileSize, int sortOrder) {
         this.categoryKey = categoryKey;
         this.fileUrl = fileUrl;
         this.originalFilename = originalFilename;
         this.fileSize = fileSize;
+        this.sortOrder = sortOrder;
         this.uploadedAt = LocalDateTime.now();
     }
 
