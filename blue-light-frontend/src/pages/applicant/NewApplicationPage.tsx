@@ -255,7 +255,7 @@ export default function NewApplicationPage() {
         buildingType: formData.buildingType || undefined,
         selectedKva: formData.selectedKva,
         applicationType: formData.applicationType,
-        renewalPeriodMonths: formData.renewalPeriodMonths,
+        renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
         spAccountNo: formData.spAccountNo.trim() || undefined,
         sldOption: formData.sldOption,
       };
