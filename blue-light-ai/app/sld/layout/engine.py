@@ -54,9 +54,10 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
     total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
 
     # Estimate vertical pressure: more DBs/circuits → more compression
+    # CT metering adds significant vertical height even for single-DB layouts
     pressure = len(dbs)
     if has_ct:
-        pressure += 1
+        pressure += 2
     if has_pg:
         pressure += 1
     if total_circuits > 25:
@@ -89,14 +90,21 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
 
 
 def _auto_component_scale(requirements: dict) -> float:
-    """Compute component scale for multi-DB layouts.
+    """Compute component scale for layouts that need compression.
 
     Dense multi-DB drawings need smaller symbols and text to fit on A3.
-    Only applies to multi-DB; single-DB uses multi-row for overflow.
+    Single-DB CT metering also benefits from slight scaling due to
+    the tall CT metering spine section.
 
-    Returns 1.0 for single-DB, <1.0 for multi-DB (e.g. 0.65 = 65% size).
+    Returns 1.0 for simple layouts, <1.0 for dense ones.
     """
     dbs = requirements.get("distribution_boards", [])
+    has_ct = requirements.get("metering") in ("ct_meter", "ct_metering")
+
+    # Single-DB CT metering: moderate scale reduction for tall spine
+    if len(dbs) <= 1 and has_ct:
+        return 0.85
+
     if len(dbs) <= 1:
         return 1.0
 
@@ -237,9 +245,11 @@ def compute_layout(
     dbs = requirements.get("distribution_boards")
     is_multi_db = dbs and len(dbs) > 1
 
-    # Multi-DB compact mode: reduce vertical spacing to fit A3
-    if is_multi_db:
-        _apply_compact_spacing(config, dbs, requirements)
+    # Compact mode: reduce vertical spacing when layout is vertically dense
+    # Multi-DB always needs compression; single-DB CT metering also needs it
+    has_ct = requirements.get("metering") in ("ct_meter", "ct_metering")
+    if is_multi_db or has_ct:
+        _apply_compact_spacing(config, dbs or [], requirements)
 
     if is_multi_db:
         topology = requirements.get("db_topology")
@@ -1078,6 +1088,7 @@ def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     target.short_dashed_connections.extend(source.short_dashed_connections)
     target.fixed_connections.extend(source.fixed_connections)
     target.thick_fixed_connections.extend(source.thick_fixed_connections)
+    target.leader_connections.extend(source.leader_connections)
     target.junction_dots.extend(source.junction_dots)
     target.junction_arrows.extend(source.junction_arrows)
     target.solid_boxes.extend(source.solid_boxes)
