@@ -212,6 +212,15 @@ class SldPipeline:
         layout_result = compute_layout(requirements, application_info=app_info,
                                        page_config=pc)
 
+        # ❺½ Post-layout validation + auto-fix (max 2 attempts)
+        if layout_result.config:
+            from app.sld.layout.post_validator import validate_and_fix
+            validation_issues = validate_and_fix(layout_result, layout_result.config)
+            if validation_issues:
+                unfixed = [i for i in validation_issues if not i.fix_applied]
+                if unfixed:
+                    logger.warning("Post-layout: %d unfixed issues remain", len(unfixed))
+
         # Title block data
         title_block_kwargs = dict(
             project_name=app_info.get("project_title", "") or app_info.get("client_name", "") or app_info.get("address", "Electrical Installation"),
@@ -492,6 +501,9 @@ class SldPipeline:
         # BI_CONNECTOR crossbar extension (CT metering reference style)
         if comp.symbol_name == "BI_CONNECTOR" and getattr(comp, 'crossbar_extend', 0) > 0:
             render_kwargs["crossbar_extend"] = comp.crossbar_extend
+        # DP ISOL device: REF DXF uses scale=0.81 (smaller than standard)
+        if comp.symbol_name == "DP_ISOL_DEVICE":
+            render_kwargs["render_scale"] = 0.81
         symbol.render(
             backend, comp.x, comp.y,
             **render_kwargs,
@@ -756,15 +768,15 @@ class SldPipeline:
                 # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
                 pass
             else:
-                # Labels stacked from TOP of breaker downward, to the LEFT
-                label_top_y = comp.y + sym_h - 1  # Start 1mm below top of breaker
+                # Single multi-line MTEXT matching REF DXF format
+                label_top_y = comp.y + sym_h - 1
                 base_x = comp.x - config.breaker_label_x_default
-                for idx, line_text in enumerate(info_items):
-                    backend.add_mtext(
-                        line_text,
-                        insert=(base_x, label_top_y - idx * line_gap),
-                        char_height=char_h,
-                    )
+                block_text = "\\P".join(info_items)
+                backend.add_mtext(
+                    block_text,
+                    insert=(base_x, label_top_y),
+                    char_height=char_h,
+                )
 
             # Cable annotation — now handled by layout.py as shared leader lines
         else:
@@ -783,12 +795,14 @@ class SldPipeline:
                     # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
                     pass
                 else:
-                    for idx, line_text in enumerate(info_items):
-                        backend.add_mtext(
-                            line_text,
-                            insert=(base_x, comp.y + 2 + idx * line_gap),
-                            char_height=char_h,
-                        )
+                    # Single multi-line MTEXT matching REF DXF format
+                    # REF: "B10A\nSPN\nMCB\n6kA" as one MTEXT entity
+                    block_text = "\\P".join(info_items)
+                    backend.add_mtext(
+                        block_text,
+                        insert=(base_x, comp.y + 2),
+                        char_height=char_h,
+                    )
 
                 # Cable annotation — now handled by layout.py as shared leader lines
             else:

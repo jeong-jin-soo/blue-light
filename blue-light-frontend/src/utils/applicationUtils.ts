@@ -112,7 +112,7 @@ export const DOCUMENT_CATEGORIES: DocumentCategory[] = [
     bgColor: 'bg-purple-50',
     borderColor: 'border-purple-200',
     headerColor: 'text-purple-800',
-    applicantUpload: true,
+    applicantUpload: true,  // Only for RENEWAL — NEW applications auto-generate LOA via LEW
     adminUpload: true,
   },
   {

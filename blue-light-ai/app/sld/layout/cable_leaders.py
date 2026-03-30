@@ -139,8 +139,8 @@ def _draw_cable_leader_group(
         label_y_override: If set, cable text label starts at this Y instead of
             bend_top_y + 1. Used to align cable labels with sub-circuit labels.
     """
-    # Horizontal leader line
-    layout_result.connections.append((
+    # Horizontal leader line (DXF: LEADER entity, others: LINE)
+    layout_result.leader_connections.append((
         (leader_start_x, leader_y),
         (leader_end_x, leader_y),
     ))
