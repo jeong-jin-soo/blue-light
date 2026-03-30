@@ -835,6 +835,9 @@ class SldPipeline:
         # Thick fixed connections — busbar-weight lines (e.g., BI crossbar)
         for start, end in layout_result.thick_fixed_connections:
             backend.add_line(start, end, lineweight=50)
+        # Leader connections — cable annotation shelf lines (tick → text)
+        for start, end in layout_result.leader_connections:
+            backend.add_line(start, end)
 
     def _draw_fanout_groups(
         self, backend: DrawingBackend, layout_result: LayoutResult,
