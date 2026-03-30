@@ -361,7 +361,7 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
                 (cx + tick_size, tick_y + tick_size),
             ))
             _leader_len = ctx.config.cable_leader_len
-            result.connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
+            result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
             # Right-align text to left of leader end (clamped to drawing boundary)
             # For multiline text (\P separator), use longest line for width calculation
             _label_ch = 2.3

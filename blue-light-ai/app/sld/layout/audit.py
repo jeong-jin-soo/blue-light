@@ -273,7 +273,8 @@ def check_c3_no_dangling_wires(result: "LayoutResult") -> AuditCheckResult:
     # 모든 endpoint 수집 (thick_connections, dashed_connections 포함)
     all_endpoints: list[tuple[float, float]] = []
     for conn_list in (result.connections, result.fixed_connections,
-                      result.thick_connections, result.dashed_connections):
+                      result.thick_connections, result.dashed_connections,
+                      result.leader_connections):
         for (x1, y1), (x2, y2) in conn_list:
             all_endpoints.append((x1, y1))
             all_endpoints.append((x2, y2))

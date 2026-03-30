@@ -52,8 +52,8 @@ SYMBOL_TO_DXF_BLOCK: dict[str, str] = {
     # "VOLTMETER": "VOLTMETER",
     # Protection / auxiliaries
     "EARTH": "EARTH",
-    "FUSE": "2A FUSE",
-    "POTENTIAL_FUSE": "2A FUSE",
+    # FUSE/POTENTIAL_FUSE: procedural rendering only — REF draws as modelspace primitives
+    # (no "2A FUSE" block in REF DXF).
     # SELECTOR_SWITCH: procedural rendering only — DXF block "SS" renders dual-arc instead of circle+slash.
     # "SELECTOR_SWITCH": "SS",
     # ELR: procedural rendering only — DXF block "EF" has wrong dimensions.

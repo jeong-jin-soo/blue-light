@@ -241,14 +241,14 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     if cable_text:
         tick_x = g.mcb_right_x + 10
         tick_size = 1.5
-        result.connections.append((
+        result.thick_connections.append((
             (tick_x - tick_size, g.mb_center_y - tick_size),
             (tick_x + tick_size, g.mb_center_y + tick_size),
         ))
         leader_bottom_y = g.mb_center_y - 10
         result.connections.append(((tick_x, g.mb_center_y), (tick_x, leader_bottom_y)))
         shelf_len = 3
-        result.connections.append(((tick_x, leader_bottom_y), (tick_x + shelf_len, leader_bottom_y)))
+        result.leader_connections.append(((tick_x, leader_bottom_y), (tick_x + shelf_len, leader_bottom_y)))
         _label_ch = 2.8
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
@@ -278,7 +278,7 @@ def _add_outgoing_cable_tick(
         (cx + tick_size, tick_y + tick_size),
     ))
     _leader_len = 3
-    result.connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
+    result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
 
     _label_ch = 2.8
     _char_w = _label_ch * 0.6

@@ -522,6 +522,9 @@ class LayoutResult:
     fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     # Thick fixed connections: busbar-weight lines (lineweight=50), e.g., BI crossbar
     thick_fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
+    # Leader connections: horizontal cable annotation shelf lines
+    # DXF renders as LEADER (no arrow), other backends render as LINE
+    leader_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     junction_dots: list[tuple[float, float]] = field(default_factory=list)
     # CT branch junction arrows: (x, y, direction) — triangular connectors at CT branch points
     # direction: "left" or "right" (branch direction from spine)
