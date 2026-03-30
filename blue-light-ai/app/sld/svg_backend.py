@@ -410,17 +410,15 @@ class SvgBackend:
         """
         _FAN_RATIO = 0.266
 
-        # Center vertical: busbar → MCB entry pin (stops before MCB body)
-        self.add_line((center_x, busbar_y), (center_x, mcb_entry_y))
+        # Center vertical drawn by layout connections. Only diagonals here.
 
         for sx in side_xs:
             dx = sx - center_x
             fan_h = abs(dx) * _FAN_RATIO
             intermediate_y = busbar_y + fan_h
-            # Diagonal: center busbar → side intermediate
+            # Diagonal only: center busbar → side intermediate
+            # Side vertical (intermediate → MCB) drawn by layout connections
             self.add_line((center_x, busbar_y), (sx, intermediate_y))
-            # Side vertical: intermediate → MCB entry pin
-            self.add_line((sx, intermediate_y), (sx, mcb_entry_y))
 
     # -- Output --
 

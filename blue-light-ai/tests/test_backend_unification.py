@@ -85,8 +85,8 @@ class TestDrawCenterLine:
 class TestDrawFanout:
     """draw_fanout() 프로토콜 구현 검증."""
 
-    def test_svg_draws_5_lines_for_2_side_fanout(self):
-        """SVG: 2-side fanout → 5개 선 (center vertical + 2 diagonal + 2 side vertical)."""
+    def test_svg_draws_2_diagonals_for_2_side_fanout(self):
+        """SVG: 2-side fanout → 2 diagonals only. All verticals drawn by layout."""
         svg = SvgBackend()
         svg.set_layer("SLD_CONNECTIONS")
         svg.draw_fanout(
@@ -95,10 +95,10 @@ class TestDrawFanout:
         )
         output = svg.get_svg_string()
         line_count = output.count("<line")
-        assert line_count == 5, f"Expected 5 lines, got {line_count}"
+        assert line_count == 2, f"Expected 2 lines, got {line_count}"
 
-    def test_svg_draws_3_lines_for_1_side_fanout(self):
-        """SVG: 1-side fanout → 3개 선 (center vertical + 1 diagonal + 1 side vertical)."""
+    def test_svg_draws_1_diagonal_for_1_side_fanout(self):
+        """SVG: 1-side fanout → 1 diagonal only. Verticals drawn by layout."""
         svg = SvgBackend()
         svg.set_layer("SLD_CONNECTIONS")
         svg.draw_fanout(
@@ -107,7 +107,7 @@ class TestDrawFanout:
         )
         output = svg.get_svg_string()
         line_count = output.count("<line")
-        assert line_count == 3, f"Expected 3 lines, got {line_count}"
+        assert line_count == 1, f"Expected 1 line, got {line_count}"
 
     def test_pdf_draws_fanout_without_error(self):
         """PDF: draw_fanout 에러 없이 실행."""
@@ -120,8 +120,8 @@ class TestDrawFanout:
         data = pdf.get_bytes()
         assert len(data) > 0
 
-    def test_dxf_creates_fanout_block(self):
-        """DXF: FANOUT_3P 블록 생성 및 INSERT."""
+    def test_dxf_creates_fanout_diagonals_only(self):
+        """DXF: fan-out emits diagonals only (center+side verticals by layout)."""
         dxf = DxfBackend()
         dxf.set_layer("SLD_CONNECTIONS")
         dxf.draw_fanout(
@@ -129,22 +129,23 @@ class TestDrawFanout:
             side_xs=[80, 120], mcb_entry_y=80,
         )
         msp = dxf.doc.modelspace()
+        lines = [e for e in msp if e.dxftype() == "LINE"]
+        # 2 diagonals only (center + side verticals drawn by layout connections)
+        assert len(lines) == 2, f"Expected 2 diagonal lines, got {len(lines)}"
+        # No block INSERTs — individual LINEs match REF DXF
         inserts = [e for e in msp if e.dxftype() == "INSERT"]
-        assert len(inserts) == 1
-        assert inserts[0].dxf.name.startswith("FANOUT_3P_")
+        assert len(inserts) == 0
 
-    def test_dxf_fanout_block_has_5_lines(self):
-        """DXF: fanout 블록 내부에 5개 LINE (center + 2 diagonal + 2 side vertical)."""
+    def test_dxf_fanout_has_2_diagonal_lines(self):
+        """DXF: fan-out produces 2 diagonal LINEs for 2-side fan-out."""
         dxf = DxfBackend()
         dxf.draw_fanout(
             center_x=100, busbar_y=50,
             side_xs=[80, 120], mcb_entry_y=80,
         )
         msp = dxf.doc.modelspace()
-        insert = [e for e in msp if e.dxftype() == "INSERT"][0]
-        block = dxf.doc.blocks[insert.dxf.name]
-        lines = [e for e in block if e.dxftype() == "LINE"]
-        assert len(lines) == 5, f"Expected 5 lines in block, got {len(lines)}"
+        lines = [e for e in msp if e.dxftype() == "LINE"]
+        assert len(lines) == 2, f"Expected 2 diagonal lines, got {len(lines)}"
 
     def test_fanout_ratio_consistency(self):
         """SVG fanout 대각선 높이가 _FAN_RATIO=0.266과 일치."""

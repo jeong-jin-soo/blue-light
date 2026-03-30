@@ -408,53 +408,38 @@ class DxfBackend:
         side_xs: list[float],
         mcb_entry_y: float,
     ) -> None:
-        """Create and insert a 3-phase fan-out block at the given busbar position.
+        """Draw 3-phase fan-out as individual LINE entities (matching REF CAD structure).
 
         mcb_entry_y = MCB busbar-side entry pin. Lines stop here;
         MCB symbol draws its own body and exit stub internally.
+
+        Reference: 63A TPN SLD 14 DXF uses 18 individual modelspace LINEs,
+        not block INSERTs. This allows LEWs to edit individual lines in AutoCAD.
 
         Reference ratio: fan_height / spacing = 193 / 727 ≈ 0.266
         """
         _FAN_RATIO = 0.266
 
-        # Build a unique block name based on geometry
-        side_count = len(side_xs)
-        spacings = [abs(sx - center_x) for sx in side_xs]
-        avg_sp = sum(spacings) / len(spacings) if spacings else 0
-        block_name = f"FANOUT_3P_{side_count}S_{avg_sp:.1f}"
+        layer = "SLD-LINE"
+        attribs = self._dxfattribs()
+        attribs["layer"] = layer
 
-        total_h = mcb_entry_y - busbar_y  # height from busbar to MCB entry pin
+        # Center vertical is already drawn by layout connections (busbar → MCB).
+        # draw_fanout only adds the diagonal lines from center to side intermediates.
 
-        if block_name not in self._doc.blocks:
-            # Block origin = (0, 0) at center busbar junction
-            block = self._doc.blocks.new(name=block_name)
-            layer = "SLD-LINE"
-            attribs = {"layer": layer, "lineweight": 25}
+        for sx in side_xs:
+            dx = sx - center_x
+            fan_h = abs(dx) * _FAN_RATIO
 
-            # Center vertical: busbar → MCB entry pin
-            block.add_line((0, 0), (0, total_h), dxfattribs=attribs)
-
-            for sx in side_xs:
-                dx = sx - center_x  # signed offset
-                fan_h = abs(dx) * _FAN_RATIO
-
-                # Diagonal: center busbar → side intermediate
-                block.add_line((0, 0), (dx, fan_h), dxfattribs=attribs)
-                # Side vertical: intermediate → MCB entry pin
-                block.add_line((dx, fan_h), (dx, total_h), dxfattribs=attribs)
-
-        # Insert the block (apply content scale transform)
-        tx, ty = self._tx(center_x, busbar_y)
-        s = self._content_scale
-        self._msp.add_blockref(
-            block_name,
-            insert=(tx, ty),
-            dxfattribs={
-                "layer": "SLD-LINE",
-                "xscale": s,
-                "yscale": s,
-            },
-        )
+            # Diagonal only: center busbar → side intermediate
+            # Side vertical (intermediate → MCB) is already drawn by layout connections
+            # (phase_fanout.py truncates the original busbar→MCB connection to start
+            # at intermediate_y, so no additional vertical line needed here).
+            self._msp.add_line(
+                self._tx(center_x, busbar_y),
+                self._tx(sx, busbar_y + fan_h),
+                dxfattribs=dict(attribs),
+            )
 
     # -- Paper Space --
 
@@ -557,7 +542,30 @@ class DxfBackend:
             margins=layout.Margins(top=5, right=5, bottom=5, left=5),
         )
         settings = layout.Settings(fit_page=True)
-        return backend.get_pdf_bytes(page, settings=settings)
+        vector_pdf = backend.get_pdf_bytes(page, settings=settings)
+
+        # Post-rasterize for macOS Preview compatibility.
+        # ezdxf renders ALL text as vector paths, producing 200K+ path ops
+        # that crash Preview.app. Convert to 200dpi image PDF (~300KB).
+        try:
+            import fitz  # PyMuPDF
+            src = fitz.open(stream=vector_pdf, filetype="pdf")
+            dst = fitz.open()
+            for src_page in src:
+                dpi = 200
+                pix = src_page.get_pixmap(dpi=dpi, alpha=False)
+                img_page = dst.new_page(
+                    width=src_page.rect.width,
+                    height=src_page.rect.height,
+                )
+                img_page.insert_image(img_page.rect, pixmap=pix)
+            raster_pdf = dst.tobytes(deflate=True, garbage=4)
+            src.close()
+            dst.close()
+            return raster_pdf
+        except Exception as e:
+            logger.warning("PDF rasterization failed, returning vector PDF: %s", e)
+            return vector_pdf
 
     def to_svg_string(self) -> str:
         """

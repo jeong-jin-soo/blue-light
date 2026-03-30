@@ -508,6 +508,7 @@ def compute_layout(
 
         # Store spine_x BEFORE resolve_overlaps for deterministic incoming chain detection
         ctx.result.spine_x = cx
+        ctx.result.use_triplets = ctx.use_triplets
 
         # Sub-circuit post-processing (these only ADD new elements or
         # reposition sub-circuit X coordinates — they don't modify spine
