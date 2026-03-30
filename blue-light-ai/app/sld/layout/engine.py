@@ -568,7 +568,8 @@ def _collect_content_extents(
         all_ys.append(jy)
     for collection in (result.connections, result.dashed_connections,
                        result.short_dashed_connections,
-                       result.thick_connections, result.fixed_connections):
+                       result.thick_connections, result.fixed_connections,
+                       result.leader_connections):
         for (sx, sy), (ex, ey) in collection:
             all_xs.extend([sx, ex])
             all_ys.extend([sy, ey])
@@ -602,6 +603,8 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
         result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_fixed_connections):
         result.thick_fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    for i, ((sx, sy), (ex, ey)) in enumerate(result.leader_connections):
+        result.leader_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
         result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
     for i, (dx, dy) in enumerate(result.junction_dots):
