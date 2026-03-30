@@ -84,8 +84,8 @@
   <line x1="248.09" y1="104.91" x2="246.89" y2="104.31" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="248.09" y1="104.91" x2="246.89" y2="105.51" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="245.20" y="76.15" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,245.20,75.03)">SPARE</text>
-  <text x="165.80" y="76.15" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,165.80,75.03)">2C 1.5sqmm PVC/PVC</text>
-  <text x="224.00" y="76.15" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,224.00,75.03)">2C 4.0sqmm PVC/PVC</text>
+  <text x="167.40" y="76.15" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,167.40,75.03)">2C 1.5sqmm PVC/PVC</text>
+  <text x="222.60" y="76.15" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,222.60,75.03)">2C 4.0sqmm PVC/PVC</text>
   <text x="161.30" y="156.31" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
   <text x="161.30" y="159.35" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 14 KVA AT 230V</text>
   <line x1="259.23" y1="164.91" x2="259.23" y2="166.71" stroke="#000000" stroke-width="0.25" fill="none" />

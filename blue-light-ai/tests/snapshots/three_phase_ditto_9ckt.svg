@@ -143,12 +143,12 @@
   <line x1="362.39" y1="67.42" x2="361.19" y2="66.82" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="362.39" y1="67.42" x2="361.19" y2="68.02" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="359.50" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,359.50,37.54)">SPARE</text>
-  <text x="53.50" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,53.50,37.54)">2 x 1C 1.5sqmm PVC + 1.5sqmm</text>
-  <text x="57.42" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,57.42,37.54)">PVC CPC IN PVC CONDUIT</text>
-  <text x="333.62" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,333.62,37.54)">2 x 1C 2.5sqmm PVC + 2.5sqmm</text>
-  <text x="337.55" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,337.55,37.54)">PVC CPC IN PVC CONDUIT</text>
-  <text x="274.75" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,274.75,37.54)">2 x 1C 6sqmm PVC + 4sqmm</text>
-  <text x="278.67" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,278.67,37.54)">PVC CPC IN PVC CONDUIT</text>
+  <text x="55.10" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,55.10,37.54)">2 x 1C 1.5sqmm PVC + 1.5sqmm</text>
+  <text x="59.02" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,59.02,37.54)">PVC CPC IN PVC CONDUIT</text>
+  <text x="332.23" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,332.23,37.54)">2 x 1C 2.5sqmm PVC + 2.5sqmm</text>
+  <text x="336.15" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,336.15,37.54)">PVC CPC IN PVC CONDUIT</text>
+  <text x="276.35" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,276.35,37.54)">2 x 1C 6sqmm PVC + 4sqmm</text>
+  <text x="280.27" y="38.66" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,280.27,37.54)">PVC CPC IN PVC CONDUIT</text>
   <text x="49.00" y="178.82" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
   <text x="49.00" y="181.86" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 45 KVA AT 400V</text>
   <line x1="360.30" y1="187.42" x2="360.30" y2="189.22" stroke="#000000" stroke-width="0.25" fill="none" />

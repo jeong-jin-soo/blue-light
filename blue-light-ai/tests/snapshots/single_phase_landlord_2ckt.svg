@@ -64,8 +64,8 @@
   <line x1="233.49" y1="111.20" x2="232.29" y2="111.80" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="222.10" y="109.80" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000"><tspan x="222.10">B20A</tspan><tspan x="222.10" dy="2.8">SPN</tspan><tspan x="222.10" dy="2.8">MCB</tspan><tspan x="222.10" dy="2.8">6kA</tspan></text>
   <text x="230.60" y="82.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,230.60,81.32)">1 NO. POWER</text>
-  <text x="182.40" y="82.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,182.40,81.32)">2C 1.5sqmm PVC/PVC</text>
-  <text x="240.60" y="82.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,240.60,81.32)">2C 4.0sqmm PVC/PVC</text>
+  <text x="184.00" y="82.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,184.00,81.32)">2C 1.5sqmm PVC/PVC</text>
+  <text x="239.20" y="82.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,239.20,81.32)">2C 4.0sqmm PVC/PVC</text>
   <text x="177.90" y="162.60" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">40A DB</text>
   <text x="177.90" y="165.64" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 9 KVA AT 230V</text>
   <text x="177.90" y="175.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">(LOCATED INSIDE UNIT)</text>

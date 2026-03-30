@@ -122,12 +122,12 @@
   <line x1="333.39" y1="131.50" x2="332.19" y2="130.90" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="333.39" y1="131.50" x2="332.19" y2="132.10" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="330.50" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,330.50,101.62)">SPARE</text>
-  <text x="82.50" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,82.50,101.62)">2C 1.5sqmm PVC + 1.5sqmm</text>
-  <text x="86.42" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,86.42,101.62)">PVC CPC IN METAL TRUNKING</text>
-  <text x="226.00" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,226.00,101.62)">2C 2.5sqmm PVC + 2.5sqmm</text>
-  <text x="229.92" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,229.92,101.62)">PVC CPC IN METAL TRUNKING</text>
-  <text x="283.25" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,283.25,101.62)">2C 6.0sqmm PVC + 6.0sqmm</text>
-  <text x="287.17" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,287.17,101.62)">PVC CPC IN METAL TRUNKING</text>
+  <text x="84.10" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,84.10,101.62)">2C 1.5sqmm PVC + 1.5sqmm</text>
+  <text x="88.02" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,88.02,101.62)">PVC CPC IN METAL TRUNKING</text>
+  <text x="224.60" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,224.60,101.62)">2C 2.5sqmm PVC + 2.5sqmm</text>
+  <text x="228.52" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,228.52,101.62)">PVC CPC IN METAL TRUNKING</text>
+  <text x="233.22" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,233.22,101.62)">2C 6.0sqmm PVC + 6.0sqmm</text>
+  <text x="237.14" y="102.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,237.14,101.62)">PVC CPC IN METAL TRUNKING</text>
   <text x="78.00" y="167.90" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
   <text x="78.00" y="170.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 45 KVA AT 400V</text>
   <text x="78.00" y="180.74" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">(LOCATED INSIDE UNIT)</text>
@@ -171,7 +171,7 @@
   <line x1="330.50" y1="125.50" x2="330.50" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="85.50" y1="107.50" x2="85.50" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="226.00" y1="107.50" x2="226.00" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="283.25" y1="107.50" x2="283.25" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="234.62" y1="107.50" x2="234.62" y2="102.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="334.20" y1="147.50" x2="334.20" y2="176.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="208.75" y1="183.65" x2="211.25" y2="181.15" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="94.25" y1="108.75" x2="96.75" y2="106.25" stroke="#000000" stroke-width="0.50" fill="none" />
@@ -182,7 +182,7 @@
   <line x1="210.00" y1="182.40" x2="201.00" y2="182.40" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="85.50" y1="107.50" x2="95.50" y2="107.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="187.38" y1="107.50" x2="226.00" y2="107.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="244.62" y1="107.50" x2="283.25" y2="107.50" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="234.62" y1="107.50" x2="273.25" y2="107.50" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="124.12" y1="147.50" x2="95.50" y2="139.89" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="124.12" y1="147.50" x2="152.75" y2="139.89" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="216.00" y1="147.50" x2="187.38" y2="139.89" stroke="#000000" stroke-width="0.25" fill="none" />

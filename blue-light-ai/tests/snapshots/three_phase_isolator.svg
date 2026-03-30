@@ -141,12 +141,12 @@
   <line x1="333.39" y1="118.11" x2="332.19" y2="117.51" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="333.39" y1="118.11" x2="332.19" y2="118.71" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="330.50" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,330.50,82.43)">SPARE</text>
-  <text x="82.50" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,82.50,82.43)">2C 1.5sqmm PVC + 1.5sqmm</text>
-  <text x="86.42" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,86.42,82.43)">PVC CPC IN METAL TRUNKING</text>
-  <text x="254.62" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,254.62,82.43)">2C 2.5sqmm PVC + 2.5sqmm</text>
-  <text x="258.55" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,258.55,82.43)">PVC CPC IN METAL TRUNKING</text>
-  <text x="203.00" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,203.00,82.43)">2C 6.0sqmm PVC + 6.0sqmm</text>
-  <text x="206.92" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,206.92,82.43)">PVC CPC IN METAL TRUNKING</text>
+  <text x="84.10" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,84.10,82.43)">2C 1.5sqmm PVC + 1.5sqmm</text>
+  <text x="88.02" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,88.02,82.43)">PVC CPC IN METAL TRUNKING</text>
+  <text x="253.22" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,253.22,82.43)">2C 2.5sqmm PVC + 2.5sqmm</text>
+  <text x="257.14" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,257.14,82.43)">PVC CPC IN METAL TRUNKING</text>
+  <text x="204.60" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,204.60,82.43)">2C 6.0sqmm PVC + 6.0sqmm</text>
+  <text x="208.52" y="83.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,208.52,82.43)">PVC CPC IN METAL TRUNKING</text>
   <polygon points="214.54,90.11 218.26,90.11 218.26,86.39 214.54,86.39" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="218.26" y1="88.25" x2="220.21" y2="88.25" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="220.21" y1="88.25" x2="220.21" y2="89.84" stroke="#000000" stroke-width="0.25" fill="none" />

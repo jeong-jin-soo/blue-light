@@ -167,6 +167,9 @@ def _draw_cable_leader_group(
     # Clamp leader endpoints to drawing boundaries
     _max_x = config.max_x if config else 395.0
     _min_x = config.min_x if config else 25.0
+    # For 90° rotated text, comp.x is the left/bottom edge.
+    # To center text on the L-bend vertical line: x = bend_x - char_height / 2
+    _ch = config.label_char_height if config else 2.8
     if text_on_left:
         _bend_x = max(leader_start_x, _min_x)
         layout_result.connections.append((
@@ -175,7 +178,7 @@ def _draw_cable_leader_group(
         ))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=max(_bend_x - 3, _min_x),
+            x=max(_bend_x - _ch / 2, _min_x),
             y=text_y,
             label=cable_text,
             rotation=90.0,
@@ -188,7 +191,7 @@ def _draw_cable_leader_group(
         ))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
-            x=_bend_x,
+            x=_bend_x - _ch / 2,
             y=text_y,
             label=cable_text,
             rotation=90.0,
@@ -388,7 +391,7 @@ def _add_cable_leader_lines(
             cable_x_span = config.label_char_height + (cable_num_lines - 1) * _line_spacing
             cable_hw = cable_x_span / 2  # 대칭 hw (collision avoidance용)
             cable_hw_right = cable_x_span  # 비대칭: anchor에서 우측으로 전체 확장
-            text_x = (leader_start_x - 3) if text_on_left else leader_end_x
+            text_x = (leader_start_x - config.label_char_height / 2) if text_on_left else (leader_end_x - config.label_char_height / 2)
             # 비대칭 bb: text_x 기준 좌측은 char_h/2, 우측은 cable_x_span
             cable_bb = (text_x - config.label_char_height / 2, text_x + cable_x_span)
 
@@ -400,11 +403,11 @@ def _add_cable_leader_lines(
                 if alt_on_left:
                     alt_ext = min(leader_extension, effective_left)
                     alt_start = leftmost_x - alt_ext
-                    alt_text_x = alt_start - 3
+                    alt_text_x = alt_start - config.label_char_height / 2
                 else:
                     alt_ext = min(leader_extension, effective_right)
                     alt_end = rightmost_x + alt_ext
-                    alt_text_x = alt_end
+                    alt_text_x = alt_end - config.label_char_height / 2
                 alt_bb = (alt_text_x - config.label_char_height / 2, alt_text_x + cable_x_span)
 
                 if not _has_collision(alt_bb, effective_leader_y, own_tap_xs=tap_xs, text_x=alt_text_x):
@@ -450,7 +453,7 @@ def _add_cable_leader_lines(
                             for _extra in (4.0, 8.0, 12.0, 16.0, 24.0, 32.0):
                                 if _try_left:
                                     _start2 = max(leftmost_x - leader_extension - _extra, _abs_min_left)
-                                    _tx2 = _start2 - 3
+                                    _tx2 = _start2 - config.label_char_height / 2
                                     _bb2 = (_tx2 - config.label_char_height / 2, _tx2 + cable_x_span)
                                     if _bb2[0] < _abs_min_left:
                                         continue
@@ -463,7 +466,7 @@ def _add_cable_leader_lines(
                                         break
                                 else:
                                     _end2 = min(rightmost_x + leader_extension + _extra, _abs_max_right)
-                                    _tx2 = _end2
+                                    _tx2 = _end2 - config.label_char_height / 2
                                     _bb2 = (_tx2 - config.label_char_height / 2, _tx2 + cable_x_span)
                                     if _bb2[1] > _abs_max_right + cable_hw:
                                         continue
@@ -488,7 +491,8 @@ def _add_cable_leader_lines(
             leader_end_x = min(leader_end_x, config.max_x - 1)
 
             # Register final cable text BB for subsequent collision checks
-            final_text_x = (leader_start_x - 3) if text_on_left else leader_end_x
+            _ch_half = config.label_char_height / 2
+            final_text_x = (leader_start_x - _ch_half) if text_on_left else (leader_end_x - _ch_half)
             final_bb = (final_text_x - config.label_char_height / 2, final_text_x + cable_x_span)
             placed_cable_bbs.append((final_bb[0], final_bb[1], effective_leader_y))
 
