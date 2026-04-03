@@ -686,6 +686,65 @@ class OverflowMetrics:
 from app.sld.locale import SG_LOCALE, SldLocale
 
 
+# -- 3-Phase Layout Engine dataclasses (Measure → Allocate → Place) --
+
+@dataclass(frozen=True)
+class SectionMeasure:
+    """Phase 1 (Measure) 출력: 한 섹션의 공간 요구사항.
+
+    그리지 않고 크기만 계산한 결과.
+    present=False인 섹션은 조건부로 생략됨 (예: CT metering, meter board).
+    """
+    section_id: str
+    height: float           # mm, 필요한 세로 공간 (gaps 포함)
+    min_width: float = 0.0  # mm, 최소 가로 공간 (busbar/meter board 등)
+    present: bool = True    # False면 이 섹션은 생략
+    exports: dict[str, float] = field(default_factory=dict)
+    # exports 예: {"arc_center_y_offset": 4.5, "bi_center_offset": 12.0}
+
+
+@dataclass(frozen=True)
+class SectionRegionV2:
+    """Phase 2 (Allocate) 출력 → Phase 3 (Place) 입력.
+
+    각 섹션에 할당된 영역. 섹션은 이 영역 안에서만 컴포넌트를 배치한다.
+    """
+    section_id: str
+    y_start: float          # mm, 영역 하단 (DXF 좌표계: 아래가 작음)
+    y_end: float            # mm, 영역 상단
+    x_center: float         # mm, 영역 중심 X
+    available_width: float  # mm, 가용 가로 폭
+
+    @property
+    def height(self) -> float:
+        return self.y_end - self.y_start
+
+    @property
+    def x_left(self) -> float:
+        return self.x_center - self.available_width / 2
+
+    @property
+    def x_right(self) -> float:
+        return self.x_center + self.available_width / 2
+
+
+@dataclass(frozen=True)
+class AllocationPlan:
+    """Phase 2 (Allocate) 출력: 전체 배치 계획.
+
+    Measure 결과 + 페이지 크기를 기반으로 scale, 영역, busbar 폭을 결정한다.
+    """
+    scale: float                                    # 1.0, 0.9, 0.8 ...
+    section_regions: dict[str, SectionRegionV2] = field(default_factory=dict)
+    busbar_x_range: tuple[float, float] = (100.0, 320.0)  # (start_x, end_x)
+    circuits_per_row: list[list[int]] = field(default_factory=list)
+    total_height: float = 0.0
+    spine_x: float = 210.0
+
+    def has_section(self, section_id: str) -> bool:
+        return section_id in self.section_regions
+
+
 # -- Layout Planning dataclasses (pre-computation before placement) --
 
 @dataclass

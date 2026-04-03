@@ -474,9 +474,9 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
         return
 
     ctx.result.sections_rendered["ct_pre_mccb_fuse"] = True
-    from app.sld.real_symbols import get_symbol_dimensions
-    pf_dims = get_symbol_dimensions("POTENTIAL_FUSE")
-    pf_h = pf_dims["height_mm"]  # 8mm — horizontal extent when rotated
+    from app.sld.catalog import get_catalog as _gc_pf
+    _pf_def = _gc_pf().get("POTENTIAL_FUSE")
+    pf_h = _pf_def.height  # 8mm — horizontal extent when rotated
 
     result = ctx.result
     cx = ctx.cx
@@ -487,8 +487,8 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
         ("POTENTIAL_FUSE", "2A", pf_h),
     ]
     if ctx.has_indicator_lights:
-        il_dims = get_symbol_dimensions("INDICATOR_LIGHTS")
-        components.append(("INDICATOR_LIGHTS", "", il_dims["width_mm"]))
+        _il_def = _gc_pf().get("INDICATOR_LIGHTS")
+        components.append(("INDICATOR_LIGHTS", "", _il_def.width))
 
     # Place as horizontal RIGHT branch (T-junction from spine)
     # DB box bottom is at ~(y - 1), so offset +4 gives 5mm clearance.
@@ -1255,8 +1255,8 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
 
     # DB box horizontal extents
     # Reserve space to the right for earth bar (symbol + gap + label)
-    from app.sld.real_symbols import get_symbol_dimensions as _gsd
-    _earth_w = _gsd("EARTH")["width_mm"]
+    from app.sld.catalog import get_catalog as _gc_earth
+    _earth_w = _gc_earth().get("EARTH").width
     earth_reserve = config.earth_x_from_db + _earth_w + 5  # gap + symbol + E label
     db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
     db_box_right = min(result.busbar_end_x + 10, config.max_x - earth_reserve)
@@ -1293,10 +1293,10 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
 
     # -- 7. Earth Bar (outside DB box, right side) --
     # RealEarth symbol dimensions: width=12mm, height=10mm (from real_symbol_paths.json)
-    from app.sld.real_symbols import get_symbol_dimensions
-    _earth_dims = get_symbol_dimensions("EARTH")
-    _earth_w = _earth_dims["width_mm"]   # 12
-    _earth_h = _earth_dims["height_mm"]  # 10
+    from app.sld.catalog import get_catalog as _gc_earth2
+    _earth_def = _gc_earth2().get("EARTH")
+    _earth_w = _earth_def.width   # 5.5
+    _earth_h = _earth_def.height  # 4.5
 
     # Position earth bar BELOW the DB box, slightly left of the right edge.
     # Connection is a straight vertical line from DB box bottom to earth top pin.

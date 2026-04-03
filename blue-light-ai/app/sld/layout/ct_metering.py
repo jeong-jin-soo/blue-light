@@ -325,9 +325,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             ("POTENTIAL_FUSE", "2A", pf_h),
         ]
         if ctx.has_indicator_lights:
-            from app.sld.real_symbols import get_symbol_dimensions as _get_il_dims
-            _il_dims = _get_il_dims("INDICATOR_LIGHTS")
-            _inst_fuse_components.append(("INDICATOR_LIGHTS", "", _il_dims["width_mm"]))
+            from app.sld.catalog import get_catalog as _gc_il
+            _il_def = _gc_il().get("INDICATOR_LIGHTS")
+            _inst_fuse_components.append(("INDICATOR_LIGHTS", "", _il_def.width))
         _inst_fuse_gap = 10.0  # wider gap for VSS diagonal start visibility
         _place_metering_branch(
             result, cx, _inst_fuse_y, direction="right",

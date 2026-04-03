@@ -1389,8 +1389,8 @@ def render_board(
     # crossbar at the shifted cx.
     _saved_cx_for_elcb = None
     if _has_ct_metering and ctx.bi_center_y > 0:
-        from app.sld.real_symbols import get_symbol_dimensions as _gsd_elcb
-        _bi_w_elcb = _gsd_elcb("BI_CONNECTOR")["width_mm"]
+        from app.sld.catalog import get_catalog as _gc_elcb
+        _bi_w_elcb = _gc_elcb().get("BI_CONNECTOR").width
         _saved_cx_for_elcb = ctx.cx
         _elcb_cx = ctx.cx - _bi_w_elcb * 3
         ctx.cx = _elcb_cx
@@ -1418,28 +1418,28 @@ def render_board(
         # Use full (pre-ratio) busbar extent for crossbar positioning
         _full_end_x = result.busbar_full_end_x or result.busbar_end_x
         _db_box_left = max(result.busbar_start_x - 10, config.min_x + 2)
-        from app.sld.real_symbols import get_symbol_dimensions as _gsd_xbar
-        _earth_w = _gsd_xbar("EARTH")["width_mm"]
+        from app.sld.catalog import get_catalog as _gc_xbar
+        _cat_xbar = _gc_xbar()
+        _earth_w = _cat_xbar.get("EARTH").width
         _earth_reserve = config.earth_x_from_db + _earth_w + 5
         _db_box_right = min(_full_end_x + 10, config.max_x - _earth_reserve)
         _db_box_width = _db_box_right - _db_box_left
 
         # Crossbar extent: aligned with BI connector, within DB box
-        _bi_dims_xbar = _gsd_xbar("BI_CONNECTOR")
-        _bi_shift = _bi_dims_xbar["width_mm"] * 1.5
+        _bi_shift = _cat_xbar.get("BI_CONNECTOR").width * 1.5
         _xbar_sx = _db_box_left + _db_box_width * 0.20 - _bi_shift
         _xbar_ex = _db_box_right - _db_box_width * 0.05 - _bi_shift
 
         _xbar_circuits = ctx.bi_crossbar_circuits
         if _xbar_circuits:
             from app.sld.layout.sections import _place_bi_crossbar_circuits
-            _bi_dims = _gsd_xbar("BI_CONNECTOR")
+            _bi_def = _cat_xbar.get("BI_CONNECTOR")
             # Place circuits at crossbar right end (beyond busbar to avoid overlap)
             _circuit_end_x = _xbar_ex
             _rightmost = _place_bi_crossbar_circuits(
                 result, ctx, cx,
-                _bi_cy - _bi_dims["height_mm"] / 2,
-                _bi_dims["width_mm"], _bi_dims["height_mm"],
+                _bi_cy - _bi_def.height / 2,
+                _bi_def.width, _bi_def.height,
                 _xbar_circuits, spacing=15.0,
                 busbar_end_x=_circuit_end_x,
                 busbar_y=result.busbar_y,

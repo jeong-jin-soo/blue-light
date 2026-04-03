@@ -124,9 +124,9 @@ _SYMBOL_DIMS: dict[str, tuple[float, float]] | None = None
 
 
 def _get_symbol_dims() -> dict[str, tuple[float, float]]:
-    """Load symbol dimensions from real_symbol_paths.json (single source of truth).
+    """Load symbol dimensions from ComponentCatalog (single source of truth).
 
-    Falls back to ``_FALLBACK_SYMBOL_DIMS`` if the JSON file cannot be read.
+    Falls back to ``_FALLBACK_SYMBOL_DIMS`` if the catalog cannot be loaded.
     Result is cached after first call.
     """
     global _SYMBOL_DIMS
@@ -134,24 +134,23 @@ def _get_symbol_dims() -> dict[str, tuple[float, float]]:
         return _SYMBOL_DIMS
 
     try:
-        from app.sld.real_symbols import get_symbol_dimensions
+        from app.sld.catalog import get_catalog
 
         dims = dict(_FALLBACK_SYMBOL_DIMS)  # start with fallback
-        _JSON_KEY_MAP = {
+        cat = get_catalog()
+        _CATALOG_KEY_MAP = {
             "CB_MCB": "MCB", "CB_MCCB": "MCCB", "CB_ACB": "ACB",
             "CB_ELCB": "ELCB", "CB_RCCB": "RCCB",
             "ISOLATOR": "ISOLATOR", "KWH_METER": "KWH_METER",
             "CT": "CT", "EARTH": "EARTH",
         }
-        for overlap_key, json_key in _JSON_KEY_MAP.items():
-            try:
-                d = get_symbol_dimensions(json_key)
-                dims[overlap_key] = (d["width_mm"], d["height_mm"])
-            except (ValueError, KeyError):
-                pass  # keep fallback for this symbol
+        for overlap_key, catalog_key in _CATALOG_KEY_MAP.items():
+            if cat.has(catalog_key):
+                comp = cat.get(catalog_key)
+                dims[overlap_key] = (comp.width, comp.height)
         _SYMBOL_DIMS = dims
     except Exception:
-        logger.debug("Failed to load symbol dims from JSON, using fallback")
+        logger.debug("Failed to load symbol dims from catalog, using fallback")
         _SYMBOL_DIMS = dict(_FALLBACK_SYMBOL_DIMS)
 
     return _SYMBOL_DIMS
@@ -299,19 +298,20 @@ _PIN_HALF_WIDTHS: dict[str, float] | None = None
 
 
 def _load_pin_half_widths() -> dict[str, float]:
-    """Load pin half-widths from real_symbol_paths.json (once)."""
+    """Load pin half-widths from ComponentCatalog (once)."""
     global _PIN_HALF_WIDTHS
     if _PIN_HALF_WIDTHS is not None:
         return _PIN_HALF_WIDTHS
     try:
-        from app.sld.real_symbols import get_symbol_dimensions
+        from app.sld.catalog import get_catalog
+        cat = get_catalog()
         result: dict[str, float] = {}
-        for json_key in ("MCB", "MCCB", "RCCB", "ELCB", "ACB"):
-            dims = get_symbol_dimensions(json_key)
-            result[json_key] = dims["width_mm"] / 2.0
+        for name in ("MCB", "MCCB", "RCCB", "ELCB", "ACB"):
+            if cat.has(name):
+                result[name] = cat.get(name).width / 2.0
         _PIN_HALF_WIDTHS = result
     except Exception:
-        # Fallback to hardcoded values if JSON unavailable
+        # Fallback to hardcoded values if catalog unavailable
         _PIN_HALF_WIDTHS = {
             "MCB": 2.5, "MCCB": 2.75, "RCCB": 3.25, "ELCB": 3.25, "ACB": 3.5,
         }

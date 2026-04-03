@@ -322,9 +322,9 @@ def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> N
 
     # Earth symbol — 3-phase only
     if ctx.supply_type != "single_phase":
-        from app.sld.real_symbols import get_symbol_dimensions
-        dims = get_symbol_dimensions("EARTH")
-        ew, eh = dims["width_mm"], dims["height_mm"]
+        from app.sld.catalog import get_catalog as _gc_mb_earth
+        _earth_def = _gc_mb_earth().get("EARTH")
+        ew, eh = _earth_def.width, _earth_def.height
         earth_cx = g.mb_box_right + 4
         earth_x = earth_cx - ew / 2
         earth_top_pin_y = g.mb_box_bottom - config.earth_x_from_db / 2
