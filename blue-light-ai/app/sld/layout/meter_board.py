@@ -290,8 +290,9 @@ def _add_outgoing_cable_tick(
     _lines = outgoing_cable_text.split("\\P")
     _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
     _text_width = _max_line_len * _char_w
-    # Label right edge aligns with leader left end (cx - _leader_len)
-    _text_x = cx - _leader_len - _text_width
+    # Label right edge with gap before leader left end (cx - _leader_len)
+    _text_gap = 3.0  # mm gap between text right edge and leader line
+    _text_x = cx - _leader_len - _text_gap - _text_width
     result.components.append(PlacedComponent(
         symbol_name="LABEL", x=_text_x, y=tick_y + _label_ch * 0.5, label=outgoing_cable_text,
     ))
