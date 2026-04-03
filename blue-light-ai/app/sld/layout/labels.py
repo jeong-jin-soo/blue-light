@@ -139,52 +139,54 @@ def place_deferred_cable_labels(
             gap = 8.0 if leader_len == 0 else 2.0
             text_x = tick_x + leader_len + gap
 
-        text_y = tick_y - text_height / 2  # 수직 중앙 정렬
+        # 텍스트 Y: 리더선과 같은 레벨 (텍스트 첫 줄 기준선 = tick_y)
+        # DXF MTEXT는 top-aligned이므로 tick_y에서 약간 위로 올린다
+        text_y = tick_y - ch * 0.3  # 텍스트 시각적 중앙이 리더선에 맞도록
 
-        # 충돌 검사 + 해소
+        # 충돌 검사 — X 방향으로만 이동 (리더선과 텍스트의 Y 정렬 유지)
+        # 리더선 Y와 분리되면 안 되므로 Y 이동은 하지 않는다.
+        # 대신 충돌 시 X gap을 늘려서 텍스트를 더 멀리 밀어낸다.
         candidate_rect = _OccupiedRect(
             x_min=text_x, y_min=text_y,
             x_max=text_x + text_width, y_max=text_y + text_height,
         )
 
-        # Y 방향으로 이동하여 빈 공간 탐색 (최대 ±30mm)
-        best_y = text_y
-        best_overlap_count = _count_overlaps(candidate_rect, occupied)
+        overlap_count = _count_overlaps(candidate_rect, occupied)
+        extra_shift = 0.0
+        while overlap_count > 0 and extra_shift < 40:
+            extra_shift += 3.0
+            if side == "left":
+                trial_x = text_x - extra_shift
+                trial_x = max(trial_x, getattr(config, "min_x", 25) + 2)
+            else:
+                trial_x = text_x + extra_shift
+            trial_rect = _OccupiedRect(
+                x_min=trial_x, y_min=text_y,
+                x_max=trial_x + text_width, y_max=text_y + text_height,
+            )
+            overlap_count = _count_overlaps(trial_rect, occupied)
+            if overlap_count == 0:
+                text_x = trial_x
+                break
 
-        if best_overlap_count > 0:
-            for dy in range(1, 31):
-                for direction in (+1, -1):
-                    trial_y = text_y + dy * direction
-                    trial_rect = _OccupiedRect(
-                        x_min=text_x, y_min=trial_y,
-                        x_max=text_x + text_width, y_max=trial_y + text_height,
-                    )
-                    overlap_count = _count_overlaps(trial_rect, occupied)
-                    if overlap_count == 0:
-                        best_y = trial_y
-                        best_overlap_count = 0
-                        break
-                if best_overlap_count == 0:
-                    break
-
-        if best_overlap_count > 0:
+        if overlap_count > 0:
             logger.warning(
-                "Cable label '%s' at (%.1f, %.1f) still has %d overlaps after search",
-                text[:30], text_x, best_y, best_overlap_count,
+                "Cable label '%s' at (%.1f, %.1f) still has %d overlaps",
+                text[:30], text_x, text_y, overlap_count,
             )
 
         # 최종 배치
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=text_x,
-            y=best_y,
+            y=text_y,
             label=text,
         ))
 
         # 배치한 텍스트를 occupied에 추가 (다음 라벨의 충돌 검사에 반영)
         occupied.append(_OccupiedRect(
-            x_min=text_x, y_min=best_y,
-            x_max=text_x + text_width, y_max=best_y + text_height,
+            x_min=text_x, y_min=text_y,
+            x_max=text_x + text_width, y_max=text_y + text_height,
         ))
 
     logger.info(
