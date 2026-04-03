@@ -112,10 +112,14 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
     mb_label_bot = mb_label_y - _anno_label_ch
     mb_box_bottom = mb_label_bot - 1
 
-    # Box horizontal extent
+    # Box horizontal extent — must contain MCB label text below symbol.
+    # MCB label (e.g., "63A TPN MCB\nTYPE B 10kA") is rendered below the symbol.
+    # Estimate: longest label line ~14 chars × 1.6mm = ~22mm wide, centered on mcb_cx.
+    _mcb_label_half_w = 14 * _comp_label_ch * 0.6  # ~13mm
+    _mcb_label_right = mcb_cx + _mcb_label_half_w
     iso_body_left = iso_cx - iso_h_extent / 2
     mb_box_left = iso_body_left - 4
-    mb_box_right = mcb_right_x + 4
+    mb_box_right = max(mcb_right_x + 4, _mcb_label_right + 2)
 
     return _MeterBoardGeom(
         iso_cx=iso_cx, kwh_cx=kwh_cx, mcb_cx=mcb_cx,
@@ -209,9 +213,11 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     """Add horizontal supply entry line, incoming label, and cable tick annotation."""
     result = ctx.result
 
-    # Supply entry line from MCB rightward
-    supply_end_x = g.mcb_right_x + 20
-    result.connections.append(((g.mcb_right_x, g.mb_center_y), (supply_end_x, g.mb_center_y)))
+    # Supply entry line from MCB rightward — must start past the box right edge
+    # so tick marks and labels are outside the meter board box.
+    _line_start_x = g.mcb_right_x
+    supply_end_x = max(g.mb_box_right + 15, g.mcb_right_x + 20)
+    result.connections.append(((_line_start_x, g.mb_center_y), (supply_end_x, g.mb_center_y)))
 
     # Incoming label — known supply_source types always use locale labels
     if ctx.is_cable_extension:
@@ -239,7 +245,8 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
         return
     cable_text = format_cable_spec(ctx.incoming_cable, multiline=True)
     if cable_text:
-        tick_x = g.mcb_right_x + 10
+        # Tick must be outside meter board box
+        tick_x = max(g.mb_box_right + 5, g.mcb_right_x + 10)
         tick_size = 1.5
         result.thick_connections.append((
             (tick_x - tick_size, g.mb_center_y - tick_size),

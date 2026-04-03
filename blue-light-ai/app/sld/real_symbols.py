@@ -331,7 +331,10 @@ class RealRCCB(BaseSymbol):
             end_angle=self._arc_end,
         )
 
-        # Connection lines
+        # Connection lines from body edges to contact circle edges.
+        # These do NOT pass between contacts — they connect body edge
+        # to the outer edge of each contact circle.
+        # (Between contacts, only the arc exists — it curves to the right.)
         backend.add_line((cx, contact_top_y + cr), (cx, y + h))
         backend.add_line((cx, y), (cx, contact_bottom_y - cr))
 

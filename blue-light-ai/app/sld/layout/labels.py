@@ -129,26 +129,27 @@ def place_deferred_cable_labels(
         num_lines = len(lines)
         text_height = num_lines * (ch + 0.5)
 
+        # 텍스트 Y: 리더선과 같은 높이.
+        # DXF: Y↑ 증가, MTEXT attachment_point=1 (TOP_LEFT).
+        # 텍스트 상단이 리더선 위 ch/2에 오면, 첫 줄 중앙 = 리더선 Y.
+        text_y = tick_y + ch * 0.5
+
         if side == "left":
-            # 텍스트 우측이 leader 끝에서 gap만큼 왼쪽
-            gap = 2.0
-            text_x = tick_x - leader_len - gap - text_width
+            # 리더선 끝(tick_x - leader_len)에서 텍스트 우측까지 충분한 간격.
+            # DXF MTEXT 가변폭 폰트 실제 폭은 char_w 추정치의 ~130%.
+            # "CABLE +" 같은 대문자+기호가 넓으므로 넉넉히 잡는다.
+            text_right_gap = 12.0  # 리더선 끝 ↔ 텍스트 우측 간격
+            leader_end_x = tick_x - leader_len
+            text_x = leader_end_x - text_right_gap - text_width
             text_x = max(text_x, getattr(config, "min_x", 25) + 2)
         else:
-            # 텍스트 좌측이 spine에서 오른쪽
             gap = 8.0 if leader_len == 0 else 2.0
             text_x = tick_x + leader_len + gap
 
-        # 텍스트 Y: 리더선과 같은 레벨 (텍스트 첫 줄 기준선 = tick_y)
-        # DXF MTEXT는 top-aligned이므로 tick_y에서 약간 위로 올린다
-        text_y = tick_y - ch * 0.3  # 텍스트 시각적 중앙이 리더선에 맞도록
-
         # 충돌 검사 — X 방향으로만 이동 (리더선과 텍스트의 Y 정렬 유지)
-        # 리더선 Y와 분리되면 안 되므로 Y 이동은 하지 않는다.
-        # 대신 충돌 시 X gap을 늘려서 텍스트를 더 멀리 밀어낸다.
         candidate_rect = _OccupiedRect(
-            x_min=text_x, y_min=text_y,
-            x_max=text_x + text_width, y_max=text_y + text_height,
+            x_min=text_x, y_min=text_y - text_height,
+            x_max=text_x + text_width, y_max=text_y,
         )
 
         overlap_count = _count_overlaps(candidate_rect, occupied)
@@ -161,8 +162,8 @@ def place_deferred_cable_labels(
             else:
                 trial_x = text_x + extra_shift
             trial_rect = _OccupiedRect(
-                x_min=trial_x, y_min=text_y,
-                x_max=trial_x + text_width, y_max=text_y + text_height,
+                x_min=trial_x, y_min=text_y - text_height,
+                x_max=trial_x + text_width, y_max=text_y,
             )
             overlap_count = _count_overlaps(trial_rect, occupied)
             if overlap_count == 0:
@@ -183,10 +184,10 @@ def place_deferred_cable_labels(
             label=text,
         ))
 
-        # 배치한 텍스트를 occupied에 추가 (다음 라벨의 충돌 검사에 반영)
+        # 배치한 텍스트를 occupied에 추가
         occupied.append(_OccupiedRect(
-            x_min=text_x, y_min=text_y,
-            x_max=text_x + text_width, y_max=text_y + text_height,
+            x_min=text_x, y_min=text_y - text_height,
+            x_max=text_x + text_width, y_max=text_y,
         ))
 
     logger.info(
