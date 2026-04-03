@@ -419,9 +419,10 @@ class RealKwhMeter(BaseSymbol):
             (cx - rw / 2, cy + rh / 2),
         ], close=True)
 
-        # "KWH" label inside (uppercase, matching real samples)
+        # "KWH" label inside — visually centered in rectangle
         backend.set_layer("SLD_ANNOTATIONS")
-        backend.add_mtext("KWH", insert=(cx - rw * 0.35, cy + 1.6 * 0.5), char_height=1.6)
+        _kwh_text_offset = 1.6 * 1.5
+        backend.add_mtext("KWH", insert=(cx - _kwh_text_offset, cy), char_height=1.6, center_across=True)
 
         # Connection lines
         backend.set_layer("SLD_CONNECTIONS")
@@ -455,9 +456,12 @@ class RealKwhMeter(BaseSymbol):
             (x, cy + hrh / 2),
         ], close=True)
 
-        # "KWH" label inside (uppercase, matching real samples)
+        # "KWH" label inside — visually centered in rectangle
+        # MTEXT attachment_point=4 (MIDDLE_LEFT): text starts from insert point going right.
+        # Offset X left by ~half text width (3 chars × 1.6 × 0.5 ≈ 2.4mm)
         backend.set_layer("SLD_ANNOTATIONS")
-        backend.add_mtext("KWH", insert=(cx - hrw * 0.35, cy + 1.6 * 0.5), char_height=1.6)
+        _kwh_text_offset = 1.6 * 1.5  # half of "KWH" width
+        backend.add_mtext("KWH", insert=(cx - _kwh_text_offset, cy), char_height=1.6, center_across=True)
 
         # Connection lines (horizontal: left and right)
         backend.set_layer("SLD_CONNECTIONS")

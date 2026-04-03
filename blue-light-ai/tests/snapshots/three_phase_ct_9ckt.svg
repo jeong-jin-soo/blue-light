@@ -71,7 +71,7 @@
   <text x="188.60" y="140.77" font-family="Arial, Helvetica, sans-serif" font-size="2.4" fill="#000000" transform="rotate(-90.0,188.60,139.81)">A</text>
   <text x="177.82" y="138.89" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">0 - 200A</text>
   <polygon points="225.00,147.50 237.00,147.50 237.00,153.50 225.00,153.50" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="228.60" y="151.81" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000">KWH</text>
+  <text x="227.34" y="153.42" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000">KWH</text>
   <text x="239.50" y="148.78" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000"><tspan x="239.50">SPPG</tspan><tspan x="239.50" dy="2.2">KWH METER</tspan></text>
   <line x1="219.03" y1="126.70" x2="222.47" y2="125.30" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="219.03" y1="125.30" x2="222.47" y2="126.70" stroke="#000000" stroke-width="0.25" fill="none" />

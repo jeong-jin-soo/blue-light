@@ -40,8 +40,8 @@ class MeterBoardLabels:
     meter_board: str = "METER BOARD"
     located_meter_compartment: str = "LOCATED AT METER COMPARTMENT"
     located_inside_unit: str = "LOCATED INSIDE UNIT"
-    kwh_meter_by_sp: str = "KWH METER BY SP"
-    kwh_meter_pg: str = "PG KWH METER"
+    kwh_meter_by_sp: str = "KWH METER\\PBY SP"
+    kwh_meter_pg: str = "PG\\PKWH METER"
     ct_by_sp: str = "CT BY SP"
     isolator: str = "ISOLATOR"
 

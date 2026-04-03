@@ -101,8 +101,10 @@ def _compute_meter_board_geom(config: LayoutConfig, cx: float, y: float) -> _Met
     mcb_right_x = mcb_cx + mcb_h_extent / 2
 
     # Vertical bands — above center
+    # KWH label is 2 lines (e.g., "PG\nKWH METER"), needs 2× annotation height
     _gap = config.meter_board_gap
-    kwh_label_y = mb_center_y + max_v_half + _gap + _anno_label_ch
+    _kwh_label_lines = 2
+    kwh_label_y = mb_center_y + max_v_half + _gap + _anno_label_ch * _kwh_label_lines
     mb_box_top = kwh_label_y + _gap
 
     # Vertical bands — below center
@@ -183,12 +185,28 @@ def _place_meter_board_symbols(
             _kwh_label = SG_LOCALE.meter_board.kwh_meter_pg
         else:
             _kwh_label = SG_LOCALE.meter_board.kwh_meter_by_sp
-    result.components.append(PlacedComponent(
-        symbol_name="LABEL",
-        x=(g.iso_cx + g.mcb_cx) / 2 - 10,
-        y=g.kwh_label_y,
-        label=_kwh_label,
-    ))
+    # KWH label: 2 lines (e.g., "PG" + "KWH METER"), each centered above KWH symbol.
+    # Use ezdxf font engine for accurate text width measurement.
+    _kwh_lines = _kwh_label.split("\\P")
+    _anno_ch = 2.8
+    _line_gap = 0.5
+    try:
+        from ezdxf.fonts import fonts as _ezdxf_fonts
+        _font = _ezdxf_fonts.make_font("txt", cap_height=_anno_ch)
+        _measure = lambda t: _font.text_width(t)
+    except Exception:
+        _measure = lambda t: len(t) * _anno_ch * 0.6  # fallback
+
+    for li, line_text in enumerate(_kwh_lines):
+        _tw = _measure(line_text)
+        _lx = g.kwh_cx - _tw / 2
+        _ly = g.kwh_label_y - li * (_anno_ch + _line_gap)
+        result.components.append(PlacedComponent(
+            symbol_name="LABEL",
+            x=_lx,
+            y=_ly,
+            label=line_text,
+        ))
 
     # KWH → MCB wiring (connection reaches KWH right pin / body edge)
     kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2
