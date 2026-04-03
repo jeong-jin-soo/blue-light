@@ -100,8 +100,12 @@ class TestThreePhaseIds:
         # SPARE should get L3S1 (completing the triplet)
         assert ids[2] == "L3S1"
 
-    def test_isolator_not_in_round_robin(self):
-        """ISOLATOR has own counter, does not affect L-phase rotation."""
+    def test_isolator_uses_power_counter(self):
+        """ISOLATOR uses power counter (L{phase}P{num}) in 3-phase grouping.
+
+        The isolator symbol on the conductor already identifies the device;
+        the circuit ID follows sequential power numbering.
+        """
         circuits = [
             _make_circuit("Lights"),
             _make_circuit("AC Isolator", breaker_type="ISOLATOR"),
@@ -109,8 +113,8 @@ class TestThreePhaseIds:
         ]
         ids = _assign_circuit_ids(circuits, "three_phase")
         assert ids[0] == "L1S1"
-        assert ids[1] == "ISOL 1"
-        assert ids[2] == "L2S1"  # Continues from L1, not reset
+        assert ids[1] == "L1P1"  # Isolator gets power ID
+        assert ids[2] == "L2S1"  # Lighting counter unaffected
 
     def test_heater_three_phase(self):
         """Heater in 3-phase uses H prefix, sharing P/H counter."""

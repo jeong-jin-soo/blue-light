@@ -341,13 +341,14 @@ class TestAssignCircuitIds:
         assert ids == ["L1P1", "L2P1", "L3P1", "L1P2"]
 
     def test_three_phase_isolator(self):
+        """Isolator uses power counter in 3-phase (L{phase}P{num})."""
         circuits = [
             {"name": "LIGHTS"},
             {"name": "ISOLATOR FOR AIRCON"},
         ]
         ids = _assign_circuit_ids(circuits, "three_phase")
         assert ids[0] == "L1S1"
-        assert ids[1] == "ISOL 1"
+        assert ids[1] == "L1P1"  # Isolator gets power ID, not ISOL
 
     def test_three_phase_spare_follows_section(self):
         circuits = [

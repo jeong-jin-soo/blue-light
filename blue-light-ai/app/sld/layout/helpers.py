@@ -356,11 +356,11 @@ def _categorize_circuit(circuit: dict) -> tuple[str, str | None]:
         return ("spare", None)
 
     if breaker_type == "ISOLATOR" or "isol" in name_lower:
-        # Explicit circuit_id takes priority, then name
-        if explicit_cid and _ISOL_ID_RE.match(explicit_cid):
-            return ("isolator", explicit_cid)
-        if _ISOL_ID_RE.match(name_raw.strip()):
-            return ("isolator", name_raw.strip())
+        # Isolator is a power circuit device — do NOT use ISOL ID as user_id.
+        # The circuit ID will be assigned from the power counter (L{phase}P{num})
+        # in _assign_circuit_ids(). The isolator symbol on the conductor already
+        # identifies it as an isolator; the circuit label should follow the
+        # sequential power numbering.
         return ("isolator", None)
 
     if explicit_cid and _PHASE_ID_RE.match(explicit_cid):
@@ -555,8 +555,14 @@ def _assign_circuit_ids(
                 spare_id = _assign_spare_phase_slot(ids, categories, user_ids, i)
                 ids.append(spare_id)
             elif cat == "isolator":
-                isol_idx += 1
-                ids.append(f"ISOL {isol_idx}")
+                # Isolator is a power circuit device — use power counter
+                # so it gets L{phase}P{num} ID in the 3-phase grouping.
+                # The isolator symbol is already shown on the conductor;
+                # the circuit ID should follow the sequential power numbering.
+                phase = (ph_idx % 3) + 1
+                num = (ph_idx // 3) + 1
+                ids.append(f"L{phase}P{num}")
+                ph_idx += 1
             elif cat == "lighting":
                 phase = (s_idx % 3) + 1
                 num = (s_idx // 3) + 1
