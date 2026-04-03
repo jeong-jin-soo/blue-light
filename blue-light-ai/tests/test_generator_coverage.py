@@ -219,13 +219,11 @@ class TestSymbolRendering:
         svg = _generate_svg(LANDLORD_SUPPLY)
         assert len(svg) > 1000
 
-    def test_busbar_with_rating_renders(self):
-        """BUSBAR component with rating label should render."""
+    def test_busbar_renders(self):
+        """BUSBAR component should render (rating displayed by separate label below)."""
         layout = compute_layout(THREE_PHASE_WITH_ISOLATOR)
         busbars = _get_components_by_type(layout, "BUSBAR")
         assert len(busbars) >= 1
-        main_bus = [b for b in busbars if b.label]
-        assert len(main_bus) >= 1, "Main busbar should have a label"
 
     def test_circuit_id_box_renders(self):
         """CIRCUIT_ID_BOX should be rendered for each sub-circuit."""

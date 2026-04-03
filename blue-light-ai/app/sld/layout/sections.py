@@ -941,8 +941,8 @@ def _place_main_busbar(ctx: _LayoutContext) -> None:
         symbol_name="BUSBAR",
         x=bus_start_x,
         y=y,
-        label=f"{breaker_rating}A {SG_LOCALE.circuit.db}",
-        rating="",
+        label="",
+        rating="",  # Busbar rating is displayed below by separate LABEL component
         cable_annotation=f"{_visual_bus_end_x:.1f}",  # encode visual bus_end_x for renderer
     ))
     # -- DB Info: compute text, defer placement to _place_db_box() --

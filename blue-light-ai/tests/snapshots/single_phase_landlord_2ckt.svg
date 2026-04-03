@@ -38,8 +38,7 @@
   <line x1="210.00" y1="143.20" x2="210.00" y2="145.20" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="134.20" x2="210.00" y2="132.20" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="216.01" y="138.14" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000"><tspan x="216.01">40A DP</tspan><tspan x="216.01" dy="2.5">RCCB </tspan><tspan x="216.01" dy="2.5">(30mA)</tspan></text>
-  <line x1="181.90" y1="127.20" x2="280.00" y2="127.20" stroke="#000000" stroke-width="0.50" fill="none" />
-  <text x="184.90" y="124.20" font-family="Arial, Helvetica, sans-serif" font-size="2.5" fill="#000000">40A DB</text>
+  <line x1="140.00" y1="127.20" x2="280.00" y2="127.20" stroke="#000000" stroke-width="0.50" fill="none" />
   <text x="184.90" y="132.44" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">100A BUSBAR</text>
   <text x="196.90" y="123.46" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,196.90,122.58)">S1</text>
   <path d="M 196.25,114.54 A 3.75,3.75 0 0,0 196.25,107.86" stroke="#000000" stroke-width="0.25" fill="none" />
