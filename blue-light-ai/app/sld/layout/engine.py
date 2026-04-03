@@ -530,7 +530,22 @@ def compute_layout(
         return merged
 
     else:
-        # ═══ SINGLE-DB PATH (v2 architecture) ═══
+        # ══�� SINGLE-DB PATH (v2 architecture) ═══
+        # Phase 1-2: Measure → Allocate (사전 계산)
+        # AllocationPlan은 ctx에 저장되어 향후 섹션 함수들이 참조 가능.
+        # 현재는 scale과 total_height를 로깅하고, ctx에 저장만 한다.
+        # 섹션 함수들이 점진적으로 region 기반으로 전환되면 실제 사용.
+        from app.sld.layout.measure import measure_all_sections
+        from app.sld.layout.allocate import allocate
+
+        _measures = measure_all_sections(requirements, config)
+        _plan = allocate(_measures, config)
+        ctx.allocation_plan = _plan
+        logger.info(
+            "3-phase engine: scale=%.2f, total=%.1fmm, sections=%d",
+            _plan.scale, _plan.total_height, len(_plan.section_regions),
+        )
+
         # Section sequence is determined by the template registry based on
         # requirements (metering type, supply source, etc.).
         from app.sld.layout.section_registry import get_section_sequence

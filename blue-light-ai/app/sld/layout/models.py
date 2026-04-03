@@ -981,3 +981,7 @@ class _LayoutContext:
 
     # BI Connector center Y (set by _place_ct_metering_section, used after busbar placement)
     bi_center_y: float = 0
+
+    # -- Phase 2 (Allocate) 결과 -- 점진적 마이그레이션용
+    # None = 기존 경로 (backward compatible), 값 있으면 3단계 엔진 활성
+    allocation_plan: "AllocationPlan | None" = None
