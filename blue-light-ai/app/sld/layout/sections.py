@@ -350,7 +350,8 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         _seg_h = 14
         result.connections.append(((cx, y), (cx, y + _seg_h)))
 
-        # Cable tick mark + annotation to the LEFT (reference: incoming cable = left side)
+        # Cable tick mark + leader line to the LEFT (reference: incoming cable = left side)
+        # Text is deferred to Step D (place_labels) for collision-free placement.
         incoming_cable = ctx.incoming_cable
         cable_text = format_cable_spec(incoming_cable, multiline=True)
         if cable_text:
@@ -362,22 +363,16 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
             ))
             _leader_len = ctx.config.cable_leader_len
             result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
-            # Right-align text to left of leader end (clamped to drawing boundary)
-            # For multiline text (\P separator), use longest line for width calculation
-            _label_ch = 2.3
-            _char_w = _label_ch * 0.6
-            _lines = cable_text.split("\\P")
-            _longest = max(len(ln) for ln in _lines)
-            _text_w = _longest * _char_w
-            _text_gap = ctx.config.cable_leader_text_gap
-            _text_x = cx - _leader_len - _text_gap - _text_w
-            _text_x = max(_text_x, ctx.config.min_x + 2)  # clamp to left boundary
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=_text_x,
-                y=tick_y + 1.5,
-                label=cable_text,
-            ))
+            # Defer text placement to Step D
+            result.deferred_cable_labels.append({
+                "text": cable_text,
+                "tick_x": cx,
+                "tick_y": tick_y,
+                "side": "left",
+                "leader_len": _leader_len,
+                "char_height": 2.3,
+                "source": "incoming_cable_landlord",
+            })
 
         y += _seg_h
     else:
@@ -417,15 +412,19 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         y += ph_half + 4
 
         # Cable annotation (no tick mark for SP supply)
+        # Deferred to Step D for collision-free placement.
         incoming_cable = ctx.incoming_cable
         cable_text = format_cable_spec(incoming_cable)
         if cable_text:
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=cx + 12,
-                y=y - 3,
-                label=cable_text,
-            ))
+            result.deferred_cable_labels.append({
+                "text": cable_text,
+                "tick_x": cx,
+                "tick_y": y - 3,
+                "side": "right",
+                "leader_len": 0,  # no leader line for SP supply
+                "char_height": 2.8,
+                "source": "incoming_cable_sp",
+            })
 
     ctx.y = y
 
@@ -838,16 +837,16 @@ def _place_internal_cable(ctx: _LayoutContext) -> None:
     cx = ctx.cx
     y = ctx.y
     cable_text = format_cable_spec(ctx.internal_cable, multiline=False)
-    # Cable annotation label — placed to the right of the spine, just below busbar.
-    # Use y - 2 (closer to busbar) to avoid collision with feeder MCB labels
-    # that are placed further down (at connect_y level).
-    result.components.append(PlacedComponent(
-        symbol_name="LABEL",
-        x=cx + 8,
-        y=y - 2,
-        label=cable_text,
-        label_style="cable_annotation",
-    ))
+    # Defer cable annotation to Step D for collision-free placement.
+    result.deferred_cable_labels.append({
+        "text": cable_text,
+        "tick_x": cx,
+        "tick_y": y - 2,
+        "side": "right",
+        "leader_len": 0,
+        "char_height": 2.0,
+        "source": "internal_cable",
+    })
 
 
 def _place_main_busbar(ctx: _LayoutContext) -> None:

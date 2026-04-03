@@ -33,7 +33,6 @@
   <text x="263.56" y="195.45" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000"><tspan x="263.56">63A DP MCB</tspan><tspan x="263.56" dy="2.5">TYPE B 10kA</tspan></text>
   <text x="296.50" y="189.95" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">INCOMING FROM HDB ELECTRICAL RISER</text>
   <text x="287.50" y="201.55" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="287.50">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="287.50" dy="3.9">16sqmm PVC CPC</tspan></text>
-  <text x="147.96" y="174.75" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="147.96">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="147.96" dy="3.9">16sqmm PVC CPC</tspan></text>
   <text x="213.00" y="203.93" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">METER BOARD</text>
   <path d="M 210.85,151.25 A 3.75,3.75 0 0,0 210.85,144.57" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="209.81" cy="144.57" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -93,6 +92,7 @@
   <line x1="257.73" y1="167.84" x2="260.73" y2="167.84" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="258.48" y1="168.96" x2="259.98" y2="168.96" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="264.48" y="166.44" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
+  <text x="148.96" y="179.45" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="148.96">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="148.96" dy="3.9">16sqmm PVC CPC</tspan></text>
   <line x1="210.00" y1="190.71" x2="216.00" y2="190.71" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="223.00" y1="190.71" x2="238.50" y2="190.71" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="250.50" y1="190.71" x2="265.50" y2="190.71" stroke="#000000" stroke-width="0.25" fill="none" />

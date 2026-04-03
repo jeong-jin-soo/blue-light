@@ -19,7 +19,6 @@
   <text x="364.00" y="273.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">DRAWING NO. :</text>
   <text x="388.00" y="273.94" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">REV :</text>
   <text x="217.00" y="199.94" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">SUPPLY FROM BUILDING RISER</text>
-  <text x="166.26" y="190.84" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="166.26">2 x 1C 10sqmm PVC/PVC +</tspan><tspan x="166.26" dy="3.9">10sqmm PVC CPC</tspan></text>
   <circle cx="210.00" cy="182.50" r="0.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="210.00" cy="176.90" r="0.70" stroke="#000000" stroke-width="0.25" fill="none" />
   <polyline points="210.23,177.56 211.97,182.41" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -74,6 +73,7 @@
   <line x1="242.79" y1="174.12" x2="245.79" y2="174.12" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="243.54" y1="175.25" x2="245.04" y2="175.25" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="249.54" y="172.73" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
+  <text x="161.97" y="195.14" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="161.97">2 x 1C 10sqmm PVC/PVC +</tspan><tspan x="161.97" dy="3.9">10sqmm PVC CPC</tspan></text>
   <line x1="210.00" y1="199.20" x2="215.00" y2="199.20" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="199.20" x2="210.00" y2="185.20" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="185.20" x2="210.00" y2="183.20" stroke="#000000" stroke-width="0.25" fill="none" />

@@ -277,25 +277,22 @@ def _add_outgoing_cable_tick(
         (cx - tick_size, tick_y - tick_size),
         (cx + tick_size, tick_y + tick_size),
     ))
-    # Leader line: from tick on spine → left, then label at the end.
-    # Use a generous leader length to keep the label clear of the spine line.
-    # DXF MTEXT uses proportional fonts where actual rendered width exceeds
-    # a simple char_count × fixed_width estimate.  Add extra margin to prevent
-    # text from visually overlapping the spine line.
+    # Leader line: from tick on spine → left.
+    # Text is NOT placed here — it's deferred to Step D (place_labels)
+    # where all geometry is finalized and collision-free placement is possible.
     _leader_len = 12
     result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
 
-    _label_ch = 2.8
-    _char_w = _label_ch * 0.7  # 0.7 ratio accounts for proportional font width
-    _lines = outgoing_cable_text.split("\\P")
-    _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
-    _text_width = _max_line_len * _char_w
-    # Label right edge with gap before leader left end (cx - _leader_len)
-    _text_gap = 3.0  # mm gap between text right edge and leader line
-    _text_x = cx - _leader_len - _text_gap - _text_width
-    result.components.append(PlacedComponent(
-        symbol_name="LABEL", x=_text_x, y=tick_y + _label_ch * 0.5, label=outgoing_cable_text,
-    ))
+    # Register deferred cable label for Step D placement
+    result.deferred_cable_labels.append({
+        "text": outgoing_cable_text,
+        "tick_x": cx,
+        "tick_y": tick_y,
+        "side": "left",
+        "leader_len": _leader_len,
+        "char_height": 2.8,
+        "source": "outgoing_cable",
+    })
 
 
 def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:

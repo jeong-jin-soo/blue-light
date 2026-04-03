@@ -575,6 +575,10 @@ def compute_layout(
         db_box_right = _place_db_box(ctx, busbar_y_row)
         _place_earth_bar(ctx, db_box_right)
 
+        # Step D: Place deferred cable labels (after all geometry is finalized)
+        from app.sld.layout.labels import place_deferred_cable_labels
+        place_deferred_cable_labels(ctx.result, ctx.config)
+
         # Post-layout: center content vertically in drawing area
         _center_vertically(ctx.result, ctx.config)
 

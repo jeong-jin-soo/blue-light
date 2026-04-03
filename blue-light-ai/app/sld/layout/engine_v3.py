@@ -157,6 +157,10 @@ def compute_layout_v3(
     db_box_right = _place_db_box(ctx, busbar_y_row)
     _place_earth_bar(ctx, db_box_right)
 
+    # ── Step D (continued): deferred cable labels ──
+    from app.sld.layout.labels import place_deferred_cable_labels
+    place_deferred_cable_labels(ctx.result, ctx.config)
+
     # ── Post-processing ──
     from app.sld.layout.engine import _center_vertically, _detect_overflow
     _center_vertically(ctx.result, ctx.config)

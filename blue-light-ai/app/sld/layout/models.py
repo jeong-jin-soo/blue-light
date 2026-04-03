@@ -600,6 +600,12 @@ class LayoutResult:
     # Used by hierarchical connections to tap from crossbar instead of main busbar.
     crossbar_feeder_exits: dict[str, tuple[float, float]] = field(default_factory=dict)
 
+    # Deferred cable labels — registered during section placement, finalized in Step D.
+    # Each entry: {"text": str, "tick_x": float, "tick_y": float, "side": "left"|"right",
+    #              "leader_len": float, "char_height": float}
+    # Step D reads all geometry and places text at non-overlapping positions.
+    deferred_cable_labels: list[dict] = field(default_factory=list)
+
 
 @dataclass
 class OverflowMetrics:
