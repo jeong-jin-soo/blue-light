@@ -52,6 +52,8 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
     has_ct = requirements.get("metering") == "ct_meter"
     has_pg = any(db.get("protection_groups") for db in dbs)
     total_circuits = sum(len(db.get("sub_circuits", [])) for db in dbs)
+    # Also count top-level sub_circuits (single-DB path)
+    total_circuits = max(total_circuits, len(requirements.get("sub_circuits", [])))
 
     # Estimate vertical pressure: more DBs/circuits → more compression
     # CT metering adds significant vertical height even for single-DB layouts
@@ -60,11 +62,13 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
         pressure += 2
     if has_pg:
         pressure += 1
+    if total_circuits > 20:
+        pressure += 1
     if total_circuits > 25:
         pressure += 1
 
     if pressure >= 3:
-        # Heavy compression: CT metering + multi-DB + PG
+        # Heavy compression: CT metering + multi-DB + PG, or small component_scale
         # Balance: tight enough to fit A3, loose enough for readability
         config.spine_component_gap = 2.0       # was 5.0 (readable min)
         config.isolator_to_db_gap = 10.0       # was 5.0 — need room for outgoing cable tick
@@ -79,6 +83,10 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
         config.ct_to_branch_gap = 1.5          # was 3.0
         config.ct_entry_gap = 0.0              # was 0.5
         config.symbol_label_gap = 1.0          # was 0.5 — more space for labels
+        # Override reference-matched gaps — they're calibrated for full-scale
+        # layouts and create excessive spacing at small component_scale.
+        config.ref_breaker_to_rccb_gap = None
+        config.ref_rccb_to_busbar_gap = None
     elif pressure >= 2:
         # Moderate compression
         config.spine_component_gap = 3.0       # was 5.0
@@ -86,6 +94,9 @@ def _apply_compact_spacing(config: "LayoutConfig", dbs: list[dict],
         config.busbar_to_breaker_gap = 10.0    # was 12.0
         config.db_box_busbar_margin = 6.0      # was 8.0
         config.db_box_label_margin = 6.0       # was 8.0
+        # Override reference-matched gaps — they inflate spine height
+        config.ref_breaker_to_rccb_gap = None
+        config.ref_rccb_to_busbar_gap = None
         config.leader_margin_above_db = 7.0    # was 10.0
 
 
@@ -101,10 +112,10 @@ def _auto_component_scale(requirements: dict) -> float:
     dbs = requirements.get("distribution_boards", [])
     has_ct = requirements.get("metering") in ("ct_meter", "ct_metering")
 
-    # Single-DB CT metering: moderate scale reduction for tall spine
-    if len(dbs) <= 1 and has_ct:
-        return 0.85
-
+    # Single-DB: ALWAYS full scale (1.0).
+    # Vertical overflow from long circuit labels is solved by adjusting
+    # label height (_adjust_label_height_to_fit), not by shrinking everything.
+    # Horizontal fit is handled by _compute_dynamic_spacing.
     if len(dbs) <= 1:
         return 1.0
 
@@ -134,27 +145,43 @@ def _expand_layout_for_scale(config: "LayoutConfig", s: float) -> None:
 
     The renderer shrinks all SLD content by factor `s` (e.g. 0.8 = 80%).
     If we don't compensate, content only fills s² of the page area.
-    By expanding layout boundaries by 1/s, the content uses more virtual
-    space, and after scaling it maps back to full A3.
+
+    SLD layouts are primarily horizontally constrained (many circuits in a row)
+    while vertical space is determined by the spine height. Therefore:
+    - Horizontal: expand by full 1/s to accommodate all circuits
+    - Vertical: expand by a smaller factor (sqrt of 1/s) to avoid excessive
+      empty space above/below the spine. The vertical centering pass
+      (_center_vertically) will fine-tune final positioning.
 
     The scale transform is centered on the page center, so we expand
     symmetrically from the center.
     """
-    inv = 1.0 / s  # e.g. s=0.8 → inv=1.25
+    inv = 1.0 / s  # e.g. s=0.56 → inv=1.79
+    # Vertical expansion strategy:
+    # - For CT metering / multi-DB: full vertical expansion needed (tall spine)
+    # - For single-DB direct metering: gentler vertical (spine is short,
+    #   circuits are horizontally arranged). Use sqrt for balanced proportions.
+    import math
+    if config.component_scale >= 0.75:
+        # Mild scale (multi-DB, CT metering) → full vertical expansion
+        inv_v = inv
+    else:
+        # Aggressive scale (many circuits, single-DB) → gentler vertical
+        inv_v = math.sqrt(inv)
 
     # Page center (the scale pivot point)
     cx = (config.min_x + config.max_x) / 2
     cy = (config.min_y + config.max_y) / 2
 
-    # Expand drawing boundaries symmetrically around center
+    # Expand drawing boundaries: full horizontal, gentler vertical
     half_w = (config.max_x - config.min_x) / 2
     half_h = (config.max_y - config.min_y) / 2
     config.min_x = cx - half_w * inv
     config.max_x = cx + half_w * inv
-    config.min_y = cy - half_h * inv
-    config.max_y = cy + half_h * inv
+    config.min_y = cy - half_h * inv_v
+    config.max_y = cy + half_h * inv_v
     config.start_x = cx  # keep centered
-    config.start_y = config.max_y - 7 * inv
+    config.start_y = config.max_y - 7 * inv_v
     config.drawing_width = config.max_x - config.min_x
     config.drawing_height = config.max_y - config.min_y
 
@@ -207,6 +234,8 @@ def compute_layout(
         config.busbar_width_ratio = float(requirements["busbar_width_ratio"])
     if requirements.get("db_width_ratios"):
         config.db_width_ratios = requirements["db_width_ratios"]
+    if requirements.get("max_circuits_per_row"):
+        config.max_circuits_per_row = int(requirements["max_circuits_per_row"])
     # -- Component scale: smaller symbols/text for dense multi-DB layouts --
     # The renderer applies a uniform scale(s) transform to all SLD content.
     # To compensate, we EXPAND the layout boundaries by 1/s so that after
@@ -245,10 +274,17 @@ def compute_layout(
     dbs = requirements.get("distribution_boards")
     is_multi_db = dbs and len(dbs) > 1
 
-    # Compact mode: reduce vertical spacing when layout is vertically dense
-    # Multi-DB always needs compression; single-DB CT metering also needs it
+    # Compact mode: reduce vertical spacing when layout is vertically dense.
+    # Triggers: multi-DB, CT metering, or many circuits (>20) in single DB.
+    # The ref gaps (58-80mm) from reference matching inflate spine height;
+    # compact spacing resets them to reasonable defaults.
     has_ct = requirements.get("metering") in ("ct_meter", "ct_metering")
-    if is_multi_db or has_ct:
+    n_circuits = max(
+        len(requirements.get("sub_circuits", [])),
+        sum(len(db.get("sub_circuits", [])) for db in (dbs or [])),
+    )
+    needs_compact = is_multi_db or has_ct or n_circuits > 20
+    if needs_compact:
         _apply_compact_spacing(config, dbs or [], requirements)
 
     if is_multi_db:
@@ -503,6 +539,9 @@ def compute_layout(
         for section in section_sequence:
             section.execute(ctx)
 
+        # Adjust label height to fit remaining vertical space (spine is fixed)
+        _adjust_label_height_to_fit(config, ctx)
+
         # Sub-circuits (always present, placed after busbar)
         busbar_y_row = _place_sub_circuits_rows(ctx)
 
@@ -620,6 +659,66 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
     ]
     result.db_box_start_y += shift
     result.db_box_end_y += shift
+
+
+def _adjust_label_height_to_fit(config: LayoutConfig, ctx: "_LayoutContext") -> None:
+    """Circuit 라벨 높이를 페이지 잔여 공간에 맞춰 조절.
+
+    SLD의 Spine(수직 직렬 경로)은 고정 크기. Circuit 라벨만 가용 공간에 맞춤.
+    이렇게 하면 component_scale 없이도 라벨이 페이지 내에 맞는다.
+    """
+    busbar_y = ctx.y  # Y cursor is at busbar position after spine placement
+
+    # Available space above busbar to page top
+    available_above = config.max_y - busbar_y
+    if available_above <= 0:
+        return
+
+    # Fixed elements above busbar (breaker + tail + DB box margins)
+    fixed_above = (
+        config.busbar_to_breaker_gap    # gap to first breaker
+        + 12.0                           # MCB height + stub (conservative)
+        + config.db_box_tail_margin
+        + config.db_box_label_margin
+        + config.leader_margin_above_db
+        + 5.0                            # breathing room
+    )
+
+    # Maximum height available for labels
+    max_label_height = available_above - fixed_above
+    if max_label_height <= 10:
+        return
+
+    # Estimate current label height: longest circuit name × char width
+    circuits = ctx.sub_circuits or []
+    active = [c for c in circuits if c.get("breaker_type") != "SPARE"]
+    if not active:
+        return
+
+    max_name_len = max(len(c.get("name", "")) for c in active)
+    # Labels wrap at ~25 chars per line, so effective visual height depends on
+    # the number of characters in the longest line after wrapping
+    chars_per_line = 25
+    n_lines = max(1, (max_name_len + chars_per_line - 1) // chars_per_line)
+    # Visual height = chars_per_line × char_w (rotated text width = visual height)
+    current_label_height = min(max_name_len, chars_per_line) * config.char_w_label
+    # Add inter-line spacing for multi-line labels
+    if n_lines > 1:
+        current_label_height += (n_lines - 1) * config.label_char_height
+
+    if current_label_height <= max_label_height:
+        return  # Fits already
+
+    # Scale down label dimensions to fit
+    ratio = max_label_height / current_label_height
+    ratio = max(ratio, 0.5)  # Never shrink below 50%
+
+    config.label_char_height *= ratio
+    config.char_w_label *= ratio
+    logger.info(
+        "Label height adjusted: ratio=%.2f (%.1fmm available, %.1fmm needed)",
+        ratio, max_label_height, current_label_height,
+    )
 
 
 def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:

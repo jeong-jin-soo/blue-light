@@ -1,9 +1,9 @@
 {
   "_meta": {
     "version": 1,
-    "last_updated": "2026-03-14T12:44:27",
+    "last_updated": "2026-04-03T01:18:58",
     "total_source_files": 28,
-    "total_blocks": 12
+    "total_blocks": 23
   },
   "_processed_files": {
     "100A Single Phase DB 1 DWG.dxf": {
@@ -1436,6 +1436,686 @@
           600.0
         ]
       }
+    },
+    "AMMETER": {
+      "width_du": 265.7,
+      "height_du": 265.7,
+      "bounds": {
+        "min_x": -132.85,
+        "max_x": 132.85,
+        "min_y": -132.85,
+        "max_y": 132.85
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            0,
+            0
+          ],
+          "radius": 132.85
+        },
+        {
+          "type": "TEXT",
+          "text": "A",
+          "insert": [
+            -39.85,
+            -39.85
+          ],
+          "height": 159.42
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          132.85
+        ],
+        "bottom": [
+          0.0,
+          -132.85
+        ],
+        "left": [
+          -132.85,
+          0.0
+        ],
+        "right": [
+          132.85,
+          0.0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "AMMETER"
+    },
+    "VOLTMETER_CUSTOM": {
+      "width_du": 265.7,
+      "height_du": 265.7,
+      "bounds": {
+        "min_x": -132.85,
+        "max_x": 132.85,
+        "min_y": -132.85,
+        "max_y": 132.85
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            0,
+            0
+          ],
+          "radius": 132.85
+        },
+        {
+          "type": "TEXT",
+          "text": "V",
+          "insert": [
+            -39.85,
+            -39.85
+          ],
+          "height": 159.42
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          132.85
+        ],
+        "bottom": [
+          0.0,
+          -132.85
+        ],
+        "left": [
+          -132.85,
+          0.0
+        ],
+        "right": [
+          132.85,
+          0.0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "VOLTMETER"
+    },
+    "SELECTOR_SWITCH": {
+      "width_du": 265.7,
+      "height_du": 265.7,
+      "bounds": {
+        "min_x": -132.85,
+        "max_x": 132.85,
+        "min_y": -132.85,
+        "max_y": 132.85
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            0,
+            0
+          ],
+          "radius": 132.85
+        },
+        {
+          "type": "LINE",
+          "start": [
+            93.94,
+            93.94
+          ],
+          "end": [
+            -93.94,
+            -93.94
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          132.85
+        ],
+        "bottom": [
+          0.0,
+          -132.85
+        ],
+        "left": [
+          -132.85,
+          0.0
+        ],
+        "right": [
+          132.85,
+          0.0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "SELECTOR_SWITCH"
+    },
+    "ELR": {
+      "width_du": 797.09,
+      "height_du": 398.55,
+      "bounds": {
+        "min_x": -398.55,
+        "max_x": 398.55,
+        "min_y": -199.27,
+        "max_y": 199.27
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              -398.5466666666667,
+              -199.27333333333334
+            ],
+            [
+              398.5466666666667,
+              -199.27333333333334
+            ],
+            [
+              398.5466666666667,
+              199.27333333333334
+            ],
+            [
+              -398.5466666666667,
+              199.27333333333334
+            ]
+          ],
+          "bulges": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "closed": true
+        },
+        {
+          "type": "TEXT",
+          "text": "ELR",
+          "insert": [
+            -159.42,
+            -39.85
+          ],
+          "height": 139.49
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          199.27
+        ],
+        "bottom": [
+          0.0,
+          -199.27
+        ],
+        "left": [
+          -398.55,
+          0.0
+        ],
+        "right": [
+          398.55,
+          0.0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "ELR"
+    },
+    "BI_CONNECTOR": {
+      "width_du": 1022.94,
+      "height_du": 365.33,
+      "bounds": {
+        "min_x": -511.47,
+        "max_x": 511.47,
+        "min_y": -182.67,
+        "max_y": 182.67
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              -232.48555555555555,
+              -182.66722222222222
+            ],
+            [
+              232.48555555555555,
+              -182.66722222222222
+            ],
+            [
+              232.48555555555555,
+              182.66722222222222
+            ],
+            [
+              -232.48555555555555,
+              182.66722222222222
+            ]
+          ],
+          "bulges": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "closed": true
+        },
+        {
+          "type": "LINE",
+          "start": [
+            -511.47,
+            0
+          ],
+          "end": [
+            511.47,
+            0
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          182.67
+        ],
+        "bottom": [
+          0.0,
+          -182.67
+        ],
+        "left": [
+          -511.47,
+          0.0
+        ],
+        "right": [
+          511.47,
+          0.0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "BI_CONNECTOR"
+    },
+    "FUSE": {
+      "width_du": 232.49,
+      "height_du": 431.76,
+      "bounds": {
+        "min_x": -116.24,
+        "max_x": 116.24,
+        "min_y": -215.88,
+        "max_y": 215.88
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              -116.24277777777777,
+              -215.87944444444446
+            ],
+            [
+              116.24277777777777,
+              -215.87944444444446
+            ],
+            [
+              116.24277777777777,
+              215.87944444444446
+            ],
+            [
+              -116.24277777777777,
+              215.87944444444446
+            ]
+          ],
+          "bulges": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "closed": true
+        }
+      ],
+      "pins": {
+        "top": [
+          0.0,
+          215.88
+        ],
+        "bottom": [
+          0.0,
+          -215.88
+        ],
+        "left": [
+          -116.24,
+          0.0
+        ],
+        "right": [
+          116.24,
+          0.0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "FUSE"
+    },
+    "CT": {
+      "width_du": 106.28,
+      "height_du": 152.78,
+      "bounds": {
+        "min_x": 0,
+        "max_x": 106.28,
+        "min_y": -76.39,
+        "max_y": 76.39
+      },
+      "entities": [
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              0,
+              -29.89
+            ],
+            [
+              0,
+              76.39
+            ]
+          ],
+          "bulges": [
+            -1.0,
+            0
+          ],
+          "closed": false
+        },
+        {
+          "type": "LWPOLYLINE",
+          "points": [
+            [
+              0,
+              -76.39
+            ],
+            [
+              0,
+              29.89
+            ]
+          ],
+          "bulges": [
+            -1.0,
+            0
+          ],
+          "closed": false
+        }
+      ],
+      "pins": {
+        "top": [
+          0,
+          76.39
+        ],
+        "bottom": [
+          0,
+          -76.39
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "CT"
+    },
+    "ACB": {
+      "width_du": 518.11,
+      "height_du": 378.62,
+      "bounds": {
+        "min_x": -259.06,
+        "max_x": 259.06,
+        "min_y": -189.31,
+        "max_y": 189.31
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            0,
+            -159.42
+          ],
+          "radius": 29.89
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            0,
+            159.42
+          ],
+          "radius": 29.89
+        },
+        {
+          "type": "ARC",
+          "center": [
+            0,
+            0
+          ],
+          "radius": 159.42,
+          "start_angle": 297.1,
+          "end_angle": 62.9
+        },
+        {
+          "type": "LINE",
+          "start": [
+            -259.06,
+            0
+          ],
+          "end": [
+            259.06,
+            0
+          ]
+        }
+      ],
+      "pins": {
+        "top": [
+          0,
+          189.31
+        ],
+        "bottom": [
+          0,
+          -189.31
+        ],
+        "left": [
+          -259.06,
+          0
+        ],
+        "right": [
+          259.06,
+          0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "ACB"
+    },
+    "INDICATOR_LIGHTS_CUSTOM": {
+      "width_du": 1156.73,
+      "height_du": 359.64,
+      "bounds": {
+        "min_x": -46.97,
+        "max_x": 1109.76,
+        "min_y": -179.82,
+        "max_y": 179.82
+      },
+      "entities": [
+        {
+          "type": "CIRCLE",
+          "center": [
+            132.85,
+            0
+          ],
+          "radius": 132.85
+        },
+        {
+          "type": "LINE",
+          "start": [
+            226.79,
+            93.94
+          ],
+          "end": [
+            273.76,
+            140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            38.91,
+            93.94
+          ],
+          "end": [
+            -8.06,
+            140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            226.79,
+            -93.94
+          ],
+          "end": [
+            273.76,
+            -140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            38.91,
+            -93.94
+          ],
+          "end": [
+            -8.06,
+            -140.91
+          ]
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            531.4,
+            0
+          ],
+          "radius": 132.85
+        },
+        {
+          "type": "LINE",
+          "start": [
+            625.33,
+            93.94
+          ],
+          "end": [
+            672.3,
+            140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            437.46,
+            93.94
+          ],
+          "end": [
+            390.49,
+            140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            625.33,
+            -93.94
+          ],
+          "end": [
+            672.3,
+            -140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            437.46,
+            -93.94
+          ],
+          "end": [
+            390.49,
+            -140.91
+          ]
+        },
+        {
+          "type": "CIRCLE",
+          "center": [
+            929.94,
+            0
+          ],
+          "radius": 132.85
+        },
+        {
+          "type": "LINE",
+          "start": [
+            1023.88,
+            93.94
+          ],
+          "end": [
+            1070.85,
+            140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            836.0,
+            93.94
+          ],
+          "end": [
+            789.04,
+            140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            1023.88,
+            -93.94
+          ],
+          "end": [
+            1070.85,
+            -140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            836.0,
+            -93.94
+          ],
+          "end": [
+            789.04,
+            -140.91
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            265.7,
+            0
+          ],
+          "end": [
+            398.55,
+            0
+          ]
+        },
+        {
+          "type": "LINE",
+          "start": [
+            664.24,
+            0
+          ],
+          "end": [
+            797.09,
+            0
+          ]
+        }
+      ],
+      "pins": {
+        "left": [
+          0,
+          0
+        ],
+        "right": [
+          1109.76,
+          0
+        ]
+      },
+      "_generator": "generate_custom_blocks.py",
+      "_source_symbol": "INDICATOR_LIGHTS"
     }
   }
 }

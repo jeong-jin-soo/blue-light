@@ -651,7 +651,8 @@ class TestRealWorldScenarios:
         """Busbar Y and X range must be set for every SLD."""
         result = compute_layout(requirements, skip_validation=True)
         assert result.busbar_y > 0, "busbar_y not set"
-        assert result.busbar_start_x > 0, "busbar_start_x not set"
+        # busbar_start_x can be negative when component_scale < 1.0 expands layout
+        assert result.busbar_start_x != 0, "busbar_start_x not set"
         assert result.busbar_end_x > result.busbar_start_x, (
             "busbar_end_x must be greater than busbar_start_x"
         )

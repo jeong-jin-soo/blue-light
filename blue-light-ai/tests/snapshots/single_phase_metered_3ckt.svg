@@ -33,7 +33,7 @@
   <text x="263.56" y="193.75" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000"><tspan x="263.56">63A DP MCB</tspan><tspan x="263.56" dy="2.5">TYPE B 10kA</tspan></text>
   <text x="296.50" y="188.25" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">INCOMING FROM HDB ELECTRICAL RISER</text>
   <text x="287.50" y="199.85" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="287.50">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="287.50" dy="3.9">16sqmm PVC CPC</tspan></text>
-  <text x="163.68" y="173.05" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="163.68">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="163.68" dy="3.9">16sqmm PVC CPC</tspan></text>
+  <text x="161.68" y="173.05" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="161.68">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="161.68" dy="3.9">16sqmm PVC CPC</tspan></text>
   <text x="213.00" y="202.23" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">METER BOARD</text>
   <path d="M 210.85,149.55 A 3.75,3.75 0 0,0 210.85,142.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="209.81" cy="142.87" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -114,7 +114,7 @@
   <line x1="177.55" y1="96.46" x2="180.05" y2="93.96" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="212.75" y1="96.46" x2="215.25" y2="93.96" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="283.50" y1="199.01" x2="286.50" y2="199.01" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="172.21" x2="207.00" y2="172.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="172.21" x2="202.00" y2="172.21" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="168.80" y1="95.21" x2="178.80" y2="95.21" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="214.00" y1="95.21" x2="224.00" y2="95.21" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="212.00" y1="203.79" x2="220.00" y2="203.79" stroke="#808080" stroke-width="0.25" fill="none" />

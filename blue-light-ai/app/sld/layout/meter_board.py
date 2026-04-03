@@ -277,7 +277,9 @@ def _add_outgoing_cable_tick(
         (cx - tick_size, tick_y - tick_size),
         (cx + tick_size, tick_y + tick_size),
     ))
-    _leader_len = 3
+    # Leader line: from tick on spine → left, then label at the end.
+    # Use a generous leader length to keep the label clear of the spine line.
+    _leader_len = 8
     result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
 
     _label_ch = 2.8
@@ -285,8 +287,8 @@ def _add_outgoing_cable_tick(
     _lines = outgoing_cable_text.split("\\P")
     _max_line_len = max(len(ln) for ln in _lines) if _lines else 20
     _text_width = _max_line_len * _char_w
-    _text_gap = ctx.config.cable_leader_text_gap
-    _text_x = cx - _leader_len - _text_gap - _text_width
+    # Label right edge aligns with leader left end (cx - _leader_len)
+    _text_x = cx - _leader_len - _text_width
     result.components.append(PlacedComponent(
         symbol_name="LABEL", x=_text_x, y=tick_y + _label_ch * 0.5, label=outgoing_cable_text,
     ))

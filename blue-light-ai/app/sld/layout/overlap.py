@@ -240,7 +240,7 @@ def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" =
         lines = text.replace("\\P", "\n").split("\n")
         max_line_len = max((len(line) for line in lines), default=0)
         num_lines = len(lines)
-        char_h = _LABEL_CHAR_H
+        char_h = config.label_char_height if config else _LABEL_CHAR_H
 
         if abs(comp.rotation - 90.0) < 0.1:
             # Rotated 90°: width↔height swap; text runs upward

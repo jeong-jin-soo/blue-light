@@ -381,16 +381,18 @@ class SldPipeline:
 
         return ditto_indices, ditto_prev_map
 
-    def _draw_label_component(self, backend: DrawingBackend, comp: PlacedComponent) -> None:
+    def _draw_label_component(self, backend: DrawingBackend, comp: PlacedComponent,
+                              layout_result: "LayoutResult | None" = None) -> None:
         """Draw a text-only LABEL component.
 
         Sub-circuit labels use top-left anchor (center_across=False) so that
         single-line and multi-line labels start at the same Y position.
         """
+        _cfg = (layout_result.config if layout_result else None) or LayoutConfig()
         backend.set_layer("SLD_ANNOTATIONS")
         backend.add_mtext(
             comp.label, insert=(comp.x, comp.y),
-            char_height=LayoutConfig.label_char_height, rotation=comp.rotation,
+            char_height=_cfg.label_char_height, rotation=comp.rotation,
             center_across=False,
         )
 
@@ -659,7 +661,7 @@ class SldPipeline:
         for comp_idx, comp in enumerate(layout_result.components):
             name = comp.symbol_name
             if name == "LABEL":
-                self._draw_label_component(backend, comp)
+                self._draw_label_component(backend, comp, layout_result)
             elif name == "FLOW_ARROW":
                 _draw_flow_arrow(backend, comp.x, comp.y, direction="down")
             elif name == "FLOW_ARROW_UP":
