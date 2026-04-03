@@ -110,12 +110,19 @@ def _check_busbar_connections(result, config) -> list[ValidationIssue]:
         for sx in _side_xs:
             fanout_side_xs.add(round(sx, 1))
 
+    # Spine X: vertical connections on the spine are NOT sub-circuit connections
+    # and should not be checked against busbar.
+    spine_x = getattr(result, 'spine_x', None)
+
     for i, conn in enumerate(result.connections):
         start_x = conn[0][0]
         start_y = conn[0][1]
         end_y = conn[1][1]
         # Vertical connections should start or end at a busbar
         if abs(conn[0][0] - conn[1][0]) < 0.5:  # vertical line
+            # Skip spine connections (they run between components, not from busbar)
+            if spine_x is not None and abs(start_x - spine_x) < 2.0:
+                continue
             # Skip fan-out side circuits (intentionally truncated)
             if round(start_x, 1) in fanout_side_xs:
                 continue
@@ -217,30 +224,18 @@ def _fix_text_overlap(result, config, issues: list[ValidationIssue]) -> int:
 
 
 def _fix_disconnected(result, config, issues: list[ValidationIssue]) -> int:
-    """Snap disconnected connections to nearest busbar. Returns count."""
-    busbar_y = getattr(result, 'busbar_y', None)
-    if busbar_y is None:
-        return 0
+    """Snap disconnected connections to nearest busbar. Returns count.
 
-    busbar_ys = [busbar_y]
-    for comp in result.components:
-        if comp.symbol_name == "BUSBAR":
-            busbar_ys.append(comp.y)
+    DISABLED: This fix was extending connection lines through symbol bodies
+    (MCB, ELCB) by snapping start points to busbar Y from far away.
+    The "disconnected" validation often flags fan-out side circuits and
+    spine connections that are correctly placed but not directly at busbar Y.
+    Snapping these to busbar creates lines that pass through breaker symbols.
 
-    fixes = 0
-    for issue in issues:
-        idx = issue.connection_idx
-        if idx is not None and idx < len(result.connections):
-            conn = result.connections[idx]
-            start = conn[0]
-            # Find nearest busbar Y
-            nearest_by = min(busbar_ys, key=lambda by: abs(start[1] - by))
-            if abs(start[1] - nearest_by) < 30:
-                result.connections[idx] = ((start[0], nearest_by), conn[1])
-                result.junction_dots.append((start[0], nearest_by))
-                issue.fix_applied = True
-                fixes += 1
-    return fixes
+    TODO: Re-enable with smarter logic that checks for symbol body collisions
+    before extending connections.
+    """
+    return 0
 
 
 def _fix_spare_disconnected(result, config, issues: list[ValidationIssue]) -> int:
