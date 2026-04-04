@@ -102,12 +102,12 @@ class TestMeasure:
 
     def test_section_order_complete(self):
         """SECTION_ORDER에 12개 섹션이 모두 포함."""
-        assert len(SECTION_ORDER) == 12
+        assert len(SECTION_ORDER) == 13  # 12 + ct_gap_setup
 
     def test_measure_returns_all_sections(self, simple_3p):
         config = LayoutConfig()
         measures = measure_all_sections(simple_3p, config)
-        assert len(measures) == 12
+        assert len(measures) == 13  # 12 + ct_gap_setup
         ids = [m.section_id for m in measures]
         assert ids == SECTION_ORDER
 

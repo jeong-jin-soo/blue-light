@@ -26,6 +26,7 @@ SECTION_ORDER: list[str] = [
     "incoming_supply",
     "meter_board",
     "unit_isolator",
+    "ct_gap_setup",
     "ct_pre_mccb_fuse",
     "main_breaker",
     "ct_metering",
@@ -68,7 +69,7 @@ def _measure_meter_board(
 ) -> SectionMeasure:
     """Meter board: ISO → KWH → MCB horizontal chain + box."""
     metering = req.get("metering")
-    if not metering:
+    if not metering or metering in ("ct_meter", "ct_metering"):
         return SectionMeasure(section_id="meter_board", height=0, present=False)
 
     cat = get_catalog()
@@ -82,7 +83,14 @@ def _measure_meter_board(
     box_height = comp_height + box_padding + config.meter_board_gap
 
     # Exit from meter board: box top + outgoing cable annotation space
-    has_outgoing_cable = bool(req.get("outgoing_cable") or req.get("cable"))
+    # Cable text comes from outgoing_cable, incoming_cable, or auto-determined cable
+    has_outgoing_cable = bool(
+        req.get("outgoing_cable") or req.get("cable") or req.get("incoming_cable")
+        or req.get("cable_size")
+    )
+    # If metering is set, there's always at least auto-determined cable
+    if metering:
+        has_outgoing_cable = True
     cable_annotation_space = 16.0 if has_outgoing_cable else 8.0
     total = box_height + cable_annotation_space
 
@@ -114,6 +122,17 @@ def _measure_unit_isolator(
     return SectionMeasure(section_id="unit_isolator", height=height)
 
 
+def _measure_ct_gap_setup(
+    req: dict, config: LayoutConfig, exports: dict[str, float],
+) -> SectionMeasure:
+    """CT metering isolator-to-DB gap (vertical connection before MCCB)."""
+    metering = req.get("metering")
+    if metering not in ("ct_meter", "ct_metering"):
+        return SectionMeasure(section_id="ct_gap_setup", height=0, present=False)
+
+    return SectionMeasure(section_id="ct_gap_setup", height=config.isolator_to_db_gap)
+
+
 def _measure_ct_pre_mccb_fuse(
     req: dict, config: LayoutConfig, exports: dict[str, float],
 ) -> SectionMeasure:
@@ -141,7 +160,10 @@ def _measure_main_breaker(
         cb = cat.get("MCCB")
 
     # Pre-gap (isolator_to_db_gap) + breaker height + stubs + spine gap
-    pre_gap = config.isolator_to_db_gap
+    # CT path uses skip_gap=True (gap is provided by _CtGapAndSetup)
+    metering = req.get("metering", "")
+    skip_gap = metering in ("ct_meter", "ct_metering")
+    pre_gap = 0 if skip_gap else config.isolator_to_db_gap
     component_height = cb.height + cb.stub * 2  # top + bottom stubs
     post_gap = config.spine_component_gap
 
@@ -292,6 +314,7 @@ _MEASURE_REGISTRY: dict[str, Any] = {
     "incoming_supply": _measure_incoming_supply,
     "meter_board": _measure_meter_board,
     "unit_isolator": _measure_unit_isolator,
+    "ct_gap_setup": _measure_ct_gap_setup,
     "ct_pre_mccb_fuse": _measure_ct_pre_mccb_fuse,
     "main_breaker": _measure_main_breaker,
     "ct_metering": _measure_ct_metering,

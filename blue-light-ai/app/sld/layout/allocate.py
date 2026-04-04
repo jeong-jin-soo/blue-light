@@ -115,12 +115,13 @@ def allocate(
         scale = 1.0
 
     # ── 3. 섹션별 Y 구간 할당 ──
-    # DXF 좌표계: Y가 위로 증가. Supply(top) → Load(bottom).
-    # 배치는 top-down: 가장 큰 Y부터 아래로 할당.
+    # DXF 좌표계: Y가 위로 증가.
+    # 배치 방향 = Place와 동일 (bottom-up): incoming_supply가 가장 낮은 Y에서 시작.
+    # 이래야 ctx.y = region.y_start 주입 후 기존 _place_* 함수가 위로 진행할 수 있다.
     scaled_total = total_needed * scale
     # 중앙 정렬: 남는 공간을 위아래로 균등 배분
     vertical_margin = (available - scaled_total) / 2
-    y_cursor = page.drawing_y_end - vertical_margin  # Start from top
+    y_cursor = page.drawing_y_start + vertical_margin  # Start from bottom
 
     section_regions: dict[str, SectionRegionV2] = {}
 
@@ -129,8 +130,8 @@ def allocate(
             continue
 
         h = m.height * scale
-        y_top = y_cursor
-        y_bottom = y_cursor - h
+        y_bottom = y_cursor
+        y_top = y_cursor + h
 
         section_regions[m.section_id] = SectionRegionV2(
             section_id=m.section_id,
@@ -139,7 +140,7 @@ def allocate(
             x_center=page.center_x,
             available_width=page.drawing_width,
         )
-        y_cursor = y_bottom
+        y_cursor = y_top
 
     # ── 4. Busbar 폭 결정 ──
     # sub_circuits 측정에서 total_circuit_width를 가져옴

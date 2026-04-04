@@ -123,12 +123,16 @@ def compute_layout_v3(
     _parse_requirements(ctx, requirements, application_info)
     ctx.allocation_plan = plan
 
-    # ── Step B: spine components (기존 순서 재사용) ──
-    # 현재는 기존 section_registry 순서를 사용.
-    # 향후 region 기반으로 전환 시 여기를 변경.
+    # ── Step B: spine components (region 기반 배치) ──
+    # Phase 2에서 할당한 region의 y_start를 각 섹션 시작 전에 ctx.y에 주입.
+    # 기존 _place_* 함수는 ctx.y에서 시작하여 위로 진행하므로 그대로 작동한다.
     from app.sld.layout.section_registry import get_section_sequence
     section_sequence = get_section_sequence(requirements)
     for section in section_sequence:
+        if plan and section.name:
+            region = plan.section_regions.get(section.name)
+            if region is not None:
+                ctx.y = region.y_start
         section.execute(ctx)
 
     # Adjust label height
