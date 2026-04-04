@@ -57,9 +57,14 @@ def _check_margin_clearance(
 # ---------------------------------------------------------------------------
 
 def _check_text_overlaps(result, config) -> list[ValidationIssue]:
-    """Detect overlapping 90-degree rotated text labels."""
+    """Detect physically overlapping 90-degree rotated text labels.
+
+    Only flags actual overlaps (gap < 0.5mm), not tight-but-readable spacing.
+    Overlap resolution (Step C) and font measurement (4c) handle normal spacing.
+    """
     issues = []
     labels = []
+    _MIN_GAP = 0.5  # mm — physical overlap threshold
 
     for i, comp in enumerate(result.components):
         if comp.symbol_name in ("LABEL", "CIRCUIT_ID_BOX") and abs(comp.rotation - 90.0) < 1:
@@ -72,11 +77,13 @@ def _check_text_overlaps(result, config) -> list[ValidationIssue]:
         x1, h1, idx1, name1 = labels[j]
         x2, h2, idx2, name2 = labels[j + 1]
         gap = abs(x2 - x1)
-        min_gap = (h1 + h2) / 2
-        if gap < min_gap:
+        # 같은 tap의 CIRCUIT_ID_BOX + LABEL 쌍은 의도적으로 같은 X
+        if gap < 0.01 and name1 != name2:
+            continue
+        if gap < _MIN_GAP:
             issues.append(ValidationIssue(
                 type="TEXT_OVERLAP", severity="warning",
-                detail=f"{name1}[{idx1}] ↔ {name2}[{idx2}] gap={gap:.1f}mm < {min_gap:.1f}mm",
+                detail=f"{name1}[{idx1}] ↔ {name2}[{idx2}] gap={gap:.1f}mm < {_MIN_GAP}mm",
                 component_idx=idx1,
             ))
     return issues
@@ -87,55 +94,71 @@ def _check_text_overlaps(result, config) -> list[ValidationIssue]:
 # ---------------------------------------------------------------------------
 
 def _check_busbar_connections(result, config) -> list[ValidationIssue]:
-    """Check that circuit connections start at the busbar Y coordinate.
+    """Check that SUB-CIRCUIT tap connections reach their busbar.
 
-    Skips connections intentionally truncated by fan-out (phase_fanout.py):
-    side circuits start at intermediate_y, not busbar_y.
+    화이트리스트 방식: busbar 근처의 서브서킷 브레이커(MCB/MCCB/CB_SPARE) tap 위치만 검사.
+    spine, meter board, CT, 케이블, earth bar 연결은 구조적으로 정확하므로 검사하지 않는다.
     """
     issues = []
     busbar_y = getattr(result, 'busbar_y', None)
     if busbar_y is None:
         return issues
 
-    # Collect all busbar Y values (main + sub-DB)
-    busbar_ys = {round(busbar_y, 1)}
-    for comp in result.components:
-        if comp.symbol_name == "BUSBAR":
-            busbar_ys.add(round(comp.y, 1))
+    # Collect all busbar Y values (main + sub-row busbars)
+    busbar_ys = set()
+    busbar_ys.add(busbar_y)
+    for by in getattr(result, 'busbar_y_per_row', []):
+        busbar_ys.add(by)
 
-    # Build set of X coords for fan-out side circuits (intentionally not at busbar)
+    # 서브서킷 브레이커의 tap X 수집 — busbar 근처(±40mm)의 CB만 대상
+    _CB_NAMES = {"CB_MCB", "CB_MCCB", "CB_ACB", "CB_RCCB", "CB_SPARE"}
+    tap_xs: set[float] = set()
+    for comp in result.components:
+        if comp.symbol_name in _CB_NAMES:
+            # 서브서킷 브레이커는 busbar 위에 위치 (Y > busbar_y)
+            near_any_busbar = any(abs(comp.y - by) < 40 for by in busbar_ys)
+            if near_any_busbar and comp.label_style == "breaker_block":
+                tap_xs.add(round(comp.x, 0))
+
+    if not tap_xs:
+        return issues
+
+    # Fan-out side circuits: 의도적으로 busbar에 직접 닿지 않음
     fanout_side_xs: set[float] = set()
     for fg in getattr(result, 'fanout_groups', []):
         _center_x, _by, _side_xs = fg
         for sx in _side_xs:
-            fanout_side_xs.add(round(sx, 1))
+            fanout_side_xs.add(round(sx, 0))
 
-    # Spine X: vertical connections on the spine are NOT sub-circuit connections
-    # and should not be checked against busbar.
-    spine_x = getattr(result, 'spine_x', None)
+    # 각 tap 위치에서 busbar에 닿는 연결이 있는지 확인
+    _TOL = 3.0  # mm tolerance
+    for tap_x in tap_xs:
+        # fan-out side circuit → busbar 직접 연결 불필요 (fanout geometry로 연결)
+        # overlap resolution이 tap을 ±3mm 이동시킬 수 있으므로 넉넉한 tolerance 사용
+        _FANOUT_TOL = 5.0
+        is_fanout = any(abs(tap_x - sx) < _FANOUT_TOL for sx in fanout_side_xs)
+        if is_fanout:
+            continue
 
-    for i, conn in enumerate(result.connections):
-        start_x = conn[0][0]
-        start_y = conn[0][1]
-        end_y = conn[1][1]
-        # Vertical connections should start or end at a busbar
-        if abs(conn[0][0] - conn[1][0]) < 0.5:  # vertical line
-            # Skip spine connections (they run between components, not from busbar)
-            if spine_x is not None and abs(start_x - spine_x) < 2.0:
+        has_busbar_conn = False
+        for conn in result.connections:
+            cx = conn[0][0]
+            # 이 tap 근처의 수직 연결인지?
+            if abs(cx - tap_x) > _TOL:
                 continue
-            # Skip fan-out side circuits (intentionally truncated)
-            if round(start_x, 1) in fanout_side_xs:
+            if abs(conn[0][0] - conn[1][0]) > 1.0:  # 수직 아님
                 continue
-            near_busbar = any(abs(start_y - by) < 2.0 for by in busbar_ys)
-            if not near_busbar:
-                # Check if end touches busbar instead
-                near_busbar_end = any(abs(end_y - by) < 2.0 for by in busbar_ys)
-                if not near_busbar_end:
-                    issues.append(ValidationIssue(
-                        type="DISCONNECTED", severity="critical",
-                        detail=f"Connection[{i}] ({conn[0][0]:.1f},{start_y:.1f})→({conn[1][0]:.1f},{end_y:.1f}) not at any busbar",
-                        connection_idx=i,
-                    ))
+            # start 또는 end가 busbar에 닿는지?
+            sy, ey = conn[0][1], conn[1][1]
+            if any(abs(sy - by) < _TOL or abs(ey - by) < _TOL for by in busbar_ys):
+                has_busbar_conn = True
+                break
+
+        if not has_busbar_conn:
+            issues.append(ValidationIssue(
+                type="DISCONNECTED", severity="critical",
+                detail=f"Sub-circuit tap at x≈{tap_x:.0f} has no connection reaching busbar",
+            ))
     return issues
 
 
@@ -197,30 +220,12 @@ def _fix_margin(result, config, issues: list[ValidationIssue]) -> int:
 
 
 def _fix_text_overlap(result, config, issues: list[ValidationIssue]) -> int:
-    """Truncate overlapping text labels to reduce collision. Returns count."""
-    fixes = 0
-    _ABBREVIATIONS = {
-        "LIGHTING POINTS": "LTG PTS",
-        "DOUBLE S/S/O": "DBL S/O",
-        "LIGHTING POINT": "LTG PT",
-        "HEATER POINT": "HTR PT",
-        "DP ISOLATOR": "DP ISO",
-        "TPN ISOLATOR": "TPN ISO",
-    }
-    for issue in issues:
-        idx = issue.component_idx
-        if idx is not None and idx < len(result.components):
-            comp = result.components[idx]
-            if comp.symbol_name == "LABEL" and comp.label:
-                original = comp.label
-                for full, abbr in _ABBREVIATIONS.items():
-                    if full in comp.label:
-                        comp.label = comp.label.replace(full, abbr)
-                        break
-                if comp.label != original:
-                    issue.fix_applied = True
-                    fixes += 1
-    return fixes
+    """Text overlap auto-fix — currently no-op.
+
+    Overlap resolution (Step C) 과 font measurement (4c)가 배치 시 겹침을 방지하므로
+    사후 약어 치환은 불필요하다. 0.5mm 임계값 이하의 실제 겹침은 배치 버그로 간주.
+    """
+    return 0
 
 
 def _fix_disconnected(result, config, issues: list[ValidationIssue]) -> int:

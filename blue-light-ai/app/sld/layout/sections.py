@@ -1249,9 +1249,33 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     db_box_start_y = text_anchor_y - config.db_info_height(ctx.db_info_text)
     from app.sld.catalog import get_catalog as _gc
     _mcb_def = _gc().get("MCB")
-    db_box_end_y = (busbar_y_row + config.db_box_busbar_margin
-                    + _mcb_def.height + _mcb_def.stub
-                    + config.db_box_tail_margin + config.db_box_label_margin)
+    # 구조적 최솟값: busbar + MCB + stub + 고정 마진
+    fixed_end_y = (busbar_y_row + config.db_box_busbar_margin
+                   + _mcb_def.height + _mcb_def.stub
+                   + config.db_box_tail_margin + config.db_box_label_margin)
+
+    # 콘텐츠 기반: busbar 위 실제 컴포넌트/연결의 최고점 스캔
+    # (Step C/D 이후이므로 모든 배치가 완료된 상태)
+    _bus_left = result.busbar_start_x - 5
+    _bus_right = result.busbar_end_x + 5
+    topmost_y = busbar_y_row
+    for comp in result.components:
+        if comp.symbol_name in ("BUSBAR", "DB_INFO_BOX", "EARTH"):
+            continue
+        if _bus_left <= comp.x <= _bus_right and comp.y > busbar_y_row:
+            comp_top = comp.y
+            # 회전 라벨: 폰트 실측으로 상단 extent 계산
+            if comp.symbol_name in ("LABEL", "CIRCUIT_ID_BOX") and abs(comp.rotation - 90.0) < 1:
+                from app.sld.layout.font_util import measure_mtext_width
+                comp_top = comp.y + measure_mtext_width(
+                    comp.label or "", cap_height=config.label_char_height,
+                )
+            topmost_y = max(topmost_y, comp_top)
+    # leader_connections는 DB box 밖(상단)으로 연장되므로 제외
+    # 페이지 상단(max_y)에 clamp — DB box가 페이지 밖으로 나가지 않도록
+    content_end_y = topmost_y + 1.5  # 1.5mm 여유
+    content_end_y = min(content_end_y, config.max_y - 0.5)
+    db_box_end_y = max(fixed_end_y, content_end_y)
 
     # DB box horizontal extents
     # Reserve space to the right for earth bar (symbol + gap + label)
