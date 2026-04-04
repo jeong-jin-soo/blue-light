@@ -75,6 +75,8 @@ def allocate(
     measures: list[SectionMeasure],
     config: LayoutConfig,
     page: PageSpec | None = None,
+    *,
+    y_offset: float | None = None,
 ) -> AllocationPlan:
     """Phase 2: 측정 결과를 기반으로 전체 레이아웃을 배분.
 
@@ -89,6 +91,8 @@ def allocate(
         measures: Phase 1 결과 (SectionMeasure 리스트)
         config: 레이아웃 설정
         page: 페이지 사양 (None → A3 landscape)
+        y_offset: 시작 Y 좌표 (None → 페이지 중앙 정렬). multi-DB에서
+                  각 board의 start_y를 지정할 때 사용.
 
     Returns:
         AllocationPlan with section regions, scale, busbar extent
@@ -119,9 +123,13 @@ def allocate(
     # 배치 방향 = Place와 동일 (bottom-up): incoming_supply가 가장 낮은 Y에서 시작.
     # 이래야 ctx.y = region.y_start 주입 후 기존 _place_* 함수가 위로 진행할 수 있다.
     scaled_total = total_needed * scale
-    # 중앙 정렬: 남는 공간을 위아래로 균등 배분
-    vertical_margin = (available - scaled_total) / 2
-    y_cursor = page.drawing_y_start + vertical_margin  # Start from bottom
+    if y_offset is not None:
+        # 외부 지정: multi-DB board의 start_y에서 시작
+        y_cursor = y_offset
+    else:
+        # 중앙 정렬: 남는 공간을 위아래로 균등 배분
+        vertical_margin = (available - scaled_total) / 2
+        y_cursor = page.drawing_y_start + vertical_margin  # Start from bottom
 
     section_regions: dict[str, SectionRegionV2] = {}
 

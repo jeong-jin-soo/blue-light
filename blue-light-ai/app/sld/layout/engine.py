@@ -1363,6 +1363,35 @@ def render_board(
     else:
         ctx.use_triplets = _should_use_triplets(ctx.sub_circuits, ctx.supply_type)
 
+    # ── Per-board Measure→Allocate (Y region 사전 결정) ──
+    # ctx 필드에서 measure 호환 requirements 재구성
+    _board_req_for_measure = {
+        "supply_type": ctx.supply_type,
+        "voltage": ctx.voltage,
+        "main_breaker": {
+            "type": ctx.breaker_type or "MCCB",
+            "rating": ctx.breaker_rating,
+            "poles": ctx.breaker_poles,
+            "fault_kA": ctx.breaker_fault_kA,
+        },
+        "elcb": ctx.elcb_config if ctx.elcb_rating else {},
+        "sub_circuits": ctx.sub_circuits,
+        "metering": "ct_meter" if board.get("_ct_metering") else "",
+        "busbar_rating": ctx.busbar_rating,
+    }
+    from app.sld.layout.measure import measure_all_sections as _meas
+    from app.sld.layout.allocate import allocate as _alloc
+    _board_measures = _meas(_board_req_for_measure, config)
+    _board_plan = _alloc(_board_measures, config, y_offset=y)
+    ctx.allocation_plan = _board_plan
+
+    def _inject_region(section_name: str) -> None:
+        """Allocate plan의 region.y_start를 ctx.y에 주입."""
+        if _board_plan:
+            _r = _board_plan.section_regions.get(section_name)
+            if _r is not None:
+                ctx.y = _r.y_start
+
     # CT metering section — placed INSIDE the root board for ct_meter installations.
     # The _ct_metering flag is injected by the multi-DB orchestrator for the root board.
     _has_ct_metering = board.get("_ct_metering")
@@ -1389,6 +1418,7 @@ def render_board(
         # Add the standard gap BEFORE CT metering — this ensures cable annotation
         # (tick mark + text) and location text from the incoming isolator stay
         # clearly OUTSIDE and BELOW the DB dashed box with proper spacing.
+        _inject_region("ct_gap_setup")
         _gap = config.isolator_to_db_gap
         result.connections.append(((cx, ctx.y), (cx, ctx.y + _gap)))
         ctx.y += _gap
@@ -1399,11 +1429,16 @@ def render_board(
         # Fuses are horizontal RIGHT branches (not on spine).
         # Ref: CT_METERING_SPINE_ORDER in sections.py, 150A/400A TPN DWGs
         ctx._ct_pre_mccb_fuse = True
+        _inject_region("ct_pre_mccb_fuse")
         _place_ct_pre_mccb_fuse(ctx)
+        _inject_region("main_breaker")
         _place_main_breaker(ctx, skip_gap=True)
+        _inject_region("ct_metering")
         _place_ct_metering_section(ctx)
     else:
+        _inject_region("main_breaker")
         _place_main_breaker(ctx)
+        _inject_region("ct_pre_mccb_fuse")
         _place_ct_pre_mccb_fuse(ctx)
     # CT metering boards: the spine terminates at the crossbar (BI connector).
     # RCCB + MCB branch from the crossbar, shifted left by 3× BI width.
@@ -1422,7 +1457,9 @@ def render_board(
         result.junction_dots.append((_elcb_cx, ctx.bi_center_y))
         # Connection from crossbar junction up to RCCB start position
         result.connections.append(((_elcb_cx, ctx.bi_center_y), (_elcb_cx, ctx.y)))
+    _inject_region("elcb")
     _place_elcb(ctx)
+    _inject_region("internal_cable")
     _place_internal_cable(ctx)
     if _saved_cx_for_elcb is not None:
         ctx.cx = _saved_cx_for_elcb
@@ -1430,6 +1467,7 @@ def render_board(
     # Reference: DB2 shows "80A BUSBAR" on each sub-busbar, no label on main busbar.
     if pgroups and any(pg.get("rccb", {}).get("rating", 0) > 0 for pg in pgroups):
         ctx._suppress_busbar_label = True
+    _inject_region("main_busbar")
     _place_main_busbar(ctx)
 
     # BI Connector crossbar line + circuits — placed AFTER busbar so crossbar
