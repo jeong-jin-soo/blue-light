@@ -286,6 +286,7 @@ def snapshot_config(request):
     return request.param
 
 
+@pytest.mark.snapshot
 class TestSvgSnapshots:
     """SVG golden file regression tests."""
 

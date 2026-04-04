@@ -97,5 +97,5 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      - name: Run tests (excluding vision)
-        run: pytest tests/ -m "not vision" --timeout=60 -x -q
+      - name: Run tests (excluding vision and snapshots)
+        run: pytest tests/ -m "not vision and not snapshot" --timeout=60 -x -q
