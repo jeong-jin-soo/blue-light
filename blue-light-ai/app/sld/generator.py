@@ -43,6 +43,7 @@ from app.sld.layout import (
     PlacedComponent,
     compute_layout,
 )
+from app.sld.layout.engine_v3 import compute_layout_v3
 from app.sld.pdf_backend import PdfBackend
 from app.sld.real_symbols import get_symbol_dimensions
 from app.sld.locale import SG_LOCALE
@@ -208,9 +209,15 @@ class SldPipeline:
         pc = page_config
         tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
 
-        # ❶~❺ Layout
-        layout_result = compute_layout(requirements, application_info=app_info,
-                                       page_config=pc)
+        # ❶~❺ Layout — single-DB는 v3 (region 기반), multi-DB는 v2
+        _dbs = requirements.get("distribution_boards")
+        _is_multi = _dbs and len(_dbs) > 1
+        if _is_multi:
+            layout_result = compute_layout(requirements, application_info=app_info,
+                                           page_config=pc)
+        else:
+            layout_result = compute_layout_v3(requirements, application_info=app_info,
+                                              page_config=pc)
 
         # ❺½ Post-layout validation + auto-fix (max 2 attempts)
         if layout_result.config:

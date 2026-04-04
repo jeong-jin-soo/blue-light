@@ -433,9 +433,13 @@ async def generate_sld_direct(
     # Ensure sld_only_mode (no LEW info required)
     application_info.setdefault("sld_only_mode", True)
 
+    # Vision AI: 서버 환경변수에서 API key 가져옴 (클라이언트 미전송, 보안)
+    api_key = settings.gemini_api_key if request.enable_vision else None
+
     try:
         pipeline = SldPipeline()
-        result = pipeline.run(requirements, application_info=application_info)
+        result = pipeline.run(requirements, application_info=application_info,
+                              api_key=api_key)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

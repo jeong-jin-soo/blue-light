@@ -61,6 +61,7 @@ class SldGenerateRequest(BaseModel):
 
     requirements: dict = Field(..., description="SLD requirements (supply_type, main_breaker, sub_circuits, etc.)")
     application_info: dict | None = Field(None, description="Application details (address, drawing_number, etc.)")
+    enable_vision: bool = Field(False, description="Enable Vision AI self-review (requires GEMINI_API_KEY on server)")
 
 
 class SldGenerateResponse(BaseModel):
