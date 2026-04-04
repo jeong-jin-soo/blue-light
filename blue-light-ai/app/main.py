@@ -433,8 +433,11 @@ async def generate_sld_direct(
     # Ensure sld_only_mode (no LEW info required)
     application_info.setdefault("sld_only_mode", True)
 
-    # Vision AI: 서버 환경변수에서 API key 가져옴 (클라이언트 미전송, 보안)
-    api_key = settings.gemini_api_key if request.enable_vision else None
+    # Vision AI: DB → 환경변수 순서로 API key 조회 (Spring Boot GeminiConfig과 동일)
+    api_key = None
+    if request.enable_vision:
+        from app.db.connection import get_system_setting
+        api_key = get_system_setting("gemini_api_key") or settings.gemini_api_key or None
 
     try:
         pipeline = SldPipeline()
