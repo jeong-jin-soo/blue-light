@@ -604,11 +604,9 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             ))
             # Position label text right-aligned to the left of enclosure box
             _label_ch = 2.3
-            _char_w = _label_ch * 0.6
             _combined = f"{iso_main_label}\\P{iso_rating_text}"
-            _lines = _combined.split("\\P")
-            _longest = max(len(ln) for ln in _lines)
-            _text_w = _longest * _char_w
+            from app.sld.layout.font_util import measure_mtext_width
+            _text_w = measure_mtext_width(_combined, cap_height=_label_ch)
             _enclosure_pad = 1.5
             _text_x = cx - _iso_def.center_x() - _enclosure_pad - config.isolator_label_gap - _text_w
             _text_y = y + _iso_def.height * 0.55
@@ -655,12 +653,15 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             ))
             _leader_len = config.cable_leader_len
             result.connections.append(((cx, tick_y), (cx + _leader_len, tick_y)))
-            result.components.append(PlacedComponent(
-                symbol_name="LABEL",
-                x=cx + _leader_len + config.cable_leader_text_gap,
-                y=tick_y + 1.5,
-                label=out_cable_text,
-            ))
+            result.deferred_cable_labels.append({
+                "text": out_cable_text,
+                "tick_x": cx,
+                "tick_y": tick_y,
+                "side": "right",
+                "leader_len": _leader_len,
+                "char_height": 2.0,
+                "source": "outgoing_cable",
+            })
 
     ctx.y = y
 
@@ -1342,7 +1343,8 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     _earth_cond = SG_LOCALE.circuit.earth_conductor
     if earth_conductor_mm2:
         conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
-        conductor_label_right = earth_x + len(conductor_label) * config.char_w_label
+        from app.sld.layout.font_util import measure_text_width as _mtw
+        conductor_label_right = earth_x + _mtw(conductor_label, cap_height=config.label_char_height)
         earth_rightmost = max(earth_label_right, conductor_label_right)
     else:
         earth_rightmost = earth_label_right
@@ -1366,7 +1368,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
 
     if earth_conductor_mm2:
         conductor_label = f"1 x {earth_conductor_mm2}sqmm {_earth_cond}"
-        label_width = len(conductor_label) * config.char_w_label
+        label_width = _mtw(conductor_label, cap_height=config.label_char_height)
         label_x = earth_x
         # Ensure label doesn't exceed right drawing border
         border_right_abs = config.max_x
@@ -1375,7 +1377,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
             label_x = border_right_abs - 2 - label_width
             label_x = max(label_x, config.min_x)
             # If still too wide, wrap to 2 lines at "CU/GRN-YEL" boundary
-            recalc_width = len(conductor_label) * config.char_w_label
+            recalc_width = _mtw(conductor_label, cap_height=config.label_char_height)
             if label_x + recalc_width > border_right_abs - 2:
                 conductor_label = f"1 x {earth_conductor_mm2}sqmm\\P{_earth_cond}"
                 label_x = earth_x  # Reset x since text is now shorter per line

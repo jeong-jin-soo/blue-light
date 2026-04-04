@@ -618,9 +618,8 @@ def _collect_content_extents(
         all_xs.append(comp.x)
         all_ys.append(comp.y)
         if comp.symbol_name == "LABEL" and abs(comp.rotation - 90.0) < 0.1:
-            lines = comp.label.split("\\P")
-            max_line_len = max(len(line) for line in lines)
-            all_ys.append(comp.y + max_line_len * config.char_w_label)
+            from app.sld.layout.font_util import measure_mtext_width
+            all_ys.append(comp.y + measure_mtext_width(comp.label, cap_height=config.label_char_height))
     for jx, jy, jdir in result.junction_arrows:
         all_xs.append(jx)
         all_ys.append(jy)
@@ -693,13 +692,16 @@ def _adjust_label_height_to_fit(config: LayoutConfig, ctx: "_LayoutContext") -> 
     if available_above <= 0:
         return
 
-    # Fixed elements above busbar (breaker + tail + DB box margins)
+    # Fixed elements above busbar (breaker + tail + DB box + cable leaders)
     fixed_above = (
         config.busbar_to_breaker_gap    # gap to first breaker
-        + 12.0                           # MCB height + stub (conservative)
+        + 16.0                           # MCB height + stub
+        + 8.0                            # circuit_id vertical text below breaker
         + config.db_box_tail_margin
         + config.db_box_label_margin
         + config.leader_margin_above_db
+        + config.leader_bend_height     # cable leader bend at top
+        + 15.0                           # DB box top border + cable text height
         + 5.0                            # breathing room
     )
 
@@ -714,13 +716,16 @@ def _adjust_label_height_to_fit(config: LayoutConfig, ctx: "_LayoutContext") -> 
     if not active:
         return
 
-    max_name_len = max(len(c.get("name", "")) for c in active)
-    # Labels wrap at ~25 chars per line, so effective visual height depends on
-    # the number of characters in the longest line after wrapping
-    chars_per_line = 25
+    from app.sld.layout.font_util import measure_mtext_width
+    # Longest circuit name determines the visual height (rotated 90°)
+    longest_name = max((c.get("name", "") for c in active), key=len)
+    # Wrap long names at preferred_max_label_chars boundary
+    chars_per_line = config.preferred_max_label_chars
+    max_name_len = len(longest_name)
     n_lines = max(1, (max_name_len + chars_per_line - 1) // chars_per_line)
-    # Visual height = chars_per_line × char_w (rotated text width = visual height)
-    current_label_height = min(max_name_len, chars_per_line) * config.char_w_label
+    # Visual height = measured text width of one line (rotated 90°)
+    first_line = longest_name[:chars_per_line]
+    current_label_height = measure_mtext_width(first_line, cap_height=config.label_char_height)
     # Add inter-line spacing for multi-line labels
     if n_lines > 1:
         current_label_height += (n_lines - 1) * config.label_char_height

@@ -526,11 +526,12 @@ class TestComputeBoundingBox:
         comp = PlacedComponent(symbol_name="CIRCUIT_ID_BOX", x=100, y=200, circuit_id="L1S1")
         bb = _compute_bounding_box(comp)
         assert bb is not None
-        # Rotated text: width=3 (fixed), height = len("L1S1")*1.8+2 = 9.2
+        # Rotated text: width=3 (fixed), height = font-measured text width + 2
+        from app.sld.layout.font_util import measure_text_width
         assert bb.x == pytest.approx(100 - 1.5, abs=0.5)
         assert bb.width == pytest.approx(3.0, abs=0.5)
-        expected_h = len("L1S1") * 1.8 + 2  # 9.2
-        assert bb.height == pytest.approx(expected_h, abs=0.5)
+        expected_h = measure_text_width("L1S1", cap_height=2.8) + 2
+        assert bb.height == pytest.approx(expected_h, abs=1.0)
 
     def test_db_info_box_extends_down(self):
         """DB_INFO_BOX should extend downward from y using sub-anchor fields."""

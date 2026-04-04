@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
+from app.sld.layout.font_util import measure_mtext_size, measure_text_width
 from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
 
 logger = logging.getLogger(__name__)
@@ -56,19 +57,16 @@ def _collect_occupied_rects(
             ))
 
     # Components (symbols)
-    char_w = getattr(config, "char_w_label", 1.8)
     for comp in result.components:
         if comp.symbol_name == "LABEL":
-            lines = comp.label.replace("\\P", "\n").split("\n")
-            max_len = max((len(ln) for ln in lines), default=0)
-            num_lines = len(lines)
             ch = getattr(config, "label_char_height", 2.8)
+            text_w, text_h = measure_mtext_size(comp.label, cap_height=ch)
             if abs(comp.rotation - 90.0) < 0.1:
-                w = num_lines * ch
-                h = max_len * char_w
+                w = text_h
+                h = text_w
             else:
-                w = max_len * char_w
-                h = num_lines * ch
+                w = text_w
+                h = text_h
             rects.append(_OccupiedRect(
                 x_min=comp.x, y_min=comp.y,
                 x_max=comp.x + w, y_max=comp.y + h,
@@ -86,13 +84,8 @@ def _collect_occupied_rects(
 def _estimate_text_rect(
     text: str, x: float, y: float, char_height: float,
 ) -> _OccupiedRect:
-    """텍스트의 경계 사각형을 추정."""
-    char_w = char_height * 0.7  # proportional font width ratio
-    lines = text.replace("\\P", "\n").split("\n")
-    max_len = max((len(ln) for ln in lines), default=0)
-    num_lines = len(lines)
-    w = max_len * char_w
-    h = num_lines * (char_height + 0.5)
+    """텍스트의 경계 사각형을 실측."""
+    w, h = measure_mtext_size(text, cap_height=char_height)
     return _OccupiedRect(x_min=x, y_min=y, x_max=x + w, y_max=y + h)
 
 
@@ -121,13 +114,8 @@ def place_deferred_cable_labels(
         leader_len = label_info["leader_len"]
         ch = label_info.get("char_height", 2.8)
 
-        # 기본 위치 계산
-        char_w = ch * 0.7
-        lines = text.replace("\\P", "\n").split("\n")
-        max_line_len = max((len(ln) for ln in lines), default=0)
-        text_width = max_line_len * char_w
-        num_lines = len(lines)
-        text_height = num_lines * (ch + 0.5)
+        # 기본 위치 계산 — 폰트 실측
+        text_width, text_height = measure_mtext_size(text, cap_height=ch)
 
         # 텍스트 Y: 리더선과 같은 높이.
         # DXF: Y↑ 증가, MTEXT attachment_point=1 (TOP_LEFT).

@@ -180,7 +180,7 @@ def generate_catalog_svg(output_path: str) -> str:
         label_y = cell_y + cell_h - 3
         backend.add_mtext(
             label,
-            insert=(cell_x + cell_w / 2 - len(label) * 1.2, label_y),
+            insert=(cell_x + cell_w / 2 - len(label) * 1.2, label_y),  # catalog preview; approx OK
             char_height=3,
         )
 
@@ -189,7 +189,7 @@ def generate_catalog_svg(output_path: str) -> str:
         dim_y = cell_y + cell_h - 8
         backend.add_mtext(
             dim_text,
-            insert=(cell_x + cell_w / 2 - len(dim_text) * 0.8, dim_y),
+            insert=(cell_x + cell_w / 2 - len(dim_text) * 0.8, dim_y),  # catalog preview; approx OK
             char_height=2,
         )
 

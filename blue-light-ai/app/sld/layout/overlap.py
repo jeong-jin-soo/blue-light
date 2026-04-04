@@ -61,6 +61,7 @@ import re
 from collections import OrderedDict
 from dataclasses import dataclass, field
 
+from app.sld.layout.font_util import measure_mtext_size, measure_text_width
 from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
 from app.sld.locale import SG_LOCALE
 
@@ -168,7 +169,6 @@ def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" =
     Returns None for structural elements (BUSBAR) that should never be moved.
     Handles text sizing and 90-degree rotation for labels.
     """
-    _char_w = config.char_w_label if config else _CHAR_W_DEFAULT
     name = comp.symbol_name
 
     # Structural — skip
@@ -177,7 +177,8 @@ def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" =
 
     # Special: CIRCUIT_ID_BOX — vertical text at tap_x (rotation=90°)
     if name == "CIRCUIT_ID_BOX":
-        text_h = len(comp.circuit_id or "") * _char_w + 2  # text length → height
+        _ch = config.label_char_height if config else _LABEL_CHAR_H
+        text_h = measure_text_width(comp.circuit_id or "", cap_height=_ch) + 2
         return BoundingBox(x=comp.x - 1.5, y=comp.y, width=3, height=text_h)
 
     # Special: DB_INFO_BOX extends downward from comp.y
@@ -236,26 +237,13 @@ def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" =
     # Text LABEL
     if name == "LABEL":
         text = comp.label or ""
-        lines = text.replace("\\P", "\n").split("\n")
-        max_line_len = max((len(line) for line in lines), default=0)
-        num_lines = len(lines)
         char_h = config.label_char_height if config else _LABEL_CHAR_H
+        text_w, text_h = measure_mtext_size(text, cap_height=char_h)
 
         if abs(comp.rotation - 90.0) < 0.1:
-            # Rotated 90°: width↔height swap; text runs upward
-            return BoundingBox(
-                x=comp.x,
-                y=comp.y,
-                width=num_lines * char_h,
-                height=max_line_len * _char_w,
-            )
+            return BoundingBox(x=comp.x, y=comp.y, width=text_h, height=text_w)
         else:
-            return BoundingBox(
-                x=comp.x,
-                y=comp.y,
-                width=max_line_len * _char_w,
-                height=num_lines * char_h,
-            )
+            return BoundingBox(x=comp.x, y=comp.y, width=text_w, height=text_h)
 
     # Default: small generic box
     return BoundingBox(x=comp.x, y=comp.y, width=5, height=5)

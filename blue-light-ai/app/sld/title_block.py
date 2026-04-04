@@ -338,12 +338,12 @@ def _fit_font_size(text: str, cell_width: float, max_height: float, min_height: 
     """
     if not text:
         return max_height
-    # Approximate: each character occupies ~0.6 * char_height in width
-    est_width = len(text) * max_height * 0.6
+    from app.sld.layout.font_util import measure_text_width
+    est_width = measure_text_width(text, cap_height=max_height)
     if est_width <= cell_width:
         return max_height
-    # Shrink proportionally, clamped to min_height
-    shrunk = cell_width / (len(text) * 0.6)
+    # Shrink proportionally
+    shrunk = max_height * (cell_width / est_width)
     return max(min_height, shrunk)
 
 

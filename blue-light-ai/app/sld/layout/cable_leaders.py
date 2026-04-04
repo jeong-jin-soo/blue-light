@@ -291,9 +291,9 @@ def _add_cable_leader_lines(
             cable_groups.setdefault(cable_spec, []).append(tap_x)
 
         # Estimate cable text height and clamp leader_y to keep text within top border
-        max_spec_len = max(len(s) for s in cable_groups.keys())
-        est_line_chars = max_spec_len // 2 + 5
-        est_text_h = est_line_chars * config.char_w_label
+        from app.sld.layout.font_util import measure_text_width as _mtw
+        max_spec = max(cable_groups.keys(), key=len)
+        est_text_h = _mtw(max_spec[:len(max_spec) // 2 + 5], cap_height=config.label_char_height)
         max_leader_y = config.max_y - config.leader_bend_height - 1 - est_text_h
         if leader_y > max_leader_y:
             leader_y = max_leader_y

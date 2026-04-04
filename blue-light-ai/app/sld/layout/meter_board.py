@@ -186,19 +186,13 @@ def _place_meter_board_symbols(
         else:
             _kwh_label = SG_LOCALE.meter_board.kwh_meter_by_sp
     # KWH label: 2 lines (e.g., "PG" + "KWH METER"), each centered above KWH symbol.
-    # Use ezdxf font engine for accurate text width measurement.
+    from app.sld.layout.font_util import measure_text_width as _mtw
     _kwh_lines = _kwh_label.split("\\P")
     _anno_ch = 2.8
     _line_gap = 0.5
-    try:
-        from ezdxf.fonts import fonts as _ezdxf_fonts
-        _font = _ezdxf_fonts.make_font("txt", cap_height=_anno_ch)
-        _measure = lambda t: _font.text_width(t)
-    except Exception:
-        _measure = lambda t: len(t) * _anno_ch * 0.6  # fallback
 
     for li, line_text in enumerate(_kwh_lines):
-        _tw = _measure(line_text)
+        _tw = _mtw(line_text, cap_height=_anno_ch)
         _lx = g.kwh_cx - _tw / 2
         _ly = g.kwh_label_y - li * (_anno_ch + _line_gap)
         result.components.append(PlacedComponent(
