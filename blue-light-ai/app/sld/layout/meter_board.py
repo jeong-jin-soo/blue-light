@@ -23,7 +23,7 @@ from app.sld.layout.models import (
     _LayoutContext,
     format_cable_spec,
 )
-from app.sld.layout.section_base import connect_points
+from app.sld.layout.section_base import connect_points, connect_ports, connect_port_to_point
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -143,24 +143,27 @@ def _place_meter_board_symbols(
     """Place ISO, CT, KWH, MCB symbols and inter-component wiring."""
     result = ctx.result
 
-    # Spine → ISO routing
-    if g.iso_left_x > ctx.cx:
-        connect_points(result, (ctx.cx, g.mb_center_y), (g.iso_left_x, g.mb_center_y))
-
     # ISOLATOR (left) — Reference uses procedural isolator symbol (2 circles + diagonal)
-    result.components.append(PlacedComponent(
+    _iso_x = g.iso_cx - g.iso_h_extent / 2
+    _iso_id = ctx.next_id("mb_isolator")
+    _iso_ports = {"left": (g.iso_left_x, g.mb_center_y), "right": (g.iso_right_x, g.mb_center_y)}
+    _iso_comp = PlacedComponent(
         symbol_name="ISOLATOR",
-        x=g.iso_cx - g.iso_h_extent / 2,
-        y=g.mb_center_y,
+        x=_iso_x, y=g.mb_center_y,
         label=f"{ctx.breaker_rating}A {ctx.meter_poles}",
         rating=SG_LOCALE.meter_board.isolator,
         rotation=90.0,
-    ))
+        id=_iso_id, ports=_iso_ports,
+    )
+    result.components.append(_iso_comp)
     result.symbols_used.add("ISOLATOR")
+
+    # Spine → ISO routing (port-based)
+    if g.iso_left_x > ctx.cx:
+        connect_port_to_point(result, _iso_comp, "left", (ctx.cx, g.mb_center_y), port_is_start=False)
 
     # ISO → KWH wiring (connection reaches KWH left pin / body edge)
     kwh_left_x = g.kwh_cx - g.kwh_h_extent / 2
-    connect_points(result, (g.iso_right_x, g.mb_center_y), (kwh_left_x, g.mb_center_y))
 
     # CT (between ISO and KWH) — ct_meter + non-landlord only
     if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
@@ -174,10 +177,19 @@ def _place_meter_board_symbols(
         result.symbols_used.add("CT")
 
     # KWH METER — x = left edge (same pattern as ISO/MCB for pin="left" alignment)
-    result.components.append(PlacedComponent(
-        symbol_name="KWH_METER", x=g.kwh_cx - g.kwh_h_extent / 2, y=g.mb_center_y, rotation=90.0,
-    ))
+    _kwh_x = g.kwh_cx - g.kwh_h_extent / 2
+    kwh_right_x_pin = g.kwh_cx + g.kwh_h_extent / 2
+    _kwh_id = ctx.next_id("mb_kwh")
+    _kwh_ports = {"left": (kwh_left_x, g.mb_center_y), "right": (kwh_right_x_pin, g.mb_center_y)}
+    _kwh_comp = PlacedComponent(
+        symbol_name="KWH_METER", x=_kwh_x, y=g.mb_center_y, rotation=90.0,
+        id=_kwh_id, ports=_kwh_ports,
+    )
+    result.components.append(_kwh_comp)
     result.symbols_used.add("KWH_METER")
+
+    # ISO right → KWH left (port-based)
+    connect_ports(result, _iso_comp, "right", _kwh_comp, "left")
 
     # KWH label (above symbols, inside box)
     _kwh_label = ctx.requirements.get("kwh_label")
@@ -203,23 +215,26 @@ def _place_meter_board_symbols(
             label=line_text,
         ))
 
-    # KWH → MCB wiring (connection reaches KWH right pin / body edge)
-    kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2
-    connect_points(result, (kwh_right_x, g.mb_center_y), (g.mcb_left_x, g.mb_center_y))
-
     # MCB (right)
     _mcb_poles = ctx.breaker_poles
     _mcb_char = ctx.main_breaker_char or "B"
     _mcb_ka = ctx.breaker_fault_kA or 10
-    result.components.append(PlacedComponent(
+    _mcb_x = g.mcb_cx - g.mcb_h_extent / 2
+    _mcb_id = ctx.next_id("mb_mcb")
+    _mcb_ports = {"left": (g.mcb_left_x, g.mb_center_y), "right": (g.mcb_right_x, g.mb_center_y)}
+    _mcb_comp = PlacedComponent(
         symbol_name="CB_MCB",
-        x=g.mcb_cx - g.mcb_h_extent / 2,
-        y=g.mb_center_y,
+        x=_mcb_x, y=g.mb_center_y,
         label=f"{ctx.breaker_rating}A {_mcb_poles} MCB",
         rating=f"TYPE {_mcb_char} {_mcb_ka}kA",
         rotation=90.0,
-    ))
+        id=_mcb_id, ports=_mcb_ports,
+    )
+    result.components.append(_mcb_comp)
     result.symbols_used.add("MCB")
+
+    # KWH right → MCB left (port-based)
+    connect_ports(result, _kwh_comp, "right", _mcb_comp, "left")
 
 
 def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
@@ -230,7 +245,13 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     # so tick marks and labels are outside the meter board box.
     _line_start_x = g.mcb_right_x
     supply_end_x = max(g.mb_box_right + 15, g.mcb_right_x + 20)
-    connect_points(result, (_line_start_x, g.mb_center_y), (supply_end_x, g.mb_center_y))
+    # MCB right port → supply endpoint
+    # _mcb_comp is in the caller scope (captured from _place_meter_board_symbols)
+    _mcb_comp_ref = next((c for c in reversed(result.components) if c.symbol_name == "CB_MCB" and c.ports), None)
+    if _mcb_comp_ref:
+        connect_port_to_point(result, _mcb_comp_ref, "right", (supply_end_x, g.mb_center_y))
+    else:
+        connect_points(result, (_line_start_x, g.mb_center_y), (supply_end_x, g.mb_center_y))
 
     # Incoming label — known supply_source types always use locale labels
     if ctx.is_cable_extension:
@@ -350,13 +371,18 @@ def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> N
         earth_y = earth_top_pin_y - eh
         junction_y = g.mb_box_bottom + 3
 
-        connect_points(result, (g.mb_box_right, junction_y), (earth_cx, junction_y))
-        connect_points(result, (earth_cx, junction_y), (earth_cx, earth_top_pin_y))
-        result.junction_dots.append((g.mb_box_right, junction_y))
-        result.components.append(PlacedComponent(
+        _earth_id = ctx.next_id("mb_earth")
+        _earth_ports = {"top": (earth_cx, earth_top_pin_y)}
+        _earth_comp = PlacedComponent(
             symbol_name="EARTH", x=earth_x, y=earth_y, label="E",
-        ))
+            id=_earth_id, ports=_earth_ports,
+        )
+        result.components.append(_earth_comp)
         result.symbols_used.add("EARTH")
+        # Junction → earth top (port-based)
+        connect_points(result, (g.mb_box_right, junction_y), (earth_cx, junction_y))
+        connect_port_to_point(result, _earth_comp, "top", (earth_cx, junction_y), port_is_start=False)
+        result.junction_dots.append((g.mb_box_right, junction_y))
 
 
 def _place_meter_board(ctx: _LayoutContext) -> None:

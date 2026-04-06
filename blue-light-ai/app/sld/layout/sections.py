@@ -41,7 +41,7 @@ from app.sld.layout.models import (
     format_cable_spec,
 )
 from app.sld.layout.overlap import _compute_dynamic_spacing
-from app.sld.layout.section_base import connect_points
+from app.sld.layout.section_base import connect_points, connect_ports, connect_port_to_point
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -1389,12 +1389,15 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
         # the DB box horizontal range is fine — the vertical position keeps
         # it outside the box.
 
-    result.components.append(PlacedComponent(
+    _earth_id = ctx.next_id("earth")
+    _earth_cx = earth_x + _earth_w / 2
+    _earth_ports = {"top": (_earth_cx, earth_y + _earth_h)}
+    _earth_comp = PlacedComponent(
         symbol_name="EARTH",
-        x=earth_x,
-        y=earth_y,
-        label="E",
-    ))
+        x=earth_x, y=earth_y, label="E",
+        id=_earth_id, ports=_earth_ports,
+    )
+    result.components.append(_earth_comp)
     result.symbols_used.add("EARTH")
 
     if earth_conductor_mm2:
@@ -1420,12 +1423,10 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
         ))
 
     # Solid earth conductor -- straight vertical from DB box bottom to earth bar
-    earth_cx = earth_x + _earth_w / 2  # Center of earth symbol
-    earth_top_pin_y = earth_y + _earth_h  # top pin at y + height
-    db_box_bottom_y = getattr(result, "db_box_start_y", earth_top_pin_y)
+    db_box_bottom_y = getattr(result, "db_box_start_y", _earth_comp.ports["top"][1])
 
-    # Single vertical line: DB box bottom → earth bar top pin
-    connect_points(result, (earth_cx, db_box_bottom_y),
-                               (earth_cx, earth_top_pin_y))
-    # Junction dot at DB box bottom edge (connection point on box border)
-    result.junction_dots.append((earth_cx, db_box_bottom_y))
+    # DB box bottom → earth bar top pin (port-based)
+    connect_port_to_point(result, _earth_comp, "top", (_earth_comp.ports["top"][0], db_box_bottom_y),
+                          port_is_start=False)
+    # Junction dot at DB box bottom edge
+    result.junction_dots.append((_earth_comp.ports["top"][0], db_box_bottom_y))
