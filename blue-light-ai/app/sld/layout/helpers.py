@@ -21,6 +21,7 @@ from app.sld.layout.models import (
     PlacedComponent,
     format_cable_spec,
 )
+from app.sld.layout.section_base import connect_points, connect_port_to_point
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -248,9 +249,12 @@ def _pad_spares_for_triplets(
     # --- Detect section boundaries ---
     # A section boundary occurs when the "type" changes:
     #   lighting → non-lighting, or non-lighting → lighting
+    def _circuit_name(c: dict) -> str:
+        return str(c.get("name", "") or c.get("load", "") or c.get("circuit_name", "")).lower()
+
     def _is_lighting(c: dict) -> bool:
-        name = str(c.get("name", "") or c.get("circuit_name", "")).lower()
-        cid = str(c.get("circuit_id", "")).upper()
+        name = _circuit_name(c)
+        cid = str(c.get("circuit_id", "") or c.get("id", "")).upper()
         if "spare" in name:
             return False  # User-added spare — don't classify
         # Explicit circuit_id with S prefix = lighting
@@ -259,8 +263,7 @@ def _pad_spares_for_triplets(
         return any(kw in name for kw in ("light", "lamp", "led"))
 
     def _is_spare(c: dict) -> bool:
-        name = str(c.get("name", "") or c.get("circuit_name", "")).lower()
-        return "spare" in name
+        return "spare" in _circuit_name(c)
 
     # Split into sections: consecutive runs of same type (lighting vs non-lighting)
     # User-specified SPAREs at section boundaries are preserved.
@@ -847,6 +850,7 @@ def _place_sub_circuits_upward(
     circuit_ids: list[str] | None = None,
     use_triplets: bool = True,
     row_start_idx: int | None = None,
+    ctx: "_LayoutContext | None" = None,
 ) -> None:
     """Place a row of sub-circuits branching UPWARD from busbar with vertical labels."""
     group_breaks = _detect_section_breaks(
@@ -870,6 +874,7 @@ def _place_sub_circuits_upward(
         result.components.append(PlacedComponent(
             symbol_name="CIRCUIT_ID_BOX", x=tap_x, y=busbar_y + 5.5,
             circuit_id=circuit_id, rotation=90.0,
+            id=ctx.next_id("sc_idbox"),
         ))
 
         # Parse circuit data
@@ -877,22 +882,33 @@ def _place_sub_circuits_upward(
         cd["name"] = cd["name"] or f"DB-{global_idx + 1}"
         sc_cb_w, sc_cb_h = _get_breaker_dimensions(cd["breaker_type"], config)
 
-        # Vertical line from busbar to breaker
+        # Vertical line from busbar to breaker (port-based, after breaker placement)
         sc_y = busbar_y + config.busbar_to_breaker_gap
-        result.connections.append(((tap_x, busbar_y), (tap_x, sc_y)))
-        result.junction_dots.append((tap_x, busbar_y))
 
         # Place breaker (SPARE circuits: no breaker symbol, just stub line)
+        _breaker_x = tap_x - sc_cb_w / 2
+        _breaker_id = ctx.next_id(f"sc_{cd['breaker_type'].lower()}") if ctx else ""
+        # Compute ports from catalog
+        _breaker_ports: dict[str, tuple[float, float]] = {}
+        if _breaker_id:
+            from app.sld.catalog import get_catalog as _gc_ports
+            _bdef = _gc_ports().get(cd["breaker_type"]) if _gc_ports().has(cd["breaker_type"]) else _gc_ports().get("MCB")
+            _breaker_ports = {
+                name: (_breaker_x + pin.x, sc_y + pin.y)
+                for name, pin in _bdef.pins.items()
+            }
+
         if cd["breaker_type"] == "SPARE":
             # SPARE: extend stub line and place "SPARE" label only
             result.components.append(PlacedComponent(
                 symbol_name="CB_SPARE",
-                x=tap_x - sc_cb_w / 2, y=sc_y,
+                x=_breaker_x, y=sc_y,
                 label="SPARE", rating="",
                 cable_annotation="", circuit_id=circuit_id,
                 load_info="", rotation=90.0,
                 poles="", breaker_type_str="SPARE",
                 fault_kA=0, label_style="breaker_block",
+                id=_breaker_id, ports=_breaker_ports,
             ))
         else:
             # Per LEW reference: all sub-circuit breakers use MCB symbol (CB_MCB),
@@ -903,15 +919,23 @@ def _place_sub_circuits_upward(
             _btype_str = "ISOLATOR" if _is_isol else cd["breaker_type"]
             result.components.append(PlacedComponent(
                 symbol_name=_symbol_name,
-                x=tap_x - sc_cb_w / 2, y=sc_y,
+                x=_breaker_x, y=sc_y,
                 label=cd["name"], rating=f"{cd['breaker_rating']}A",
                 cable_annotation=format_cable_spec(cd["cable"], default_method=config.default_wiring_method), circuit_id=circuit_id,
                 load_info=cd["load_info"], rotation=90.0,
                 poles=cd["poles"], breaker_type_str=_btype_str,
                 fault_kA=cd["fault_kA"], label_style="breaker_block",
                 breaker_characteristic=cd["breaker_char"],
+                id=_breaker_id, ports=_breaker_ports,
             ))
             result.symbols_used.add(cd["breaker_type"])
+
+        # Get breaker component reference for port-based connections
+        _breaker_comp = result.components[-1]  # just appended
+
+        # Busbar tap → breaker bottom (port-based)
+        connect_port_to_point(result, _breaker_comp, "bottom", (tap_x, busbar_y), port_is_start=False)
+        result.junction_dots.append((tap_x, busbar_y))
 
         # Conductor tail (extends upward past cable leader line)
         # Use catalog pin("top").y for exit pin offset (= height + stub)
@@ -926,7 +950,8 @@ def _place_sub_circuits_upward(
         _sc_stub = _sc_comp.stub
         if _sc_stub > 0:
             _body_top_y = sc_y + _sc_comp.height
-            result.connections.append(((tap_x, _body_top_y), (tap_x, breaker_top_y)))
+            # Top stub: body top → top pin tip (port-based)
+            connect_port_to_point(result, _breaker_comp, "top", (tap_x, _body_top_y), port_is_start=False)
         _leader_y_from_busbar = (config.db_box_busbar_margin + _exit_pin_offset
                                  + config.db_box_tail_margin
                                  + config.db_box_label_margin
@@ -941,7 +966,8 @@ def _place_sub_circuits_upward(
         _ISOL_DEVICE_BOX_H = 3.8
         _is_isol_circuit = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
         conductor_top_y = tail_end_y + (_ISOL_DEVICE_BOX_H if _is_isol_circuit else 0.0)
-        result.connections.append(((tap_x, breaker_top_y), (tap_x, tail_end_y)))
+        # Conductor tail: breaker top port → tail end (port-based)
+        connect_port_to_point(result, _breaker_comp, "top", (tap_x, tail_end_y))
 
         # Circuit name label — above device box for ISOLATOR, above conductor for MCB.
         # When row has ISOLATORs, all labels align at the ISOLATOR label height.

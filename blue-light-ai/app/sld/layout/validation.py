@@ -26,6 +26,10 @@ def _validate_and_correct(requirements: dict) -> dict:
     from app.sld.sld_spec import apply_corrections, validate_sld_requirements
 
     # ── Normalise metering field ──
+    # Accept alternative key name "meter_type" (common in Excel/API inputs)
+    if not requirements.get("metering") and requirements.get("meter_type"):
+        requirements["metering"] = requirements["meter_type"]
+
     # metering MUST be a string ("ct_meter", "sp_meter", "none", "").
     # If a dict is passed (common mis-specification), extract its "type" key
     # and move the rest to metering_config so downstream CT/SP logic works.
@@ -65,9 +69,18 @@ def _validate_and_correct(requirements: dict) -> dict:
     if requirements.get("is_cable_extension") and supply_source != "landlord":
         supply_source = "landlord"
 
+    # Normalise supply_type to canonical form (matching sections.py logic)
+    _raw_st = requirements.get("supply_type", "")
+    if "single" in str(_raw_st).lower() or "1" in str(_raw_st):
+        _normalised_supply_type = "single_phase"
+    elif _raw_st:
+        _normalised_supply_type = "three_phase"
+    else:
+        _normalised_supply_type = ""
+
     spec_input = {
         "kva": requirements.get("kva", 0),
-        "supply_type": requirements.get("supply_type", ""),
+        "supply_type": _normalised_supply_type,
         "supply_source": supply_source,
         "breaker_rating": breaker_rating,
         "breaker_type": main_breaker.get("type", "") or requirements.get("breaker_type", ""),

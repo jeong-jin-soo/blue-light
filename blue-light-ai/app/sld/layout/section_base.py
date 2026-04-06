@@ -16,7 +16,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from app.sld.catalog import ComponentDef, get_catalog
-from app.sld.layout.models import PlacedComponent
+from app.sld.layout.models import PlacedComponent, PortConnection
 
 if TYPE_CHECKING:
     from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
@@ -69,6 +69,82 @@ def sym_v_pins(name: str, x: float, y: float) -> dict[str, tuple[float, float]]:
         p = comp.pins["bottom"]
         result["bottom"] = (x + p.x, y + p.y)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Port-based connection helpers (dual-write: port_connections + legacy lists)
+# ---------------------------------------------------------------------------
+
+_STYLE_TO_LIST = {
+    "normal": "connections",
+    "thick": "thick_connections",
+    "dashed": "dashed_connections",
+    "short_dashed": "short_dashed_connections",
+    "fixed": "fixed_connections",
+    "thick_fixed": "thick_fixed_connections",
+    "leader": "leader_connections",
+}
+
+
+def connect_ports(
+    result: "LayoutResult",
+    from_comp: PlacedComponent,
+    from_port: str,
+    to_comp: PlacedComponent,
+    to_port: str,
+    style: str = "normal",
+) -> None:
+    """Connect two component ports. Dual-writes to port_connections and legacy list."""
+    result.port_connections.append(PortConnection(
+        from_id=from_comp.id, from_port=from_port,
+        to_id=to_comp.id, to_port=to_port,
+        style=style,
+    ))
+    start = from_comp.ports.get(from_port, (0, 0))
+    end = to_comp.ports.get(to_port, (0, 0))
+    getattr(result, _STYLE_TO_LIST[style]).append((start, end))
+
+
+def connect_port_to_point(
+    result: "LayoutResult",
+    comp: PlacedComponent,
+    port: str,
+    point: tuple[float, float],
+    style: str = "normal",
+    *,
+    port_is_start: bool = True,
+) -> None:
+    """Connect a component port to a fixed coordinate point."""
+    if port_is_start:
+        pc = PortConnection(
+            from_id=comp.id, from_port=port,
+            to_xy=point, style=style,
+        )
+        start = comp.ports.get(port, (0, 0))
+        end = point
+    else:
+        pc = PortConnection(
+            from_xy=point,
+            to_id=comp.id, to_port=port,
+            style=style,
+        )
+        start = point
+        end = comp.ports.get(port, (0, 0))
+    result.port_connections.append(pc)
+    getattr(result, _STYLE_TO_LIST[style]).append((start, end))
+
+
+def connect_points(
+    result: "LayoutResult",
+    start: tuple[float, float],
+    end: tuple[float, float],
+    style: str = "normal",
+) -> None:
+    """Connect two anonymous points (backward-compatible wrapper)."""
+    result.port_connections.append(PortConnection(
+        from_xy=start, to_xy=end, style=style,
+    ))
+    getattr(result, _STYLE_TO_LIST[style]).append((start, end))
 
 
 class Section(ABC):
@@ -135,11 +211,12 @@ class FunctionSection(Section):
         label: str = "",
         gap_before: float = 0,
         **comp_kwargs,
-    ) -> tuple[float, float, float]:
+    ) -> "PlacedComponent":
         """Place a symbol centered on the vertical spine.
 
         Uses catalog pin coordinates — no manual arithmetic.
         Y-cursor is set to exit pin (top) after placement.
+        ctx.last_spine_comp is updated for automatic port chaining.
 
         Args:
             ctx: Layout context (cx = spine X, y = current cursor)
@@ -149,78 +226,98 @@ class FunctionSection(Section):
             **comp_kwargs: Extra PlacedComponent fields
 
         Returns:
-            (body_bottom_y, bottom_pin_y, top_pin_y)
+            The placed component (with .y, .ports["top"], .ports["bottom"])
         """
         comp = _comp_def(symbol_name)
 
         if gap_before > 0:
-            ctx.result.connections.append(
-                ((ctx.cx, ctx.y), (ctx.cx, ctx.y + gap_before))
-            )
+            _prev = getattr(ctx, 'last_spine_comp', None)
+            if _prev and "top" in _prev.ports:
+                connect_port_to_point(
+                    ctx.result, _prev, "top",
+                    (ctx.cx, ctx.y + gap_before),
+                )
+            else:
+                connect_points(ctx.result, (ctx.cx, ctx.y), (ctx.cx, ctx.y + gap_before))
             ctx.y += gap_before
 
         comp_y = ctx.y
         comp_x = ctx.cx - comp.center_x()
 
-        ctx.result.components.append(PlacedComponent(
+        # Compute absolute port positions from catalog pins
+        comp_id = ctx.next_id(f"spine_{symbol_name.lower()}")
+        ports = {
+            name: (comp_x + pin.x, comp_y + pin.y)
+            for name, pin in comp.pins.items()
+        }
+
+        placed = PlacedComponent(
             x=comp_x,
             y=comp_y,
             symbol_name=symbol_name,
             label=label,
+            id=comp_id,
+            ports=ports,
             **comp_kwargs,
-        ))
+        )
+        ctx.result.components.append(placed)
 
         # Pin coordinates from catalog — no manual h+stub arithmetic
         bottom_pin_y = comp_y + comp.pin("bottom").y  # = comp_y - stub
         top_pin_y = comp_y + comp.pin("top").y         # = comp_y + height + stub
 
         # Draw stub connections to close gaps between pin tips and body edges.
-        # Some symbols (MCCB, RCCB) draw their own stubs via DXF block rendering —
-        # double-drawing is harmless (overlapping lines are invisible in output).
         stub = comp.stub
         if stub > 0:
             body_top_y = comp_y + comp.height
-            # Bottom stub: pin tip → body bottom
-            ctx.result.connections.append(
-                ((ctx.cx, bottom_pin_y), (ctx.cx, comp_y))
+            # Bottom stub: pin tip → body bottom (port "bottom" → body edge)
+            connect_port_to_point(
+                ctx.result, placed, "bottom", (ctx.cx, comp_y),
             )
-            # Top stub: body top → pin tip
-            ctx.result.connections.append(
-                ((ctx.cx, body_top_y), (ctx.cx, top_pin_y))
+            # Top stub: body top → pin tip (body edge → port "top")
+            connect_port_to_point(
+                ctx.result, placed, "top", (ctx.cx, body_top_y),
+                port_is_start=False,
             )
 
         ctx.y = top_pin_y  # cursor = exit pin
+        ctx.last_spine_comp = placed
 
-        return comp_y, bottom_pin_y, top_pin_y
+        return placed
 
     @staticmethod
     def place_batch_on_spine(
         ctx: _LayoutContext,
         components: list[dict],
-    ) -> list[tuple[float, float, float]]:
+    ) -> list["PlacedComponent"]:
         """Place multiple symbols on the vertical spine sequentially.
 
         Each dict in *components*: {"symbol": str, "label": str, "gap_before": float}
-        Returns list of (body_bottom_y, bottom_pin_y, top_pin_y) per component.
+        Returns list of PlacedComponent per component.
         """
         results = []
         for spec in components:
-            result = FunctionSection.place_on_spine(
+            placed = FunctionSection.place_on_spine(
                 ctx,
                 spec["symbol"],
                 label=spec.get("label", ""),
                 gap_before=spec.get("gap_before", 0),
             )
-            results.append(result)
+            results.append(placed)
         return results
 
     @staticmethod
     def spine_connection(ctx: _LayoutContext, distance: float) -> None:
         """Add a vertical spine connection and advance cursor."""
         if distance > 0:
-            ctx.result.connections.append(
-                ((ctx.cx, ctx.y), (ctx.cx, ctx.y + distance))
-            )
+            _prev = getattr(ctx, 'last_spine_comp', None)
+            if _prev and "top" in _prev.ports:
+                connect_port_to_point(
+                    ctx.result, _prev, "top",
+                    (ctx.cx, ctx.y + distance),
+                )
+            else:
+                connect_points(ctx.result, (ctx.cx, ctx.y), (ctx.cx, ctx.y + distance))
             ctx.y += distance
 
     @staticmethod
@@ -277,7 +374,7 @@ class FunctionSection(Section):
 
         # Arm from spine
         arm_end_x = cx + sign * arm_len
-        result.connections.append(((cx, branch_y), (arm_end_x, branch_y)))
+        connect_points(result, (cx, branch_y), (arm_end_x, branch_y))
 
         placed: list[tuple[str, float, float]] = []
         cursor_x = arm_end_x
@@ -293,27 +390,41 @@ class FunctionSection(Section):
 
             is_last = idx == is_last_idx
 
+            comp_id = ctx.next_id(f"branch_{sym_name.lower()}")
+
             if direction == "right":
                 comp_x = cursor_x
                 comp_y = branch_y
+                ports = {
+                    name: (comp_x + pin.x, comp_y + pin.y)
+                    for name, pin in comp.pins.items()
+                }
                 result.components.append(PlacedComponent(
                     x=comp_x, y=comp_y,
                     symbol_name=sym_name,
                     label=label,
                     rotation=90.0,
                     no_right_stub=is_last,
+                    id=comp_id,
+                    ports=ports,
                 ))
                 placed.append((sym_name, comp_x, comp_y))
                 cursor_x = comp_x + body_w + stub
             else:
                 comp_x = cursor_x - body_w
                 comp_y = branch_y
+                ports = {
+                    name: (comp_x + pin.x, comp_y + pin.y)
+                    for name, pin in comp.pins.items()
+                }
                 result.components.append(PlacedComponent(
                     x=comp_x, y=comp_y,
                     symbol_name=sym_name,
                     label=label,
                     rotation=90.0,
                     no_left_stub=is_last,
+                    id=comp_id,
+                    ports=ports,
                 ))
                 placed.append((sym_name, comp_x, comp_y))
                 cursor_x = comp_x - stub
@@ -322,9 +433,7 @@ class FunctionSection(Section):
             if not is_last:
                 gap_start_x = cursor_x
                 gap_end_x = cursor_x + sign * gap
-                result.connections.append(
-                    ((gap_start_x, branch_y), (gap_end_x, branch_y))
-                )
+                connect_points(result, (gap_start_x, branch_y), (gap_end_x, branch_y))
                 cursor_x = gap_end_x
 
         return placed

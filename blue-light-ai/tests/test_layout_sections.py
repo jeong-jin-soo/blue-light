@@ -297,7 +297,7 @@ class TestPlaceIncomingSupply:
         assert "FLOW_ARROW_UP" not in symbols  # No AC symbol for landlord
         assert "LABEL" in symbols
         labels = [c.label for c in ctx.result.components if c.symbol_name == "LABEL"]
-        assert "SUPPLY FROM BUILDING RISER" in labels
+        assert "FROM LANDLORD RISER" in labels
 
     def test_y_advances(self):
         ctx = _make_context(

@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from app.sld.layout.section_base import FunctionSection, Section
+from app.sld.layout.section_base import FunctionSection, Section, connect_points
 
 if TYPE_CHECKING:
     from app.sld.layout.models import _LayoutContext
@@ -79,7 +79,7 @@ def _ct_meter_sequence() -> list[Section]:
 
         def place(self, ctx: "_LayoutContext") -> None:
             gap = ctx.config.isolator_to_db_gap
-            ctx.result.connections.append(((ctx.cx, ctx.y), (ctx.cx, ctx.y + gap)))
+            connect_points(ctx.result, (ctx.cx, ctx.y), (ctx.cx, ctx.y + gap))
             ctx.y += gap
             ctx._ct_box_start_y = ctx.y - 1
             ctx._ct_pre_mccb_fuse = True

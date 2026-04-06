@@ -121,22 +121,89 @@ class VisionReport:
 # SVG → PNG conversion
 # ---------------------------------------------------------------------------
 
+def _normalize_svg_viewbox(svg_text: str) -> str:
+    """ezdxf SVG의 DXF 단위 viewBox를 픽셀 단위로 정규화.
+
+    ezdxf는 viewBox를 DXF 좌표 단위(예: 0 0 1000000 707143)로 출력하는데,
+    PyMuPDF가 이를 렌더링하면 검은 이미지가 된다.
+    viewBox 값이 10000 이상이면 A3 비율(420x297mm)로 정규화한다.
+    """
+    import re
+
+    m = re.search(r'viewBox="([^"]*)"', svg_text)
+    if not m:
+        return svg_text
+
+    parts = m.group(1).split()
+    if len(parts) != 4:
+        return svg_text
+
+    try:
+        vb_vals = [float(v) for v in parts]
+    except ValueError:
+        return svg_text
+
+    vb_w, vb_h = vb_vals[2] - vb_vals[0], vb_vals[3] - vb_vals[1]
+    if vb_w <= 10000 and vb_h <= 10000:
+        return svg_text  # 정상 범위면 수정 불필요
+
+    # A3 비율(420:297) 유지하면서 픽셀 범위(2000px 기준)로 축소
+    aspect = vb_w / vb_h if vb_h > 0 else 1.414
+    target_w = 2000
+    target_h = target_w / aspect
+
+    # viewBox 교체
+    new_vb = f"0 0 {target_w:.0f} {target_h:.0f}"
+    svg_text = svg_text[:m.start(1)] + new_vb + svg_text[m.end(1):]
+
+    # width/height 속성도 동기화
+    svg_text = re.sub(
+        r'(<svg[^>]*)\bwidth="[^"]*"',
+        rf'\1width="{target_w:.0f}"',
+        svg_text,
+    )
+    svg_text = re.sub(
+        r'(<svg[^>]*)\bheight="[^"]*"',
+        rf'\1height="{target_h:.0f}"',
+        svg_text,
+    )
+
+    logger.info("SVG viewBox normalized: %s → %s", m.group(1), new_vb)
+    return svg_text
+
+
 def svg_to_png(svg_path: str | Path, dpi: int = 150) -> str:
     """SVG 파일을 PNG로 변환. PyMuPDF 사용.
 
+    ezdxf SVG의 DXF 단위 viewBox를 자동 정규화한 뒤 변환.
     Returns: PNG 파일 경로 (svg_path와 같은 디렉토리, .png 확장자)
     """
     import fitz
+    import tempfile
 
     svg_path = Path(svg_path)
     png_path = svg_path.with_suffix(".png")
 
-    doc = fitz.open(str(svg_path))
-    page = doc.load_page(0)
-    mat = fitz.Matrix(dpi / 72, dpi / 72)
-    pix = page.get_pixmap(matrix=mat)
-    pix.save(str(png_path))
-    doc.close()
+    # ezdxf SVG viewBox 정규화
+    svg_text = svg_path.read_text(encoding="utf-8")
+    svg_text = _normalize_svg_viewbox(svg_text)
+
+    # 정규화된 SVG를 임시 파일에 저장 후 변환
+    with tempfile.NamedTemporaryFile(
+        suffix=".svg", prefix="norm_", delete=False, mode="w", encoding="utf-8"
+    ) as tmp:
+        tmp.write(svg_text)
+        norm_svg = tmp.name
+
+    try:
+        doc = fitz.open(norm_svg)
+        page = doc.load_page(0)
+        mat = fitz.Matrix(dpi / 72, dpi / 72)
+        pix = page.get_pixmap(matrix=mat)
+        pix.save(str(png_path))
+        doc.close()
+    finally:
+        Path(norm_svg).unlink(missing_ok=True)
 
     logger.info("SVG → PNG: %s (%dx%d)", png_path.name, pix.width, pix.height)
     return str(png_path)
@@ -629,10 +696,14 @@ async def _self_review_once(
     """Self-Review: 생성된 SLD 이미지의 시각적 품질 검증.
 
     레퍼런스 불필요. 이미지만 보고 문제를 탐지.
+    SVG, PDF, PNG 모두 지원.
     """
     path = Path(svg_or_png_path)
-    if path.suffix.lower() == ".svg":
+    ext = path.suffix.lower()
+    if ext == ".svg":
         png_path = svg_to_png(path, dpi=200)
+    elif ext == ".pdf":
+        png_path = pdf_to_png(path, dpi=200)
     else:
         png_path = str(path)
 

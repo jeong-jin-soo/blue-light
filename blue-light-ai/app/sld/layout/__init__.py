@@ -16,6 +16,7 @@ from app.sld.layout.models import (
     LayoutResult,
     OverflowMetrics,
     PlacedComponent,
+    PortConnection,
     _LayoutContext,
     format_cable_spec,
 )
@@ -39,6 +40,7 @@ __all__ = [
     "LayoutResult",
     "OverflowMetrics",
     "PlacedComponent",
+    "PortConnection",
     "_LayoutContext",
     "format_cable_spec",
     # engine

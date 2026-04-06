@@ -158,15 +158,22 @@ class SldPipeline:
             try:
                 from app.sld.vision_validator import self_review, apply_adjustments
 
-                # SVG를 임시 파일에 저장하여 Vision AI에 전달
-                with tempfile.NamedTemporaryFile(
-                    suffix=".svg", prefix="sld_vision_", delete=False, mode="w"
-                ) as tmp:
-                    tmp.write(result.svg_string)
-                    tmp_svg = tmp.name
+                # PDF→PNG가 SVG→PNG보다 안정적 (ezdxf SVG viewBox 문제 우회)
+                if result.pdf_bytes:
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".pdf", prefix="sld_vision_", delete=False,
+                    ) as tmp:
+                        tmp.write(result.pdf_bytes)
+                        tmp_path = tmp.name
+                else:
+                    with tempfile.NamedTemporaryFile(
+                        suffix=".svg", prefix="sld_vision_", delete=False, mode="w",
+                    ) as tmp:
+                        tmp.write(result.svg_string)
+                        tmp_path = tmp.name
 
                 vision_report = asyncio.run(
-                    self_review(tmp_svg, api_key=api_key)
+                    self_review(tmp_path, api_key=api_key)
                 )
                 result.vision_report = vision_report
 
@@ -177,8 +184,8 @@ class SldPipeline:
                 )
 
                 # 임시 파일 정리
-                Path(tmp_svg).unlink(missing_ok=True)
-                png_tmp = Path(tmp_svg).with_suffix(".png")
+                Path(tmp_path).unlink(missing_ok=True)
+                png_tmp = Path(tmp_path).with_suffix(".png")
                 png_tmp.unlink(missing_ok=True)
 
                 if vision_report.severity != "fail" or attempt >= self.MAX_VISION_RETRIES:
@@ -831,22 +838,18 @@ class SldPipeline:
                     )
 
     def _draw_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
-        """Draw all solid connection lines."""
+        """Draw all solid connection lines via port_connections."""
         backend.set_layer("SLD_CONNECTIONS")
-        for start, end in layout_result.connections:
-            backend.add_line(start, end)
-        # Thick connections — heavier line weight (0.5mm) for outgoing cable tick marks
-        for start, end in layout_result.thick_connections:
-            backend.add_line(start, end, lineweight=50)
-        # Fixed connections — not affected by resolve_overlaps (e.g., VSS diagonal)
-        for start, end in layout_result.fixed_connections:
-            backend.add_line(start, end)
-        # Thick fixed connections — busbar-weight lines (e.g., BI crossbar)
-        for start, end in layout_result.thick_fixed_connections:
-            backend.add_line(start, end, lineweight=50)
-        # Leader connections — cable annotation shelf lines (tick → text)
-        for start, end in layout_result.leader_connections:
-            backend.add_line(start, end)
+        _THICK_STYLES = {"thick", "thick_fixed"}
+
+        for pc in layout_result.port_connections:
+            if pc.style in ("dashed", "short_dashed"):
+                continue  # Drawn by _draw_dashed_connections
+            start, end = layout_result.resolve_port_connection(pc)
+            if start is None or end is None:
+                continue
+            kwargs = {"lineweight": 50} if pc.style in _THICK_STYLES else {}
+            backend.add_line(start, end, **kwargs)
 
     def _draw_fanout_groups(
         self, backend: DrawingBackend, layout_result: LayoutResult,
@@ -892,19 +895,18 @@ class SldPipeline:
             backend.draw_fanout(center_x, busbar_y, side_xs, mcb_entry_y)
 
     def _draw_dashed_connections(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
-        """Draw dashed connection lines (DB box boundary per reference DWG).
-
-        Each backend implements draw_center_line() with format-specific rendering:
-        DXF: single LINE on SLD_DB_FRAME layer with native CENTER linetype (gray).
-        PDF/SVG: procedural dash pattern on SLD_DB_FRAME layer (gray).
-        """
-        for start, end in layout_result.dashed_connections:
-            backend.draw_center_line(start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
-
-        # Short-dashed lines (SPARE conductor tails etc.) — regular short dashes
-        backend.set_layer("SLD_POWER_MAIN")
-        for start, end in layout_result.short_dashed_connections:
-            backend.draw_short_dashed_line(start, end)
+        """Draw dashed connection lines via port_connections."""
+        for pc in layout_result.port_connections:
+            if pc.style not in ("dashed", "short_dashed"):
+                continue
+            start, end = layout_result.resolve_port_connection(pc)
+            if start is None or end is None:
+                continue
+            if pc.style == "dashed":
+                backend.draw_center_line(start, end, long_dash=8.0, short_dash=1.5, gap=2.0)
+            else:
+                backend.set_layer("SLD_POWER_MAIN")
+                backend.draw_short_dashed_line(start, end)
 
     def _draw_junction_dots(self, backend: DrawingBackend, layout_result: LayoutResult) -> None:
         """Draw filled junction dots at busbar tap points."""

@@ -15,6 +15,7 @@ import logging
 import re
 
 from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent, _LayoutContext
+from app.sld.layout.section_base import connect_points
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -165,7 +166,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     spine_top = bi_y + bi_h + bi_stub
 
     # --- 2. Spine backbone — ONE straight line, MCCB exit → crossbar ---
-    result.connections.append(((cx, spine_bottom), (cx, spine_line_top)))
+    connect_points(result, (cx, spine_bottom), (cx, spine_line_top))
 
     # --- 3. Place components on spine ---
 
@@ -206,9 +207,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             elr_bottom_y = prot_ct_center_y - elr_sym.height / 2 - elr_stub
             mccb_y = ctx.main_breaker_arc_center_y
             # Vertical down from bottom stub tip
-            result.connections.append(((elr_bottom_cx, elr_bottom_y), (elr_bottom_cx, mccb_y)))
+            connect_points(result, (elr_bottom_cx, elr_bottom_y), (elr_bottom_cx, mccb_y))
             # Horizontal right — stops just before MCCB contact gap
-            result.connections.append(((elr_bottom_cx, mccb_y), (cx - 1.0, mccb_y)))
+            connect_points(result, (elr_bottom_cx, mccb_y), (cx - 1.0, mccb_y))
 
     # Metering CT
     if ct_ratio:
@@ -295,7 +296,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     result.symbols_used.add("KWH_METER")
 
     # Arm connection: spine → KWH left pin
-    result.connections.append(((cx, _kwh_branch_y), (cx + branch_arm_len, _kwh_branch_y)))
+    connect_points(result, (cx, _kwh_branch_y), (cx + branch_arm_len, _kwh_branch_y))
     result.junction_arrows.append((cx, _kwh_branch_y, "right"))
 
     # KWH return connection: bottom of KWH box → down → left to spine.
@@ -303,15 +304,13 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     _kwh_bottom_cx = _kwh_comp_x + _kwh_rect_w / 2  # bottom center X of rect
     _kwh_bottom_y = _kwh_branch_y - _kwh_rect_h / 2  # bottom edge Y of rect
     # Vertical: KWH bottom → down to return Y
-    result.connections.append((
+    connect_points(result,
         (_kwh_bottom_cx, _kwh_bottom_y),
-        (_kwh_bottom_cx, _kwh_return_y),
-    ))
+        (_kwh_bottom_cx, _kwh_return_y))
     # Horizontal: return point → left to spine
-    result.connections.append((
+    connect_points(result,
         (_kwh_bottom_cx, _kwh_return_y),
-        (cx, _kwh_return_y),
-    ))
+        (cx, _kwh_return_y))
 
     # Instrument fuse (RIGHT branch below BI Connector)
     # Reference DWG: 2A fuse + indicator lights for instrument protection
@@ -384,10 +383,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             # Diagonal connection: fuse-LED midpoint → VSS left stub tip
             # v2 architecture: validate_connectivity removed, so this can
             # be a regular connection without risk of post-hoc snapping.
-            result.connections.append((
+            connect_points(result,
                 (_diag_start_x, _diag_start_y),
-                (_diag_end_x, _diag_end_y),
-            ))
+                (_diag_end_x, _diag_end_y))
 
             # Place VSS component
             result.components.append(PlacedComponent(
@@ -403,10 +401,9 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             _vss_right_pin_x = _vss_body_x + _vss_body_w + _vss_stub
             _vm_body_x = _vss_right_pin_x + branch_gap
             _vm_left_pin_x = _vm_body_x - _vm_stub
-            result.connections.append((
+            connect_points(result,
                 (_vss_right_pin_x, vss_branch_y),
-                (_vm_left_pin_x, vss_branch_y),
-            ))
+                (_vm_left_pin_x, vss_branch_y))
 
             # Place Voltmeter component (last on branch → no right stub)
             result.components.append(PlacedComponent(
@@ -502,7 +499,7 @@ def _place_bi_crossbar_circuits(
         mcb_bottom_pin_y = mcb_bottom_y - mcb_stub   # bottom pin tip
         mcb_top_pin_y = mcb_bottom_y + mcb_h + mcb_stub  # top pin tip
         # Connection: crossbar junction → MCB bottom pin
-        result.connections.append(((ckt_x, bi_center_y), (ckt_x, mcb_bottom_pin_y)))
+        connect_points(result, (ckt_x, bi_center_y), (ckt_x, mcb_bottom_pin_y))
 
         # Build MCB label
         feeder_brk = ckt.get("feeder_breaker", {})
@@ -561,7 +558,7 @@ def _place_bi_crossbar_circuits(
 
         if is_spare:
             # SPARE: short-dashed tail line + "SPARE" label (no cable tick)
-            result.short_dashed_connections.append(((ckt_x, mcb_top_pin_y), (ckt_x, tail_top_y)))
+            connect_points(result, (ckt_x, mcb_top_pin_y), (ckt_x, tail_top_y), style="short_dashed")
             result.components.append(PlacedComponent(
                 symbol_name="LABEL",
                 x=ckt_x - 3,
@@ -573,7 +570,7 @@ def _place_bi_crossbar_circuits(
             _tail_end = tail_top_y
             if is_feeder:
                 _tail_end = tail_top_y  # feeder symbol sits ON tail_top_y; its stub connects
-            result.connections.append(((ckt_x, mcb_top_pin_y), (ckt_x, _tail_end)))
+            connect_points(result, (ckt_x, mcb_top_pin_y), (ckt_x, _tail_end))
 
             # Cable tick + cable spec label
             cable_spec = ckt.get("cable", "")
@@ -585,12 +582,12 @@ def _place_bi_crossbar_circuits(
                     # between symbol bottom and DB box top boundary
                     _tick_y = tail_top_y - 4
                     _tick_half = 1.5
-                    result.connections.append(((ckt_x - _tick_half, _tick_y - _tick_half),
-                                               (ckt_x + _tick_half, _tick_y + _tick_half)))
+                    connect_points(result, (ckt_x - _tick_half, _tick_y - _tick_half),
+                                           (ckt_x + _tick_half, _tick_y + _tick_half))
                     # Horizontal leader line from tick to the right
                     _leader_len = 8.0
-                    result.connections.append(((ckt_x, _tick_y),
-                                               (ckt_x + _leader_len, _tick_y)))
+                    connect_points(result, (ckt_x, _tick_y),
+                                           (ckt_x + _leader_len, _tick_y))
                     # Cable spec text above leader line
                     result.components.append(PlacedComponent(
                         symbol_name="LABEL",
@@ -603,8 +600,8 @@ def _place_bi_crossbar_circuits(
                     # Normal crossbar circuit: tick near MCB with rotated label
                     _tick_y = mcb_top_pin_y + 4
                     _tick_half = 1.5
-                    result.connections.append(((ckt_x - _tick_half, _tick_y - _tick_half),
-                                               (ckt_x + _tick_half, _tick_y + _tick_half)))
+                    connect_points(result, (ckt_x - _tick_half, _tick_y - _tick_half),
+                                           (ckt_x + _tick_half, _tick_y + _tick_half))
                     result.components.append(PlacedComponent(
                         symbol_name="LABEL",
                         x=ckt_x - 5,
@@ -685,7 +682,7 @@ def _place_metering_branch(
 
     # Initial arm from spine to first component
     x_next = x + sign * arm_len
-    result.connections.append(((x, branch_y), (x_next, branch_y)))
+    connect_points(result, (x, branch_y), (x_next, branch_y))
     x = x_next
 
     for i, (symbol_name, label, w_hint) in enumerate(components):
@@ -731,5 +728,5 @@ def _place_metering_branch(
         # Gap connection to next component (if not last)
         if not is_last:
             x_next = x + sign * gap
-            result.connections.append(((x, branch_y), (x_next, branch_y)))
+            connect_points(result, (x, branch_y), (x_next, branch_y))
             x = x_next

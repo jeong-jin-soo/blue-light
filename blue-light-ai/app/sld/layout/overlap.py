@@ -919,6 +919,14 @@ def _determine_final_positions(
     return new_tap_xs
 
 
+def _shift_ports_x(comp: "PlacedComponent", delta_x: float) -> None:
+    """Shift all port X coordinates by delta_x (called after component x changes)."""
+    if comp.ports and abs(delta_x) > 0.001:
+        comp.ports = {
+            name: (px + delta_x, py) for name, (px, py) in comp.ports.items()
+        }
+
+
 def _rebuild_from_positions(
     groups: list[SubCircuitGroup],
     new_tap_xs: list[float],
@@ -943,18 +951,25 @@ def _rebuild_from_positions(
         # Breaker: shift by delta_x (maintains half_width offset)
         if group.breaker_idx is not None:
             components[group.breaker_idx].x += delta_x
+            _shift_ports_x(components[group.breaker_idx], delta_x)
 
         # CIRCUIT_ID_BOX: set absolute position (centered on tap)
         if group.circuit_id_idx is not None:
+            _dx = new_tap_x - components[group.circuit_id_idx].x
             components[group.circuit_id_idx].x = new_tap_x
+            _shift_ports_x(components[group.circuit_id_idx], _dx)
 
         # Circuit name LABEL: set absolute position (at tap_x)
         if group.name_label_idx is not None:
+            _dx = new_tap_x - components[group.name_label_idx].x
             components[group.name_label_idx].x = new_tap_x
+            _shift_ports_x(components[group.name_label_idx], _dx)
 
         # SPARE LABEL: set absolute position (at tap_x)
         if group.spare_label_idx is not None:
+            _dx = new_tap_x - components[group.spare_label_idx].x
             components[group.spare_label_idx].x = new_tap_x
+            _shift_ports_x(components[group.spare_label_idx], _dx)
 
         # Connections: set both endpoints x to new_tap_x (vertical wires)
         for conn_idx in group.connection_indices:

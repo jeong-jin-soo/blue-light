@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 
 from app.sld.layout.models import LayoutConfig, LayoutResult, _LayoutContext
+from app.sld.layout.section_base import connect_points
 from app.sld.page_config import PageConfig
 from app.sld.layout.overlap import (
     _add_cable_leader_lines,
@@ -648,6 +649,11 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
         comp.y += shift
         if comp.label_y_override is not None:
             comp.label_y_override += shift
+        # Update port Y coordinates to stay in sync with component position
+        if comp.ports:
+            comp.ports = {
+                name: (px, py + shift) for name, (px, py) in comp.ports.items()
+            }
     for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
         result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
@@ -662,6 +668,12 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
         result.thick_fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     for i, ((sx, sy), (ex, ey)) in enumerate(result.leader_connections):
         result.leader_connections[i] = ((sx, sy + shift), (ex, ey + shift))
+    # Shift anonymous endpoints in port_connections
+    for pc in result.port_connections:
+        if pc.from_xy:
+            pc.from_xy = (pc.from_xy[0], pc.from_xy[1] + shift)
+        if pc.to_xy:
+            pc.to_xy = (pc.to_xy[0], pc.to_xy[1] + shift)
     for i, (x1, y1, x2, y2) in enumerate(result.solid_boxes):
         result.solid_boxes[i] = (x1, y1 + shift, x2, y2 + shift)
     for i, (dx, dy) in enumerate(result.junction_dots):
@@ -1420,7 +1432,7 @@ def render_board(
         # clearly OUTSIDE and BELOW the DB dashed box with proper spacing.
         _inject_region("ct_gap_setup")
         _gap = config.isolator_to_db_gap
-        result.connections.append(((cx, ctx.y), (cx, ctx.y + _gap)))
+        connect_points(result, (cx, ctx.y), (cx, ctx.y + _gap))
         ctx.y += _gap
         # DB box bottom starts AFTER the gap (so cable annotation stays outside)
         _ct_box_start_y = ctx.y - 1
@@ -1456,7 +1468,7 @@ def render_board(
         # Junction dot on crossbar where RCCB branch starts
         result.junction_dots.append((_elcb_cx, ctx.bi_center_y))
         # Connection from crossbar junction up to RCCB start position
-        result.connections.append(((_elcb_cx, ctx.bi_center_y), (_elcb_cx, ctx.y)))
+        connect_points(result, (_elcb_cx, ctx.bi_center_y), (_elcb_cx, ctx.y))
     _inject_region("elcb")
     _place_elcb(ctx)
     _inject_region("internal_cable")
@@ -1509,7 +1521,7 @@ def render_board(
             # Crossbar line stays at original extent (not extended by circuit positions)
 
         # Crossbar line at BI connector center Y — thick (same as busbar)
-        result.thick_fixed_connections.append(((_xbar_sx, _bi_cy), (_xbar_ex, _bi_cy)))
+        connect_points(result, (_xbar_sx, _bi_cy), (_xbar_ex, _bi_cy), style="thick_fixed")
 
     # Override db_box_start_y to include CT metering section inside the DB box.
     # _place_main_breaker sets it at the breaker position, but we need the box
@@ -1606,13 +1618,12 @@ def _add_hierarchical_connections(
             _supply_line_bottom = child_top_y - 25  # line extends 25mm below DB box
 
             # Vertical incoming line into DB2 box
-            merged.connections.append(((child_cx, _supply_line_bottom), (child_cx, child_top_y + 3)))
+            connect_points(merged, (child_cx, _supply_line_bottom), (child_cx, child_top_y + 3))
 
             # Cable tick mark
             _tick_y = _supply_line_bottom + 8
             _tick_half = 1.5
-            merged.connections.append(((child_cx - _tick_half, _tick_y - _tick_half),
-                                       (child_cx + _tick_half, _tick_y + _tick_half)))
+            connect_points(merged, (child_cx - _tick_half, _tick_y - _tick_half), (child_cx + _tick_half, _tick_y + _tick_half))
 
             # Cable spec label (horizontal, right of tick)
             cable_text = ""
@@ -1664,8 +1675,8 @@ def _add_hierarchical_connections(
         # Horizontal run if needed
         if abs(tap_x - child_cx) > 1.0:
             cable_run_y = root_busbar_y - 8
-            merged.connections.append(((tap_x, root_busbar_y), (tap_x, cable_run_y)))
-            merged.connections.append(((tap_x, cable_run_y), (child_cx, cable_run_y)))
+            connect_points(merged, (tap_x, root_busbar_y), (tap_x, cable_run_y))
+            connect_points(merged, (tap_x, cable_run_y), (child_cx, cable_run_y))
             connect_y = cable_run_y
         else:
             connect_y = root_busbar_y
@@ -1702,7 +1713,7 @@ def _add_hierarchical_connections(
             feeder_brk = _fb
         if feeder_brk and feeder_brk.get("rating"):
             fmcb_y = connect_y - stub - mcb_h
-            merged.connections.append(((child_cx, connect_y), (child_cx, fmcb_y + mcb_h)))
+            connect_points(merged, (child_cx, connect_y), (child_cx, fmcb_y + mcb_h))
             f_type = feeder_brk.get("type", "MCB")
             f_char = feeder_brk.get("breaker_characteristic", "")
             f_rating = feeder_brk.get("rating", 0)
@@ -1781,7 +1792,7 @@ def _add_hierarchical_connections(
             ))
 
         # Connection to child board top
-        merged.connections.append(((child_cx, connect_y), (child_cx, connect_y - 3)))
+        connect_points(merged, (child_cx, connect_y), (child_cx, connect_y - 3))
 
 
 def _add_parallel_connections(
@@ -1807,7 +1818,7 @@ def _add_parallel_connections(
 
         # Connection from main busbar to BI_CONNECTOR
         bi_y = main_busbar_y + 5
-        merged.connections.append(((db_cx, main_busbar_y), (db_cx, bi_y)))
+        connect_points(merged, (db_cx, main_busbar_y), (db_cx, bi_y))
 
         # BI_CONNECTOR symbol
         merged.components.append(PlacedComponent(
@@ -1820,7 +1831,7 @@ def _add_parallel_connections(
 
         # Connection from BI_CONNECTOR to sub-DB
         sub_start_y = bi_y + bi_h
-        merged.connections.append(((db_cx, sub_start_y), (db_cx, sub_start_y + 3)))
+        connect_points(merged, (db_cx, sub_start_y), (db_cx, sub_start_y + 3))
 
 
 def _is_per_phase_busbar_mode(db: dict, ctx: _LayoutContext) -> bool:
@@ -1971,7 +1982,7 @@ def _place_per_phase_busbars(
         # Vertical connection from main busbar to per-phase busbar
         # (They are at the same Y, so this is just a junction — no visible line needed
         # unless the per-phase busbar is offset. For visual clarity, draw a short stub.)
-        result.connections.append(((pg_cx, main_busbar_y), (pg_cx, per_phase_busbar_y)))
+        connect_points(result, (pg_cx, main_busbar_y), (pg_cx, per_phase_busbar_y))
 
         # ── Place sub-circuits for this group ──
         saved_cx = ctx.cx
@@ -2229,7 +2240,7 @@ def _place_protection_groups(
 
         # Vertical connection from main busbar to RCCB
         rccb_y = main_busbar_y + 5  # small gap above busbar
-        result.connections.append(((pg_cx, main_busbar_y), (pg_cx, rccb_y)))
+        connect_points(result, (pg_cx, main_busbar_y), (pg_cx, rccb_y))
 
         # RCCB symbol
         rccb_rating = rccb_spec.get("rating", 40)
@@ -2253,7 +2264,7 @@ def _place_protection_groups(
         # Connection from RCCB top to sub-busbar
         rccb_top_y = rccb_y + rccb_h
         sub_busbar_gap = 3
-        result.connections.append(((pg_cx, rccb_top_y), (pg_cx, rccb_top_y + sub_busbar_gap)))
+        connect_points(result, (pg_cx, rccb_top_y), (pg_cx, rccb_top_y + sub_busbar_gap))
 
         # ── Place sub-circuits for this group ──
         # Save/restore ctx to place circuits at the group's CX

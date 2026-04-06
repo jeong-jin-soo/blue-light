@@ -16,6 +16,8 @@ import logging
 import math
 from dataclasses import dataclass, field
 
+from app.sld.layout.section_base import connect_points
+
 logger = logging.getLogger(__name__)
 
 
@@ -255,7 +257,7 @@ def _fix_spare_disconnected(result, config, issues: list[ValidationIssue]) -> in
                 sx = float(issue.detail.split("x≈")[1].split(" ")[0])
                 # Add vertical connection from busbar to SPARE
                 spare_y = busbar_y + 12  # default gap
-                result.connections.append(((sx, busbar_y), (sx, spare_y)))
+                connect_points(result, (sx, busbar_y), (sx, spare_y))
                 result.junction_dots.append((sx, busbar_y))
                 issue.fix_applied = True
                 fixes += 1

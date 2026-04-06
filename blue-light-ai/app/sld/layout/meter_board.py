@@ -23,6 +23,7 @@ from app.sld.layout.models import (
     _LayoutContext,
     format_cable_spec,
 )
+from app.sld.layout.section_base import connect_points
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -144,7 +145,7 @@ def _place_meter_board_symbols(
 
     # Spine → ISO routing
     if g.iso_left_x > ctx.cx:
-        result.connections.append(((ctx.cx, g.mb_center_y), (g.iso_left_x, g.mb_center_y)))
+        connect_points(result, (ctx.cx, g.mb_center_y), (g.iso_left_x, g.mb_center_y))
 
     # ISOLATOR (left) — Reference uses procedural isolator symbol (2 circles + diagonal)
     result.components.append(PlacedComponent(
@@ -159,7 +160,7 @@ def _place_meter_board_symbols(
 
     # ISO → KWH wiring (connection reaches KWH left pin / body edge)
     kwh_left_x = g.kwh_cx - g.kwh_h_extent / 2
-    result.connections.append(((g.iso_right_x, g.mb_center_y), (kwh_left_x, g.mb_center_y)))
+    connect_points(result, (g.iso_right_x, g.mb_center_y), (kwh_left_x, g.mb_center_y))
 
     # CT (between ISO and KWH) — ct_meter + non-landlord only
     if ctx.metering == "ct_meter" and ctx.supply_source != "landlord":
@@ -204,7 +205,7 @@ def _place_meter_board_symbols(
 
     # KWH → MCB wiring (connection reaches KWH right pin / body edge)
     kwh_right_x = g.kwh_cx + g.kwh_h_extent / 2
-    result.connections.append(((kwh_right_x, g.mb_center_y), (g.mcb_left_x, g.mb_center_y)))
+    connect_points(result, (kwh_right_x, g.mb_center_y), (g.mcb_left_x, g.mb_center_y))
 
     # MCB (right)
     _mcb_poles = ctx.breaker_poles
@@ -229,7 +230,7 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
     # so tick marks and labels are outside the meter board box.
     _line_start_x = g.mcb_right_x
     supply_end_x = max(g.mb_box_right + 15, g.mcb_right_x + 20)
-    result.connections.append(((_line_start_x, g.mb_center_y), (supply_end_x, g.mb_center_y)))
+    connect_points(result, (_line_start_x, g.mb_center_y), (supply_end_x, g.mb_center_y))
 
     # Incoming label — known supply_source types always use locale labels
     if ctx.is_cable_extension:
@@ -260,14 +261,13 @@ def _add_incoming_supply_line(ctx: _LayoutContext, g: _MeterBoardGeom) -> None:
         # Tick must be outside meter board box
         tick_x = max(g.mb_box_right + 5, g.mcb_right_x + 10)
         tick_size = 1.5
-        result.thick_connections.append((
+        connect_points(result,
             (tick_x - tick_size, g.mb_center_y - tick_size),
-            (tick_x + tick_size, g.mb_center_y + tick_size),
-        ))
+            (tick_x + tick_size, g.mb_center_y + tick_size), style="thick")
         leader_bottom_y = g.mb_center_y - 10
-        result.connections.append(((tick_x, g.mb_center_y), (tick_x, leader_bottom_y)))
+        connect_points(result, (tick_x, g.mb_center_y), (tick_x, leader_bottom_y))
         shelf_len = 3
-        result.leader_connections.append(((tick_x, leader_bottom_y), (tick_x + shelf_len, leader_bottom_y)))
+        connect_points(result, (tick_x, leader_bottom_y), (tick_x + shelf_len, leader_bottom_y), style="leader")
         _label_ch = 2.8
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
@@ -292,15 +292,14 @@ def _add_outgoing_cable_tick(
 
     tick_y = (g.mb_box_top + y_exit) / 2
     tick_size = 1.25
-    result.thick_connections.append((
+    connect_points(result,
         (cx - tick_size, tick_y - tick_size),
-        (cx + tick_size, tick_y + tick_size),
-    ))
+        (cx + tick_size, tick_y + tick_size), style="thick")
     # Leader line: from tick on spine → left.
     # Text is NOT placed here — it's deferred to Step D (place_labels)
     # where all geometry is finalized and collision-free placement is possible.
     _leader_len = 12
-    result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
+    connect_points(result, (cx, tick_y), (cx - _leader_len, tick_y), style="leader")
 
     # Register deferred cable label for Step D placement
     result.deferred_cable_labels.append({
@@ -320,10 +319,10 @@ def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> N
     config = ctx.config
 
     # Dashed box
-    result.dashed_connections.append(((g.mb_box_left, g.mb_box_bottom), (g.mb_box_right, g.mb_box_bottom)))
-    result.dashed_connections.append(((g.mb_box_left, g.mb_box_top), (g.mb_box_right, g.mb_box_top)))
-    result.dashed_connections.append(((g.mb_box_left, g.mb_box_bottom), (g.mb_box_left, g.mb_box_top)))
-    result.dashed_connections.append(((g.mb_box_right, g.mb_box_bottom), (g.mb_box_right, g.mb_box_top)))
+    connect_points(result, (g.mb_box_left, g.mb_box_bottom), (g.mb_box_right, g.mb_box_bottom), style="dashed")
+    connect_points(result, (g.mb_box_left, g.mb_box_top), (g.mb_box_right, g.mb_box_top), style="dashed")
+    connect_points(result, (g.mb_box_left, g.mb_box_bottom), (g.mb_box_left, g.mb_box_top), style="dashed")
+    connect_points(result, (g.mb_box_right, g.mb_box_bottom), (g.mb_box_right, g.mb_box_top), style="dashed")
 
     # "METER BOARD" label inside box
     result.components.append(PlacedComponent(
@@ -351,8 +350,8 @@ def _add_meter_board_box_and_earth(ctx: _LayoutContext, g: _MeterBoardGeom) -> N
         earth_y = earth_top_pin_y - eh
         junction_y = g.mb_box_bottom + 3
 
-        result.connections.append(((g.mb_box_right, junction_y), (earth_cx, junction_y)))
-        result.connections.append(((earth_cx, junction_y), (earth_cx, earth_top_pin_y)))
+        connect_points(result, (g.mb_box_right, junction_y), (earth_cx, junction_y))
+        connect_points(result, (earth_cx, junction_y), (earth_cx, earth_top_pin_y))
         result.junction_dots.append((g.mb_box_right, junction_y))
         result.components.append(PlacedComponent(
             symbol_name="EARTH", x=earth_x, y=earth_y, label="E",
@@ -380,7 +379,7 @@ def _place_meter_board(ctx: _LayoutContext) -> None:
         _out_cable_mb = ctx.requirements.get("outgoing_cable", "") or ctx.incoming_cable
         outgoing_cable_text = format_cable_spec(_out_cable_mb, multiline=True)
         y_exit = g.mb_box_top + (16 if outgoing_cable_text else 8)
-        ctx.result.connections.append(((ctx.cx, g.mb_center_y), (ctx.cx, y_exit)))
+        connect_points(ctx.result, (ctx.cx, g.mb_center_y), (ctx.cx, y_exit))
 
         _add_outgoing_cable_tick(ctx, g, y_exit)
         _add_meter_board_box_and_earth(ctx, g)

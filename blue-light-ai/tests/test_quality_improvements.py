@@ -284,7 +284,7 @@ class TestSupplyLabel:
     """Test supply label selection logic."""
 
     def test_default_landlord_label(self):
-        """Default landlord supply should use 'SUPPLY FROM BUILDING RISER'."""
+        """Default landlord supply should use 'FROM LANDLORD RISER'."""
         from app.sld.layout.engine import compute_layout
         req = {
             "kva": 43,
@@ -294,7 +294,7 @@ class TestSupplyLabel:
         }
         result = compute_layout(req)
         labels = [c.label for c in result.components if c.symbol_name == "LABEL"]
-        assert any("SUPPLY FROM BUILDING RISER" in l for l in labels)
+        assert any("FROM LANDLORD RISER" in l for l in labels)
 
     def test_cable_extension_label(self):
         """Cable extension should use 'FROM POWER SUPPLY ON SITE'."""

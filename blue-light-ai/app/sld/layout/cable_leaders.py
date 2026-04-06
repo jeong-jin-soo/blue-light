@@ -16,6 +16,7 @@ from collections import OrderedDict
 
 from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
 from app.sld.layout.overlap import SubCircuitGroup, _identify_groups
+from app.sld.layout.section_base import connect_points
 
 logger = logging.getLogger(__name__)
 
@@ -140,17 +141,11 @@ def _draw_cable_leader_group(
             bend_top_y + 1. Used to align cable labels with sub-circuit labels.
     """
     # Horizontal leader line (DXF: LEADER entity, others: LINE)
-    layout_result.leader_connections.append((
-        (leader_start_x, leader_y),
-        (leader_end_x, leader_y),
-    ))
+    connect_points(layout_result, (leader_start_x, leader_y), (leader_end_x, leader_y), style="leader")
 
     # Ticker marks at each conductor intersection
     for tx in tap_xs:
-        layout_result.thick_connections.append((
-            (tx - tick_size, leader_y - tick_size),
-            (tx + tick_size, leader_y + tick_size),
-        ))
+        connect_points(layout_result, (tx - tick_size, leader_y - tick_size), (tx + tick_size, leader_y + tick_size), style="thick")
 
     # Split long cable text into 2 lines to avoid exceeding drawing border
     cable_text = cable_spec
@@ -172,10 +167,7 @@ def _draw_cable_leader_group(
     _ch = config.label_char_height if config else 2.8
     if text_on_left:
         _bend_x = max(leader_start_x, _min_x)
-        layout_result.connections.append((
-            (_bend_x, leader_y),
-            (_bend_x, bend_top_y),
-        ))
+        connect_points(layout_result, (_bend_x, leader_y), (_bend_x, bend_top_y))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=max(_bend_x - _ch / 2, _min_x),
@@ -185,10 +177,7 @@ def _draw_cable_leader_group(
         ))
     else:
         _bend_x = min(leader_end_x, _max_x - 3)
-        layout_result.connections.append((
-            (_bend_x, leader_y),
-            (_bend_x, bend_top_y),
-        ))
+        connect_points(layout_result, (_bend_x, leader_y), (_bend_x, bend_top_y))
         layout_result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=_bend_x - _ch / 2,

@@ -482,6 +482,9 @@ class PlacedComponent:
     symbol_name: str
     x: float
     y: float
+    # --- Port-based connection system ---
+    id: str = ""                # Unique within LayoutResult, e.g. "spine_mccb_1"
+    ports: dict[str, tuple[float, float]] = field(default_factory=dict)  # {"top": (x,y), ...}
     label: str = ""
     rating: str = ""
     cable_annotation: str = ""
@@ -506,6 +509,24 @@ class PlacedComponent:
     rating_offset_y: float = -4.0    # Y offset for rating text relative to title
     title_char_height: float = 3.0   # Title text char_height (mm)
     rating_char_height: float = 1.8  # Rating text char_height (mm)
+
+
+@dataclass
+class PortConnection:
+    """A connection between two component ports (or a port and a fixed point).
+
+    Endpoints are resolved at render time via LayoutResult.resolve_port_connection().
+    When a component moves, its ports dict is updated — PortConnection auto-follows.
+    Anonymous endpoints (from_xy/to_xy) must be shifted explicitly by
+    _apply_vertical_shift or similar transforms.
+    """
+    from_id: str = ""           # component id ("" = anonymous endpoint)
+    from_port: str = ""         # port name ("" = use from_xy)
+    to_id: str = ""
+    to_port: str = ""
+    from_xy: tuple[float, float] | None = None   # fallback for anonymous endpoints
+    to_xy: tuple[float, float] | None = None
+    style: str = "normal"       # normal|thick|dashed|short_dashed|fixed|thick_fixed|leader
 
 
 @dataclass
@@ -605,6 +626,41 @@ class LayoutResult:
     #              "leader_len": float, "char_height": float}
     # Step D reads all geometry and places text at non-overlapping positions.
     deferred_cable_labels: list[dict] = field(default_factory=list)
+
+    # --- Port-based connection system (coexists with coordinate lists during migration) ---
+    port_connections: list[PortConnection] = field(default_factory=list)
+    _component_index: dict[str, int] = field(default_factory=dict, repr=False)
+
+    def component_by_id(self, comp_id: str) -> "PlacedComponent | None":
+        """Lookup component by id. Builds index lazily."""
+        if not self._component_index:
+            self._component_index = {
+                c.id: i for i, c in enumerate(self.components) if c.id
+            }
+        idx = self._component_index.get(comp_id)
+        return self.components[idx] if idx is not None else None
+
+    def invalidate_component_index(self) -> None:
+        """Call after inserting/removing components to rebuild the index."""
+        self._component_index.clear()
+
+    def resolve_port_connection(
+        self, pc: PortConnection,
+    ) -> tuple[tuple[float, float], tuple[float, float]]:
+        """Resolve a PortConnection to absolute coordinate pairs for rendering."""
+        # Start point
+        if pc.from_id and pc.from_port:
+            comp = self.component_by_id(pc.from_id)
+            start = comp.ports[pc.from_port] if comp and pc.from_port in comp.ports else pc.from_xy
+        else:
+            start = pc.from_xy
+        # End point
+        if pc.to_id and pc.to_port:
+            comp = self.component_by_id(pc.to_id)
+            end = comp.ports[pc.to_port] if comp and pc.to_port in comp.ports else pc.to_xy
+        else:
+            end = pc.to_xy
+        return (start, end)  # type: ignore[return-value]
 
 
 @dataclass
@@ -877,6 +933,15 @@ class _LayoutContext:
     config: LayoutConfig
     cx: float
     y: float
+
+    # Port-based connection system
+    _comp_counter: int = 0
+    last_spine_comp: "PlacedComponent | None" = None  # last component placed on spine
+
+    def next_id(self, prefix: str) -> str:
+        """Generate a unique component ID within this layout."""
+        self._comp_counter += 1
+        return f"{prefix}_{self._comp_counter}"
 
     # -- Parsed from requirements --
     supply_type: str = ""

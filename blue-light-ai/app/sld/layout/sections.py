@@ -41,6 +41,7 @@ from app.sld.layout.models import (
     format_cable_spec,
 )
 from app.sld.layout.overlap import _compute_dynamic_spacing
+from app.sld.layout.section_base import connect_points
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -234,7 +235,13 @@ def _parse_incoming_cable(ctx: _LayoutContext, requirements: dict) -> None:
 
 def _parse_sub_circuits(ctx: _LayoutContext, requirements: dict, application_info: dict | None) -> None:
     """Sub-circuit 리스트 파싱 + busbar rating 결정."""
+    dbs = requirements.get("distribution_boards")
+    _first_db = dbs[0] if dbs and isinstance(dbs, list) and len(dbs) >= 1 else {}
+
     raw_circuits = requirements.get("sub_circuits", []) or requirements.get("circuits", [])
+    # Fallback: distribution_boards[0].circuits (single-DB shorthand)
+    if not raw_circuits:
+        raw_circuits = _first_db.get("circuits", [])
     if not isinstance(raw_circuits, list):
         logger.warning("sub_circuits is not a list (%s), using empty list", type(raw_circuits).__name__)
         raw_circuits = []
@@ -254,6 +261,8 @@ def _parse_sub_circuits(ctx: _LayoutContext, requirements: dict, application_inf
     ctx.premises_type = premises_type
 
     ctx.busbar_rating = requirements.get("busbar_rating", 0)
+    if not ctx.busbar_rating:
+        ctx.busbar_rating = _first_db.get("busbar_rating", 0)
     if not ctx.busbar_rating:
         # Per SG standard: minimum 100A COMB BUSBAR for installations ≤ 100A
         ctx.busbar_rating = max(100, ctx.breaker_rating)
@@ -338,7 +347,7 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         # ── Landlord / building riser supply: label RIGHT + cable tick marks ──
         # Both use same visual style per LEW practice (enclosed isolator path).
         _h_tick_len = 5
-        result.connections.append(((cx, y), (cx + _h_tick_len, y)))
+        connect_points(result, (cx, y), (cx + _h_tick_len, y))
         result.components.append(PlacedComponent(
             symbol_name="LABEL",
             x=cx + _h_tick_len + 2,
@@ -348,7 +357,7 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
 
         # Vertical cable segment (extended for tick mark clearance)
         _seg_h = 14
-        result.connections.append(((cx, y), (cx, y + _seg_h)))
+        connect_points(result, (cx, y), (cx, y + _seg_h))
 
         # Cable tick mark + leader line to the LEFT (reference: incoming cable = left side)
         # Text is deferred to Step D (place_labels) for collision-free placement.
@@ -357,12 +366,11 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
         if cable_text:
             tick_y = y + _seg_h * 0.65
             tick_size = 1.25
-            result.thick_connections.append((
+            connect_points(result,
                 (cx - tick_size, tick_y - tick_size),
-                (cx + tick_size, tick_y + tick_size),
-            ))
+                (cx + tick_size, tick_y + tick_size), style="thick")
             _leader_len = ctx.config.cable_leader_len
-            result.leader_connections.append(((cx, tick_y), (cx - _leader_len, tick_y)))
+            connect_points(result, (cx, tick_y), (cx - _leader_len, tick_y), style="leader")
             # Defer text placement to Step D
             result.deferred_cable_labels.append({
                 "text": cable_text,
@@ -397,18 +405,18 @@ def _place_incoming_supply(ctx: _LayoutContext) -> None:
             spacing = 4
             for offset, label in [(-spacing*1.5, "L1"), (-spacing*0.5, "L2"),
                                    (spacing*0.5, "L3"), (spacing*1.5, "N")]:
-                result.connections.append(((cx + offset, y - ph_half), (cx + offset, y + ph_half)))
+                connect_points(result, (cx + offset, y - ph_half), (cx + offset, y + ph_half))
                 result.components.append(PlacedComponent(
                     symbol_name="LABEL",
                     x=cx + offset - 2,
                     y=y - ph_half - 3,
                     label=label,
                 ))
-            result.connections.append(((cx - spacing * 1.5, y + ph_half), (cx + spacing * 1.5, y + ph_half)))
-            result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
+            connect_points(result, (cx - spacing * 1.5, y + ph_half), (cx + spacing * 1.5, y + ph_half))
+            connect_points(result, (cx, y + ph_half), (cx, y + ph_half + 4))
         else:
-            result.connections.append(((cx, y - ph_half), (cx, y + ph_half)))
-            result.connections.append(((cx, y + ph_half), (cx, y + ph_half + 4)))
+            connect_points(result, (cx, y - ph_half), (cx, y + ph_half))
+            connect_points(result, (cx, y + ph_half), (cx, y + ph_half + 4))
         y += ph_half + 4
 
         # Cable annotation (no tick mark for SP supply)
@@ -506,7 +514,7 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
     # Spine continues — fuse is a branch, not on the main vertical path.
     # Spine segment covers entry (y) through branch junction and a bit beyond.
     junction_end = branch_y + 1.0
-    result.connections.append(((cx, y), (cx, junction_end)))
+    connect_points(result, (cx, y), (cx, junction_end))
     ctx.y = junction_end
 
 
@@ -584,7 +592,7 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         from app.sld.layout.section_base import FunctionSection
 
         result.sections_rendered["unit_isolator"] = True
-        result.connections.append(((cx, y), (cx, y + 2)))
+        connect_points(result, (cx, y), (cx, y + 2))
         y += 2
         iso_main_label = f"{isolator_rating}A {meter_poles} {SG_LOCALE.meter_board.isolator}"
         iso_rating_text = (
@@ -623,13 +631,13 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             )
             y = ctx.y
             # place_on_spine advances past stub; add extra gap
-            result.connections.append(((cx, y), (cx, y + 2)))
+            connect_points(result, (cx, y), (cx, y + 2))
             y += 2
             # Skip the old y += height + 2 + connection + 2 pattern
             result.symbols_used.add("ISOLATOR")
 
         if supply_source in ("landlord", "building_riser"):
-            result.connections.append(((cx, y), (cx, y + 2)))
+            connect_points(result, (cx, y), (cx, y + 2))
             y += 2
             result.symbols_used.add("ISOLATOR")
 
@@ -647,12 +655,11 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             _mid = (_iso_box_top + _db_box_bottom) / 2
             tick_y = max(_mid, _iso_box_top + 3.0)
             tick_size = 1.25
-            result.thick_connections.append((
+            connect_points(result,
                 (cx - tick_size, tick_y - tick_size),
-                (cx + tick_size, tick_y + tick_size),
-            ))
+                (cx + tick_size, tick_y + tick_size), style="thick")
             _leader_len = config.cable_leader_len
-            result.connections.append(((cx, tick_y), (cx + _leader_len, tick_y)))
+            connect_points(result, (cx, tick_y), (cx + _leader_len, tick_y))
             result.deferred_cable_labels.append({
                 "text": out_cable_text,
                 "tick_x": cx,
@@ -689,7 +696,7 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
     # stays OUTSIDE (below) the DB dashed box.
     if not skip_gap:
         _gap = config.isolator_to_db_gap
-        result.connections.append(((cx, y), (cx, y + _gap)))
+        connect_points(result, (cx, y), (cx, y + _gap))
         y += _gap
     ctx.db_box_start_y = y - 1  # Track DB box bottom (below main breaker, above cable annotation)
 
@@ -705,7 +712,8 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
     # Place via place_on_spine — catalog pins handle centering + cursor advance
     ctx.y = y  # sync cursor before helper call
     from app.sld.layout.section_base import FunctionSection, _comp_def
-    comp_y, _, exit_y = FunctionSection.place_on_spine(ctx, cb_symbol, label=main_label)
+    _mccb_comp = FunctionSection.place_on_spine(ctx, cb_symbol, label=main_label)
+    comp_y = _mccb_comp.y
 
     # Side-effects that depend on component geometry
     _cb_def = _comp_def(cb_symbol)
@@ -1149,7 +1157,7 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             prev_busbar_y = result.busbar_y_per_row[row_idx - 1]
             if getattr(ctx, 'skip_row_bi_connector', False):
                 # Protection groups: plain vertical line between rows (no BI connector)
-                result.connections.append(((cx, prev_busbar_y + 2), (cx, busbar_y_row)))
+                connect_points(result, (cx, prev_busbar_y + 2), (cx, busbar_y_row))
             else:
                 # BI Connector between rows (replacing plain vertical line)
                 bi_w = 16   # BIConnector symbol width
@@ -1165,8 +1173,8 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
                 result.symbols_used.add("BI_CONNECTOR")
 
                 # Connection lines: prev busbar → BI top, BI bottom → new busbar
-                result.connections.append(((cx, prev_busbar_y + 2), (cx, bi_y)))
-                result.connections.append(((cx, bi_y + bi_h), (cx, busbar_y_row)))
+                connect_points(result, (cx, prev_busbar_y + 2), (cx, bi_y))
+                connect_points(result, (cx, bi_y + bi_h), (cx, busbar_y_row))
 
         sc_bus_start = row_bus_start
         result.busbar_y_per_row.append(busbar_y_row)
@@ -1180,6 +1188,7 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
             h_spacing, config, sub_circuits, supply_type, circuit_ids,
             use_triplets=ctx.use_triplets,
             row_start_idx=cumulative_idx,
+            ctx=ctx,
         )
         cumulative_idx += row_count
 
@@ -1206,12 +1215,10 @@ def _emit_db_box_rect_and_labels(
     Callers compute box extents and pass them in; this function only draws.
     """
     # Dashed rectangle (4 sides: bottom, top, left, right)
-    result.dashed_connections.extend([
-        ((box_left, box_start_y), (box_right, box_start_y)),
-        ((box_left, box_end_y), (box_right, box_end_y)),
-        ((box_left, box_start_y), (box_left, box_end_y)),
-        ((box_right, box_start_y), (box_right, box_end_y)),
-    ])
+    connect_points(result, (box_left, box_start_y), (box_right, box_start_y), style="dashed")
+    connect_points(result, (box_left, box_end_y), (box_right, box_end_y), style="dashed")
+    connect_points(result, (box_left, box_start_y), (box_left, box_end_y), style="dashed")
+    connect_points(result, (box_right, box_start_y), (box_right, box_end_y), style="dashed")
 
     # DB info: board name + approved load inside box bottom-left
     if display_label:
@@ -1418,7 +1425,7 @@ def _place_earth_bar(ctx: _LayoutContext, db_box_right: float) -> None:
     db_box_bottom_y = getattr(result, "db_box_start_y", earth_top_pin_y)
 
     # Single vertical line: DB box bottom → earth bar top pin
-    result.connections.append(((earth_cx, db_box_bottom_y),
-                               (earth_cx, earth_top_pin_y)))
+    connect_points(result, (earth_cx, db_box_bottom_y),
+                               (earth_cx, earth_top_pin_y))
     # Junction dot at DB box bottom edge (connection point on box border)
     result.junction_dots.append((earth_cx, db_box_bottom_y))
