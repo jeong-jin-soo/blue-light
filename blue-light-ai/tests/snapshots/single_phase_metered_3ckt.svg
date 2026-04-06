@@ -87,29 +87,29 @@
   <line x1="258.48" y1="173.42" x2="259.98" y2="173.42" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="264.48" y="170.90" font-family="Arial, Helvetica, sans-serif" font-size="1.6" fill="#000000">E</text>
   <text x="135.02" y="179.11" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000"><tspan x="135.02">2 x 1C 16sqmm XLPE/PVC +</tspan><tspan x="135.02" dy="3.9">16sqmm PVC CPC</tspan></text>
-  <line x1="210.00" y1="197.87" x2="216.00" y2="197.87" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="197.87" x2="216.00" y2="197.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="223.00" y1="197.87" x2="238.50" y2="197.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="250.50" y1="197.87" x2="265.50" y2="197.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="273.50" y1="197.87" x2="299.94" y2="197.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="288.44" y1="199.37" x2="291.44" y2="196.37" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="289.94" y1="197.87" x2="289.94" y2="207.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="289.94" y1="207.87" x2="292.94" y2="207.87" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="197.87" x2="210.00" y2="170.27" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="197.87" x2="214.00" y2="170.27" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="208.75" y1="179.52" x2="211.25" y2="177.02" stroke="#000000" stroke-width="0.50" fill="none" />
-  <line x1="210.00" y1="178.27" x2="198.00" y2="178.27" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="170.37" x2="210.00" y2="156.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="158.37" x2="210.00" y2="156.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="148.37" x2="210.00" y2="146.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="146.37" x2="210.00" y2="141.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="147.00" y1="139.37" x2="178.80" y2="129.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="147.00" y1="119.37" x2="178.80" y2="117.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="178.80" y1="117.37" x2="147.00" y2="94.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="139.37" x2="214.00" y2="129.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="210.00" y1="119.37" x2="214.00" y2="117.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="214.00" y1="117.37" x2="210.00" y2="94.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="273.00" y1="139.37" x2="245.20" y2="129.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="273.00" y1="119.37" x2="245.20" y2="117.37" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="245.20" y1="117.37" x2="273.00" y2="94.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="178.27" x2="198.00" y2="178.27" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="170.37" x2="214.00" y2="156.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="210.00" y1="158.37" x2="214.00" y2="156.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="148.37" x2="210.00" y2="146.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="146.37" x2="214.00" y2="141.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="178.80" y1="139.37" x2="178.80" y2="129.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="178.80" y1="119.37" x2="178.80" y2="117.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="178.80" y1="117.37" x2="178.80" y2="94.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="139.37" x2="214.00" y2="129.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="119.37" x2="214.00" y2="117.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="214.00" y1="117.37" x2="214.00" y2="94.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="245.20" y1="139.37" x2="245.20" y2="129.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="245.20" y1="119.37" x2="245.20" y2="117.37" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="245.20" y1="117.37" x2="245.20" y2="94.37" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="168.80" y1="104.76" x2="178.80" y2="104.76" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="177.55" y1="106.01" x2="180.05" y2="103.51" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="168.80" y1="104.76" x2="168.80" y2="99.76" stroke="#000000" stroke-width="0.25" fill="none" />

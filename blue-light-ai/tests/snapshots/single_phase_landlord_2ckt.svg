@@ -86,12 +86,12 @@
   <line x1="210.00" y1="147.47" x2="210.00" y2="145.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="136.47" x2="210.00" y2="134.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="210.00" y1="134.47" x2="210.00" y2="129.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="150.00" y1="127.47" x2="195.40" y2="117.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="150.00" y1="107.47" x2="195.40" y2="105.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="195.40" y1="105.47" x2="150.00" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="270.00" y1="127.47" x2="230.60" y2="117.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="270.00" y1="107.47" x2="230.60" y2="105.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="230.60" y1="105.47" x2="270.00" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="195.40" y1="127.47" x2="195.40" y2="117.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="195.40" y1="107.47" x2="195.40" y2="105.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="195.40" y1="105.47" x2="195.40" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="230.60" y1="127.47" x2="230.60" y2="117.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="230.60" y1="107.47" x2="230.60" y2="105.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="230.60" y1="105.47" x2="230.60" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="185.40" y1="87.47" x2="195.40" y2="87.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="194.15" y1="88.72" x2="196.65" y2="86.22" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="185.40" y1="87.47" x2="185.40" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />

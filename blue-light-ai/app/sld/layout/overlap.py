@@ -976,6 +976,18 @@ def _rebuild_from_positions(
             (sx, sy), (ex, ey) = connections[conn_idx]
             connections[conn_idx] = ((new_tap_x, sy), (new_tap_x, ey))
 
+        # Port connections: shift anonymous endpoints that reference this tap
+        _old_tap = group.tap_x
+        for pc in layout_result.port_connections:
+            if pc.from_xy:
+                fx, fy = pc.from_xy
+                if abs(fx - _old_tap) < 0.5:
+                    pc.from_xy = (new_tap_x, fy)
+            if pc.to_xy:
+                tx, ty = pc.to_xy
+                if abs(tx - _old_tap) < 0.5:
+                    pc.to_xy = (new_tap_x, ty)
+
         # Junction dot: set x to new_tap_x (busbar tap dot)
         if group.junction_dot_idx is not None:
             _, jy = layout_result.junction_dots[group.junction_dot_idx]

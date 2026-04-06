@@ -195,6 +195,21 @@ def _add_phase_fanout(
                     if abs(sy - by) < 1.0 and abs(sx - ex) < 0.5:
                         connections[ci] = ((sx, intermediate_y), (ex, ey))
 
+                # Also update port_connections (generator reads from these)
+                _side_x = s_g.tap_x
+                for pc in layout_result.port_connections:
+                    if pc.from_xy and pc.to_xy:
+                        fx, fy = pc.from_xy
+                        tx, ty = pc.to_xy
+                        if abs(fx - _side_x) < 0.5 and abs(tx - _side_x) < 0.5 and abs(fy - by) < 1.0:
+                            pc.from_xy = (fx, intermediate_y)
+                    elif pc.to_xy and not pc.from_id:
+                        pass  # handled above
+                    elif pc.from_xy and pc.to_id:
+                        fx, fy = pc.from_xy
+                        if abs(fx - _side_x) < 0.5 and abs(fy - by) < 1.0:
+                            pc.from_xy = (fx, intermediate_y)
+
                 # Relocate junction dot to center busbar position
                 if s_g.junction_dot_idx is not None:
                     layout_result.junction_dots[s_g.junction_dot_idx] = (center_x, by)
