@@ -123,10 +123,9 @@ def place_deferred_cable_labels(
         text_y = tick_y + ch * 0.5
 
         if side == "left":
-            # 리더선 끝(tick_x - leader_len)에서 텍스트 우측까지 충분한 간격.
-            # DXF MTEXT 가변폭 폰트 실제 폭은 char_w 추정치의 ~130%.
-            # "CABLE +" 같은 대문자+기호가 넓으므로 넉넉히 잡는다.
-            text_right_gap = 12.0  # 리더선 끝 ↔ 텍스트 우측 간격
+            # 리더선 끝(tick_x - leader_len)에서 텍스트 우측이 바로 인접.
+            # 레퍼런스: 리더선 끝 ← 2mm gap ← 텍스트 우측 끝
+            text_right_gap = 2.0
             leader_end_x = tick_x - leader_len
             text_x = leader_end_x - text_right_gap - text_width
             text_x = max(text_x, getattr(config, "min_x", 25) + 2)
