@@ -308,17 +308,19 @@ class FunctionSection(Section):
 
     @staticmethod
     def spine_connection(ctx: _LayoutContext, distance: float) -> None:
-        """Add a vertical spine connection and advance cursor."""
+        """Add a vertical spine connection and advance cursor.
+
+        Uses ctx.y (current cursor) as start — NOT last_spine_comp.top,
+        because region injection may have reset ctx.y to a different position.
+        After drawing, clears last_spine_comp so subsequent place_on_spine()
+        gap_before connections start from ctx.y, not from a stale component port.
+        """
         if distance > 0:
-            _prev = getattr(ctx, 'last_spine_comp', None)
-            if _prev and "top" in _prev.ports:
-                connect_port_to_point(
-                    ctx.result, _prev, "top",
-                    (ctx.cx, ctx.y + distance),
-                )
-            else:
-                connect_points(ctx.result, (ctx.cx, ctx.y), (ctx.cx, ctx.y + distance))
+            connect_points(ctx.result, (ctx.cx, ctx.y), (ctx.cx, ctx.y + distance))
             ctx.y += distance
+            # Clear last_spine_comp: this gap line is not a component,
+            # so the next place_on_spine's gap_before should start from ctx.y
+            ctx.last_spine_comp = None
 
     @staticmethod
     def add_label(

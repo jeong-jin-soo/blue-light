@@ -720,12 +720,17 @@ def _place_main_breaker(ctx: _LayoutContext, *, skip_gap: bool = False) -> None:
     ctx.main_breaker_arc_center_y = comp_y + _cb_def.height / 2  # between contacts
     result.symbols_used.add(breaker_type)
 
-    # Extra gap with connection line for visual spacing
-    # Use reference-matched breaker→RCCB gap for direct metering only (Phase 3).
-    # CT metering path has CT sections between breaker and RCCB, so the ref gap
-    # (which measures the total distance) would over-allocate space.
+    # Extra gap with connection line for visual spacing.
+    # ref_breaker_to_rccb_gap is the total breaker→busbar distance from reference.
+    # Only use it when there are NO intermediate components (no ELCB, no CT).
+    # When ELCB or CT exists between breaker and busbar, use default gap
+    # to avoid the connection line passing through intermediate symbols.
+    _has_elcb = bool(ctx.elcb_rating)
     is_ct = ctx.metering in ("ct_metering", "ct_meter")
-    gap = (config.ref_breaker_to_rccb_gap or config.spine_component_gap) if not is_ct else config.spine_component_gap
+    if is_ct or _has_elcb:
+        gap = config.spine_component_gap
+    else:
+        gap = config.ref_breaker_to_rccb_gap or config.spine_component_gap
     FunctionSection.spine_connection(ctx, gap)
 
     y = ctx.y  # sync back

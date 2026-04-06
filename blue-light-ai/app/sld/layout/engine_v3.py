@@ -133,6 +133,10 @@ def compute_layout_v3(
             region = plan.section_regions.get(section.name)
             if region is not None:
                 ctx.y = region.y_start
+                # Region boundary: clear last_spine_comp to prevent
+                # port connections from spanning across region gaps
+                # (which causes lines to pass through intermediate symbols)
+                ctx.last_spine_comp = None
         section.execute(ctx)
 
     # Adjust label height
