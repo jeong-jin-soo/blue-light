@@ -63,7 +63,7 @@
   <text x="222.10" y="110.07" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000"><tspan x="222.10">B20A</tspan><tspan x="222.10" dy="2.8">SPN</tspan><tspan x="222.10" dy="2.8">MCB</tspan><tspan x="222.10" dy="2.8">6kA</tspan></text>
   <text x="230.60" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,230.60,81.59)">1 NO. POWER</text>
   <text x="184.00" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,184.00,81.59)">2C 1.5sqmm PVC/PVC</text>
-  <text x="239.20" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,239.20,81.59)">2C 4.0sqmm PVC/PVC</text>
+  <text x="219.20" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,219.20,81.59)">2C 4.0sqmm PVC/PVC</text>
   <text x="177.90" y="166.87" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">40A DB</text>
   <text x="177.90" y="169.91" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 9 KVA AT 230V</text>
   <text x="177.90" y="179.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">(LOCATED INSIDE UNIT)</text>
@@ -95,9 +95,9 @@
   <line x1="185.40" y1="87.47" x2="195.40" y2="87.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="194.15" y1="88.72" x2="196.65" y2="86.22" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="185.40" y1="87.47" x2="185.40" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="230.60" y1="87.47" x2="240.60" y2="87.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="220.60" y1="87.47" x2="230.60" y2="87.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="229.35" y1="88.72" x2="231.85" y2="86.22" stroke="#000000" stroke-width="0.50" fill="none" />
-  <line x1="240.60" y1="87.47" x2="240.60" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="220.60" y1="87.47" x2="220.60" y2="82.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="244.29" y1="172.47" x2="244.29" y2="175.47" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="171.90" y1="172.47" x2="179.90" y2="172.47" stroke="#808080" stroke-width="0.25" fill="none" />
   <line x1="181.90" y1="172.47" x2="183.40" y2="172.47" stroke="#808080" stroke-width="0.25" fill="none" />

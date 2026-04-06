@@ -176,8 +176,17 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             prot_ct_label = f"{protection_ct_ratio} CT\\P{protection_ct_class}"
         else:
             prot_ct_label = f"CT\\P{protection_ct_class}"
+        _pct_x = cx - ct_w / 2
+        from app.sld.catalog import get_catalog as _gc_ct
+        _ct_cat = _gc_ct().get("CT")
+        _pct_id = ctx.next_id("spine_protection_ct")
+        _pct_ports = {
+            name: (_pct_x + pin.x, prot_ct_y + pin.y)
+            for name, pin in _ct_cat.pins.items()
+        }
         result.components.append(PlacedComponent(
-            symbol_name="CT", x=cx - ct_w / 2, y=prot_ct_y, label=prot_ct_label,
+            symbol_name="CT", x=_pct_x, y=prot_ct_y, label=prot_ct_label,
+            id=_pct_id, ports=_pct_ports,
         ))
 
         # Branch from Protection CT (LEFT): ELR
@@ -187,7 +196,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         _place_metering_branch(
             result, cx, prot_ct_center_y, direction="left",
             components=[("ELR", elr_label, 12.0)],
-            arm_len=branch_arm_len, gap=branch_gap,
+            arm_len=branch_arm_len, gap=branch_gap, ctx=ctx,
         )
         result.junction_arrows.append((cx, prot_ct_center_y, "left"))
         result.symbols_used.add("ELR")
@@ -240,9 +249,16 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     vss_branch_y = ass_branch_y + ct_to_branch_gap
 
     # Place Metering CT — label aligned with ASS branch height
+    _mct_x = cx - ct_w / 2
+    _mct_id = ctx.next_id("spine_metering_ct")
+    _mct_ports = {
+        name: (_mct_x + pin.x, metering_ct_y + pin.y)
+        for name, pin in _ct_cat.pins.items()
+    }
     result.components.append(PlacedComponent(
-        symbol_name="CT", x=cx - ct_w / 2, y=metering_ct_y, label=ct_label,
+        symbol_name="CT", x=_mct_x, y=metering_ct_y, label=ct_label,
         label_y_override=ass_branch_y + 3,
+        id=_mct_id, ports=_mct_ports,
     ))
     result.symbols_used.add("CT")
 
@@ -263,7 +279,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
                 ("SELECTOR_SWITCH", "ASS", 8.0),
                 ("AMMETER", ctx.ammeter_range or "0-500A", 7.6),
             ],
-            arm_len=9.0, gap=7.0,
+            arm_len=9.0, gap=7.0, ctx=ctx,
         )
         result.junction_arrows.append((cx, ass_branch_y, "left"))
 
@@ -285,6 +301,11 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
 
     # Place KWH component (right of spine, no right stub)
     _kwh_comp_x = cx + branch_arm_len  # rect left edge (same as _place_metering_branch)
+    _kwh_id = ctx.next_id("branch_kwh_meter")
+    _kwh_ports = {
+        "left": (_kwh_comp_x, _kwh_branch_y),
+        "right": (_kwh_comp_x + _kwh_rect_w, _kwh_branch_y),
+    }
     result.components.append(PlacedComponent(
         symbol_name="KWH_METER",
         x=_kwh_comp_x,
@@ -292,6 +313,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
         label=_kwh_label,
         rotation=90.0,
         no_right_stub=True,
+        id=_kwh_id, ports=_kwh_ports,
     ))
     result.symbols_used.add("KWH_METER")
 
@@ -332,7 +354,7 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
             result, cx, _inst_fuse_y, direction="right",
             components=_inst_fuse_components,
             arm_len=8.0,
-            gap=_inst_fuse_gap,
+            gap=_inst_fuse_gap, ctx=ctx,
         )
         result.junction_dots.append((cx, _inst_fuse_y))
         result.symbols_used.add("POTENTIAL_FUSE")
@@ -387,25 +409,35 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
                 (_diag_start_x, _diag_start_y),
                 (_diag_end_x, _diag_end_y))
 
-            # Place VSS component
+            # Place VSS component (horizontal — ports from actual geometry)
+            _vss_id = ctx.next_id("branch_vss")
+            _vss_left_pin_x = _vss_body_x - _vss_stub
+            _vss_right_pin_x = _vss_body_x + _vss_body_w + _vss_stub
+            _vss_ports = {
+                "left": (_vss_left_pin_x, vss_branch_y),
+                "right": (_vss_right_pin_x, vss_branch_y),
+            }
             result.components.append(PlacedComponent(
                 symbol_name="SELECTOR_SWITCH",
                 x=_vss_body_x,
                 y=vss_branch_y,
                 label="VSS",
                 rotation=90.0,
+                id=_vss_id, ports=_vss_ports,
             ))
             result.symbols_used.add("SELECTOR_SWITCH")
 
             # Gap connection: VSS right pin → Voltmeter left pin
-            _vss_right_pin_x = _vss_body_x + _vss_body_w + _vss_stub
             _vm_body_x = _vss_right_pin_x + branch_gap
             _vm_left_pin_x = _vm_body_x - _vm_stub
-            connect_points(result,
-                (_vss_right_pin_x, vss_branch_y),
-                (_vm_left_pin_x, vss_branch_y))
+            _vm_right_pin_x = _vm_body_x + _vm_body_w + _vm_stub
 
-            # Place Voltmeter component (last on branch → no right stub)
+            # Place Voltmeter component (horizontal, last → no right stub)
+            _vm_id = ctx.next_id("branch_voltmeter")
+            _vm_ports = {
+                "left": (_vm_left_pin_x, vss_branch_y),
+                "right": (_vm_right_pin_x, vss_branch_y),
+            }
             result.components.append(PlacedComponent(
                 symbol_name="VOLTMETER",
                 x=_vm_body_x,
@@ -413,8 +445,14 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
                 label=ctx.voltmeter_range or "0-500V",
                 rotation=90.0,
                 no_right_stub=True,
+                id=_vm_id, ports=_vm_ports,
             ))
             result.symbols_used.add("VOLTMETER")
+
+            # Gap: VSS → Voltmeter (connect body edges, not stub tips)
+            connect_points(result,
+                (_vss_right_pin_x, vss_branch_y),
+                (_vm_left_pin_x, vss_branch_y))
 
     # BI Connector — include isolator/busbar rating (e.g., "100A BI CONNECTOR")
     # Reference: crossbar line through BI connector matches busbar length.
@@ -422,9 +460,17 @@ def _place_ct_metering_section(ctx: _LayoutContext) -> None:
     # can match busbar_start_x/busbar_end_x exactly.
     _bi_rating = ctx.busbar_rating or ctx.breaker_rating or 0
     _bi_label = f"{_bi_rating}A BI CONNECTOR" if _bi_rating else "BI CONNECTOR"
+    _bi_x = cx - bi_w / 2
+    _bi_id = ctx.next_id("spine_bi_connector")
+    _bi_cat = _gc_ct().get("BI_CONNECTOR")
+    _bi_ports = {
+        name: (_bi_x + pin.x, bi_y + pin.y)
+        for name, pin in _bi_cat.pins.items()
+    }
     result.components.append(PlacedComponent(
-        symbol_name="BI_CONNECTOR", x=cx - bi_w / 2, y=bi_y, label=_bi_label,
+        symbol_name="BI_CONNECTOR", x=_bi_x, y=bi_y, label=_bi_label,
         crossbar_extend=0,  # crossbar drawn separately after busbar placement
+        id=_bi_id, ports=_bi_ports,
     ))
     result.symbols_used.add("BI_CONNECTOR")
 
@@ -657,7 +703,8 @@ def _place_metering_branch(
     components: list[tuple[str, str, float]],
     arm_len: float = 15.0,
     gap: float = 3.0,
-) -> None:
+    ctx: "_LayoutContext | None" = None,
+) -> list[PlacedComponent]:
     """Place a horizontal branch from the main spine.
 
     Components occupy their own space (no line through them).
@@ -674,11 +721,16 @@ def _place_metering_branch(
             in the registry; otherwise the real symbol width is used.
         arm_len: length of the initial arm from spine to first component.
         gap: gap between components on the branch.
+        ctx: Optional layout context for port-based ID generation.
+
+    Returns:
+        List of placed components (with id and ports when ctx is provided).
     """
     from app.sld.real_symbols import get_real_symbol
 
     sign = -1 if direction == "left" else 1
     x = cx
+    placed_comps: list[PlacedComponent] = []
 
     # Initial arm from spine to first component
     x_next = x + sign * arm_len
@@ -705,28 +757,43 @@ def _place_metering_branch(
 
         is_last = (i == len(components) - 1)
         # Last component on branch: suppress outer stub (no dangling line)
-        comp_kwargs = {}
+        comp_kwargs: dict = {}
         if is_last:
             if direction == "left":
                 comp_kwargs["no_left_stub"] = True
             else:
                 comp_kwargs["no_right_stub"] = True
 
-        result.components.append(PlacedComponent(
+        # Port-based: add id and ports when ctx is available.
+        # Components are placed horizontally (rotation=90°), so compute
+        # ports from actual geometry, not catalog pins (which are vertical).
+        if ctx:
+            comp_kwargs["id"] = ctx.next_id(f"branch_{symbol_name.lower()}")
+            comp_kwargs["ports"] = {
+                "left": (comp_x - stub, branch_y),
+                "right": (comp_x + w + stub, branch_y),
+            }
+
+        _placed = PlacedComponent(
             symbol_name=symbol_name,
             x=comp_x,
             y=branch_y,
             label=label,
             rotation=90.0,
             **comp_kwargs,
-        ))
+        )
+        result.components.append(_placed)
+        placed_comps.append(_placed)
         result.symbols_used.add(symbol_name.replace("CB_", ""))
 
         # Advance past this component
         x = x + sign * w
 
-        # Gap connection to next component (if not last)
+        # Gap connection to next component (if not last).
+        # Connects body edges (not stub tips) — stubs drawn by renderer.
         if not is_last:
             x_next = x + sign * gap
             connect_points(result, (x, branch_y), (x_next, branch_y))
             x = x_next
+
+    return placed_comps

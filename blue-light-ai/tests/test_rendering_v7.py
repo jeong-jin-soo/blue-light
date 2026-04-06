@@ -252,16 +252,19 @@ class TestSpareCircuit:
         # 3-phase triplet padding: 2 padded SPAREs + 1 original Spare = 3
         assert len(spare_breakers) >= 1
 
-    def test_spare_circuit_has_label(self):
-        """Spare circuits should have SPARE text labels."""
+    def test_spare_circuit_no_load_label(self):
+        """Spare circuits should NOT have a load description label (per LEW reference).
+
+        SPARE is identified only by the circuit ID box (e.g., L2S3).
+        """
         result = compute_layout(BASIC_3PHASE_REQ)
-        spare_labels = [
+        spare_load_labels = [
             c for c in result.components
             if c.symbol_name == "LABEL"
-            and (c.label or "").upper() in ("SPARE", "SPARE")
+            and c.rotation == 90.0
+            and (c.label or "").upper() == "SPARE"
         ]
-        # 3-phase padding creates multiple spare labels
-        assert len(spare_labels) >= 1
+        assert len(spare_load_labels) == 0
 
 
 # -- Test: generate_pdf_bytes --

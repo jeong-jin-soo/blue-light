@@ -52,11 +52,15 @@ def _compute_safe_leader_bounds(
     safe_right = region.max_x if region else config.max_x
 
     # Clamp to SPARE positions (leave gap for SPARE labels)
+    # SPARE positions as soft boundaries: use reduced gap (2mm) so that
+    # cable text can extend slightly past SPARE position when needed.
+    # SPARE circuits have no cable annotation text, so overlap risk is minimal.
+    _SPARE_CABLE_GAP = min(_SPARE_GAP, 2.0)
     for sx in spare_tap_xs:
         if sx < leftmost_x:
-            safe_left = max(safe_left, sx + _SPARE_GAP)
+            safe_left = max(safe_left, sx + _SPARE_CABLE_GAP)
         if sx > rightmost_x:
-            safe_right = min(safe_right, sx - _SPARE_GAP)
+            safe_right = min(safe_right, sx - _SPARE_CABLE_GAP)
 
     # Clamp to adjacent cable group boundaries
     # Margin accounts for cable text extending beyond leader endpoint:
@@ -83,6 +87,9 @@ def _compute_safe_leader_bounds(
                 continue
             # Skip labels belonging to circuits in the current cable group
             if any(abs(g.tap_x - tx) < 0.5 for tx in current_group_taps):
+                continue
+            # Skip SPARE labels — short text, low collision risk with cable text
+            if g.is_spare:
                 continue
             label_comp = components[g.name_label_idx]
             # 90° rotated label: horizontal extent = num_lines × char_height
@@ -291,9 +298,9 @@ def _add_cable_leader_lines(
 
         # Build circuit name label bounding boxes for collision detection
         # (X range only; at same Y zone, vertical ranges always overlap for 90° text)
-        # Store (x_min, x_max, center_x) to allow filtering own-group names
-        # Include SPARE labels — they occupy space and cable text must not overlap them.
-        name_label_bbs: list[tuple[float, float, float]] = []
+        # Store (x_min, x_max, center_x, is_spare) to allow filtering.
+        # SPARE labels have short text and low collision risk with cable text.
+        name_label_bbs: list[tuple[float, float, float, bool]] = []
         for g in groups:
             if g.name_label_idx is None:
                 continue
@@ -302,7 +309,7 @@ def _add_cable_leader_lines(
             _ls = config.label_char_height * 1.4
             x_span = config.label_char_height + (n_lines - 1) * _ls
             hw = x_span / 2
-            name_label_bbs.append((comp.x - hw, comp.x + hw, comp.x))
+            name_label_bbs.append((comp.x - hw, comp.x + hw, comp.x, g.is_spare))
 
         # Track placed cable text bounding boxes for sequential collision avoidance
         placed_cable_bbs: list[tuple[float, float, float]] = []  # (x_min, x_max, y)
@@ -320,14 +327,13 @@ def _add_cable_leader_lines(
             Names near text_x (the cable text placement point) are always checked.
             """
             _MARGIN = 0.5  # extra clearance to catch near-misses
-            _TEXT_PROXIMITY = 8.0  # mm — labels within this distance of text_x are always checked
-            for nx_min, nx_max, nx_center in name_label_bbs:
-                # Skip own-group names ONLY if far from text placement point
+            for nx_min, nx_max, nx_center, nx_spare in name_label_bbs:
+                # Always skip own-group name labels — cable text belongs to this group
                 if own_tap_xs and any(abs(nx_center - tx) < 0.5 for tx in own_tap_xs):
-                    if text_x is not None and abs(nx_center - text_x) < _TEXT_PROXIMITY:
-                        pass  # Near text anchor — do NOT skip, check collision
-                    else:
-                        continue  # Mid-leader — safe to skip
+                    continue
+                # Skip SPARE labels — short text, cable text can safely overlap
+                if nx_spare:
+                    continue
                 if bb[1] > nx_min - _MARGIN and bb[0] < nx_max + _MARGIN:
                     return True
             for px_min, px_max, py in placed_cable_bbs:
@@ -352,12 +358,12 @@ def _add_cable_leader_lines(
                 safe_right = min(safe_right, busbar_end_x + 5)
 
             # Determine text placement direction
+            # Default: text at LEFT side of each group (consistent with LEW reference).
+            # Only use right side when there's not enough space on the left.
             effective_left = leftmost_x - safe_left
             effective_right = safe_right - rightmost_x
-            if len(group_keys) == 1:
-                text_on_left = effective_left >= effective_right
-            else:
-                text_on_left = (gi % 2 == 0)
+            _MIN_TEXT_SPACE = 12.0  # minimum mm needed for cable text label
+            text_on_left = effective_left >= _MIN_TEXT_SPACE or effective_left >= effective_right
 
             # Compute leader line endpoints
             leader_extension = config.leader_extension

@@ -504,7 +504,7 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
         result, cx, branch_y, direction="right",
         components=components,
         arm_len=8.0,
-        gap=6.0,
+        gap=6.0, ctx=ctx,
     )
     result.junction_dots.append((cx, branch_y))
     result.symbols_used.add("POTENTIAL_FUSE")
@@ -514,8 +514,14 @@ def _place_ct_pre_mccb_fuse(ctx: _LayoutContext) -> None:
     # Spine continues — fuse is a branch, not on the main vertical path.
     # Spine segment covers entry (y) through branch junction and a bit beyond.
     junction_end = branch_y + 1.0
-    connect_points(result, (cx, y), (cx, junction_end))
+    _prev = getattr(ctx, 'last_spine_comp', None)
+    if _prev and "top" in _prev.ports:
+        from app.sld.layout.section_base import connect_port_to_point as _cpp_fuse
+        _cpp_fuse(result, _prev, "top", (cx, junction_end))
+    else:
+        connect_points(result, (cx, y), (cx, junction_end))
     ctx.y = junction_end
+    ctx.last_spine_comp = None  # junction is not a component
 
 
 def _place_unit_isolator(ctx: _LayoutContext) -> None:
@@ -589,7 +595,7 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             isolator_rating = _next_standard_rating(breaker_rating)
 
     if isolator_rating:
-        from app.sld.layout.section_base import FunctionSection
+        from app.sld.layout.section_base import FunctionSection, connect_port_to_point
 
         result.sections_rendered["unit_isolator"] = True
         connect_points(result, (cx, y), (cx, y + 2))
@@ -602,14 +608,24 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
         if supply_source in ("landlord", "building_riser"):
             # Landlord / building riser — enclosed isolator with labels to the LEFT
             # Manual placement (enclosed + separate label = can't use place_on_spine)
-            result.components.append(PlacedComponent(
+            _iso_x = cx - _iso_def.center_x()
+            _iso_id = ctx.next_id("spine_isolator")
+            _iso_ports = {
+                name: (_iso_x + pin.x, y + pin.y)
+                for name, pin in _iso_def.pins.items()
+            }
+            _iso_comp = PlacedComponent(
                 symbol_name="ISOLATOR",
-                x=cx - _iso_def.center_x(),
+                x=_iso_x,
                 y=y,
                 label="",
                 rating="",
                 enclosed=True,
-            ))
+                id=_iso_id,
+                ports=_iso_ports,
+            )
+            result.components.append(_iso_comp)
+            ctx.last_spine_comp = _iso_comp
             # Position label text right-aligned to the left of enclosure box
             _label_ch = 2.3
             _combined = f"{iso_main_label}\\P{iso_rating_text}"
@@ -637,7 +653,8 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
             result.symbols_used.add("ISOLATOR")
 
         if supply_source in ("landlord", "building_riser"):
-            connect_points(result, (cx, y), (cx, y + 2))
+            # Gap after isolator — port-based from isolator top
+            connect_port_to_point(result, _iso_comp, "top", (cx, y + 2))
             y += 2
             result.symbols_used.add("ISOLATOR")
 
@@ -1169,17 +1186,26 @@ def _place_sub_circuits_rows(ctx: _LayoutContext) -> float:
                 bi_h = 10   # BIConnector symbol height
                 bi_y = (prev_busbar_y + busbar_y_row) / 2 - bi_h / 2
 
-                result.components.append(PlacedComponent(
+                _bi_id = ctx.next_id("row_bi_connector")
+                _bi_ports = {
+                    "bottom": (cx, bi_y),
+                    "top": (cx, bi_y + bi_h),
+                }
+                _bi_comp = PlacedComponent(
                     symbol_name="BI_CONNECTOR",
                     x=cx - bi_w / 2,
                     y=bi_y,
                     label="BI CONN.",
-                ))
+                    id=_bi_id,
+                    ports=_bi_ports,
+                )
+                result.components.append(_bi_comp)
                 result.symbols_used.add("BI_CONNECTOR")
 
-                # Connection lines: prev busbar → BI top, BI bottom → new busbar
-                connect_points(result, (cx, prev_busbar_y + 2), (cx, bi_y))
-                connect_points(result, (cx, bi_y + bi_h), (cx, busbar_y_row))
+                # Connection lines: prev busbar → BI bottom, BI top → new busbar
+                from app.sld.layout.section_base import connect_port_to_point as _cpp_bi
+                _cpp_bi(result, _bi_comp, "bottom", (cx, prev_busbar_y + 2), port_is_start=False)
+                _cpp_bi(result, _bi_comp, "top", (cx, busbar_y_row))
 
         sc_bus_start = row_bus_start
         result.busbar_y_per_row.append(busbar_y_row)

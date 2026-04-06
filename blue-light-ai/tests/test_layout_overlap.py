@@ -633,7 +633,7 @@ class TestComputeSafeLeaderBounds:
         safe_left, safe_right = _compute_safe_leader_bounds(
             100.0, 150.0, spare_tap_xs, cable_groups, 0, config,
         )
-        assert safe_left >= 80.0 + 5.0  # SPARE_GAP = 5.0
+        assert safe_left >= 80.0 + 2.0  # SPARE_CABLE_GAP = min(SPARE_GAP, 2.0)
 
     def test_adjacent_group_clamps(self):
         """Adjacent cable group → boundary clamped."""

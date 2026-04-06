@@ -117,11 +117,10 @@
   <line x1="267.19" y1="97.81" x2="299.39" y2="97.81" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="299.39" y1="97.81" x2="298.19" y2="97.21" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="299.39" y1="97.81" x2="298.19" y2="98.41" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="296.50" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,296.50,67.67)">SPARE</text>
   <text x="118.43" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,118.43,67.67)">2 x 1C 1.5sqmm PVC +</text>
   <text x="121.43" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,121.43,67.67)">1.5sqmm PVC CPC</text>
-  <text x="273.23" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,273.23,67.67)">2 x 1C 2.5sqmm PVC +</text>
-  <text x="276.23" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,276.23,67.67)">2.5sqmm PVC CPC</text>
+  <text x="221.03" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,221.03,67.67)">2 x 1C 2.5sqmm PVC +</text>
+  <text x="224.03" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,224.03,67.67)">2.5sqmm PVC CPC</text>
   <text x="112.00" y="154.21" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
   <text x="112.00" y="157.25" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 45 KVA AT 400V</text>
   <line x1="303.60" y1="162.81" x2="303.60" y2="164.61" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -172,10 +171,10 @@
   <line x1="160.45" y1="75.06" x2="162.95" y2="72.56" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="192.65" y1="75.06" x2="195.15" y2="72.56" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="119.50" y1="73.81" x2="119.50" y2="68.81" stroke="#000000" stroke-width="0.25" fill="none" />
-  <line x1="232.10" y1="73.81" x2="274.30" y2="73.81" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="222.10" y1="73.81" x2="264.30" y2="73.81" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="230.85" y1="75.06" x2="233.35" y2="72.56" stroke="#000000" stroke-width="0.50" fill="none" />
   <line x1="263.05" y1="75.06" x2="265.55" y2="72.56" stroke="#000000" stroke-width="0.50" fill="none" />
-  <line x1="274.30" y1="73.81" x2="274.30" y2="68.81" stroke="#000000" stroke-width="0.25" fill="none" />
+  <line x1="222.10" y1="73.81" x2="222.10" y2="68.81" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="303.60" y1="159.81" x2="303.60" y2="162.81" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="161.70" y1="113.81" x2="129.50" y2="105.25" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="161.70" y1="113.81" x2="193.90" y2="105.25" stroke="#000000" stroke-width="0.25" fill="none" />

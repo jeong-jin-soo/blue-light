@@ -258,6 +258,7 @@ class SubCircuitGroup:
     name_label_idx: int | None = None    # Vertical circuit name LABEL index
     spare_label_idx: int | None = None   # SPARE label index (if spare circuit)
     connection_indices: list[int] = field(default_factory=list)  # Indices in connections list
+    port_connection_indices: list[int] = field(default_factory=list)  # Indices in port_connections list
     junction_dot_idx: int | None = None   # Index in junction_dots list
     arrow_point_idx: int | None = None    # Index in arrow_points list
     is_spare: bool = False
@@ -538,6 +539,33 @@ def _match_elements_to_groups(
                     continue
                 g.connection_indices.append(ci)
                 break
+
+    # Match port_connections to groups (same zone/proximity rules as legacy connections).
+    # Only anonymous endpoints are matched — named endpoints follow component ports.
+    for pci, pc in enumerate(layout_result.port_connections):
+        # Collect anonymous endpoint coordinates
+        _ep_coords = []
+        if pc.from_xy:
+            _ep_coords.append(pc.from_xy)
+        if pc.to_xy:
+            _ep_coords.append(pc.to_xy)
+        if not _ep_coords:
+            continue
+        _matched = False
+        for (px, py) in _ep_coords:
+            if _matched:
+                break
+            if abs(px - incoming_chain_x) < _TOL:
+                continue
+            if py < main_busbar_y - 5 or py > main_busbar_y + 60:
+                continue
+            for g in groups:
+                if abs(px - g.tap_x) < _TOL:
+                    if abs(py - g.row_busbar_y) > _Y_TOL:
+                        continue
+                    g.port_connection_indices.append(pci)
+                    _matched = True
+                    break
 
     # Match junction_dots (skip fanout-relocated dots — they share center position)
     fanout_dots = layout_result.fanout_relocated_dots
@@ -976,9 +1004,13 @@ def _rebuild_from_positions(
             (sx, sy), (ex, ey) = connections[conn_idx]
             connections[conn_idx] = ((new_tap_x, sy), (new_tap_x, ey))
 
-        # Port connections: shift anonymous endpoints that reference this tap
+        # Port connections: shift only group-owned anonymous endpoints.
+        # Previous code did a full scan of ALL port_connections with X-proximity
+        # matching, which caused false matches (e.g., CT metering connections at
+        # the same X as a sub-circuit tap). Now we use pre-computed group indices.
         _old_tap = group.tap_x
-        for pc in layout_result.port_connections:
+        for pci in group.port_connection_indices:
+            pc = layout_result.port_connections[pci]
             if pc.from_xy:
                 fx, fy = pc.from_xy
                 if abs(fx - _old_tap) < 0.5:

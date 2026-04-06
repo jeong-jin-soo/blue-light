@@ -302,7 +302,9 @@ def _pad_spares_for_triplets(
         user_spare_count = sum(1 for c in section if _is_spare(c))
         total = non_spare_count + user_spare_count
         remainder = total % 3
-        if remainder != 0:
+        # Skip auto-padding when user already provided SPAREs at section boundary.
+        # User-specified SPAREs indicate intentional circuit arrangement.
+        if remainder != 0 and user_spare_count == 0:
             pad_count = 3 - remainder
             for _ in range(pad_count):
                 # Auto-SPAREs inherit breaker specs from last non-spare circuit
@@ -356,14 +358,15 @@ def _categorize_circuit(circuit: dict) -> tuple[str, str | None]:
         breaker_type = str(breaker_dict.get("type", "")).upper()
 
     if "spare" in name_lower:
+        # Preserve user-provided phase-slot ID (e.g., "L2S3") but NOT generic "SPARE"
+        if explicit_cid and _PHASE_ID_RE.match(explicit_cid):
+            return ("spare", explicit_cid)
         return ("spare", None)
 
     if breaker_type == "ISOLATOR" or "isol" in name_lower:
-        # Isolator is a power circuit device — do NOT use ISOL ID as user_id.
-        # The circuit ID will be assigned from the power counter (L{phase}P{num})
-        # in _assign_circuit_ids(). The isolator symbol on the conductor already
-        # identifies it as an isolator; the circuit label should follow the
-        # sequential power numbering.
+        # Preserve user-provided ID for ISOLATOR circuits (e.g., "ISOL1")
+        if explicit_cid:
+            return ("isolator", explicit_cid)
         return ("isolator", None)
 
     if explicit_cid and _PHASE_ID_RE.match(explicit_cid):
@@ -911,11 +914,10 @@ def _place_sub_circuits_upward(
                 id=_breaker_id, ports=_breaker_ports,
             ))
         else:
-            # Per LEW reference: all sub-circuit breakers use MCB symbol (CB_MCB),
-            # even isolator-load circuits. The DP ISOL device box is added separately
-            # at the conductor top by _add_isolator_device_symbols().
+            # ISOLATOR circuits use ISOLATOR symbol at the busbar tap (□ symbol).
+            # The DP ISOL device box is added separately at the conductor top.
             _is_isol = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
-            _symbol_name = "CB_MCB" if _is_isol else f"CB_{cd['breaker_type']}"
+            _symbol_name = "ISOLATOR" if _is_isol else f"CB_{cd['breaker_type']}"
             _btype_str = "ISOLATOR" if _is_isol else cd["breaker_type"]
             result.components.append(PlacedComponent(
                 symbol_name=_symbol_name,
@@ -977,6 +979,10 @@ def _place_sub_circuits_upward(
         )
         _ISOL_LABEL_GAP = 4.0  # gap above device box top to clear the symbol
         label_y = tail_end_y + (_ISOL_DEVICE_BOX_H + _ISOL_LABEL_GAP if _has_any_isol else 2)
+        # SPARE circuits: no load description label (per LEW reference).
+        # Only the circuit ID box (L2S3 etc.) identifies the SPARE position.
+        if cd.get("breaker_type") == "SPARE" or "spare" in cd["name"].lower():
+            continue
         display_label = _build_display_label(circuit, cd["name"], label_y, config)
         result.components.append(PlacedComponent(
             symbol_name="LABEL", x=tap_x, y=label_y,
