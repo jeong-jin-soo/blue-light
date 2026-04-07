@@ -113,8 +113,8 @@
   <text x="192.42" y="105.00" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,192.42,103.88)">PVC CPC IN METAL TRUNKING</text>
   <text x="252.90" y="105.00" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,252.90,103.88)">2C 6.0sqmm PVC + 6.0sqmm</text>
   <text x="256.82" y="105.00" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,256.82,103.88)">PVC CPC IN METAL TRUNKING</text>
-  <text x="79.80" y="172.16" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
-  <text x="79.80" y="175.20" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 45 KVA AT 400V</text>
+  <text x="79.80" y="172.16" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#262626">63A DB</text>
+  <text x="79.80" y="175.20" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#262626">APPROVED LOAD: 45 KVA AT 400V</text>
   <text x="79.80" y="185.00" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">(LOCATED INSIDE UNIT)</text>
   <line x1="332.58" y1="180.76" x2="332.58" y2="182.56" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="330.33" y1="182.56" x2="334.83" y2="182.56" stroke="#000000" stroke-width="0.25" fill="none" />

@@ -454,7 +454,7 @@ class QualityGateValidator:
             ))
 
         # Q5: Connections exist
-        if result.connections:
+        if result.port_connections:
             report.passed_rules.append("has_connections")
         else:
             report.violations.append(Violation(

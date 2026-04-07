@@ -376,6 +376,45 @@ def lookup_outgoing_cable(sub_breaker_rating_a: int) -> float:
     )
 
 
+# CPC (earth conductor) size: same as main conductor up to 16mm², then per SS 638 Table 54A
+_CPC_SIZE: dict[float, float] = {
+    1.0: 1.0, 1.5: 1.5, 2.5: 2.5, 4.0: 4.0, 6: 6, 10: 10, 16: 16,
+    25: 16, 35: 16, 50: 25, 70: 35, 95: 50, 120: 70, 150: 70,
+    185: 95, 240: 120, 300: 150, 500: 240, 630: 300,
+}
+
+
+def lookup_outgoing_cable_spec(
+    sub_breaker_rating_a: int,
+    *,
+    poles: str = "SPN",
+    method: str = "",
+) -> dict:
+    """Return full cable specification dict for a sub-circuit breaker rating.
+
+    Format follows Singapore SLD standard:
+        "2 x 1C {size}sqmm PVC/PVC + {cpc}sqmm PVC CPC IN {method}"
+
+    Returns dict compatible with format_cable_spec():
+        {"count": 2, "cores": 1, "size_mm2": "2.5", "type": "PVC/PVC",
+         "cpc_mm2": "2.5", "method": "METAL TRUNKING"}
+    """
+    size_mm2 = lookup_outgoing_cable(sub_breaker_rating_a)
+    cpc_mm2 = _CPC_SIZE.get(size_mm2, size_mm2)
+
+    is_three_phase = poles in ("TPN", "4P")
+    count = 4 if is_three_phase else 2
+
+    return {
+        "count": count,
+        "cores": 1,
+        "size_mm2": str(int(size_mm2)) if size_mm2 == int(size_mm2) else str(size_mm2),
+        "type": "PVC/PVC",
+        "cpc_mm2": str(int(cpc_mm2)) if cpc_mm2 == int(cpc_mm2) else str(cpc_mm2),
+        "method": method,
+    }
+
+
 # ─────────────────────────────────────────────────────────────────────
 # 4. Validation logic for Gemini-extracted JSON
 # ─────────────────────────────────────────────────────────────────────
@@ -840,6 +879,29 @@ def _validate_sub_circuits(
                     f"main breaker {effective_rating}A."
                 )
 
+        # Voltage drop check (only when cable_length is provided)
+        ckt_length = circuit.get("cable_length", 0) or circuit.get("cable_length_m", 0)
+        if ckt_rating and ckt_length and ckt_length > 0:
+            cable_mm2 = 0.0
+            try:
+                cable_mm2 = float(ckt_cable) if ckt_cable else lookup_outgoing_cable(ckt_rating)
+            except (ValueError, TypeError):
+                pass
+            if cable_mm2 > 0:
+                from app.sld.electrical_calc import calc_circuit_voltage_drop
+                poles = circuit.get("breaker_poles", circuit.get("poles", ""))
+                phase = "three_phase" if poles in ("TPN", "4P") else "single_phase"
+                cable_type = circuit.get("cable_type", "PVC")
+                vd = calc_circuit_voltage_drop(
+                    ckt_rating, cable_mm2, float(ckt_length),
+                    phase=phase, cable_type=cable_type,
+                )
+                if not vd["pass"]:
+                    ckt_name = circuit.get("name", f"Circuit {i + 1}")
+                    result.add_warning(
+                        f"{ckt_name}: {vd['message']}"
+                    )
+
 
 def _log_validation_summary(result: ValidationResult) -> None:
     """Log validation summary: errors, warnings, corrections (Step 11)."""
@@ -950,7 +1012,10 @@ def validate_sld_requirements(requirements: dict) -> ValidationResult:
     _validate_metering(effective_spec, requirements.get("metering", ""),
                        requirements.get("supply_source", ""), effective_rating, result,
                        is_cable_extension=bool(requirements.get("is_cable_extension")))
-    _validate_sub_circuits(requirements.get("circuits", []), effective_rating, result)
+    _validate_sub_circuits(
+        requirements.get("circuits") or requirements.get("sub_circuits", []),
+        effective_rating, result,
+    )
     _log_validation_summary(result)
     return result
 

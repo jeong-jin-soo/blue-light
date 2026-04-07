@@ -54,15 +54,15 @@ class TestDrawCenterLine:
         pdf.draw_center_line((0, 0), (40, 0))
         assert pdf._current_layer == "SLD_SYMBOLS"
 
-    def test_dxf_uses_native_center_linetype(self):
-        """DXF: SLD_DB_FRAME (E-SLD-BOX) 레이어에 단일 LINE 생성."""
+    def test_dxf_uses_dashed_linetype_on_sld_line(self):
+        """DXF: DB box dashed lines on SLD-LINE layer with DASHED linetype (per LEW reference)."""
         dxf = DxfBackend()
         dxf.set_layer("SLD_CONNECTIONS")
         dxf.draw_center_line((10, 50), (50, 50))
-        # Should create exactly 1 LINE entity on E-SLD-BOX layer
         lines = [e for e in dxf.doc.modelspace() if e.dxftype() == "LINE"]
         assert len(lines) == 1
-        assert lines[0].dxf.layer == "E-SLD-BOX"
+        assert lines[0].dxf.layer == "SLD-LINE"
+        assert lines[0].dxf.linetype == "DASHED"
 
     def test_dxf_restores_previous_layer(self):
         """DXF: draw_center_line 후 이전 레이어 복원."""
@@ -180,7 +180,7 @@ class TestDbFrameLayerColor:
         assert abs(color[1] - 0.502) < 0.01
         assert abs(color[2] - 0.502) < 0.01
 
-    def test_dxf_db_frame_layer_is_gray(self):
-        """DXF: E-SLD-BOX 레이어 ACI color 8."""
+    def test_dxf_db_frame_on_sld_line(self):
+        """DXF: DB box dashed lines use SLD-LINE layer (color 7)."""
         from app.sld.dxf_backend import _LAYER_CONFIG
-        assert _LAYER_CONFIG["E-SLD-BOX"]["color"] == 8
+        assert _LAYER_CONFIG["SLD-LINE"]["color"] == 7

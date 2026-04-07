@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
+from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent, PortConnection
 from app.sld.layout.post_validator import (
     ValidationIssue,
     _check_busbar_connections,
@@ -20,6 +20,10 @@ def _make_result(**kwargs) -> LayoutResult:
     r = LayoutResult()
     for k, v in kwargs.items():
         setattr(r, k, v)
+    # Auto-populate port_connections from legacy connections if not explicitly set
+    if "connections" in kwargs and "port_connections" not in kwargs:
+        for start, end in kwargs["connections"]:
+            r.port_connections.append(PortConnection(from_xy=start, to_xy=end, style="normal"))
     return r
 
 

@@ -95,8 +95,8 @@ class TestV3Parity:
         req = request.getfixturevalue(fixture_name)
         r2 = compute_layout(dict(req))
         r3 = compute_layout_v3(dict(req))
-        assert len(r3.connections) == len(r2.connections), \
-            f"Connection count: v2={len(r2.connections)}, v3={len(r3.connections)}"
+        assert len(r3.resolved_connections(style_filter={"normal"})) == len(r2.resolved_connections(style_filter={"normal"})), \
+            f"Connection count: v2={len(r2.resolved_connections(style_filter={'normal'}))}, v3={len(r3.resolved_connections(style_filter={'normal'}))}"
 
     @pytest.mark.parametrize("fixture_name", [
         "simple_3p", "ct_metering", "sp_meter", "single_phase",

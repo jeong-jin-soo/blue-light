@@ -336,7 +336,7 @@ class TestSubCircuitGroup:
         assert g.is_spare is False
         assert g.is_ditto is False
         assert g.min_width == 25.0
-        assert g.connection_indices == []
+        assert g.port_connection_indices == []
         assert g.row_idx == 0
 
     def test_with_breaker(self):

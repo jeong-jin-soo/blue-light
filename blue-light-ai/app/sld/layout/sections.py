@@ -684,6 +684,7 @@ def _place_unit_isolator(ctx: _LayoutContext) -> None:
                 "side": "right",
                 "leader_len": _leader_len,
                 "char_height": 2.0,
+                "label_gap": 3.0,
                 "source": "outgoing_cable",
             })
 
@@ -825,7 +826,8 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         FunctionSection.place_on_spine(ctx, elcb_symbol, label=_rccb_label,
                                        label_side="left")
         result.symbols_used.add(elcb_type_str)
-        FunctionSection.spine_connection(ctx, config.spine_component_gap)
+        _elcb_gap = max(config.spine_component_gap, config.elcb_to_busbar_min_gap)
+        FunctionSection.spine_connection(ctx, _elcb_gap)
     else:
         # Direct metering path: RCCB first, then optional MCB
         ctx.y = y
@@ -833,7 +835,11 @@ def _place_elcb(ctx: _LayoutContext) -> None:
         result.symbols_used.add(elcb_type_str)
 
         # Use reference-matched RCCB→busbar gap for direct metering only (Phase 3).
-        rccb_gap = config.ref_rccb_to_busbar_gap or config.spine_component_gap
+        # Enforce minimum ELCB→busbar gap even under compression.
+        rccb_gap = max(
+            config.ref_rccb_to_busbar_gap or config.spine_component_gap,
+            config.elcb_to_busbar_min_gap,
+        )
         FunctionSection.spine_connection(ctx, rccb_gap)
 
         if post_mcb:
@@ -1327,8 +1333,8 @@ def _place_db_box(ctx: _LayoutContext, busbar_y_row: float) -> float:
     result.db_box_start_y = db_box_start_y
     result.db_box_end_y = db_box_end_y
 
-    # Store dashed line indices for resolve_overlaps to update
-    base_idx = len(result.dashed_connections)
+    # Store port_connection indices for resolve_overlaps to update
+    base_idx = len(result.port_connections)
 
     db_display_label = ctx.board_name if ctx.board_name else ctx.db_info_label
     _emit_db_box_rect_and_labels(

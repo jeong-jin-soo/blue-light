@@ -77,7 +77,7 @@ def _find_horizontal_connections_at_y(
 ) -> list[tuple[tuple[float, float], tuple[float, float]]]:
     """특정 Y 좌표의 수평 커넥션만 필터링."""
     horizontal = []
-    for start, end in result.connections:
+    for start, end in result.resolved_connections(style_filter={"normal"}):
         dy = abs(start[1] - end[1])
         if dy > 0.5:
             continue  # 수평이 아님
@@ -250,7 +250,7 @@ class TestVerticalSpineConnectionAlignment:
 
         # MCB body bottom에 닿는 수직 커넥션 찾기
         found = False
-        for start, end in result.connections:
+        for start, end in result.resolved_connections(style_filter={"normal"}):
             if abs(start[0] - end[0]) > 1.0:
                 continue  # 수평 커넥션 스킵
             for pt in [start, end]:
@@ -295,7 +295,7 @@ class TestVerticalSpineConnectionAlignment:
         spine_x = raw_pins["top"][0]
         stub_top = raw_pins["top"][1]
         found = False
-        for start, end in result.connections:
+        for start, end in result.resolved_connections(style_filter={"normal"}):
             if abs(start[0] - end[0]) > 1.0:
                 continue  # 수평 커넥션 스킵
             lo_y = min(start[1], end[1])
@@ -330,7 +330,7 @@ class TestVerticalSpineConnectionAlignment:
 
         # 수직 커넥션 확인: 스파인 커넥션의 X 좌표가 일관적인지
         vertical_conns = []
-        for s, e in result.connections:
+        for s, e in result.resolved_connections(style_filter={"normal"}):
             if abs(s[0] - e[0]) < 1.0 and abs(s[0] - spine_x) < 3:
                 vertical_conns.append((s, e))
 

@@ -242,6 +242,7 @@ class LayoutConfig:
     isolator_h: float = 7.0          # Isolator height
     ct_size: float = 2.5             # CT diameter
     spine_component_gap: float = 5.0  # Extra gap between spine components (with connection line)
+    elcb_to_busbar_min_gap: float = 5.0  # ELCB→busbar minimum gap (not compressed)
 
     # Spine section gaps — populated by reference matcher (Phase 3)
     # None = use existing computed gaps (backward compatible)
@@ -534,18 +535,6 @@ class LayoutResult:
     """Result of the layout computation."""
 
     components: list[PlacedComponent] = field(default_factory=list)
-    connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
-    thick_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
-    dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
-    # Short-dashed connections: regular short dashes (e.g., SPARE conductor tails)
-    short_dashed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
-    # Fixed connections: not affected by resolve_overlaps (e.g., VSS diagonal)
-    fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
-    # Thick fixed connections: busbar-weight lines (lineweight=50), e.g., BI crossbar
-    thick_fixed_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
-    # Leader connections: horizontal cable annotation shelf lines
-    # DXF renders as LEADER (no arrow), other backends render as LINE
-    leader_connections: list[tuple[tuple[float, float], tuple[float, float]]] = field(default_factory=list)
     junction_dots: list[tuple[float, float]] = field(default_factory=list)
     # CT branch junction arrows: (x, y, direction) — triangular connectors at CT branch points
     # direction: "left" or "right" (branch direction from spine)
@@ -646,21 +635,77 @@ class LayoutResult:
 
     def resolve_port_connection(
         self, pc: PortConnection,
-    ) -> tuple[tuple[float, float], tuple[float, float]]:
+    ) -> tuple[tuple[float, float] | None, tuple[float, float] | None]:
         """Resolve a PortConnection to absolute coordinate pairs for rendering."""
         # Start point
+        start: tuple[float, float] | None = None
         if pc.from_id and pc.from_port:
             comp = self.component_by_id(pc.from_id)
-            start = comp.ports[pc.from_port] if comp and pc.from_port in comp.ports else pc.from_xy
+            if comp is None:
+                logger.debug("PortConnection skip: component '%s' not found", pc.from_id)
+                start = pc.from_xy
+            elif pc.from_port not in comp.ports:
+                logger.debug(
+                    "PortConnection skip: port '%s' not in %s.ports %s",
+                    pc.from_port, pc.from_id, list(comp.ports.keys()),
+                )
+                start = pc.from_xy
+            else:
+                start = comp.ports[pc.from_port]
         else:
             start = pc.from_xy
+
         # End point
+        end: tuple[float, float] | None = None
         if pc.to_id and pc.to_port:
             comp = self.component_by_id(pc.to_id)
-            end = comp.ports[pc.to_port] if comp and pc.to_port in comp.ports else pc.to_xy
+            if comp is None:
+                logger.debug("PortConnection skip: component '%s' not found", pc.to_id)
+                end = pc.to_xy
+            elif pc.to_port not in comp.ports:
+                logger.debug(
+                    "PortConnection skip: port '%s' not in %s.ports %s",
+                    pc.to_port, pc.to_id, list(comp.ports.keys()),
+                )
+                end = pc.to_xy
+            else:
+                end = comp.ports[pc.to_port]
         else:
             end = pc.to_xy
-        return (start, end)  # type: ignore[return-value]
+
+        if start is None or end is None:
+            logger.debug(
+                "PortConnection unresolved: start=%s end=%s pc=%s",
+                start, end, pc,
+            )
+        return (start, end)
+
+    def resolved_connections(
+        self,
+        style_filter: set[str] | None = None,
+        exclude_styles: set[str] | None = None,
+    ) -> list[tuple[tuple[float, float], tuple[float, float]]]:
+        """Resolve port_connections to coordinate pairs (migration helper).
+
+        Returns the same format as legacy connection lists: [(start, end), ...].
+        Use this to progressively replace legacy list reads with port_connections.
+
+        Args:
+            style_filter: If set, include only these styles (e.g., {"normal", "fixed"}).
+            exclude_styles: If set, exclude these styles (e.g., {"dashed"}).
+        """
+        # Ensure component index is fresh (components may have been added/moved)
+        self.invalidate_component_index()
+        result: list[tuple[tuple[float, float], tuple[float, float]]] = []
+        for pc in self.port_connections:
+            if style_filter and pc.style not in style_filter:
+                continue
+            if exclude_styles and pc.style in exclude_styles:
+                continue
+            start, end = self.resolve_port_connection(pc)
+            if start is not None and end is not None:
+                result.append((start, end))
+        return result
 
 
 @dataclass

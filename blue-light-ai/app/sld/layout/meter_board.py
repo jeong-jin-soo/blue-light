@@ -330,6 +330,7 @@ def _add_outgoing_cable_tick(
         "side": "left",
         "leader_len": _leader_len,
         "char_height": 2.8,
+        "label_gap": 2.0,
         "source": "outgoing_cable",
     })
 

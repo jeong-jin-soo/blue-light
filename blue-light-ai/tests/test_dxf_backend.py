@@ -27,7 +27,7 @@ _EXPECTED_DXF_LAYERS = [
     "SLD-TXT",
     "TXT",
     "E-SLD-LEGENDF",
-    "E-SLD-BOX",
+    "E-SLD-DB-TXT",
     "E-SLD-FRAME",
 ]
 
@@ -436,7 +436,7 @@ class TestDxfLayerConvention:
             "SLD_POWER_MAIN": "SLD-LINE",
             "SLD_ANNOTATIONS": "SLD-TXT",
             "SLD_TITLE_BLOCK": "TXT",
-            "SLD_DB_FRAME": "E-SLD-BOX",
+            "SLD_DB_FRAME": "SLD-LINE",
         }
         for logical, dxf_name in expected.items():
             assert _LOGICAL_TO_DXF_LAYER[logical] == dxf_name, (
@@ -489,13 +489,13 @@ class TestDxfLayerConvention:
         entities = list(dxf.doc.modelspace())
         assert entities[-1].dxf.layer == "TXT"
 
-    def test_db_frame_on_box_layer(self):
-        """Entities drawn on SLD_DB_FRAME end up on E-SLD-BOX layer."""
+    def test_db_frame_on_line_layer(self):
+        """Entities drawn on SLD_DB_FRAME end up on SLD-LINE layer (per LEW reference)."""
         dxf = DxfBackend()
         dxf.set_layer("SLD_DB_FRAME")
         dxf.add_line((0, 0), (100, 0))
         entities = list(dxf.doc.modelspace())
-        assert entities[-1].dxf.layer == "E-SLD-BOX"
+        assert entities[-1].dxf.layer == "SLD-LINE"
 
     def test_busbar_on_busbar_layer(self):
         """Entities drawn on SLD_POWER_MAIN end up on E-SLD-BUSBAR layer."""
@@ -505,17 +505,17 @@ class TestDxfLayerConvention:
         entities = list(dxf.doc.modelspace())
         assert entities[-1].dxf.layer == "SLD-LINE"
 
-    def test_box_layer_has_center_linetype(self):
-        """E-SLD-BOX layer uses CENTER linetype for dashed boxes."""
+    def test_db_text_layer_color_green(self):
+        """E-SLD-DB-TXT layer uses ACI color 3 (green) per LEW reference."""
         dxf = DxfBackend()
-        layer = dxf.doc.layers.get("E-SLD-BOX")
-        assert layer.dxf.linetype == "CENTER"
+        layer = dxf.doc.layers.get("E-SLD-DB-TXT")
+        assert layer.color == 3
 
-    def test_box_layer_color_gray(self):
-        """E-SLD-BOX layer uses ACI color 8 (gray)."""
+    def test_dashed_linetype_defined(self):
+        """DASHED linetype is defined for DB box dashed lines."""
         dxf = DxfBackend()
-        layer = dxf.doc.layers.get("E-SLD-BOX")
-        assert layer.color == 8
+        lt_names = [lt.dxf.name for lt in dxf.doc.linetypes]
+        assert "DASHED" in lt_names
 
     def test_default_layer_is_sym(self):
         """Default current layer on new DxfBackend is E-SLD-SYM."""

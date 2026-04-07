@@ -44,11 +44,10 @@ def _collect_occupied_rects(
     """현재 배치된 모든 요소의 경계 사각형을 수집."""
     rects: list[_OccupiedRect] = []
 
-    # Connections (spine lines, busbar, etc.)
-    for collection in (result.connections, result.thick_connections,
-                       result.leader_connections, result.fixed_connections,
-                       result.thick_fixed_connections):
-        for (x1, y1), (x2, y2) in collection:
+    # Connections (spine lines, busbar, etc.) — exclude dashed/short_dashed (box outlines)
+    for (x1, y1), (x2, y2) in result.resolved_connections(
+        exclude_styles={"dashed", "short_dashed"},
+    ):
             rects.append(_OccupiedRect(
                 x_min=min(x1, x2) - 0.5,
                 y_min=min(y1, y2) - 0.5,
@@ -122,15 +121,18 @@ def place_deferred_cable_labels(
         # 텍스트 상단이 리더선 위 ch/2에 오면, 첫 줄 중앙 = 리더선 Y.
         text_y = tick_y + ch * 0.5
 
+        # Per-source label_gap: allows outgoing_cable (non-meter) vs meter_board
+        # to use different tick-to-label spacing.
+        _label_gap = label_info.get("label_gap")
         if side == "left":
             # 리더선 끝(tick_x - leader_len)에서 텍스트 우측이 바로 인접.
-            # 레퍼런스: 리더선 끝 ← 2mm gap ← 텍스트 우측 끝
-            text_right_gap = 2.0
+            # 레퍼런스: 리더선 끝 ← gap ← 텍스트 우측 끝
+            text_right_gap = _label_gap if _label_gap is not None else 2.0
             leader_end_x = tick_x - leader_len
             text_x = leader_end_x - text_right_gap - text_width
             text_x = max(text_x, getattr(config, "min_x", 25) + 2)
         else:
-            gap = 8.0 if leader_len == 0 else 2.0
+            gap = _label_gap if _label_gap is not None else (8.0 if leader_len == 0 else 2.0)
             text_x = tick_x + leader_len + gap
 
         # 충돌 검사 — X 방향으로만 이동 (리더선과 텍스트의 Y 정렬 유지)

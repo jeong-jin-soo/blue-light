@@ -34,11 +34,11 @@ _PAGE_HEIGHT = 297.0
 # ACI color 2 = yellow (symbol blocks), ACI 7 = white/black, ACI 8 = gray
 _LAYER_CONFIG: dict[str, dict] = {
     "SLD": {"color": 2, "lineweight": 25},                # symbol/block inserts (yellow)
-    "SLD-LINE": {"color": 7, "lineweight": 25},           # connection lines, spine
+    "SLD-LINE": {"color": 7, "lineweight": 25},           # connection lines, spine, DB box dashed
     "SLD-TXT": {"color": 7, "lineweight": 25},            # text labels
     "TXT": {"color": 7, "lineweight": 25},                # title block text
     "E-SLD-LEGENDF": {"color": 2, "lineweight": 25},      # symbol legend (yellow)
-    "E-SLD-BOX": {"color": 8, "lineweight": 25, "linetype": "CENTER"},  # dashed boxes
+    "E-SLD-DB-TXT": {"color": 3, "lineweight": 25},       # DB info text (green, per LEW reference)
     "E-SLD-FRAME": {"color": 8, "lineweight": 25},        # drawing border/frame
 }
 
@@ -49,7 +49,8 @@ _LOGICAL_TO_DXF_LAYER: dict[str, str] = {
     "SLD_POWER_MAIN": "SLD-LINE",          # busbar uses SLD-LINE with heavier lineweight
     "SLD_ANNOTATIONS": "SLD-TXT",
     "SLD_TITLE_BLOCK": "TXT",
-    "SLD_DB_FRAME": "E-SLD-BOX",
+    "SLD_DB_FRAME": "SLD-LINE",           # DB box dashed lines use SLD-LINE + DASHED linetype
+    "SLD_DB_TEXT": "E-SLD-DB-TXT",       # DB info text (green)
     "SLD_FRAME": "E-SLD-FRAME",
     # Direct names accepted
     "SLD": "SLD",
@@ -57,7 +58,7 @@ _LOGICAL_TO_DXF_LAYER: dict[str, str] = {
     "SLD-TXT": "SLD-TXT",
     "TXT": "TXT",
     "E-SLD-LEGENDF": "E-SLD-LEGENDF",
-    "E-SLD-BOX": "E-SLD-BOX",
+    "E-SLD-DB-TXT": "E-SLD-DB-TXT",
     "E-SLD-FRAME": "E-SLD-FRAME",
     # Legacy names for backward compat
     "E-SLD-SYM": "SLD",
@@ -385,10 +386,13 @@ class DxfBackend:
         short_dash: float = 1.5,
         gap: float = 2.0,
     ) -> None:
-        """Draw IEC CENTER linetype line using native DXF linetype on SLD_DB_FRAME layer."""
+        """Draw DB box dashed line on SLD-LINE layer with DASHED linetype (per LEW reference)."""
+        attribs = self._dxfattribs()
         prev_layer = self._current_layer
-        self.set_layer("SLD_DB_FRAME")
-        self.add_line(start, end)
+        self.set_layer("SLD_CONNECTIONS")
+        attribs = self._dxfattribs()
+        attribs["linetype"] = "DASHED"
+        self._msp.add_line(self._tx(*start), self._tx(*end), dxfattribs=attribs)
         self._current_layer = prev_layer
 
     def draw_short_dashed_line(

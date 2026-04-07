@@ -121,8 +121,8 @@
   <text x="121.43" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,121.43,67.67)">1.5sqmm PVC CPC</text>
   <text x="221.03" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,221.03,67.67)">2 x 1C 2.5sqmm PVC +</text>
   <text x="224.03" y="68.53" font-family="Arial, Helvetica, sans-serif" font-size="2.1" fill="#000000" transform="rotate(-90.0,224.03,67.67)">2.5sqmm PVC CPC</text>
-  <text x="112.00" y="154.21" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">63A DB</text>
-  <text x="112.00" y="157.25" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 45 KVA AT 400V</text>
+  <text x="112.00" y="154.21" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#262626">63A DB</text>
+  <text x="112.00" y="157.25" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#262626">APPROVED LOAD: 45 KVA AT 400V</text>
   <line x1="303.60" y1="162.81" x2="303.60" y2="164.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="301.35" y1="164.61" x2="305.85" y2="164.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="302.10" y1="165.74" x2="305.10" y2="165.74" stroke="#000000" stroke-width="0.25" fill="none" />

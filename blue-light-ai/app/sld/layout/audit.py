@@ -166,10 +166,9 @@ def _get_component_pins(
 def _all_connection_endpoints(result: "LayoutResult") -> list[tuple[float, float]]:
     """모든 connection의 endpoint 좌표 수집."""
     endpoints = []
-    for conn_list in (result.connections, result.fixed_connections):
-        for (x1, y1), (x2, y2) in conn_list:
-            endpoints.append((x1, y1))
-            endpoints.append((x2, y2))
+    for (x1, y1), (x2, y2) in result.resolved_connections(style_filter={"normal", "fixed"}):
+        endpoints.append((x1, y1))
+        endpoints.append((x2, y2))
     return endpoints
 
 
@@ -270,14 +269,11 @@ def check_c3_no_dangling_wires(result: "LayoutResult") -> AuditCheckResult:
     for idx, comp in enumerate(result.components):
         all_pins.extend(_get_component_pins(comp, idx))
 
-    # 모든 endpoint 수집 (thick_connections, dashed_connections 포함)
+    # 모든 endpoint 수집 (port_connections 기반)
     all_endpoints: list[tuple[float, float]] = []
-    for conn_list in (result.connections, result.fixed_connections,
-                      result.thick_connections, result.dashed_connections,
-                      result.leader_connections):
-        for (x1, y1), (x2, y2) in conn_list:
-            all_endpoints.append((x1, y1))
-            all_endpoints.append((x2, y2))
+    for (x1, y1), (x2, y2) in result.resolved_connections():
+        all_endpoints.append((x1, y1))
+        all_endpoints.append((x2, y2))
 
     # junction dots
     jdots = set()
@@ -308,12 +304,13 @@ def check_c3_no_dangling_wires(result: "LayoutResult") -> AuditCheckResult:
             horiz_comp_positions.append((comp.x, comp.y))
 
     # 도면 최하단 Y (incoming supply entry point 판정)
+    _normal_conns = result.resolved_connections(style_filter={"normal"})
     all_conn_ys = []
-    for (cx1, cy1), (cx2, cy2) in result.connections:
+    for (cx1, cy1), (cx2, cy2) in _normal_conns:
         all_conn_ys.extend([cy1, cy2])
     min_conn_y = min(all_conn_ys) if all_conn_ys else 0
 
-    for ci, ((x1, y1), (x2, y2)) in enumerate(result.connections):
+    for ci, ((x1, y1), (x2, y2)) in enumerate(_normal_conns):
         r.checked_count += 1
         for pt_x, pt_y in [(x1, y1), (x2, y2)]:
             matched = False
@@ -406,7 +403,7 @@ def check_c4_intentional_diagonals(result: "LayoutResult") -> AuditCheckResult:
         severity="warning",
     )
 
-    for ci, ((x1, y1), (x2, y2)) in enumerate(result.connections):
+    for ci, ((x1, y1), (x2, y2)) in enumerate(result.resolved_connections(style_filter={"normal"})):
         dx = abs(x2 - x1)
         dy = abs(y2 - y1)
         r.checked_count += 1
@@ -461,7 +458,7 @@ def check_c5_junction_dots(result: "LayoutResult") -> AuditCheckResult:
     # endpoint 좌표별 카운트
     from collections import Counter
     endpoint_counts: Counter[tuple[float, float]] = Counter()
-    for (x1, y1), (x2, y2) in result.connections:
+    for (x1, y1), (x2, y2) in result.resolved_connections(style_filter={"normal"}):
         endpoint_counts[(round(x1, 0), round(y1, 0))] += 1
         endpoint_counts[(round(x2, 0), round(y2, 0))] += 1
 
@@ -773,7 +770,7 @@ def check_a5_spine_x_alignment(result: "LayoutResult") -> AuditCheckResult:
     # 3-phase에서 위상선(L1/L2/L3)은 spine 양옆 ±2mm에 의도적 배치
     phase_offset = 4.0  # 3-phase 위상 오프셋 허용 범위
 
-    for ci, ((x1, y1), (x2, y2)) in enumerate(result.connections):
+    for ci, ((x1, y1), (x2, y2)) in enumerate(result.resolved_connections(style_filter={"normal"})):
         dx = abs(x2 - x1)
         dy = abs(y2 - y1)
         if dx < 0.5 and dy > 1.0:  # 수직 connection
@@ -895,18 +892,11 @@ def check_c6_no_line_through_symbol(result: "LayoutResult") -> AuditCheckResult:
 
     # 2. 서브회로 연결선 수집 (스파인 연결선 제외)
     subcircuit_connections: list[tuple[tuple[float, float], tuple[float, float]]] = []
-    for (sx, sy), (ex, ey) in result.connections:
-        # 스파인 연결선: X가 spine_x 근처인 수직선
+    for (sx, sy), (ex, ey) in result.resolved_connections(style_filter={"normal", "fixed"}):
+        # 스��인 연결선: X가 spine_x 근처인 수직선
         if spine_x and abs(sx - spine_x) < 2.0 and abs(ex - spine_x) < 2.0:
             continue
         subcircuit_connections.append(((sx, sy), (ex, ey)))
-
-    # fixed_connections도 검사 (fanout 렌더링 후 추가되는 선)
-    if hasattr(result, 'fixed_connections'):
-        for (sx, sy), (ex, ey) in result.fixed_connections:
-            if spine_x and abs(sx - spine_x) < 2.0 and abs(ex - spine_x) < 2.0:
-                continue
-            subcircuit_connections.append(((sx, sy), (ex, ey)))
 
     r.checked_count = len(subcircuit_connections) * len(bboxes)
 

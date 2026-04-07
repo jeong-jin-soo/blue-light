@@ -4,7 +4,9 @@ Page configuration for SLD drawings.
 Single source of truth for page dimensions, margins, and title block geometry.
 All values in mm.
 
-Default: A3 landscape (420 x 297 mm) — standard for Singapore EMA submissions.
+Supported sizes:
+- A3 landscape (420 × 297 mm) — standard for Singapore EMA submissions
+- A2 landscape (594 × 420 mm) — for large systems (28+ circuits, 3+ boards)
 """
 
 from __future__ import annotations
@@ -69,5 +71,44 @@ class PageConfig:
         return self.page_height - 2 * self.margin
 
 
-# Default A3 landscape instance — used as fallback throughout the codebase.
-A3_LANDSCAPE = PageConfig()
+# Standard page sizes — landscape orientation.
+A3_LANDSCAPE = PageConfig()  # 420 × 297 mm
+A2_LANDSCAPE = PageConfig(page_width=594.0, page_height=420.0)  # 594 × 420 mm
+
+
+def auto_page_size(
+    requirements: dict | None = None,
+    *,
+    circuit_threshold: int = 21,
+    board_threshold: int = 3,
+) -> PageConfig:
+    """Select page size based on circuit/board count.
+
+    Rules:
+    - ≥ circuit_threshold total circuits → A2
+    - ≥ board_threshold distribution boards → A2
+    - Otherwise → A3 (default)
+
+    Args:
+        requirements: SLD requirements dict.
+        circuit_threshold: Total circuit count to trigger A2 (default 21).
+        board_threshold: Board count to trigger A2 (default 3).
+    """
+    if not requirements:
+        return A3_LANDSCAPE
+
+    # Count circuits
+    total_circuits = len(requirements.get("sub_circuits", []))
+    dbs = requirements.get("distribution_boards", [])
+    if dbs:
+        total_circuits = sum(
+            len(db.get("sub_circuits", [])) for db in dbs
+        )
+
+    # Count boards
+    board_count = len(dbs) if dbs else 1
+
+    if total_circuits >= circuit_threshold or board_count >= board_threshold:
+        return A2_LANDSCAPE
+
+    return A3_LANDSCAPE

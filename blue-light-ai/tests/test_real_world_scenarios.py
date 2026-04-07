@@ -632,7 +632,7 @@ class TestRealWorldScenarios:
     def test_has_connections(self, requirements: dict):
         """Every SLD must produce at least one electrical connection."""
         result = compute_layout(requirements, skip_validation=True)
-        assert len(result.connections) > 0, "Layout produced zero connections"
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0, "Layout produced zero connections"
 
     @pytest.mark.parametrize("requirements", SCENARIOS)
     def test_all_coordinates_are_finite(self, requirements: dict):
@@ -675,7 +675,7 @@ class TestRealWorldScenarios:
     def test_connection_endpoints_are_finite(self, requirements: dict):
         """All connection line endpoints must be finite numbers."""
         result = compute_layout(requirements, skip_validation=True)
-        for idx, ((x1, y1), (x2, y2)) in enumerate(result.connections):
+        for idx, ((x1, y1), (x2, y2)) in enumerate(result.resolved_connections(style_filter={"normal"})):
             assert math.isfinite(x1) and math.isfinite(y1), (
                 f"Connection {idx} start ({x1}, {y1}) not finite"
             )

@@ -46,8 +46,16 @@ def sym_dims(name: str) -> tuple[float, float, float]:
 
 
 def sym_h_pins(name: str, x: float, y: float) -> dict[str, tuple[float, float]]:
-    """Get horizontal pin positions {left: (x,y), right: (x,y)} from catalog."""
+    """Get horizontal pin positions {left: (x,y), right: (x,y)} from catalog.
+
+    Prefers explicit h_pins (rotation=90° specific) if defined in the catalog.
+    Falls back to standard left/right pins for backward compatibility.
+    """
     comp = _comp_def(name)
+    # Prefer rotation=90° specific pins
+    if comp.h_pins:
+        return {k: (x + p.x, y + p.y) for k, p in comp.h_pins.items()}
+    # Fallback: use standard left/right pins
     result = {}
     if "left" in comp.pins:
         p = comp.pins["left"]
@@ -72,18 +80,8 @@ def sym_v_pins(name: str, x: float, y: float) -> dict[str, tuple[float, float]]:
 
 
 # ---------------------------------------------------------------------------
-# Port-based connection helpers (dual-write: port_connections + legacy lists)
+# Port-based connection helpers
 # ---------------------------------------------------------------------------
-
-_STYLE_TO_LIST = {
-    "normal": "connections",
-    "thick": "thick_connections",
-    "dashed": "dashed_connections",
-    "short_dashed": "short_dashed_connections",
-    "fixed": "fixed_connections",
-    "thick_fixed": "thick_fixed_connections",
-    "leader": "leader_connections",
-}
 
 
 def connect_ports(
@@ -94,15 +92,12 @@ def connect_ports(
     to_port: str,
     style: str = "normal",
 ) -> None:
-    """Connect two component ports. Dual-writes to port_connections and legacy list."""
+    """Connect two component ports via port_connections."""
     result.port_connections.append(PortConnection(
         from_id=from_comp.id, from_port=from_port,
         to_id=to_comp.id, to_port=to_port,
         style=style,
     ))
-    start = from_comp.ports.get(from_port, (0, 0))
-    end = to_comp.ports.get(to_port, (0, 0))
-    getattr(result, _STYLE_TO_LIST[style]).append((start, end))
 
 
 def connect_port_to_point(
@@ -120,18 +115,13 @@ def connect_port_to_point(
             from_id=comp.id, from_port=port,
             to_xy=point, style=style,
         )
-        start = comp.ports.get(port, (0, 0))
-        end = point
     else:
         pc = PortConnection(
             from_xy=point,
             to_id=comp.id, to_port=port,
             style=style,
         )
-        start = point
-        end = comp.ports.get(port, (0, 0))
     result.port_connections.append(pc)
-    getattr(result, _STYLE_TO_LIST[style]).append((start, end))
 
 
 def connect_points(
@@ -140,11 +130,10 @@ def connect_points(
     end: tuple[float, float],
     style: str = "normal",
 ) -> None:
-    """Connect two anonymous points (backward-compatible wrapper)."""
+    """Connect two anonymous points."""
     result.port_connections.append(PortConnection(
         from_xy=start, to_xy=end, style=style,
     ))
-    getattr(result, _STYLE_TO_LIST[style]).append((start, end))
 
 
 class Section(ABC):
@@ -153,7 +142,7 @@ class Section(ABC):
     Subclasses implement place() which:
     - Reads ctx fields for configuration
     - Appends PlacedComponents to ctx.result.components
-    - Appends connections to ctx.result.connections
+    - Appends connections to ctx.result.port_connections
     - Advances ctx.y past the section's extent
 
     The execute() method wraps place() with automatic sections_rendered tracking.

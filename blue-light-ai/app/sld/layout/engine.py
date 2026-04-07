@@ -624,13 +624,9 @@ def _collect_content_extents(
     for jx, jy, jdir in result.junction_arrows:
         all_xs.append(jx)
         all_ys.append(jy)
-    for collection in (result.connections, result.dashed_connections,
-                       result.short_dashed_connections,
-                       result.thick_connections, result.fixed_connections,
-                       result.leader_connections):
-        for (sx, sy), (ex, ey) in collection:
-            all_xs.extend([sx, ex])
-            all_ys.extend([sy, ey])
+    for (sx, sy), (ex, ey) in result.resolved_connections():
+        all_xs.extend([sx, ex])
+        all_ys.extend([sy, ey])
     for x1, y1, x2, y2 in result.solid_boxes:
         all_xs.extend([x1, x2])
         all_ys.extend([y1, y2])
@@ -654,20 +650,6 @@ def _apply_vertical_shift(result: LayoutResult, shift: float) -> None:
             comp.ports = {
                 name: (px, py + shift) for name, (px, py) in comp.ports.items()
             }
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.connections):
-        result.connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.dashed_connections):
-        result.dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.short_dashed_connections):
-        result.short_dashed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_connections):
-        result.thick_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.fixed_connections):
-        result.fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.thick_fixed_connections):
-        result.thick_fixed_connections[i] = ((sx, sy + shift), (ex, ey + shift))
-    for i, ((sx, sy), (ex, ey)) in enumerate(result.leader_connections):
-        result.leader_connections[i] = ((sx, sy + shift), (ex, ey + shift))
     # Shift anonymous endpoints in port_connections
     for pc in result.port_connections:
         if pc.from_xy:
@@ -1221,13 +1203,7 @@ def _parse_board_requirements(
 def _merge_layout_into(target: "LayoutResult", source: "LayoutResult") -> None:
     """Append all elements from source into target (no coordinate transform)."""
     target.components.extend(source.components)
-    target.connections.extend(source.connections)
-    target.thick_connections.extend(source.thick_connections)
-    target.dashed_connections.extend(source.dashed_connections)
-    target.short_dashed_connections.extend(source.short_dashed_connections)
-    target.fixed_connections.extend(source.fixed_connections)
-    target.thick_fixed_connections.extend(source.thick_fixed_connections)
-    target.leader_connections.extend(source.leader_connections)
+    target.port_connections.extend(source.port_connections)
     target.junction_dots.extend(source.junction_dots)
     target.junction_arrows.extend(source.junction_arrows)
     target.solid_boxes.extend(source.solid_boxes)

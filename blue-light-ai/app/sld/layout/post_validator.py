@@ -143,15 +143,13 @@ def _check_busbar_connections(result, config) -> list[ValidationIssue]:
             continue
 
         has_busbar_conn = False
-        for conn in result.connections:
-            cx = conn[0][0]
+        for (sx, sy), (ex, ey) in result.resolved_connections(style_filter={"normal"}):
             # 이 tap 근처의 수직 연결인지?
-            if abs(cx - tap_x) > _TOL:
+            if abs(sx - tap_x) > _TOL:
                 continue
-            if abs(conn[0][0] - conn[1][0]) > 1.0:  # 수직 아님
+            if abs(sx - ex) > 1.0:  # 수직 아님
                 continue
             # start 또는 end가 busbar에 닿는지?
-            sy, ey = conn[0][1], conn[1][1]
             if any(abs(sy - by) < _TOL or abs(ey - by) < _TOL for by in busbar_ys):
                 has_busbar_conn = True
                 break
@@ -177,10 +175,11 @@ def _check_spare_connections(result, config) -> list[ValidationIssue]:
         if comp.symbol_name == "CB_SPARE":
             spare_xs.add(round(comp.x + 1.0, 1))  # approximate center
 
+    _normal_conns = result.resolved_connections(style_filter={"normal"})
     for sx in spare_xs:
         has_conn = any(
-            abs(conn[0][0] - sx) < 3.0 or abs(conn[1][0] - sx) < 3.0
-            for conn in result.connections
+            abs(s[0] - sx) < 3.0 or abs(e[0] - sx) < 3.0
+            for s, e in _normal_conns
         )
         if not has_conn:
             issues.append(ValidationIssue(

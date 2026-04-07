@@ -10,7 +10,7 @@ Tests cover:
 import pytest
 
 from app.sld.layout.engine import _center_vertically, _validate_and_correct, compute_layout
-from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
+from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent, PortConnection
 
 
 # =============================================
@@ -25,7 +25,7 @@ class TestCenterVertically:
         result = LayoutResult()
         result.components.append(PlacedComponent(symbol_name="BOTTOM", x=100, y=min_y))
         result.components.append(PlacedComponent(symbol_name="TOP", x=100, y=max_y))
-        result.connections.append(((100, min_y), (100, max_y)))
+        result.port_connections.append(PortConnection(from_xy=(100, min_y), to_xy=(100, max_y)))
         result.junction_dots.append((100, min_y))
         result.busbar_y = (min_y + max_y) / 2
         result.busbar_y_per_row = [result.busbar_y]
@@ -54,7 +54,8 @@ class TestCenterVertically:
         config = LayoutConfig()
         _center_vertically(result, config)
         # Connection Y values should match component shift
-        (_, sy), (_, ey) = result.connections[0]
+        conns = result.resolved_connections(style_filter={"normal"})
+        (_, sy), (_, ey) = conns[0]
         assert sy == result.components[0].y
         assert ey == result.components[1].y
 
@@ -103,14 +104,15 @@ class TestCenterVertically:
         result = LayoutResult()
         result.components.append(PlacedComponent(symbol_name="A", x=100, y=70))
         result.components.append(PlacedComponent(symbol_name="B", x=100, y=120))
-        result.dashed_connections.append(((100, 70), (100, 120)))
+        result.port_connections.append(PortConnection(from_xy=(100, 70), to_xy=(100, 120), style="dashed"))
         result.busbar_y = 95
         result.busbar_y_per_row = [95]
         result.db_box_start_y = 70
         result.db_box_end_y = 120
         config = LayoutConfig()
         _center_vertically(result, config)
-        (_, sy), (_, ey) = result.dashed_connections[0]
+        conns = result.resolved_connections(style_filter={"dashed"})
+        (_, sy), (_, ey) = conns[0]
         assert sy == result.components[0].y
         assert ey == result.components[1].y
 
@@ -118,14 +120,15 @@ class TestCenterVertically:
         result = LayoutResult()
         result.components.append(PlacedComponent(symbol_name="A", x=100, y=70))
         result.components.append(PlacedComponent(symbol_name="B", x=100, y=120))
-        result.thick_connections.append(((100, 70), (100, 120)))
+        result.port_connections.append(PortConnection(from_xy=(100, 70), to_xy=(100, 120), style="thick"))
         result.busbar_y = 95
         result.busbar_y_per_row = [95]
         result.db_box_start_y = 70
         result.db_box_end_y = 120
         config = LayoutConfig()
         _center_vertically(result, config)
-        (_, sy), (_, ey) = result.thick_connections[0]
+        conns = result.resolved_connections(style_filter={"thick"})
+        (_, sy), (_, ey) = conns[0]
         assert sy == result.components[0].y
         assert ey == result.components[1].y
 
@@ -260,7 +263,7 @@ class TestComputeLayout:
 
     def test_has_connections(self):
         result = compute_layout(self._minimal_requirements(), skip_validation=True)
-        assert len(result.connections) > 0
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0
 
     def test_busbar_set(self):
         result = compute_layout(self._minimal_requirements(), skip_validation=True)

@@ -11,7 +11,7 @@ Tests cover:
 
 import pytest
 
-from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
+from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent, PortConnection
 from app.sld.layout.overlap import (
     SubCircuitGroup,
     _compute_group_width,
@@ -111,8 +111,8 @@ def _make_simple_layout(num_circuits: int = 3, spacing: float = 26.0) -> LayoutR
         ))
 
         # Connections: busbar→breaker, breaker→tail
-        result.connections.append(((tap_x, busbar_y), (tap_x, breaker_y)))
-        result.connections.append(((tap_x, breaker_y + 16), (tap_x, breaker_y + 30)))
+        result.port_connections.append(PortConnection(from_xy=(tap_x, busbar_y), to_xy=(tap_x, breaker_y)))
+        result.port_connections.append(PortConnection(from_xy=(tap_x, breaker_y + 16), to_xy=(tap_x, breaker_y + 30)))
 
         # Junction dot at busbar
         result.junction_dots.append((tap_x, busbar_y))
@@ -264,9 +264,9 @@ class TestRebuildFromPositions:
             _make_circuit_id_box(100, 203.5, "L1P1"),
             _make_label(100, 230, "LIGHTS"),
         ]
-        result.connections = [
-            ((100, 200), (100, 212)),
-            ((100, 228), (100, 238)),
+        result.port_connections = [
+            PortConnection(from_xy=(100, 200), to_xy=(100, 212)),
+            PortConnection(from_xy=(100, 228), to_xy=(100, 238)),
         ]
         result.junction_dots = [(100, 200)]
 
@@ -275,7 +275,7 @@ class TestRebuildFromPositions:
             breaker_idx=0,
             circuit_id_idx=1,
             name_label_idx=2,
-            connection_indices=[0, 1],
+            port_connection_indices=[0, 1],
             junction_dot_idx=0,
         )
 
@@ -288,9 +288,11 @@ class TestRebuildFromPositions:
         assert result.components[1].x == 150.0
         # LABEL set to absolute tap_x
         assert result.components[2].x == 150.0
-        # Connections updated
-        assert result.connections[0][0][0] == 150.0
-        assert result.connections[0][1][0] == 150.0
+        # Port connections anonymous endpoints updated
+        pc0 = result.port_connections[0]
+        s, e = result.resolve_port_connection(pc0)
+        assert abs(s[0] - 150.0) < 0.01
+        assert abs(e[0] - 150.0) < 0.01
         # Junction dot updated
         assert result.junction_dots[0][0] == 150.0
 
@@ -389,9 +391,9 @@ class TestResolveOverlaps:
         """All connections survive (new ones may be added)."""
         result = _make_simple_layout(6)
         config = _make_config()
-        initial_count = len(result.connections)
+        initial_count = len(result.port_connections)
         resolve_overlaps(result, config)
-        assert len(result.connections) >= initial_count
+        assert len(result.port_connections) >= initial_count
 
     def test_busbar_covers_all_circuits(self):
         """Busbar extends to cover all sub-circuit tap points."""
@@ -468,10 +470,10 @@ class TestC3IndexInvariant:
     def test_connection_count_preserved(self):
         """resolve_overlaps must not add or remove connections."""
         result = _make_simple_layout(6, spacing=15)
-        count_before = len(result.connections)
+        count_before = len(result.port_connections)
         config = _make_config()
         resolve_overlaps(result, config)
-        assert len(result.connections) == count_before
+        assert len(result.port_connections) == count_before
 
     def test_junction_dot_count_preserved(self):
         """resolve_overlaps must not add or remove junction dots."""

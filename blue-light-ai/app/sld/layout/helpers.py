@@ -759,6 +759,16 @@ def _parse_circuit_data(circuit: dict, supply_type: str) -> dict:
             "cores": circuit.get("cable_cores", "2C").replace("C", ""),
             "method": circuit.get("wiring_method", ""),
         }
+    # Auto-determine cable from breaker rating if not provided
+    if not sc_cable_raw and sc_breaker_rating:
+        from app.sld.sld_spec import lookup_outgoing_cable_spec
+        try:
+            sc_cable_raw = lookup_outgoing_cable_spec(
+                sc_breaker_rating, poles=sc_poles,
+                method=circuit.get("wiring_method", ""),
+            )
+        except ValueError:
+            pass  # Rating out of range — leave cable empty
     sc_cable = format_cable_spec(sc_cable_raw)
 
     # Load current
@@ -883,7 +893,10 @@ def _place_sub_circuits_upward(
         # Parse circuit data
         cd = _parse_circuit_data(circuit, supply_type)
         cd["name"] = cd["name"] or f"DB-{global_idx + 1}"
-        sc_cb_w, sc_cb_h = _get_breaker_dimensions(cd["breaker_type"], config)
+        # ISOLATOR circuits render as MCB symbol per LEW reference — use MCB dimensions
+        _is_isol = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
+        _dim_type = "MCB" if _is_isol else cd["breaker_type"]
+        sc_cb_w, sc_cb_h = _get_breaker_dimensions(_dim_type, config)
 
         # Vertical line from busbar to breaker (port-based, after breaker placement)
         sc_y = busbar_y + config.busbar_to_breaker_gap
@@ -891,11 +904,11 @@ def _place_sub_circuits_upward(
         # Place breaker (SPARE circuits: no breaker symbol, just stub line)
         _breaker_x = tap_x - sc_cb_w / 2
         _breaker_id = ctx.next_id(f"sc_{cd['breaker_type'].lower()}") if ctx else ""
-        # Compute ports from catalog
+        # Compute ports from catalog — ISOLATOR uses MCB catalog for positioning
         _breaker_ports: dict[str, tuple[float, float]] = {}
         if _breaker_id:
             from app.sld.catalog import get_catalog as _gc_ports
-            _bdef = _gc_ports().get(cd["breaker_type"]) if _gc_ports().has(cd["breaker_type"]) else _gc_ports().get("MCB")
+            _bdef = _gc_ports().get(_dim_type) if _gc_ports().has(_dim_type) else _gc_ports().get("MCB")
             _breaker_ports = {
                 name: (_breaker_x + pin.x, sc_y + pin.y)
                 for name, pin in _bdef.pins.items()
@@ -914,10 +927,10 @@ def _place_sub_circuits_upward(
                 id=_breaker_id, ports=_breaker_ports,
             ))
         else:
-            # ISOLATOR circuits use ISOLATOR symbol at the busbar tap (□ symbol).
+            # ISOLATOR circuits: use MCB symbol (arc) at the busbar tap per LEW reference.
             # The DP ISOL device box is added separately at the conductor top.
             _is_isol = cd.get("_is_isolator_load") or cd["breaker_type"] == "ISOLATOR"
-            _symbol_name = "ISOLATOR" if _is_isol else f"CB_{cd['breaker_type']}"
+            _symbol_name = "CB_MCB" if _is_isol else f"CB_{cd['breaker_type']}"
             _btype_str = "ISOLATOR" if _is_isol else cd["breaker_type"]
             result.components.append(PlacedComponent(
                 symbol_name=_symbol_name,
@@ -941,8 +954,9 @@ def _place_sub_circuits_upward(
 
         # Conductor tail (extends upward past cable leader line)
         # Use catalog pin("top").y for exit pin offset (= height + stub)
+        # ISOLATOR circuits use MCB symbol — use MCB catalog for geometry
         from app.sld.catalog import get_catalog as _gc_h
-        _sc_comp = _gc_h().get(cd["breaker_type"]) if _gc_h().has(cd["breaker_type"]) else _gc_h().get("MCB")
+        _sc_comp = _gc_h().get(_dim_type) if _gc_h().has(_dim_type) else _gc_h().get("MCB")
         _exit_pin_offset = _sc_comp.pin("top").y  # = height + stub (relative to body bottom)
         breaker_top_y = sc_y + _exit_pin_offset
 

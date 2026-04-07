@@ -714,7 +714,7 @@ class TestConnectionAlignment:
             tap_x = self._get_breaker_tap_x(breaker)
             # There should be at least one connection near this tap_x
             matching = [
-                (s, e) for s, e in result.connections
+                (s, e) for s, e in result.resolved_connections(style_filter={"normal"})
                 if abs(s[0] - tap_x) < self._CONN_TOL or abs(e[0] - tap_x) < self._CONN_TOL
             ]
             assert len(matching) >= 1, (
@@ -730,7 +730,7 @@ class TestConnectionAlignment:
         for breaker in breakers:
             tap_x = self._get_breaker_tap_x(breaker)
             matching = [
-                (s, e) for s, e in result.connections
+                (s, e) for s, e in result.resolved_connections(style_filter={"normal"})
                 if abs(s[0] - tap_x) < self._CONN_TOL or abs(e[0] - tap_x) < self._CONN_TOL
             ]
             assert len(matching) >= 1, (
@@ -764,7 +764,7 @@ class TestConnectionAlignment:
         for label in spare_labels:
             spare_tap_x = label.x  # LABEL placed at tap_x
             matching = [
-                (s, e) for s, e in result.connections
+                (s, e) for s, e in result.resolved_connections(style_filter={"normal"})
                 if abs(s[0] - spare_tap_x) < 0.5 or abs(e[0] - spare_tap_x) < 0.5
             ]
             assert len(matching) >= 1, (
@@ -780,7 +780,7 @@ class TestConnectionAlignment:
         """
         result = compute_layout(DENSE_3PHASE_REQ)
         busbar_y = result.busbar_y
-        for start, end in result.connections:
+        for start, end in result.resolved_connections(style_filter={"normal"}):
             # Identify busbar tap connections (one end at busbar_y)
             if abs(start[1] - busbar_y) < 0.5 or abs(end[1] - busbar_y) < 0.5:
                 # Skip horizontal connections (e.g., earth bar horizontal run)
@@ -811,7 +811,7 @@ class TestConnectionAlignment:
         for breaker in breakers:
             tap_x = self._get_breaker_tap_x(breaker)
             matching = [
-                (s, e) for s, e in result.connections
+                (s, e) for s, e in result.resolved_connections(style_filter={"normal"})
                 if abs(s[0] - tap_x) < self._CONN_TOL or abs(e[0] - tap_x) < self._CONN_TOL
             ]
             if len(matching) >= 1:
@@ -860,12 +860,12 @@ class TestSubCircuitGrouping:
         """Incoming chain connections should not be assigned to any group."""
         result = compute_layout(BASIC_3PHASE_REQ)
         groups, incoming_x = _identify_groups(result)
-        # Collect all connection indices assigned to groups
+        # Collect all port_connection indices assigned to groups
         assigned = set()
         for g in groups:
-            assigned.update(g.connection_indices)
+            assigned.update(g.port_connection_indices)
         # Check that connections at incoming_x are NOT assigned
-        for ci, ((sx, sy), (ex, ey)) in enumerate(result.connections):
+        for ci, ((sx, sy), (ex, ey)) in enumerate(result.resolved_connections(style_filter={"normal"})):
             if abs(sx - incoming_x) < 1.5 and abs(sx - ex) < 0.5:
                 assert ci not in assigned, (
                     f"Connection {ci} at incoming_chain_x={incoming_x} "
@@ -882,7 +882,7 @@ class TestSubCircuitGrouping:
         result = compute_layout(BASIC_3PHASE_REQ)
         groups, _ = _identify_groups(result)
         non_spare = [g for g in groups if not g.is_spare]
-        groups_with_conns = [g for g in non_spare if len(g.connection_indices) >= 1]
+        groups_with_conns = [g for g in non_spare if len(g.port_connection_indices) >= 1]
         # At least half of non-spare groups should have matched connections
         assert len(groups_with_conns) >= len(non_spare) // 2, (
             f"Only {len(groups_with_conns)}/{len(non_spare)} non-spare groups "
@@ -1008,7 +1008,7 @@ class TestRebuildPositions:
         for breaker in breakers:
             tap_x = breaker.x + _breaker_half_width(breaker)
             matching = [
-                (s, e) for s, e in result.connections
+                (s, e) for s, e in result.resolved_connections(style_filter={"normal"})
                 if abs(s[0] - tap_x) < _REBUILD_TOL or abs(e[0] - tap_x) < _REBUILD_TOL
             ]
             assert len(matching) >= 1, (
@@ -1039,7 +1039,7 @@ class TestRebuildPositions:
         if incoming_x > 0:
             # Find connections at incoming_x
             incoming_conns = [
-                (s, e) for s, e in result.connections
+                (s, e) for s, e in result.resolved_connections(style_filter={"normal"})
                 if abs(s[0] - incoming_x) < 1.0 and abs(s[0] - e[0]) < 0.5
             ]
             # They should all still be at incoming_x

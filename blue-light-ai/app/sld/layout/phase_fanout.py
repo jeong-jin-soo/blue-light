@@ -154,8 +154,6 @@ def _add_phase_fanout(
     # Reference: 63A TPN SLD 14 → dy/dx = 193/727 ≈ 0.266
     _FAN_RATIO = 0.266
 
-    connections = layout_result.connections
-
     for row_idx in sorted(rows.keys()):
         all_circuits = rows[row_idx]
 
@@ -188,14 +186,7 @@ def _add_phase_fanout(
                 fan_h = spacing * _FAN_RATIO
                 intermediate_y = by + fan_h
 
-                # Modify side vertical connections: start from intermediate_y
-                # (original starts from busbar_y — truncate to start from fan-out tip)
-                for ci in s_g.connection_indices:
-                    (sx, sy), (ex, ey) = connections[ci]
-                    if abs(sy - by) < 1.0 and abs(sx - ex) < 0.5:
-                        connections[ci] = ((sx, intermediate_y), (ex, ey))
-
-                # Also update port_connections (generator reads from these)
+                # Update port_connections: truncate busbar-start to fan-out tip Y
                 _side_x = s_g.tap_x
                 for pc in layout_result.port_connections:
                     if pc.from_xy and pc.to_xy:

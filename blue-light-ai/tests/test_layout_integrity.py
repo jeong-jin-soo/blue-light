@@ -156,7 +156,7 @@ def _snap_pt(pt: tuple[float, float]) -> tuple[float, float]:
 def _build_adjacency(result: LayoutResult) -> dict[tuple, set[tuple]]:
     """Build adjacency map: snapped point → set of connected snapped points."""
     adj: dict[tuple, set[tuple]] = {}
-    all_conns = list(result.connections) + list(result.dashed_connections)
+    all_conns = result.resolved_connections(style_filter={"normal", "dashed"})
     for (start, end) in all_conns:
         s, e = _snap_pt(start), _snap_pt(end)
         adj.setdefault(s, set()).add(e)
@@ -212,11 +212,11 @@ class TestConnectionIntegrity:
 
     def test_connections_not_empty(self, layout_result: LayoutResult):
         """Every SLD case must produce at least one connection."""
-        assert len(layout_result.connections) > 0, "No connections in layout"
+        assert len(layout_result.resolved_connections(style_filter={"normal"})) > 0, "No connections in layout"
 
     def test_all_connections_nonzero_length(self, layout_result: LayoutResult):
         """Every connection segment must have non-zero length (start ≠ end)."""
-        for i, (start, end) in enumerate(layout_result.connections):
+        for i, (start, end) in enumerate(layout_result.resolved_connections(style_filter={"normal"})):
             dx = abs(start[0] - end[0])
             dy = abs(start[1] - end[1])
             length = (dx**2 + dy**2) ** 0.5
@@ -233,7 +233,7 @@ class TestConnectionIntegrity:
         """
         seen: set[tuple] = set()
         dups = 0
-        for (start, end) in layout_result.connections:
+        for (start, end) in layout_result.resolved_connections(style_filter={"normal"}):
             key = (_snap_pt(start), _snap_pt(end))
             rev_key = (_snap_pt(end), _snap_pt(start))
             if key in seen or rev_key in seen:
@@ -271,7 +271,7 @@ class TestConnectionIntegrity:
         in SLD drawings are always axis-aligned except for tick marks
         and 3-phase fan-out diagonals (dy≈7.0mm from busbar to intermediate).
         """
-        for i, (start, end) in enumerate(layout_result.connections):
+        for i, (start, end) in enumerate(layout_result.resolved_connections(style_filter={"normal"})):
             dx = abs(start[0] - end[0])
             dy = abs(start[1] - end[1])
             # Allow pure horizontal, pure vertical, or short diagonals (tick marks)
@@ -501,7 +501,7 @@ def test_meter_board_has_tick_marks(requirements: dict):
 
     tick_marks = []
     # Check both regular and thick connections (outgoing tick uses thick_connections)
-    all_conns = list(result.connections) + list(result.thick_connections)
+    all_conns = result.resolved_connections(style_filter={"normal", "thick"})
     for c in all_conns:
         p1, p2 = c
         dx = abs(p2[0] - p1[0])

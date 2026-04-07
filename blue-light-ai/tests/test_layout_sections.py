@@ -378,7 +378,7 @@ class TestPlaceMeterBoard:
         )
         _place_meter_board(ctx)
         # Dashed box = 4 dashed connections
-        assert len(ctx.result.dashed_connections) == 4
+        assert len(ctx.result.resolved_connections(style_filter={"dashed"})) == 4
 
     def test_y_advances(self):
         ctx = _make_context(
@@ -540,9 +540,9 @@ class TestPlaceMainBreaker:
             breaker_poles="TPN", breaker_fault_kA=25,
             main_breaker_char="",
         )
-        initial_conns = len(ctx.result.connections)
+        initial_conns = len(ctx.result.resolved_connections(style_filter={"normal"}))
         _place_main_breaker(ctx)
-        assert len(ctx.result.connections) > initial_conns
+        assert len(ctx.result.resolved_connections(style_filter={"normal"})) > initial_conns
 
 
 # =============================================
@@ -672,10 +672,10 @@ class TestPlaceSubCircuitsRows:
 
     def test_connections_added(self):
         ctx = self._setup_ctx(3)
-        initial_conns = len(ctx.result.connections)
+        initial_conns = len(ctx.result.resolved_connections(style_filter={"normal"}))
         _place_sub_circuits_rows(ctx)
         # Each circuit adds at least 2 connections (busbar→breaker, breaker→tail)
-        assert len(ctx.result.connections) >= initial_conns + 6
+        assert len(ctx.result.resolved_connections(style_filter={"normal"})) >= initial_conns + 6
 
     def test_busbar_y_per_row_populated(self):
         ctx = self._setup_ctx(3)
@@ -717,7 +717,7 @@ class TestPlaceDbBox:
         ctx = self._setup_ctx()
         _place_db_box(ctx, busbar_y_row=200)
         # 4 dashed connections for box sides
-        assert len(ctx.result.dashed_connections) == 4
+        assert len(ctx.result.resolved_connections(style_filter={"dashed"})) == 4
 
     def test_db_box_indices_stored(self):
         ctx = self._setup_ctx()
@@ -772,7 +772,7 @@ class TestPlaceEarthBar:
         ctx.result.busbar_y = 200
         _place_earth_bar(ctx, db_box_right=300)
         # Should add horizontal connection from DB box right wall
-        assert len(ctx.result.connections) >= 1
+        assert len(ctx.result.resolved_connections(style_filter={"normal"})) >= 1
 
 
 # =============================================
@@ -810,7 +810,7 @@ class TestFullPlacementPipeline:
 
         # Structural checks
         assert len(ctx.result.components) > 0
-        assert len(ctx.result.connections) > 0
+        assert len(ctx.result.resolved_connections(style_filter={"normal"})) > 0
         assert ctx.result.busbar_y > 0
         assert ctx.result.busbar_start_x < ctx.result.busbar_end_x
         assert "MCCB" in ctx.result.symbols_used

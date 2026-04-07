@@ -113,8 +113,9 @@ class TestConnectionContinuity:
     @pytest.mark.parametrize("config_id", list(ALL_CONFIGS.keys()))
     def test_has_connections(self, config_id):
         result = get_layout(config_id)
-        total_conns = (len(result.connections) + len(result.thick_connections) +
-                      len(result.fixed_connections))
+        total_conns = (len(result.resolved_connections(style_filter={"normal"})) +
+                      len(result.resolved_connections(style_filter={"thick"})) +
+                      len(result.resolved_connections(style_filter={"fixed"})))
         assert total_conns > 0, \
             f"[{config_id}] No connections found in layout"
 
@@ -123,7 +124,7 @@ class TestConnectionContinuity:
         """연결 수는 컴포넌트 수의 최소 절반."""
         result = get_layout(config_id)
         n_comps = len(result.components)
-        n_conns = len(result.connections) + len(result.thick_connections)
+        n_conns = len(result.resolved_connections(style_filter={"normal"})) + len(result.resolved_connections(style_filter={"thick"}))
         if n_comps < 3:
             return
         # 대략 component 수의 절반 이상의 연결이 있어야 함

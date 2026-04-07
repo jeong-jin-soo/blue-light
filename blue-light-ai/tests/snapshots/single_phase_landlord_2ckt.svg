@@ -64,8 +64,8 @@
   <text x="230.60" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,230.60,81.59)">1 NO. POWER</text>
   <text x="184.00" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,184.00,81.59)">2C 1.5sqmm PVC/PVC</text>
   <text x="219.20" y="82.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,219.20,81.59)">2C 4.0sqmm PVC/PVC</text>
-  <text x="177.90" y="166.87" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#000000">40A DB</text>
-  <text x="177.90" y="169.91" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#000000">APPROVED LOAD: 9 KVA AT 230V</text>
+  <text x="177.90" y="166.87" font-family="Arial, Helvetica, sans-serif" font-size="3.0" fill="#262626">40A DB</text>
+  <text x="177.90" y="169.91" font-family="Arial, Helvetica, sans-serif" font-size="1.8" fill="#262626">APPROVED LOAD: 9 KVA AT 230V</text>
   <text x="177.90" y="179.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000">(LOCATED INSIDE UNIT)</text>
   <line x1="244.29" y1="175.47" x2="244.29" y2="177.27" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="242.04" y1="177.27" x2="246.54" y2="177.27" stroke="#000000" stroke-width="0.25" fill="none" />

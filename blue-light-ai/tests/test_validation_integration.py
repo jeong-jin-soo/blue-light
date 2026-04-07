@@ -124,14 +124,14 @@ class TestValidPassthrough:
         result = compute_layout(VALID_SINGLE_PHASE)
         assert isinstance(result, LayoutResult)
         assert len(result.components) > 0
-        assert len(result.connections) > 0
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0
 
     def test_valid_three_phase(self):
         """Valid three-phase requirements should produce a layout without errors."""
         result = compute_layout(VALID_THREE_PHASE)
         assert isinstance(result, LayoutResult)
         assert len(result.components) > 0
-        assert len(result.connections) > 0
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0
 
     def test_valid_with_elcb(self):
         """Valid requirements with ELCB should pass validation."""

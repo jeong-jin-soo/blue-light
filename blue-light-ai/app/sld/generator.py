@@ -47,7 +47,7 @@ from app.sld.layout.engine_v3 import compute_layout_v3
 from app.sld.pdf_backend import PdfBackend
 from app.sld.real_symbols import get_symbol_dimensions
 from app.sld.locale import SG_LOCALE
-from app.sld.page_config import PageConfig
+from app.sld.page_config import A2_LANDSCAPE, A3_LANDSCAPE, PageConfig, auto_page_size
 from app.sld.svg_backend import SvgBackend
 from app.sld.symbol import Symbol, create_symbol
 from app.sld.title_block import TitleBlockConfig, draw_border, draw_title_block_frame, fill_title_block_data
@@ -213,7 +213,15 @@ class SldPipeline:
         page_config: PageConfig | None,
     ) -> SldResult:
         """단일 생성 (레이아웃 + 렌더링). Vision AI 없이."""
+        # Page size: explicit > requirements["page_size"] > A3 default
         pc = page_config
+        if pc is None:
+            ps = str(requirements.get("page_size", "")).upper()
+            if ps == "A2":
+                pc = A2_LANDSCAPE
+            elif ps == "AUTO":
+                pc = auto_page_size(requirements)
+            # else: None → downstream defaults to A3
         tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
 
         # ❶~❺ Layout — single-DB는 v3 (region 기반), multi-DB는 v2
@@ -458,7 +466,7 @@ class SldPipeline:
         All positions and sizes come from PlacedComponent fields set by the layout
         engine — the renderer adds NO offsets of its own.
         """
-        backend.set_layer("SLD_ANNOTATIONS")
+        backend.set_layer("SLD_DB_TEXT")
         backend.add_mtext(comp.label, insert=(comp.x, comp.y), char_height=comp.title_char_height)
         if comp.rating:
             backend.add_mtext(comp.rating,
@@ -842,14 +850,21 @@ class SldPipeline:
         backend.set_layer("SLD_CONNECTIONS")
         _THICK_STYLES = {"thick", "thick_fixed"}
 
+        total = 0
+        skipped = 0
         for pc in layout_result.port_connections:
             if pc.style in ("dashed", "short_dashed"):
                 continue  # Drawn by _draw_dashed_connections
+            total += 1
             start, end = layout_result.resolve_port_connection(pc)
             if start is None or end is None:
+                skipped += 1
                 continue
             kwargs = {"lineweight": 50} if pc.style in _THICK_STYLES else {}
             backend.add_line(start, end, **kwargs)
+
+        if skipped:
+            logger.warning("Connections: drawn=%d, skipped=%d / total=%d", total - skipped, skipped, total)
 
     def _draw_fanout_groups(
         self, backend: DrawingBackend, layout_result: LayoutResult,

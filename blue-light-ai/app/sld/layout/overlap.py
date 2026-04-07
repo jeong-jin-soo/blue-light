@@ -10,7 +10,7 @@ pipeline **per row** of sub-circuits:
   Step 1: _identify_groups(layout_result)
     INPUT:  LayoutResult with all components/connections placed
     OUTPUT: list[SubCircuitGroup] with tap_x, breaker_idx, circuit_id_idx,
-            name_label_idx, connection_indices, junction_dot_idx set
+            name_label_idx, port_connection_indices, junction_dot_idx set
     DEPS:   Requires spine_x set by compute_layout()
             Requires busbar_y_per_row for multi-row Y-proximity filtering
     INVARIANT: groups sorted by (row_idx, tap_x) ascending
@@ -62,7 +62,7 @@ from collections import OrderedDict
 from dataclasses import dataclass, field
 
 from app.sld.layout.font_util import measure_mtext_size, measure_text_width
-from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent
+from app.sld.layout.models import LayoutConfig, LayoutResult, PlacedComponent, PortConnection
 from app.sld.locale import SG_LOCALE
 
 logger = logging.getLogger(__name__)
@@ -257,7 +257,6 @@ class SubCircuitGroup:
     circuit_id_idx: int | None = None    # CIRCUIT_ID_BOX index
     name_label_idx: int | None = None    # Vertical circuit name LABEL index
     spare_label_idx: int | None = None   # SPARE label index (if spare circuit)
-    connection_indices: list[int] = field(default_factory=list)  # Indices in connections list
     port_connection_indices: list[int] = field(default_factory=list)  # Indices in port_connections list
     junction_dot_idx: int | None = None   # Index in junction_dots list
     arrow_point_idx: int | None = None    # Index in arrow_points list
@@ -269,6 +268,7 @@ class SubCircuitGroup:
     gap_before: float = 0.0              # Extra gap (mm) before this group (category break)
     row_idx: int = 0                     # Row index (0-based, for multi-row layouts)
     row_busbar_y: float = 0.0            # Busbar Y of this circuit's row
+    body_width: float = 0.0              # Breaker symbol body width (mm) for center normalization
 
 
 # Map symbol_name → real_symbol_paths.json key for pin half-width lookup.
@@ -432,7 +432,7 @@ def _detect_incoming_chain_x(
         incoming_chain_x = layout_result.spine_x
     else:
         vert_conn_x_count: dict[float, int] = {}
-        for (sx, sy), (ex, ey) in layout_result.connections:
+        for (sx, sy), (ex, ey) in layout_result.resolved_connections(style_filter={"normal"}):
             if abs(sx - ex) < 0.5:
                 x_val = round(sx, 1)
                 vert_conn_x_count[x_val] = vert_conn_x_count.get(x_val, 0) + 1
@@ -455,7 +455,7 @@ def _detect_incoming_chain_x(
     # Transition validation
     if layout_result.spine_x > 0 and incoming_chain_x > 0:
         _histo_count: dict[float, int] = {}
-        for (sx, sy), (ex, ey) in layout_result.connections:
+        for (sx, sy), (ex, ey) in layout_result.resolved_connections(style_filter={"normal"}):
             if abs(sx - ex) < 0.5:
                 x_val = round(sx, 1)
                 _histo_count[x_val] = _histo_count.get(x_val, 0) + 1
@@ -484,10 +484,9 @@ def _match_elements_to_groups(
     """Match CIRCUIT_ID_BOX, LABELs, connections, dots, and arrows to groups.
 
     Mutates groups in-place, setting circuit_id_idx, name_label_idx,
-    connection_indices, junction_dot_idx, arrow_point_idx, and is_spare.
+    port_connection_indices, junction_dot_idx, arrow_point_idx, and is_spare.
     """
     components = layout_result.components
-    connections = layout_result.connections
     _TOL = 1.5
     main_busbar_y = layout_result.busbar_y
 
@@ -520,24 +519,6 @@ def _match_elements_to_groups(
                     if abs(comp.y - breaker_y) > _Y_TOL + 30:
                         continue
                 g.name_label_idx = i
-                break
-
-    # Match vertical connections (exclude incoming chain and out-of-zone)
-    for ci, ((sx, sy), (ex, ey)) in enumerate(connections):
-        if abs(sx - ex) > 0.5:
-            continue
-        conn_x = sx
-        if abs(conn_x - incoming_chain_x) < _TOL:
-            continue
-        conn_max_y = max(sy, ey)
-        conn_min_y = min(sy, ey)
-        if conn_max_y < main_busbar_y - 5 or conn_min_y > main_busbar_y + 60:
-            continue
-        for g in groups:
-            if abs(conn_x - g.tap_x) < _TOL:
-                if abs(conn_min_y - g.row_busbar_y) > _Y_TOL:
-                    continue
-                g.connection_indices.append(ci)
                 break
 
     # Match port_connections to groups (same zone/proximity rules as legacy connections).
@@ -713,6 +694,13 @@ def _compute_group_width(
 
     if group.breaker_idx is not None:
         comp = components[group.breaker_idx]
+        # Record body width for center normalization in 3-phase layouts
+        from app.sld.catalog import get_catalog
+        _cat = get_catalog()
+        _sym_key = comp.symbol_name.replace("CB_", "")
+        _comp_def = _cat.get(_sym_key) if _sym_key != "SPARE" else None
+        group.body_width = _comp_def.width if _comp_def else 5.0
+
         bb = _compute_bounding_box(comp, config=config)
         if bb is not None:
             tap_x = group.tap_x
@@ -968,7 +956,6 @@ def _rebuild_from_positions(
     double-move bugs entirely.
     """
     components = layout_result.components
-    connections = layout_result.connections
 
     for group, new_tap_x in zip(groups, new_tap_xs):
         delta_x = new_tap_x - group.tap_x
@@ -999,11 +986,6 @@ def _rebuild_from_positions(
             components[group.spare_label_idx].x = new_tap_x
             _shift_ports_x(components[group.spare_label_idx], _dx)
 
-        # Connections: set both endpoints x to new_tap_x (vertical wires)
-        for conn_idx in group.connection_indices:
-            (sx, sy), (ex, ey) = connections[conn_idx]
-            connections[conn_idx] = ((new_tap_x, sy), (new_tap_x, ey))
-
         # Port connections: shift only group-owned anonymous endpoints.
         # Previous code did a full scan of ALL port_connections with X-proximity
         # matching, which caused false matches (e.g., CT metering connections at
@@ -1019,6 +1001,24 @@ def _rebuild_from_positions(
                 tx, ty = pc.to_xy
                 if abs(tx - _old_tap) < 0.5:
                     pc.to_xy = (new_tap_x, ty)
+
+        # Sync anonymous endpoints for mixed port_connections.
+        # When a PC has one named endpoint (from_id/to_id) referencing this
+        # group's breaker AND one anonymous endpoint (from_xy/to_xy), the
+        # named endpoint auto-follows component.ports but the anonymous
+        # endpoint may not have been matched to group.port_connection_indices
+        # (e.g., Y outside zone filter). Shift it here to prevent diagonals.
+        _breaker_id = components[group.breaker_idx].id if group.breaker_idx is not None else ""
+        if _breaker_id:
+            for pc in layout_result.port_connections:
+                if pc.to_id == _breaker_id and pc.from_xy:
+                    fx, fy = pc.from_xy
+                    if abs(fx - _old_tap) < 1.0:
+                        pc.from_xy = (new_tap_x, fy)
+                if pc.from_id == _breaker_id and pc.to_xy:
+                    tx, ty = pc.to_xy
+                    if abs(tx - _old_tap) < 1.0:
+                        pc.to_xy = (new_tap_x, ty)
 
         # Junction dot: set x to new_tap_x (busbar tap dot)
         if group.junction_dot_idx is not None:
@@ -1123,13 +1123,13 @@ def _fit_busbar_to_groups(
     if layout_result.db_box_dashed_indices:
         sy = layout_result.db_box_start_y
         ey = layout_result.db_box_end_y
-        dc = layout_result.dashed_connections
+        pc = layout_result.port_connections
         idx = layout_result.db_box_dashed_indices
         # bottom horizontal, top horizontal, left vertical, right vertical
-        dc[idx[0]] = ((new_db_left, sy), (new_db_right, sy))
-        dc[idx[1]] = ((new_db_left, ey), (new_db_right, ey))
-        dc[idx[2]] = ((new_db_left, sy), (new_db_left, ey))
-        dc[idx[3]] = ((new_db_right, sy), (new_db_right, ey))
+        pc[idx[0]] = PortConnection(from_xy=(new_db_left, sy), to_xy=(new_db_right, sy), style="dashed")
+        pc[idx[1]] = PortConnection(from_xy=(new_db_left, ey), to_xy=(new_db_right, ey), style="dashed")
+        pc[idx[2]] = PortConnection(from_xy=(new_db_left, sy), to_xy=(new_db_left, ey), style="dashed")
+        pc[idx[3]] = PortConnection(from_xy=(new_db_right, sy), to_xy=(new_db_right, ey), style="dashed")
 
     # Update DB_INFO_BOX position to match new DB box left
     for comp in components:
@@ -1193,9 +1193,11 @@ def _add_isolator_device_symbols(
         # In helpers.py, conductor_top_y = tail_end_y + _ISOL_DEVICE_BOX_H
         # The conductor line ends at tail_end_y (= conductor_top_y - _BOX_SIZE)
         conductor_top_y = 0
-        for ci in g.connection_indices:
-            (_, sy), (_, ey) = layout_result.connections[ci]
-            conductor_top_y = max(conductor_top_y, sy, ey)
+        for pci in g.port_connection_indices:
+            pc = layout_result.port_connections[pci]
+            start, end = layout_result.resolve_port_connection(pc)
+            if start and end:
+                conductor_top_y = max(conductor_top_y, start[1], end[1])
 
         if conductor_top_y <= 0:
             continue
@@ -1374,10 +1376,19 @@ def _normalize_row_spacing(
             max_left = max(max_left, 3.0)
             max_right = max(max_right, 3.0)
 
+        # Step 2d: compensate for body width differences.
+        # When ISOLATOR (5.5mm) and MCB (5.0mm) mix in same row, widen
+        # the left_extent of narrower symbols so visual centers align.
+        _body_widths = [g.body_width for g in row_groups if g.body_width > 0]
+        _max_body_w = max(_body_widths) if _body_widths else 0.0
+
         for g in row_groups:
-            g.left_extent = max_left
+            _extra = 0.0
+            if _max_body_w > 0 and g.body_width > 0:
+                _extra = (_max_body_w - g.body_width) / 2
+            g.left_extent = max_left + _extra
             g.right_extent = max_right
-            g.min_width = max_left + max_right
+            g.min_width = g.left_extent + g.right_extent
 
 
 def _update_secondary_busbars(

@@ -765,14 +765,11 @@ def _place_metering_branch(
                 comp_kwargs["no_right_stub"] = True
 
         # Port-based: add id and ports when ctx is available.
-        # Components are placed horizontally (rotation=90°), so compute
-        # ports from actual geometry, not catalog pins (which are vertical).
+        # Uses catalog h_pins for rotation=90° placement.
         if ctx:
+            from app.sld.layout.section_base import sym_h_pins
             comp_kwargs["id"] = ctx.next_id(f"branch_{symbol_name.lower()}")
-            comp_kwargs["ports"] = {
-                "left": (comp_x - stub, branch_y),
-                "right": (comp_x + w + stub, branch_y),
-            }
+            comp_kwargs["ports"] = sym_h_pins(symbol_name, comp_x, branch_y)
 
         _placed = PlacedComponent(
             symbol_name=symbol_name,

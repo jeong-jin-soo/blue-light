@@ -59,6 +59,7 @@ class ComponentDef:
 
     dxf_block: str | None = None
     h_extent: float | None = None   # 수평 배치 시 extent (None → height)
+    h_pins: dict[str, Pin] | None = None   # rotation=90° 전용 핀 (None → left/right 사용)
 
     def pin(self, name: str) -> Pin:
         """핀 조회. KeyError on missing."""
@@ -123,6 +124,8 @@ class ComponentCatalog:
         for name, raw in data.get("components", {}).items():
             pins = {k: Pin(**v) for k, v in raw.get("pins", {}).items()}
             anchors = {k: Pin(**v) for k, v in raw.get("anchors", {}).items()}
+            h_pins_raw = raw.get("h_pins")
+            h_pins = {k: Pin(**v) for k, v in h_pins_raw.items()} if h_pins_raw else None
             components[name] = ComponentDef(
                 name=name,
                 category=raw["category"],
@@ -134,6 +137,7 @@ class ComponentCatalog:
                 render_params=raw.get("render_params", {}),
                 dxf_block=raw.get("dxf_block"),
                 h_extent=raw.get("h_extent"),
+                h_pins=h_pins,
             )
         return cls(components)
 

@@ -176,12 +176,12 @@ class TestBackwardCompat:
 
     def test_single_db_has_connections(self):
         result = compute_layout(THREE_PHASE_6CKT)
-        assert len(result.connections) > 0
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0
 
     def test_single_db_dashed_connections(self):
         """Single-DB still gets a DB box (dashed lines)."""
         result = compute_layout(SINGLE_PHASE_3CKT)
-        assert len(result.dashed_connections) > 0
+        assert len(result.resolved_connections(style_filter={"dashed"})) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -201,12 +201,12 @@ class TestMultiDbLayout:
 
     def test_has_connections(self):
         result = compute_layout(MULTI_DB_2_BOARDS)
-        assert len(result.connections) > 0
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0
 
     def test_has_dashed_connections(self):
         """Multi-DB produces dashed lines for sub-DB boxes."""
         result = compute_layout(MULTI_DB_2_BOARDS)
-        assert len(result.dashed_connections) > 0
+        assert len(result.resolved_connections(style_filter={"dashed"})) > 0
 
     def test_db_box_ranges_populated(self):
         result = compute_layout(MULTI_DB_2_BOARDS)
@@ -335,7 +335,7 @@ class TestMultiDbSubCircuits:
     def test_all_db_busbars_placed(self):
         """Each sub-DB should have its own busbar segment."""
         result = compute_layout(MULTI_DB_2_BOARDS)
-        busbar_connections = [c for c in result.connections
+        busbar_connections = [c for c in result.resolved_connections(style_filter={"normal"})
                               if abs(c[0][1] - c[1][1]) < 0.1  # horizontal lines
                               and abs(c[0][0] - c[1][0]) > 10]  # long enough
         # Should have at least main busbar + 2 sub-DB busbars
@@ -869,7 +869,7 @@ class TestHierarchicalLayout:
         result = compute_layout(MULTI_DB_HIERARCHICAL)
         assert result.db_count == 2
         assert len(result.components) > 0
-        assert len(result.connections) > 0
+        assert len(result.resolved_connections(style_filter={"normal"})) > 0
 
     def test_incoming_under_root_board(self):
         """Incoming supply components (meter, isolator) should be within MSB region."""
