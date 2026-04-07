@@ -1118,7 +1118,7 @@ async def extract_sld_from_text(user_input: str) -> dict:
     # Configure Gemini
     genai.configure(api_key=settings.gemini_api_key)
     model = genai.GenerativeModel(
-        model_name=settings.gemini_model,
+        model_name=settings.gemini_pro_model,
         system_instruction=SLD_EXTRACTION_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",

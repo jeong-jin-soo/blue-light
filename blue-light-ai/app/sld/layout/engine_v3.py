@@ -69,6 +69,13 @@ def compute_layout_v3(
         config.db_width_ratios = requirements["db_width_ratios"]
     if requirements.get("max_circuits_per_row"):
         config.max_circuits_per_row = int(requirements["max_circuits_per_row"])
+    # -- layout_overrides from Vision AI retry loop (Phase C) --
+    _layout_ovr = requirements.get("layout_overrides", {})
+    if _layout_ovr:
+        for _ovr_key, _ovr_val in _layout_ovr.items():
+            if hasattr(config, _ovr_key):
+                setattr(config, _ovr_key, float(_ovr_val))
+        logger.info("Applied layout_overrides: %s", _layout_ovr)
 
     # Component scale
     from app.sld.layout.engine import _auto_component_scale, _expand_layout_for_scale

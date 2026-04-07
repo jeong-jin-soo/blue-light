@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -37,26 +37,55 @@ class MatchedSpacing:
     match_score: float
     circuits_ref: int
 
-    # 적용할 오버라이드
+    # 적용할 오버라이드 — 기존 4개
     horizontal_spacing: float | None = None   # 서브회로 간격 (mm)
     breaker_to_rccb_gap: float | None = None  # 스파인: breaker→RCCB 간격 (mm)
     rccb_to_busbar_gap: float | None = None   # 스파인: RCCB→busbar 간격 (mm)
     isolator_to_breaker_gap: float | None = None  # 스파인: isolator→breaker 간격 (mm, CT only)
 
+    # Phase A 확장 — 5개 추가
+    spine_component_gap: float | None = None      # 스파인 컴포넌트 간 간격 (mm)
+    busbar_to_breaker_gap: float | None = None     # 부스바→서브회로 브레이커 간격 (mm)
+    isolator_to_db_gap: float | None = None        # 아이솔레이터→DB 간격 (mm)
+    row_spacing: float | None = None               # 다열 회로 행간 간격 (mm)
+    label_char_height: float | None = None         # 라벨 텍스트 높이 (mm)
+
     # Spine gap 유효 범위 (이상치 clamp)
     _MIN_SPINE_GAP: float = 5.0
     _MAX_SPINE_GAP: float = 80.0
+
+    # Phase A 확장 필드별 clamp 범위
+    _CLAMP_RANGES: dict = field(default_factory=lambda: {
+        "spine_component_gap": (2.0, 8.0),
+        "busbar_to_breaker_gap": (7.0, 20.0),
+        "isolator_to_db_gap": (8.0, 25.0),
+        "row_spacing": (40.0, 80.0),
+        "label_char_height": (2.0, 3.0),
+    })
+
+    def __post_init__(self):
+        # dataclass field 기본값으로 _CLAMP_RANGES가 이미 설정됨
+        pass
 
     def _clamp_gap(self, value: float | None) -> float | None:
         if value is None or value <= 0:
             return None
         return max(self._MIN_SPINE_GAP, min(value, self._MAX_SPINE_GAP))
 
+    def _clamp_range(self, name: str, value: float | None) -> float | None:
+        """Phase A 확장 필드의 범위 clamp."""
+        if value is None or value <= 0:
+            return None
+        lo, hi = self._CLAMP_RANGES.get(name, (0, 1e6))
+        return max(lo, min(value, hi))
+
     def to_overrides(self) -> dict[str, float]:
         """LayoutConfig에 적용할 오버라이드 dict 반환."""
         overrides = {}
         if self.horizontal_spacing is not None and self.horizontal_spacing > 0:
             overrides["horizontal_spacing"] = self.horizontal_spacing
+
+        # 기존 spine gap 오버라이드
         gap = self._clamp_gap(self.breaker_to_rccb_gap)
         if gap is not None:
             overrides["ref_breaker_to_rccb_gap"] = gap
@@ -66,6 +95,14 @@ class MatchedSpacing:
         gap = self._clamp_gap(self.isolator_to_breaker_gap)
         if gap is not None:
             overrides["ref_isolator_to_breaker_gap"] = gap
+
+        # Phase A 확장 오버라이드 — LayoutConfig 필드명과 동일
+        for attr_name in ("spine_component_gap", "busbar_to_breaker_gap",
+                          "isolator_to_db_gap", "row_spacing", "label_char_height"):
+            val = self._clamp_range(attr_name, getattr(self, attr_name))
+            if val is not None:
+                overrides[attr_name] = val
+
         return overrides
 
 
@@ -160,6 +197,9 @@ def get_reference_spacing(requirements: dict) -> MatchedSpacing | None:
         best_file, best_score, best_prof.get("circuits", 0), circuits, spacing_mm, spine,
     )
 
+    # Phase A 확장 필드
+    extended = best_prof.get("extended", {})
+
     return MatchedSpacing(
         reference_file=best_file,
         match_score=best_score,
@@ -168,4 +208,10 @@ def get_reference_spacing(requirements: dict) -> MatchedSpacing | None:
         breaker_to_rccb_gap=spine.get("breaker_to_rccb"),
         rccb_to_busbar_gap=spine.get("rccb_to_busbar"),
         isolator_to_breaker_gap=spine.get("isolator_to_breaker"),
+        # Phase A 확장
+        spine_component_gap=extended.get("spine_component_gap"),
+        busbar_to_breaker_gap=extended.get("busbar_to_breaker_gap"),
+        isolator_to_db_gap=extended.get("isolator_to_db_gap"),
+        row_spacing=extended.get("row_spacing"),
+        label_char_height=extended.get("label_char_height"),
     )

@@ -12,7 +12,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 0,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 6.52
+      }
     },
     "100A TPN SLD 1 DWG.dxf": {
       "filename": "100A TPN SLD 1 DWG.dxf",
@@ -28,6 +31,10 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 58.18,
         "rccb_to_busbar": 77.38
+      },
+      "extended": {
+        "row_spacing": 60.36,
+        "label_char_height_raw": 7.04
       }
     },
     "125A TPN SLD 1 DWG.dxf": {
@@ -44,6 +51,9 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 300.4,
         "rccb_to_busbar": 73.75
+      },
+      "extended": {
+        "label_char_height_raw": 8.04
       }
     },
     "150A TPN SLD 1 DWG.dxf": {
@@ -62,6 +72,10 @@
         "isolator_to_breaker": 48.39,
         "breaker_to_rccb": 61.66,
         "rccb_to_busbar": 116.12
+      },
+      "extended": {
+        "row_spacing": 66.83,
+        "label_char_height_raw": 4.46
       }
     },
     "150A TPN SLD 3 DWG.dxf": {
@@ -78,6 +92,10 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 123.88,
         "rccb_to_busbar": 39.43
+      },
+      "extended": {
+        "row_spacing": 73.68,
+        "label_char_height_raw": 4.3
       }
     },
     "200A TPN SLD 1 DWG.dxf": {
@@ -94,6 +112,11 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 148.18,
         "rccb_to_busbar": 35.5
+      },
+      "extended": {
+        "spine_component_gap": 47.29,
+        "row_spacing": 52.8,
+        "label_char_height_raw": 3.42
       }
     },
     "200A TPN SLD 3 DWG.dxf": {
@@ -110,6 +133,11 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 110.9,
         "rccb_to_busbar": 37.15
+      },
+      "extended": {
+        "spine_component_gap": 49.48,
+        "row_spacing": 72.6,
+        "label_char_height_raw": 4.71
       }
     },
     "300A TPN SLD 1 DWG.dxf": {
@@ -126,6 +154,12 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 18.84,
         "rccb_to_busbar": 39.67
+      },
+      "extended": {
+        "spine_component_gap": 25.09,
+        "busbar_to_breaker_gap": 11.32,
+        "row_spacing": 112.77,
+        "label_char_height_raw": 4.71
       }
     },
     "32A Single Phase DB 1 DWG.dxf": {
@@ -136,7 +170,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 0,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 7.03
+      }
     },
     "32A Single Phase DB 3 DWG.dxf": {
       "filename": "32A Single Phase DB 3 DWG.dxf",
@@ -146,7 +183,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0.072422,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 26.8,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 9.41
+      }
     },
     "32A TPN SLD 1 DWG.dxf": {
       "filename": "32A TPN SLD 1 DWG.dxf",
@@ -156,7 +196,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0.072422,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 26.8,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 9.41
+      }
     },
     "400A TPN SLD 1 DWG.dxf": {
       "filename": "400A TPN SLD 1 DWG.dxf",
@@ -174,6 +217,10 @@
         "isolator_to_breaker": 63.55,
         "breaker_to_rccb": 59.99,
         "rccb_to_busbar": 116.05
+      },
+      "extended": {
+        "row_spacing": 66.83,
+        "label_char_height_raw": 4.46
       }
     },
     "40A Single Phase DB 1 DWG.dxf": {
@@ -190,7 +237,8 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 53.99,
         "rccb_to_busbar": 85.86
-      }
+      },
+      "extended": {}
     },
     "40A Single Phase DB 3 DWG.dxf": {
       "filename": "40A Single Phase DB 3 DWG.dxf",
@@ -200,7 +248,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0.092116,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 34.08,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 9.41
+      }
     },
     "40A TPN SLD 1 DWG.dxf": {
       "filename": "40A TPN SLD 1 DWG.dxf",
@@ -210,7 +261,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0.050065,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 18.52,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 8.14
+      }
     },
     "40A TPN SLD 3 DWG.dxf": {
       "filename": "40A TPN SLD 3 DWG.dxf",
@@ -226,6 +280,10 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 82.69,
         "rccb_to_busbar": 51.25
+      },
+      "extended": {
+        "row_spacing": 49.43,
+        "label_char_height_raw": 5.77
       }
     },
     "500A TPN SLD 1 DWG.dxf": {
@@ -242,6 +300,11 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 163.88,
         "rccb_to_busbar": 32.31
+      },
+      "extended": {
+        "spine_component_gap": 43.03,
+        "row_spacing": 76.61,
+        "label_char_height_raw": 2.98
       }
     },
     "63A Single Phase DB 3 DWG.dxf": {
@@ -258,6 +321,9 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 80.19,
         "rccb_to_busbar": 69.96
+      },
+      "extended": {
+        "label_char_height_raw": 9.55
       }
     },
     "63A Single Phase DB 6 DWG.dxf": {
@@ -268,7 +334,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 0,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 9.97
+      }
     },
     "63A TPN SLD 1 DWG.dxf": {
       "filename": "63A TPN SLD 1 DWG.dxf",
@@ -284,6 +353,9 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 40.34,
         "rccb_to_busbar": 84.83
+      },
+      "extended": {
+        "label_char_height_raw": 8.98
       }
     },
     "63A TPN SLD 14.dxf": {
@@ -300,7 +372,8 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 58.81,
         "rccb_to_busbar": 94.77
-      }
+      },
+      "extended": {}
     },
     "63A TPN SLD 16 DWG.dxf": {
       "filename": "63A TPN SLD 16 DWG.dxf",
@@ -316,6 +389,9 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 80.93,
         "rccb_to_busbar": 78.32
+      },
+      "extended": {
+        "label_char_height_raw": 9.16
       }
     },
     "63A TPN SLD 8 DWG.dxf": {
@@ -326,7 +402,10 @@
       "subcircuit_spacing_per_circuit_ratio": 0.039642,
       "spine_gap_ratios": {},
       "subcircuit_spacing_mm": 14.67,
-      "spine_gaps_mm": {}
+      "spine_gaps_mm": {},
+      "extended": {
+        "label_char_height_raw": 8.48
+      }
     },
     "80A TPN SLD 2 DWG.dxf": {
       "filename": "80A TPN SLD 2 DWG.dxf",
@@ -342,6 +421,10 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 68.64,
         "rccb_to_busbar": 91.36
+      },
+      "extended": {
+        "row_spacing": 71.2,
+        "label_char_height_raw": 8.31
       }
     },
     "Cable Extension SLD 4 DWG.dxf": {
@@ -358,6 +441,9 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 44.91,
         "rccb_to_busbar": 97.92
+      },
+      "extended": {
+        "label_char_height_raw": 4.95
       }
     },
     "Cable Extension SLD 5 DWG.dxf": {
@@ -374,7 +460,8 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 44.91,
         "rccb_to_busbar": 97.96
-      }
+      },
+      "extended": {}
     },
     "I2R-ETR-NLB-SLD-1.dxf": {
       "filename": "I2R-ETR-NLB-SLD-1.dxf",
@@ -390,6 +477,10 @@
       "spine_gaps_mm": {
         "breaker_to_rccb": 122.4,
         "rccb_to_busbar": 40.97
+      },
+      "extended": {
+        "row_spacing": 115.75,
+        "label_char_height_raw": 5.19
       }
     }
   },
@@ -410,6 +501,16 @@
         "min": 41.0,
         "max": 85.9,
         "median": 70.0
+      },
+      "ext_label_char_height_raw": {
+        "min": 5.2,
+        "max": 10.0,
+        "median": 9.4
+      },
+      "ext_row_spacing": {
+        "min": 115.8,
+        "max": 115.8,
+        "median": 115.8
       }
     },
     "direct_metering_3phase": {
@@ -428,6 +529,26 @@
         "min": 32.3,
         "max": 94.8,
         "median": 73.8
+      },
+      "ext_busbar_to_breaker_gap": {
+        "min": 11.3,
+        "max": 11.3,
+        "median": 11.3
+      },
+      "ext_label_char_height_raw": {
+        "min": 3.0,
+        "max": 9.4,
+        "median": 8.0
+      },
+      "ext_row_spacing": {
+        "min": 49.4,
+        "max": 112.8,
+        "median": 72.6
+      },
+      "ext_spine_component_gap": {
+        "min": 25.1,
+        "max": 49.5,
+        "median": 47.3
       }
     },
     "ct_metering_3phase": {
@@ -451,6 +572,16 @@
         "min": 116.0,
         "max": 116.1,
         "median": 116.1
+      },
+      "ext_label_char_height_raw": {
+        "min": 4.5,
+        "max": 4.5,
+        "median": 4.5
+      },
+      "ext_row_spacing": {
+        "min": 66.8,
+        "max": 66.8,
+        "median": 66.8
       }
     },
     "cable_extension": {
@@ -469,6 +600,11 @@
         "min": 97.9,
         "max": 98.0,
         "median": 98.0
+      },
+      "ext_label_char_height_raw": {
+        "min": 5.0,
+        "max": 5.0,
+        "median": 5.0
       }
     }
   }

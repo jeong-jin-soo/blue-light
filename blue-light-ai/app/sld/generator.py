@@ -32,7 +32,10 @@ import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.sld.layout_optimizer import LayoutOptimizer
 
 from app.sld.backend import DrawingBackend
 from app.sld.block_replayer import BlockReplayer
@@ -112,6 +115,9 @@ class SldPipeline:
     """
 
     MAX_VISION_RETRIES = 3
+
+    def __init__(self, optimizer: "LayoutOptimizer | None" = None):
+        self._optimizer = optimizer
 
     def run(
         self,
@@ -225,14 +231,24 @@ class SldPipeline:
         tb_config = TitleBlockConfig.from_page_config(pc) if pc else None
 
         # ❶~❺ Layout — single-DB는 v3 (region 기반), multi-DB는 v2
+        # Optimizer가 있으면 최적화된 config를 엔진에 전달
+        _opt_config = None
+        if self._optimizer:
+            opt_result = self._optimizer.optimize_config(requirements, pc)
+            _opt_config = opt_result.config
+            logger.info(
+                "LayoutOptimizer: tier=%d, params=%s",
+                opt_result.tier_used, opt_result.parameters_applied,
+            )
+
         _dbs = requirements.get("distribution_boards")
         _is_multi = _dbs and len(_dbs) > 1
         if _is_multi:
-            layout_result = compute_layout(requirements, application_info=app_info,
-                                           page_config=pc)
+            layout_result = compute_layout(requirements, config=_opt_config,
+                                           application_info=app_info, page_config=pc)
         else:
-            layout_result = compute_layout_v3(requirements, application_info=app_info,
-                                              page_config=pc)
+            layout_result = compute_layout_v3(requirements, config=_opt_config,
+                                              application_info=app_info, page_config=pc)
 
         # ❺½ Post-layout validation + auto-fix (max 2 attempts)
         if layout_result.config:

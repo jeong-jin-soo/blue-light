@@ -570,7 +570,7 @@ async def _call_gemini_vision(
         parts.append(types.Part.from_bytes(data=reference_bytes, mime_type="image/png"))
 
     response = await client.aio.models.generate_content(
-        model=settings.gemini_model,
+        model=settings.gemini_pro_model,
         contents=[types.Content(parts=parts)],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",

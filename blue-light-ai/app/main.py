@@ -440,7 +440,13 @@ async def generate_sld_direct(
         api_key = get_system_setting("gemini_api_key") or settings.gemini_api_key or None
 
     try:
-        pipeline = SldPipeline()
+        # Layout Optimizer (Tier 1: reference, Tier 2: Gemini, Tier 0: defaults)
+        optimizer = None
+        if settings.layout_optimizer_enabled:
+            from app.sld.layout_optimizer import LayoutOptimizer
+            optimizer = LayoutOptimizer(api_key=api_key)
+
+        pipeline = SldPipeline(optimizer=optimizer)
         result = pipeline.run(requirements, application_info=application_info,
                               api_key=api_key)
     except ValueError as e:

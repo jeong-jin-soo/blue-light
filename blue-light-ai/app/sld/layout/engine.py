@@ -237,6 +237,13 @@ def compute_layout(
         config.db_width_ratios = requirements["db_width_ratios"]
     if requirements.get("max_circuits_per_row"):
         config.max_circuits_per_row = int(requirements["max_circuits_per_row"])
+    # -- layout_overrides from Vision AI retry loop (Phase C) --
+    _layout_ovr = requirements.get("layout_overrides", {})
+    if _layout_ovr:
+        for _ovr_key, _ovr_val in _layout_ovr.items():
+            if hasattr(config, _ovr_key):
+                setattr(config, _ovr_key, float(_ovr_val))
+        logger.info("Applied layout_overrides: %s", _layout_ovr)
     # -- Component scale: smaller symbols/text for dense multi-DB layouts --
     # The renderer applies a uniform scale(s) transform to all SLD content.
     # To compensate, we EXPAND the layout boundaries by 1/s so that after

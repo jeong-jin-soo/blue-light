@@ -581,7 +581,12 @@ def generate_sld(
             # Track B: SldPipeline — 생성 + Vision AI 검증 (파이프라인 내부 처리)
             from app.sld.generator import SldPipeline
 
-            sld_result = SldPipeline().run(
+            optimizer = None
+            if settings.layout_optimizer_enabled:
+                from app.sld.layout_optimizer import LayoutOptimizer
+                optimizer = LayoutOptimizer(api_key=settings.gemini_api_key)
+
+            sld_result = SldPipeline(optimizer=optimizer).run(
                 requirements=requirements,
                 application_info=application_info or {},
                 backend_type="dxf",
@@ -839,7 +844,7 @@ def _sync_extract_sld(user_input: str) -> dict:
 
     genai.configure(api_key=settings.gemini_api_key)
     model = genai.GenerativeModel(
-        model_name=settings.gemini_model,
+        model_name=settings.gemini_pro_model,
         system_instruction=SLD_EXTRACTION_PROMPT,
         generation_config=genai.GenerationConfig(
             response_mime_type="application/json",

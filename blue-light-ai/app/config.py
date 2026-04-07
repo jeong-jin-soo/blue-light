@@ -11,8 +11,9 @@ class Settings(BaseSettings):
 
     # Gemini API
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
-    gemini_fallback_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-2.5-flash"              # 대화/에이전트용
+    gemini_pro_model: str = "gemini-2.5-pro"             # 스펙 추출 + Vision 검증용
+    gemini_fallback_model: str = "gemini-2.5-flash-lite"  # 503/429 폴백용
     gemini_max_tokens: int = 8192
     gemini_temperature: float = 0.3
 
@@ -30,6 +31,9 @@ class Settings(BaseSettings):
     mysql_database: str = "bluelight"
     mysql_user: str = "user"
     mysql_password: str = "password"
+
+    # Layout Optimizer (3-Tier)
+    layout_optimizer_enabled: bool = False  # LAYOUT_OPTIMIZER_ENABLED=true로 활성화
 
     # Environment (development | production)
     environment: str = "development"

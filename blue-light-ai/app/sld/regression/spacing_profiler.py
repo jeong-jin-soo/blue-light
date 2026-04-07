@@ -59,6 +59,9 @@ class SpacingProfile:
     # 스파인 간격 (mm, usable_height=223mm 기준 환산)
     spine_gaps_mm: dict[str, float] = field(default_factory=dict)
 
+    # Phase A 확장 — 추가 간격 파라미터 (mm)
+    extended: dict[str, float] = field(default_factory=dict)
+
     def to_dict(self) -> dict:
         return asdict(self)
 
@@ -226,6 +229,140 @@ def _extract_spine_gap_ratios(
 
 
 # ---------------------------------------------------------------------------
+# Phase A: Extended parameter extraction
+# ---------------------------------------------------------------------------
+
+def _extract_spine_component_gap(spine_comps: dict[str, float], mm_per_du_y: float) -> float | None:
+    """스파인 컴포넌트 간 평균 간격 (mm).
+
+    인접한 스파인 컴포넌트 쌍의 Y 간격 중앙값.
+    """
+    ys = sorted(spine_comps.values())
+    if len(ys) < 2 or mm_per_du_y <= 0:
+        return None
+    gaps = [(ys[i + 1] - ys[i]) * mm_per_du_y for i in range(len(ys) - 1)]
+    gaps = [g for g in gaps if 1.0 < g < 50.0]  # 이상치 제거
+    if not gaps:
+        return None
+    gaps.sort()
+    return round(gaps[len(gaps) // 2], 2)
+
+
+def _extract_busbar_to_breaker_gap(
+    spine_comps: dict[str, float], positions: dict, mm_per_du_y: float,
+) -> float | None:
+    """부스바 Y → 가장 가까운 서브회로 브레이커 Y 간격 (mm).
+
+    subcircuit_y가 spine_comps에 있으면 사용, 없으면 MCCB Y 그룹의 가장 높은 레벨.
+    """
+    if mm_per_du_y <= 0:
+        return None
+
+    subckt_y = spine_comps.get("subcircuit_y")
+    main_y = spine_comps.get("main_breaker_y")
+    rccb_y = spine_comps.get("rccb_y")
+
+    # busbar는 subcircuit_y 바로 아래에 위치
+    # busbar_to_breaker = subcircuit_y - (rccb_y or main_breaker_y 중 더 높은 것)
+    # 대신 간단히: subcircuit_y가 있고 해당 DXF에서 busbar-breaker 간격을 직접 측정
+    if subckt_y is None:
+        return None
+
+    # MCCBs 중 subcircuit 행에 속하는 것들의 Y와 busbar(== subcircuit_y) 간 차이
+    mccbs = positions.get("MCCB", [])
+    upright = [m for m in mccbs if abs(m["rotation"]) < 1.0]
+    if not upright:
+        return None
+
+    from collections import Counter
+    y_bins = Counter(round(m["y"] / 300) * 300 for m in upright)
+    largest_bin = y_bins.most_common(1)[0][0]
+    subckt_mccbs = [m for m in upright if abs(round(m["y"] / 300) * 300 - largest_bin) < 1]
+    if not subckt_mccbs:
+        return None
+
+    avg_subckt_y = sum(m["y"] for m in subckt_mccbs) / len(subckt_mccbs)
+    # busbar는 subcircuit MCCB보다 약간 아래 — 여기서는 subcircuit_y를 busbar Y로 근사
+    # busbar_to_breaker = avg_subckt_mccb_y - subcircuit_y (busbar)
+    gap_du = avg_subckt_y - subckt_y
+    gap_mm = abs(gap_du) * mm_per_du_y
+    if 3.0 < gap_mm < 30.0:
+        return round(gap_mm, 2)
+    return None
+
+
+def _extract_row_spacing(positions: dict, mm_per_du_y: float) -> float | None:
+    """다열 회로 행간 간격 (mm).
+
+    MCCB Y 좌표를 클러스터링하여 행 간 간격 추출.
+    """
+    if mm_per_du_y <= 0:
+        return None
+
+    mccbs = positions.get("MCCB", [])
+    upright = [m for m in mccbs if abs(m["rotation"]) < 1.0]
+    if len(upright) < 6:
+        return None  # 행이 2개 이상이려면 최소 6개 MCCB
+
+    from collections import Counter
+    y_bins = Counter(round(m["y"] / 300) * 300 for m in upright)
+
+    if len(y_bins) < 2:
+        return None  # 단일 행
+
+    # 행 중심 Y 값 추출
+    row_ys = sorted(y_bins.keys())
+    gaps = [(row_ys[i + 1] - row_ys[i]) * mm_per_du_y for i in range(len(row_ys) - 1)]
+    gaps = [g for g in gaps if 20.0 < g < 120.0]  # 합리적 범위
+    if not gaps:
+        return None
+    gaps.sort()
+    return round(gaps[len(gaps) // 2], 2)
+
+
+def _extract_label_char_height(msp, mm_per_du_y: float) -> float | None:
+    """TEXT/MTEXT 엔티티의 char_height 중앙값 (mm)."""
+    if mm_per_du_y <= 0:
+        return None
+
+    heights: list[float] = []
+    for e in msp:
+        dxf_type = e.dxftype()
+        if dxf_type == "TEXT":
+            h = getattr(e.dxf, "height", 0)
+            if h > 0:
+                heights.append(h * mm_per_du_y)
+        elif dxf_type == "MTEXT":
+            h = getattr(e.dxf, "char_height", 0)
+            if h > 0:
+                heights.append(h * mm_per_du_y)
+
+    # 비정상 크기 필터 (0.5mm ~ 10mm)
+    heights = [h for h in heights if 0.5 < h < 10.0]
+    if not heights:
+        return None
+    heights.sort()
+    return round(heights[len(heights) // 2], 2)
+
+
+def _extract_isolator_to_db_gap(
+    spine_comps: dict[str, float], mm_per_du_y: float,
+) -> float | None:
+    """아이솔레이터 → 메인 브레이커 간격 (mm).
+
+    isolator_y와 main_breaker_y 사이 거리.
+    """
+    iso_y = spine_comps.get("isolator_y")
+    main_y = spine_comps.get("main_breaker_y")
+    if iso_y is None or main_y is None or mm_per_du_y <= 0:
+        return None
+    gap_mm = abs(main_y - iso_y) * mm_per_du_y
+    if 5.0 < gap_mm < 40.0:
+        return round(gap_mm, 2)
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Main profiler
 # ---------------------------------------------------------------------------
 
@@ -282,6 +419,32 @@ def extract_profile(dxf_path: Path) -> SpacingProfile | None:
         for k, v in spine_gap_ratios.items()
     }
 
+    # Phase A: DU→mm 변환 계수
+    mm_x, mm_y = _compute_du_to_mm(msp)
+
+    # Phase A: 확장 파라미터 추출
+    extended: dict[str, float] = {}
+
+    scg = _extract_spine_component_gap(spine_comps, mm_y)
+    if scg is not None:
+        extended["spine_component_gap"] = scg
+
+    btb = _extract_busbar_to_breaker_gap(spine_comps, positions, mm_y)
+    if btb is not None:
+        extended["busbar_to_breaker_gap"] = btb
+
+    itd = _extract_isolator_to_db_gap(spine_comps, mm_y)
+    if itd is not None:
+        extended["isolator_to_db_gap"] = itd
+
+    rs = _extract_row_spacing(positions, mm_y)
+    if rs is not None:
+        extended["row_spacing"] = rs
+
+    lch = _extract_label_char_height(msp, mm_y)
+    if lch is not None:
+        extended["label_char_height_raw"] = lch  # 원본 DXF 크기 (참고용, 직접 적용 안 함)
+
     return SpacingProfile(
         filename=dxf_path.name,
         sld_type=sld_type,
@@ -291,6 +454,7 @@ def extract_profile(dxf_path: Path) -> SpacingProfile | None:
         spine_gap_ratios=spine_gap_ratios,
         subcircuit_spacing_mm=subcircuit_spacing_mm,
         spine_gaps_mm=spine_gaps_mm,
+        extended=extended,
     )
 
 
@@ -335,6 +499,20 @@ def extract_all_profiles(dxf_dir: Path | None = None) -> dict:
             if vals:
                 sorted_v = sorted(vals)
                 agg[f"spine_{key}_mm"] = {
+                    "min": round(min(vals), 1),
+                    "max": round(max(vals), 1),
+                    "median": round(sorted_v[len(sorted_v) // 2], 1),
+                }
+
+        # Phase A: 확장 파라미터 집계
+        ext_keys: set[str] = set()
+        for p in profs:
+            ext_keys.update(p.extended.keys())
+        for key in sorted(ext_keys):
+            vals = [p.extended.get(key, 0) for p in profs if p.extended.get(key, 0) > 0]
+            if vals:
+                sorted_v = sorted(vals)
+                agg[f"ext_{key}"] = {
                     "min": round(min(vals), 1),
                     "max": round(max(vals), 1),
                     "median": round(sorted_v[len(sorted_v) // 2], 1),
