@@ -3,6 +3,8 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 interface Props {
   svg: string;
   className?: string;
+  onDownloadPdf?: () => void;
+  onDownloadDxf?: () => void;
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * SVG는 ezdxf에서 생성되며 width/height가 mm 단위 + 큰 viewBox를 사용한다.
  * 컨테이너에 맞게 표시하기 위해 width/height를 100%로 정규화한다.
  */
-export function SvgPreviewViewer({ svg, className = '' }: Props) {
+export function SvgPreviewViewer({ svg, className = '', onDownloadPdf, onDownloadDxf }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
@@ -112,6 +114,36 @@ export function SvgPreviewViewer({ svg, className = '' }: Props) {
           ⟲
         </button>
       </div>
+
+      {/* Download buttons */}
+      {(onDownloadPdf || onDownloadDxf) && (
+        <div className="absolute top-2 left-2 z-10 flex flex-col gap-1">
+          {onDownloadPdf && (
+            <button
+              onClick={onDownloadPdf}
+              className="h-7 px-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+              title="Download PDF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              PDF
+            </button>
+          )}
+          {onDownloadDxf && (
+            <button
+              onClick={onDownloadDxf}
+              className="h-7 px-2 bg-white border border-gray-300 rounded text-xs font-medium text-gray-600 hover:bg-gray-50 flex items-center gap-1"
+              title="Download DXF"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              DXF
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Scale indicator */}
       <div className="absolute bottom-2 left-2 z-10 text-xs text-gray-400 bg-black/50 px-1.5 py-0.5 rounded">

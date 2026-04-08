@@ -225,3 +225,27 @@ export const getSldPreviewUrl = (applicationId: number, fileId: string): string 
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
   return `${baseUrl}/admin/applications/${applicationId}/sld-chat/preview/${fileId}`;
 };
+
+/**
+ * AI 생성 파일 다운로드 (PDF/DXF)
+ */
+export const downloadSldFile = async (
+  applicationId: number,
+  fileId: string,
+  format: 'pdf' | 'dxf',
+): Promise<void> => {
+  const response = await axiosClient.get(
+    `/admin/applications/${applicationId}/sld-chat/download/${fileId}`,
+    { params: { format }, responseType: 'blob' },
+  );
+
+  const blob = new Blob([response.data]);
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `SLD_${fileId}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};

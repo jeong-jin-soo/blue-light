@@ -388,6 +388,28 @@ public class SldAgentService {
         }
     }
 
+    /**
+     * AI 생성 파일 다운로드 (PDF/DXF) -- Python 서비스에서 바이트 가져오기
+     */
+    public byte[] downloadGeneratedFile(Long applicationSeq, String fileId, String format) {
+        validateApplicationExists(applicationSeq);
+
+        try {
+            return sldAgentWebClient
+                    .get()
+                    .uri("/api/files/" + fileId + "?format=" + format)
+                    .retrieve()
+                    .bodyToMono(byte[].class)
+                    .block();
+        } catch (Exception e) {
+            log.error("Failed to download generated file: applicationSeq={}, fileId={}, format={}",
+                    applicationSeq, fileId, format, e);
+            throw new BusinessException(
+                    "Failed to download SLD file",
+                    HttpStatus.INTERNAL_SERVER_ERROR, "FILE_DOWNLOAD_FAILED");
+        }
+    }
+
     // ──────────────────────────────────────
     // Private helpers (트랜잭션 분리)
     // ──────────────────────────────────────

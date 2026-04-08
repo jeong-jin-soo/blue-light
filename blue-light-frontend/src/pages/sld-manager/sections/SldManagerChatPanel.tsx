@@ -3,7 +3,7 @@ import { Button } from '../../../components/ui/Button';
 import { SvgPreviewViewer } from '../../../components/ui/SvgPreviewViewer';
 import { useSldOrderChatStore } from '../../../stores/sldOrderChatStore';
 import { useToastStore } from '../../../stores/toastStore';
-import { sldOrderAcceptSld } from '../../../api/sldOrderChatApi';
+import { sldOrderAcceptSld, sldOrderDownloadFile } from '../../../api/sldOrderChatApi';
 import { getSldAiGeneration } from '../../../api/systemAdminApi';
 import { sldManagerApi } from '../../../api/sldManagerApi';
 
@@ -307,7 +307,16 @@ export function SldManagerChatPanel({ sldOrderSeq, onSldUpdated }: Props) {
 
         {/* Right: SVG Preview (40%) */}
         <div className="w-2/5 flex flex-col">
-          <SvgPreviewViewer svg={svgPreview || ''} className="flex-1" />
+          <SvgPreviewViewer
+            svg={svgPreview || ''}
+            className="flex-1"
+            onDownloadPdf={generatedFileId ? () => {
+              sldOrderDownloadFile(sldOrderSeq, generatedFileId, 'pdf').catch(() => toast.error('PDF download failed'));
+            } : undefined}
+            onDownloadDxf={generatedFileId ? () => {
+              sldOrderDownloadFile(sldOrderSeq, generatedFileId, 'dxf').catch(() => toast.error('DXF download failed'));
+            } : undefined}
+          />
         </div>
       </div>
 

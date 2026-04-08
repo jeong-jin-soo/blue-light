@@ -3,7 +3,7 @@ import { Button } from '../../../components/ui/Button';
 import { SvgPreviewViewer } from '../../../components/ui/SvgPreviewViewer';
 import { useSldChatStore } from '../../../stores/sldChatStore';
 import { useToastStore } from '../../../stores/toastStore';
-import { acceptSld } from '../../../api/sldChatApi';
+import { acceptSld, downloadSldFile } from '../../../api/sldChatApi';
 import { getSldAiGeneration } from '../../../api/systemAdminApi';
 import axiosClient from '../../../api/axiosClient';
 import fileApi from '../../../api/fileApi';
@@ -348,7 +348,16 @@ export function SldChatPanel({ applicationSeq, onSldUpdated, existingSldFiles = 
 
         {/* Right: SVG Preview (40%) */}
         <div className="w-2/5 flex flex-col">
-          <SvgPreviewViewer svg={svgPreview || ''} className="flex-1" />
+          <SvgPreviewViewer
+            svg={svgPreview || ''}
+            className="flex-1"
+            onDownloadPdf={generatedFileId ? () => {
+              downloadSldFile(applicationSeq, generatedFileId, 'pdf').catch(() => toast.error('PDF download failed'));
+            } : undefined}
+            onDownloadDxf={generatedFileId ? () => {
+              downloadSldFile(applicationSeq, generatedFileId, 'dxf').catch(() => toast.error('DXF download failed'));
+            } : undefined}
+          />
         </div>
       </div>
 

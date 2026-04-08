@@ -203,3 +203,28 @@ export const sldOrderGetPreviewUrl = (sldOrderSeq: number, fileId: string): stri
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api';
   return `${baseUrl}/sld-manager/orders/${sldOrderSeq}/sld-chat/preview/${fileId}`;
 };
+
+/**
+ * AI 생성 파일 다운로드 (PDF/DXF)
+ */
+export const sldOrderDownloadFile = async (
+  sldOrderSeq: number,
+  fileId: string,
+  format: 'pdf' | 'dxf',
+): Promise<void> => {
+  const response = await axiosClient.get(
+    `/sld-manager/orders/${sldOrderSeq}/sld-chat/download/${fileId}`,
+    { params: { format }, responseType: 'blob' },
+  );
+
+  // 브라우저 다운로드 트리거
+  const blob = new Blob([response.data]);
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `SLD_${fileId}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+};

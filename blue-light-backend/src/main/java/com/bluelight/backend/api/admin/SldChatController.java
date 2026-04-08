@@ -100,4 +100,26 @@ public class SldChatController {
         String svg = sldAgentService.getSvgPreview(id, fileId);
         return ResponseEntity.ok(svg);
     }
+
+    /**
+     * AI 생성 파일 다운로드 (PDF/DXF)
+     * GET /api/admin/applications/{id}/sld-chat/download/{fileId}?format=pdf|dxf
+     */
+    @GetMapping("/applications/{id}/sld-chat/download/{fileId}")
+    public ResponseEntity<byte[]> downloadGeneratedFile(
+            @PathVariable Long id,
+            @PathVariable String fileId,
+            @RequestParam(defaultValue = "pdf") String format) {
+
+        log.info("SLD file download: applicationSeq={}, fileId={}, format={}", id, fileId, format);
+        byte[] fileBytes = sldAgentService.downloadGeneratedFile(id, fileId, format);
+
+        String mediaType = "dxf".equals(format) ? "application/dxf" : "application/pdf";
+        String filename = "SLD_" + fileId + "." + format;
+
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+                .header("Content-Type", mediaType)
+                .body(fileBytes);
+    }
 }
