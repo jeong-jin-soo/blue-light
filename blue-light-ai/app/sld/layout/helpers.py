@@ -275,12 +275,15 @@ def _pad_spares_for_triplets(
     def _is_lighting(c: dict) -> bool:
         name = _circuit_name(c)
         cid = str(c.get("circuit_id", "") or c.get("id", "")).upper()
+        raw_name = str(c.get("name", "")).upper()
         if "spare" in name:
             return False  # User-added spare — don't classify
-        # Explicit circuit_id with S prefix = lighting
-        if re.match(r"^L[123]S", cid):
+        # Explicit circuit_id or name with S prefix = lighting (e.g., L1S1, L2S3)
+        if re.match(r"^L[123]S", cid) or re.match(r"^L[123]S", raw_name):
             return True
-        return any(kw in name for kw in ("light", "lamp", "led"))
+        # load_description 키워드도 확인
+        load_desc = str(c.get("load_description", "") or c.get("load", "")).lower()
+        return any(kw in name or kw in load_desc for kw in ("light", "lamp", "led"))
 
     def _is_spare(c: dict) -> bool:
         return "spare" in _circuit_name(c)
