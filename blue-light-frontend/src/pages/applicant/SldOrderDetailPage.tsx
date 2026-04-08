@@ -52,6 +52,7 @@ export default function SldOrderDetailPage() {
   const [showAcceptConfirm, setShowAcceptConfirm] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
 
   const orderId = Number(id);
 
@@ -77,6 +78,22 @@ export default function SldOrderDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Load PDF preview for SLD_UPLOADED / COMPLETED status
+  useEffect(() => {
+    if (!order?.uploadedFileSeq) return;
+    if (order.status !== 'SLD_UPLOADED' && order.status !== 'COMPLETED') return;
+
+    let revoked = false;
+    fileApi.getFilePreviewUrl(order.uploadedFileSeq).then((url) => {
+      if (!revoked) setPdfPreviewUrl(url);
+    }).catch(() => { /* non-critical */ });
+
+    return () => {
+      revoked = true;
+      if (pdfPreviewUrl) window.URL.revokeObjectURL(pdfPreviewUrl);
+    };
+  }, [order?.uploadedFileSeq, order?.status]);
 
   // ── Actions ──
 
@@ -373,6 +390,18 @@ export default function SldOrderDetailPage() {
                 )}
               </div>
 
+              {/* PDF inline preview */}
+              {pdfPreviewUrl && (
+                <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
+                  <iframe
+                    src={pdfPreviewUrl}
+                    title="SLD Drawing Preview"
+                    className="w-full bg-white"
+                    style={{ height: '500px' }}
+                  />
+                </div>
+              )}
+
               {/* Revision request form */}
               {showRevisionForm ? (
                 <div className="mt-4 space-y-3">
@@ -467,6 +496,17 @@ export default function SldOrderDetailPage() {
                   </div>
                 </div>
               </div>
+              {/* PDF inline preview */}
+              {pdfPreviewUrl && (
+                <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
+                  <iframe
+                    src={pdfPreviewUrl}
+                    title="SLD Drawing Preview"
+                    className="w-full bg-white"
+                    style={{ height: '500px' }}
+                  />
+                </div>
+              )}
             </Card>
           )}
         </div>
