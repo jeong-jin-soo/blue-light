@@ -241,7 +241,10 @@ def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" =
         text_w, text_h = measure_mtext_size(text, cap_height=char_h)
 
         if abs(comp.rotation - 90.0) < 0.1:
-            return BoundingBox(x=comp.x, y=comp.y, width=text_h, height=text_w)
+            # 90° 회전 시 텍스트는 anchor 기준으로 좌측으로 뻗어남
+            # width = text_h (줄 수에 비례), 중심을 anchor 기준으로 좌우 균등 배분
+            half_w = text_h / 2
+            return BoundingBox(x=comp.x - half_w, y=comp.y, width=text_h, height=text_w)
         else:
             return BoundingBox(x=comp.x, y=comp.y, width=text_w, height=text_h)
 
@@ -706,6 +709,21 @@ def _compute_group_width(
             tap_x = group.tap_x
             group.left_extent = (tap_x - bb.x) + _MARGIN
             group.right_extent = (bb.right - tap_x) + _MARGIN
+
+        # LABEL (vertical circuit name) bbox도 extent에 포함
+        # rotation=90° 라벨은 수평 폭이 줄 수에 비례하므로 group width에 반영 필요
+        if group.name_label_idx is not None:
+            label_comp = components[group.name_label_idx]
+            label_bb = _compute_bounding_box(label_comp, config=config)
+            if label_bb is not None:
+                label_left = tap_x - label_bb.x
+                label_right = label_bb.right - tap_x
+                if label_left > 0:
+                    group.left_extent = max(group.left_extent, label_left + _MARGIN)
+                if label_right > 0:
+                    group.right_extent = max(group.right_extent, label_right + _MARGIN)
+
+        if bb is not None or group.name_label_idx is not None:
             return group.left_extent + group.right_extent
 
     group.left_extent = 12.5

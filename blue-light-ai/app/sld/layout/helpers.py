@@ -864,28 +864,19 @@ def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, co
     avail_h = config.max_y - label_y - 2  # 2mm margin
 
     # 가용 높이 기반 최대 글자 수: measure_mtext_width로 실측
-    # 수직 렌더링에서 높이 = max(줄 길이) × ~2mm/char (ezdxf 폰트 기준)
     from app.sld.layout.font_util import measure_mtext_width
     _ch = config.label_char_height
 
-    # 이진 탐색으로 avail_h에 맞는 최대 글자 수 결정
     _PREFERRED_MAX_CHARS = config.preferred_max_label_chars
     dyn_max = _PREFERRED_MAX_CHARS
     if len(sc_display_name) > 10:
-        # 빠른 추정: 1글자당 실측 폭으로 max_chars 계산
         per_char = measure_mtext_width("M" * 10, cap_height=_ch) / 10
         if per_char > 0:
             dyn_max = max(10, min(_PREFERRED_MAX_CHARS, int(avail_h / per_char)))
 
-    # 줄 수: 텍스트가 dyn_max보다 길면 줄을 늘려서 각 줄 길이 제한
-    total_chars = len(sc_display_name)
-    if total_chars > dyn_max:
-        needed_lines = (total_chars + dyn_max - 1) // dyn_max
-        max_lines = max(2, min(needed_lines, 6))
-    else:
-        max_lines = 2
-
-    return _wrap_label(sc_display_name, max_chars=dyn_max, max_lines=max_lines)
+    # 줄 수는 2줄 고정 (레퍼런스 관행) — 넘치면 truncation
+    # 줄 수를 늘리면 rotation=90°에서 수평 폭이 증가하여 인접 라벨과 겹침 발생
+    return _wrap_label(sc_display_name, max_chars=dyn_max, max_lines=2)
 
 
 def _place_sub_circuits_upward(
