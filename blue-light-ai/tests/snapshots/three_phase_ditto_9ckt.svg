@@ -124,7 +124,8 @@
   <line x1="290.64" y1="118.61" x2="289.44" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="290.64" y1="118.61" x2="289.44" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="279.25" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000"><tspan x="279.25">B32A</tspan><tspan x="279.25" dy="2.8">SPN</tspan><tspan x="279.25" dy="2.8">MCB</tspan><tspan x="279.25" dy="2.8">6kA</tspan></text>
-  <text x="287.75" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,287.75,88.67)">1 NO. WATER HEATER</text>
+  <text x="287.75" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,287.75,88.67)">1 NO. WATER</text>
+  <text x="291.46" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,291.46,88.67)">HEATER</text>
   <text x="325.12" y="130.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,325.12,129.99)">L2P2</text>
   <path d="M 324.48,121.95 A 3.75,3.75 0 0,0 324.48,115.27" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="323.43" cy="115.27" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />

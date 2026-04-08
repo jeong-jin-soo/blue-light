@@ -89,7 +89,8 @@
   <line x1="202.79" y1="122.27" x2="201.59" y2="121.67" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="202.79" y1="122.27" x2="201.59" y2="122.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="191.40" y="120.87" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000"><tspan x="191.40">B20A</tspan><tspan x="191.40" dy="2.8">SPN</tspan><tspan x="191.40" dy="2.8">MCB</tspan><tspan x="191.40" dy="2.8">6kA</tspan></text>
-  <text x="199.90" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,199.90,86.59)">1 NO. 13A S/S/O</text>
+  <text x="199.90" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,199.90,86.59)">1 NO. 13A</text>
+  <text x="203.82" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,203.82,86.59)">S/S/O</text>
   <text x="233.60" y="134.53" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,233.60,133.65)">L2P1</text>
   <path d="M 232.95,125.61 A 3.75,3.75 0 0,0 232.95,118.94" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="231.91" cy="118.94" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -99,7 +100,8 @@
   <line x1="228.99" y1="122.27" x2="234.99" y2="122.27" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="234.99" y1="122.27" x2="233.79" y2="121.67" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="234.99" y1="122.27" x2="233.79" y2="122.87" stroke="#000000" stroke-width="0.25" fill="none" />
-  <text x="232.10" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,232.10,86.59)">1 NO. AC ISOLATOR</text>
+  <text x="232.10" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,232.10,86.59)">1 NO. AC</text>
+  <text x="236.02" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,236.02,86.59)">ISOLATOR</text>
   <text x="265.80" y="134.53" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,265.80,133.65)">L3P1</text>
   <path d="M 265.15,125.61 A 3.75,3.75 0 0,0 265.15,118.94" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="264.11" cy="118.94" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -110,7 +112,8 @@
   <line x1="267.19" y1="122.27" x2="265.99" y2="121.67" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="267.19" y1="122.27" x2="265.99" y2="122.87" stroke="#000000" stroke-width="0.25" fill="none" />
   <text x="255.80" y="120.87" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B20A</text>
-  <text x="264.30" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,264.30,86.59)">1 NO. 13A POWER</text>
+  <text x="264.30" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,264.30,86.59)">1 NO. 13A</text>
+  <text x="268.22" y="87.71" font-family="Arial, Helvetica, sans-serif" font-size="2.8" fill="#000000" transform="rotate(-90.0,268.22,86.59)">POWER</text>
   <text x="298.00" y="134.53" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,298.00,133.65)">L1P2</text>
   <path d="M 297.35,125.61 A 3.75,3.75 0 0,0 297.35,118.94" stroke="#000000" stroke-width="0.25" fill="none" />
   <circle cx="296.31" cy="118.94" r="0.66" stroke="#000000" stroke-width="0.25" fill="none" />

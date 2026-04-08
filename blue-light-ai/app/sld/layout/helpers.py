@@ -103,8 +103,17 @@ def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
     Splits at word boundaries. If the text exceeds max_lines when wrapped
     at max_chars, recalculates line width to fit all content in max_lines.
     """
-    if len(text) <= max_chars or "\\P" in text:
-        return text  # Already short or pre-wrapped
+    if len(text) <= max_chars and "\\P" not in text:
+        return text  # Short enough, no wrapping needed
+
+    # Pre-wrapped text: check if any line exceeds max_chars and re-split if needed
+    if "\\P" in text:
+        existing_lines = text.split("\\P")
+        longest = max(len(line) for line in existing_lines)
+        if longest <= max_chars:
+            return text  # All lines fit
+        # Re-split: flatten and re-wrap
+        text = " ".join(line.strip() for line in existing_lines)
 
     words = text.split()
 
@@ -132,7 +141,18 @@ def _wrap_label(text: str, max_chars: int = 30, max_lines: int = 2) -> str:
     if len(lines) > max_lines:
         lines = lines[:max_lines]
 
-    return "\\P".join(lines)
+    # Enforce max_chars per line — truncate any line exceeding the limit
+    # This prevents a single long line from causing vertical overflow
+    capped: list[str] = []
+    for line in lines:
+        if len(line) > max_chars:
+            # Truncate at word boundary
+            cut = line[:max_chars].rsplit(" ", 1)[0] if " " in line[:max_chars] else line[:max_chars]
+            capped.append(cut)
+        else:
+            capped.append(line)
+
+    return "\\P".join(capped)
 
 
 def _split_into_rows(sub_circuits: list[dict], max_per_row: int) -> list[list[dict]]:
@@ -840,12 +860,32 @@ def _build_display_label(circuit: dict, sc_name: str, conductor_top_y: float, co
     if sc_room:
         sc_display_name = f"{sc_display_name} — {sc_room.upper()}"
 
-    _CHAR_ADVANCE = config.char_advance
-    _PREFERRED_MAX_CHARS = config.preferred_max_label_chars
     label_y = conductor_top_y + 2
-    avail_h = config.max_y - label_y
-    dyn_max = max(15, min(_PREFERRED_MAX_CHARS, int(avail_h / _CHAR_ADVANCE)))
-    return _wrap_label(sc_display_name, max_chars=dyn_max)
+    avail_h = config.max_y - label_y - 2  # 2mm margin
+
+    # 가용 높이 기반 최대 글자 수: measure_mtext_width로 실측
+    # 수직 렌더링에서 높이 = max(줄 길이) × ~2mm/char (ezdxf 폰트 기준)
+    from app.sld.layout.font_util import measure_mtext_width
+    _ch = config.label_char_height
+
+    # 이진 탐색으로 avail_h에 맞는 최대 글자 수 결정
+    _PREFERRED_MAX_CHARS = config.preferred_max_label_chars
+    dyn_max = _PREFERRED_MAX_CHARS
+    if len(sc_display_name) > 10:
+        # 빠른 추정: 1글자당 실측 폭으로 max_chars 계산
+        per_char = measure_mtext_width("M" * 10, cap_height=_ch) / 10
+        if per_char > 0:
+            dyn_max = max(10, min(_PREFERRED_MAX_CHARS, int(avail_h / per_char)))
+
+    # 줄 수: 텍스트가 dyn_max보다 길면 줄을 늘려서 각 줄 길이 제한
+    total_chars = len(sc_display_name)
+    if total_chars > dyn_max:
+        needed_lines = (total_chars + dyn_max - 1) // dyn_max
+        max_lines = max(2, min(needed_lines, 6))
+    else:
+        max_lines = 2
+
+    return _wrap_label(sc_display_name, max_chars=dyn_max, max_lines=max_lines)
 
 
 def _place_sub_circuits_upward(
