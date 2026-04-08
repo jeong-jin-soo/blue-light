@@ -805,8 +805,15 @@ class SldPipeline:
             line_gap = char_h + config.breaker_line_gap_h
 
             if is_ditto:
-                # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
-                pass
+                # Ditto: 축약 라벨 (rating만, 예: "B20A")
+                if info_items:
+                    label_top_y = comp.y + sym_h - 1
+                    base_x = comp.x - config.breaker_label_x_default
+                    backend.add_mtext(
+                        info_items[0],
+                        insert=(base_x, label_top_y),
+                        char_height=char_h,
+                    )
             else:
                 # Single multi-line MTEXT matching REF DXF format
                 label_top_y = comp.y + sym_h - 1
@@ -832,8 +839,13 @@ class SldPipeline:
                 line_gap = char_h + config.breaker_line_gap_v
 
                 if is_ditto:
-                    # Chain arrow already drawn in symbol section (arrow→arc→arrow→arc)
-                    pass
+                    # Ditto: 축약 라벨 (rating만, 예: "B20A")
+                    if info_items:
+                        backend.add_mtext(
+                            info_items[0],
+                            insert=(base_x, comp.y + 2),
+                            char_height=char_h,
+                        )
                 else:
                     # Single multi-line MTEXT matching REF DXF format
                     # REF: "B10A\nSPN\nMCB\n6kA" as one MTEXT entity

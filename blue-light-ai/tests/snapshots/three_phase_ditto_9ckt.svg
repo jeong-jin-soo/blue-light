@@ -68,6 +68,7 @@
   <line x1="69.39" y1="118.61" x2="105.27" y2="118.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="105.27" y1="118.61" x2="104.07" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="105.27" y1="118.61" x2="104.07" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="93.88" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B10A</text>
   <text x="102.38" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,102.38,88.67)">1 NO. LIGHTING</text>
   <text x="139.75" y="130.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,139.75,129.99)">L3S1</text>
   <path d="M 139.10,121.95 A 3.75,3.75 0 0,0 139.10,115.27" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -78,6 +79,7 @@
   <line x1="105.27" y1="118.61" x2="141.14" y2="118.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="141.14" y1="118.61" x2="139.94" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="141.14" y1="118.61" x2="139.94" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="129.75" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B10A</text>
   <text x="138.25" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,138.25,88.67)">1 NO. LIGHTING</text>
   <text x="181.62" y="130.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,181.62,129.99)">L1P1</text>
   <path d="M 180.98,121.95 A 3.75,3.75 0 0,0 180.98,115.27" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -99,6 +101,7 @@
   <line x1="183.02" y1="118.61" x2="218.89" y2="118.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="218.89" y1="118.61" x2="217.69" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="218.89" y1="118.61" x2="217.69" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="207.50" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B20A</text>
   <text x="216.00" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,216.00,88.67)">1 NO. 13A S/S/O</text>
   <text x="253.38" y="130.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,253.38,129.99)">L3P1</text>
   <path d="M 252.73,121.95 A 3.75,3.75 0 0,0 252.73,115.27" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -109,6 +112,7 @@
   <line x1="218.89" y1="118.61" x2="254.77" y2="118.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="254.77" y1="118.61" x2="253.57" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="254.77" y1="118.61" x2="253.57" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="243.38" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B20A</text>
   <text x="251.88" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,251.88,88.67)">1 NO. 13A S/S/O</text>
   <text x="289.25" y="130.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,289.25,129.99)">H4</text>
   <path d="M 288.60,121.95 A 3.75,3.75 0 0,0 288.60,115.27" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -130,6 +134,7 @@
   <line x1="254.77" y1="118.61" x2="326.52" y2="118.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="326.52" y1="118.61" x2="325.32" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="326.52" y1="118.61" x2="325.32" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="315.12" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B20A</text>
   <text x="323.62" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,323.62,88.67)">1 NO. AIRCON</text>
   <text x="361.00" y="130.87" font-family="Arial, Helvetica, sans-serif" font-size="2.2" fill="#000000" transform="rotate(-90.0,361.00,129.99)">L1P2</text>
   <path d="M 360.35,121.95 A 3.75,3.75 0 0,0 360.35,115.27" stroke="#000000" stroke-width="0.25" fill="none" />
@@ -140,6 +145,7 @@
   <line x1="326.52" y1="118.61" x2="362.39" y2="118.61" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="362.39" y1="118.61" x2="361.19" y2="118.01" stroke="#000000" stroke-width="0.25" fill="none" />
   <line x1="362.39" y1="118.61" x2="361.19" y2="119.21" stroke="#000000" stroke-width="0.25" fill="none" />
+  <text x="351.00" y="117.21" font-family="Arial, Helvetica, sans-serif" font-size="2.0" fill="#000000">B20A</text>
   <text x="55.18" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,55.18,88.67)">2 x 1C 1.5sqmm PVC + 1.5sqmm</text>
   <text x="58.88" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,58.88,88.67)">PVC CPC IN PVC CONDUIT</text>
   <text x="168.80" y="89.73" font-family="Arial, Helvetica, sans-serif" font-size="2.6" fill="#000000" transform="rotate(-90.0,168.80,88.67)">2 x 1C 2.5sqmm PVC + 2.5sqmm</text>

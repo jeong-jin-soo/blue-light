@@ -99,6 +99,20 @@
       "pattern": "line.*through.*BI.*connector|BI.*connector.*pass.*through|connection.*through.*BI",
       "reason": "BI Connector(Bus Interface Connector)는 스파인 선이 관통하는 것이 정상. BI Connector는 스파인 위에 오버레이되는 심볼이며, 연결점 역할.",
       "source": "Singapore LEW practice — BI connector on spine"
+    },
+    {
+      "id": "layout_unbalanced_whitespace",
+      "category": "spacing",
+      "pattern": "unbalanced|excessive.*white.*space|empty.*space.*bottom|empty.*space.*center|content.*concentrated|poorly.*proportioned",
+      "reason": "A3 도면에서 컴포넌트가 수직 중앙 정렬된 상태로, 위아래 여유 공간은 정상. 제목란(하단 55mm)과 상단 마진을 고려하면 콘텐츠 영역이 한쪽에 치우쳐 보일 수 있으나 실제로는 중앙 정렬됨.",
+      "source": "Layout engine — _center_vertically() verified"
+    },
+    {
+      "id": "spine_line_through_breaker",
+      "category": "symbol",
+      "pattern": "spine.*through.*body|line.*through.*MCB|line.*through.*MCCB|line.*through.*ELCB|intersect.*symbol|pass.*through.*breaker",
+      "reason": "SLD에서 메인 스파인 선은 차단기/ELCB 심볼을 관통하여 그려지는 것이 정상. 차단기 심볼은 스파인 선 위에 오버레이되며, 실제 DXF 레퍼런스도 동일.",
+      "source": "IEC 61082, Singapore LEW DXF reference"
     }
   ]
 }
