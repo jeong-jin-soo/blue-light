@@ -2,13 +2,13 @@ name: Deploy to Production
 
 on:
   push:
-    tags:
-      - 'v*'  # v1.0.0, v1.2.3 등 태그 푸시 시 실행
+    branches:
+      - main
 
 env:
   AWS_REGION: ap-southeast-7
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-7.amazonaws.com
-  IMAGE_TAG: ${{ github.ref_name }}
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   # ============================================
