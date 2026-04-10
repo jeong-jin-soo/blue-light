@@ -48,6 +48,10 @@ services:
       SLD_AGENT_SERVICE_KEY: ${SLD_AGENT_SERVICE_KEY:-dev-service-key}
     volumes:
       - uploads_data:/app/uploads
+    deploy:
+      resources:
+        limits:
+          memory: 768M
 
   # ============================================
   # SLD AI Agent (Python)
@@ -74,6 +78,10 @@ services:
     volumes:
       - sld_data:/app/data/db
       - sld_temp:/app/temp
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     depends_on:
       - backend
 
@@ -86,6 +94,10 @@ services:
     restart: always
     ports:
       - "80:80"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     depends_on:
       - backend
 

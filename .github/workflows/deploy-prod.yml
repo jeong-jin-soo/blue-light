@@ -71,7 +71,7 @@ jobs:
           VITE_API_BASE_URL: /api
 
   # ============================================
-  # Docker Build & Push → ECR
+  # Docker Build & Push → ECR (ARM64)
   # ============================================
   docker-push:
     name: Push Docker Images
@@ -81,6 +81,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set up QEMU (ARM64 cross-compile)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -93,39 +101,40 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & Push Backend image
+      - name: Build & Push Backend image (ARM64)
         run: |
-          docker build -t ${{ env.ECR_REGISTRY }}/bluelight-backend:${{ env.IMAGE_TAG }} \
-                        -t ${{ env.ECR_REGISTRY }}/bluelight-backend:stable \
-                        ./blue-light-backend
-          docker push ${{ env.ECR_REGISTRY }}/bluelight-backend:${{ env.IMAGE_TAG }}
-          docker push ${{ env.ECR_REGISTRY }}/bluelight-backend:stable
+          docker buildx build --platform linux/arm64 \
+            -t ${{ env.ECR_REGISTRY }}/bluelight-backend:${{ env.IMAGE_TAG }} \
+            -t ${{ env.ECR_REGISTRY }}/bluelight-backend:stable \
+            --push ./blue-light-backend
 
-      - name: Build & Push Frontend image
+      - name: Build & Push Frontend image (ARM64)
         run: |
-          docker build -t ${{ env.ECR_REGISTRY }}/bluelight-frontend:${{ env.IMAGE_TAG }} \
-                        -t ${{ env.ECR_REGISTRY }}/bluelight-frontend:stable \
-                        --build-arg VITE_API_BASE_URL=/api \
-                        ./blue-light-frontend
-          docker push ${{ env.ECR_REGISTRY }}/bluelight-frontend:${{ env.IMAGE_TAG }}
-          docker push ${{ env.ECR_REGISTRY }}/bluelight-frontend:stable
+          docker buildx build --platform linux/arm64 \
+            -t ${{ env.ECR_REGISTRY }}/bluelight-frontend:${{ env.IMAGE_TAG }} \
+            -t ${{ env.ECR_REGISTRY }}/bluelight-frontend:stable \
+            --build-arg VITE_API_BASE_URL=/api \
+            --push ./blue-light-frontend
 
-      - name: Build & Push SLD Agent image
+      - name: Build & Push SLD Agent image (ARM64)
         run: |
-          docker build -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }} \
-                        -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:stable \
-                        ./blue-light-ai
-          docker push ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }}
-          docker push ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:stable
+          docker buildx build --platform linux/arm64 \
+            -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:${{ env.IMAGE_TAG }} \
+            -t ${{ env.ECR_REGISTRY }}/bluelight-sld-agent:stable \
+            --push ./blue-light-ai
 
   # ============================================
-  # Deploy to Production Server
+  # Rolling Deploy to Production (2 instances)
   # ============================================
   deploy:
-    name: Deploy to Production
+    name: Deploy (${{ matrix.server == 1 && 'Instance A' || 'Instance B' }})
     runs-on: ubuntu-latest
     needs: docker-push
     environment: production
+    strategy:
+      matrix:
+        server: [1, 2]
+      max-parallel: 1  # 순차 배포 — A 완료 후 B (무중단)
 
     steps:
       - uses: actions/checkout@v4
@@ -133,7 +142,7 @@ jobs:
       - name: Copy docker-compose to server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.PROD_SERVER_HOST }}
+          host: ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
           username: ${{ secrets.PROD_SERVER_USER }}
           key: ${{ secrets.PROD_SERVER_SSH_KEY }}
           source: "docker-compose.yml"
@@ -142,7 +151,7 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.PROD_SERVER_HOST }}
+          host: ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
           username: ${{ secrets.PROD_SERVER_USER }}
           key: ${{ secrets.PROD_SERVER_SSH_KEY }}
           script: |
@@ -161,10 +170,9 @@ jobs:
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
-            FILE_ENCRYPTION_KEY=${{ secrets.FILE_ENCRYPTION_KEY }}
-            FILE_STORAGE_TYPE=${{ secrets.FILE_STORAGE_TYPE }}
+            FILE_STORAGE_TYPE=s3
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
-            AWS_S3_REGION=${{ secrets.AWS_S3_REGION }}
+            AWS_S3_REGION=ap-southeast-7
             SLD_AGENT_SERVICE_KEY=${{ secrets.SLD_AGENT_SERVICE_KEY }}
             MAIL_HOST=${{ secrets.MAIL_HOST }}
             MAIL_PORT=${{ secrets.MAIL_PORT }}
@@ -175,9 +183,31 @@ jobs:
             SQL_INIT_MODE=never
             ENVEOF
 
-            # 배포 (운영: DB는 외부 RDS)
-            docker compose -f docker-compose.yml pull
-            docker compose -f docker-compose.yml up -d --remove-orphans
+            # MySQL 접속 정보 추출 (SLD Agent용)
+            DB_URL_RAW=$(grep '^DB_URL=' .env | sed 's/^DB_URL=//')
+            MYSQL_HOST=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d: -f1)
+            MYSQL_PORT=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d: -f2 | cut -d/ -f1)
+            MYSQL_DB=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d/ -f2 | cut -d? -f1)
+            echo "MYSQL_HOST=$MYSQL_HOST" >> .env
+            echo "MYSQL_PORT=$MYSQL_PORT" >> .env
+            echo "MYSQL_DATABASE=$MYSQL_DB" >> .env
 
-            # 이전 이미지 정리
+            # 배포
+            docker compose pull
+            docker compose up -d --remove-orphans
             docker image prune -f
+
+      - name: Wait for health check
+        run: |
+          HOST=${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://$HOST/health 2>/dev/null || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "✅ Instance healthy"
+              exit 0
+            fi
+            echo "⏳ Waiting... attempt $i/30 (status: $STATUS)"
+            sleep 10
+          done
+          echo "❌ Health check failed after 300s"
+          exit 1
