@@ -199,15 +199,18 @@ jobs:
           DEPLOY_SCRIPT
 
       - name: Wait for health check
+        env:
+          HOST: ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
+          USER: ${{ secrets.PROD_SERVER_USER }}
         run: |
-          HOST=${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
           for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' http://$HOST/health 2>/dev/null || true)
-            if [ "$STATUS" = "200" ]; then
+            RESULT=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+              ${USER}@${HOST} "curl -s -o /dev/null -w '%{http_code}' http://localhost/health" 2>/dev/null || echo "000")
+            if [ "$RESULT" = "200" ]; then
               echo "✅ Instance healthy"
               exit 0
             fi
-            echo "⏳ Waiting... attempt $i/30 (status: $STATUS)"
+            echo "⏳ Waiting... attempt $i/30 (status: $RESULT)"
             sleep 10
           done
           echo "❌ Health check failed after 300s"
