@@ -140,13 +140,9 @@ jobs:
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.PROD_SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets.PROD_SERVER_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }} >> ~/.ssh/known_hosts 2>/dev/null
-          # Debug: key file info (no content exposed)
-          echo "Key file: $(wc -c < ~/.ssh/deploy_key) bytes, $(wc -l < ~/.ssh/deploy_key) lines"
-          head -1 ~/.ssh/deploy_key
-          ssh-keygen -l -f ~/.ssh/deploy_key 2>&1 || echo "Key validation failed"
 
       - name: Copy docker-compose and deploy
         env:
