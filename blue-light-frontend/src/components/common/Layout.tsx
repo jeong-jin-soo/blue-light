@@ -101,7 +101,7 @@ export default function Layout() {
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/10">
           <Link to={homePath} className="flex items-center">
-            <img src={licensekakiLogo} alt="LicenseKaki" className="h-7 brightness-0 invert" />
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-6 brightness-0 invert" />
           </Link>
         </div>
 

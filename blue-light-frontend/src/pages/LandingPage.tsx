@@ -81,7 +81,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
-            <img src={licensekakiLogo} alt="LicenseKaki" className="h-7" />
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-6" />
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login">

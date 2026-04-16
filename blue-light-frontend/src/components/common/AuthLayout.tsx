@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       <div className="w-full max-w-md">
         {/* Logo — links back to landing page */}
         <Link to="/" className="block text-center mb-8 group">
-          <img src={licensekakiLogo} alt="LicenseKaki" className="max-w-[240px] mx-auto mb-4 group-hover:opacity-80 transition-opacity" />
+          <img src={licensekakiLogo} alt="LicenseKaki" className="max-w-[192px] mx-auto mb-4 group-hover:opacity-80 transition-opacity" />
           <p className="text-sm text-gray-500 mt-1">Singapore Electrical Licence Platform</p>
         </Link>
 
