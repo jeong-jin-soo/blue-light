@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import licensekakiLogo from '../../assets/licensekaki-logo.jpg';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -6,9 +7,8 @@ export default function PrivacyPolicyPage() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
-            <span className="text-2xl">💡</span>
-            <span className="text-xl font-bold">LicenseKaki</span>
+          <Link to="/" className="inline-flex items-center hover:opacity-80 transition-opacity">
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-10" />
           </Link>
         </div>
 

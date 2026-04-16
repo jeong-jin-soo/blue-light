@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import licensekakiLogo from '../../assets/licensekaki-logo.jpg';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -15,10 +16,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       <div className="w-full max-w-md">
         {/* Logo — links back to landing page */}
         <Link to="/" className="block text-center mb-8 group">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4 group-hover:shadow-lg transition-shadow">
-            <span className="text-3xl">💡</span>
-          </div>
-          <h1 className="text-2xl font-bold text-primary">LicenseKaki</h1>
+          <img src={licensekakiLogo} alt="LicenseKaki" className="h-12 mx-auto mb-4 group-hover:opacity-80 transition-opacity" />
           <p className="text-sm text-gray-500 mt-1">Singapore Electrical Licence Platform</p>
         </Link>
 
