@@ -11,28 +11,22 @@ import licensekakiLogo from '../assets/licensekaki-logo.png';
 const features = [
   {
     icon: '📋',
-    title: 'Digital Licence Applications',
+    title: 'Online Licence Applications',
     desc: 'Submit NEW or RENEWAL applications for EMA electrical installation licences with a guided multi-step form. Upload SLD drawings, authorization letters, and supporting documents — all online.',
     bullets: ['Multi-step guided form', 'Document upload & management', 'Real-time status tracking'],
   },
   {
     icon: '📐',
     title: 'Professional SLD Drawings',
-    desc: 'Order single-line diagram drawings from qualified professionals. Receive custom quotes and benefit from AI-assisted SLD generation for faster turnaround.',
-    bullets: ['Custom quote system', 'AI-assisted generation', 'Expert review & revision'],
-  },
-  {
-    icon: '👥',
-    title: 'Multi-Role Collaboration',
-    desc: 'A unified platform connecting building, business, and shop owners, Licensed Electrical Workers, SLD professionals, and administrators in one seamless workflow.',
-    bullets: ['Building, business & shop owners', 'Licensed Electrical Workers', 'SLD drawing professionals'],
+    desc: 'Order single-line diagram drawings from qualified professionals. Receive custom quotes and professional SLD generation for faster turnaround.',
+    bullets: ['Custom quote system', 'Professional generation', 'Expert review & revision'],
   },
 ];
 
 const steps = [
   { num: 1, title: 'Create Account', desc: 'Sign up as a building, business, or shop owner. Add your details and SP account information.' },
   { num: 2, title: 'Submit Application', desc: 'Choose NEW or RENEWAL, enter your property details, select kVA capacity, and upload required documents.' },
-  { num: 3, title: 'Review & Payment', desc: 'Your application is reviewed by a Licensed Electrical Worker. Once approved, complete payment via PayNow or bank transfer.' },
+  { num: 3, title: 'Review & Payment', desc: 'Your application is reviewed by a Licensed Electrical Worker. Once approved, complete payment via PayNow or QRcode.' },
   { num: 4, title: 'Licence Issued', desc: 'Track your application in real-time. Once processing is complete, your electrical installation licence is issued.' },
 ];
 
@@ -40,7 +34,6 @@ const trustItems = [
   { icon: '🔒', label: 'AES-256 Encryption', desc: 'Enterprise-grade file encryption at rest' },
   { icon: '🛡️', label: 'PDPA Compliant', desc: 'Singapore data protection compliance' },
   { icon: '📝', label: 'Audit Trail', desc: 'Complete logging for transparency' },
-  { icon: '💳', label: 'Secure Payments', desc: 'PayNow & bank transfer support' },
 ];
 
 const statusSteps = [
@@ -116,9 +109,6 @@ export default function LandingPage() {
                 <Link to="/signup?role=APPLICANT">
                   <Button size="lg">Apply for a Licence</Button>
                 </Link>
-                <Link to="/signup?role=LEW">
-                  <Button variant="outline" size="lg">Join as LEW</Button>
-                </Link>
                 <Button variant="ghost" size="lg" onClick={scrollToFeatures}>
                   Learn More
                 </Button>
@@ -169,14 +159,15 @@ export default function LandingPage() {
               Platform Features
             </span>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-gray-900">
-              Everything You Need for Licence Management
+              Everything You Need for Licence Management{' '}
+              <span className="text-primary italic">& more</span>
             </h2>
             <p className="mt-3 text-gray-500 max-w-2xl mx-auto">
-              From application to approval, manage the entire electrical installation licence lifecycle digitally.
+              From application to approval, manage the entire licensing process online.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {features.map((f) => (
               <div
                 key={f.title}
@@ -249,7 +240,7 @@ export default function LandingPage() {
       {/* ── E. Trust & Security Banner ── */}
       <section className="py-14 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {trustItems.map((t) => (
               <div key={t.label} className="text-center">
                 <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3">
@@ -267,10 +258,11 @@ export default function LandingPage() {
       <section className="bg-primary">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
-            Ready to Simplify Your Licence Application?
+            Ready to Simplify Your Licence Application{' '}
+            <span className="italic">&amp; more</span>?
           </h2>
           <p className="text-blue-200 mb-8 max-w-2xl mx-auto">
-            Join building, business, and shop owners and electrical professionals across Singapore who trust LicenseKaki.
+            Singapore's first seamless online electrical licensing platform.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
             <Link to="/signup?role=APPLICANT">
@@ -280,15 +272,6 @@ export default function LandingPage() {
                 className="!bg-white !text-primary !border-white hover:!bg-gray-100"
               >
                 Apply for a Licence
-              </Button>
-            </Link>
-            <Link to="/signup?role=LEW">
-              <Button
-                size="lg"
-                variant="outline"
-                className="!bg-transparent !text-white !border-white/60 hover:!bg-white/10"
-              >
-                Join as LEW
               </Button>
             </Link>
           </div>
