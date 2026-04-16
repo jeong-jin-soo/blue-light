@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
-import licensekakiLogo from '../assets/licensekaki-logo.jpg';
+import licensekakiLogo from '../assets/licensekaki-logo.png';
 
 /* ------------------------------------------------------------------ */
 /*  Data                                                               */
@@ -81,7 +81,7 @@ export default function LandingPage() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center">
-            <img src={licensekakiLogo} alt="LicenseKaki" className="h-8" />
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-7" />
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login">
@@ -300,7 +300,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center">
-              <img src={licensekakiLogo} alt="LicenseKaki" className="h-6" />
+              <img src={licensekakiLogo} alt="LicenseKaki" className="h-5" />
             </div>
             <div className="flex items-center gap-4 text-xs text-gray-400">
               <Link to="/disclaimer" className="hover:text-gray-600 transition-colors">Disclaimer</Link>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import licensekakiLogo from '../../assets/licensekaki-logo.jpg';
+import licensekakiLogo from '../../assets/licensekaki-logo.png';
 
 export default function PrivacyPolicyPage() {
   return (
@@ -8,7 +8,7 @@ export default function PrivacyPolicyPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center hover:opacity-80 transition-opacity">
-            <img src={licensekakiLogo} alt="LicenseKaki" className="h-10" />
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-8" />
           </Link>
         </div>
 

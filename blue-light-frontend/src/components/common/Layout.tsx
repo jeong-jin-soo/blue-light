@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import licensekakiLogo from '../../assets/licensekaki-logo.jpg';
+import licensekakiLogo from '../../assets/licensekaki-logo.png';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import Footer from './Footer';
@@ -101,7 +101,7 @@ export default function Layout() {
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/10">
           <Link to={homePath} className="flex items-center">
-            <img src={licensekakiLogo} alt="LicenseKaki" className="h-8 brightness-0 invert" />
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-7 brightness-0 invert" />
           </Link>
         </div>
 
