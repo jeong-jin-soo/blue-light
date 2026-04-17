@@ -253,6 +253,16 @@ public class User extends BaseEntity {
     }
 
     /**
+     * Phase 2 PR#3 (JIT): 회사 정보 3필드만 업데이트.
+     * 신청 제출 경로에서 단일 트랜잭션으로 호출된다.
+     */
+    public void updateCompanyInfo(String companyName, String uen, String designation) {
+        this.companyName = companyName;
+        this.uen = uen;
+        this.designation = designation;
+    }
+
+    /**
      * 역할 변경 (approvedStatus, lewGrade 연동)
      */
     public void changeRole(UserRole role) {

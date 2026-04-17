@@ -303,6 +303,17 @@ export interface TokenResponse {
 // ============================================
 
 /**
+ * Phase 2 PR#3: 법인 JIT 모달에서 수집하는 회사 정보
+ */
+export interface CompanyInfo {
+  companyName: string;
+  uen: string;
+  designation: string;
+  /** true(기본) = User 프로필에 저장 / false = 이 신청에만 사용 */
+  persistToProfile: boolean;
+}
+
+/**
  * 신청서 작성 요청
  */
 export interface CreateApplicationRequest {
@@ -321,6 +332,8 @@ export interface CreateApplicationRequest {
   renewalReferenceNo?: string;
   // SLD 제출 방식
   sldOption?: string;
+  // Phase 2 PR#3: 법인 JIT
+  companyInfo?: CompanyInfo;
 }
 
 /**

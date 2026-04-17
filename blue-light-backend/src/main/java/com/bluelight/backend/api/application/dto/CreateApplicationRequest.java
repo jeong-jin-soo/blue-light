@@ -1,17 +1,22 @@
 package com.bluelight.backend.api.application.dto;
 
 import com.bluelight.backend.domain.application.ApplicantType;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Create application request DTO
  */
 @Getter
+@Setter
 @NoArgsConstructor
 public class CreateApplicationRequest {
 
@@ -81,4 +86,33 @@ public class CreateApplicationRequest {
      * SLD 제출 방식: "SELF_UPLOAD" (기본) / "REQUEST_LEW"
      */
     private String sldOption;
+
+    // ── Phase 2 PR#3: 법인 JIT 회사 정보 ──
+
+    /**
+     * applicantType=CORPORATE이고 User.companyName이 없을 때 필수.
+     * INDIVIDUAL일 때 전송되어도 무시된다(서비스 계층에서 처리).
+     *
+     * 필수성 조건부 검증은 {@link #isCompanyInfoValidForCorporate()} 참조.
+     * User에 이미 companyName이 저장돼 있는 경우에는 이 필드가 비어있어도 OK.
+     */
+    @Valid
+    private CompanyInfoRequest companyInfo;
+
+    /**
+     * Bean Validation 조건부 검증 — applicantType=CORPORATE인데 companyInfo가 누락된 경우를
+     * 탐지한다. 단, User에 이미 companyName이 있는 케이스는 여기서 알 수 없으므로 서비스
+     * 계층에서 추가 분기한다. 이 단계에서는 "둘 다 누락"만 400으로 떨어뜨리지 말고,
+     * DTO 단에서는 applicantType 자체만 체크하여 *완전히 누락된 법인 신청*을 거른다.
+     *
+     * 실제 "User에 companyName이 없고 + companyInfo도 없음" 분기는 서비스에서 처리:
+     * errorCode="COMPANY_INFO_REQUIRED".
+     *
+     * 여기에는 null/not-null 자체 검증만 수행하지 않는다 — 서비스에서 복합 판단.
+     */
+    @JsonIgnore
+    @AssertTrue(message = "applicantType is required")
+    public boolean isApplicantTypePresent() {
+        return applicantType != null;
+    }
 }

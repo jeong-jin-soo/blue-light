@@ -10,6 +10,8 @@ interface ModalProps {
   children: ReactNode;
   closeOnOverlay?: boolean;
   closeOnEscape?: boolean;
+  /** id of the heading element inside the modal; improves screen reader labelling */
+  ariaLabelledBy?: string;
 }
 
 const sizeClasses: Record<ModalSize, string> = {
@@ -28,6 +30,7 @@ export function Modal({
   children,
   closeOnOverlay = true,
   closeOnEscape = true,
+  ariaLabelledBy,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -125,6 +128,7 @@ export function Modal({
         className={`relative bg-surface rounded-xl shadow-modal w-full ${sizeClasses[size]} animate-in max-h-[90vh] overflow-y-auto`}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={ariaLabelledBy}
         tabIndex={-1}
       >
         {children}

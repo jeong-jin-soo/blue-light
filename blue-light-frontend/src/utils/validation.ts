@@ -141,3 +141,17 @@ export function validateApplicationStep2(formData: ApplicationFormData): Record<
 
   return errors;
 }
+
+/**
+ * Phase 2 PR#3: 싱가포르 UEN 형식 검증
+ * - 9자리 숫자 + 1 알파벳 (예: 201812345A)
+ * - 또는 8자리 숫자 + 1 알파벳 (Business 등록)
+ * - 또는 T/S/R 프리픽스 10자리 (사업체)
+ *
+ * 백엔드 CompanyInfoRequest.uen 정규식과 동일하게 유지해야 함.
+ */
+export function isValidSingaporeUen(uen: string): boolean {
+  if (!uen) return false;
+  const re = /^(\d{8}[A-Z]|\d{9}[A-Z]|[TSR]\d{2}[A-Z]{2}\d{4}[A-Z])$/;
+  return re.test(uen.trim());
+}

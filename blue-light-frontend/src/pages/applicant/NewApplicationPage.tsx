@@ -7,6 +7,7 @@ import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { InfoBox } from '../../components/ui/InfoBox';
 import { ApplicantTypeCard } from '../../components/applicant/ApplicantTypeCard';
+import { CompanyInfoModal } from '../../components/applicant/CompanyInfoModal';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
@@ -16,12 +17,13 @@ import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
 import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
+import { userApi } from '../../api/userApi';
 import {
   validateApplicationStep0,
   validateApplicationStep1,
   validateApplicationStep2,
 } from '../../utils/validation';
-import type { MasterPrice, PriceCalculation, Application, ApplicantType, ApplicationType, CreateApplicationRequest } from '../../types';
+import type { MasterPrice, PriceCalculation, Application, ApplicantType, ApplicationType, CreateApplicationRequest, CompanyInfo } from '../../types';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
@@ -70,6 +72,12 @@ export default function NewApplicationPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+
+  // Phase 2 PR#3 — 법인 JIT 모달 상태
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [jitSubmitError, setJitSubmitError] = useState<string | null>(null);
+  // User profile에 이미 회사정보가 있는지 여부 (Submit 시 한 번 조회)
+  const [userHasCompanyInfo, setUserHasCompanyInfo] = useState<boolean | null>(null);
 
   // Phase 1 PR#3: 파일 업로드 UI/상태 전부 제거. LEW가 필요 시 이후 단계에서 요청함.
 
@@ -220,47 +228,124 @@ export default function NewApplicationPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /** 공통 payload 빌더 (JIT 모달 경로와 일반 경로 공유) */
+  const buildPayload = (companyInfo?: CompanyInfo): CreateApplicationRequest | null => {
+    if (!formData.selectedKva) return null;
+    const payload: CreateApplicationRequest = {
+      address: formData.address.trim(),
+      postalCode: formData.postalCode.trim(),
+      buildingType: formData.buildingType || undefined,
+      selectedKva: formData.selectedKva,
+      applicantType: formData.applicantType,
+      applicationType: formData.applicationType,
+      renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
+      spAccountNo: formData.spAccountNo.trim() || undefined,
+      sldOption: formData.sldOption,
+    };
+    if (formData.applicationType === 'RENEWAL') {
+      if (formData.renewalReferenceNo.trim()) {
+        payload.renewalReferenceNo = formData.renewalReferenceNo.trim();
+      }
+      if (formData.originalApplicationSeq && !formData.manualEntry) {
+        payload.originalApplicationSeq = formData.originalApplicationSeq;
+      } else {
+        payload.existingLicenceNo = formData.existingLicenceNo.trim();
+        payload.existingExpiryDate = formData.existingExpiryDate;
+      }
+    }
+    if (companyInfo) {
+      payload.companyInfo = companyInfo;
+    }
+    return payload;
+  };
+
+  /** 실제 API 호출 — 일반 경로와 JIT 경로 공유 */
+  const createApplicationCall = async (payload: CreateApplicationRequest) => {
+    const result = await applicationApi.createApplication(payload);
+    clearDraft();
+    toast.success('Application submitted successfully!');
+    navigate(`/applications/${result.applicationSeq}`);
+    return result;
+  };
+
+  /**
+   * AC-J1 / AC-J5: Submit Confirm 에서 "Submit" 클릭 시 진입.
+   * - INDIVIDUAL 이면 즉시 API 호출.
+   * - CORPORATE + User에 회사정보가 이미 있으면 즉시 호출.
+   * - CORPORATE + User 회사정보 없음이면 JIT 모달 열고 API는 아직 호출하지 않는다.
+   */
   const handleSubmit = async () => {
     if (!formData.selectedKva) return;
     setShowSubmitConfirm(false);
-    setSubmitting(true);
-    try {
-      const payload: CreateApplicationRequest = {
-        address: formData.address.trim(),
-        postalCode: formData.postalCode.trim(),
-        buildingType: formData.buildingType || undefined,
-        selectedKva: formData.selectedKva,
-        // Phase 1 PR#3: UI 라디오와 연동 (AC-A3)
-        applicantType: formData.applicantType,
-        applicationType: formData.applicationType,
-        renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
-        spAccountNo: formData.spAccountNo.trim() || undefined,
-        sldOption: formData.sldOption,
-      };
-      if (formData.applicationType === 'RENEWAL') {
-        if (formData.renewalReferenceNo.trim()) {
-          payload.renewalReferenceNo = formData.renewalReferenceNo.trim();
-        }
-        if (formData.originalApplicationSeq && !formData.manualEntry) {
-          payload.originalApplicationSeq = formData.originalApplicationSeq;
-        } else {
-          payload.existingLicenceNo = formData.existingLicenceNo.trim();
-          payload.existingExpiryDate = formData.existingExpiryDate;
+
+    // 법인 preflight — 모달 표시 여부 결정
+    if (formData.applicantType === 'CORPORATE') {
+      // User.companyName 확인 — 캐시 없으면 1회 조회
+      let hasCompany = userHasCompanyInfo;
+      if (hasCompany === null) {
+        try {
+          const profile = await userApi.getMyProfile();
+          hasCompany = !!(profile.companyName && profile.companyName.trim());
+          setUserHasCompanyInfo(hasCompany);
+        } catch {
+          // 프로필 조회 실패 시 안전하게 모달 표시 (서버도 COMPANY_INFO_REQUIRED 방어)
+          hasCompany = false;
+          setUserHasCompanyInfo(false);
         }
       }
-      const result = await applicationApi.createApplication(payload);
-      clearDraft(); // 신청서 생성 성공 → draft 삭제
 
-      // Phase 1 PR#3: Step 0 파일 업로드 UI 제거 → 업로드 시도 없음.
-      // LEW가 검토 후 필요 시 이후 단계에서 요청 (Phase 2 예정).
+      if (!hasCompany) {
+        setJitSubmitError(null);
+        setShowCompanyModal(true);
+        return; // 모달에서 confirm 시 제출
+      }
+    }
 
-      toast.success('Application submitted successfully!');
-      navigate(`/applications/${result.applicationSeq}`);
+    setSubmitting(true);
+    try {
+      const payload = buildPayload();
+      if (!payload) return;
+      await createApplicationCall(payload);
     } catch {
       toast.error('Failed to submit application. Please try again.');
     } finally {
       setSubmitting(false);
     }
+  };
+
+  /** AC-J2: JIT 모달 confirm — 단일 @Transactional 백엔드가 User 업데이트 + Application 생성 */
+  const handleCompanyModalConfirm = async (info: CompanyInfo) => {
+    setJitSubmitError(null);
+    setSubmitting(true);
+    try {
+      const payload = buildPayload(info);
+      if (!payload) {
+        setSubmitting(false);
+        return;
+      }
+      await createApplicationCall(payload);
+      setShowCompanyModal(false);
+      if (info.persistToProfile) {
+        setUserHasCompanyInfo(true); // 다음 신청 시 모달 생략
+      }
+    } catch (err: unknown) {
+      // 서버 400 INVALID_UEN / COMPANY_INFO_REQUIRED 등을 모달 내 표시
+      const e = err as { response?: { data?: { code?: string; message?: string } }; message?: string };
+      const code = e.response?.data?.code;
+      let msg = e.response?.data?.message || 'Could not submit. Please try again.';
+      if (code === 'INVALID_UEN') msg = 'Invalid UEN format. Check SG UEN rules.';
+      if (code === 'COMPANY_INFO_REQUIRED') msg = 'Company info is required for corporate applications.';
+      setJitSubmitError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** AC-J4: 모달 취소 — Step 3 폼 보존, API 호출 없음 */
+  const handleCompanyModalCancel = () => {
+    if (submitting) return;
+    setShowCompanyModal(false);
+    setJitSubmitError(null);
   };
 
   // Helper: reset renewal fields when switching type (applicantType은 사용자 선택 유지)
@@ -820,6 +905,15 @@ export default function NewApplicationPage() {
           formData.applicationType === 'RENEWAL' ? 'renewal ' : ''
         }application? You will need to make payment after submission.`}
         confirmLabel="Submit"
+      />
+
+      {/* Phase 2 PR#3: 법인 JIT 회사정보 모달 */}
+      <CompanyInfoModal
+        isOpen={showCompanyModal}
+        submitting={submitting}
+        submitError={jitSubmitError}
+        onConfirm={handleCompanyModalConfirm}
+        onCancel={handleCompanyModalCancel}
       />
 
       {/* Phase 1 PR#3: SP Account Email Sample Modal, SamplePreviewModal 제거 (파일 업로드 UI 제거와 함께) */}

@@ -3,8 +3,12 @@ package com.bluelight.backend.api.application;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
+import com.bluelight.backend.api.application.dto.CompanyInfoRequest;
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
+import com.bluelight.backend.api.audit.AuditLogService;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.api.application.dto.CreateSldRequestDto;
@@ -29,7 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Application service for applicants
@@ -47,15 +53,20 @@ public class ApplicationService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final FileRepository fileRepository;
+    private final AuditLogService auditLogService;
 
     /**
      * Create a new licence application (NEW or RENEWAL)
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ApplicationResponse createApplication(Long userSeq, CreateApplicationRequest request) {
         // Find user
         User user = userRepository.findById(userSeq)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+
+        // Phase 2 PR#3 — 법인 JIT 회사 정보 처리 (AC-J1~J6)
+        // 같은 @Transactional 안에서 User 업데이트 + Application insert가 함께 커밋된다.
+        applyCorporateJitCompanyInfo(user, request);
 
         // Calculate price from kVA
         MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
@@ -462,6 +473,83 @@ public class ApplicationService {
         log.info("SLD request updated: applicationSeq={}, userSeq={}, hasSketch={}",
                 applicationSeq, userSeq, sketchFileSeq != null);
         return SldRequestResponse.from(sldRequest);
+    }
+
+    /**
+     * Phase 2 PR#3 — 법인 JIT 회사 정보 적용.
+     *
+     * 규칙:
+     * - applicantType != CORPORATE 이면 no-op (INDIVIDUAL일 때 companyInfo 전송되어도 무시).
+     * - CORPORATE이고 User에 companyName이 이미 있으면 companyInfo 없이도 통과 (모달 없이 제출 케이스).
+     * - CORPORATE이고 User.companyName이 없는데 companyInfo도 누락이면 400 COMPANY_INFO_REQUIRED.
+     * - companyInfo가 주어졌을 때 persistToProfile=true(default)면 User에 저장 + 감사 로그 2건
+     *   (PROFILE_COMPANY_INFO_UPDATED + CORPORATE_INFO_CAPTURED_VIA_JIT).
+     * - persistToProfile=false이면 User는 변경하지 않고 감사 로그 1건만 기록
+     *   (CORPORATE_INFO_CAPTURED_VIA_JIT, metadata.persistToProfile=false).
+     */
+    private void applyCorporateJitCompanyInfo(User user, CreateApplicationRequest request) {
+        if (request.getApplicantType() != ApplicantType.CORPORATE) {
+            return;
+        }
+
+        CompanyInfoRequest info = request.getCompanyInfo();
+        boolean userHasCompany = user.getCompanyName() != null && !user.getCompanyName().isBlank();
+
+        if (info == null) {
+            if (!userHasCompany) {
+                throw new BusinessException(
+                        "Company info is required for corporate applications",
+                        HttpStatus.BAD_REQUEST, "COMPANY_INFO_REQUIRED");
+            }
+            // User에 이미 회사정보가 있음 → JIT 불필요, no-op
+            return;
+        }
+
+        String companyName = info.getCompanyName() == null ? null : info.getCompanyName().trim();
+        String uen = info.getUen() == null ? null : info.getUen().trim();
+        String designation = info.getDesignation() == null ? null : info.getDesignation().trim();
+        boolean persist = info.shouldPersistToProfile();
+
+        Map<String, String> before = new LinkedHashMap<>();
+        before.put("companyName", user.getCompanyName());
+        before.put("uen", user.getUen());
+        before.put("designation", user.getDesignation());
+
+        Map<String, String> after = new LinkedHashMap<>();
+        after.put("companyName", companyName);
+        after.put("uen", uen);
+        after.put("designation", designation);
+
+        if (persist && !before.equals(after)) {
+            user.updateCompanyInfo(companyName, uen, designation);
+            // 기존 프로필 수정 경로와 동일한 감사 이벤트 (Phase 1 B-2와 일관)
+            auditLogService.logAsync(
+                    user.getUserSeq(),
+                    AuditAction.PROFILE_COMPANY_INFO_UPDATED,
+                    AuditCategory.DATA_PROTECTION,
+                    "User", String.valueOf(user.getUserSeq()),
+                    "Company information captured via JIT modal during application submission",
+                    before, after,
+                    null, null, "POST", "/api/applications", 201
+            );
+        }
+
+        // JIT 경로 표식 감사 이벤트 (Security B-2: persistToProfile flag 반드시 기록)
+        Map<String, Object> jitMetadata = new LinkedHashMap<>();
+        jitMetadata.put("persistToProfile", persist);
+        jitMetadata.put("companyName", companyName);
+        jitMetadata.put("uen", uen);
+        jitMetadata.put("designation", designation);
+
+        auditLogService.logAsync(
+                user.getUserSeq(),
+                AuditAction.CORPORATE_INFO_CAPTURED_VIA_JIT,
+                AuditCategory.APPLICATION,
+                "User", String.valueOf(user.getUserSeq()),
+                "Corporate company info captured via JIT modal",
+                null, jitMetadata,
+                null, null, "POST", "/api/applications", 201
+        );
     }
 
     /**
