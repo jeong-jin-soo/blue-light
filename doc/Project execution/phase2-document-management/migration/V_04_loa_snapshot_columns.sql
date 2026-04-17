@@ -38,12 +38,8 @@ UPDATE applications a
                AND f.file_type = 'OWNER_AUTH_LETTER'
         ));
 
--- 3) 백필 대상이 아닌 나머지 row는 빈 문자열로 채운다 — NOT NULL 제약을 걸기 위한 준비.
---    (LOA가 아예 없는 application은 법적 스냅샷 대상이 아니지만 컬럼은 NOT NULL 필요)
-UPDATE applications
-   SET applicant_name_snapshot = ''
- WHERE applicant_name_snapshot IS NULL;
-
--- 4) applicant_name_snapshot NOT NULL 확정 (신규 LOA는 항상 값 기록)
-ALTER TABLE applications
-    MODIFY COLUMN applicant_name_snapshot VARCHAR(100) NOT NULL DEFAULT '';
+-- NOTE (Hotfix 2026-04-17): applicant_name_snapshot은 NULL 유지.
+-- 이유: 신청 생성 시점에는 LOA가 아직 없으므로 null이어야 한다.
+-- LOA 생성(LoaService#recordLoaSnapshot) 시점에 값이 채워진다.
+-- 이미 운영 DB에서 NOT NULL이 걸린 경우 다음 SQL로 복원:
+--   ALTER TABLE applications MODIFY COLUMN applicant_name_snapshot VARCHAR(100) NULL;

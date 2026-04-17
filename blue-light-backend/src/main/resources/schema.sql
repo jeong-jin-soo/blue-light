@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS applications (
     loa_signature_url        VARCHAR(255),
     loa_signed_at            DATETIME(6),
     -- LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) — UPDATE 금지, 엔티티 @Column(updatable=false)로 강제
-    applicant_name_snapshot  VARCHAR(100)  NOT NULL DEFAULT '',
+    -- 신청 생성 시점에는 null, LOA 생성(recordLoaSnapshot) 시점에 기록됨
+    applicant_name_snapshot  VARCHAR(100)  NULL,
     company_name_snapshot    VARCHAR(100)  NULL,
     uen_snapshot             VARCHAR(20)   NULL,
     designation_snapshot     VARCHAR(50)   NULL,
