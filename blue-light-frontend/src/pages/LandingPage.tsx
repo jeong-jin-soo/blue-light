@@ -160,12 +160,8 @@ export default function LandingPage() {
             </span>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-gray-900">
               Everything You Need for Licence Management{' '}
-              <span className="relative inline-block">
-                <span className="relative z-10 italic font-extrabold text-3xl sm:text-4xl bg-gradient-to-r from-red-500 to-rose-600 bg-clip-text text-transparent">
-                  &amp; more
-                </span>
-                <span className="absolute -bottom-1 left-0 right-0 h-2 bg-yellow-200/70 -z-0 rounded" aria-hidden="true" />
-                <span className="absolute -top-3 -right-4 text-xs animate-pulse" aria-hidden="true">✨</span>
+              <span className="italic font-extrabold text-3xl sm:text-4xl bg-gradient-to-r from-emerald-500 to-green-600 bg-clip-text text-transparent">
+                &amp; more
               </span>
             </h2>
             <p className="mt-3 text-gray-500 max-w-2xl mx-auto">
