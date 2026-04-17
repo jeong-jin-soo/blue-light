@@ -835,6 +835,15 @@ export interface AuditLog {
 
 export type NotificationType = 'PAYMENT_CONFIRMED';
 
+// ── Phase 2 Document Management (re-export) ───
+export type {
+  DocumentRequestStatus,
+  DocumentType,
+  DocumentRequest,
+  VoluntaryUploadResponse,
+  VoluntaryUploadPayload,
+} from './document';
+
 export interface AppNotification {
   notificationSeq: number;
   type: NotificationType;

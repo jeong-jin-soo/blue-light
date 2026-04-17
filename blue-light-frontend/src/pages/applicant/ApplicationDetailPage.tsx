@@ -20,12 +20,15 @@ import { ApplicationInfo } from './sections/ApplicationInfo';
 import { ApplicationPayment } from './sections/ApplicationPayment';
 import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
+import { DocumentUploadSection } from '../../components/document/DocumentUploadSection';
+import { useAuthStore } from '../../stores/authStore';
 import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus, SampleFileInfo } from '../../types';
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToastStore();
+  const authUser = useAuthStore((s) => s.user);
 
   const [application, setApplication] = useState<Application | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -362,6 +365,12 @@ export default function ApplicationDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Phase 2 — 서류 섹션 (자발적 업로드). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
+          <DocumentUploadSection
+            applicationSeq={applicationId}
+            canUpload={authUser?.role === 'APPLICANT'}
+          />
+
           <ApplicationInfo
             application={application}
             editMode={editMode}

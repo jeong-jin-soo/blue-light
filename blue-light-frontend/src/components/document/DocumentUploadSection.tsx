@@ -1,0 +1,318 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import documentApi from '../../api/documentApi';
+import { useToastStore } from '../../stores/toastStore';
+import type { DocumentRequest, DocumentType } from '../../types/document';
+import { Card, CardHeader } from '../ui/Card';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { InfoBox } from '../ui/InfoBox';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { DocumentRequestCard } from './DocumentRequestCard';
+import { formatBytes } from './documentUtils';
+
+interface DocumentUploadSectionProps {
+  applicationSeq: number;
+  /** 신청자(APPLICANT)만 자발적 업로드 가능. LEW/ADMIN은 읽기 전용. */
+  canUpload: boolean;
+}
+
+/**
+ * 신청 상세 페이지 "서류" 섹션 컨테이너 (Phase 2, AC-U1~U4)
+ *
+ * 구성:
+ *   1. InfoBox (Phase 1 연속 — "업로드는 선택" 안내)
+ *   2. DocumentRequestCard variant=neutral — 자발적 업로드 카드 (APPLICANT only)
+ *   3. 업로드된 서류 목록 (또는 empty state)
+ *   4. ?devMockups=1 쿼리로 Phase 3 variant skeleton 확인 (AC-U3)
+ */
+export function DocumentUploadSection({
+  applicationSeq,
+  canUpload,
+}: DocumentUploadSectionProps) {
+  const toast = useToastStore();
+
+  const [catalog, setCatalog] = useState<DocumentType[]>([]);
+  const [requests, setRequests] = useState<DocumentRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DocumentRequest | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const showDevMockups = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('devMockups') === '1';
+  }, []);
+
+  const catalogByCode = useMemo(() => {
+    const map = new Map<string, DocumentType>();
+    for (const dt of catalog) map.set(dt.code, dt);
+    return map;
+  }, [catalog]);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const [catalogData, requestData] = await Promise.all([
+        documentApi.getDocumentTypes(),
+        documentApi.getDocumentRequests(applicationSeq),
+      ]);
+      setCatalog(catalogData);
+      setRequests(requestData);
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? 'Failed to load documents';
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+    // 의도적으로 toast를 deps에서 제외 (zustand store 참조는 stable)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationSeq]);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  const handleUpload = async ({
+    documentTypeCode,
+    customLabel,
+    file,
+  }: {
+    documentTypeCode: string;
+    customLabel?: string;
+    file: File;
+  }) => {
+    setUploading(true);
+    try {
+      await documentApi.uploadVoluntaryDocument(applicationSeq, {
+        documentTypeCode,
+        customLabel,
+        file,
+      });
+      toast.success('업로드 완료 · Uploaded');
+      // 목록 새로고침 (낙관적 업데이트 대신 서버 source of truth 사용)
+      const refreshed = await documentApi.getDocumentRequests(applicationSeq);
+      setRequests(refreshed);
+    } catch (err) {
+      const msg =
+        (err as { message?: string })?.message ??
+        '업로드에 실패했습니다. · Upload failed.';
+      toast.error(msg);
+      throw err; // DocumentRequestCard 내부 에러 표시용
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await documentApi.deleteDocument(applicationSeq, deleteTarget.id);
+      toast.success('삭제되었습니다. · Deleted');
+      setRequests((prev) => prev.filter((r) => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? '삭제에 실패했습니다. · Delete failed.';
+      toast.error(msg);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  // Phase 2에서는 자발적 업로드 = UPLOADED 상태의 DocumentRequest만 목록에 표시
+  const uploadedList = requests.filter((r) => r.status === 'UPLOADED');
+
+  return (
+    <>
+      <Card>
+        <CardHeader title="서류 · Documents" description="Supporting documents (optional)" />
+
+        <InfoBox title="지금은 업로드가 필수가 아니에요 · Upload is optional for now">
+          LEW가 검토 중 서류를 요청할 수 있습니다. 이미 가진 서류가 있다면 먼저 업로드해 두면 진행이 빨라집니다.
+          <br />
+          Your LEW may request documents during review. You can also upload anything you already have — it speeds things up.
+        </InfoBox>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <LoadingSpinner size="md" label="Loading documents..." />
+          </div>
+        ) : (
+          <>
+            {canUpload && (
+              <div className="mt-6">
+                <DocumentRequestCard
+                  variant="neutral"
+                  catalog={catalog}
+                  onUpload={handleUpload}
+                  uploading={uploading}
+                />
+              </div>
+            )}
+
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-800">
+                  업로드됨 · Uploaded{' '}
+                  <span className="text-gray-500 font-normal">({uploadedList.length})</span>
+                </h4>
+              </div>
+
+              {uploadedList.length === 0 ? (
+                <div className="text-center py-8 text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg">
+                  <span className="text-3xl block mb-2" aria-hidden>
+                    🗂
+                  </span>
+                  업로드된 서류가 없습니다.
+                  <br />
+                  No documents yet. Upload when ready.
+                </div>
+              ) : (
+                <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                  {uploadedList.map((req) => {
+                    const dt = catalogByCode.get(req.documentTypeCode);
+                    const label = req.customLabel ?? dt?.labelKo ?? req.documentTypeCode;
+                    const sizeText =
+                      req.fulfilledFileSize != null ? formatBytes(req.fulfilledFileSize) : '';
+                    const dateText = req.fulfilledAt
+                      ? new Date(req.fulfilledAt).toLocaleDateString()
+                      : '';
+                    return (
+                      <li
+                        key={req.id}
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50"
+                      >
+                        <span className="text-2xl flex-shrink-0" aria-hidden>
+                          {dt?.iconEmoji ?? '📄'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {req.fulfilledFilename ?? label}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {label}
+                            {sizeText && <> · {sizeText}</>}
+                            {dateText && <> · {dateText}</>}
+                          </p>
+                        </div>
+                        {canUpload && (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(req)}
+                            className="flex-shrink-0 p-2 text-error-600 hover:bg-error-50 rounded-md transition-colors"
+                            aria-label={`${req.fulfilledFilename ?? label} 삭제 · Delete`}
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              viewBox="0 0 24 24"
+                              aria-hidden
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M10 3h4a1 1 0 011 1v3H9V4a1 1 0 011-1z"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {showDevMockups && (
+              <DevMockupSkeletons catalog={catalog} />
+            )}
+          </>
+        )}
+      </Card>
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => (deleting ? undefined : setDeleteTarget(null))}
+        onConfirm={handleDelete}
+        title="서류 삭제 · Delete document"
+        message={`이 서류를 삭제할까요? 되돌릴 수 없습니다.\nDelete this document? It cannot be undone.${
+          deleteTarget?.fulfilledFilename ? `\n\n${deleteTarget.fulfilledFilename}` : ''
+        }`}
+        confirmLabel="삭제 · Delete"
+        cancelLabel="취소 · Cancel"
+        variant="danger"
+        loading={deleting}
+      />
+    </>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Dev mockups — ?devMockups=1 에서만 렌더 (AC-U3)
+// ─────────────────────────────────────────────
+function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
+  const sampleType = catalog.find((c) => c.code === 'SP_ACCOUNT') ?? catalog[0];
+  if (!sampleType) return null;
+
+  const baseRequest = {
+    id: 99999,
+    applicationSeq: 0,
+    documentTypeCode: sampleType.code,
+    createdAt: new Date().toISOString(),
+  };
+
+  const variants = ['requested', 'uploaded', 'approved', 'rejected'] as const;
+
+  const mockFor = (v: 'requested' | 'uploaded' | 'approved' | 'rejected'): DocumentRequest => {
+    switch (v) {
+      case 'requested':
+        return {
+          ...baseRequest,
+          status: 'REQUESTED',
+          lewNote: 'SP 계정 보유자 확인을 위해 PDF를 첨부해 주세요.',
+          requestedAt: new Date().toISOString(),
+        };
+      case 'uploaded':
+        return {
+          ...baseRequest,
+          status: 'UPLOADED',
+          fulfilledFilename: 'sp_account.pdf',
+          fulfilledFileSize: 524288,
+          fulfilledAt: new Date().toISOString(),
+        };
+      case 'approved':
+        return {
+          ...baseRequest,
+          status: 'APPROVED',
+          fulfilledFilename: 'sp_account.pdf',
+          reviewedAt: new Date().toISOString(),
+        };
+      case 'rejected':
+        return {
+          ...baseRequest,
+          status: 'REJECTED',
+          fulfilledFilename: 'sp_account.pdf',
+          rejectionReason: '파일이 흐릿합니다. 선명한 사본을 다시 올려주세요.',
+          reviewedAt: new Date().toISOString(),
+        };
+    }
+  };
+
+  return (
+    <div className="mt-10 border-t border-dashed border-gray-300 pt-6">
+      <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">
+        Dev mockups — Phase 3 variant skeletons (?devMockups=1)
+      </p>
+      <div className="space-y-3">
+        {variants.map((v) => (
+          <DocumentRequestCard
+            key={v}
+            variant={v}
+            documentType={sampleType}
+            request={mockFor(v)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
