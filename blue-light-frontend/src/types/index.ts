@@ -85,6 +85,11 @@ export type ApplicationStatus =
 export type ApplicationType = 'NEW' | 'RENEWAL';
 
 /**
+ * 신청자 유형 (Phase 1)
+ */
+export type ApplicantType = 'INDIVIDUAL' | 'CORPORATE';
+
+/**
  * SLD 제출 방식
  */
 export type SldOption = 'SELF_UPLOAD' | 'REQUEST_LEW';
@@ -132,6 +137,8 @@ export interface Application {
   assignedLewLicenceNo?: string;
   // SP Group 계정 번호
   spAccountNo?: string;
+  // Phase 1: 신청자 유형
+  applicantType: ApplicantType;
   // 갱신 + 견적
   applicationType: ApplicationType;
   sldFee?: number;
@@ -303,6 +310,7 @@ export interface CreateApplicationRequest {
   postalCode: string;
   buildingType?: string;
   selectedKva: number;
+  applicantType: ApplicantType;
   spAccountNo?: string;
   // Phase 18: 갱신 관련
   applicationType?: string;

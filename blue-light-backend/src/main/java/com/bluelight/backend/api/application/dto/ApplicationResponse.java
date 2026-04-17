@@ -37,6 +37,9 @@ public class ApplicationResponse {
     // SP Group 계정 번호
     private String spAccountNo;
 
+    // Phase 1: 신청자 유형 (INDIVIDUAL | CORPORATE)
+    private String applicantType;
+
     // ── 갱신 + 견적 필드 ──
     private String applicationType;
     private BigDecimal sldFee;
@@ -77,6 +80,9 @@ public class ApplicationResponse {
                         ? application.getAssignedLew().getLewLicenceNo() : null)
                 // SP Account
                 .spAccountNo(application.getSpAccountNo())
+                // Phase 1: applicantType
+                .applicantType(application.getApplicantType() != null
+                        ? application.getApplicantType().name() : null)
                 // Phase 18 fields
                 .applicationType(application.getApplicationType().name())
                 .sldFee(application.getSldFee())

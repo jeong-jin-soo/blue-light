@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.application.dto;
 
+import com.bluelight.backend.domain.application.ApplicantType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -28,6 +29,13 @@ public class CreateApplicationRequest {
     @NotNull(message = "Selected kVA is required")
     @Positive(message = "Selected kVA must be a positive number")
     private Integer selectedKva;
+
+    /**
+     * 신청자 유형 (Phase 1 필수)
+     * INDIVIDUAL: 개인 / CORPORATE: 법인
+     */
+    @NotNull(message = "applicantType is required")
+    private ApplicantType applicantType;
 
     /**
      * SP Group 계정 번호 (선택)

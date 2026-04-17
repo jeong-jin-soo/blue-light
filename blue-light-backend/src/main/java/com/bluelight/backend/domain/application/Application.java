@@ -115,6 +115,13 @@ public class Application extends BaseEntity {
     private ApplicationType applicationType = ApplicationType.NEW;
 
     /**
+     * 신청자 유형 (INDIVIDUAL / CORPORATE) — Phase 1 추가
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "applicant_type", nullable = false)
+    private ApplicantType applicantType = ApplicantType.INDIVIDUAL;
+
+    /**
      * SLD 작성 비용 (REQUEST_LEW 시에만 설정, 생성 시점 스냅샷)
      */
     @Column(name = "sld_fee", precision = 10, scale = 2)
@@ -186,7 +193,8 @@ public class Application extends BaseEntity {
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
                        String spAccountNo, SldOption sldOption,
-                       ApplicationType applicationType, Application originalApplication,
+                       ApplicationType applicationType, ApplicantType applicantType,
+                       Application originalApplication,
                        String existingLicenceNo, String renewalReferenceNo,
                        LocalDate existingExpiryDate, Integer renewalPeriodMonths,
                        BigDecimal emaFee) {
@@ -200,6 +208,7 @@ public class Application extends BaseEntity {
         this.spAccountNo = spAccountNo;
         this.sldOption = sldOption != null ? sldOption : SldOption.SELF_UPLOAD;
         this.applicationType = applicationType != null ? applicationType : ApplicationType.NEW;
+        this.applicantType = applicantType != null ? applicantType : ApplicantType.INDIVIDUAL;
         this.originalApplication = originalApplication;
         this.existingLicenceNo = existingLicenceNo;
         this.renewalReferenceNo = renewalReferenceNo;

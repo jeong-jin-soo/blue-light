@@ -254,6 +254,8 @@ export default function NewApplicationPage() {
         postalCode: formData.postalCode.trim(),
         buildingType: formData.buildingType || undefined,
         selectedKva: formData.selectedKva,
+        // Phase 1 PR#2: 기본값 INDIVIDUAL 전송. UI 라디오는 PR#3에서 추가.
+        applicantType: 'INDIVIDUAL',
         applicationType: formData.applicationType,
         renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
         spAccountNo: formData.spAccountNo.trim() || undefined,

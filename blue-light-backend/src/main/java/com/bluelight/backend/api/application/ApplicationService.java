@@ -168,6 +168,7 @@ public class ApplicationService {
                 .spAccountNo(request.getSpAccountNo())
                 .sldOption(sldOption)
                 .applicationType(appType)
+                .applicantType(request.getApplicantType())
                 .originalApplication(originalApp)
                 .existingLicenceNo(existingLicenceNo)
                 .renewalReferenceNo(renewalReferenceNo)

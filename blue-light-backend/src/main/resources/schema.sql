@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS applications (
     assigned_lew_seq   BIGINT,
     sp_account_no            VARCHAR(30),
     application_type         VARCHAR(10)   NOT NULL DEFAULT 'NEW',
+    applicant_type           VARCHAR(20)   NOT NULL DEFAULT 'INDIVIDUAL' COMMENT 'INDIVIDUAL | CORPORATE',
     sld_fee                  DECIMAL(10,2),
     original_application_seq BIGINT,
     existing_licence_no      VARCHAR(50),
