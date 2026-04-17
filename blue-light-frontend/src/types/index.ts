@@ -269,13 +269,9 @@ export interface SignupRequest {
   password: string;
   firstName: string;
   lastName: string;
-  phone?: string;
   role?: string;
   lewLicenceNo?: string;
   lewGrade?: string;
-  companyName?: string;
-  uen?: string;
-  designation?: string;
   pdpaConsent: boolean;
 }
 

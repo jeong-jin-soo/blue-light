@@ -122,14 +122,12 @@ public class AuthService {
                 .password(encodedPassword)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
-                .phone(request.getPhone())
+                // Phase 1: phone/companyName/uen/designation은 가입 시 수집하지 않는다.
+                // ProfilePage에서 선택 입력 받는다 (AC-S1~S4).
                 .role(selectedRole)
                 .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
                 .lewLicenceNo(selectedRole == UserRole.LEW ? request.getLewLicenceNo() : null)
                 .lewGrade(lewGrade)
-                .companyName(request.getCompanyName())
-                .uen(request.getUen())
-                .designation(request.getDesignation())
                 .emailVerified(!emailVerificationEnabled)
                 .emailVerificationToken(emailVerificationToken)
                 .pdpaConsentAt(LocalDateTime.now())

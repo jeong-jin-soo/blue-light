@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
         {/* Content */}
         <div className="bg-white rounded-2xl shadow-sm p-8 space-y-6">
           <h1 className="text-2xl font-bold text-gray-800">Privacy Policy</h1>
-          <p className="text-sm text-gray-500">Last updated: February 2026</p>
+          <p className="text-sm text-gray-500">Last updated: 17 April 2026</p>
 
           <p className="text-sm text-gray-600 leading-relaxed">
             LicenseKaki ("we", "our", "us") is committed to protecting your personal data in
@@ -29,7 +29,16 @@ export default function PrivacyPolicyPage() {
               We collect the following personal data when you use our services:
             </p>
             <ul className="text-sm text-gray-600 list-disc pl-5 space-y-1">
-              <li><strong>Account Information:</strong> Full name, email address, phone number</li>
+              <li>
+                <strong>Account Information (required):</strong> Full name and email address. Your
+                password is stored only as a one-way BCrypt hash.
+              </li>
+              <li>
+                <strong>Optional Profile Information:</strong> Phone number, company name, UEN, and
+                designation &mdash; provided voluntarily via the Profile page for the sole purpose of
+                generating the Letter of Appointment (LOA) and printing the EMA electrical
+                installation licence. You may leave these blank and still use the core service.
+              </li>
               <li><strong>Application Information:</strong> Installation address, postal code, building type</li>
               <li><strong>Documents:</strong> Single Line Diagrams (SLD), Letters of Appointment, and other uploaded documents</li>
               <li><strong>Chat Data:</strong> Messages you send through our AI chatbot assistant</li>

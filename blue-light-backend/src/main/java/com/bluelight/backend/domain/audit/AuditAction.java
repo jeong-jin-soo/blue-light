@@ -51,6 +51,7 @@ public enum AuditAction {
     DATA_EXPORTED,
     ACCOUNT_DELETED,
     PDPA_CONSENT_WITHDRAWN,
+    PROFILE_COMPANY_INFO_UPDATED,
 
     // Data breach
     DATA_BREACH_REPORTED,

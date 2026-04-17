@@ -9,6 +9,11 @@ import lombok.NoArgsConstructor;
 
 /**
  * 회원가입 요청 DTO
+ *
+ * Phase 1 (2026-04-17): phone/companyName/uen/designation 제거.
+ * - 회사 정보는 이제 ProfilePage에서 선택적으로 입력한다 (Just-in-Time Disclosure).
+ * - 구버전 클라이언트가 제거된 필드를 포함해 호출해도 Jackson 기본값
+ *   (FAIL_ON_UNKNOWN_PROPERTIES=false) 덕분에 조용히 무시된다 (AC-S3).
  */
 @Getter
 @NoArgsConstructor
@@ -30,9 +35,6 @@ public class SignupRequest {
     @Size(max = 50, message = "Last name must be 50 characters or less")
     private String lastName;
 
-    @Size(max = 20, message = "Phone number must be 20 characters or less")
-    private String phone;
-
     @NotNull(message = "PDPA consent is required")
     private Boolean pdpaConsent;
 
@@ -52,22 +54,4 @@ public class SignupRequest {
      */
     @Size(max = 20, message = "LEW grade must be 20 characters or less")
     private String lewGrade;
-
-    /**
-     * 회사명 (APPLICANT 선택 시 입력 가능)
-     */
-    @Size(max = 100, message = "Company name must be 100 characters or less")
-    private String companyName;
-
-    /**
-     * UEN (싱가포르 사업자등록번호, 선택)
-     */
-    @Size(max = 20, message = "UEN must be 20 characters or less")
-    private String uen;
-
-    /**
-     * 직위 (Director, Manager 등, 선택)
-     */
-    @Size(max = 50, message = "Designation must be 50 characters or less")
-    private String designation;
 }

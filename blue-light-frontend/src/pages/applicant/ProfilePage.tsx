@@ -351,10 +351,15 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Business Information */}
+          {/* Business Information (Phase 1 B-2: 수집 목적 고지) */}
           <div className="border-t border-gray-100 pt-4 mt-2">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">Business Information</h3>
-            <p className="text-xs text-gray-500 mb-4">Company details required for EMA licence application (Letter of Appointment)</p>
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="text-sm font-semibold text-gray-700">Business Information</h3>
+              <Badge variant="gray">Optional</Badge>
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              Used only for Letter of Appointment (LOA) and EMA licence printing. / LOA 문서 및 EMA 면허 인쇄에만 사용됩니다.
+            </p>
           </div>
           <Input
             label="Company Name"

@@ -7,19 +7,20 @@ import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { authApi } from '../../api/authApi';
 
+/**
+ * Phase 1 (2026-04-17): 회원가입 간소화.
+ * phone / companyName / uen / designation 4필드 제거.
+ * 회사 정보는 ProfilePage에서 선택적으로 입력한다 (Just-in-Time Disclosure, AC-S1~S4).
+ */
 interface SignupForm {
   email: string;
   password: string;
   confirmPassword: string;
   firstName: string;
   lastName: string;
-  phone: string;
   role: string;
   lewLicenceNo: string;
   lewGrade: string;
-  companyName: string;
-  uen: string;
-  designation: string;
   pdpaConsent: boolean;
 }
 
@@ -29,13 +30,9 @@ const INITIAL_FORM: SignupForm = {
   confirmPassword: '',
   firstName: '',
   lastName: '',
-  phone: '',
   role: 'APPLICANT',
   lewLicenceNo: '',
   lewGrade: '',
-  companyName: '',
-  uen: '',
-  designation: '',
   pdpaConsent: false,
 };
 
@@ -131,13 +128,9 @@ export default function SignupPage() {
         password: form.password,
         firstName: form.firstName,
         lastName: form.lastName,
-        phone: form.phone || undefined,
         role: form.role,
         lewLicenceNo: form.role === 'LEW' ? form.lewLicenceNo.trim() : undefined,
         lewGrade: form.role === 'LEW' ? form.lewGrade : undefined,
-        companyName: form.role === 'APPLICANT' && form.companyName.trim() ? form.companyName.trim() : undefined,
-        uen: form.role === 'APPLICANT' && form.uen.trim() ? form.uen.trim() : undefined,
-        designation: form.role === 'APPLICANT' && form.designation.trim() ? form.designation.trim() : undefined,
         pdpaConsent: form.pdpaConsent,
       });
     } catch {
@@ -159,9 +152,10 @@ export default function SignupPage() {
 
   return (
     <AuthLayout>
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">
+      <h2 className="text-xl font-semibold text-gray-800 mb-1">
         {isRolePreset && form.role === 'LEW' ? 'Register as LEW' : 'Create your account'}
       </h2>
+      <p className="text-sm text-gray-500 mb-6">Get started in 30 seconds</p>
 
       {displayError && (
         <div className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg text-sm text-error-600">
@@ -199,50 +193,6 @@ export default function SignupPage() {
           onChange={(e) => updateField('email', e.target.value)}
           placeholder="you@example.com"
         />
-
-        <Input
-          label="Phone"
-          type="tel"
-          maxLength={20}
-          value={form.phone}
-          onChange={(e) => updateField('phone', e.target.value)}
-          placeholder="+65-XXXX-XXXX"
-          hint="Optional"
-        />
-
-        {/* Business Information — APPLICANT 회원가입 시 (선택적) */}
-        {form.role === 'APPLICANT' && (
-          <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs font-medium text-gray-600">
-              Business Information <span className="text-gray-400">(Optional — can be added later in Profile)</span>
-            </p>
-            <Input
-              label="Company Name"
-              maxLength={100}
-              value={form.companyName}
-              onChange={(e) => updateField('companyName', e.target.value)}
-              placeholder="e.g., LICENSEKAKI PTE LTD"
-              hint="Will be printed on your installation licence"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="UEN"
-                maxLength={20}
-                value={form.uen}
-                onChange={(e) => updateField('uen', e.target.value)}
-                placeholder="e.g., 202407291M"
-                hint="Business registration number"
-              />
-              <Input
-                label="Designation"
-                maxLength={50}
-                value={form.designation}
-                onChange={(e) => updateField('designation', e.target.value)}
-                placeholder="e.g., Director"
-              />
-            </div>
-          </div>
-        )}
 
         {/* Role indicator — 랜딩에서 역할이 지정된 경우 */}
         {isRolePreset && (
@@ -360,6 +310,7 @@ export default function SignupPage() {
           value={form.password}
           onChange={(e) => updateField('password', e.target.value)}
           placeholder="8-20 characters"
+          hint="Min 8 chars, 1 uppercase, 1 number"
         />
 
         <Input
@@ -389,7 +340,7 @@ export default function SignupPage() {
             <a href="/disclaimer" target="_blank" className="text-primary font-medium hover:underline">
               Disclaimer
             </a>
-            . I consent to the collection and use of my personal data as described.
+            . I consent to the collection and use of my personal data under Singapore PDPA.
             <span className="text-error-500"> *</span>
           </label>
         </div>
@@ -399,7 +350,11 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <div className="mt-6 text-center text-sm text-gray-500">
+      <p className="text-xs text-gray-500 mt-6 text-center">
+        You can add phone and company details later from your profile — they're optional.
+      </p>
+
+      <div className="mt-4 text-center text-sm text-gray-500">
         Already have an account?{' '}
         <Link to="/login" className="text-primary font-medium hover:underline">
           Sign in
