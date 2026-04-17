@@ -17,13 +17,9 @@ interface FormData {
 interface StepReviewProps {
   formData: FormData;
   priceResult: PriceCalculation | null;
-  sldFile?: File | null;
-  loaEmailFile?: File | null;
-  breakerBoxPhoto?: File | null;
-  spAccountFile?: File | null;
 }
 
-export function StepReview({ formData, priceResult, sldFile, loaEmailFile, breakerBoxPhoto, spAccountFile }: StepReviewProps) {
+export function StepReview({ formData, priceResult }: StepReviewProps) {
   return (
     <div className="space-y-5">
       <div>
@@ -49,65 +45,6 @@ export function StepReview({ formData, priceResult, sldFile, loaEmailFile, break
           <div>
             <dt className="text-xs text-blue-600">Account Number</dt>
             <dd className="text-sm font-medium text-blue-800 mt-0.5">{formData.spAccountNo}</dd>
-          </div>
-        </div>
-      )}
-
-      {/* SP Account Document (NEW only, if attached) */}
-      {spAccountFile && formData.applicationType === 'NEW' && (
-        <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
-          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">SP Account Document</h3>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
-            <span className="text-lg">📧</span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-700 truncate">{spAccountFile.name}</p>
-              <p className="text-xs text-gray-400">
-                {spAccountFile.size < 1024 * 1024
-                  ? `${(spAccountFile.size / 1024).toFixed(1)} KB`
-                  : `${(spAccountFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                {' — Will be uploaded on submission'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* LOA Document (Renewal only, if attached) */}
-      {loaEmailFile && formData.applicationType === 'RENEWAL' && (
-        <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
-          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">
-            LOA Document
-          </h3>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
-            <span className="text-lg">🖼️</span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
-              <p className="text-xs text-gray-400">
-                {loaEmailFile.size < 1024 * 1024
-                  ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
-                  : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                {' — Will be uploaded on submission'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Breaker Box Photo (if attached) */}
-      {breakerBoxPhoto && (
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2 border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Main Breaker Box Photo</h3>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <span className="text-lg">📷</span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-700 truncate">{breakerBoxPhoto.name}</p>
-              <p className="text-xs text-gray-400">
-                {breakerBoxPhoto.size < 1024 * 1024
-                  ? `${(breakerBoxPhoto.size / 1024).toFixed(1)} KB`
-                  : `${(breakerBoxPhoto.size / (1024 * 1024)).toFixed(1)} MB`}
-                {' — Will be uploaded on submission'}
-              </p>
-            </div>
           </div>
         </div>
       )}
@@ -187,23 +124,9 @@ export function StepReview({ formData, priceResult, sldFile, loaEmailFile, break
             Additional fee may apply.
           </p>
         )}
-        {formData.sldOption === 'SELF_UPLOAD' && sldFile && (
-          <div className="flex items-center gap-2 mt-2 px-3 py-2 bg-white rounded-lg border border-gray-200">
-            <span className="text-lg">📄</span>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-700 truncate">{sldFile.name}</p>
-              <p className="text-xs text-gray-400">
-                {sldFile.size < 1024 * 1024
-                  ? `${(sldFile.size / 1024).toFixed(1)} KB`
-                  : `${(sldFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                {' — Will be uploaded on submission'}
-              </p>
-            </div>
-          </div>
-        )}
-        {formData.sldOption === 'SELF_UPLOAD' && !sldFile && (
+        {formData.sldOption === 'SELF_UPLOAD' && (
           <p className="text-xs text-gray-500 mt-1">
-            No SLD file attached. You can upload it later from the application detail page.
+            You can upload your SLD from the application detail page after submission.
           </p>
         )}
       </div>

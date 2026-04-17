@@ -5,11 +5,10 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { InfoBox } from '../../components/ui/InfoBox';
+import { ApplicantTypeCard } from '../../components/applicant/ApplicantTypeCard';
 import { StepTracker } from '../../components/domain/StepTracker';
-import { SpAccountEmailSample } from '../../components/domain/SpAccountEmailSample';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { SamplePreviewModal } from '../../components/domain/SamplePreviewModal';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
 import { useFormAutoSave } from '../../hooks/useFormAutoSave';
@@ -17,14 +16,12 @@ import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
 import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
-import fileApi from '../../api/fileApi';
-import sampleFileApi from '../../api/sampleFileApi';
 import {
   validateApplicationStep0,
   validateApplicationStep1,
   validateApplicationStep2,
 } from '../../utils/validation';
-import type { MasterPrice, PriceCalculation, Application, ApplicationType, CreateApplicationRequest, SampleFileInfo } from '../../types';
+import type { MasterPrice, PriceCalculation, Application, ApplicantType, ApplicationType, CreateApplicationRequest } from '../../types';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
@@ -48,6 +45,7 @@ const BUILDING_TYPES = [
 
 interface FormData {
   applicationType: ApplicationType;
+  applicantType: ApplicantType;
   spAccountNo: string;
   address: string;
   postalCode: string;
@@ -73,23 +71,12 @@ export default function NewApplicationPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
-  // SLD file (held client-side until application is created)
-  const [sldFile, setSldFile] = useState<File | null>(null);
-  // LOA email screenshot (held client-side until application is created)
-  const [loaEmailFile, setLoaEmailFile] = useState<File | null>(null);
-  // Main breaker box photo (held client-side until application is created)
-  const [breakerBoxPhoto, setBreakerBoxPhoto] = useState<File | null>(null);
-  // SP Account document (held client-side until application is created)
-  const [spAccountFile, setSpAccountFile] = useState<File | null>(null);
-  // SP Account sample modal
-  const [showSpSample, setShowSpSample] = useState(false);
-  // Sample files for guide buttons
-  const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
-  const [samplePreviewKey, setSamplePreviewKey] = useState<string | null>(null);
+  // Phase 1 PR#3: 파일 업로드 UI/상태 전부 제거. LEW가 필요 시 이후 단계에서 요청함.
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
     applicationType: 'NEW',
+    applicantType: 'INDIVIDUAL', // AC-A3: 기본값 INDIVIDUAL
     spAccountNo: '',
     address: '',
     postalCode: '',
@@ -129,17 +116,6 @@ export default function NewApplicationPage() {
       return true;
     },
   });
-
-  // Load sample files for guide buttons
-  useEffect(() => {
-    sampleFileApi.getSampleFiles()
-      .then(setSampleFiles)
-      .catch(() => { /* non-critical */ });
-  }, []);
-
-  const handleViewSample = (categoryKey: string) => {
-    setSamplePreviewKey(categoryKey);
-  };
 
   // Load completed applications when selecting RENEWAL
   useEffect(() => {
@@ -254,8 +230,8 @@ export default function NewApplicationPage() {
         postalCode: formData.postalCode.trim(),
         buildingType: formData.buildingType || undefined,
         selectedKva: formData.selectedKva,
-        // Phase 1 PR#2: 기본값 INDIVIDUAL 전송. UI 라디오는 PR#3에서 추가.
-        applicantType: 'INDIVIDUAL',
+        // Phase 1 PR#3: UI 라디오와 연동 (AC-A3)
+        applicantType: formData.applicantType,
         applicationType: formData.applicationType,
         renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
         spAccountNo: formData.spAccountNo.trim() || undefined,
@@ -275,50 +251,8 @@ export default function NewApplicationPage() {
       const result = await applicationApi.createApplication(payload);
       clearDraft(); // 신청서 생성 성공 → draft 삭제
 
-      // Upload SLD file if attached
-      if (sldFile && formData.sldOption === 'SELF_UPLOAD') {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, sldFile, 'DRAWING_SLD');
-        } catch {
-          // Application created successfully, but SLD upload failed — user can retry from detail page
-          toast.warning('Application submitted, but SLD upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      // Upload LOA document if attached (Renewal only)
-      if (loaEmailFile && formData.applicationType === 'RENEWAL') {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, loaEmailFile, 'OWNER_AUTH_LETTER');
-        } catch {
-          toast.warning('Application submitted, but LOA upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      // Upload main breaker box photo if attached
-      if (breakerBoxPhoto) {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, breakerBoxPhoto, 'SITE_PHOTO');
-        } catch {
-          toast.warning('Application submitted, but breaker box photo upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      // Upload SP Account document if attached (NEW only)
-      if (spAccountFile && formData.applicationType === 'NEW') {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, spAccountFile, 'SP_ACCOUNT_DOC');
-        } catch {
-          toast.warning('Application submitted, but SP account document upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
+      // Phase 1 PR#3: Step 0 파일 업로드 UI 제거 → 업로드 시도 없음.
+      // LEW가 검토 후 필요 시 이후 단계에서 요청 (Phase 2 예정).
 
       toast.success('Application submitted successfully!');
       navigate(`/applications/${result.applicationSeq}`);
@@ -329,10 +263,11 @@ export default function NewApplicationPage() {
     }
   };
 
-  // Helper: reset renewal fields when switching type
+  // Helper: reset renewal fields when switching type (applicantType은 사용자 선택 유지)
   const handleTypeChange = (type: ApplicationType) => {
-    setFormData({
+    setFormData((prev) => ({
       applicationType: type,
+      applicantType: prev.applicantType,
       spAccountNo: '',
       address: '',
       postalCode: '',
@@ -345,12 +280,9 @@ export default function NewApplicationPage() {
       renewalReferenceNo: '',
       manualEntry: false,
       sldOption: 'SELF_UPLOAD',
-    });
+    }));
     setErrors({});
     setPriceResult(null);
-    setSldFile(null);
-    setLoaEmailFile(null);
-    setSpAccountFile(null);
   };
 
   return (
@@ -432,178 +364,57 @@ export default function NewApplicationPage() {
               ))}
             </div>
 
-            {/* SP Account Notice + Input — NEW only */}
-            {formData.applicationType === 'NEW' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-xl mt-0.5">💡</span>
-                  <div>
-                    <p className="text-sm font-semibold text-blue-800">SP Group Account Required</p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      New licence applications require an active SP Group electricity account. If you don't have one yet, please apply at{' '}
-                      <a
-                        href="https://www.spgroup.com.sg"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline font-medium hover:text-blue-900"
-                      >
-                        SP Group website
-                      </a>{' '}
-                      before proceeding.
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="spAccountNo" className="block text-sm font-medium text-blue-800 mb-1">
-                    SP Account Number
-                  </label>
-                  <input
-                    id="spAccountNo"
-                    type="text"
-                    placeholder="e.g. 1234567890"
-                    value={formData.spAccountNo}
-                    onChange={(e) => updateField('spAccountNo', e.target.value)}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-400"
-                  />
-                  <p className="text-xs text-blue-600 mt-1">
-                    Enter your SP Group account number if available. You can also provide it later.
-                  </p>
-                </div>
-
-                {/* SP Account Email Screenshot/PDF Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-blue-800 mb-1">
-                    SP Account Email Screenshot / PDF <span className="text-red-500">*</span>
-                  </label>
-                  <p className="text-xs text-blue-600 mb-2">
-                    Upload a screenshot or PDF of your SP Group account confirmation email. Accepted formats: PDF, JPG, JPEG. You can also upload it later.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowSpSample(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-900 mb-2 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    View sample email
-                  </button>
-                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
-                    {spAccountFile ? (
-                      <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-lg">📧</span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-700 truncate">{spAccountFile.name}</p>
-                            <p className="text-xs text-gray-400">
-                              {spAccountFile.size < 1024 * 1024
-                                ? `${(spAccountFile.size / 1024).toFixed(1)} KB`
-                                : `${(spAccountFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSpAccountFile(null)}
-                          className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                          aria-label="Remove SP account file"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors">
-                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span className="text-sm text-blue-600">Choose file</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) {
-                              if (f.size > 10 * 1024 * 1024) {
-                                toast.error('File size must be under 10 MB');
-                                return;
-                              }
-                              setSpAccountFile(f);
-                            }
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
+            {/* Applicant Type — 개인/법인 카드형 라디오 (Phase 1 PR#3, AC-A3) */}
+            <fieldset className="space-y-2 border-t border-gray-100 pt-5">
+              <legend className="block text-sm font-medium text-gray-700 mb-2">
+                Who is applying? <span className="text-red-500">*</span>
+                <span className="ml-2 text-xs font-normal text-gray-500">
+                  (default: Individual)
+                </span>
+              </legend>
+              <div
+                role="radiogroup"
+                aria-label="Applicant Type"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+              >
+                <ApplicantTypeCard
+                  value="INDIVIDUAL"
+                  checked={formData.applicantType === 'INDIVIDUAL'}
+                  onChange={(v) => updateField('applicantType', v)}
+                />
+                <ApplicantTypeCard
+                  value="CORPORATE"
+                  checked={formData.applicantType === 'CORPORATE'}
+                  onChange={(v) => updateField('applicantType', v)}
+                />
               </div>
-            )}
+              {formData.applicantType === 'CORPORATE' && (
+                <p
+                  className="text-xs text-gray-500 mt-3"
+                  role="status"
+                >
+                  You may be asked for company details in a later step.
+                  <span className="block text-[11px] text-gray-400 mt-0.5">
+                    법인 선택 시, 이후 단계에서 회사 정보가 필요할 수 있습니다.
+                  </span>
+                </p>
+              )}
+              {errors.applicantType && (
+                <p className="text-sm text-red-600">{errors.applicantType}</p>
+              )}
+            </fieldset>
 
-            {/* LOA Upload — Renewal only */}
-            {formData.applicationType === 'RENEWAL' && (
+            {/* SP Account Number — optional text only (no file upload) */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
-              <label className="block text-sm font-medium text-gray-700">
-                📄 Letter of Appointment (LOA) Document
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Upload the LOA document received from the relevant authority. You can also upload it later.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                {loaEmailFile ? (
-                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">🖼️</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {loaEmailFile.size < 1024 * 1024
-                            ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
-                            : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLoaEmailFile(null)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      aria-label="Remove LOA file"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="text-sm text-gray-600">Choose LOA document</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          if (f.size > 10 * 1024 * 1024) {
-                            toast.error('File size must be under 10 MB');
-                            return;
-                          }
-                          setLoaEmailFile(f);
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
+              <Input
+                id="spAccountNo"
+                label="SP Account Number (optional)"
+                placeholder="e.g. 1234567890"
+                value={formData.spAccountNo}
+                onChange={(e) => updateField('spAccountNo', e.target.value)}
+                hint="If you have it on hand. Otherwise your LEW will ask later."
+              />
             </div>
-            )}
 
             {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
@@ -646,81 +457,6 @@ export default function NewApplicationPage() {
               )}
             </div>
 
-            {/* Main Breaker Box Photo */}
-            <div className="space-y-2 border-t border-gray-100 pt-5">
-              <div className="flex items-center gap-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Main Breaker Box Photo
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleViewSample('photo')}
-                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
-                  title="View sample file uploaded by admin"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  View Sample
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mb-2">
-                Upload a photo of the main breaker box at the installation site. This helps verify the electrical capacity (kVA). You can also upload it later.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                {breakerBoxPhoto ? (
-                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">📷</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">{breakerBoxPhoto.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {breakerBoxPhoto.size < 1024 * 1024
-                            ? `${(breakerBoxPhoto.size / 1024).toFixed(1)} KB`
-                            : `${(breakerBoxPhoto.size / (1024 * 1024)).toFixed(1)} MB`}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setBreakerBoxPhoto(null)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      aria-label="Remove breaker box photo"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-sm text-gray-600">Choose photo file</span>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.heic,.heif"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 10 * 1024 * 1024) {
-                            toast.error('File size must be less than 10MB');
-                            return;
-                          }
-                          setBreakerBoxPhoto(file);
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-
             {/* SLD Option Selection */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
               <label className="block text-sm font-medium text-gray-700">
@@ -751,7 +487,7 @@ export default function NewApplicationPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { updateField('sldOption', 'REQUEST_LEW'); setSldFile(null); }}
+                  onClick={() => updateField('sldOption', 'REQUEST_LEW')}
                   className={`p-4 rounded-lg border-2 text-left transition-all ${
                     formData.sldOption === 'REQUEST_LEW'
                       ? 'border-emerald-500 bg-emerald-50'
@@ -772,84 +508,6 @@ export default function NewApplicationPage() {
                   </div>
                 </button>
               </div>
-
-              {/* SLD File Attachment (shown when SELF_UPLOAD is selected) */}
-              {formData.sldOption === 'SELF_UPLOAD' && (
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-start gap-2 mb-3">
-                    <span className="text-sm">📎</span>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-700">Attach SLD File (Optional)</p>
-                        <button
-                          type="button"
-                          onClick={() => handleViewSample('sld')}
-                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
-                          title="View sample file uploaded by admin"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          View Sample
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        You can attach your SLD now, or upload it later from the application detail page.
-                      </p>
-                    </div>
-                  </div>
-
-                  {sldFile ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-lg">📄</span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-700 truncate">{sldFile.name}</p>
-                          <p className="text-xs text-gray-400">
-                            {sldFile.size < 1024 * 1024
-                              ? `${(sldFile.size / 1024).toFixed(1)} KB`
-                              : `${(sldFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSldFile(null)}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                        aria-label="Remove SLD file"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span className="text-sm text-gray-600">Choose SLD file</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 10 * 1024 * 1024) {
-                              toast.error('File size must be less than 10MB');
-                              return;
-                            }
-                            setSldFile(file);
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  )}
-                </div>
-              )}
             </div>
 
             {/* Renewal-specific fields */}
@@ -981,6 +639,20 @@ export default function NewApplicationPage() {
                 />
               </div>
             )}
+
+            {/* Phase 1 PR#3: "서류 제출 필요 없음" 안내 (AC-A1, 하단 고정) */}
+            <div className="border-t border-gray-100 pt-5">
+              <InfoBox title="No documents needed now">
+                Your assigned Licensed Electrical Worker (LEW) will review your
+                application and request any required documents — SP account,
+                LOA, main breaker photo, SLD — through the platform. This keeps
+                your first step fast.
+                <span className="block mt-2 text-[11px] opacity-80">
+                  지금은 서류 업로드가 필요하지 않습니다. 배정된 LEW가 검토 후
+                  필요한 서류만 요청드립니다.
+                </span>
+              </InfoBox>
+            </div>
           </div>
         )}
 
@@ -1120,7 +792,7 @@ export default function NewApplicationPage() {
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <StepReview formData={formData} priceResult={priceResult} sldFile={sldFile} loaEmailFile={loaEmailFile} breakerBoxPhoto={breakerBoxPhoto} spAccountFile={spAccountFile} />
+          <StepReview formData={formData} priceResult={priceResult} />
         )}
 
         {/* Navigation buttons */}
@@ -1150,27 +822,7 @@ export default function NewApplicationPage() {
         confirmLabel="Submit"
       />
 
-      {/* SP Account Email Sample Modal */}
-      <Modal isOpen={showSpSample} onClose={() => setShowSpSample(false)} size="lg">
-        <ModalHeader title="SP Account Email — Sample" onClose={() => setShowSpSample(false)} />
-        <ModalBody>
-          <p className="text-sm text-gray-600 mb-4">
-            Below are examples of the SP Services Ltd account confirmation emails. Please upload a screenshot or PDF of a similar email you received from SP Group.
-          </p>
-          <SpAccountEmailSample />
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" onClick={() => setShowSpSample(false)}>Close</Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Sample File Preview Modal */}
-      <SamplePreviewModal
-        isOpen={samplePreviewKey !== null}
-        onClose={() => setSamplePreviewKey(null)}
-        categoryKey={samplePreviewKey}
-        sampleFiles={sampleFiles}
-      />
+      {/* Phase 1 PR#3: SP Account Email Sample Modal, SamplePreviewModal 제거 (파일 업로드 UI 제거와 함께) */}
     </div>
   );
 }

@@ -64,6 +64,7 @@ export function maxLength(value: string, max: number): boolean {
  */
 export interface ApplicationFormData {
   applicationType: string;
+  applicantType: 'INDIVIDUAL' | 'CORPORATE';
   spAccountNo: string;
   address: string;
   postalCode: string;
@@ -82,6 +83,11 @@ export function validateApplicationStep0(formData: ApplicationFormData): Record<
 
   if (!formData.renewalPeriodMonths) {
     errors.renewalPeriodMonths = 'Please select a licence period';
+  }
+
+  // AC-A3: applicantType 필수. 기본값 INDIVIDUAL이므로 실제로는 null이 될 수 없지만 방어적 검증.
+  if (formData.applicantType !== 'INDIVIDUAL' && formData.applicantType !== 'CORPORATE') {
+    errors.applicantType = 'Please select an applicant type';
   }
 
   if (formData.applicationType === 'RENEWAL') {
