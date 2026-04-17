@@ -60,6 +60,12 @@ CREATE TABLE IF NOT EXISTS applications (
     sld_option               VARCHAR(20)   DEFAULT 'SELF_UPLOAD',
     loa_signature_url        VARCHAR(255),
     loa_signed_at            DATETIME(6),
+    -- LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) — UPDATE 금지, 엔티티 @Column(updatable=false)로 강제
+    applicant_name_snapshot  VARCHAR(100)  NOT NULL DEFAULT '',
+    company_name_snapshot    VARCHAR(100)  NULL,
+    uen_snapshot             VARCHAR(20)   NULL,
+    designation_snapshot     VARCHAR(50)   NULL,
+    snapshot_backfilled_at   DATETIME(6)   NULL,
     expiry_notified_at       DATETIME(6),
     created_at         DATETIME(6),
     updated_at         DATETIME(6),

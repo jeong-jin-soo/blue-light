@@ -29,6 +29,9 @@ public enum AuditAction {
     DOCUMENT_UPLOADED_VOLUNTARY,
     DOCUMENT_DELETED_VOLUNTARY,
 
+    // LOA snapshot (Phase 2 PR#4)
+    LOA_SNAPSHOT_CREATED,
+
     // Admin user management
     LEW_APPROVED,
     LEW_REJECTED,

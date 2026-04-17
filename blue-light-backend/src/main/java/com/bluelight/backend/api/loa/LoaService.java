@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.loa;
 
+import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -7,9 +8,12 @@ import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationType;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
+import com.bluelight.backend.domain.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * LOA 비즈니스 로직 오케스트레이션 서비스
@@ -34,6 +40,7 @@ public class LoaService {
     private final FileRepository fileRepository;
     private final LoaGenerationService loaGenerationService;
     private final FileStorageService fileStorageService;
+    private final AuditLogService auditLogService;
 
     /**
      * LOA PDF 생성 (Admin/LEW 액션)
@@ -67,6 +74,32 @@ public class LoaService {
             pdfStoredPath = loaGenerationService.generateRenewalLoa(application);
         } else {
             pdfStoredPath = loaGenerationService.generateNewLicenceLoa(application);
+        }
+
+        // Phase 2 PR#4 (B-5) — LOA 생성 시점의 신청자 신원 스냅샷 기록 (법적 무결성)
+        // @Column(updatable=false) + 엔티티 가드로 한 번만 기록됨.
+        User applicant = application.getUser();
+        boolean snapshotRecorded = application.recordLoaSnapshot(
+                applicant.getFullName(),
+                applicant.getCompanyName(),
+                applicant.getUen(),
+                applicant.getDesignation()
+        );
+        if (snapshotRecorded) {
+            Map<String, Object> after = new LinkedHashMap<>();
+            after.put("applicantNameSnapshot", applicant.getFullName());
+            after.put("companyNameSnapshot", applicant.getCompanyName());
+            after.put("uenSnapshot", applicant.getUen());
+            after.put("designationSnapshot", applicant.getDesignation());
+            auditLogService.logAsync(
+                    applicant.getUserSeq(),
+                    AuditAction.LOA_SNAPSHOT_CREATED,
+                    AuditCategory.DATA_PROTECTION,
+                    "Application", String.valueOf(applicationSeq),
+                    "LOA applicant identity snapshot captured at generation time (immutable)",
+                    null, after,
+                    null, null, "POST", "/api/admin/applications/" + applicationSeq + "/loa/generate", 201
+            );
         }
 
         // 파일 크기: FileStorageService에서 로드하여 확인

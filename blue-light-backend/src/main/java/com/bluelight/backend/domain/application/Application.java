@@ -15,7 +15,20 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
- * 라이선스 신청 내역 Entity
+ * 라이선스 신청 내역 Entity.
+ *
+ * <h2>LOA 스냅샷 컬럼 불변 정책 (Phase 2 PR#4 / Security B-5)</h2>
+ * {@code loaApplicantNameSnapshot}, {@code loaCompanyNameSnapshot},
+ * {@code loaUenSnapshot}, {@code loaDesignationSnapshot} 4개 컬럼은
+ * LOA 생성 시점의 신청자 신원 정보를 보존하는 법적 문서 무결성 요건이다.
+ * <ul>
+ *   <li>JPA 레벨에서 {@code @Column(updatable = false)}로 UPDATE 강제 차단.</li>
+ *   <li>교정이 필요한 경우, 기존 LOA를 revoke하고 신규 LOA를 재발급한다
+ *       (엔티티 자체를 분리하지 않는 현재 구조에서는 LOA 파일 재생성 + FileEntity 갱신).</li>
+ *   <li>관리자 권한으로도 UPDATE 금지 — 운영 절차로 관리.</li>
+ *   <li>{@code loaSnapshotBackfilledAt}는 V_04 마이그레이션으로 백필된 row 식별용.
+ *       법적 쟁송 시 원본 생성 시점 vs 백필 시점을 구분할 수 있다.</li>
+ * </ul>
  */
 @Entity
 @Table(name = "applications")
@@ -183,6 +196,41 @@ public class Application extends BaseEntity {
     @Column(name = "loa_signed_at")
     private LocalDateTime loaSignedAt;
 
+    // ── LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) ──
+    // 클래스 JavaDoc의 "LOA 스냅샷 컬럼 불변 정책" 참조.
+
+    /**
+     * LOA 생성 시점 신청자 성명 스냅샷.
+     * 신규 LOA는 항상 기록 (NOT NULL), 백필 row는 비어있지 않더라도 {@link #loaSnapshotBackfilledAt}로 구분.
+     */
+    @Column(name = "applicant_name_snapshot", length = 100, updatable = false)
+    private String loaApplicantNameSnapshot;
+
+    /**
+     * LOA 생성 시점 회사명 스냅샷. 개인 신청은 null 가능.
+     */
+    @Column(name = "company_name_snapshot", length = 100, updatable = false)
+    private String loaCompanyNameSnapshot;
+
+    /**
+     * LOA 생성 시점 UEN 스냅샷. 개인 신청은 null 가능.
+     */
+    @Column(name = "uen_snapshot", length = 20, updatable = false)
+    private String loaUenSnapshot;
+
+    /**
+     * LOA 생성 시점 직책 스냅샷. 개인 신청은 null 가능.
+     */
+    @Column(name = "designation_snapshot", length = 50, updatable = false)
+    private String loaDesignationSnapshot;
+
+    /**
+     * 스냅샷이 백필로 채워진 시각(Security R-2).
+     * 신규 LOA 생성 시에는 null, V_04 마이그레이션 백필 대상은 NOW() 기록.
+     */
+    @Column(name = "snapshot_backfilled_at", updatable = false)
+    private LocalDateTime loaSnapshotBackfilledAt;
+
     /**
      * 만료 알림 발송 시각 (중복 알림 방지)
      */
@@ -333,5 +381,31 @@ public class Application extends BaseEntity {
     public void registerLoaSignature(String signatureUrl) {
         this.loaSignatureUrl = signatureUrl;
         this.loaSignedAt = LocalDateTime.now();
+    }
+
+    /**
+     * LOA 생성 시점의 신청자 신원 스냅샷 기록 (Phase 2 PR#4 / B-5).
+     * <p>
+     * 최초 1회만 채우며, 이후 호출해도 {@code @Column(updatable=false)}로 인해
+     * UPDATE 시 무시된다 (영속화 레이어 차단). 도메인 레벨에서도 기존 값이
+     * 있으면 재기록하지 않는다(재발급 시 LOA 파일 regenerate는 스냅샷을 바꾸지
+     * 않는다 — 원본 스냅샷 유지가 법적 무결성 원칙).
+     * <p>
+     * {@code snapshotBackfilledAt}는 항상 null로 설정 — 이 메서드는 실시간 생성 경로이므로
+     * 백필이 아님을 명시한다.
+     *
+     * @return true: 신규 기록됨, false: 이미 스냅샷이 존재해 건너뜀
+     */
+    public boolean recordLoaSnapshot(String applicantName, String companyName,
+                                     String uen, String designation) {
+        if (this.loaApplicantNameSnapshot != null && !this.loaApplicantNameSnapshot.isBlank()) {
+            return false;
+        }
+        this.loaApplicantNameSnapshot = applicantName != null ? applicantName : "";
+        this.loaCompanyNameSnapshot = companyName;
+        this.loaUenSnapshot = uen;
+        this.loaDesignationSnapshot = designation;
+        this.loaSnapshotBackfilledAt = null;
+        return true;
     }
 }
