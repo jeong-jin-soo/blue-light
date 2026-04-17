@@ -45,10 +45,12 @@ spring:
       name: ${MAIL_FROM_NAME:LicenseKaki}
 
   # 파일 업로드 설정
+  # B-3 §10: document_type_catalog 최대값(SLD_FILE=20MB) + 헤더/메타 마진 = 25MB.
+  #          서비스 계층은 카탈로그 max_size_mb로 별도 검증한다.
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 25MB
+      max-request-size: 30MB
 
 # 로깅 설정 (개발 시 환경변수로 오버라이드: LOG_LEVEL_APP=DEBUG 등)
 logging:

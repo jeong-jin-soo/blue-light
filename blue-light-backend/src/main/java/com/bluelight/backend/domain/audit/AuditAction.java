@@ -25,6 +25,10 @@ public enum AuditAction {
     FILE_UPLOADED,
     FILE_DELETED,
 
+    // Document Request (Phase 2)
+    DOCUMENT_UPLOADED_VOLUNTARY,
+    DOCUMENT_DELETED_VOLUNTARY,
+
     // Admin user management
     LEW_APPROVED,
     LEW_REJECTED,

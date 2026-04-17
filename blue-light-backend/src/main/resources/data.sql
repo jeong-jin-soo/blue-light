@@ -109,3 +109,53 @@ UNION ALL
 SELECT '1001 - 2000 kVA',   1001, 2000,  2500.00,  800.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
 SELECT '2001 kVA and above', 2001, 9999,  3500.00, 1000.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1);
+
+
+-- ============================================
+-- Document Type Catalog (Phase 2)
+-- B-3 §10: 재실행 안전성 위해 INSERT ... ON DUPLICATE KEY UPDATE 사용.
+-- 라벨/MIME/크기 변경이 있을 경우 다음 배포 시 자동 반영된다.
+-- ============================================
+INSERT INTO document_type_catalog
+    (code, label_en, label_ko, description, help_text,
+     accepted_mime, max_size_mb, icon_emoji, display_order, active, created_at, updated_at)
+VALUES
+    ('SP_ACCOUNT',         'SP Account Holder PDF', 'SP 계정 보유자 PDF',
+     'Proof of SP Group account ownership for the premises',
+     'Download the official PDF from SP Group portal and upload it here.',
+     'application/pdf',                        10, '📄',  10, TRUE, NOW(), NOW()),
+    ('LOA',                'Letter of Authorisation', '위임장 (LOA)',
+     'Signed authorisation letter granting LEW to act on your behalf',
+     'Use the system-generated LOA template, sign it, then re-upload.',
+     'application/pdf',                        10, '📝',  20, TRUE, NOW(), NOW()),
+    ('MAIN_BREAKER_PHOTO', 'Main Breaker Photo', '메인 차단기 사진',
+     'Clear photo of the main circuit breaker nameplate',
+     'Make sure the rating and brand are readable in the photo.',
+     'image/png,image/jpeg',                    8, '📷',  30, TRUE, NOW(), NOW()),
+    ('SLD_FILE',           'Single Line Diagram',     '단선도 (SLD)',
+     'Single-line diagram of the electrical installation',
+     'PDF preferred. Image accepted if PDF is unavailable.',
+     'application/pdf,image/png,image/jpeg',   20, '📐',  40, TRUE, NOW(), NOW()),
+    ('SKETCH',             'Sketch / Plan',           '평면 스케치',
+     'Hand-drawn sketch or floor plan of the premises',
+     NULL,
+     'application/pdf,image/png,image/jpeg',   10, '✏️',  50, TRUE, NOW(), NOW()),
+    ('PAYMENT_RECEIPT',    'Payment Receipt',         '결제 영수증',
+     'Receipt evidencing payment for related fees',
+     NULL,
+     'application/pdf,image/png,image/jpeg',    5, '🧾',  60, TRUE, NOW(), NOW()),
+    ('OTHER',              'Other',                   '기타',
+     'Any other supporting document not listed above',
+     'Provide a short label so reviewers know what this file is.',
+     'application/pdf,image/png,image/jpeg',   10, '📎', 999, TRUE, NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+    label_en          = VALUES(label_en),
+    label_ko          = VALUES(label_ko),
+    description       = VALUES(description),
+    help_text         = VALUES(help_text),
+    accepted_mime     = VALUES(accepted_mime),
+    max_size_mb       = VALUES(max_size_mb),
+    icon_emoji        = VALUES(icon_emoji),
+    display_order     = VALUES(display_order),
+    active            = VALUES(active),
+    updated_at        = NOW();

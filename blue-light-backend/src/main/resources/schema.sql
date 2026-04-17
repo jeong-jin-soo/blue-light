@@ -113,6 +113,30 @@ CREATE TABLE IF NOT EXISTS inspections (
     CONSTRAINT fk_inspections_inspector FOREIGN KEY (inspector_user_seq) REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 5-pre. Document Type Catalog (Phase 2)
+-- 신청서 첨부 표준 서류 카탈로그. document_request가 FK로 참조하므로 files 테이블 앞에 정의.
+CREATE TABLE IF NOT EXISTS document_type_catalog (
+    code               VARCHAR(40)  NOT NULL,
+    label_en           VARCHAR(120) NOT NULL,
+    label_ko           VARCHAR(120) NOT NULL,
+    description        VARCHAR(500),
+    help_text          VARCHAR(1000),
+    accepted_mime      VARCHAR(200) NOT NULL,
+    max_size_mb        INT          NOT NULL DEFAULT 10,
+    template_url       VARCHAR(500),
+    example_image_url  VARCHAR(500),
+    required_fields    JSON,
+    icon_emoji         VARCHAR(16),
+    display_order      INT          NOT NULL DEFAULT 0,
+    active             BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at         DATETIME(6),
+    updated_at         DATETIME(6),
+    created_by         BIGINT,
+    updated_by         BIGINT,
+    deleted_at         DATETIME(6),
+    PRIMARY KEY (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 5. 첨부 파일
 CREATE TABLE IF NOT EXISTS files (
     file_seq        BIGINT       NOT NULL AUTO_INCREMENT,
@@ -131,6 +155,37 @@ CREATE TABLE IF NOT EXISTS files (
     KEY idx_files_application_seq (application_seq),
     KEY idx_files_sld_order_seq (sld_order_seq),
     CONSTRAINT fk_files_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 5-post. Document Request (Phase 2)
+-- 신청서 단위 서류 요청/제출 레코드. files / document_type_catalog / users 이후 정의.
+CREATE TABLE IF NOT EXISTS document_request (
+    document_request_id  BIGINT       NOT NULL AUTO_INCREMENT,
+    application_seq      BIGINT       NOT NULL,
+    document_type_code   VARCHAR(40)  NOT NULL,
+    custom_label         VARCHAR(200),
+    lew_note             VARCHAR(1000),
+    status               VARCHAR(20)  NOT NULL,
+    fulfilled_file_seq   BIGINT,
+    requested_by         BIGINT,
+    requested_at         DATETIME(6),
+    fulfilled_at         DATETIME(6),
+    reviewed_at          DATETIME(6),
+    reviewed_by          BIGINT,
+    rejection_reason     VARCHAR(1000),
+    created_at           DATETIME(6),
+    updated_at           DATETIME(6),
+    created_by           BIGINT,
+    updated_by           BIGINT,
+    deleted_at           DATETIME(6),
+    PRIMARY KEY (document_request_id),
+    KEY idx_dr_app_status (application_seq, status),
+    KEY idx_dr_type (document_type_code),
+    CONSTRAINT fk_dr_application FOREIGN KEY (application_seq)    REFERENCES applications (application_seq),
+    CONSTRAINT fk_dr_type        FOREIGN KEY (document_type_code) REFERENCES document_type_catalog (code),
+    CONSTRAINT fk_dr_file        FOREIGN KEY (fulfilled_file_seq) REFERENCES files (file_seq),
+    CONSTRAINT fk_dr_requested_by FOREIGN KEY (requested_by)      REFERENCES users (user_seq),
+    CONSTRAINT fk_dr_reviewed_by  FOREIGN KEY (reviewed_by)       REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 6. 시스템 설정 (key-value)
