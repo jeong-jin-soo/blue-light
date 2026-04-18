@@ -110,4 +110,52 @@ public interface EmailService {
      * @param amount   결제 금액
      */
     void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount);
+
+    // ── Phase 3 PR#4 · LEW Document Request Workflow ──────────────────────
+
+    /**
+     * 서류 요청 생성 알림 (신청자 수신)
+     *
+     * @param to              신청자 이메일
+     * @param userName        신청자 이름
+     * @param appSeq          신청서 번호
+     * @param requestedCount  요청 건수
+     * @param documentLabels  요청된 문서 라벨 목록 (catalog label 또는 customLabel, 영문)
+     */
+    void sendDocumentRequestCreatedEmail(String to, String userName, Long appSeq,
+                                          int requestedCount, java.util.List<String> documentLabels);
+
+    /**
+     * 서류 업로드 알림 (할당 LEW 수신)
+     *
+     * @param to             LEW 이메일
+     * @param lewName        LEW 이름
+     * @param appSeq         신청서 번호
+     * @param documentLabel  업로드된 문서 라벨
+     */
+    void sendDocumentRequestFulfilledEmail(String to, String lewName, Long appSeq,
+                                            String documentLabel);
+
+    /**
+     * 서류 승인 알림 (신청자 수신)
+     *
+     * @param to             신청자 이메일
+     * @param userName       신청자 이름
+     * @param appSeq         신청서 번호
+     * @param documentLabel  승인된 문서 라벨
+     */
+    void sendDocumentRequestApprovedEmail(String to, String userName, Long appSeq,
+                                           String documentLabel);
+
+    /**
+     * 서류 반려 알림 (신청자 수신)
+     *
+     * @param to              신청자 이메일
+     * @param userName        신청자 이름
+     * @param appSeq          신청서 번호
+     * @param documentLabel   반려된 문서 라벨
+     * @param rejectionReason 반려 사유 (본문에 이스케이프되어 렌더)
+     */
+    void sendDocumentRequestRejectedEmail(String to, String userName, Long appSeq,
+                                           String documentLabel, String rejectionReason);
 }

@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * 개발용 이메일 서비스 (로그 출력만)
@@ -121,6 +122,56 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Application: #{}", appSeq);
         log.info("  Address: {}", address);
         log.info("  Amount: ${}", amount);
+        log.info("==================================================");
+    }
+
+    // ── Phase 3 PR#4 · Document Request Workflow ──
+
+    @Override
+    public void sendDocumentRequestCreatedEmail(String to, String userName, Long appSeq,
+                                                 int requestedCount, List<String> documentLabels) {
+        log.info("==================================================");
+        log.info("[DEV] Document Request Created Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Requested Count: {}", requestedCount);
+        log.info("  Labels: {}", documentLabels);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendDocumentRequestFulfilledEmail(String to, String lewName, Long appSeq, String documentLabel) {
+        log.info("==================================================");
+        log.info("[DEV] Document Request Fulfilled Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Document: {}", documentLabel);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendDocumentRequestApprovedEmail(String to, String userName, Long appSeq, String documentLabel) {
+        log.info("==================================================");
+        log.info("[DEV] Document Request Approved Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Document: {}", documentLabel);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendDocumentRequestRejectedEmail(String to, String userName, Long appSeq,
+                                                  String documentLabel, String rejectionReason) {
+        log.info("==================================================");
+        log.info("[DEV] Document Request Rejected Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", userName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Document: {}", documentLabel);
+        log.info("  Reason: {}", rejectionReason);
         log.info("==================================================");
     }
 }

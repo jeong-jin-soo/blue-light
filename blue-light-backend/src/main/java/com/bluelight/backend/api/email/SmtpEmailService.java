@@ -11,10 +11,12 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * SMTP 기반 이메일 발송 서비스
@@ -35,6 +37,20 @@ public class SmtpEmailService implements EmailService {
 
     @Value("${spring.mail.sender.name:LicenseKaki}")
     private String fromName;
+
+    /**
+     * 프론트엔드 base URL — CTA 링크 및 로고 이미지 참조에 사용.
+     * {@code password-reset.base-url} 를 재사용하여 별도 설정 부담을 줄인다.
+     */
+    @Value("${password-reset.base-url:http://localhost:5174}")
+    private String appBaseUrl;
+
+    // ── B-2 · HTML 이스케이프 유틸 ─────────────────────────
+    // 모든 사용자 입력 주입 지점(userName, comment, rejectionReason, customLabel 등)에 적용.
+    // 기존 템플릿도 회귀 방지 차원에서 동일 유틸을 통과시킨다.
+    private static String esc(String s) {
+        return s == null ? "" : HtmlUtils.htmlEscape(s);
+    }
 
     @Override
     @Async
@@ -242,7 +258,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, resetLink, resetLink, resetLink);
+                """.formatted(esc(userName), esc(resetLink), esc(resetLink), esc(resetLink));
     }
 
     private String buildLicenseExpiryHtml(String userName, String licenseNumber,
@@ -296,7 +312,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, urgencyColor, daysText, licenseNumber, address, urgencyColor, formattedDate);
+                """.formatted(esc(userName), urgencyColor, daysText, esc(licenseNumber), esc(address), urgencyColor, formattedDate);
     }
 
     private String buildEmailVerificationHtml(String userName, String verificationLink) {
@@ -332,7 +348,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, verificationLink, verificationLink, verificationLink);
+                """.formatted(esc(userName), esc(verificationLink), esc(verificationLink), esc(verificationLink));
     }
 
     private String buildRevisionRequestHtml(String userName, Long appSeq, String address, String comment) {
@@ -366,7 +382,11 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, appSeq, address, comment != null ? comment : "Please review and update your application.");
+                """.formatted(
+                        esc(userName),
+                        appSeq,
+                        esc(address),
+                        esc(comment != null ? comment : "Please review and update your application."));
     }
 
     private String buildPaymentRequestHtml(String userName, Long appSeq, String address, BigDecimal amount) {
@@ -401,7 +421,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, appSeq, address, amount);
+                """.formatted(esc(userName), appSeq, esc(address), amount);
     }
 
     private String buildPaymentConfirmHtml(String userName, Long appSeq, String address, BigDecimal amount) {
@@ -435,7 +455,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, amount, appSeq, address);
+                """.formatted(esc(userName), amount, appSeq, esc(address));
     }
 
     private String buildLicenseIssuedHtml(String userName, Long appSeq, String address,
@@ -484,7 +504,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, appSeq, licenseNo, address, formattedDate);
+                """.formatted(esc(userName), appSeq, esc(licenseNo), esc(address), formattedDate);
     }
 
     private String buildLewAssignedHtml(String lewName, Long appSeq, String address, String applicantName) {
@@ -530,7 +550,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(lewName, appSeq, address, applicantName);
+                """.formatted(esc(lewName), appSeq, esc(address), esc(applicantName));
     }
 
     private String buildPaymentConfirmedToLewHtml(String lewName, Long appSeq, String address, BigDecimal amount) {
@@ -576,6 +596,199 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(lewName, amount, appSeq, address, amount);
+                """.formatted(esc(lewName), amount, appSeq, esc(address), amount);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Phase 3 PR#4 · LEW Document Request Workflow — 4종 이메일
+    // ──────────────────────────────────────────────────────────────────
+
+    @Override
+    @Async
+    public void sendDocumentRequestCreatedEmail(String to, String userName, Long appSeq,
+                                                 int requestedCount, List<String> documentLabels) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Your LEW requested " + requestedCount
+                    + " document(s) · LEW가 서류를 요청했습니다");
+            helper.setText(buildDocumentRequestCreatedHtml(userName, appSeq, requestedCount, documentLabels), true);
+            mailSender.send(message);
+            log.info("Document request created email sent to: {}, appSeq={}, count={}", to, appSeq, requestedCount);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request created email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendDocumentRequestFulfilledEmail(String to, String lewName, Long appSeq, String documentLabel) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA: 신청자 이름은 제외하고 appSeq/라벨만 노출 (B-2 §3.1 권고)
+            helper.setSubject("[LicenseKaki] Application #" + appSeq
+                    + " — applicant uploaded " + documentLabel + ", please review");
+            helper.setText(buildDocumentRequestFulfilledHtml(lewName, appSeq, documentLabel), true);
+            mailSender.send(message);
+            log.info("Document request fulfilled email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request fulfilled email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendDocumentRequestApprovedEmail(String to, String userName, Long appSeq, String documentLabel) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] " + documentLabel + " approved · " + documentLabel + " 승인됨");
+            helper.setText(buildDocumentRequestApprovedHtml(userName, appSeq, documentLabel), true);
+            mailSender.send(message);
+            log.info("Document request approved email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request approved email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendDocumentRequestRejectedEmail(String to, String userName, Long appSeq,
+                                                  String documentLabel, String rejectionReason) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] " + documentLabel + " needs re-upload · "
+                    + documentLabel + " 재업로드 필요");
+            helper.setText(buildDocumentRequestRejectedHtml(userName, appSeq, documentLabel, rejectionReason), true);
+            mailSender.send(message);
+            log.info("Document request rejected email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request rejected email to: {}", to, e);
+        }
+    }
+
+    // ── Phase 3 템플릿 빌더 (영/한 병기, primary #1a3a5c 헤더, PDPA 푸터) ──
+
+    /**
+     * Phase 3 공통 레이아웃. {@code coreEn}/{@code coreKo} 타이틀, 상세 블록, CTA, PDPA 푸터를 렌더.
+     * 동적 값은 모두 호출부에서 {@link #esc} 를 거친 뒤 주입한다.
+     */
+    private String buildDocumentEmailLayout(String coreEn, String coreKo, String detailsHtml,
+                                             String deepLinkPath, String role) {
+        String deepLink = appBaseUrl + deepLinkPath;
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 24px 0;">
+                  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">
+                    <tr><td align="center">
+                      <table width="600" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                        <tr><td style="background:#1a3a5c;padding:20px 32px;">
+                          <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:600;">LicenseKaki</h1>
+                        </td></tr>
+                        <tr><td style="padding:32px;color:#1f2937;">
+                          <h2 style="font-size:18px;margin:0 0 8px;color:#111827;">%s</h2>
+                          <p style="font-size:14px;color:#6b7280;font-style:italic;margin:0 0 20px;">%s</p>
+                          <table width="100%%" style="background:#f9fafb;border-radius:8px;margin-bottom:24px;">
+                            <tr><td style="padding:16px;font-size:13px;color:#374151;line-height:1.8;">
+                              %s
+                            </td></tr>
+                          </table>
+                          <a href="%s" style="display:inline-block;background:#1a3a5c;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">Open in LicenseKaki &rarr;</a>
+                        </td></tr>
+                        <tr><td style="background:#f9fafb;padding:16px 32px;font-size:11px;color:#9ca3af;line-height:1.6;">
+                          You are receiving this because you are the %s on this application.<br/>
+                          LicenseKaki complies with Singapore PDPA. For privacy inquiries: privacy@licensekaki.sg
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(esc(coreEn), esc(coreKo), detailsHtml, esc(deepLink), esc(role));
+    }
+
+    private String buildDocumentRequestCreatedHtml(String userName, Long appSeq,
+                                                    int requestedCount, List<String> documentLabels) {
+        StringBuilder labelList = new StringBuilder();
+        if (documentLabels != null && !documentLabels.isEmpty()) {
+            labelList.append("<strong>Documents requested:</strong><ul style=\"margin:4px 0 0 18px;padding:0;\">");
+            for (String label : documentLabels) {
+                labelList.append("<li>").append(esc(label)).append("</li>");
+            }
+            labelList.append("</ul>");
+        }
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Hello,</strong> %s<br/>
+                Your LEW has requested <strong>%d</strong> document(s) to proceed with your licence application. Please log in to upload them.<br/>
+                %s
+                """.formatted(appSeq, esc(userName), requestedCount, labelList.toString());
+        return buildDocumentEmailLayout(
+                "Your LEW has requested documents",
+                "서류 요청이 도착했습니다",
+                details,
+                "/applications/" + appSeq,
+                "applicant");
+    }
+
+    private String buildDocumentRequestFulfilledHtml(String lewName, Long appSeq, String documentLabel) {
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Hello,</strong> %s<br/>
+                The applicant has uploaded <strong>%s</strong>. Please review it in LicenseKaki.
+                """.formatted(appSeq, esc(lewName), esc(documentLabel));
+        return buildDocumentEmailLayout(
+                "Applicant uploaded a requested document",
+                "신청자가 요청 서류를 업로드했습니다",
+                details,
+                "/admin/applications/" + appSeq,
+                "assigned LEW");
+    }
+
+    private String buildDocumentRequestApprovedHtml(String userName, Long appSeq, String documentLabel) {
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Document:</strong> %s<br/>
+                <strong>Hello,</strong> %s<br/>
+                Your document has been <span style="color:#16a34a;font-weight:600;">approved</span>. No further action is required for this item.
+                """.formatted(appSeq, esc(documentLabel), esc(userName));
+        return buildDocumentEmailLayout(
+                documentLabel + " approved",
+                documentLabel + " 승인됨",
+                details,
+                "/applications/" + appSeq,
+                "applicant");
+    }
+
+    private String buildDocumentRequestRejectedHtml(String userName, Long appSeq,
+                                                     String documentLabel, String rejectionReason) {
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Document:</strong> %s<br/>
+                <strong>Hello,</strong> %s<br/>
+                Your document needs to be <span style="color:#dc2626;font-weight:600;">re-uploaded</span>. Please review the reviewer's reason below and upload a corrected file.
+                <div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:12px;margin-top:12px;border-radius:4px;">
+                  <strong style="color:#92400e;">Reason:</strong>
+                  <p style="color:#78350f;margin:4px 0 0 0;line-height:1.5;">%s</p>
+                </div>
+                """.formatted(appSeq, esc(documentLabel), esc(userName), esc(rejectionReason));
+        return buildDocumentEmailLayout(
+                documentLabel + " needs re-upload",
+                documentLabel + " 재업로드 필요",
+                details,
+                "/applications/" + appSeq,
+                "applicant");
     }
 }

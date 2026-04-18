@@ -5,7 +5,6 @@ import com.bluelight.backend.api.document.dto.DocumentRequestDto;
 import com.bluelight.backend.api.document.dto.DocumentRequestItemRequest;
 import com.bluelight.backend.api.document.dto.VoluntaryUploadResponse;
 import com.bluelight.backend.api.file.FileStorageService;
-import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.MimeTypeValidator;
 import com.bluelight.backend.common.util.OwnershipValidator;
@@ -18,7 +17,6 @@ import com.bluelight.backend.domain.document.DocumentTypeCatalog;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
-import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +51,7 @@ public class DocumentRequestService {
     private final FileStorageService fileStorageService;
     private final FileRepository fileRepository;
     private final UserRepository userRepository;
-    private final NotificationService notificationService;
+    private final DocumentRequestNotifier notifier;
 
     /** 활성 요청 상태 집합 — 리밋/중복 검사에 사용 */
     private static final Set<DocumentRequestStatus> ACTIVE_STATUSES =
@@ -333,6 +331,7 @@ public class DocumentRequestService {
         }
 
         // (7) 저장
+        List<DocumentRequest> savedEntities = new ArrayList<>(resolved.size());
         List<DocumentRequestDto> result = new ArrayList<>(resolved.size());
         for (ResolvedItem item : resolved) {
             DocumentRequest dr = DocumentRequest.forLewRequest(
@@ -342,18 +341,15 @@ public class DocumentRequestService {
                     item.lewNote(),
                     requester);
             DocumentRequest saved = documentRequestRepository.save(dr);
+            savedEntities.add(saved);
             result.add(DocumentRequestDto.from(saved));
         }
 
         log.info("DocumentRequest batch created: applicationSeq={}, count={}, requestor={}, role={}",
                 applicationSeq, result.size(), requestorSeq, requestorRole);
 
-        // 인앱 알림 (Phase 3 PR#4 에서 이메일 고도화. 여기선 구조적 연결만)
-        Long applicantSeq = application.getUser().getUserSeq();
-        safeNotify(applicantSeq, NotificationType.DOCUMENT_REQUEST_CREATED,
-                "LEW가 서류를 요청했습니다",
-                "신청 #" + applicationSeq + " — " + result.size() + "건의 서류 요청이 도착했습니다.",
-                "DOCUMENT_REQUEST", applicationSeq);
+        // 인앱 + 이메일 알림 (afterCommit 훅으로 트랜잭션 커밋 후 발송)
+        notifier.notifyCreated(application, savedEntities);
 
         return result;
     }
@@ -420,14 +416,8 @@ public class DocumentRequestService {
         log.info("DocumentRequest fulfilled: drId={}, applicationSeq={}, previousFileSeq={}, newFileSeq={}",
                 dr.getId(), applicationSeq, previousFileSeq, savedFile.getFileSeq());
 
-        // LEW 알림 (assignedLew 있을 때만)
-        if (application.getAssignedLew() != null) {
-            Long lewSeq = application.getAssignedLew().getUserSeq();
-            safeNotify(lewSeq, NotificationType.DOCUMENT_REQUEST_FULFILLED,
-                    "신청자가 서류를 업로드했습니다",
-                    "신청 #" + applicationSeq + " — " + catalog.getCode() + " 검토가 필요합니다.",
-                    "DOCUMENT_REQUEST", dr.getId());
-        }
+        // LEW 알림 (assignedLew 있을 때만, afterCommit 훅)
+        notifier.notifyFulfilled(dr);
 
         return DocumentRequestDto.from(dr, previousFileSeq);
     }
@@ -448,12 +438,7 @@ public class DocumentRequestService {
 
         log.info("DocumentRequest approved: drId={}, reviewer={}", dr.getId(), requestorSeq);
 
-        Long applicantSeq = dr.getApplication().getUser().getUserSeq();
-        safeNotify(applicantSeq, NotificationType.DOCUMENT_REQUEST_APPROVED,
-                "서류가 승인되었습니다",
-                "신청 #" + dr.getApplication().getApplicationSeq()
-                        + " — " + dr.getDocumentTypeCode() + " 승인 완료.",
-                "DOCUMENT_REQUEST", dr.getId());
+        notifier.notifyApproved(dr);
 
         return DocumentRequestDto.from(dr);
     }
@@ -477,12 +462,7 @@ public class DocumentRequestService {
         log.info("DocumentRequest rejected: drId={}, reviewer={}, reasonLen={}",
                 dr.getId(), requestorSeq, rejectionReason.length());
 
-        Long applicantSeq = dr.getApplication().getUser().getUserSeq();
-        safeNotify(applicantSeq, NotificationType.DOCUMENT_REQUEST_REJECTED,
-                "서류가 반려되었습니다",
-                "신청 #" + dr.getApplication().getApplicationSeq()
-                        + " — " + dr.getDocumentTypeCode() + " 반려. 재업로드가 필요합니다.",
-                "DOCUMENT_REQUEST", dr.getId());
+        notifier.notifyRejected(dr);
 
         return DocumentRequestDto.from(dr);
     }
@@ -571,23 +551,6 @@ public class DocumentRequestService {
             return trimmed;
         }
         return null;
-    }
-
-    /**
-     * 인앱 알림 발송 — 실패는 삼키고 로그만 남긴다.
-     * (Phase 3 PR#4 에서 이메일 + 비동기 고도화 예정)
-     */
-    private void safeNotify(Long recipientSeq, NotificationType type,
-                            String title, String message,
-                            String referenceType, Long referenceId) {
-        if (recipientSeq == null) return;
-        try {
-            notificationService.createNotification(recipientSeq, type, title, message,
-                    referenceType, referenceId);
-        } catch (Exception e) {
-            log.warn("Notification delivery failed (suppressed): type={}, recipient={}, err={}",
-                    type, recipientSeq, e.getMessage());
-        }
     }
 
     /**
