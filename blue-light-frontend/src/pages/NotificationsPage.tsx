@@ -9,7 +9,18 @@ import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import { getBasePath } from '../utils/routeUtils';
 import notificationApi from '../api/notificationApi';
-import type { AppNotification } from '../types';
+import type { AppNotification, NotificationType } from '../types';
+
+/**
+ * Phase 3 PR#3 — 알림 타입별 아이콘 (AC-N1~N3)
+ */
+const NOTIFICATION_ICON: Record<NotificationType, string> = {
+  PAYMENT_CONFIRMED: '💳',
+  DOCUMENT_REQUEST_CREATED: '🔔',
+  DOCUMENT_REQUEST_FULFILLED: '📤',
+  DOCUMENT_REQUEST_APPROVED: '✅',
+  DOCUMENT_REQUEST_REJECTED: '⚠️',
+};
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -53,8 +64,15 @@ export default function NotificationsPage() {
     }
 
     // Navigate to referenced entity
+    // Phase 3: DOCUMENT_REQUEST notifications reference_type='DOCUMENT_REQUEST',
+    //         reference_id=document_request_id. 백엔드가 metadata.applicationSeq를 같이
+    //         싣지 않는 한 현재는 일반 APPLICATION 라우팅 fallback만 수행.
     if (n.referenceType === 'APPLICATION' && n.referenceId) {
       navigate(`${basePath}/applications/${n.referenceId}`);
+    } else if (n.referenceType === 'DOCUMENT_REQUEST' && n.referenceId) {
+      // PR#4에서 referenceType=APPLICATION + metadata로 정규화 예정.
+      // 임시: 알림 message에서 applicationSeq 파싱 불가 → 알림 목록 유지.
+      // (스펙상 deep link는 `/applications/:appId#doc-req-:id`)
     }
   };
 
@@ -129,6 +147,9 @@ export default function NotificationsPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? 'bg-blue-500' : 'bg-transparent'}`} />
+                  <span className="text-lg flex-shrink-0 leading-none mt-0.5" aria-hidden>
+                    {NOTIFICATION_ICON[n.type] ?? '🔔'}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className={`text-sm ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>

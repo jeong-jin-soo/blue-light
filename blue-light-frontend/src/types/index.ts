@@ -846,7 +846,13 @@ export interface AuditLog {
 
 // ── Notification ──────────────────────────────
 
-export type NotificationType = 'PAYMENT_CONFIRMED';
+export type NotificationType =
+  | 'PAYMENT_CONFIRMED'
+  // Phase 3 — LEW 서류 요청 워크플로
+  | 'DOCUMENT_REQUEST_CREATED'
+  | 'DOCUMENT_REQUEST_FULFILLED'
+  | 'DOCUMENT_REQUEST_APPROVED'
+  | 'DOCUMENT_REQUEST_REJECTED';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

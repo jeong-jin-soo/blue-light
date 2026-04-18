@@ -208,26 +208,91 @@ function NeutralBody({
 }
 
 // ─────────────────────────────────────────────
-// Request body — Phase 3 skeleton (requested/uploaded/approved/rejected)
-// Phase 2는 `?devMockups=1`에서만 확인
+// Request body — Phase 3 PR#3 프로덕션 4 variant
+//   requested: LEW 메모 + 업로드 영역 + [Upload]
+//   uploaded : 파일 요약 + [Replace file]
+//   approved : 승인 시각
+//   rejected : 사유 + 이전 파일 힌트 + 업로드 영역 + [Upload new file]
 // ─────────────────────────────────────────────
-function RequestBody({ variant, documentType, request }: DocumentRequestCardProps) {
+function RequestBody({
+  variant,
+  documentType,
+  request,
+  onReupload,
+  readOnly,
+}: DocumentRequestCardProps) {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+
   const badge = (() => {
     switch (variant) {
       case 'requested':
-        return <Badge variant="warning">요청됨 · Requested</Badge>;
+        return <Badge variant="warning">업로드 필요 · Action needed</Badge>;
       case 'uploaded':
-        return <Badge variant="info">검토 대기 · Under Review</Badge>;
+        return <Badge variant="info">LEW 검토 중 · Waiting for LEW</Badge>;
       case 'approved':
         return <Badge variant="success">승인됨 · Approved</Badge>;
       case 'rejected':
-        return <Badge variant="error">반려됨 · Rejected</Badge>;
+        return <Badge variant="error">재업로드 필요 · Needs re-upload</Badge>;
       default:
         return null;
     }
   })();
 
   const label = request?.customLabel ?? documentType?.labelKo ?? documentType?.code ?? '—';
+  const acceptedMime = documentType?.acceptedMime ?? '';
+  const maxSizeMb = documentType?.maxSizeMb ?? 10;
+  const canReupload =
+    (variant === 'requested' || variant === 'rejected' || variant === 'uploaded') &&
+    typeof onReupload === 'function' &&
+    !readOnly;
+
+  const handleFileSelect = (f: File | null) => {
+    setError(undefined);
+    if (!f) {
+      setFile(null);
+      return;
+    }
+    if (documentType) {
+      const maxBytes = maxSizeMb * 1024 * 1024;
+      if (f.size > maxBytes) {
+        setFile(null);
+        setError(`파일이 너무 큽니다 (최대 ${maxSizeMb}MB). · File too large.`);
+        return;
+      }
+      if (!isMimeAccepted(f, acceptedMime)) {
+        setFile(null);
+        setError(`${documentType.labelKo}에 허용되지 않는 형식입니다. · File type not allowed.`);
+        return;
+      }
+    }
+    setFile(f);
+  };
+
+  const handleSubmit = async () => {
+    if (!onReupload || !file) return;
+    setUploading(true);
+    try {
+      await onReupload(file);
+      setFile(null);
+      setError(undefined);
+    } catch (err) {
+      const msg =
+        (err as { message?: string })?.message ??
+        '업로드에 실패했습니다. · Upload failed.';
+      setError(msg);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const uploadButtonLabel =
+    variant === 'rejected'
+      ? '새 파일 업로드 · Upload new file'
+      : variant === 'uploaded'
+        ? '파일 교체 · Replace file'
+        : '업로드 · Upload';
 
   return (
     <>
@@ -246,34 +311,109 @@ function RequestBody({ variant, documentType, request }: DocumentRequestCardProp
         {badge}
       </div>
 
+      {/* LEW 메모 (requested/rejected에서 공통 노출) */}
       {variant === 'requested' && request?.lewNote && (
-        <blockquote className="border-l-2 border-warning-500 pl-3 text-sm text-gray-700 italic my-3">
-          {request.lewNote}
-        </blockquote>
+        <div className="mb-3">
+          <p className="text-xs font-medium text-gray-500 mb-1">
+            LEW 메모 · Note from LEW
+          </p>
+          <blockquote className="border-l-2 border-warning-500 pl-3 text-sm text-gray-700 italic">
+            {request.lewNote}
+          </blockquote>
+        </div>
       )}
 
-      {variant === 'uploaded' && request?.fulfilledFilename && (
-        <p className="text-xs text-gray-700">
-          {request.fulfilledFilename}
-          {request.fulfilledFileSize != null && (
-            <> · {formatBytes(request.fulfilledFileSize)}</>
-          )}
+      {/* 템플릿 링크 */}
+      {variant === 'requested' && documentType?.templateUrl && (
+        <p className="text-xs text-gray-600 mb-3">
+          💡{' '}
+          <a
+            href={documentType.templateUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary underline"
+          >
+            템플릿 다운로드 · Download template
+          </a>
         </p>
       )}
 
-      {variant === 'rejected' && request?.rejectionReason && (
-        <blockquote className="border-l-2 border-error-500 pl-3 text-sm text-gray-700 italic my-3">
-          {request.rejectionReason}
-        </blockquote>
+      {/* UPLOADED — 파일 요약 */}
+      {variant === 'uploaded' && (
+        <div className="mb-3">
+          <p className="text-sm text-gray-800">
+            <span className="font-medium">{request?.fulfilledFilename ?? '—'}</span>
+            {request?.fulfilledFileSize != null && (
+              <span className="text-gray-500"> · {formatBytes(request.fulfilledFileSize)}</span>
+            )}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            LEW가 검토 중입니다. 알림을 보내드립니다.
+            <br />
+            LEW is reviewing. You will be notified.
+          </p>
+        </div>
       )}
 
+      {/* REJECTED — 사유 + 이전 파일 힌트 */}
+      {variant === 'rejected' && (
+        <div className="mb-3">
+          <p className="text-sm text-gray-800 mb-2">
+            LEW가 업로드를 반려했습니다. · LEW rejected your upload.
+          </p>
+          {request?.rejectionReason && (
+            <blockquote className="border-l-2 border-error-500 pl-3 text-sm text-gray-700 italic">
+              {request.rejectionReason}
+            </blockquote>
+          )}
+          {request?.fulfilledFilename && (
+            <p className="text-xs text-gray-500 mt-2">
+              이전 파일 · Previous:{' '}
+              <span className="font-medium">{request.fulfilledFilename}</span> (이력 보존 · kept in history)
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* APPROVED */}
       {variant === 'approved' && (
-        <p className="text-xs text-success-700 flex items-center gap-1">
+        <div className="flex items-center gap-2 text-xs text-success-700">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
-          LEW가 승인했습니다. · Approved by LEW.
-        </p>
+          <span>
+            LEW가 승인했습니다. · Approved by LEW.
+            {request?.reviewedAt && (
+              <> · {new Date(request.reviewedAt).toLocaleString()}</>
+            )}
+          </span>
+        </div>
+      )}
+
+      {/* 업로드 영역 — requested/rejected/uploaded(Replace) */}
+      {canReupload && documentType && (
+        <div className="mt-3 space-y-3">
+          <DocumentUploadArea
+            acceptedMime={acceptedMime}
+            maxSizeMb={maxSizeMb}
+            selectedFile={file}
+            onFileSelect={handleFileSelect}
+            disabled={readOnly}
+            uploading={uploading}
+            error={error}
+          />
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSubmit}
+              loading={uploading}
+              disabled={!file || uploading || readOnly}
+              variant={variant === 'uploaded' ? 'outline' : 'primary'}
+              size="sm"
+            >
+              {uploadButtonLabel}
+            </Button>
+          </div>
+        </div>
       )}
     </>
   );

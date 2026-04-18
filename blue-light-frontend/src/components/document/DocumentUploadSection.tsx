@@ -6,7 +6,8 @@ import { Card, CardHeader } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { InfoBox } from '../ui/InfoBox';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
-import { DocumentRequestCard } from './DocumentRequestCard';
+import { DocumentRequestBanner } from './DocumentRequestBanner';
+import { DocumentRequestCard, type DocumentRequestCardVariant } from './DocumentRequestCard';
 import { formatBytes } from './documentUtils';
 
 interface DocumentUploadSectionProps {
@@ -16,13 +17,19 @@ interface DocumentUploadSectionProps {
 }
 
 /**
- * 신청 상세 페이지 "서류" 섹션 컨테이너 (Phase 2, AC-U1~U4)
+ * 신청 상세 페이지 "서류" 섹션 컨테이너
  *
- * 구성:
- *   1. InfoBox (Phase 1 연속 — "업로드는 선택" 안내)
- *   2. DocumentRequestCard variant=neutral — 자발적 업로드 카드 (APPLICANT only)
- *   3. 업로드된 서류 목록 (또는 empty state)
- *   4. ?devMockups=1 쿼리로 Phase 3 variant skeleton 확인 (AC-U3)
+ * Phase 2 (AC-U1~U4):
+ *   1. InfoBox ("업로드는 선택")
+ *   2. 자발적 업로드 카드 (DocumentRequestCard variant=neutral)
+ *   3. 업로드된 자발적 파일 목록
+ *
+ * Phase 3 PR#3 (AC-AU1/AU2/AU4, AC-S1/S4):
+ *   0. DocumentRequestBanner (상단, REQUESTED/REJECTED ≥ 1건일 때)
+ *   ├─ 요청 서류 카드 목록 (LEW가 요청한 것만 — 4 variant)
+ *   ├─ (요청 있을 때는 InfoBox 축약 / 없을 때는 유지)
+ *   ├─ 자발적 업로드 카드 (Phase 2)
+ *   └─ 자발적 업로드 파일 목록
  */
 export function DocumentUploadSection({
   applicationSeq,
@@ -101,6 +108,30 @@ export function DocumentUploadSection({
     }
   };
 
+  /**
+   * Phase 3 PR#3 — LEW 요청 건에 대한 fulfill/재업로드 (AC-S1, AC-S4, AC-AU4)
+   *
+   * - 성공 시 서버 응답으로 해당 요청만 교체 (낙관적 업데이트는 응답값으로 대체)
+   * - 실패 시 카드 내부 에러로 전파
+   */
+  const handleReupload = async (requestId: number, file: File) => {
+    try {
+      const updated = await documentApi.fulfillDocumentRequest(
+        applicationSeq,
+        requestId,
+        file,
+      );
+      setRequests((prev) => prev.map((r) => (r.id === requestId ? updated : r)));
+      toast.success('업로드 완료 · LEW에게 알립니다 · Uploaded · LEW will be notified');
+    } catch (err) {
+      const msg =
+        (err as { message?: string })?.message ??
+        '업로드에 실패했습니다. · Upload failed.';
+      toast.error(msg);
+      throw err;
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -117,19 +148,48 @@ export function DocumentUploadSection({
     }
   };
 
-  // Phase 2에서는 자발적 업로드 = UPLOADED 상태의 DocumentRequest만 목록에 표시
-  const uploadedList = requests.filter((r) => r.status === 'UPLOADED');
+  // ─────────────────────────────────────────────
+  // 분류
+  //   · LEW가 요청한 것: `requested_at`이 채워진 요청 (REQUESTED/UPLOADED/APPROVED/REJECTED)
+  //   · 신청자가 자발 업로드: requested_at 없는 UPLOADED (Phase 2 패턴)
+  //   CANCELLED는 신청자 화면에서 제외.
+  // ─────────────────────────────────────────────
+  const lewRequested = useMemo(
+    () =>
+      requests.filter(
+        (r) => r.status !== 'CANCELLED' && r.requestedAt != null,
+      ),
+    [requests],
+  );
+  const voluntaryUploaded = useMemo(
+    () =>
+      requests.filter((r) => r.status === 'UPLOADED' && r.requestedAt == null),
+    [requests],
+  );
+
+  const hasActiveRequests = lewRequested.some(
+    (r) => r.status === 'REQUESTED' || r.status === 'REJECTED',
+  );
+
+  const variantOf = (r: DocumentRequest): DocumentRequestCardVariant => {
+    switch (r.status) {
+      case 'REQUESTED':
+        return 'requested';
+      case 'UPLOADED':
+        return 'uploaded';
+      case 'APPROVED':
+        return 'approved';
+      case 'REJECTED':
+        return 'rejected';
+      default:
+        return 'requested';
+    }
+  };
 
   return (
     <>
       <Card>
-        <CardHeader title="서류 · Documents" description="Supporting documents (optional)" />
-
-        <InfoBox title="지금은 업로드가 필수가 아니에요 · Upload is optional for now">
-          LEW가 검토 중 서류를 요청할 수 있습니다. 이미 가진 서류가 있다면 먼저 업로드해 두면 진행이 빨라집니다.
-          <br />
-          Your LEW may request documents during review. You can also upload anything you already have — it speeds things up.
-        </InfoBox>
+        <CardHeader title="서류 · Documents" description="Supporting documents" />
 
         {loading ? (
           <div className="flex items-center justify-center py-10">
@@ -137,6 +197,58 @@ export function DocumentUploadSection({
           </div>
         ) : (
           <>
+            {/* 상단 경고 배너 (AC-AU1) */}
+            {canUpload && hasActiveRequests && (
+              <div className="mb-4">
+                <DocumentRequestBanner requests={lewRequested} />
+              </div>
+            )}
+
+            {/* LEW 요청 서류 섹션 (AC-AU2) */}
+            {lewRequested.length > 0 && (
+              <section id="doc-requests" className="mb-8">
+                <div className="flex items-center justify-between mb-3">
+                  <h3
+                    className="text-sm font-semibold text-gray-800"
+                    tabIndex={-1}
+                  >
+                    LEW 요청 서류 · Requested by LEW{' '}
+                    <span className="text-gray-500 font-normal">({lewRequested.length})</span>
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {lewRequested.map((req) => {
+                    const dt = catalogByCode.get(req.documentTypeCode) ?? null;
+                    return (
+                      <div key={req.id} id={`doc-req-${req.id}`}>
+                        <DocumentRequestCard
+                          variant={variantOf(req)}
+                          documentType={dt}
+                          request={req}
+                          readOnly={!canUpload}
+                          onReupload={
+                            canUpload
+                              ? (file) => handleReupload(req.id, file)
+                              : undefined
+                          }
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* InfoBox — 요청이 없을 때만 노출 (요청 있으면 상단 배너가 대체) */}
+            {!hasActiveRequests && (
+              <InfoBox title="지금은 업로드가 필수가 아니에요 · Upload is optional for now">
+                LEW가 검토 중 서류를 요청할 수 있습니다. 이미 가진 서류가 있다면 먼저 업로드해 두면 진행이 빨라집니다.
+                <br />
+                Your LEW may request documents during review. You can also upload anything you already have — it speeds things up.
+              </InfoBox>
+            )}
+
+            {/* 자발적 업로드 카드 (Phase 2 그대로) */}
             {canUpload && (
               <div className="mt-6">
                 <DocumentRequestCard
@@ -148,15 +260,16 @@ export function DocumentUploadSection({
               </div>
             )}
 
+            {/* 자발적 업로드 파일 목록 */}
             <div className="mt-8">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-800">
                   업로드됨 · Uploaded{' '}
-                  <span className="text-gray-500 font-normal">({uploadedList.length})</span>
+                  <span className="text-gray-500 font-normal">({voluntaryUploaded.length})</span>
                 </h4>
               </div>
 
-              {uploadedList.length === 0 ? (
+              {voluntaryUploaded.length === 0 ? (
                 <div className="text-center py-8 text-sm text-gray-500 border border-dashed border-gray-200 rounded-lg">
                   <span className="text-3xl block mb-2" aria-hidden>
                     🗂
@@ -167,7 +280,7 @@ export function DocumentUploadSection({
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
-                  {uploadedList.map((req) => {
+                  {voluntaryUploaded.map((req) => {
                     const dt = catalogByCode.get(req.documentTypeCode);
                     const label = req.customLabel ?? dt?.labelKo ?? req.documentTypeCode;
                     const sizeText =
@@ -223,9 +336,7 @@ export function DocumentUploadSection({
               )}
             </div>
 
-            {showDevMockups && (
-              <DevMockupSkeletons catalog={catalog} />
-            )}
+            {showDevMockups && <DevMockupSkeletons catalog={catalog} />}
           </>
         )}
       </Card>
@@ -248,7 +359,8 @@ export function DocumentUploadSection({
 }
 
 // ─────────────────────────────────────────────
-// Dev mockups — ?devMockups=1 에서만 렌더 (AC-U3)
+// Dev mockups — ?devMockups=1 에서만 렌더
+// Phase 3 PR#3 프로덕션 활성화 후에도 비교/QA 목적으로 유지
 // ─────────────────────────────────────────────
 function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
   const sampleType = catalog.find((c) => c.code === 'SP_ACCOUNT') ?? catalog[0];

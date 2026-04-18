@@ -4,7 +4,8 @@ import { useNotificationStore } from '../../stores/notificationStore';
 import { useAuthStore } from '../../stores/authStore';
 import { getBasePath } from '../../utils/routeUtils';
 
-const POLL_INTERVAL = 60_000; // 60 seconds
+// Phase 3 PR#3 — 60s → 30s 단축 (서류 요청 워크플로 반응성 개선, UX §4)
+const POLL_INTERVAL = 30_000; // 30 seconds
 
 export function NotificationBell() {
   const navigate = useNavigate();

@@ -132,6 +132,32 @@ export const cancelDocumentRequest = async (
   return response.data;
 };
 
+// ─────────────────────────────────────────────
+// Phase 3 PR#3 — 신청자 fulfill (REQUESTED/REJECTED → UPLOADED)
+// ─────────────────────────────────────────────
+
+/**
+ * 신청자가 LEW의 요청 건에 대해 파일을 업로드/재업로드한다 (AC-S1, AC-S4).
+ * - REQUESTED → UPLOADED
+ * - REJECTED → UPLOADED (재업로드; 서버가 previousFileSeq를 DTO에 포함)
+ *
+ * 엔드포인트: POST /api/applications/{id}/document-requests/{reqId}/fulfill (multipart)
+ */
+export const fulfillDocumentRequest = async (
+  applicationSeq: number,
+  reqId: number,
+  file: File,
+): Promise<DocumentRequest> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axiosClient.post<DocumentRequest>(
+    `/applications/${applicationSeq}/document-requests/${reqId}/fulfill`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return response.data;
+};
+
 export const documentApi = {
   getDocumentTypes,
   getDocumentRequests,
@@ -141,5 +167,6 @@ export const documentApi = {
   approveDocumentRequest,
   rejectDocumentRequest,
   cancelDocumentRequest,
+  fulfillDocumentRequest,
 };
 export default documentApi;
