@@ -14,6 +14,9 @@ import type {
   DocumentRequestStatus,
   VoluntaryUploadPayload,
   VoluntaryUploadResponse,
+  CreateDocumentRequestItem,
+  CreateDocumentRequestsResponse,
+  DocumentRequestDecisionResponse,
 } from '../types/document';
 
 /**
@@ -72,10 +75,71 @@ export const deleteDocument = async (
   await axiosClient.delete(`/applications/${applicationSeq}/documents/${docRequestId}`);
 };
 
+// ─────────────────────────────────────────────
+// Phase 3 (PR#1 백엔드) — LEW 요청 생성 / 검토
+// ─────────────────────────────────────────────
+
+/**
+ * LEW/ADMIN이 서류 요청을 배치 생성한다 (AC-R1).
+ * 서버는 전체 트랜잭션으로 처리 — 한 건이라도 실패하면 전체 롤백.
+ */
+export const createDocumentRequests = async (
+  applicationSeq: number,
+  items: CreateDocumentRequestItem[],
+): Promise<CreateDocumentRequestsResponse> => {
+  const response = await axiosClient.post<CreateDocumentRequestsResponse>(
+    `/admin/applications/${applicationSeq}/document-requests`,
+    { items },
+  );
+  return response.data;
+};
+
+/**
+ * UPLOADED → APPROVED (AC-S2).
+ */
+export const approveDocumentRequest = async (
+  reqId: number,
+): Promise<DocumentRequestDecisionResponse> => {
+  const response = await axiosClient.patch<DocumentRequestDecisionResponse>(
+    `/admin/document-requests/${reqId}/approve`,
+  );
+  return response.data;
+};
+
+/**
+ * UPLOADED → REJECTED (AC-S3). reason은 min 10자.
+ */
+export const rejectDocumentRequest = async (
+  reqId: number,
+  rejectionReason: string,
+): Promise<DocumentRequestDecisionResponse> => {
+  const response = await axiosClient.patch<DocumentRequestDecisionResponse>(
+    `/admin/document-requests/${reqId}/reject`,
+    { rejectionReason },
+  );
+  return response.data;
+};
+
+/**
+ * REQUESTED → CANCELLED (AC-S5). 다른 상태에서는 서버가 409 반환.
+ */
+export const cancelDocumentRequest = async (
+  reqId: number,
+): Promise<DocumentRequestDecisionResponse> => {
+  const response = await axiosClient.delete<DocumentRequestDecisionResponse>(
+    `/admin/document-requests/${reqId}`,
+  );
+  return response.data;
+};
+
 export const documentApi = {
   getDocumentTypes,
   getDocumentRequests,
   uploadVoluntaryDocument,
   deleteDocument,
+  createDocumentRequests,
+  approveDocumentRequest,
+  rejectDocumentRequest,
+  cancelDocumentRequest,
 };
 export default documentApi;

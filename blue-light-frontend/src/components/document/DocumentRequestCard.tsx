@@ -29,6 +29,16 @@ interface DocumentRequestCardProps {
 
   /** 신청자가 읽기 전용으로 열람 중 (LEW/ADMIN) 등 */
   readOnly?: boolean;
+
+  // ── Phase 3 (PR#2 타입 선언, PR#3에서 프로덕션 연결) ─────────
+  /** UPLOADED → APPROVED (LEW 전용) */
+  onApprove?: () => void | Promise<void>;
+  /** UPLOADED → REJECTED (LEW 전용) */
+  onReject?: () => void | Promise<void>;
+  /** REQUESTED → CANCELLED (LEW 전용) */
+  onCancel?: () => void | Promise<void>;
+  /** REQUESTED/REJECTED → UPLOADED (신청자 전용, PR#3) */
+  onReupload?: (file: File) => Promise<void>;
 }
 
 const variantStyle: Record<DocumentRequestCardVariant, string> = {

@@ -20,6 +20,7 @@ import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
 import { AdminPaymentSection } from './sections/AdminPaymentSection';
 import { AdminSidebar } from './sections/AdminSidebar';
+import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 
 // Modal components
 import {
@@ -72,6 +73,16 @@ export default function AdminApplicationDetailPage() {
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN';
   const basePath = getBasePath(currentUser?.role);
   const applicationId = Number(id);
+
+  // Phase 3 PR#2 — 서류 요청 모달 권한 가드 (AC-R4 UI 레벨)
+  //   · ADMIN/SYSTEM_ADMIN: 모든 신청 허용
+  //   · LEW: assigned_lew_seq == currentUser.seq 일 때만
+  //   · 그 외: 버튼 미노출
+  const canRequestDocuments =
+    isAdmin ||
+    (currentUser?.role === 'LEW' &&
+      !!application?.assignedLewSeq &&
+      application.assignedLewSeq === currentUser.userSeq);
 
   // ── Data Fetching ──────────────────────────────────
 
@@ -434,6 +445,18 @@ export default function AdminApplicationDetailPage() {
             onFileUpload={handleFileUpload}
             onFileDownload={handleFileDownload}
             onFileDelete={handleFileDelete}
+          />
+
+          {/* Phase 3 PR#2 — LEW/ADMIN 서류 요청 섹션 */}
+          <LewDocumentReviewSection
+            applicationSeq={applicationId}
+            canRequest={canRequestDocuments}
+            applicantDisplayName={
+              application.userFirstName || application.userLastName
+                ? `${application.userFirstName ?? ''} ${application.userLastName ?? ''}`.trim()
+                : application.userEmail
+            }
+            applicationCode={`APP-${String(application.applicationSeq).padStart(6, '0')}`}
           />
 
           <AdminPaymentSection payments={payments} files={files} applicationStatus={application.status} />

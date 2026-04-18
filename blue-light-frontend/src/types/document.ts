@@ -54,6 +54,53 @@ export interface DocumentRequest {
   reviewedAt?: string;
   rejectionReason?: string;
   createdAt: string;
+
+  /**
+   * 재업로드 시 이전 파일 seq (Phase 3 PR#1 DTO 확장). AC-AU4.
+   */
+  previousFileSeq?: number;
+}
+
+// ─────────────────────────────────────────────
+// Phase 3 — LEW 서류 요청 API 타입
+// ─────────────────────────────────────────────
+
+/**
+ * 배치 생성 요청 1건 (POST /api/admin/applications/{id}/document-requests)
+ */
+export interface CreateDocumentRequestItem {
+  documentTypeCode: string;
+  /** OTHER 일 때 필수. */
+  customLabel?: string;
+  /** 신청자에게 보낼 메모 (optional, max 1000자). */
+  lewNote?: string;
+}
+
+/**
+ * 배치 생성 응답 1건.
+ */
+export interface CreateDocumentRequestCreated {
+  id: number;
+  documentTypeCode: string;
+  customLabel?: string;
+  status: DocumentRequestStatus;
+}
+
+/**
+ * 배치 생성 응답 (201).
+ */
+export interface CreateDocumentRequestsResponse {
+  created: CreateDocumentRequestCreated[];
+}
+
+/**
+ * Approve/Reject/Cancel 공통 응답.
+ */
+export interface DocumentRequestDecisionResponse {
+  id: number;
+  status: DocumentRequestStatus;
+  reviewedAt?: string;
+  rejectionReason?: string;
 }
 
 /**
