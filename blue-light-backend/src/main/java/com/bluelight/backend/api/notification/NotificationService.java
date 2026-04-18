@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -27,9 +28,10 @@ public class NotificationService {
     private final UserRepository userRepository;
 
     /**
-     * 알림 생성
+     * 알림 생성 — afterCommit 훅에서 호출될 수 있으므로 REQUIRES_NEW로 독립 트랜잭션 보장.
+     * saveAndFlush()로 즉시 영속화하여 ID 생성 확인.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public Notification createNotification(Long recipientSeq, NotificationType type,
                                             String title, String message,
                                             String referenceType, Long referenceId) {
@@ -45,7 +47,7 @@ public class NotificationService {
                 .referenceId(referenceId)
                 .build();
 
-        Notification saved = notificationRepository.save(notification);
+        Notification saved = notificationRepository.saveAndFlush(notification);
         log.info("Notification created: seq={}, type={}, recipientSeq={}", saved.getNotificationSeq(), type, recipientSeq);
         return saved;
     }
