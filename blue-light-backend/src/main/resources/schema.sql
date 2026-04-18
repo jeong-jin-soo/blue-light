@@ -173,6 +173,7 @@ CREATE TABLE IF NOT EXISTS document_request (
     custom_label         VARCHAR(200),
     lew_note             VARCHAR(1000),
     status               VARCHAR(20)  NOT NULL,
+    version              BIGINT       NOT NULL DEFAULT 0,
     fulfilled_file_seq   BIGINT,
     requested_by         BIGINT,
     requested_at         DATETIME(6),

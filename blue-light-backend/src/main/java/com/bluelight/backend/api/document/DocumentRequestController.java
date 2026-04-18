@@ -87,4 +87,31 @@ public class DocumentRequestController {
         documentRequestService.deleteVoluntary(userSeq, role, applicationId, docRequestId);
         return ResponseEntity.noContent().build();
     }
+
+    /**
+     * Phase 3 PR#1 — 신청자 fulfill
+     *
+     * POST /api/applications/{id}/document-requests/{reqId}/fulfill (multipart)
+     *
+     * - 상태 전이: REQUESTED/REJECTED/UPLOADED → UPLOADED
+     * - AC-P2: path 불일치 / 타인 신청 시 404 DOCUMENT_REQUEST_NOT_FOUND
+     */
+    @Auditable(
+            action = AuditAction.DOCUMENT_REQUEST_FULFILLED,
+            category = AuditCategory.APPLICATION,
+            entityType = "DocumentRequest")
+    @PostMapping("/api/applications/{applicationId}/document-requests/{docRequestId}/fulfill")
+    public ResponseEntity<DocumentRequestDto> fulfill(
+            Authentication authentication,
+            @PathVariable Long applicationId,
+            @PathVariable Long docRequestId,
+            @RequestParam("file") MultipartFile file) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        rateLimiter.checkAndRecord(RATE_TYPE, String.valueOf(userSeq), UPLOAD_MAX, UPLOAD_WINDOW_MIN);
+        log.info("DocumentRequest fulfill: userSeq={}, applicationSeq={}, drId={}, name={}",
+                userSeq, applicationId, docRequestId, file.getOriginalFilename());
+        return ResponseEntity.ok(
+                documentRequestService.fulfill(userSeq, role, applicationId, docRequestId, file));
+    }
 }

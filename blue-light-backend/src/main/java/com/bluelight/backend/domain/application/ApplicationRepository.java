@@ -1,11 +1,15 @@
 package com.bluelight.backend.domain.application;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -132,6 +136,14 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
      * LEW 전용: 할당된 신청서 중 특정 상태 건수
      */
     long countByAssignedLewUserSeqAndStatus(Long lewSeq, ApplicationStatus status);
+
+    /**
+     * 비관적 락으로 application row 를 조회 (B-3 rate limit race 방지).
+     * {@link DocumentRequest} 배치 생성 진입 시 호출하여 active request count 재검사를 직렬화한다.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Application a WHERE a.applicationSeq = :id")
+    Optional<Application> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * 만료 대상: COMPLETED + 만료일 경과

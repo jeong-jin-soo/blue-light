@@ -34,7 +34,16 @@ public class DocumentRequestDto {
 
     private LocalDateTime createdAt;
 
+    /**
+     * 재업로드 시 이전 파일 seq (AC-AU4) — 새 fulfill 응답에서만 non-null.
+     */
+    private Long previousFileSeq;
+
     public static DocumentRequestDto from(DocumentRequest dr) {
+        return from(dr, null);
+    }
+
+    public static DocumentRequestDto from(DocumentRequest dr, Long previousFileSeq) {
         FileEntity file = dr.getFulfilledFile();
         return DocumentRequestDto.builder()
                 .id(dr.getId())
@@ -51,6 +60,7 @@ public class DocumentRequestDto {
                 .reviewedAt(dr.getReviewedAt())
                 .rejectionReason(dr.getRejectionReason())
                 .createdAt(dr.getCreatedAt())
+                .previousFileSeq(previousFileSeq)
                 .build();
     }
 }

@@ -1,5 +1,6 @@
 package com.bluelight.backend.domain.document;
 
+import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.common.BaseEntity;
 import com.bluelight.backend.domain.file.FileEntity;
@@ -16,12 +17,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
@@ -47,6 +50,13 @@ public class DocumentRequest extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "document_request_id")
     private Long id;
+
+    /**
+     * 낙관적 락 버전 (B-1 동시 승인/반려 race 방지)
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
 
     /**
      * 대상 신청서
@@ -147,6 +157,10 @@ public class DocumentRequest extends BaseEntity {
         this.fulfilledAt = fulfilledAt;
     }
 
+    // ----------------------------------------------------------------------
+    // 팩터리
+    // ----------------------------------------------------------------------
+
     /**
      * Phase 2 자발적 업로드 팩터리
      */
@@ -166,9 +180,82 @@ public class DocumentRequest extends BaseEntity {
     }
 
     /**
-     * 신청자가 자발적 업로드 후 삭제 → CANCELLED 전이 (감사 흔적 보존)
+     * Phase 3 LEW 요청 팩터리 — status=REQUESTED, requestedBy/At 설정, 파일 미첨부
+     */
+    public static DocumentRequest forLewRequest(Application application,
+                                                String documentTypeCode,
+                                                String customLabel,
+                                                String lewNote,
+                                                User requester) {
+        LocalDateTime now = LocalDateTime.now();
+        return DocumentRequest.builder()
+                .application(application)
+                .documentTypeCode(documentTypeCode)
+                .customLabel(customLabel)
+                .lewNote(lewNote)
+                .status(DocumentRequestStatus.REQUESTED)
+                .requestedBy(requester)
+                .requestedAt(now)
+                .build();
+    }
+
+    // ----------------------------------------------------------------------
+    // 상태 전이 메서드 (중앙 가드)
+    // ----------------------------------------------------------------------
+
+    /**
+     * 상태 전이 가드. 불법 전이 시 409 INVALID_STATE_TRANSITION.
+     */
+    private void assertCanTransitionTo(DocumentRequestStatus next) {
+        if (!this.status.canTransitionTo(next)) {
+            throw new BusinessException(
+                    "Illegal state transition: " + this.status + " -> " + next,
+                    HttpStatus.CONFLICT,
+                    "INVALID_STATE_TRANSITION");
+        }
+    }
+
+    /**
+     * 신청자 fulfill — REQUESTED/REJECTED/UPLOADED → UPLOADED.
+     * 재업로드 시 rejection_reason 은 보존하고 reviewed_by/at 만 초기화한다.
+     */
+    public void fulfill(FileEntity newFile) {
+        assertCanTransitionTo(DocumentRequestStatus.UPLOADED);
+        this.fulfilledFile = newFile;
+        this.fulfilledAt = LocalDateTime.now();
+        // 재업로드(REJECTED → UPLOADED 또는 UPLOADED → UPLOADED) 시 검토 기록 초기화
+        this.reviewedAt = null;
+        this.reviewedBy = null;
+        this.status = DocumentRequestStatus.UPLOADED;
+    }
+
+    /**
+     * LEW 승인 — UPLOADED → APPROVED
+     */
+    public void approve(User reviewer) {
+        assertCanTransitionTo(DocumentRequestStatus.APPROVED);
+        this.status = DocumentRequestStatus.APPROVED;
+        this.reviewedBy = reviewer;
+        this.reviewedAt = LocalDateTime.now();
+    }
+
+    /**
+     * LEW 반려 — UPLOADED → REJECTED
+     */
+    public void reject(User reviewer, String reason) {
+        assertCanTransitionTo(DocumentRequestStatus.REJECTED);
+        this.status = DocumentRequestStatus.REJECTED;
+        this.rejectionReason = reason;
+        this.reviewedBy = reviewer;
+        this.reviewedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 신청자가 자발적 업로드 후 삭제 또는 LEW 가 REQUESTED 취소 → CANCELLED
      */
     public void cancel() {
+        assertCanTransitionTo(DocumentRequestStatus.CANCELLED);
         this.status = DocumentRequestStatus.CANCELLED;
     }
+
 }
