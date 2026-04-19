@@ -18,7 +18,7 @@ function PendingDocsBadge({ count }: { count: number }) {
   return (
     <span
       className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-warning-800 bg-warning-50 border border-warning-500/40 rounded-full"
-      title="LEW 요청 서류 대기 · Awaiting requested documents"
+      title="Awaiting requested documents"
     >
       🟡 {count} awaiting
     </span>

@@ -53,8 +53,8 @@ public class DocumentRequestNotifier {
 
         afterCommit(() -> {
             createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_CREATED,
-                    "LEW가 서류를 요청했습니다",
-                    "신청 #" + appSeq + " — " + count + "건의 서류 요청이 도착했습니다.",
+                    "Documents requested",
+                    "Application #" + appSeq + " — " + count + " document(s) requested by your LEW.",
                     "APPLICATION", appSeq);
             if (hasEmail(applicantEmail)) {
                 try {
@@ -88,8 +88,8 @@ public class DocumentRequestNotifier {
 
         afterCommit(() -> {
             createInAppSafe(lewSeq, NotificationType.DOCUMENT_REQUEST_FULFILLED,
-                    "신청자가 서류를 업로드했습니다",
-                    "신청 #" + appSeq + " — " + code + " 검토가 필요합니다.",
+                    "Applicant uploaded a document",
+                    "Application #" + appSeq + " — " + code + " is ready for your review.",
                     "DOCUMENT_REQUEST", drId);
             if (hasEmail(lewEmail)) {
                 try {
@@ -122,8 +122,8 @@ public class DocumentRequestNotifier {
 
         afterCommit(() -> {
             createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_APPROVED,
-                    "서류가 승인되었습니다",
-                    "신청 #" + appSeq + " — " + code + " 승인 완료.",
+                    "Document approved",
+                    "Application #" + appSeq + " — " + code + " has been approved.",
                     "DOCUMENT_REQUEST", drId);
             if (hasEmail(applicantEmail)) {
                 try {
@@ -157,8 +157,8 @@ public class DocumentRequestNotifier {
 
         afterCommit(() -> {
             createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_REJECTED,
-                    "서류가 반려되었습니다",
-                    "신청 #" + appSeq + " — " + code + " 반려. 재업로드가 필요합니다.",
+                    "Document rejected",
+                    "Application #" + appSeq + " — " + code + " was rejected. Please re-upload.",
                     "DOCUMENT_REQUEST", drId);
             if (hasEmail(applicantEmail)) {
                 try {

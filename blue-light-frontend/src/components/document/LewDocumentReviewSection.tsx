@@ -109,7 +109,7 @@ export function LewDocumentReviewSection({
     );
     try {
       await documentApi.approveDocumentRequest(req.id);
-      toast.success('승인되었습니다 · Approved');
+      toast.success('Approved');
       // 서버 상태로 refresh (reviewedBy 등 메타 정확화)
       fetchAll();
     } catch (err) {
@@ -117,7 +117,7 @@ export function LewDocumentReviewSection({
       setRequests(prev);
       const msg =
         (err as { message?: string })?.message ??
-        '승인에 실패했습니다. 다시 시도해 주세요. · Failed to approve.';
+        'Failed to approve. Please try again.';
       toast.error(msg);
     } finally {
       setApprovingId(null);
@@ -128,13 +128,13 @@ export function LewDocumentReviewSection({
     if (!rejectTarget) return;
     try {
       await documentApi.rejectDocumentRequest(rejectTarget.id, reason);
-      toast.success('반려되었습니다 · Rejected');
+      toast.success('Rejected');
       setRejectTarget(null);
       fetchAll();
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        '반려 처리에 실패했습니다. · Failed to reject.';
+        'Failed to reject.';
       toast.error(msg);
       // 모달은 유지해서 재시도 가능하게
       throw err;
@@ -146,13 +146,13 @@ export function LewDocumentReviewSection({
     setCancelLoading(true);
     try {
       await documentApi.cancelDocumentRequest(cancelTarget.id);
-      toast.success('요청이 취소되었습니다 · Request cancelled');
+      toast.success('Request cancelled');
       setCancelTarget(null);
       fetchAll();
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        '취소에 실패했습니다. · Failed to cancel request.';
+        'Failed to cancel request.';
       toast.error(msg);
     } finally {
       setCancelLoading(false);
@@ -167,7 +167,7 @@ export function LewDocumentReviewSection({
         req.fulfilledFilename ?? `document-${req.id}`,
       );
     } catch {
-      toast.error('다운로드에 실패했습니다. · Failed to download file.');
+      toast.error('Failed to download file.');
     }
   };
 
@@ -176,8 +176,8 @@ export function LewDocumentReviewSection({
       <Card id="doc-requests">
         <div className="flex items-start justify-between gap-3 mb-4">
           <CardHeader
-            title="서류 요청 · Document Requests"
-            description={`LEW 요청 워크플로 — ${visibleRequests.length}건`}
+            title="Document Requests"
+            description={`LEW request workflow — ${visibleRequests.length} item${visibleRequests.length === 1 ? '' : 's'}`}
           />
           {canRequest && (
             <Button
@@ -185,7 +185,7 @@ export function LewDocumentReviewSection({
               onClick={() => setShowCreateModal(true)}
               leftIcon={<span aria-hidden>＋</span>}
             >
-              서류 요청 · Request Documents
+              Request Documents
             </Button>
           )}
         </div>
@@ -199,8 +199,6 @@ export function LewDocumentReviewSection({
             <span className="text-3xl block mb-2" aria-hidden>
               📋
             </span>
-            아직 요청한 서류가 없습니다.
-            <br />
             No document requests yet.
           </div>
         ) : (
@@ -240,7 +238,7 @@ export function LewDocumentReviewSection({
         documentLabel={
           rejectTarget
             ? rejectTarget.customLabel ??
-              catalogByCode.get(rejectTarget.documentTypeCode)?.labelKo ??
+              catalogByCode.get(rejectTarget.documentTypeCode)?.labelEn ??
               rejectTarget.documentTypeCode
             : undefined
         }
@@ -252,14 +250,14 @@ export function LewDocumentReviewSection({
         isOpen={cancelTarget !== null}
         onClose={() => (cancelLoading ? undefined : setCancelTarget(null))}
         onConfirm={handleCancelConfirm}
-        title="요청 취소 · Cancel request"
+        title="Cancel request"
         message={
           cancelTarget
-            ? `요청 #${cancelTarget.id}을(를) 취소할까요? 신청자 화면에서도 사라집니다.\nCancel request #${cancelTarget.id}? The applicant will no longer see it.`
+            ? `Cancel request #${cancelTarget.id}? The applicant will no longer see it.`
             : ''
         }
-        confirmLabel="요청 취소 · Cancel Request"
-        cancelLabel="되돌아가기 · Keep"
+        confirmLabel="Cancel Request"
+        cancelLabel="Keep"
         variant="danger"
         loading={cancelLoading}
       />
@@ -298,7 +296,7 @@ function LewRequestRow({
   const style = variantStyle[request.status] ?? { border: 'border-gray-200', bg: 'bg-surface' };
   const label =
     request.customLabel ??
-    documentType?.labelKo ??
+    documentType?.labelEn ??
     documentType?.code ??
     request.documentTypeCode;
 
@@ -307,25 +305,25 @@ function LewRequestRow({
       case 'REQUESTED':
         return (
           <Badge variant="warning" dot>
-            요청됨 · Requested
+            Requested
           </Badge>
         );
       case 'UPLOADED':
         return (
           <Badge variant="info" dot>
-            검토 대기 · Under Review
+            Under Review
           </Badge>
         );
       case 'APPROVED':
         return (
           <Badge variant="success" dot>
-            승인됨 · Approved
+            Approved
           </Badge>
         );
       case 'REJECTED':
         return (
           <Badge variant="error" dot>
-            반려됨 · Rejected
+            Rejected
           </Badge>
         );
       default:
@@ -382,13 +380,13 @@ function LewRequestRow({
       {request.status === 'REJECTED' && request.rejectionReason && (
         <div className="bg-surface border-l-2 border-error-500 rounded p-3 mb-2">
           <p className="text-xs font-medium text-gray-500 mb-1">
-            반려 사유 · Rejection reason
+            Rejection reason
           </p>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">
             {request.rejectionReason}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            신청자의 재업로드를 기다립니다. · Awaiting applicant re-upload.
+            Awaiting applicant re-upload.
           </p>
         </div>
       )}
@@ -405,7 +403,7 @@ function LewRequestRow({
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
-          승인되었습니다 · Approved
+          Approved
           {request.reviewedAt && (
             <span className="text-gray-500 ml-1">
               · {new Date(request.reviewedAt).toLocaleString()}
@@ -419,12 +417,12 @@ function LewRequestRow({
         {(request.status === 'UPLOADED' || request.status === 'APPROVED') &&
           request.fulfilledFileSeq && (
             <Button size="sm" variant="ghost" onClick={onDownload}>
-              다운로드 · Download
+              Download
             </Button>
           )}
         {request.status === 'REQUESTED' && (
           <Button size="sm" variant="ghost" onClick={onCancel}>
-            요청 취소 · Cancel Request
+            Cancel Request
           </Button>
         )}
         {request.status === 'UPLOADED' && (
@@ -436,10 +434,10 @@ function LewRequestRow({
               onClick={onReject}
               disabled={approving}
             >
-              반려 · Reject
+              Reject
             </Button>
             <Button size="sm" onClick={onApprove} loading={approving}>
-              승인 · Approve ✓
+              Approve ✓
             </Button>
           </>
         )}

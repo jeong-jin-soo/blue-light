@@ -479,9 +479,6 @@ export default function NewApplicationPage() {
                   role="status"
                 >
                   You may be asked for company details in a later step.
-                  <span className="block text-[11px] text-gray-400 mt-0.5">
-                    법인 선택 시, 이후 단계에서 회사 정보가 필요할 수 있습니다.
-                  </span>
                 </p>
               )}
               {errors.applicantType && (
@@ -732,10 +729,6 @@ export default function NewApplicationPage() {
                 application and request any required documents — SP account,
                 LOA, main breaker photo, SLD — through the platform. This keeps
                 your first step fast.
-                <span className="block mt-2 text-[11px] opacity-80">
-                  지금은 서류 업로드가 필요하지 않습니다. 배정된 LEW가 검토 후
-                  필요한 서류만 요청드립니다.
-                </span>
               </InfoBox>
             </div>
           </div>

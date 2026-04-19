@@ -358,7 +358,7 @@ export default function ProfilePage() {
               <Badge variant="gray">Optional</Badge>
             </div>
             <p className="text-xs text-gray-500 mb-4">
-              Used only for Letter of Appointment (LOA) and EMA licence printing. / LOA 문서 및 EMA 면허 인쇄에만 사용됩니다.
+              Used only for Letter of Appointment (LOA) and EMA licence printing.
             </p>
           </div>
           <Input

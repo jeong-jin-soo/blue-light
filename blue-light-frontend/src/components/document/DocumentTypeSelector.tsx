@@ -34,9 +34,9 @@ export function DocumentTypeSelector({
   return (
     <div>
       <Select
-        label="서류 종류 / Document Type"
+        label="Document Type"
         required
-        placeholder="서류 종류 선택 · Select type"
+        placeholder="Select type"
         options={options}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -56,7 +56,7 @@ export function DocumentTypeSelector({
           rel="noreferrer"
           className="text-xs text-primary underline mt-1 inline-block"
         >
-          템플릿 다운로드 · Download template
+          Download template
         </a>
       )}
     </div>

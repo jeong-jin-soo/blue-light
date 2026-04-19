@@ -104,7 +104,7 @@ export function DocumentRequestModal({
         setCatalog(data);
       })
       .catch(() => {
-        toast.error('서류 카탈로그를 불러오지 못했습니다. · Failed to load document types.');
+        toast.error('Failed to load document types.');
       })
       .finally(() => setLoading(false));
     // toast는 zustand 안정 참조
@@ -158,7 +158,7 @@ export function DocumentRequestModal({
     try {
       const res = await documentApi.createDocumentRequests(applicationSeq, items);
       toast.success(
-        `서류 ${res.created.length}건 요청 완료 · Requested ${res.created.length} document(s)`,
+        `Requested ${res.created.length} document(s)`,
       );
       onSuccess();
       onClose();
@@ -167,7 +167,7 @@ export function DocumentRequestModal({
       switch (e.code) {
         case 'TOO_MANY_ACTIVE_REQUESTS':
           setLimitBannerMessage(
-            '활성 요청 한도(10건)에 도달했습니다. 기존 요청을 승인/반려 후 다시 시도하세요. · Maximum 10 active requests reached.',
+            'Maximum 10 active requests reached. Approve or reject existing ones before trying again.',
           );
           break;
         case 'DUPLICATE_ACTIVE_REQUEST': {
@@ -176,29 +176,29 @@ export function DocumentRequestModal({
             e.response?.data?.details?.documentTypeCode ?? '';
           if (duplicatedCode && rows[duplicatedCode]) {
             updateRow(duplicatedCode, {
-              error: '이미 요청 중입니다 · Already pending',
+              error: 'Already pending',
             });
           } else {
             toast.error(
-              e.message ?? '이미 요청 중인 서류가 포함되어 있습니다. · A selected document is already pending.',
+              e.message ?? 'A selected document is already pending.',
             );
           }
           break;
         }
         case 'CUSTOM_LABEL_REQUIRED':
           if (rows['OTHER']) {
-            updateRow('OTHER', { error: '라벨이 필요합니다 · Label required' });
+            updateRow('OTHER', { error: 'Label required' });
           } else {
             toast.error(e.message ?? 'Custom label required.');
           }
           break;
         case 'UNKNOWN_DOCUMENT_TYPE':
           toast.error(
-            e.message ?? '알 수 없는 서류 타입입니다. · Unknown document type.',
+            e.message ?? 'Unknown document type.',
           );
           break;
         default:
-          toast.error(e.message ?? '요청 생성에 실패했습니다. · Failed to create requests.');
+          toast.error(e.message ?? 'Failed to create requests.');
       }
     } finally {
       setSubmitting(false);
@@ -226,7 +226,7 @@ export function DocumentRequestModal({
           </span>
           <div>
             <h3 id="dr-modal-title" className="text-lg font-semibold text-gray-800">
-              신청자에게 서류 요청 · Request Documents
+              Request Documents
             </h3>
             {(applicantDisplayName || applicationCode) && (
               <p className="text-xs text-gray-500 mt-0.5">
@@ -246,16 +246,12 @@ export function DocumentRequestModal({
             className="mt-4 text-sm text-warning-700 bg-warning-50 border border-warning-500/40 rounded-md p-3"
           >
             {limitBannerMessage ??
-              '활성 요청 한도(10건)에 도달했습니다. 기존 요청을 승인/반려 후 다시 시도하세요. · Maximum 10 active requests reached.'}
+              'Maximum 10 active requests reached. Approve or reject existing ones before trying again.'}
           </div>
         )}
 
         <p className="text-sm text-gray-600 my-3">
-          필요한 서류를 선택하세요. 신청자에게 즉시 알림이 전송됩니다.
-          <br />
-          <span className="text-gray-500">
-            Select the documents you need. The applicant will be notified immediately.
-          </span>
+          Select the documents you need. The applicant will be notified immediately.
         </p>
 
         {loading ? (
@@ -314,17 +310,16 @@ export function DocumentRequestModal({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <p className="text-sm font-medium text-gray-900">
-                          {dt.labelKo}{' '}
-                          <span className="text-gray-500 font-normal">· {dt.labelEn}</span>
+                          {dt.labelEn}
                         </p>
                         {alreadyPending && dt.code !== 'OTHER' && (
                           <Badge variant="gray" dot>
-                            이미 요청 중 #{alreadyPending.id} · Already pending
+                            Already pending #{alreadyPending.id}
                           </Badge>
                         )}
                       </div>
                       <p id={`dr-meta-${dt.code}`} className="text-xs text-gray-500 mt-0.5">
-                        {prettyMime(dt.acceptedMime)} · 최대 {dt.maxSizeMb}MB
+                        {prettyMime(dt.acceptedMime)} · max {dt.maxSizeMb}MB
                       </p>
                     </div>
                   </label>
@@ -333,9 +328,9 @@ export function DocumentRequestModal({
                     <div className="ml-8 mt-3 space-y-2 animate-in">
                       {dt.code === 'OTHER' && (
                         <Input
-                          label="라벨 · Label"
+                          label="Label"
                           required
-                          placeholder="서류 설명 · Describe the document"
+                          placeholder="Describe the document"
                           value={row.customLabel}
                           onChange={(e) =>
                             updateRow(dt.code, {
@@ -350,15 +345,15 @@ export function DocumentRequestModal({
                             (dt.code === 'OTHER' &&
                             row.customLabel.length > 0 &&
                             !!alreadyPending
-                              ? `이미 요청 중입니다 #${alreadyPending.id} · Already pending`
+                              ? `Already pending #${alreadyPending.id}`
                               : undefined)
                           }
                         />
                       )}
                       <Textarea
-                        label="신청자에게 전할 메모 (선택) · Note to applicant (optional)"
+                        label="Note to applicant (optional)"
                         rows={2}
-                        placeholder="예: 전체 페이지 고해상도 스캔"
+                        placeholder="e.g., Full pages, high-resolution scan"
                         value={row.lewNote}
                         onChange={(e) =>
                           updateRow(dt.code, { lewNote: e.target.value })
@@ -381,10 +376,10 @@ export function DocumentRequestModal({
 
       <ModalFooter>
         <span className="mr-auto text-xs text-gray-500">
-          {selectedCount} of {SOFT_LIMIT} active requests will be used (현재 활성 {activeCount}건)
+          {selectedCount} of {SOFT_LIMIT} active requests will be used ({activeCount} currently active)
         </span>
         <Button variant="outline" size="sm" onClick={close} disabled={submitting}>
-          취소 · Cancel
+          Cancel
         </Button>
         <Button
           size="sm"
@@ -393,8 +388,8 @@ export function DocumentRequestModal({
           disabled={selectedCount === 0 || hasInvalid || softLimitReached}
         >
           {selectedCount === 0
-            ? '최소 1건 선택 · Select at least one'
-            : `${selectedCount}건 요청 보내기 · Send ${selectedCount} Request${selectedCount > 1 ? 's' : ''}`}
+            ? 'Select at least one'
+            : `Send ${selectedCount} Request${selectedCount > 1 ? 's' : ''}`}
         </Button>
       </ModalFooter>
     </Modal>

@@ -93,14 +93,14 @@ export function DocumentUploadSection({
         customLabel,
         file,
       });
-      toast.success('업로드 완료 · Uploaded');
+      toast.success('Uploaded');
       // 목록 새로고침 (낙관적 업데이트 대신 서버 source of truth 사용)
       const refreshed = await documentApi.getDocumentRequests(applicationSeq);
       setRequests(refreshed);
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        '업로드에 실패했습니다. · Upload failed.';
+        'Upload failed.';
       toast.error(msg);
       throw err; // DocumentRequestCard 내부 에러 표시용
     } finally {
@@ -122,11 +122,11 @@ export function DocumentUploadSection({
         file,
       );
       setRequests((prev) => prev.map((r) => (r.id === requestId ? updated : r)));
-      toast.success('업로드 완료 · LEW에게 알립니다 · Uploaded · LEW will be notified');
+      toast.success('Uploaded · LEW will be notified');
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        '업로드에 실패했습니다. · Upload failed.';
+        'Upload failed.';
       toast.error(msg);
       throw err;
     }
@@ -137,11 +137,11 @@ export function DocumentUploadSection({
     setDeleting(true);
     try {
       await documentApi.deleteDocument(applicationSeq, deleteTarget.id);
-      toast.success('삭제되었습니다. · Deleted');
+      toast.success('Deleted');
       setRequests((prev) => prev.filter((r) => r.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err) {
-      const msg = (err as { message?: string })?.message ?? '삭제에 실패했습니다. · Delete failed.';
+      const msg = (err as { message?: string })?.message ?? 'Delete failed.';
       toast.error(msg);
     } finally {
       setDeleting(false);
@@ -189,7 +189,7 @@ export function DocumentUploadSection({
   return (
     <>
       <Card>
-        <CardHeader title="서류 · Documents" description="Supporting documents" />
+        <CardHeader title="Documents" description="Supporting documents" />
 
         {loading ? (
           <div className="flex items-center justify-center py-10">
@@ -212,7 +212,7 @@ export function DocumentUploadSection({
                     className="text-sm font-semibold text-gray-800"
                     tabIndex={-1}
                   >
-                    LEW 요청 서류 · Requested by LEW{' '}
+                    Requested by LEW{' '}
                     <span className="text-gray-500 font-normal">({lewRequested.length})</span>
                   </h3>
                 </div>
@@ -241,9 +241,7 @@ export function DocumentUploadSection({
 
             {/* InfoBox — 요청이 없을 때만 노출 (요청 있으면 상단 배너가 대체) */}
             {!hasActiveRequests && (
-              <InfoBox title="지금은 업로드가 필수가 아니에요 · Upload is optional for now">
-                LEW가 검토 중 서류를 요청할 수 있습니다. 이미 가진 서류가 있다면 먼저 업로드해 두면 진행이 빨라집니다.
-                <br />
+              <InfoBox title="Upload is optional for now">
                 Your LEW may request documents during review. You can also upload anything you already have — it speeds things up.
               </InfoBox>
             )}
@@ -264,7 +262,7 @@ export function DocumentUploadSection({
             <div className="mt-8">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-gray-800">
-                  업로드됨 · Uploaded{' '}
+                  Uploaded{' '}
                   <span className="text-gray-500 font-normal">({voluntaryUploaded.length})</span>
                 </h4>
               </div>
@@ -274,15 +272,13 @@ export function DocumentUploadSection({
                   <span className="text-3xl block mb-2" aria-hidden>
                     🗂
                   </span>
-                  업로드된 서류가 없습니다.
-                  <br />
                   No documents yet. Upload when ready.
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
                   {voluntaryUploaded.map((req) => {
                     const dt = catalogByCode.get(req.documentTypeCode);
-                    const label = req.customLabel ?? dt?.labelKo ?? req.documentTypeCode;
+                    const label = req.customLabel ?? dt?.labelEn ?? req.documentTypeCode;
                     const sizeText =
                       req.fulfilledFileSize != null ? formatBytes(req.fulfilledFileSize) : '';
                     const dateText = req.fulfilledAt
@@ -311,7 +307,7 @@ export function DocumentUploadSection({
                             type="button"
                             onClick={() => setDeleteTarget(req)}
                             className="flex-shrink-0 p-2 text-error-600 hover:bg-error-50 rounded-md transition-colors"
-                            aria-label={`${req.fulfilledFilename ?? label} 삭제 · Delete`}
+                            aria-label={`Delete ${req.fulfilledFilename ?? label}`}
                           >
                             <svg
                               className="w-4 h-4"
@@ -345,12 +341,12 @@ export function DocumentUploadSection({
         isOpen={deleteTarget !== null}
         onClose={() => (deleting ? undefined : setDeleteTarget(null))}
         onConfirm={handleDelete}
-        title="서류 삭제 · Delete document"
-        message={`이 서류를 삭제할까요? 되돌릴 수 없습니다.\nDelete this document? It cannot be undone.${
+        title="Delete document"
+        message={`Delete this document? It cannot be undone.${
           deleteTarget?.fulfilledFilename ? `\n\n${deleteTarget.fulfilledFilename}` : ''
         }`}
-        confirmLabel="삭제 · Delete"
-        cancelLabel="취소 · Cancel"
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
         variant="danger"
         loading={deleting}
       />
@@ -381,7 +377,7 @@ function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
         return {
           ...baseRequest,
           status: 'REQUESTED',
-          lewNote: 'SP 계정 보유자 확인을 위해 PDF를 첨부해 주세요.',
+          lewNote: 'Please attach the SP account holder PDF for verification.',
           requestedAt: new Date().toISOString(),
         };
       case 'uploaded':
@@ -404,7 +400,7 @@ function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
           ...baseRequest,
           status: 'REJECTED',
           fulfilledFilename: 'sp_account.pdf',
-          rejectionReason: '파일이 흐릿합니다. 선명한 사본을 다시 올려주세요.',
+          rejectionReason: 'The file is blurry. Please upload a clearer copy.',
           reviewedAt: new Date().toISOString(),
         };
     }

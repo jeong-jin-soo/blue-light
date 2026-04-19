@@ -63,12 +63,11 @@ export function DocumentRequestBanner({
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-warning-800">
-            LEW가 서류 {total}건을 요청했습니다 · Your LEW requested {total} document
-            {total > 1 ? 's' : ''}
+            Your LEW requested {total} document{total > 1 ? 's' : ''}
           </p>
           {rejected > 0 && (
             <p className="text-xs text-warning-700 mt-1">
-              {rejected}건 반려 · 재업로드가 필요합니다 · {rejected} rejected · please re-upload
+              {rejected} rejected · please re-upload
             </p>
           )}
         </div>
@@ -77,7 +76,7 @@ export function DocumentRequestBanner({
           onClick={handleView}
           className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-warning-800 bg-white border border-warning-500/40 rounded-md hover:bg-warning-50 focus:outline-none focus:ring-2 focus:ring-warning-500/30 transition-colors"
         >
-          보기 · View
+          View
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
           </svg>

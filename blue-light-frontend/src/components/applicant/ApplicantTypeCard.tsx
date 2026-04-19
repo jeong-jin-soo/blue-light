@@ -20,17 +20,13 @@ const OPTIONS: Record<
   ApplicantType,
   {
     titleEn: string;
-    titleKo: string;
     descEn: string;
-    descKo: string;
     Icon: () => ReactElement;
   }
 > = {
   INDIVIDUAL: {
     titleEn: 'Individual',
-    titleKo: '개인',
     descEn: 'I am applying as an individual.',
-    descKo: '개인 자격으로 신청합니다.',
     // Heroicons outline: user
     Icon: () => (
       <svg
@@ -51,10 +47,8 @@ const OPTIONS: Record<
   },
   CORPORATE: {
     titleEn: 'Corporate',
-    titleKo: '법인',
     descEn:
       'I am applying on behalf of a registered company (UEN).',
-    descKo: '회사(UEN 보유 법인) 명의로 신청합니다.',
     // Heroicons outline: building-office-2
     Icon: () => (
       <svg

@@ -91,16 +91,16 @@ export function DocumentUploadArea({
           <>
             <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
             <p className="text-xs text-gray-500">
-              {formatBytes(selectedFile.size)} · 클릭하여 변경 · Click to change
+              {formatBytes(selectedFile.size)} · Click to change
             </p>
           </>
         ) : (
           <>
             <p className="text-sm font-medium text-gray-700">
-              파일을 끌어 놓거나 클릭 · Drag &amp; drop or click
+              Drag &amp; drop or click
             </p>
             <p className="text-xs text-gray-500">
-              {prettyMime(acceptedMime)} · 최대 {maxSizeMb}MB
+              {prettyMime(acceptedMime)} · max {maxSizeMb}MB
             </p>
           </>
         )}
@@ -122,7 +122,7 @@ export function DocumentUploadArea({
           }}
           className="text-xs text-gray-500 hover:text-gray-700 underline mt-2"
         >
-          선택 해제 · Clear
+          Clear
         </button>
       )}
     </div>

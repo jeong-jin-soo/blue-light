@@ -106,13 +106,13 @@ function NeutralBody({
     const maxBytes = selectedType.maxSizeMb * 1024 * 1024;
     if (f.size > maxBytes) {
       setFile(null);
-      setError(`파일이 너무 큽니다 (최대 ${selectedType.maxSizeMb}MB). · File too large.`);
+      setError(`File too large (max ${selectedType.maxSizeMb}MB).`);
       return;
     }
     if (!isMimeAccepted(f, selectedType.acceptedMime)) {
       setFile(null);
       setError(
-        `${selectedType.labelKo}에 허용되지 않는 형식입니다. · File type not allowed.`,
+        `File type not allowed for ${selectedType.labelEn}.`,
       );
       return;
     }
@@ -134,7 +134,7 @@ function NeutralBody({
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        '업로드에 실패했습니다. · Upload failed.';
+        'Upload failed.';
       setError(msg);
     }
   };
@@ -147,10 +147,10 @@ function NeutralBody({
         </span>
         <div>
           <h4 className="text-sm font-semibold text-gray-900">
-            서류 업로드 · Upload a document
+            Upload a document
           </h4>
           <p className="text-xs text-gray-500 mt-0.5">
-            원하는 서류를 자발적으로 업로드할 수 있습니다. · Upload optional supporting documents.
+            Upload optional supporting documents.
           </p>
         </div>
       </div>
@@ -170,9 +170,9 @@ function NeutralBody({
         {isOther && (
           <div className="animate-in">
             <Input
-              label="라벨 · Label"
+              label="Label"
               required
-              placeholder="이 서류를 설명해 주세요 · Describe this document"
+              placeholder="Describe this document"
               value={customLabel}
               onChange={(e) => setCustomLabel(e.target.value)}
               disabled={readOnly || uploading}
@@ -199,7 +199,7 @@ function NeutralBody({
             loading={uploading}
             disabled={!canUpload || readOnly}
           >
-            업로드 · Upload
+            Upload
           </Button>
         </div>
       </div>
@@ -228,19 +228,19 @@ function RequestBody({
   const badge = (() => {
     switch (variant) {
       case 'requested':
-        return <Badge variant="warning">업로드 필요 · Action needed</Badge>;
+        return <Badge variant="warning">Action needed</Badge>;
       case 'uploaded':
-        return <Badge variant="info">LEW 검토 중 · Waiting for LEW</Badge>;
+        return <Badge variant="info">Waiting for LEW</Badge>;
       case 'approved':
-        return <Badge variant="success">승인됨 · Approved</Badge>;
+        return <Badge variant="success">Approved</Badge>;
       case 'rejected':
-        return <Badge variant="error">재업로드 필요 · Needs re-upload</Badge>;
+        return <Badge variant="error">Needs re-upload</Badge>;
       default:
         return null;
     }
   })();
 
-  const label = request?.customLabel ?? documentType?.labelKo ?? documentType?.code ?? '—';
+  const label = request?.customLabel ?? documentType?.labelEn ?? documentType?.code ?? '—';
   const acceptedMime = documentType?.acceptedMime ?? '';
   const maxSizeMb = documentType?.maxSizeMb ?? 10;
   const canReupload =
@@ -258,12 +258,12 @@ function RequestBody({
       const maxBytes = maxSizeMb * 1024 * 1024;
       if (f.size > maxBytes) {
         setFile(null);
-        setError(`파일이 너무 큽니다 (최대 ${maxSizeMb}MB). · File too large.`);
+        setError(`File too large (max ${maxSizeMb}MB).`);
         return;
       }
       if (!isMimeAccepted(f, acceptedMime)) {
         setFile(null);
-        setError(`${documentType.labelKo}에 허용되지 않는 형식입니다. · File type not allowed.`);
+        setError(`File type not allowed for ${documentType.labelEn}.`);
         return;
       }
     }
@@ -280,7 +280,7 @@ function RequestBody({
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        '업로드에 실패했습니다. · Upload failed.';
+        'Upload failed.';
       setError(msg);
     } finally {
       setUploading(false);
@@ -289,10 +289,10 @@ function RequestBody({
 
   const uploadButtonLabel =
     variant === 'rejected'
-      ? '새 파일 업로드 · Upload new file'
+      ? 'Upload new file'
       : variant === 'uploaded'
-        ? '파일 교체 · Replace file'
-        : '업로드 · Upload';
+        ? 'Replace file'
+        : 'Upload';
 
   return (
     <>
@@ -315,7 +315,7 @@ function RequestBody({
       {variant === 'requested' && request?.lewNote && (
         <div className="mb-3">
           <p className="text-xs font-medium text-gray-500 mb-1">
-            LEW 메모 · Note from LEW
+            Note from LEW
           </p>
           <blockquote className="border-l-2 border-warning-500 pl-3 text-sm text-gray-700 italic">
             {request.lewNote}
@@ -333,7 +333,7 @@ function RequestBody({
             rel="noreferrer"
             className="text-primary underline"
           >
-            템플릿 다운로드 · Download template
+            Download template
           </a>
         </p>
       )}
@@ -348,8 +348,6 @@ function RequestBody({
             )}
           </p>
           <p className="text-xs text-gray-500 mt-0.5">
-            LEW가 검토 중입니다. 알림을 보내드립니다.
-            <br />
             LEW is reviewing. You will be notified.
           </p>
         </div>
@@ -359,7 +357,7 @@ function RequestBody({
       {variant === 'rejected' && (
         <div className="mb-3">
           <p className="text-sm text-gray-800 mb-2">
-            LEW가 업로드를 반려했습니다. · LEW rejected your upload.
+            LEW rejected your upload.
           </p>
           {request?.rejectionReason && (
             <blockquote className="border-l-2 border-error-500 pl-3 text-sm text-gray-700 italic">
@@ -368,8 +366,8 @@ function RequestBody({
           )}
           {request?.fulfilledFilename && (
             <p className="text-xs text-gray-500 mt-2">
-              이전 파일 · Previous:{' '}
-              <span className="font-medium">{request.fulfilledFilename}</span> (이력 보존 · kept in history)
+              Previous:{' '}
+              <span className="font-medium">{request.fulfilledFilename}</span> (kept in history)
             </p>
           )}
         </div>
@@ -382,7 +380,7 @@ function RequestBody({
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
           <span>
-            LEW가 승인했습니다. · Approved by LEW.
+            Approved by LEW.
             {request?.reviewedAt && (
               <> · {new Date(request.reviewedAt).toLocaleString()}</>
             )}

@@ -65,5 +65,5 @@ export function isMimeAccepted(file: File, acceptedMime: string): boolean {
  */
 export function formatTypeOptionLabel(dt: DocumentType): string {
   const icon = dt.iconEmoji ? `${dt.iconEmoji} ` : '';
-  return `${icon}${dt.labelKo} · ${prettyMime(dt.acceptedMime)} · 최대 ${dt.maxSizeMb}MB`;
+  return `${icon}${dt.labelEn} · ${prettyMime(dt.acceptedMime)} · max ${dt.maxSizeMb}MB`;
 }

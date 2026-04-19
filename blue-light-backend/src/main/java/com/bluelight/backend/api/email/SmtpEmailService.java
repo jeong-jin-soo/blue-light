@@ -612,8 +612,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] Your LEW requested " + requestedCount
-                    + " document(s) · LEW가 서류를 요청했습니다");
+            helper.setSubject("[LicenseKaki] Your LEW requested " + requestedCount + " document(s)");
             helper.setText(buildDocumentRequestCreatedHtml(userName, appSeq, requestedCount, documentLabels), true);
             mailSender.send(message);
             log.info("Document request created email sent to: {}, appSeq={}, count={}", to, appSeq, requestedCount);
@@ -649,7 +648,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] " + documentLabel + " approved · " + documentLabel + " 승인됨");
+            helper.setSubject("[LicenseKaki] " + documentLabel + " approved");
             helper.setText(buildDocumentRequestApprovedHtml(userName, appSeq, documentLabel), true);
             mailSender.send(message);
             log.info("Document request approved email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
@@ -667,8 +666,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] " + documentLabel + " needs re-upload · "
-                    + documentLabel + " 재업로드 필요");
+            helper.setSubject("[LicenseKaki] " + documentLabel + " needs re-upload");
             helper.setText(buildDocumentRequestRejectedHtml(userName, appSeq, documentLabel, rejectionReason), true);
             mailSender.send(message);
             log.info("Document request rejected email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
@@ -685,6 +683,7 @@ public class SmtpEmailService implements EmailService {
      */
     private String buildDocumentEmailLayout(String coreEn, String coreKo, String detailsHtml,
                                              String deepLinkPath, String role) {
+        // coreKo 파라미터는 호환을 위해 유지하되 영어화 이후 사용하지 않는다.
         String deepLink = appBaseUrl + deepLinkPath;
         return """
                 <!DOCTYPE html>
@@ -698,8 +697,7 @@ public class SmtpEmailService implements EmailService {
                           <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:600;">LicenseKaki</h1>
                         </td></tr>
                         <tr><td style="padding:32px;color:#1f2937;">
-                          <h2 style="font-size:18px;margin:0 0 8px;color:#111827;">%s</h2>
-                          <p style="font-size:14px;color:#6b7280;font-style:italic;margin:0 0 20px;">%s</p>
+                          <h2 style="font-size:18px;margin:0 0 20px;color:#111827;">%s</h2>
                           <table width="100%%" style="background:#f9fafb;border-radius:8px;margin-bottom:24px;">
                             <tr><td style="padding:16px;font-size:13px;color:#374151;line-height:1.8;">
                               %s
@@ -716,7 +714,7 @@ public class SmtpEmailService implements EmailService {
                   </table>
                 </body>
                 </html>
-                """.formatted(esc(coreEn), esc(coreKo), detailsHtml, esc(deepLink), esc(role));
+                """.formatted(esc(coreEn), detailsHtml, esc(deepLink), esc(role));
     }
 
     private String buildDocumentRequestCreatedHtml(String userName, Long appSeq,
@@ -737,7 +735,7 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(appSeq, esc(userName), requestedCount, labelList.toString());
         return buildDocumentEmailLayout(
                 "Your LEW has requested documents",
-                "서류 요청이 도착했습니다",
+                "",
                 details,
                 "/applications/" + appSeq,
                 "applicant");
@@ -751,7 +749,7 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(appSeq, esc(lewName), esc(documentLabel));
         return buildDocumentEmailLayout(
                 "Applicant uploaded a requested document",
-                "신청자가 요청 서류를 업로드했습니다",
+                "",
                 details,
                 "/admin/applications/" + appSeq,
                 "assigned LEW");
@@ -766,7 +764,7 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(appSeq, esc(documentLabel), esc(userName));
         return buildDocumentEmailLayout(
                 documentLabel + " approved",
-                documentLabel + " 승인됨",
+                "",
                 details,
                 "/applications/" + appSeq,
                 "applicant");
@@ -786,7 +784,7 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(appSeq, esc(documentLabel), esc(userName), esc(rejectionReason));
         return buildDocumentEmailLayout(
                 documentLabel + " needs re-upload",
-                documentLabel + " 재업로드 필요",
+                "",
                 details,
                 "/applications/" + appSeq,
                 "applicant");
