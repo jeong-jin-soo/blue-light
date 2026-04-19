@@ -34,6 +34,7 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
       : user.role === 'ADMIN' ? '/admin/dashboard'
       : user.role === 'LEW' ? '/lew/dashboard'
       : user.role === 'SLD_MANAGER' ? '/sld-manager/dashboard'
+      : user.role === 'CONCIERGE_MANAGER' ? '/concierge-manager/dashboard'
       : '/dashboard';
     return <Navigate to={redirectPath} replace />;
   }

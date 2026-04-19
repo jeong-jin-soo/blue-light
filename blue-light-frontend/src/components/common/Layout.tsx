@@ -19,6 +19,7 @@ export default function Layout() {
   const isSystemAdmin = user?.role === 'SYSTEM_ADMIN';
   const isLew = user?.role === 'LEW' && user?.approved;
   const isSldManager = user?.role === 'SLD_MANAGER';
+  const isConciergeManager = user?.role === 'CONCIERGE_MANAGER';
 
   const handleLogout = () => {
     logout();
@@ -59,10 +60,17 @@ export default function Layout() {
     { path: '/sld-manager/orders', label: 'Orders', icon: '📐' },
   ];
 
+  // ★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B
+  const conciergeManagerMenu = [
+    { path: '/concierge-manager/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/concierge-manager/requests', label: 'Requests', icon: '🤝' },
+  ];
+
   const menuItems = isSystemAdmin ? systemAdminMenu
     : isAdmin ? adminMenu
     : isLew ? lewMenu
     : isSldManager ? sldManagerMenu
+    : isConciergeManager ? conciergeManagerMenu
     : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
@@ -71,12 +79,14 @@ export default function Layout() {
     : isAdmin ? 'Administrator'
     : isLew ? 'LEW'
     : isSldManager ? 'SLD Manager'
+    : isConciergeManager ? 'Concierge Manager'
     : 'Applicant';
 
   const homePath = isSystemAdmin ? '/admin/system'
     : isAdmin ? '/admin/dashboard'
     : isLew ? '/lew/dashboard'
     : isSldManager ? '/sld-manager/dashboard'
+    : isConciergeManager ? '/concierge-manager/dashboard'
     : '/dashboard';
 
   return (

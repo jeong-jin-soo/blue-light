@@ -48,6 +48,8 @@ public class DatabaseMigrationRunner {
             // ★ Kaki Concierge Phase 1 PR#1 Stage 3
             migrateApplicationsLoaSignatureSource(conn);
             seedSystemSettings(conn);
+            // ★ Kaki Concierge Phase 1 PR#4 Stage A
+            seedConciergeManager(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -595,6 +597,41 @@ public class DatabaseMigrationRunner {
             log.info("Migration [seed-system-settings]: seeded {} new settings", seeded);
         } else {
             log.debug("Migration [seed-system-settings]: all settings exist, skipping");
+        }
+    }
+
+    /**
+     * 시드 데이터: CONCIERGE_MANAGER 계정 (★ Kaki Concierge Phase 1 PR#4 Stage A).
+     * SQL_INIT_MODE=never 환경 대응 — data.sql이 실행되지 않을 때 여기서 INSERT.
+     * 이미 존재하면 스킵 (멱등성).
+     * <p>
+     * 이메일: conciergemanager@licensekaki.sg / Password: admin1234 (BCrypt)
+     */
+    private void seedConciergeManager(Connection conn) throws SQLException {
+        final String email = "conciergemanager@licensekaki.sg";
+        // admin1234 BCrypt 해시 (다른 seed 계정과 동일)
+        final String passwordHash = "$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW";
+
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM users WHERE email = ?")) {
+            check.setString(1, email);
+            try (ResultSet rs = check.executeQuery()) {
+                if (rs.next()) {
+                    log.debug("Migration [seed-concierge-manager]: account exists, skipping");
+                    return;
+                }
+            }
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO users (email, password, first_name, last_name, phone, role, " +
+                "status, signup_source, email_verified, created_at, updated_at) " +
+                "VALUES (?, ?, 'Concierge', 'Manager', '+65-0000-0003', 'CONCIERGE_MANAGER', " +
+                "'ACTIVE', 'DIRECT_SIGNUP', TRUE, NOW(6), NOW(6))")) {
+            ps.setString(1, email);
+            ps.setString(2, passwordHash);
+            ps.executeUpdate();
+            log.info("Migration [seed-concierge-manager]: created seed account {}", email);
         }
     }
 

@@ -39,6 +39,16 @@ SELECT 'sldmanager@licensekaki.sg',
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'sldmanager@licensekaki.sg');
 
+-- Concierge Manager 계정 (password: admin1234 / BCrypt encoded, Kaki Concierge 대행 서비스)
+-- ★ Kaki Concierge v1.5 Phase 1 PR#4 Stage A
+INSERT INTO users (email, password, first_name, last_name, phone, role, status, signup_source, email_verified, created_at, updated_at)
+SELECT 'conciergemanager@licensekaki.sg',
+       '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
+       'Concierge', 'Manager', '+65-0000-0003', 'CONCIERGE_MANAGER', 'ACTIVE', 'DIRECT_SIGNUP', TRUE,
+       NOW(), NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'conciergemanager@licensekaki.sg');
+
 -- 시스템 설정 초기값
 INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
 SELECT 'lew_registration_open', 'true', 'LEW 가입 허용 여부', NOW()

@@ -49,6 +49,11 @@ import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPag
 import SldManagerOrderListPage from '../pages/sld-manager/SldManagerOrderListPage';
 import SldManagerOrderDetailPage from '../pages/sld-manager/SldManagerOrderDetailPage';
 
+// Concierge Manager pages (★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B)
+import ConciergeManagerDashboardPage from '../pages/concierge-manager/ConciergeManagerDashboardPage';
+import ConciergeRequestListPage from '../pages/concierge-manager/ConciergeRequestListPage';
+import ConciergeRequestDetailPage from '../pages/concierge-manager/ConciergeRequestDetailPage';
+
 // Common pages
 import NotificationsPage from '../pages/NotificationsPage';
 
@@ -195,6 +200,23 @@ const router = createBrowserRouter([
           { path: '/sld-manager/orders', element: <SldManagerOrderListPage /> },
           { path: '/sld-manager/orders/:id', element: <SldManagerOrderDetailPage /> },
           { path: '/sld-manager/notifications', element: <NotificationsPage /> },
+        ],
+      },
+    ],
+  },
+
+  // Concierge Manager routes (★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B)
+  // ADMIN/SYSTEM_ADMIN도 접근 가능 (backend Stage A SecurityConfig와 일치)
+  {
+    element: <ProtectedRoute allowedRoles={['CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/concierge-manager/dashboard', element: <ConciergeManagerDashboardPage /> },
+          { path: '/concierge-manager/requests', element: <ConciergeRequestListPage /> },
+          { path: '/concierge-manager/requests/:id', element: <ConciergeRequestDetailPage /> },
+          { path: '/concierge-manager/notifications', element: <NotificationsPage /> },
         ],
       },
     ],

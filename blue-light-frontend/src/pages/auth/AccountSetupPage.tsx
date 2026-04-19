@@ -33,6 +33,7 @@ function roleHomePath(role: UserRole): string {
   if (role === 'ADMIN') return '/admin/dashboard';
   if (role === 'LEW') return '/lew/dashboard';
   if (role === 'SLD_MANAGER') return '/sld-manager/dashboard';
+  if (role === 'CONCIERGE_MANAGER') return '/concierge-manager/dashboard';
   return '/dashboard';
 }
 

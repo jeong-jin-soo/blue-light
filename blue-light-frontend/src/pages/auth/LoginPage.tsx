@@ -35,7 +35,12 @@ export default function LoginPage() {
         navigate('/lew-pending', { replace: true });
         return;
       }
-      const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system' : user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
+      const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system'
+        : user.role === 'ADMIN' ? '/admin/dashboard'
+        : user.role === 'LEW' ? '/lew/dashboard'
+        : user.role === 'SLD_MANAGER' ? '/sld-manager/dashboard'
+        : user.role === 'CONCIERGE_MANAGER' ? '/concierge-manager/dashboard'
+        : '/dashboard';
       navigate(dest, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
