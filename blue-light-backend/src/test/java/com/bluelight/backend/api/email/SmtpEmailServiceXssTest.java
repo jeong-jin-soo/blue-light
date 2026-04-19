@@ -101,7 +101,7 @@ class SmtpEmailServiceXssTest {
         MimeMessage sent = captor.getValue();
 
         assertThat(sent.getSubject()).contains("3 document(s)");
-        assertThat(sent.getSubject()).contains("서류를 요청했습니다");
+        assertThat(sent.getSubject()).contains("Your LEW requested");
 
         // 라벨 리스트의 HTML 도 이스케이프되는지
         String html = htmlBodyOf(sent);

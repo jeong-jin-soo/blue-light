@@ -24,13 +24,23 @@ CREATE TABLE IF NOT EXISTS users (
     email_verification_token VARCHAR(255),
     pdpa_consent_at DATETIME(6),
     signature_url   VARCHAR(255),
+    -- ★ Kaki Concierge v1.4/v1.5 (Phase 1 PR#1) — 계정 상태 + 가입 경로 + 동의 스냅샷
+    status                    VARCHAR(30)   NOT NULL DEFAULT 'ACTIVE',
+    activated_at              DATETIME(6),
+    first_logged_in_at        DATETIME(6),
+    signup_source             VARCHAR(30)   NOT NULL DEFAULT 'DIRECT_SIGNUP',
+    signup_consent_at         DATETIME(6),
+    terms_version             VARCHAR(30),
+    marketing_opt_in          BOOLEAN       NOT NULL DEFAULT FALSE,
+    marketing_opt_in_at       DATETIME(6),
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
     created_by     BIGINT,
     updated_by     BIGINT,
     deleted_at     DATETIME(6),
     PRIMARY KEY (user_seq),
-    UNIQUE KEY uk_users_email (email)
+    UNIQUE KEY uk_users_email (email),
+    KEY idx_users_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. 라이선스 신청
@@ -60,6 +70,12 @@ CREATE TABLE IF NOT EXISTS applications (
     sld_option               VARCHAR(20)   DEFAULT 'SELF_UPLOAD',
     loa_signature_url        VARCHAR(255),
     loa_signed_at            DATETIME(6),
+    -- ★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3 — LOA 서명 출처 (3경로 모델)
+    -- PRD §3.4a / §7.2.1-LOA 참조. 모두 updatable=false (최초 1회만 기록)
+    loa_signature_source       VARCHAR(30),
+    loa_signature_uploaded_by  BIGINT,
+    loa_signature_uploaded_at  DATETIME(6),
+    loa_signature_source_memo  VARCHAR(500),
     -- LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) — UPDATE 금지, 엔티티 @Column(updatable=false)로 강제
     -- 신청 생성 시점에는 null, LOA 생성(recordLoaSnapshot) 시점에 기록됨
     applicant_name_snapshot  VARCHAR(100)  NULL,
@@ -92,6 +108,9 @@ CREATE TABLE IF NOT EXISTS applications (
     -- Phase 5: LEW 계정 삭제 시 확정자 참조는 NULL 로 (감사 로그에 원본 userSeq 보존)
     CONSTRAINT fk_applications_kva_confirmed_by FOREIGN KEY (kva_confirmed_by)
         REFERENCES users (user_seq) ON DELETE SET NULL,
+    -- ★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3: LOA 서명 업로더(Manager) FK
+    CONSTRAINT fk_applications_loa_uploader FOREIGN KEY (loa_signature_uploaded_by)
+        REFERENCES users (user_seq),
     -- Phase 5: kva_status 와 kva_source 일관성 (R7 대응)
     CONSTRAINT chk_applications_kva_status_source CHECK (
         kva_status = 'UNKNOWN' OR kva_source IS NOT NULL
@@ -518,4 +537,109 @@ CREATE TABLE IF NOT EXISTS notifications (
     PRIMARY KEY (notification_seq),
     CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_seq) REFERENCES users (user_seq),
     INDEX idx_notification_recipient_read (recipient_seq, is_read, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 16. 계정 활성화 토큰 (★ Kaki Concierge v1.5, Phase 1 PR#1)
+-- 컨시어지 자동 생성 계정의 최초 비밀번호 설정용 일회성 토큰 (48h TTL)
+CREATE TABLE IF NOT EXISTS account_setup_tokens (
+    token_seq             BIGINT        NOT NULL AUTO_INCREMENT,
+    token_uuid            VARCHAR(36)   NOT NULL,
+    user_seq              BIGINT        NOT NULL,
+    source                VARCHAR(40)   NOT NULL,
+    expires_at            DATETIME(6)   NOT NULL,
+    used_at               DATETIME(6),
+    revoked_at            DATETIME(6),
+    failed_attempts       INT           NOT NULL DEFAULT 0,
+    locked_at             DATETIME(6),
+    requesting_ip         VARCHAR(45),
+    requesting_user_agent VARCHAR(500),
+    created_at            DATETIME(6),
+    updated_at            DATETIME(6),
+    created_by            BIGINT,
+    updated_by            BIGINT,
+    deleted_at            DATETIME(6),
+    PRIMARY KEY (token_seq),
+    UNIQUE KEY uk_account_setup_tokens_uuid (token_uuid),
+    CONSTRAINT fk_account_setup_tokens_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    INDEX idx_account_setup_tokens_user_active (user_seq, used_at, revoked_at, locked_at, expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 17. 컨시어지 신청 (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 2)
+-- 화이트글러브 대행 서비스 신청 — 신청 시점 스냅샷 + 상태 머신 + 동의 4종 타임스탬프
+CREATE TABLE IF NOT EXISTS concierge_requests (
+    concierge_request_seq    BIGINT        NOT NULL AUTO_INCREMENT,
+    public_code              VARCHAR(20)   NOT NULL,
+    submitter_name           VARCHAR(100)  NOT NULL,
+    submitter_email          VARCHAR(100)  NOT NULL,
+    submitter_phone          VARCHAR(20)   NOT NULL,
+    memo                     VARCHAR(2000),
+    applicant_user_seq       BIGINT        NOT NULL,
+    assigned_manager_seq     BIGINT,
+    application_seq          BIGINT,
+    payment_seq              BIGINT,
+    status                   VARCHAR(40)   NOT NULL DEFAULT 'SUBMITTED',
+    pdpa_consent_at          DATETIME(6)   NOT NULL,
+    terms_consent_at         DATETIME(6)   NOT NULL,
+    signup_consent_at        DATETIME(6)   NOT NULL,
+    delegation_consent_at    DATETIME(6)   NOT NULL,
+    marketing_opt_in         BOOLEAN       NOT NULL DEFAULT FALSE,
+    assigned_at              DATETIME(6),
+    first_contact_at         DATETIME(6),
+    application_created_at   DATETIME(6),
+    loa_requested_at         DATETIME(6),
+    loa_signed_at            DATETIME(6),
+    licence_paid_at          DATETIME(6),
+    completed_at             DATETIME(6),
+    cancelled_at             DATETIME(6),
+    cancellation_reason      VARCHAR(500),
+    version                  BIGINT        NOT NULL DEFAULT 0,
+    created_at               DATETIME(6),
+    updated_at               DATETIME(6),
+    created_by               BIGINT,
+    updated_by               BIGINT,
+    deleted_at               DATETIME(6),
+    PRIMARY KEY (concierge_request_seq),
+    UNIQUE KEY uk_concierge_public_code (public_code),
+    CONSTRAINT fk_concierge_applicant FOREIGN KEY (applicant_user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_concierge_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq),
+    INDEX idx_concierge_status (status),
+    INDEX idx_concierge_assigned (assigned_manager_seq, status),
+    INDEX idx_concierge_submitter_email (submitter_email),
+    INDEX idx_concierge_created (created_at),
+    INDEX idx_concierge_applicant_user (applicant_user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18. 컨시어지 연락 기록 (담당자 노트)
+CREATE TABLE IF NOT EXISTS concierge_notes (
+    concierge_note_seq       BIGINT        NOT NULL AUTO_INCREMENT,
+    concierge_request_seq    BIGINT        NOT NULL,
+    author_user_seq          BIGINT        NOT NULL,
+    channel                  VARCHAR(20)   NOT NULL,
+    content                  VARCHAR(2000) NOT NULL,
+    created_at               DATETIME(6),
+    updated_at               DATETIME(6),
+    created_by               BIGINT,
+    updated_by               BIGINT,
+    deleted_at               DATETIME(6),
+    PRIMARY KEY (concierge_note_seq),
+    CONSTRAINT fk_concierge_note_request FOREIGN KEY (concierge_request_seq) REFERENCES concierge_requests (concierge_request_seq),
+    CONSTRAINT fk_concierge_note_author FOREIGN KEY (author_user_seq) REFERENCES users (user_seq),
+    INDEX idx_concierge_note_request (concierge_request_seq, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19. 사용자 동의 감사 로그 (PDPA 7년 보존 — soft delete 미적용, 모든 필드 불변)
+CREATE TABLE IF NOT EXISTS user_consent_logs (
+    consent_log_seq          BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq                 BIGINT        NOT NULL,
+    consent_type             VARCHAR(40)   NOT NULL,
+    action                   VARCHAR(20)   NOT NULL,
+    document_version         VARCHAR(30),
+    source_context           VARCHAR(40)   NOT NULL,
+    ip_address               VARCHAR(45),
+    user_agent               VARCHAR(500),
+    created_at               DATETIME(6)   NOT NULL,
+    PRIMARY KEY (consent_log_seq),
+    CONSTRAINT fk_consent_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    INDEX idx_consent_log_user_type (user_seq, consent_type, created_at),
+    INDEX idx_consent_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

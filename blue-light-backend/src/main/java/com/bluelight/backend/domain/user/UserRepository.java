@@ -80,4 +80,20 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * 역할 + 승인상태별 사용자 수 (Admin dashboard)
      */
     long countByRoleAndApprovedStatus(UserRole role, ApprovalStatus approvedStatus);
+
+    // ============================================================
+    // ★ Kaki Concierge v1.4/v1.5 (Phase 1 PR#1) — Stage 2 이후 사용
+    // ============================================================
+
+    /**
+     * 특정 status를 제외한 이메일 조회 (예: DELETED 제외 조회)
+     * - Stage 2 ConciergeService가 PENDING/ACTIVE/SUSPENDED 케이스 분기에 사용
+     */
+    Optional<User> findByEmailAndStatusNot(String email, UserStatus status);
+
+    /**
+     * 특정 status의 사용자 목록 (예: PENDING_ACTIVATION 대기 계정 집계)
+     * - Stage 2 Manager 대시보드 "계정 설정 대기" 배지 렌더링에 사용
+     */
+    List<User> findAllByStatus(UserStatus status);
 }

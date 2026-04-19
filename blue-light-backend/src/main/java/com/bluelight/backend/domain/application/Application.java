@@ -196,6 +196,36 @@ public class Application extends BaseEntity {
     @Column(name = "loa_signed_at")
     private LocalDateTime loaSignedAt;
 
+    // ── LOA 서명 출처 (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3) ──
+    // PRD §3.4a / §7.2.1-LOA 3-경로 모델 — 기존 스냅샷 컬럼과 동일하게 updatable=false로 불변 보장
+
+    /**
+     * LOA 서명 출처 (APPLICANT_DIRECT / MANAGER_UPLOAD / REMOTE_LINK).
+     * 최초 1회만 기록되며 이후 변경 금지.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "loa_signature_source", length = 30, updatable = false)
+    private LoaSignatureSource loaSignatureSource;
+
+    /**
+     * MANAGER_UPLOAD 경로 시 업로드한 Manager (APPLICANT_DIRECT는 null).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "loa_signature_uploaded_by", updatable = false)
+    private User loaSignatureUploadedBy;
+
+    /**
+     * LOA 서명 출처 기록 시점.
+     */
+    @Column(name = "loa_signature_uploaded_at", updatable = false)
+    private LocalDateTime loaSignatureUploadedAt;
+
+    /**
+     * Manager 대리 업로드 시 수령 경로 메모 (예: "applicant emailed PDF on 2026-04-19").
+     */
+    @Column(name = "loa_signature_source_memo", length = 500, updatable = false)
+    private String loaSignatureSourceMemo;
+
     // ── LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) ──
     // 클래스 JavaDoc의 "LOA 스냅샷 컬럼 불변 정책" 참조.
 
@@ -506,5 +536,66 @@ public class Application extends BaseEntity {
         this.loaDesignationSnapshot = designation;
         this.loaSnapshotBackfilledAt = null;
         return true;
+    }
+
+    // ── LOA 서명 출처 도메인 메서드 (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3) ──
+
+    /**
+     * LOA 서명 출처 기록 (경로 A/B 공통, 최초 1회만).
+     * <p>
+     * Phase 1: MANAGER_UPLOAD 경로에서 {@code LoaService.uploadSignature} 호출 시 사용.
+     * APPLICANT_DIRECT 경로는 기존 {@link #registerLoaSignature(String)}와 병행 호출하거나
+     * Service 레이어에서 함께 호출하는 방식을 택한다 (이번 Stage에서는 엔티티 메서드만 제공).
+     * <p>
+     * 재호출 방지: 이미 source가 기록되어 있으면 동일 source 호출은 멱등(false 반환),
+     * 다른 source로의 덮어쓰기는 {@link IllegalStateException}. {@code @Column(updatable=false)}가
+     * JPA 레벨 가드를 제공하지만 도메인 레벨에서도 명시적으로 차단한다.
+     * <p>
+     * {@link #loaSignatureUploadedBy}는 Manager 엔티티 resolving 이후
+     * {@link #setLoaSignatureUploadedBy(User)}로 별도 세팅 (연관관계 주입).
+     *
+     * @param source             LOA 서명 출처 (null 금지)
+     * @param uploadedByUserSeq  업로드한 Manager의 userSeq (로깅/감사용 참고 파라미터, 엔티티 연결은 별도 메서드)
+     * @param memo               수령 경로 메모 (nullable)
+     * @return true: 신규 기록됨, false: 이미 동일 source로 기록되어 건너뜀(멱등)
+     * @throws IllegalArgumentException source가 null인 경우
+     * @throws IllegalStateException    이미 다른 source가 기록된 경우
+     */
+    public boolean recordLoaSignatureSource(LoaSignatureSource source, Long uploadedByUserSeq, String memo) {
+        if (source == null) {
+            throw new IllegalArgumentException("LOA signature source must not be null");
+        }
+        if (this.loaSignatureSource != null) {
+            if (this.loaSignatureSource != source) {
+                throw new IllegalStateException(
+                    "LOA signature source already recorded as " + this.loaSignatureSource
+                        + ", cannot change to " + source);
+            }
+            return false; // 멱등: 동일 source 재호출
+        }
+        this.loaSignatureSource = source;
+        this.loaSignatureUploadedAt = LocalDateTime.now();
+        this.loaSignatureSourceMemo = memo;
+        // loaSignatureUploadedBy는 setLoaSignatureUploadedBy(User)에서 별도 세팅
+        return true;
+    }
+
+    /**
+     * LOA 서명 업로더(Manager) 연결. {@link #recordLoaSignatureSource} 이후에만 호출 가능.
+     * APPLICANT_DIRECT 경로에서는 호출하지 않는다.
+     *
+     * @throws IllegalStateException recordLoaSignatureSource 호출 전 / APPLICANT_DIRECT 상태 / 이미 세팅됨
+     */
+    public void setLoaSignatureUploadedBy(User uploader) {
+        if (this.loaSignatureSource == null) {
+            throw new IllegalStateException("recordLoaSignatureSource must be called first");
+        }
+        if (this.loaSignatureSource == LoaSignatureSource.APPLICANT_DIRECT) {
+            throw new IllegalStateException("APPLICANT_DIRECT source cannot have uploader");
+        }
+        if (this.loaSignatureUploadedBy != null) {
+            throw new IllegalStateException("LOA signature uploader already set");
+        }
+        this.loaSignatureUploadedBy = uploader;
     }
 }

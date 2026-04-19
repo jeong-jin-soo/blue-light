@@ -140,6 +140,63 @@ public class User extends BaseEntity {
     @Column(name = "signature_url", length = 255)
     private String signatureUrl;
 
+    // ============================================================
+    // ★ Kaki Concierge v1.4/v1.5 확장 컬럼 (Phase 1 PR#1)
+    // ============================================================
+
+    /**
+     * 계정 활성화 상태 (v1.3 signupCompleted boolean 대체)
+     * - 기본값은 ACTIVE (기존 유저 backfill 및 DIRECT_SIGNUP 대응)
+     * - 컨시어지 자동 생성 계정은 PENDING_ACTIVATION으로 시작
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private UserStatus status = UserStatus.ACTIVE;
+
+    /**
+     * 최초 활성화 시점 (컴플라이언스 증적 — updatable=false로 불변 보장)
+     * - PENDING_ACTIVATION → ACTIVE 전이 시점에 한 번만 기록
+     */
+    @Column(name = "activated_at", updatable = false)
+    private LocalDateTime activatedAt;
+
+    /**
+     * 첫 로그인 성공 시점 (분석/대시보드용)
+     */
+    @Column(name = "first_logged_in_at")
+    private LocalDateTime firstLoggedInAt;
+
+    /**
+     * 가입 경로 (DIRECT_SIGNUP / CONCIERGE_REQUEST / ADMIN_INVITE)
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "signup_source", nullable = false, length = 30)
+    private SignupSource signupSource = SignupSource.DIRECT_SIGNUP;
+
+    /**
+     * 회원가입 명시 동의 시점 (v1.3 5종 동의 중 하나)
+     */
+    @Column(name = "signup_consent_at")
+    private LocalDateTime signupConsentAt;
+
+    /**
+     * 동의한 약관 버전 (TermsVersion.CURRENT 스냅샷)
+     */
+    @Column(name = "terms_version", length = 30)
+    private String termsVersion;
+
+    /**
+     * 마케팅 수신 동의 여부 (선택 동의)
+     */
+    @Column(name = "marketing_opt_in", nullable = false)
+    private Boolean marketingOptIn = false;
+
+    /**
+     * 마케팅 수신 동의 시점
+     */
+    @Column(name = "marketing_opt_in_at")
+    private LocalDateTime marketingOptInAt;
+
     @Builder
     public User(String email, String password, String firstName, String lastName, String phone,
                 UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
@@ -147,7 +204,10 @@ public class User extends BaseEntity {
                 String companyName, String uen, String designation,
                 String correspondenceAddress, String correspondencePostalCode,
                 Boolean emailVerified, String emailVerificationToken,
-                LocalDateTime pdpaConsentAt) {
+                LocalDateTime pdpaConsentAt,
+                UserStatus status, SignupSource signupSource,
+                LocalDateTime signupConsentAt, String termsVersion,
+                Boolean marketingOptIn) {
         this.email = email;
         this.password = password;
         this.firstName = firstName;
@@ -165,6 +225,12 @@ public class User extends BaseEntity {
         this.emailVerified = emailVerified != null ? emailVerified : false;
         this.emailVerificationToken = emailVerificationToken;
         this.pdpaConsentAt = pdpaConsentAt;
+        // ★ Concierge v1.4/v1.5 — 기본값 처리
+        this.status = status != null ? status : UserStatus.ACTIVE;
+        this.signupSource = signupSource != null ? signupSource : SignupSource.DIRECT_SIGNUP;
+        this.signupConsentAt = signupConsentAt;
+        this.termsVersion = termsVersion;
+        this.marketingOptIn = marketingOptIn != null ? marketingOptIn : false;
     }
 
     /**
@@ -354,5 +420,107 @@ public class User extends BaseEntity {
         this.signatureUrl = null;
         this.emailVerificationToken = null;
         this.password = "DELETED";
+        // ★ Concierge v1.3 — PDPA 삭제 시 마케팅 기록도 초기화
+        this.marketingOptIn = false;
+        this.marketingOptInAt = null;
+    }
+
+    // ============================================================
+    // ★ Kaki Concierge v1.4/v1.5 도메인 메서드 (Phase 1 PR#1)
+    // ============================================================
+
+    /**
+     * 첫 로그인 성공 시 호출: PENDING_ACTIVATION → ACTIVE 전이
+     * <p>
+     * - 멱등성: 이미 ACTIVE면 아무 일도 하지 않고 반환
+     * - activatedAt은 updatable=false로 한 번만 기록됨 (이중 가드로 null 체크)
+     * - firstLoggedInAt도 함께 기록 (분석용)
+     *
+     * @throws IllegalStateException PENDING_ACTIVATION/ACTIVE 외 상태에서 호출 시
+     */
+    public void activate() {
+        if (this.status == UserStatus.ACTIVE) {
+            return; // 멱등
+        }
+        if (this.status != UserStatus.PENDING_ACTIVATION) {
+            throw new IllegalStateException("Cannot activate from status: " + this.status);
+        }
+        this.status = UserStatus.ACTIVE;
+        if (this.activatedAt == null) {
+            this.activatedAt = LocalDateTime.now();
+        }
+        if (this.firstLoggedInAt == null) {
+            this.firstLoggedInAt = LocalDateTime.now();
+        }
+    }
+
+    /**
+     * 관리자 정지 (정책 위반, 의심 활동 등)
+     * <p>
+     * DELETED 상태에서는 호출 불가.
+     * reason은 별도 감사 로그(AuditLog)에 기록되며 엔티티 자체에는 저장하지 않는다.
+     *
+     * @throws IllegalStateException DELETED 계정 정지 시도 시
+     */
+    public void suspend(String reason) {
+        if (this.status == UserStatus.DELETED) {
+            throw new IllegalStateException("Cannot suspend deleted user");
+        }
+        this.status = UserStatus.SUSPENDED;
+    }
+
+    /**
+     * 관리자 정지 해제: SUSPENDED → ACTIVE
+     *
+     * @throws IllegalStateException SUSPENDED 외 상태에서 호출 시
+     */
+    public void unsuspend() {
+        if (this.status != UserStatus.SUSPENDED) {
+            throw new IllegalStateException("Cannot unsuspend from: " + this.status);
+        }
+        this.status = UserStatus.ACTIVE;
+    }
+
+    /**
+     * Soft delete + status=DELETED 원자 세팅 (PRD §3.4b-2)
+     * <p>
+     * BaseEntity.softDelete()가 deleted_at을 기록하는 것과 일관되도록
+     * 여기서는 status=DELETED만 세팅하고, BaseEntity의 softDelete()도 호출한다.
+     * 기존 @SQLDelete 동작(@Hibernate가 DELETE 쿼리 가로채 UPDATE로 전환)과는 별개로,
+     * 애플리케이션 레벨에서 명시적 삭제 시 두 필드를 원자적으로 업데이트한다.
+     */
+    @Override
+    public void softDelete() {
+        this.status = UserStatus.DELETED;
+        super.softDelete();
+    }
+
+    /**
+     * 회원가입 동의 기록 (Concierge 통합 플로우에서 호출)
+     *
+     * @param at          동의 시점
+     * @param termsVersion 동의한 약관 버전 (TermsVersion.CURRENT 스냅샷)
+     * @param source      가입 경로 (주로 CONCIERGE_REQUEST)
+     */
+    public void recordSignupConsent(LocalDateTime at, String termsVersion, SignupSource source) {
+        this.signupConsentAt = at;
+        this.termsVersion = termsVersion;
+        this.signupSource = source;
+    }
+
+    /**
+     * 마케팅 수신 동의
+     */
+    public void optInMarketing(LocalDateTime at) {
+        this.marketingOptIn = true;
+        this.marketingOptInAt = at;
+    }
+
+    /**
+     * 마케팅 수신 거부 (동의 철회)
+     * - marketingOptInAt은 이력 보존 목적으로 그대로 두고 플래그만 내린다.
+     */
+    public void optOutMarketing() {
+        this.marketingOptIn = false;
     }
 }
