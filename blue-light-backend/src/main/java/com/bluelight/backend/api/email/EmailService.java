@@ -158,4 +158,35 @@ public interface EmailService {
      */
     void sendDocumentRequestRejectedEmail(String to, String userName, Long appSeq,
                                            String documentLabel, String rejectionReason);
+
+    // ── Kaki Concierge Phase 1 PR#2 ──────────────────────
+
+    /**
+     * Concierge 계정 활성화 링크 이메일.
+     * Kaki Concierge로 자동 생성된 계정에 대해 최초 비밀번호 설정 링크를 발송한다.
+     *
+     * @param to               수신자 이메일
+     * @param fullName         수신자 이름
+     * @param setupUrl         완전한 URL (예: https://licensekaki.sg/setup-account/{uuid})
+     * @param expiresAtDisplay 만료 시각 표시 문자열 (예: "2026-04-21 16:00 SGT")
+     */
+    void sendAccountSetupLinkEmail(String to, String fullName, String setupUrl, String expiresAtDisplay);
+
+    /**
+     * N1: Concierge 신청 접수 + 계정 설정 링크 (신규 C1 / PENDING C3 케이스).
+     * 접수 확인과 활성화 링크를 한 통으로 통합 발송.
+     */
+    void sendConciergeRequestReceivedEmail(String to, String fullName, String setupUrl, String expiresAtDisplay);
+
+    /**
+     * N1-Alt: Concierge 신청 접수 + 이미 활성 계정 연결 안내 (C2 케이스).
+     * 활성화 링크는 포함하지 않고 기존 계정 로그인 안내만.
+     */
+    void sendConciergeRequestReceivedExistingUserEmail(String to, String fullName);
+
+    /**
+     * N2: Admin/Concierge Manager에게 신규 신청 접수 알림 (staff-facing).
+     */
+    void sendConciergeStaffNewRequestEmail(String to, String staffName, String publicCode,
+                                            String applicantName, String applicantEmail);
 }

@@ -174,4 +174,49 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Reason: {}", rejectionReason);
         log.info("==================================================");
     }
+
+    // ── Kaki Concierge Phase 1 PR#2 ──────────────────────
+
+    @Override
+    public void sendAccountSetupLinkEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        log.info("==================================================");
+        log.info("[DEV] Account Setup Link Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", fullName);
+        log.info("  Setup URL: {}", setupUrl);
+        log.info("  Expires At: {}", expiresAtDisplay);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendConciergeRequestReceivedEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge Request Received (N1) Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", fullName);
+        log.info("  Setup URL: {}", setupUrl);
+        log.info("  Expires At: {}", expiresAtDisplay);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendConciergeRequestReceivedExistingUserEmail(String to, String fullName) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge Request Received - Existing User (N1-Alt) (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", fullName);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendConciergeStaffNewRequestEmail(String to, String staffName, String publicCode,
+                                                   String applicantName, String applicantEmail) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge Staff New Request (N2) Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Staff: {}", staffName);
+        log.info("  Public Code: {}", publicCode);
+        log.info("  Applicant: {} <{}>", applicantName, applicantEmail);
+        log.info("==================================================");
+    }
 }

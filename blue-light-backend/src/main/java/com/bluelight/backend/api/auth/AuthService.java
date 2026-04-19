@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.auth;
 
+import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.auth.dto.ForgotPasswordRequest;
 import com.bluelight.backend.api.auth.dto.LoginRequest;
 import com.bluelight.backend.api.auth.dto.ResetPasswordRequest;
@@ -8,9 +9,12 @@ import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.EnumParser;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.*;
 import com.bluelight.backend.security.JwtTokenProvider;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -41,12 +46,23 @@ public class AuthService {
     private final SystemSettingRepository systemSettingRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
+    private final AuditLogService auditLogService;
 
     @Value("${password-reset.token-expiry-minutes:60}")
     private int tokenExpiryMinutes;
 
     @Value("${password-reset.base-url:http://localhost:5174}")
     private String resetBaseUrl;
+
+    /**
+     * 미존재/DELETED 이메일에 대한 타이밍 동등성용 더미 BCrypt 해시 (60자 표준).
+     * {@code passwordEncoder.matches()}가 항상 false 반환하면서 실제 BCrypt 연산 CPU 비용 발생 →
+     * 응답 시간 편차 축소 (★ v1.5 §4.4 H-1 완화).
+     * <p>
+     * 이 해시는 실제 사용자의 비밀번호 해시와 일치할 수 없다(임의 샘플 해시).
+     */
+    private static final String DUMMY_BCRYPT_HASH =
+        "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
     /**
      * 회원가입
@@ -148,40 +164,109 @@ public class AuthService {
     }
 
     /**
-     * 로그인
+     * 로그인 (★ Kaki Concierge v1.5 §4.4 H-1 재설계).
+     * <p>
+     * <b>1단계</b> — 비밀번호 검증 선행:
+     * <ul>
+     *   <li>이메일 존재 여부와 관계없이 {@code passwordEncoder.matches()} 호출 (미존재 → DUMMY_BCRYPT_HASH)</li>
+     *   <li>status 분기는 비밀번호 일치 후에만 수행</li>
+     * </ul>
+     * <b>2단계</b> — 비번 실패 시 INVALID_CREDENTIALS + 감사 로그(UNKNOWN_EMAIL 또는 BAD_PASSWORD).
+     * <p>
+     * <b>3단계</b> — 비번 성공 시 status 분기:
+     * <ul>
+     *   <li>ACTIVE → JWT 발급 + LOGIN_SUCCESS</li>
+     *   <li>PENDING_ACTIVATION → 401 ACCOUNT_PENDING_ACTIVATION</li>
+     *   <li>SUSPENDED → 403 ACCOUNT_SUSPENDED</li>
+     *   <li>DELETED → 401 INVALID_CREDENTIALS (존재 감춤, 감사 로그는 LOGIN_FAILED_DELETED)</li>
+     * </ul>
      *
-     * @param request 로그인 요청 정보
-     * @return 토큰 응답
+     * @param request     로그인 요청 정보
+     * @param httpRequest IP/User-Agent 추출용 (null 허용 — 내부 호출 테스트용)
+     * @return 토큰 응답 (ACTIVE인 경우만)
      */
     @Transactional
-    public TokenResponse login(LoginRequest request) {
-        // 이메일로 사용자 조회
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BusinessException(
-                        "Invalid email or password",
-                        HttpStatus.UNAUTHORIZED,
-                        "INVALID_CREDENTIALS"
-                ));
+    public TokenResponse login(LoginRequest request, HttpServletRequest httpRequest) {
+        String email = request.getEmail() == null ? "" : request.getEmail().trim().toLowerCase();
+        String rawPassword = request.getPassword() == null ? "" : request.getPassword();
+        String ip = extractIp(httpRequest);
+        String ua = userAgent(httpRequest);
 
-        // 비밀번호 검증
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        Optional<User> userOpt = userRepository.findByEmail(email);
+
+        // 1단계: 비밀번호 검증 (미존재 이메일도 dummy hash로 BCrypt 1회 호출 — 타이밍 동등성)
+        boolean passwordMatches;
+        if (userOpt.isPresent()) {
+            passwordMatches = passwordEncoder.matches(rawPassword, userOpt.get().getPassword());
+        } else {
+            passwordEncoder.matches(rawPassword, DUMMY_BCRYPT_HASH);
+            passwordMatches = false;
+        }
+
+        // 2단계: 비밀번호 실패 → 감사 로그 분기 후 INVALID_CREDENTIALS
+        if (!passwordMatches) {
+            if (userOpt.isEmpty()) {
+                auditLogService.logAsync(null, AuditAction.LOGIN_FAILED_UNKNOWN_EMAIL, AuditCategory.AUTH,
+                    "User", null, "Login attempt for unknown email: " + email, null, null,
+                    ip, ua, "POST", "/api/auth/login", 401);
+            } else {
+                User u = userOpt.get();
+                auditLogService.logAsync(u.getUserSeq(), AuditAction.LOGIN_FAILED_BAD_PASSWORD, AuditCategory.AUTH,
+                    "User", u.getUserSeq().toString(), "Bad password for " + email, null, null,
+                    ip, ua, "POST", "/api/auth/login", 401);
+            }
             throw new BusinessException(
-                    "Invalid email or password",
-                    HttpStatus.UNAUTHORIZED,
-                    "INVALID_CREDENTIALS"
-            );
+                "Invalid email or password", HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
+        }
+
+        // 3단계: 비번 성공 → status 분기
+        User user = userOpt.get();
+        switch (user.getStatus()) {
+            case ACTIVE:
+                // fall through to JWT 발급
+                break;
+            case PENDING_ACTIVATION:
+                throw new BusinessException(
+                    "Account is pending activation. Please set up your password via the activation link.",
+                    HttpStatus.UNAUTHORIZED, "ACCOUNT_PENDING_ACTIVATION");
+            case SUSPENDED:
+                throw new BusinessException(
+                    "Account has been suspended. Please contact support.",
+                    HttpStatus.FORBIDDEN, "ACCOUNT_SUSPENDED");
+            case DELETED:
+                // 존재 감춤 — 미존재처럼 응답하되 감사 로그엔 실제 userSeq 기록
+                auditLogService.logAsync(user.getUserSeq(), AuditAction.LOGIN_FAILED_DELETED, AuditCategory.AUTH,
+                    "User", user.getUserSeq().toString(), "Login attempt on deleted account", null, null,
+                    ip, ua, "POST", "/api/auth/login", 401);
+                throw new BusinessException(
+                    "Invalid email or password", HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS");
         }
 
         log.info("로그인 성공: userSeq={}, email={}", user.getUserSeq(), user.getEmail());
 
-        // 이메일 인증 비활성화 상태이면서 미인증 사용자 → 자동 인증 처리
+        // 이메일 인증 비활성화 상태이면서 미인증 사용자 → 자동 인증 처리 (기존 로직 보존)
         if (!user.isEmailVerified() && !isEmailVerificationEnabled()) {
             user.verifyEmail();
             log.info("이메일 인증 비활성화 상태 → 기존 사용자 자동 인증: userSeq={}", user.getUserSeq());
         }
 
-        // JWT 토큰 생성 및 반환
+        // LOGIN_SUCCESS 감사 로그 (서비스 레이어에서 단일 책임)
+        auditLogService.logAsync(user.getUserSeq(), AuditAction.LOGIN_SUCCESS, AuditCategory.AUTH,
+            "User", user.getUserSeq().toString(), "Login success: " + user.getEmail(), null, null,
+            ip, ua, "POST", "/api/auth/login", 200);
+
         return createTokenResponse(user);
+    }
+
+    private static String extractIp(HttpServletRequest request) {
+        if (request == null) return null;
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isEmpty()) return xff.split(",")[0].trim();
+        return request.getRemoteAddr();
+    }
+
+    private static String userAgent(HttpServletRequest request) {
+        return request != null ? request.getHeader("User-Agent") : null;
     }
 
     /**

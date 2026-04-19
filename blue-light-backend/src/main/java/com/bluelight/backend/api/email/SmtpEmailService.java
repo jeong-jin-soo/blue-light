@@ -789,4 +789,246 @@ public class SmtpEmailService implements EmailService {
                 "/applications/" + appSeq,
                 "applicant");
     }
+
+    // ── Kaki Concierge Phase 1 PR#2 ──────────────────────
+
+    @Override
+    @Async
+    public void sendAccountSetupLinkEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Activate your account");
+
+            String htmlContent = buildAccountSetupLinkHtml(fullName, setupUrl, expiresAtDisplay);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Account setup link email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send account setup link email to: {}", to, e);
+            // 실패해도 예외를 던지지 않음 (보안: 이메일 존재 여부 노출 방지, 기존 패턴 준수)
+        }
+    }
+
+    /**
+     * Concierge 계정 활성화 링크 이메일 본문.
+     * 기존 템플릿 스타일(600px max-width, #1a3a5c 헤더, PDPA footer) 준수.
+     * 사용자 입력(name)은 esc(), URL은 htmlEscape로 XSS 방어.
+     */
+    private String buildAccountSetupLinkHtml(String fullName, String setupUrl, String expiresAtDisplay) {
+        String name = esc(fullName);
+        String url = HtmlUtils.htmlEscape(setupUrl == null ? "" : setupUrl);
+        String exp = esc(expiresAtDisplay);
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Activate your LicenseKaki account</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Your LicenseKaki account has been created via the Kaki Concierge Service.
+                         Your account is currently <strong>inactive</strong>. To activate it and set
+                         your password, please use the link below.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Activate account</a>
+                      </p>
+                      <p style="color:#555;font-size:13px;">This link expires at <strong>%s</strong> (48 hours after issue).</p>
+                      <p style="color:#555;font-size:13px;">If you did not request this, you may safely ignore this email.</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, url, exp);
+    }
+
+    // ── N1 / N1-Alt / N2: Concierge 신청 접수 이메일 ──
+
+    @Override
+    @Async
+    public void sendConciergeRequestReceivedEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Your Kaki Concierge request is received");
+
+            String htmlContent = buildConciergeReceivedHtml(fullName, setupUrl, expiresAtDisplay);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N1 email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N1 email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendConciergeRequestReceivedExistingUserEmail(String to, String fullName) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Your Kaki Concierge request is received");
+
+            String htmlContent = buildConciergeReceivedExistingHtml(fullName);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N1-Alt email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N1-Alt email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendConciergeStaffNewRequestEmail(String to, String staffName, String publicCode,
+                                                   String applicantName, String applicantEmail) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // 제목에 사용자 입력이 섞이지 않도록 publicCode는 서버 생성값(C-YYYY-NNNN)으로 제한적
+            helper.setSubject("[LicenseKaki] New concierge request: " + publicCode);
+
+            String htmlContent = buildConciergeStaffNewRequestHtml(staffName, publicCode, applicantName, applicantEmail);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N2 email sent to: {}, publicCode={}", to, publicCode);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N2 email to: {}", to, e);
+        }
+    }
+
+    /**
+     * N1 본문 — 신청 접수 + 활성화 링크 안내 (C1/C3).
+     */
+    private String buildConciergeReceivedHtml(String fullName, String setupUrl, String expiresAtDisplay) {
+        String name = esc(fullName);
+        String url = HtmlUtils.htmlEscape(setupUrl == null ? "" : setupUrl);
+        String exp = esc(expiresAtDisplay);
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Your Kaki Concierge request is received</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Thank you for requesting the Kaki Concierge Service. A dedicated manager
+                         will contact you within <strong>24 hours</strong>.</p>
+                      <p>A LicenseKaki account has been created for you. Your account is currently
+                         <strong>inactive</strong>. Please activate it by setting your password
+                         using the link below.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Activate account</a>
+                      </p>
+                      <p style="color:#555;font-size:13px;">This link expires at <strong>%s</strong> (48 hours after issue).</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, url, exp);
+    }
+
+    /**
+     * N1-Alt 본문 — 기존 활성 계정 연결 안내 (C2).
+     */
+    private String buildConciergeReceivedExistingHtml(String fullName) {
+        String name = esc(fullName);
+        String loginUrl = HtmlUtils.htmlEscape(appBaseUrl + "/login");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Your Kaki Concierge request is received</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Thank you for requesting the Kaki Concierge Service. A dedicated manager
+                         will contact you within <strong>24 hours</strong>.</p>
+                      <p>We linked this request to your existing LicenseKaki account. You can track
+                         progress anytime after logging in.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Log in</a>
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, loginUrl);
+    }
+
+    /**
+     * N2 본문 — Admin/Manager에게 신규 신청 접수 알림.
+     */
+    private String buildConciergeStaffNewRequestHtml(String staffName, String publicCode,
+                                                      String applicantName, String applicantEmail) {
+        String name = esc(staffName);
+        String code = esc(publicCode);
+        String aName = esc(applicantName);
+        String aEmail = esc(applicantEmail);
+        String dashboardUrl = HtmlUtils.htmlEscape(appBaseUrl + "/admin/concierge");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">New Kaki Concierge request</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>A new concierge request has been submitted:</p>
+                      <table style="width:100%%;border-collapse:collapse;margin:16px 0;">
+                        <tr><td style="padding:6px 0;color:#666;width:140px;">Request code</td><td><strong>%s</strong></td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Applicant</td><td>%s</td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Email</td><td>%s</td></tr>
+                      </table>
+                      <p>SLA reminder: first contact must be made within <strong>24 hours</strong>.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Open Concierge Dashboard</a>
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Internal notification.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, code, aName, aEmail, dashboardUrl);
+    }
 }

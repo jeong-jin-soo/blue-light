@@ -60,7 +60,22 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		// 'timing' 태그는 기본 test 태스크에서 제외 (CI 노이즈 + MySQL 의존 회피).
+		// 수동 실행: ./gradlew timingTest
+		excludeTags 'timing'
+	}
+}
+
+// 타이밍 민감 테스트 수동 실행용 태스크 (★ Kaki Concierge v1.5 §4.4 H-1 검증)
+tasks.register('timingTest', Test) {
+	useJUnitPlatform {
+		includeTags 'timing'
+	}
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	// 타이밍 측정은 다른 테스트와 병렬 실행하지 않음
+	maxParallelForks = 1
 }
 
 // .env 파일에서 환경변수 로드 (bootRun 시)

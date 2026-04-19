@@ -96,4 +96,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * - Stage 2 Manager 대시보드 "계정 설정 대기" 배지 렌더링에 사용
      */
     List<User> findAllByStatus(UserStatus status);
+
+    /**
+     * 여러 역할 + 특정 status 조합으로 사용자 조회 (PR#2 Stage B).
+     * Concierge 신청 접수 시 ADMIN/CONCIERGE_MANAGER 활성 계정에게 일괄 알림 발송용.
+     * soft delete(deleted_at IS NULL)는 엔티티의 @SQLRestriction이 자동 적용.
+     */
+    List<User> findByRoleInAndStatus(List<UserRole> roles, UserStatus status);
 }
