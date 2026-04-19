@@ -69,11 +69,12 @@ public class ApplicationService {
         applyCorporateJitCompanyInfo(user, request);
 
         // Phase 5 — "I don't know" 분기.
-        // security-review §6: kvaStatus=UNKNOWN 이면 악의적 selectedKva 값을 무시하고 45 로 강제.
+        // security-review §6: kvaStatus=UNKNOWN 이면 악의적 selectedKva 값을 무시하고 최저 tier 로 강제.
+        // 현재 master_prices 최저 tier 는 55 kVA (45는 tier 존재하지 않음 — Phase 5 배포 후 버그 발견).
         // 이 강제 덮어쓰기는 가격 계산(findByKva) 진입 전에 수행해야 안전.
         boolean kvaUnknown = Boolean.TRUE.equals(request.getKvaUnknown());
         if (kvaUnknown) {
-            request.setSelectedKva(45);
+            request.setSelectedKva(55);
         }
 
         // Calculate price from kVA

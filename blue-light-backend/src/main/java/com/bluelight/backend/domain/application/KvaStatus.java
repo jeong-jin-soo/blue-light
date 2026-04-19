@@ -5,7 +5,7 @@ package com.bluelight.backend.domain.application;
  *
  * <ul>
  *   <li>{@link #UNKNOWN} — 신청자가 "I don't know"를 선택. LEW 확정 필요.
- *       이 상태에서는 {@code selectedKva=45} (placeholder)로 저장되며,
+ *       이 상태에서는 {@code selectedKva=55} (placeholder)로 저장되며,
  *       결제 단계(approveForPayment) 진입이 차단된다.</li>
  *   <li>{@link #CONFIRMED} — 사용자 직접 선택(USER_INPUT) 또는 LEW 확정(LEW_VERIFIED)
  *       으로 값이 확정된 상태. 기본값. 결제 단계 진입 가능.</li>

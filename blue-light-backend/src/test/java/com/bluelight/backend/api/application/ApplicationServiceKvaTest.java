@@ -31,7 +31,7 @@ import static org.mockito.Mockito.when;
  * Phase 5 PR#1 — {@link ApplicationService#createApplication} 의 kVA 분기 검증.
  *
  * <ul>
- *   <li>kvaUnknown=true → 서버가 selectedKva=45 로 강제, kvaStatus=UNKNOWN, kvaSource=null</li>
+ *   <li>kvaUnknown=true → 서버가 selectedKva=55 로 강제, kvaStatus=UNKNOWN, kvaSource=null</li>
  *   <li>kvaUnknown=false/null (기존) → kvaStatus=CONFIRMED, kvaSource=USER_INPUT</li>
  *   <li>악의적: kvaUnknown=true 인데 selectedKva=500 전송 → 서버가 45 로 덮어쓰기</li>
  * </ul>
@@ -90,9 +90,9 @@ class ApplicationServiceKvaTest {
     }
 
     @Test
-    void kvaUnknown_true면_서버가_selectedKva_45로_강제하고_UNKNOWN_저장() {
-        // 클라이언트가 200 을 보내도 서버가 45 로 덮어쓴다 (security §6).
-        stubCommon(45);
+    void kvaUnknown_true면_서버가_selectedKva_55로_강제하고_UNKNOWN_저장() {
+        // 클라이언트가 200 을 보내도 서버가 55 (최저 tier)로 덮어쓴다 (security §6).
+        stubCommon(55);
         CreateApplicationRequest req = baseReq(200, Boolean.TRUE);
 
         service.createApplication(77L, req);
@@ -100,7 +100,7 @@ class ApplicationServiceKvaTest {
         ArgumentCaptor<Application> cap = ArgumentCaptor.forClass(Application.class);
         verify(applicationRepository).save(cap.capture());
         Application saved = cap.getValue();
-        assertThat(saved.getSelectedKva()).isEqualTo(45);
+        assertThat(saved.getSelectedKva()).isEqualTo(55);
         assertThat(saved.getKvaStatus()).isEqualTo(KvaStatus.UNKNOWN);
         assertThat(saved.getKvaSource()).isNull();
     }
@@ -123,8 +123,8 @@ class ApplicationServiceKvaTest {
 
     @Test
     void kvaUnknown_누락_null_이면_CONFIRMED_USER_INPUT_하위호환() {
-        stubCommon(45);
-        CreateApplicationRequest req = baseReq(45, null);
+        stubCommon(55);
+        CreateApplicationRequest req = baseReq(55, null);
 
         service.createApplication(77L, req);
 
