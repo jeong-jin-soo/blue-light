@@ -12,10 +12,15 @@ import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import LewPendingPage from '../pages/auth/LewPendingPage';
 import EmailVerificationPendingPage from '../pages/auth/EmailVerificationPendingPage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
+import AccountSetupPage from '../pages/auth/AccountSetupPage';
 
 // Legal pages
 import DisclaimerPage from '../pages/legal/DisclaimerPage';
 import PrivacyPolicyPage from '../pages/legal/PrivacyPolicyPage';
+
+// Concierge public pages (★ Kaki Concierge v1.5 Phase 1 PR#3)
+import ConciergeRequestPage from '../pages/concierge/ConciergeRequestPage';
+import ConciergeRequestSuccessPage from '../pages/concierge/ConciergeRequestSuccessPage';
 
 // Applicant pages
 import DashboardPage from '../pages/applicant/DashboardPage';
@@ -91,6 +96,21 @@ const router = createBrowserRouter([
   {
     path: '/verify-email',
     element: <VerifyEmailPage />,
+  },
+
+  // Concierge public routes (★ Kaki Concierge v1.5 Phase 1 PR#3)
+  {
+    path: '/concierge/request',
+    element: <ConciergeRequestPage />,
+  },
+  {
+    path: '/concierge/request/success',
+    element: <ConciergeRequestSuccessPage />,
+  },
+  {
+    // AccountSetupPage — Stage C
+    path: '/setup-account/:token',
+    element: <AccountSetupPage />,
   },
 
   // Applicant routes (APPLICANT role)

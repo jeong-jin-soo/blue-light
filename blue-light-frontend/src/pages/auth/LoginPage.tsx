@@ -4,6 +4,15 @@ import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { requestActivationLink } from '../../api/authApi';
+import type { ApiError } from '../../types';
+
+/** axiosClient interceptor가 정규화한 에러(spread된 객체) + AxiosError 양쪽에서 code/status 추출 */
+interface NormalizedHttpError {
+  response?: { status?: number; data?: ApiError };
+  code?: string;
+  message?: string;
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -12,6 +21,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [sessionExpiredMsg, setSessionExpiredMsg] = useState('');
+
+  // ── Kaki Concierge v1.5 Phase 1 PR#3 Stage C: 활성화 링크 플로우 ──
+  const [pendingActivationEmail, setPendingActivationEmail] = useState<string | null>(null);
+  const [suspendedMessage, setSuspendedMessage] = useState<string | null>(null);
+  const [activationLinkSending, setActivationLinkSending] = useState(false);
+  const [activationLinkMessage, setActivationLinkMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -30,7 +45,6 @@ export default function LoginPage() {
     const reason = sessionStorage.getItem('licensekaki_logout_reason');
     if (reason === 'session_expired') {
       sessionStorage.removeItem('licensekaki_logout_reason');
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSessionExpiredMsg('Your session has expired. Please sign in again.');
     }
   }, []);
@@ -38,11 +52,53 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
+    // Concierge 상태 패널도 초기화
+    setPendingActivationEmail(null);
+    setSuspendedMessage(null);
+    setActivationLinkMessage(null);
 
     try {
       await login({ email, password });
-    } catch {
-      // error is managed by store
+    } catch (err) {
+      // store에도 error 가 저장되지만, code 감지는 원본 error 객체에서 수행
+      const e = err as NormalizedHttpError;
+      const code = e.code ?? e.response?.data?.code;
+
+      if (code === 'ACCOUNT_PENDING_ACTIVATION') {
+        // 일반 에러 배너 대신 Concierge 활성화 패널 표시
+        setPendingActivationEmail(email);
+        clearError();
+      } else if (code === 'ACCOUNT_SUSPENDED') {
+        setSuspendedMessage(
+          'Your account has been suspended. Please contact support at support@licensekaki.sg.'
+        );
+        clearError();
+      }
+      // 그 외(INVALID_CREDENTIALS 등)는 store의 error 상태 그대로 사용
+    }
+  };
+
+  const handleRequestActivation = async () => {
+    if (!pendingActivationEmail) return;
+    setActivationLinkSending(true);
+    setActivationLinkMessage(null);
+
+    const FIXED_MESSAGE =
+      "If this email is registered and eligible for activation, we've sent an activation link.";
+
+    try {
+      const result = await requestActivationLink({ email: pendingActivationEmail });
+      setActivationLinkMessage(result.message || FIXED_MESSAGE);
+    } catch (err) {
+      const e = err as NormalizedHttpError;
+      if (e.response?.status === 429) {
+        setActivationLinkMessage('Too many requests. Please try again later.');
+      } else {
+        // 5케이스 동일 응답 원칙 — 실패해도 고정 메시지 유지
+        setActivationLinkMessage(FIXED_MESSAGE);
+      }
+    } finally {
+      setActivationLinkSending(false);
     }
   };
 
@@ -56,7 +112,59 @@ export default function LoginPage() {
         </div>
       )}
 
-      {error && (
+      {/* ★ Kaki Concierge v1.5 Phase 1 PR#3 Stage C: PENDING_ACTIVATION 패널 */}
+      {pendingActivationEmail && (
+        <div
+          className="mb-4 p-4 rounded-lg bg-concierge-50 border border-concierge-300"
+          role="alert"
+        >
+          <h3 className="text-sm font-semibold text-concierge-800 mb-1">
+            Account pending activation
+          </h3>
+          <p className="text-sm text-gray-800 mb-3">
+            Your account at <strong className="break-all">{pendingActivationEmail}</strong>{' '}
+            hasn&apos;t been activated yet. Request a new activation link to set your
+            password.
+          </p>
+          {activationLinkMessage ? (
+            <p className="text-sm text-gray-700 bg-white rounded p-2 border border-gray-200">
+              {activationLinkMessage}
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="concierge"
+                size="sm"
+                onClick={handleRequestActivation}
+                loading={activationLinkSending}
+              >
+                Send activation link
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPendingActivationEmail(null)}
+                disabled={activationLinkSending}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ★ Stage C: SUSPENDED 안내 */}
+      {suspendedMessage && (
+        <div
+          className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg text-sm text-error-600"
+          role="alert"
+        >
+          {suspendedMessage}
+        </div>
+      )}
+
+      {/* 일반 에러 (INVALID_CREDENTIALS 등) — PENDING/SUSPENDED 분기 시에는 클리어됨 */}
+      {error && !pendingActivationEmail && !suspendedMessage && (
         <div className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg text-sm text-error-600">
           {error}
         </div>

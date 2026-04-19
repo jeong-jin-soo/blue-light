@@ -154,10 +154,13 @@ public class User extends BaseEntity {
     private UserStatus status = UserStatus.ACTIVE;
 
     /**
-     * 최초 활성화 시점 (컴플라이언스 증적 — updatable=false로 불변 보장)
-     * - PENDING_ACTIVATION → ACTIVE 전이 시점에 한 번만 기록
+     * 최초 활성화 시점 (컴플라이언스 증적).
+     * - PENDING_ACTIVATION → ACTIVE 전이 시점에 한 번만 기록 ({@link #activate()}가 null 가드)
+     * - 도메인 메서드 레벨에서 불변 보장 (activatedAt != null이면 재세팅 금지)
+     * - JPA updatable 제약은 걸 수 없음: 엔티티 INSERT 시점엔 null이고 이후 UPDATE로
+     *   값을 채우는 플로우이므로 updatable=false를 걸면 DB 반영이 막힘.
      */
-    @Column(name = "activated_at", updatable = false)
+    @Column(name = "activated_at")
     private LocalDateTime activatedAt;
 
     /**

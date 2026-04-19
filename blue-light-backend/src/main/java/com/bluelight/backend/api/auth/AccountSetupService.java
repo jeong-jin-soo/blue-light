@@ -87,6 +87,12 @@ public class AccountSetupService {
             user.activate();
         }
 
+        // 이메일 자동 인증: 토큰 링크 클릭 자체가 이메일 소유 증명이므로 verifyEmail 동시 처리
+        // (Concierge 가입자가 AccountSetup 직후 대시보드 진입 가능하도록)
+        if (!user.isEmailVerified()) {
+            user.verifyEmail();
+        }
+
         tokenService.markUsed(token);
 
         // 감사 로그 (동기, REQUIRES_NEW — REST 응답 전 영속화 보장)
