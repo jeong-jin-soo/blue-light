@@ -115,6 +115,18 @@ export interface SldRequest {
 }
 
 /**
+ * Phase 5 — kVA 확정 상태
+ * - UNKNOWN: 신청자가 "I don't know" 선택, LEW 확정 대기
+ * - CONFIRMED: 신청자 직접 입력(USER_INPUT) 또는 LEW 확정(LEW_VERIFIED)
+ */
+export type KvaStatus = 'UNKNOWN' | 'CONFIRMED';
+
+/**
+ * Phase 5 — kVA 출처
+ */
+export type KvaSource = 'USER_INPUT' | 'LEW_VERIFIED';
+
+/**
  * 라이선스 신청 내역
  */
 export interface Application {
@@ -131,6 +143,10 @@ export interface Application {
   licenseExpiryDate?: string;
   createdAt: string;
   updatedAt: string;
+  // Phase 5: kVA 확정 상태
+  kvaStatus?: KvaStatus;
+  kvaSource?: KvaSource;
+  kvaConfirmedAt?: string;
   // Phase 19: Assigned LEW info
   assignedLewFirstName?: string;
   assignedLewLastName?: string;
@@ -334,6 +350,8 @@ export interface CreateApplicationRequest {
   sldOption?: string;
   // Phase 2 PR#3: 법인 JIT
   companyInfo?: CompanyInfo;
+  // Phase 5: kVA UNKNOWN 플래그 — true면 서버가 selectedKva=45 강제
+  kvaUnknown?: boolean;
 }
 
 /**

@@ -10,6 +10,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
 import { usePendingDocumentCounts } from '../../hooks/usePendingDocumentCounts';
+import { KvaPendingBadge } from '../../components/applicant/KvaPendingBadge';
 import type { Application, ApplicationSummary } from '../../types';
 
 function PendingDocsBadge({ count }: { count: number }) {
@@ -150,14 +151,17 @@ export default function DashboardPage() {
                       <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {app.kvaStatus === 'UNKNOWN' && <KvaPendingBadge />}
                       <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
                       <StatusBadge status={app.status} />
                     </div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-3 text-gray-500">
-                      <span>{app.selectedKva} kVA</span>
-                      <span className="font-medium text-gray-800">${app.quoteAmount.toLocaleString()}</span>
+                      <span>{app.kvaStatus === 'UNKNOWN' ? '— kVA' : `${app.selectedKva} kVA`}</span>
+                      <span className="font-medium text-gray-800">
+                        {app.kvaStatus === 'UNKNOWN' ? `From $${app.quoteAmount.toLocaleString()}` : `$${app.quoteAmount.toLocaleString()}`}
+                      </span>
                     </div>
                     <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
                   </div>
@@ -192,9 +196,17 @@ export default function DashboardPage() {
                         </div>
                         <div className="text-xs text-gray-400">{app.postalCode}</div>
                       </td>
-                      <td className="py-3 px-2 text-gray-600">{app.selectedKva} kVA</td>
+                      <td className="py-3 px-2 text-gray-600">
+                        {app.kvaStatus === 'UNKNOWN' ? (
+                          <KvaPendingBadge />
+                        ) : (
+                          <>{app.selectedKva} kVA</>
+                        )}
+                      </td>
                       <td className="py-3 px-2 text-right font-medium text-gray-800">
-                        ${app.quoteAmount.toLocaleString()}
+                        {app.kvaStatus === 'UNKNOWN'
+                          ? <span className="text-gray-500">From ${app.quoteAmount.toLocaleString()}</span>
+                          : `$${app.quoteAmount.toLocaleString()}`}
                       </td>
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-2">

@@ -8,6 +8,8 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { InfoBox } from '../../components/ui/InfoBox';
 import { ApplicantTypeCard } from '../../components/applicant/ApplicantTypeCard';
 import { CompanyInfoModal } from '../../components/applicant/CompanyInfoModal';
+import { KvaTipBox } from '../../components/applicant/KvaTipBox';
+import { KvaPriceCard } from '../../components/applicant/KvaPriceCard';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
@@ -53,6 +55,8 @@ interface FormData {
   postalCode: string;
   buildingType: string;
   selectedKva: number | null;
+  // Phase 5: kVA UNKNOWN 플래그 (I don't know 선택 시 true)
+  kvaUnknown: boolean;
   // Renewal fields
   originalApplicationSeq: number | null;
   existingLicenceNo: string;
@@ -63,6 +67,9 @@ interface FormData {
   // SLD option
   sldOption: 'SELF_UPLOAD' | 'REQUEST_LEW';
 }
+
+/** Step 2 드롭다운의 "I don't know" 특수 sentinel 값. */
+const KVA_UNKNOWN_SENTINEL = '__UNKNOWN__';
 
 export default function NewApplicationPage() {
   const navigate = useNavigate();
@@ -90,6 +97,7 @@ export default function NewApplicationPage() {
     postalCode: '',
     buildingType: '',
     selectedKva: null,
+    kvaUnknown: false,
     originalApplicationSeq: null,
     existingLicenceNo: '',
     existingExpiryDate: '',
@@ -111,8 +119,8 @@ export default function NewApplicationPage() {
   // Form leave guard — warn when navigating away with unsaved data
   const isFormDirty = useMemo(() => {
     if (showGuide || submitting) return false;
-    return !!(formData.address || formData.postalCode || formData.spAccountNo || formData.selectedKva);
-  }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva]);
+    return !!(formData.address || formData.postalCode || formData.spAccountNo || formData.selectedKva || formData.kvaUnknown);
+  }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva, formData.kvaUnknown]);
   useFormGuard(isFormDirty);
 
   // 폼 자동 저장 — sessionStorage 기반 (새로고침 시 복원)
@@ -154,7 +162,12 @@ export default function NewApplicationPage() {
   }, [currentStep]);
 
   // Calculate price when kVA, licence period, or SLD option changes
+  // Phase 5: kvaUnknown 시에는 price breakdown을 숨기므로 계산 스킵
   useEffect(() => {
+    if (formData.kvaUnknown) {
+      setPriceResult(null);
+      return;
+    }
     if (formData.selectedKva) {
       priceApi.calculatePrice(
         formData.selectedKva,
@@ -167,7 +180,7 @@ export default function NewApplicationPage() {
     } else {
       setPriceResult(null);
     }
-  }, [formData.selectedKva, formData.renewalPeriodMonths, formData.sldOption, formData.applicationType]);
+  }, [formData.selectedKva, formData.kvaUnknown, formData.renewalPeriodMonths, formData.sldOption, formData.applicationType]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -230,17 +243,19 @@ export default function NewApplicationPage() {
 
   /** 공통 payload 빌더 (JIT 모달 경로와 일반 경로 공유) */
   const buildPayload = (companyInfo?: CompanyInfo): CreateApplicationRequest | null => {
-    if (!formData.selectedKva) return null;
+    // Phase 5: kvaUnknown 시 selectedKva는 placeholder 45 — 서버가 강제 덮어쓰지만 미리 세팅
+    if (!formData.kvaUnknown && !formData.selectedKva) return null;
     const payload: CreateApplicationRequest = {
       address: formData.address.trim(),
       postalCode: formData.postalCode.trim(),
       buildingType: formData.buildingType || undefined,
-      selectedKva: formData.selectedKva,
+      selectedKva: formData.kvaUnknown ? 45 : (formData.selectedKva as number),
       applicantType: formData.applicantType,
       applicationType: formData.applicationType,
       renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
       spAccountNo: formData.spAccountNo.trim() || undefined,
       sldOption: formData.sldOption,
+      kvaUnknown: formData.kvaUnknown || undefined,
     };
     if (formData.applicationType === 'RENEWAL') {
       if (formData.renewalReferenceNo.trim()) {
@@ -275,7 +290,8 @@ export default function NewApplicationPage() {
    * - CORPORATE + User 회사정보 없음이면 JIT 모달 열고 API는 아직 호출하지 않는다.
    */
   const handleSubmit = async () => {
-    if (!formData.selectedKva) return;
+    // Phase 5: kvaUnknown 상태면 selectedKva는 미정 → payload에서 45로 placeholder
+    if (!formData.kvaUnknown && !formData.selectedKva) return;
     setShowSubmitConfirm(false);
 
     // 법인 preflight — 모달 표시 여부 결정
@@ -358,6 +374,7 @@ export default function NewApplicationPage() {
       postalCode: '',
       buildingType: '',
       selectedKva: null,
+      kvaUnknown: false,
       originalApplicationSeq: null,
       existingLicenceNo: '',
       existingExpiryDate: '',
@@ -784,12 +801,36 @@ export default function NewApplicationPage() {
                 <h2 className="text-lg font-semibold text-gray-800">Capacity & Pricing</h2>
                 <p className="text-sm text-gray-500 mt-1">Select the electrical capacity for your installation</p>
               </div>
+
+              {/* Phase 5 — Not sure about kVA? 안내 (pre-select 하지 않음) */}
+              <KvaTipBox buildingType={formData.buildingType} />
+
               <Select
                 label="Electric Box (kVA)"
-                value={formData.selectedKva ? String(formData.selectedKva) : ''}
-                onChange={(e) => updateField('selectedKva', e.target.value ? Number(e.target.value) : null)}
+                value={
+                  formData.kvaUnknown
+                    ? KVA_UNKNOWN_SENTINEL
+                    : (formData.selectedKva ? String(formData.selectedKva) : '')
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === KVA_UNKNOWN_SENTINEL) {
+                    // I don't know 선택 — selectedKva는 서버가 45로 강제
+                    setFormData((prev) => ({ ...prev, kvaUnknown: true, selectedKva: null }));
+                    setErrors((prev) => ({ ...prev, selectedKva: '' }));
+                  } else {
+                    setFormData((prev) => ({
+                      ...prev,
+                      kvaUnknown: false,
+                      selectedKva: v ? Number(v) : null,
+                    }));
+                    setErrors((prev) => ({ ...prev, selectedKva: '' }));
+                  }
+                }}
                 options={[
                   { value: '', label: 'Select kVA capacity' },
+                  { value: KVA_UNKNOWN_SENTINEL, label: "I don't know — let LEW confirm me later" },
+                  { value: '__DIVIDER__', label: '────────────────────', disabled: true },
                   ...priceTiers.map((tier) => ({
                     value: String(tier.kvaMin),
                     label: `${tier.description} — SGD $${tier.price.toLocaleString()}`,
@@ -799,71 +840,14 @@ export default function NewApplicationPage() {
                 required
               />
 
-              {/* Price breakdown */}
-              {priceResult && (
-                <div className="bg-primary-50 rounded-xl p-5 border border-primary-100 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-primary-700">Selected Tier</p>
-                      <p className="text-lg font-semibold text-primary-800 mt-1">{priceResult.tierDescription}</p>
-                    </div>
-                  </div>
-                  <div className="border-t border-primary-200 pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-primary-700">kVA Tier Price</span>
-                      <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
-                    </div>
-                    {priceResult.sldFee != null && priceResult.sldFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-primary-700">SLD Drawing Fee</span>
-                        <span className="font-medium text-primary-800">SGD ${priceResult.sldFee.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {priceResult.emaFee != null && priceResult.emaFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>
-                        <span className="font-medium text-primary-800">SGD ${priceResult.emaFee.toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="border-t border-primary-200 pt-2 flex justify-between">
-                      <span className="text-sm font-semibold text-primary-700">Total Amount</span>
-                      <span className="text-xl font-bold text-primary-800">
-                        SGD ${priceResult.totalAmount.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Price reference table */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Price Reference Table</h3>
-                <div className="border border-gray-200 rounded-lg overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-left py-2 px-3 font-medium text-gray-600">Capacity</th>
-                        <th className="text-right py-2 px-3 font-medium text-gray-600">Price (SGD)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {priceTiers.map((tier) => (
-                        <tr
-                          key={tier.masterPriceSeq}
-                          className={`border-t border-gray-100 ${
-                            formData.selectedKva && formData.selectedKva >= tier.kvaMin && formData.selectedKva <= tier.kvaMax
-                              ? 'bg-primary-50 font-medium'
-                              : ''
-                          }`}
-                        >
-                          <td className="py-2 px-3">{tier.description}</td>
-                          <td className="py-2 px-3 text-right">${tier.price.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Phase 5 — 가격 카드 (UNKNOWN 시 "From S$350" + deactivated table) */}
+              <KvaPriceCard
+                kvaUnknown={formData.kvaUnknown}
+                selectedKva={formData.selectedKva}
+                priceResult={priceResult}
+                priceTiers={priceTiers}
+                renewalPeriodMonths={formData.renewalPeriodMonths}
+              />
             </div>
           )
         )}

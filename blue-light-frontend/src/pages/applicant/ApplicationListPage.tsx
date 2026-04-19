@@ -10,6 +10,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import applicationApi from '../../api/applicationApi';
 import { usePendingDocumentCounts } from '../../hooks/usePendingDocumentCounts';
+import { KvaPendingBadge } from '../../components/applicant/KvaPendingBadge';
 import type { Application } from '../../types';
 
 /** Phase 3 PR#3 — LEW 요청 대기 배지 (AC-AU3) */
@@ -125,7 +126,9 @@ export default function ApplicationListPage() {
       align: 'right',
       className: 'hidden sm:table-cell',
       render: (app) => (
-        <span className="font-medium text-gray-700">{app.selectedKva} kVA</span>
+        app.kvaStatus === 'UNKNOWN'
+          ? <KvaPendingBadge />
+          : <span className="font-medium text-gray-700">{app.selectedKva} kVA</span>
       ),
     },
     {
@@ -134,8 +137,8 @@ export default function ApplicationListPage() {
       sortable: true,
       align: 'right',
       render: (app) => (
-        <span className="font-medium text-gray-800">
-          SGD ${app.quoteAmount.toLocaleString()}
+        <span className={`font-medium ${app.kvaStatus === 'UNKNOWN' ? 'text-gray-500' : 'text-gray-800'}`}>
+          {app.kvaStatus === 'UNKNOWN' ? 'From ' : ''}SGD ${app.quoteAmount.toLocaleString()}
         </span>
       ),
     },
@@ -242,14 +245,17 @@ export default function ApplicationListPage() {
                 <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
+                {app.kvaStatus === 'UNKNOWN' && <KvaPendingBadge />}
                 <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
                 <StatusBadge status={app.status} />
               </div>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-3 text-gray-500">
-                <span>{app.selectedKva} kVA</span>
-                <span className="font-medium text-gray-800">SGD ${app.quoteAmount.toLocaleString()}</span>
+                <span>{app.kvaStatus === 'UNKNOWN' ? '— kVA' : `${app.selectedKva} kVA`}</span>
+                <span className={`font-medium ${app.kvaStatus === 'UNKNOWN' ? 'text-gray-500' : 'text-gray-800'}`}>
+                  {app.kvaStatus === 'UNKNOWN' ? 'From ' : ''}SGD ${app.quoteAmount.toLocaleString()}
+                </span>
               </div>
               <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
             </div>

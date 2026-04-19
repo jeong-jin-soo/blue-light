@@ -70,6 +70,8 @@ export interface ApplicationFormData {
   postalCode: string;
   buildingType: string;
   selectedKva: number | null;
+  /** Phase 5: "I don't know" 선택 시 true. true면 selectedKva 필수 검증 면제. */
+  kvaUnknown?: boolean;
   originalApplicationSeq: number | null;
   existingLicenceNo: string;
   existingExpiryDate: string;
@@ -135,8 +137,9 @@ export function validateApplicationStep1(formData: ApplicationFormData): Record<
 export function validateApplicationStep2(formData: ApplicationFormData): Record<string, string> {
   const errors: Record<string, string> = {};
 
-  if (!formData.selectedKva) {
-    errors.selectedKva = 'Please select a kVA capacity';
+  // Phase 5: "I don't know" 선택 시 selectedKva 필수 면제 — 서버가 45 강제
+  if (!formData.kvaUnknown && !formData.selectedKva) {
+    errors.selectedKva = 'Please select a kVA capacity, or choose "I don\'t know"';
   }
 
   return errors;

@@ -197,7 +197,22 @@ export function ApplicationPayment({
           </div>
         </div>
 
-        {application.status === 'PENDING_PAYMENT' && (
+        {/* Phase 5 — kVA UNKNOWN 시 결제 차단 (백엔드 KVA_NOT_CONFIRMED 가드 방어용 UI) */}
+        {application.kvaStatus === 'UNKNOWN' && application.status === 'PENDING_PAYMENT' && (
+          <div className="mt-4 bg-warning-50 rounded-lg p-4 border border-warning-200">
+            <div className="flex items-start gap-3">
+              <span className="text-lg">⏳</span>
+              <div>
+                <p className="text-sm font-medium text-warning-800">Waiting for kVA Confirmation</p>
+                <p className="text-xs text-warning-700 mt-1">
+                  Your LEW needs to confirm the kVA before payment. You will be notified once it's confirmed.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {application.status === 'PENDING_PAYMENT' && application.kvaStatus !== 'UNKNOWN' && (
           <div className="mt-4 space-y-3">
             <div className="bg-warning-50 rounded-lg p-4 border border-warning-200">
               <div className="flex items-start gap-3">

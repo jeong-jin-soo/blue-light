@@ -2,7 +2,9 @@ import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
+import { Badge } from '../../../components/ui/Badge';
 import { InfoField } from '../../../components/common/InfoField';
+import { KvaPendingBadge } from '../../../components/applicant/KvaPendingBadge';
 import type { Application, MasterPrice } from '../../../types';
 
 interface EditState {
@@ -102,7 +104,25 @@ export function ApplicationInfo({
             <InfoField label="Installation Address" value={application.address} />
             <InfoField label="Postal Code" value={application.postalCode} />
             <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-            <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
+            {/* Phase 5 — kVA UNKNOWN 시 pending 배지, CONFIRMED 시 값 + source 배지 */}
+            <div>
+              <dt className="text-xs text-gray-500 mb-0.5">Electric Box (kVA)</dt>
+              {application.kvaStatus === 'UNKNOWN' ? (
+                <div className="space-y-1">
+                  <KvaPendingBadge label="kVA pending LEW review" />
+                  <p className="text-xs text-gray-500">
+                    Your LEW will confirm the kVA based on your main breaker or SP account information.
+                  </p>
+                </div>
+              ) : (
+                <dd className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                  <span>{application.selectedKva} kVA</span>
+                  {application.kvaSource === 'LEW_VERIFIED' && (
+                    <Badge variant="success">Confirmed by LEW</Badge>
+                  )}
+                </dd>
+              )}
+            </div>
             {application.spAccountNo && (
               <InfoField label="SP Account No." value={application.spAccountNo} />
             )}

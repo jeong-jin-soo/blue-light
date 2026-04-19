@@ -1,4 +1,5 @@
 import type { PriceCalculation, ApplicationType } from '../../../types';
+import { KvaPendingBadge } from '../../../components/applicant/KvaPendingBadge';
 
 interface FormData {
   applicationType: ApplicationType;
@@ -7,6 +8,8 @@ interface FormData {
   postalCode: string;
   buildingType: string;
   selectedKva: number | null;
+  /** Phase 5: "I don't know" 선택 시 true — 가격은 "From ..." 표시 */
+  kvaUnknown?: boolean;
   existingLicenceNo: string;
   existingExpiryDate: string;
   renewalPeriodMonths: number | null;
@@ -153,21 +156,40 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
       {/* Capacity & Price */}
       <div className="bg-gray-50 rounded-lg p-4 space-y-3">
         <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Capacity & Pricing</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <dt className="text-xs text-gray-500">Selected kVA</dt>
-            <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.selectedKva} kVA</dd>
+        {formData.kvaUnknown ? (
+          <div className="flex items-center gap-2">
+            <KvaPendingBadge />
+            <span className="text-sm text-gray-600">Your LEW will confirm the kVA after reviewing your application.</span>
           </div>
-          <div>
-            <dt className="text-xs text-gray-500">Tier</dt>
-            <dd className="text-sm font-medium text-gray-800 mt-0.5">{priceResult?.tierDescription || '-'}</dd>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <dt className="text-xs text-gray-500">Selected kVA</dt>
+              <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.selectedKva} kVA</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-500">Tier</dt>
+              <dd className="text-sm font-medium text-gray-800 mt-0.5">{priceResult?.tierDescription || '-'}</dd>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Total with breakdown */}
       <div className="bg-primary-50 rounded-xl p-5 border border-primary-100">
-        {priceResult && (
+        {formData.kvaUnknown ? (
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm text-primary-700">From</span>
+              <span className="text-2xl font-bold text-primary-800 underline decoration-dashed decoration-primary-400 underline-offset-4">
+                S$350
+              </span>
+            </div>
+            <p className="text-xs text-primary-600 mt-2">
+              Final price after LEW confirms your kVA.
+            </p>
+          </div>
+        ) : priceResult && (
           <div className="space-y-2 mb-3">
             <div className="flex justify-between text-sm">
               <span className="text-primary-700">kVA Tier Price</span>
@@ -188,15 +210,19 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
             <div className="border-t border-primary-200 pt-2"></div>
           </div>
         )}
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-primary-700">Total Amount Due</span>
-          <span className="text-2xl font-bold text-primary-800">
-            SGD ${priceResult?.totalAmount.toLocaleString() || '—'}
-          </span>
-        </div>
-        <p className="text-xs text-primary-600 mt-2">
-          Payment via PayNow. Details will be provided after submission.
-        </p>
+        {!formData.kvaUnknown && (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-primary-700">Total Amount Due</span>
+              <span className="text-2xl font-bold text-primary-800">
+                SGD ${priceResult?.totalAmount.toLocaleString() || '—'}
+              </span>
+            </div>
+            <p className="text-xs text-primary-600 mt-2">
+              Payment via PayNow. Details will be provided after submission.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
