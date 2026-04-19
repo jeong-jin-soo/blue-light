@@ -307,7 +307,7 @@ public class AdminApplicationService {
         // security-review §1.2 — 실제 코드 경로는 `/approve` 이며, 여기에 가드 배치.
         if (application.getKvaStatus() == KvaStatus.UNKNOWN) {
             throw new BusinessException(
-                    "LEW가 kVA를 확정하면 결제가 활성화됩니다",
+                    "Payment will be enabled after LEW confirms the kVA",
                     HttpStatus.BAD_REQUEST, "KVA_NOT_CONFIRMED");
         }
 
