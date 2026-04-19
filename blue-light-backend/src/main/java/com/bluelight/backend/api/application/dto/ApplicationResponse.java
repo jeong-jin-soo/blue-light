@@ -57,6 +57,11 @@ public class ApplicationResponse {
     private String loaSignatureUrl;
     private LocalDateTime loaSignedAt;
 
+    // ── Phase 5: kVA 확정 상태 ──
+    private String kvaStatus;           // UNKNOWN | CONFIRMED
+    private String kvaSource;           // USER_INPUT | LEW_VERIFIED | null
+    private LocalDateTime kvaConfirmedAt;
+
     public static ApplicationResponse from(Application application) {
         return ApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -96,6 +101,10 @@ public class ApplicationResponse {
                 .sldOption(application.getSldOption() != null ? application.getSldOption().name() : null)
                 .loaSignatureUrl(application.getLoaSignatureUrl())
                 .loaSignedAt(application.getLoaSignedAt())
+                // Phase 5
+                .kvaStatus(application.getKvaStatus() != null ? application.getKvaStatus().name() : null)
+                .kvaSource(application.getKvaSource() != null ? application.getKvaSource().name() : null)
+                .kvaConfirmedAt(application.getKvaConfirmedAt())
                 .build();
     }
 }

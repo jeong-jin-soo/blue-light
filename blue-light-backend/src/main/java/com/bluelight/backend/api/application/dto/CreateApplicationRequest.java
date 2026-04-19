@@ -36,6 +36,19 @@ public class CreateApplicationRequest {
     private Integer selectedKva;
 
     /**
+     * Phase 5 — "I don't know — let LEW confirm" 옵션.
+     * <p>{@code true} 이면 서버가:
+     * <ul>
+     *   <li>{@code selectedKva} 값을 무시하고 {@code 45} 로 강제 설정 (placeholder)</li>
+     *   <li>{@code kvaStatus=UNKNOWN}, {@code kvaSource=null} 로 저장</li>
+     *   <li>{@code quoteAmount} 는 45 kVA placeholder 기준 계산</li>
+     * </ul>
+     * {@code false} 또는 {@code null} 이면 기존 경로 — {@code kvaStatus=CONFIRMED}, {@code kvaSource=USER_INPUT}.
+     * <p>하위호환: 이 필드가 누락된 구버전 클라이언트는 {@code null} → {@code false} 취급.
+     */
+    private Boolean kvaUnknown;
+
+    /**
      * 신청자 유형 (Phase 1 필수)
      * INDIVIDUAL: 개인 / CORPORATE: 법인
      */

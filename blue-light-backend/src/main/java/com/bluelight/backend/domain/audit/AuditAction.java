@@ -68,6 +68,11 @@ public enum AuditAction {
     PROFILE_COMPANY_INFO_UPDATED,
     CORPORATE_INFO_CAPTURED_VIA_JIT,
 
+    // Phase 5: kVA 확정 (security-review §4 — 3종 분리)
+    KVA_CONFIRMED_BY_LEW,
+    KVA_OVERRIDDEN_BY_ADMIN,
+    KVA_CONFIRMATION_DENIED,
+
     // Data breach
     DATA_BREACH_REPORTED,
     DATA_BREACH_PDPC_NOTIFIED,

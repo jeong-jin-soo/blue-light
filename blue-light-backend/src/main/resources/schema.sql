@@ -68,6 +68,13 @@ CREATE TABLE IF NOT EXISTS applications (
     designation_snapshot     VARCHAR(50)   NULL,
     snapshot_backfilled_at   DATETIME(6)   NULL,
     expiry_notified_at       DATETIME(6),
+    -- Phase 5: kVA 확정 상태 (phase5-kva-ux/01-spec.md §3)
+    kva_status               VARCHAR(20)   NOT NULL DEFAULT 'CONFIRMED' COMMENT 'UNKNOWN | CONFIRMED',
+    kva_source               VARCHAR(20)   NULL                         COMMENT 'USER_INPUT | LEW_VERIFIED',
+    kva_confirmed_by         BIGINT        NULL,
+    kva_confirmed_at         DATETIME(6)   NULL,
+    -- Phase 5 B-2: 낙관적 락 (동시성 공격 방어)
+    version                  BIGINT        NOT NULL DEFAULT 0,
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -78,9 +85,17 @@ CREATE TABLE IF NOT EXISTS applications (
     KEY idx_applications_status (status),
     KEY idx_applications_assigned_lew (assigned_lew_seq),
     KEY idx_applications_type (application_type),
+    KEY idx_applications_kva_status (kva_status),
     CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_applications_assigned_lew FOREIGN KEY (assigned_lew_seq) REFERENCES users (user_seq),
-    CONSTRAINT fk_applications_original FOREIGN KEY (original_application_seq) REFERENCES applications (application_seq)
+    CONSTRAINT fk_applications_original FOREIGN KEY (original_application_seq) REFERENCES applications (application_seq),
+    -- Phase 5: LEW 계정 삭제 시 확정자 참조는 NULL 로 (감사 로그에 원본 userSeq 보존)
+    CONSTRAINT fk_applications_kva_confirmed_by FOREIGN KEY (kva_confirmed_by)
+        REFERENCES users (user_seq) ON DELETE SET NULL,
+    -- Phase 5: kva_status 와 kva_source 일관성 (R7 대응)
+    CONSTRAINT chk_applications_kva_status_source CHECK (
+        kva_status = 'UNKNOWN' OR kva_source IS NOT NULL
+    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. 결제 로그

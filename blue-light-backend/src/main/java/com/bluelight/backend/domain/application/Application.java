@@ -237,6 +237,52 @@ public class Application extends BaseEntity {
     @Column(name = "expiry_notified_at")
     private LocalDateTime expiryNotifiedAt;
 
+    // ── Phase 5: kVA 확정 상태 ──
+    // 상세: doc/Project execution/phase5-kva-ux/01-spec.md §3
+    // 보안: doc/Project execution/phase5-kva-ux/03-security-review.md §1,§3
+
+    /**
+     * kVA 확정 상태 (UNKNOWN | CONFIRMED).
+     * <p>기본값 {@code CONFIRMED} — 하위호환 (기존 레코드 + kvaStatus 누락 요청 모두 CONFIRMED 로 간주).
+     * <p>{@code UNKNOWN} 인 경우 결제 단계 진입 차단 (B-1 가드).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kva_status", nullable = false, length = 20)
+    private KvaStatus kvaStatus = KvaStatus.CONFIRMED;
+
+    /**
+     * kVA 값 출처 (USER_INPUT | LEW_VERIFIED).
+     * <p>{@code kvaStatus=UNKNOWN} 일 때는 {@code null}, {@code CONFIRMED} 일 때는 필수.
+     * <p>schema CHECK 제약으로 일관성 강제.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "kva_source", length = 20)
+    private KvaSource kvaSource;
+
+    /**
+     * LEW/ADMIN 이 kVA 를 확정한 경우 확정자 (FK → users).
+     * <p>USER_INPUT 경로에서는 {@code null}.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "kva_confirmed_by")
+    private User kvaConfirmedBy;
+
+    /**
+     * LEW/ADMIN 이 kVA 를 확정한 시각.
+     */
+    @Column(name = "kva_confirmed_at")
+    private LocalDateTime kvaConfirmedAt;
+
+    /**
+     * 낙관적 락 버전 (Security B-2).
+     * <p>동시성 공격 방어 — kVA 확정과 승인 경로가 동시에 실행되어도 한 건만 성공.
+     * <p>충돌 시 {@link org.springframework.orm.ObjectOptimisticLockingFailureException} →
+     * {@code GlobalExceptionHandler} 에서 409 {@code STALE_STATE} 로 변환.
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version = 0L;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
@@ -245,7 +291,8 @@ public class Application extends BaseEntity {
                        Application originalApplication,
                        String existingLicenceNo, String renewalReferenceNo,
                        LocalDate existingExpiryDate, Integer renewalPeriodMonths,
-                       BigDecimal emaFee) {
+                       BigDecimal emaFee,
+                       KvaStatus kvaStatus, KvaSource kvaSource) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
@@ -264,6 +311,9 @@ public class Application extends BaseEntity {
         this.renewalPeriodMonths = renewalPeriodMonths;
         this.emaFee = emaFee;
         this.status = ApplicationStatus.PENDING_REVIEW;
+        // Phase 5: kVA 상태 (기본값은 필드 초기화로 CONFIRMED — 하위호환)
+        this.kvaStatus = kvaStatus != null ? kvaStatus : KvaStatus.CONFIRMED;
+        this.kvaSource = kvaSource;
     }
 
     /**
@@ -297,16 +347,65 @@ public class Application extends BaseEntity {
     }
 
     /**
-     * 신청 내용 수정 (보완 시)
+     * 신청 내용 수정 (보완 시).
+     *
+     * <p><b>Phase 5 보안 가드 (재제출 허점 차단)</b>: 이미 {@code kvaStatus=CONFIRMED} 인 신청에서
+     * 신청자가 재제출(REVISION_REQUESTED → PENDING_REVIEW) 시 {@code selectedKva} 를
+     * 임의로 변경해 가격을 우회하는 경로를 차단한다.
+     * <ul>
+     *   <li>{@code kvaStatus=CONFIRMED} 이면 {@code selectedKva}/{@code quoteAmount}/{@code sldFee}
+     *       파라미터를 <b>무시</b>하고 기존 값을 유지한다. 주소/우편번호/건물유형만 갱신.</li>
+     *   <li>{@code kvaStatus=UNKNOWN} 이면 기존처럼 모두 갱신 가능 (아직 확정 전).</li>
+     * </ul>
+     * 출처: {@code phase5-kva-ux/03-security-review.md} §1.1, 추가 발견 — 사용자 결정:
+     * "LEW 확정 후에는 LEW만 수정 가능".
      */
     public void updateDetails(String address, String postalCode, String buildingType,
                               Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee) {
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
+        if (this.kvaStatus == KvaStatus.CONFIRMED) {
+            // CONFIRMED 인 경우 kVA/금액 재계산은 applicant 가 수행 불가 — 기존값 유지
+            return;
+        }
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.sldFee = sldFee;
+    }
+
+    // ── Phase 5: kVA 확정 도메인 메서드 ──
+
+    /**
+     * LEW/ADMIN 에 의한 kVA 확정 (Phase 5).
+     *
+     * <p>상태 전이 규칙:
+     * <ul>
+     *   <li>{@code kvaStatus=UNKNOWN} → {@code CONFIRMED} 로 전환.</li>
+     *   <li>{@code kvaStatus=CONFIRMED} 인 경우 {@code force=false} 이면 {@link IllegalStateException}.
+     *       컨트롤러/서비스에서 409 {@code KVA_ALREADY_CONFIRMED} 로 변환할 것.</li>
+     *   <li>재계산된 {@code quoteAmount} 는 서비스에서 계산 후 파라미터로 전달.</li>
+     * </ul>
+     *
+     * <p>금지 상태 검증({@code PAID} 이후 차단, B-3)은 서비스에서 수행 — 도메인에서는
+     * kvaStatus 자체의 전이만 관리한다.
+     *
+     * @param selectedKva    새 kVA tier
+     * @param quoteAmount    재계산된 금액
+     * @param confirmedBy    확정자 (LEW 또는 ADMIN)
+     * @param force          이미 CONFIRMED 상태에서 덮어쓸지 여부 (ADMIN 전용, 컨트롤러에서 역할 검증)
+     */
+    public void confirmKva(Integer selectedKva, BigDecimal quoteAmount,
+                           User confirmedBy, boolean force) {
+        if (this.kvaStatus == KvaStatus.CONFIRMED && !force) {
+            throw new IllegalStateException("kVA is already confirmed");
+        }
+        this.selectedKva = selectedKva;
+        this.quoteAmount = quoteAmount;
+        this.kvaStatus = KvaStatus.CONFIRMED;
+        this.kvaSource = KvaSource.LEW_VERIFIED;
+        this.kvaConfirmedBy = confirmedBy;
+        this.kvaConfirmedAt = LocalDateTime.now();
     }
 
     /**

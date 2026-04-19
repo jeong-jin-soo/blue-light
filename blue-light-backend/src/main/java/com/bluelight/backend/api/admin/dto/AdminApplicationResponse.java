@@ -70,6 +70,12 @@ public class AdminApplicationResponse {
     private String loaSignatureUrl;
     private LocalDateTime loaSignedAt;
 
+    // ── Phase 5: kVA 확정 상태 ──
+    private String kvaStatus;           // UNKNOWN | CONFIRMED
+    private String kvaSource;           // USER_INPUT | LEW_VERIFIED | null
+    private Long kvaConfirmedBy;
+    private LocalDateTime kvaConfirmedAt;
+
     public static AdminApplicationResponse from(Application application) {
         return AdminApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -123,6 +129,12 @@ public class AdminApplicationResponse {
                 .sldOption(application.getSldOption() != null ? application.getSldOption().name() : null)
                 .loaSignatureUrl(application.getLoaSignatureUrl())
                 .loaSignedAt(application.getLoaSignedAt())
+                // Phase 5
+                .kvaStatus(application.getKvaStatus() != null ? application.getKvaStatus().name() : null)
+                .kvaSource(application.getKvaSource() != null ? application.getKvaSource().name() : null)
+                .kvaConfirmedBy(application.getKvaConfirmedBy() != null
+                        ? application.getKvaConfirmedBy().getUserSeq() : null)
+                .kvaConfirmedAt(application.getKvaConfirmedAt())
                 .build();
     }
 }

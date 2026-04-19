@@ -249,6 +249,14 @@ public class AdminApplicationService {
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_APPROVAL");
         }
 
+        // Phase 5 B-1: kVA 가 UNKNOWN 인 신청은 결제 단계 진입 차단.
+        // security-review §1.2 — 실제 코드 경로는 `/approve` 이며, 여기에 가드 배치.
+        if (application.getKvaStatus() == KvaStatus.UNKNOWN) {
+            throw new BusinessException(
+                    "LEW가 kVA를 확정하면 결제가 활성화됩니다",
+                    HttpStatus.BAD_REQUEST, "KVA_NOT_CONFIRMED");
+        }
+
         application.approveForPayment();
         log.info("Application approved for payment: applicationSeq={}", applicationSeq);
 
