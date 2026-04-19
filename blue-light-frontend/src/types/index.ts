@@ -147,6 +147,7 @@ export interface Application {
   kvaStatus?: KvaStatus;
   kvaSource?: KvaSource;
   kvaConfirmedAt?: string;
+  kvaConfirmedBy?: number;
   // Phase 19: Assigned LEW info
   assignedLewFirstName?: string;
   assignedLewLastName?: string;
@@ -870,7 +871,9 @@ export type NotificationType =
   | 'DOCUMENT_REQUEST_CREATED'
   | 'DOCUMENT_REQUEST_FULFILLED'
   | 'DOCUMENT_REQUEST_APPROVED'
-  | 'DOCUMENT_REQUEST_REJECTED';
+  | 'DOCUMENT_REQUEST_REJECTED'
+  // Phase 5 — LEW kVA 확정 알림
+  | 'KVA_CONFIRMED';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

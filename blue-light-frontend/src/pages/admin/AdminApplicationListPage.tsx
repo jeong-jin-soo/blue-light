@@ -12,7 +12,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
 import { getBasePath } from '../../utils/routeUtils';
-import type { AdminApplication, ApplicationStatus } from '../../types';
+import type { AdminApplication, ApplicationStatus, KvaStatus } from '../../types';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -25,6 +25,13 @@ const STATUS_OPTIONS = [
   { value: 'EXPIRED', label: 'Expired' },
 ];
 
+// Phase 5 PR#3 — kVA Status filter (AC-P3)
+const KVA_STATUS_OPTIONS = [
+  { value: '', label: 'All kVA' },
+  { value: 'UNKNOWN', label: 'kVA pending' },
+  { value: 'CONFIRMED', label: 'Confirmed' },
+];
+
 const PAGE_SIZE = 15;
 
 export default function AdminApplicationListPage() {
@@ -35,12 +42,14 @@ export default function AdminApplicationListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialStatus = searchParams.get('status') || '';
+  const initialKvaStatus = searchParams.get('kvaStatus') || '';
 
   const [applications, setApplications] = useState<AdminApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [kvaStatusFilter, setKvaStatusFilter] = useState(initialKvaStatus);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -63,7 +72,8 @@ export default function AdminApplicationListPage() {
         page,
         PAGE_SIZE,
         statusFilter ? (statusFilter as ApplicationStatus) : undefined,
-        debouncedSearch || undefined
+        debouncedSearch || undefined,
+        kvaStatusFilter ? (kvaStatusFilter as KvaStatus) : undefined
       )
       .then((data) => {
         setApplications(data.content);
@@ -73,16 +83,25 @@ export default function AdminApplicationListPage() {
         toast.error(err.message || 'Failed to load applications');
       })
       .finally(() => setLoading(false));
-  }, [page, statusFilter, debouncedSearch]);
+  }, [page, statusFilter, kvaStatusFilter, debouncedSearch]);
+
+  const syncQuery = (next: { status?: string; kvaStatus?: string }) => {
+    const params: Record<string, string> = {};
+    if (next.status) params.status = next.status;
+    if (next.kvaStatus) params.kvaStatus = next.kvaStatus;
+    setSearchParams(params);
+  };
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
     setPage(0);
-    if (value) {
-      setSearchParams({ status: value });
-    } else {
-      setSearchParams({});
-    }
+    syncQuery({ status: value, kvaStatus: kvaStatusFilter });
+  };
+
+  const handleKvaStatusChange = (value: string) => {
+    setKvaStatusFilter(value);
+    setPage(0);
+    syncQuery({ status: statusFilter, kvaStatus: value });
   };
 
   const columns: Column<AdminApplication>[] = [
@@ -129,9 +148,20 @@ export default function AdminApplicationListPage() {
       key: 'selectedKva',
       header: 'kVA',
       align: 'right',
-      width: '80px',
+      width: '110px',
       render: (app) => (
-        <span className="text-gray-600">{app.selectedKva}</span>
+        <div className="flex items-center justify-end gap-1.5">
+          {app.kvaStatus === 'UNKNOWN' ? (
+            <Badge variant="warning" className="text-[10px]">kVA pending</Badge>
+          ) : (
+            <>
+              <span className="text-gray-600">{app.selectedKva}</span>
+              {app.kvaSource === 'LEW_VERIFIED' && (
+                <Badge variant="success" className="text-[10px]">LEW verified</Badge>
+              )}
+            </>
+          )}
+        </div>
       ),
     },
     {
@@ -202,6 +232,14 @@ export default function AdminApplicationListPage() {
               options={STATUS_OPTIONS}
             />
           </div>
+          <div className="w-full sm:w-44">
+            <Select
+              aria-label="kVA Status"
+              value={kvaStatusFilter}
+              onChange={(e) => handleKvaStatusChange(e.target.value)}
+              options={KVA_STATUS_OPTIONS}
+            />
+          </div>
         </div>
       </Card>
 
@@ -215,7 +253,7 @@ export default function AdminApplicationListPage() {
         emptyIcon="📋"
         emptyTitle="No applications found"
         emptyDescription={
-          statusFilter || debouncedSearch
+          statusFilter || kvaStatusFilter || debouncedSearch
             ? 'No applications match your search criteria.'
             : 'Applications will appear here once users start submitting them.'
         }
@@ -235,8 +273,17 @@ export default function AdminApplicationListPage() {
             </div>
             <p className="text-sm text-gray-700 truncate mb-1">{app.address}</p>
             <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center gap-3 text-gray-500">
-                <span>{app.selectedKva} kVA</span>
+              <div className="flex items-center gap-2 text-gray-500 flex-wrap">
+                {app.kvaStatus === 'UNKNOWN' ? (
+                  <Badge variant="warning" className="text-[10px]">kVA pending</Badge>
+                ) : (
+                  <>
+                    <span>{app.selectedKva} kVA</span>
+                    {app.kvaSource === 'LEW_VERIFIED' && (
+                      <Badge variant="success" className="text-[10px]">LEW verified</Badge>
+                    )}
+                  </>
+                )}
                 <span className="font-medium text-gray-800">${app.quoteAmount.toLocaleString()}</span>
               </div>
               <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>

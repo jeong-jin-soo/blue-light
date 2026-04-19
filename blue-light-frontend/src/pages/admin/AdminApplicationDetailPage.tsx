@@ -15,6 +15,7 @@ import { getBasePath } from '../../utils/routeUtils';
 
 // Section components
 import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
+import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminLoaSection } from './sections/AdminLoaSection';
 import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
@@ -410,6 +411,9 @@ export default function AdminApplicationDetailPage() {
             application={application}
             onNavigateToOriginal={(seq) => navigate(`${basePath}/applications/${seq}`)}
           />
+
+          {/* Phase 5 PR#3 — kVA 확정 섹션 (ADMIN/LEW) */}
+          <KvaSection application={application} onUpdated={fetchData} />
 
           <AdminLoaSection
             application={application}

@@ -6,6 +6,8 @@ import type {
   CompleteApplicationRequest,
   FileInfo,
   FileType,
+  KvaStatus,
+  KvaSource,
   Page,
   Payment,
   PaymentConfirmRequest,
@@ -13,6 +15,22 @@ import type {
   SldRequest,
   UpdateStatusRequest,
 } from '../types';
+
+// Phase 5 PR#3 — kVA 확정 API
+export interface ConfirmKvaPayload {
+  selectedKva: number;
+  note?: string;
+}
+
+export interface ConfirmKvaResponse {
+  applicationId: number;
+  kvaStatus: KvaStatus;
+  kvaSource: KvaSource;
+  selectedKva: number;
+  quoteAmount: number;
+  kvaConfirmedBy: number | null;
+  kvaConfirmedAt: string | null;
+}
 
 // ── Dashboard ──────────────────────────────
 
@@ -27,10 +45,17 @@ export const getApplications = async (
   page = 0,
   size = 20,
   status?: ApplicationStatus,
-  search?: string
+  search?: string,
+  kvaStatus?: KvaStatus
 ): Promise<Page<AdminApplication>> => {
   const response = await axiosClient.get<Page<AdminApplication>>('/admin/applications', {
-    params: { page, size, ...(status && { status }), ...(search && { search }) },
+    params: {
+      page,
+      size,
+      ...(status && { status }),
+      ...(search && { search }),
+      ...(kvaStatus && { kvaStatus }),
+    },
   });
   return response.data;
 };
@@ -65,6 +90,23 @@ export const requestRevision = async (
 export const approveForPayment = async (id: number): Promise<AdminApplication> => {
   const response = await axiosClient.post<AdminApplication>(
     `/admin/applications/${id}/approve`
+  );
+  return response.data;
+};
+
+/**
+ * Phase 5 PR#3 — LEW/ADMIN kVA 확정 (AC-A1).
+ * force=true 는 ADMIN 전용 override.
+ */
+export const confirmKva = async (
+  id: number,
+  data: ConfirmKvaPayload,
+  force = false
+): Promise<ConfirmKvaResponse> => {
+  const response = await axiosClient.patch<ConfirmKvaResponse>(
+    `/admin/applications/${id}/kva`,
+    data,
+    { params: force ? { force: true } : {} }
   );
   return response.data;
 };

@@ -20,6 +20,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   DOCUMENT_REQUEST_FULFILLED: '📤',
   DOCUMENT_REQUEST_APPROVED: '✅',
   DOCUMENT_REQUEST_REJECTED: '⚠️',
+  // Phase 5 — LEW kVA 확정 알림
+  KVA_CONFIRMED: '💡',
 };
 
 export default function NotificationsPage() {

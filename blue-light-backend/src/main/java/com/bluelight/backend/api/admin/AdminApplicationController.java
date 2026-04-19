@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.KvaStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
@@ -62,6 +63,7 @@ public class AdminApplicationController {
     public ResponseEntity<Page<AdminApplicationResponse>> getAllApplications(
             Authentication authentication,
             @RequestParam(required = false) ApplicationStatus status,
+            @RequestParam(required = false) KvaStatus kvaStatus,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -69,11 +71,11 @@ public class AdminApplicationController {
         String role = authentication.getAuthorities().iterator().next().getAuthority();
         int validPage = Math.max(0, page);
         int validSize = Math.min(Math.max(1, size), 100);
-        log.info("Admin get all applications: userSeq={}, role={}, status={}, search={}, page={}, size={}",
-                userSeq, role, status, search, validPage, validSize);
+        log.info("Admin get all applications: userSeq={}, role={}, status={}, kvaStatus={}, search={}, page={}, size={}",
+                userSeq, role, status, kvaStatus, search, validPage, validSize);
         Pageable pageable = PageRequest.of(validPage, validSize);
         Page<AdminApplicationResponse> applications =
-                adminApplicationService.getAllApplications(status, search, pageable, userSeq, role);
+                adminApplicationService.getAllApplications(status, kvaStatus, search, pageable, userSeq, role);
         return ResponseEntity.ok(applications);
     }
 

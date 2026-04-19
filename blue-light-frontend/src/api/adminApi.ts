@@ -17,7 +17,9 @@ export {
   uploadSldComplete,
   confirmSld,
   unconfirmSld,
+  confirmKva,
 } from './adminApplicationApi';
+export type { ConfirmKvaPayload, ConfirmKvaResponse } from './adminApplicationApi';
 
 export {
   getAvailableLews,
