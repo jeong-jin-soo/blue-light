@@ -1,9 +1,13 @@
 package com.bluelight.backend.api.concierge;
 
+import com.bluelight.backend.api.application.ApplicationService;
+import com.bluelight.backend.api.application.dto.ApplicationResponse;
+import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.auth.AccountSetupTokenService;
 import com.bluelight.backend.api.concierge.dto.CancelRequest;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestDetail;
+import com.bluelight.backend.api.concierge.dto.CreateOnBehalfResponse;
 import com.bluelight.backend.api.concierge.dto.NoteAddRequest;
 import com.bluelight.backend.api.concierge.dto.NoteResponse;
 import com.bluelight.backend.api.concierge.dto.StatusTransitionRequest;
@@ -53,6 +57,7 @@ class ConciergeManagerServiceTest {
     private AccountSetupTokenService tokenService;
     private EmailService emailService;
     private AuditLogService auditLogService;
+    private com.bluelight.backend.api.application.ApplicationService applicationService;
     private ConciergeManagerService service;
 
     @BeforeEach
@@ -64,8 +69,10 @@ class ConciergeManagerServiceTest {
         tokenService = mock(AccountSetupTokenService.class);
         emailService = mock(EmailService.class);
         auditLogService = mock(AuditLogService.class);
+        applicationService = mock(com.bluelight.backend.api.application.ApplicationService.class);
 
         service = new ConciergeManagerService(
+            applicationService,
             conciergeRepository, noteRepository, userRepository,
             tokenRepository, tokenService, emailService, auditLogService);
         ReflectionTestUtils.setField(service, "setupBaseUrl", "http://localhost:5174");
@@ -570,6 +577,82 @@ class ConciergeManagerServiceTest {
                 BusinessException be = (BusinessException) e;
                 assertThat(be.getStatus()).isEqualTo(HttpStatus.CONFLICT);
                 assertThat(be.getCode()).isEqualTo("INVALID_TRANSITION");
+            });
+    }
+
+    // ============================================================
+    // createApplicationOnBehalf (PR#5 Stage A)
+    // ============================================================
+
+    @Test
+    @DisplayName("createApplicationOnBehalf - CONTACTING 상태 + 배정된 Manager → 성공 + APPLICATION_CREATED 전이")
+    void createOnBehalf_contactingState_success() {
+        User manager = makeUser(10L, UserRole.CONCIERGE_MANAGER, UserStatus.ACTIVE);
+        User applicant = makeUser(200L, UserRole.APPLICANT, UserStatus.PENDING_ACTIVATION);
+        ConciergeRequest cr = makeRequest(100L, applicant, manager);
+        cr.markContacted();
+        stubActor(manager);
+        when(conciergeRepository.findById(100L)).thenReturn(Optional.of(cr));
+
+        ApplicationResponse appResp = ApplicationResponse.builder()
+            .applicationSeq(777L)
+            .build();
+        when(applicationService.createOnBehalfOf(eq(200L), eq(100L), any(CreateApplicationRequest.class)))
+            .thenReturn(appResp);
+
+        CreateApplicationRequest req = new CreateApplicationRequest();
+
+        CreateOnBehalfResponse resp = service.createApplicationOnBehalf(100L, req, 10L, null);
+
+        assertThat(resp.getApplicationSeq()).isEqualTo(777L);
+        assertThat(resp.getConciergeRequestSeq()).isEqualTo(100L);
+        assertThat(resp.getConciergeStatus()).isEqualTo("APPLICATION_CREATED");
+        assertThat(cr.getStatus()).isEqualTo(ConciergeRequestStatus.APPLICATION_CREATED);
+        assertThat(cr.getApplicationSeq()).isEqualTo(777L);
+        verify(applicationService).createOnBehalfOf(eq(200L), eq(100L), any(CreateApplicationRequest.class));
+    }
+
+    @Test
+    @DisplayName("createApplicationOnBehalf - ASSIGNED 상태에서 호출 → 409 INVALID_STATE_FOR_APPLICATION")
+    void createOnBehalf_assignedState_conflicts() {
+        User manager = makeUser(10L, UserRole.CONCIERGE_MANAGER, UserStatus.ACTIVE);
+        User applicant = makeUser(200L, UserRole.APPLICANT, UserStatus.PENDING_ACTIVATION);
+        ConciergeRequest cr = makeRequest(100L, applicant, manager);
+        // ASSIGNED 상태 유지 (markContacted 호출 안 함)
+        stubActor(manager);
+        when(conciergeRepository.findById(100L)).thenReturn(Optional.of(cr));
+
+        CreateApplicationRequest req = new CreateApplicationRequest();
+
+        assertThatThrownBy(() -> service.createApplicationOnBehalf(100L, req, 10L, null))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> {
+                BusinessException be = (BusinessException) e;
+                assertThat(be.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                assertThat(be.getCode()).isEqualTo("INVALID_STATE_FOR_APPLICATION");
+            });
+        verify(applicationService, never()).createOnBehalfOf(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("createApplicationOnBehalf - 타 Manager → 403 CONCIERGE_NOT_ASSIGNED")
+    void createOnBehalf_otherManager_forbidden() {
+        User manager = makeUser(10L, UserRole.CONCIERGE_MANAGER, UserStatus.ACTIVE);
+        User otherManager = makeUser(11L, UserRole.CONCIERGE_MANAGER, UserStatus.ACTIVE);
+        User applicant = makeUser(200L, UserRole.APPLICANT, UserStatus.PENDING_ACTIVATION);
+        ConciergeRequest cr = makeRequest(100L, applicant, otherManager);
+        cr.markContacted();
+        stubActor(manager);
+        when(conciergeRepository.findById(100L)).thenReturn(Optional.of(cr));
+
+        CreateApplicationRequest req = new CreateApplicationRequest();
+
+        assertThatThrownBy(() -> service.createApplicationOnBehalf(100L, req, 10L, null))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> {
+                BusinessException be = (BusinessException) e;
+                assertThat(be.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+                assertThat(be.getCode()).isEqualTo("CONCIERGE_NOT_ASSIGNED");
             });
     }
 }

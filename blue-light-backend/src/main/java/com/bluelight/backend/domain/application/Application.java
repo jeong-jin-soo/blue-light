@@ -226,6 +226,20 @@ public class Application extends BaseEntity {
     @Column(name = "loa_signature_source_memo", length = 500, updatable = false)
     private String loaSignatureSourceMemo;
 
+    // ── Concierge 대리 생성 연결 (★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A) ──
+
+    /**
+     * Concierge Manager 대리 생성 시 연결된 ConciergeRequest seq.
+     * <ul>
+     *   <li>APPLICANT 직접 신청: {@code null}</li>
+     *   <li>CONCIERGE_MANAGER 대리 생성: {@code ConciergeRequest.seq}</li>
+     * </ul>
+     * {@code updatable=false} — INSERT 시 1회만 기록, 이후 변경 불가.
+     * FK 제약은 schema에 걸지 않음 (concierge_requests soft-delete와의 상호작용 회피).
+     */
+    @Column(name = "via_concierge_request_seq", updatable = false)
+    private Long viaConciergeRequestSeq;
+
     // ── LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) ──
     // 클래스 JavaDoc의 "LOA 스냅샷 컬럼 불변 정책" 참조.
 
@@ -322,7 +336,8 @@ public class Application extends BaseEntity {
                        String existingLicenceNo, String renewalReferenceNo,
                        LocalDate existingExpiryDate, Integer renewalPeriodMonths,
                        BigDecimal emaFee,
-                       KvaStatus kvaStatus, KvaSource kvaSource) {
+                       KvaStatus kvaStatus, KvaSource kvaSource,
+                       Long viaConciergeRequestSeq) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
@@ -344,6 +359,8 @@ public class Application extends BaseEntity {
         // Phase 5: kVA 상태 (기본값은 필드 초기화로 CONFIRMED — 하위호환)
         this.kvaStatus = kvaStatus != null ? kvaStatus : KvaStatus.CONFIRMED;
         this.kvaSource = kvaSource;
+        // ★ PR#5 Stage A: Concierge 대리 생성 연결 (null이면 APPLICANT 직접 신청)
+        this.viaConciergeRequestSeq = viaConciergeRequestSeq;
     }
 
     /**
@@ -597,5 +614,14 @@ public class Application extends BaseEntity {
             throw new IllegalStateException("LOA signature uploader already set");
         }
         this.loaSignatureUploadedBy = uploader;
+    }
+
+    // ── Concierge 대리 생성 판정 (★ PR#5 Stage A) ──
+
+    /**
+     * 이 신청이 Concierge Manager에 의한 대리 생성인지 여부.
+     */
+    public boolean isCreatedViaConcierge() {
+        return viaConciergeRequestSeq != null;
     }
 }

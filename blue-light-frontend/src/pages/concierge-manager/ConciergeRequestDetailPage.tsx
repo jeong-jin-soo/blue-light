@@ -15,6 +15,7 @@ import ConciergeTimeline from './sections/ConciergeTimeline';
 import ConciergeNotesPanel from './sections/ConciergeNotesPanel';
 import ConciergeAccountStatusPanel from './sections/ConciergeAccountStatusPanel';
 import ConciergeActionBar from './sections/ConciergeActionBar';
+import ConciergeCreateApplicationModal from './sections/ConciergeCreateApplicationModal';
 import conciergeManagerApi, {
   type ConciergeRequestDetail,
   type ConciergeStatus,
@@ -34,6 +35,8 @@ export default function ConciergeRequestDetailPage() {
   const [detail, setDetail] = useState<ConciergeRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // ★ PR#5 Stage B: Create Application 모달 상태
+  const [createAppOpen, setCreateAppOpen] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -214,6 +217,7 @@ export default function ConciergeRequestDetailPage() {
               detail={detail}
               onTransition={handleTransition}
               onCancel={handleCancel}
+              onCreateApplication={() => setCreateAppOpen(true)}
             />
           </Card>
 
@@ -223,6 +227,19 @@ export default function ConciergeRequestDetailPage() {
           </Card>
         </div>
       </div>
+
+      {/* ★ PR#5 Stage B: 대리 Application 생성 모달 */}
+      <ConciergeCreateApplicationModal
+        conciergeRequestSeq={detail.conciergeRequestSeq}
+        submitterName={detail.submitterName}
+        isOpen={createAppOpen}
+        onClose={() => setCreateAppOpen(false)}
+        onCreated={() => {
+          setCreateAppOpen(false);
+          // 상태/타임라인/applicationSeq 등 업데이트 반영
+          void reload();
+        }}
+      />
     </div>
   );
 }

@@ -109,6 +109,33 @@ export interface CancelPayload {
   reason: string;
 }
 
+// ── PR#5 Stage B: Application on-behalf 대리 생성 ──
+
+/**
+ * 대리 Application 생성 요청 페이로드.
+ * Backend {@code CreateApplicationRequest}와 일치. Phase 1 MVP 기준 최소 필드만 정의.
+ */
+export interface CreateApplicationPayload {
+  address: string;
+  postalCode: string;
+  buildingType?: string;
+  selectedKva: number;
+  applicantType: 'INDIVIDUAL' | 'CORPORATE';
+  /** 기본 'NEW'. RENEWAL은 original licence 필드가 추가 필요. */
+  applicationType?: 'NEW' | 'RENEWAL';
+  spAccountNo?: string;
+  /** 기본 'SELF_UPLOAD'. */
+  sldOption?: 'SELF_UPLOAD' | 'REQUEST_LEW';
+  kvaUnknown?: boolean;
+}
+
+export interface CreateOnBehalfResponse {
+  applicationSeq: number;
+  conciergeRequestSeq: number;
+  /** Concierge 전이 후 상태 (APPLICATION_CREATED) */
+  conciergeStatus: ConciergeStatus;
+}
+
 // ── API calls ──
 
 const base = '/concierge-manager/requests';
@@ -171,6 +198,22 @@ export const cancelConciergeRequest = async (
   return response.data;
 };
 
+/**
+ * 대리 Application 생성 (★ PR#5 Stage B).
+ * - CONTACTING 상태에서만 성공. 성공 시 ConciergeRequest는 APPLICATION_CREATED로 자동 전이.
+ * - 에러 코드: INVALID_STATE_FOR_APPLICATION (409), CONCIERGE_NOT_ASSIGNED (403), 기타 400/500.
+ */
+export const createApplicationOnBehalf = async (
+  id: number,
+  payload: CreateApplicationPayload
+): Promise<CreateOnBehalfResponse> => {
+  const response = await axiosClient.post<CreateOnBehalfResponse>(
+    `${base}/${id}/applications`,
+    payload
+  );
+  return response.data;
+};
+
 export const conciergeManagerApi = {
   list: listConciergeRequests,
   getDetail: getConciergeRequestDetail,
@@ -178,6 +221,7 @@ export const conciergeManagerApi = {
   addNote: addConciergeNote,
   resendSetupEmail: resendConciergeSetupEmail,
   cancel: cancelConciergeRequest,
+  createApplicationOnBehalf,
 };
 
 export default conciergeManagerApi;

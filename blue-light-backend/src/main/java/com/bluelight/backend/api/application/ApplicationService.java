@@ -231,6 +231,181 @@ public class ApplicationService {
     }
 
     /**
+     * Concierge Manager가 대리 생성하는 Application (★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A).
+     * <p>
+     * Owner = targetApplicant (Application.user). Actor(created_by)는 SecurityContext의
+     * AuditorAware에 의해 Manager로 자동 세팅된다. {@code viaConciergeRequestSeq}는
+     * {@code @Column(updatable=false)}라 INSERT 시점에 Builder로만 주입 가능.
+     * <p>
+     * 검증 로직은 {@link #createApplication}과 동일(JIT 회사 정보, kVA UNKNOWN 강제,
+     * MasterPrice 조회, RENEWAL 전용 검증 등). JIT 회사 정보는 Manager의 것이 아닌
+     * <b>target applicant</b>의 User 레코드에 적용된다.
+     * <p>
+     * ownership 검증(OwnershipValidator)은 {@code originalApplicationSeq}가 있을 때만 수행 —
+     * 이때 "원본 Application 소유자"가 target applicant와 일치해야 함.
+     *
+     * @param targetApplicantSeq     대리 생성 대상 신청자 seq (Application.user가 될 대상)
+     * @param conciergeRequestSeq    연결할 ConciergeRequest seq (via_concierge_request_seq에 기록)
+     * @param request                신청서 본문 (기존 CreateApplicationRequest 재사용)
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ApplicationResponse createOnBehalfOf(Long targetApplicantSeq,
+                                                 Long conciergeRequestSeq,
+                                                 CreateApplicationRequest request) {
+        // Target applicant 조회 (Manager가 대리 소유자로 지정하는 대상)
+        User user = userRepository.findById(targetApplicantSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Target applicant not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+
+        // 법인 JIT (target applicant 기준)
+        applyCorporateJitCompanyInfo(user, request);
+
+        // kVA UNKNOWN 분기 (applicant 경로와 동일)
+        boolean kvaUnknown = Boolean.TRUE.equals(request.getKvaUnknown());
+        if (kvaUnknown) {
+            request.setSelectedKva(55);
+        }
+
+        MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
+                .orElseThrow(() -> new BusinessException(
+                        "No price tier found for " + request.getSelectedKva() + " kVA",
+                        HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
+
+        SldOption sldOption = SldOption.SELF_UPLOAD;
+        if ("REQUEST_LEW".equals(request.getSldOption())) {
+            sldOption = SldOption.REQUEST_LEW;
+        }
+
+        BigDecimal sldFee = (sldOption == SldOption.REQUEST_LEW)
+                ? masterPrice.getSldPrice() : null;
+
+        ApplicationType appType = ApplicationType.NEW;
+        if ("RENEWAL".equals(request.getApplicationType())) {
+            appType = ApplicationType.RENEWAL;
+        }
+
+        Application originalApp = null;
+        String existingLicenceNo = null;
+        String renewalReferenceNo = request.getRenewalReferenceNo();
+        LocalDate existingExpiryDate = null;
+        Integer renewalPeriodMonths = null;
+        BigDecimal emaFee = null;
+
+        if (request.getRenewalPeriodMonths() != null) {
+            renewalPeriodMonths = request.getRenewalPeriodMonths();
+            if (renewalPeriodMonths != 3 && renewalPeriodMonths != 12) {
+                throw new BusinessException(
+                        "Licence period must be 3 or 12 months",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            emaFee = calculateEmaFee(appType, renewalPeriodMonths);
+        }
+
+        BigDecimal tierPrice = (appType == ApplicationType.RENEWAL)
+                ? masterPrice.getRenewalPrice()
+                : masterPrice.getPrice();
+        BigDecimal quoteAmount = tierPrice;
+        if (sldFee != null) {
+            quoteAmount = quoteAmount.add(sldFee);
+        }
+        if (emaFee != null) {
+            quoteAmount = quoteAmount.add(emaFee);
+        }
+
+        if (appType == ApplicationType.RENEWAL) {
+            if (renewalPeriodMonths == null) {
+                throw new BusinessException(
+                        "Licence period is required for renewal",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            if (renewalReferenceNo == null || renewalReferenceNo.isBlank()) {
+                throw new BusinessException(
+                        "Renewal reference number is required",
+                        HttpStatus.BAD_REQUEST, "RENEWAL_REF_REQUIRED");
+            }
+
+            if (request.getOriginalApplicationSeq() != null) {
+                originalApp = applicationRepository.findById(request.getOriginalApplicationSeq())
+                        .orElseThrow(() -> new BusinessException(
+                                "Original application not found",
+                                HttpStatus.NOT_FOUND, "ORIGINAL_APP_NOT_FOUND"));
+
+                // 원본 소유자 == target applicant 여야 함 (Manager가 타인 원본을 끌어쓸 수 없음)
+                OwnershipValidator.validateOwner(
+                    originalApp.getUser().getUserSeq(), targetApplicantSeq);
+
+                if (originalApp.getStatus() != ApplicationStatus.COMPLETED
+                        && originalApp.getStatus() != ApplicationStatus.EXPIRED) {
+                    throw new BusinessException(
+                            "Original application must be completed or expired for renewal",
+                            HttpStatus.BAD_REQUEST, "ORIGINAL_APP_NOT_ELIGIBLE");
+                }
+
+                existingLicenceNo = originalApp.getLicenseNumber();
+                existingExpiryDate = originalApp.getLicenseExpiryDate();
+            } else {
+                existingLicenceNo = request.getExistingLicenceNo();
+                if (request.getExistingExpiryDate() != null && !request.getExistingExpiryDate().isBlank()) {
+                    existingExpiryDate = LocalDate.parse(request.getExistingExpiryDate());
+                }
+            }
+        }
+
+        // Application 빌드 — ★ PR#5 Stage A: viaConciergeRequestSeq 주입
+        Application application = Application.builder()
+                .user(user)
+                .address(request.getAddress())
+                .postalCode(request.getPostalCode())
+                .buildingType(request.getBuildingType())
+                .selectedKva(request.getSelectedKva())
+                .quoteAmount(quoteAmount)
+                .sldFee(sldFee)
+                .spAccountNo(request.getSpAccountNo())
+                .sldOption(sldOption)
+                .applicationType(appType)
+                .applicantType(request.getApplicantType())
+                .originalApplication(originalApp)
+                .existingLicenceNo(existingLicenceNo)
+                .renewalReferenceNo(renewalReferenceNo)
+                .existingExpiryDate(existingExpiryDate)
+                .renewalPeriodMonths(renewalPeriodMonths)
+                .emaFee(emaFee)
+                .kvaStatus(kvaUnknown
+                        ? com.bluelight.backend.domain.application.KvaStatus.UNKNOWN
+                        : com.bluelight.backend.domain.application.KvaStatus.CONFIRMED)
+                .kvaSource(kvaUnknown
+                        ? null
+                        : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)
+                .viaConciergeRequestSeq(conciergeRequestSeq)
+                .build();
+
+        // 승인된 LEW 자동 할당 (applicant 경로와 동일)
+        List<User> approvedLews = userRepository.findByRoleAndApprovedStatus(
+                UserRole.LEW, ApprovalStatus.APPROVED);
+        if (approvedLews.size() == 1) {
+            application.assignLew(approvedLews.get(0));
+            log.info("LEW auto-assigned on-behalf: lewSeq={}", approvedLews.get(0).getUserSeq());
+        }
+
+        Application saved = applicationRepository.save(application);
+        log.info("Application created ON-BEHALF: seq={}, targetApplicantSeq={}, conciergeRequestSeq={}, type={}, kva={}, amount={}",
+                saved.getApplicationSeq(), targetApplicantSeq, conciergeRequestSeq, appType,
+                request.getSelectedKva(), quoteAmount);
+
+        // SLD 요청 자동 생성 (applicant 경로와 동일)
+        if (sldOption == SldOption.REQUEST_LEW) {
+            SldRequest sldRequest = SldRequest.builder()
+                    .application(saved)
+                    .applicantNote(null)
+                    .build();
+            sldRequestRepository.save(sldRequest);
+            log.info("SLD request auto-created on-behalf: applicationSeq={}", saved.getApplicationSeq());
+        }
+
+        return ApplicationResponse.from(saved);
+    }
+
+    /**
      * Update and resubmit application (after revision request)
      */
     @Transactional

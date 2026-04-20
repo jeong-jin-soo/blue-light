@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS applications (
     loa_signature_uploaded_by  BIGINT,
     loa_signature_uploaded_at  DATETIME(6),
     loa_signature_source_memo  VARCHAR(500),
+    -- ★ Kaki Concierge v1.5, Phase 1 PR#5 Stage A — Concierge 대리 생성 연결
+    via_concierge_request_seq  BIGINT,
     -- LOA 스냅샷 컬럼 (Phase 2 PR#4 / Security B-5) — UPDATE 금지, 엔티티 @Column(updatable=false)로 강제
     -- 신청 생성 시점에는 null, LOA 생성(recordLoaSnapshot) 시점에 기록됨
     applicant_name_snapshot  VARCHAR(100)  NULL,
@@ -102,6 +104,8 @@ CREATE TABLE IF NOT EXISTS applications (
     KEY idx_applications_assigned_lew (assigned_lew_seq),
     KEY idx_applications_type (application_type),
     KEY idx_applications_kva_status (kva_status),
+    -- ★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A
+    KEY idx_applications_concierge (via_concierge_request_seq),
     CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_applications_assigned_lew FOREIGN KEY (assigned_lew_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_applications_original FOREIGN KEY (original_application_seq) REFERENCES applications (application_seq),

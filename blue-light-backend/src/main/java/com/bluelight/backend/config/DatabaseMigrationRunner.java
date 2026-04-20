@@ -47,6 +47,8 @@ public class DatabaseMigrationRunner {
             migrateUserConsentLogsTable(conn);
             // ★ Kaki Concierge Phase 1 PR#1 Stage 3
             migrateApplicationsLoaSignatureSource(conn);
+            // ★ Kaki Concierge Phase 1 PR#5 Stage A
+            migrateApplicationsViaConciergeColumn(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -559,6 +561,39 @@ public class DatabaseMigrationRunner {
                 log.info("Migration [applications-loa-signature-source]: added FK fk_applications_loa_uploader");
             } catch (SQLException e) {
                 log.debug("Migration [applications-loa-signature-source]: FK fk_applications_loa_uploader already exists, skipping");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: applications 테이블에 Concierge 대리 생성 연결 컬럼 추가
+     * (★ Kaki Concierge v1.5, Phase 1 PR#5 Stage A)
+     * <p>
+     * Manager가 대리 생성한 Application은 {@code via_concierge_request_seq}에 해당
+     * ConciergeRequest.seq를 기록. APPLICANT 직접 신청은 null. FK는 걸지 않음
+     * (concierge_requests soft-delete와 상호작용 회피, 인덱스만).
+     */
+    private void migrateApplicationsViaConciergeColumn(Connection conn) throws SQLException {
+        if (columnExists(conn, "applications", "via_concierge_request_seq")) {
+            log.debug("Migration [applications-via-concierge]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [applications-via-concierge]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN via_concierge_request_seq BIGINT " +
+                "AFTER loa_signature_source_memo"
+            );
+            log.info("Migration [applications-via-concierge]: added via_concierge_request_seq column");
+
+            try {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_applications_concierge ON applications (via_concierge_request_seq)"
+                );
+                log.info("Migration [applications-via-concierge]: created idx_applications_concierge");
+            } catch (SQLException e) {
+                log.debug("Migration [applications-via-concierge]: idx_applications_concierge already exists, skipping");
             }
         }
     }

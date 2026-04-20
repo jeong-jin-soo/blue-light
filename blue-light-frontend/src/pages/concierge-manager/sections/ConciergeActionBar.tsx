@@ -17,36 +17,43 @@ interface Props {
   detail: ConciergeRequestDetail;
   onTransition: (nextStatus: ConciergeStatus) => Promise<void>;
   onCancel: (reason: string) => Promise<void>;
+  /** CONTACTING 상태에서 "Create application on behalf" 클릭 시 호출 (★ PR#5 Stage B) */
+  onCreateApplication?: () => void;
   disabled?: boolean;
 }
 
+type ActionKind = 'transition' | 'createApplication' | 'blocked';
+
 interface ActionDef {
   label: string;
-  nextStatus: ConciergeStatus | null; // null means blocked with tooltip
+  kind: ActionKind;
+  /** kind='transition'인 경우의 target status */
+  nextStatus?: ConciergeStatus;
+  /** kind='blocked'인 경우의 툴팁 안내 */
   disabledReason?: string;
 }
 
 function actionsFor(status: ConciergeStatus): ActionDef[] {
   switch (status) {
     case 'SUBMITTED':
-      return [{ label: 'Assign to me', nextStatus: 'ASSIGNED' }];
+      return [{ label: 'Assign to me', kind: 'transition', nextStatus: 'ASSIGNED' }];
     case 'ASSIGNED':
-      return [{ label: 'Mark as contacting', nextStatus: 'CONTACTING' }];
+      return [{ label: 'Mark as contacting', kind: 'transition', nextStatus: 'CONTACTING' }];
     case 'CONTACTING':
+      // ★ PR#5 Stage B: 활성화 — onCreateApplication 핸들러 연결
       return [
         {
           label: 'Create application on behalf',
-          nextStatus: null,
-          disabledReason: 'Coming in Phase 1 PR#5 — use the on-behalf application form.',
+          kind: 'createApplication',
         },
       ];
     case 'APPLICATION_CREATED':
-      return [{ label: 'Request LOA signing', nextStatus: 'AWAITING_APPLICANT_LOA_SIGN' }];
+      return [{ label: 'Request LOA signing', kind: 'transition', nextStatus: 'AWAITING_APPLICANT_LOA_SIGN' }];
     case 'AWAITING_APPLICANT_LOA_SIGN':
       return [
         {
           label: 'Awaiting applicant LOA signature',
-          nextStatus: null,
+          kind: 'blocked',
           disabledReason: 'Applicant must sign the LOA before continuing.',
         },
       ];
@@ -54,19 +61,19 @@ function actionsFor(status: ConciergeStatus): ActionDef[] {
       return [
         {
           label: 'Awaiting applicant payment',
-          nextStatus: null,
+          kind: 'blocked',
           disabledReason: 'Applicant must pay the licence fee before continuing.',
         },
       ];
     case 'IN_PROGRESS':
-      return [{ label: 'Mark completed', nextStatus: 'COMPLETED' }];
+      return [{ label: 'Mark completed', kind: 'transition', nextStatus: 'COMPLETED' }];
     case 'COMPLETED':
     case 'CANCELLED':
       return [];
   }
 }
 
-export function ConciergeActionBar({ detail, onTransition, onCancel, disabled }: Props) {
+export function ConciergeActionBar({ detail, onTransition, onCancel, onCreateApplication, disabled }: Props) {
   const [transitioning, setTransitioning] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
@@ -131,19 +138,53 @@ export function ConciergeActionBar({ detail, onTransition, onCancel, disabled }:
       )}
 
       <div className="flex flex-wrap gap-2">
-        {actions.map((a) => (
-          <Button
-            key={a.label}
-            variant={a.nextStatus ? 'concierge' : 'outline'}
-            size="sm"
-            onClick={a.nextStatus ? () => handleTransition(a.nextStatus!) : undefined}
-            disabled={disabled || transitioning || !a.nextStatus}
-            loading={transitioning && a.nextStatus !== null}
-            title={a.disabledReason}
-          >
-            {a.label}
-          </Button>
-        ))}
+        {actions.map((a) => {
+          if (a.kind === 'transition' && a.nextStatus) {
+            const next = a.nextStatus;
+            return (
+              <Button
+                key={a.label}
+                variant="concierge"
+                size="sm"
+                onClick={() => handleTransition(next)}
+                disabled={disabled || transitioning}
+                loading={transitioning}
+              >
+                {a.label}
+              </Button>
+            );
+          }
+          if (a.kind === 'createApplication') {
+            return (
+              <Button
+                key={a.label}
+                variant="concierge"
+                size="sm"
+                onClick={() => onCreateApplication?.()}
+                disabled={disabled || transitioning || !onCreateApplication}
+                title={
+                  !onCreateApplication
+                    ? 'Create application handler not provided'
+                    : undefined
+                }
+              >
+                {a.label}
+              </Button>
+            );
+          }
+          // kind='blocked'
+          return (
+            <Button
+              key={a.label}
+              variant="outline"
+              size="sm"
+              disabled
+              title={a.disabledReason}
+            >
+              {a.label}
+            </Button>
+          );
+        })}
 
         {!isTerminal && (
           <Button

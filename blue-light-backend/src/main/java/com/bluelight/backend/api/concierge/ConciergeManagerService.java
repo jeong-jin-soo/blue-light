@@ -1,11 +1,15 @@
 package com.bluelight.backend.api.concierge;
 
+import com.bluelight.backend.api.application.ApplicationService;
+import com.bluelight.backend.api.application.dto.ApplicationResponse;
+import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.auth.AccountSetupTokenService;
 import com.bluelight.backend.api.concierge.dto.ApplicantStatusInfo;
 import com.bluelight.backend.api.concierge.dto.CancelRequest;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestDetail;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
+import com.bluelight.backend.api.concierge.dto.CreateOnBehalfResponse;
 import com.bluelight.backend.api.concierge.dto.NoteAddRequest;
 import com.bluelight.backend.api.concierge.dto.NoteResponse;
 import com.bluelight.backend.api.concierge.dto.StatusTransitionRequest;
@@ -57,6 +61,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ConciergeManagerService {
 
+    private final ApplicationService applicationService;
     private final ConciergeRequestRepository conciergeRepository;
     private final ConciergeNoteRepository noteRepository;
     private final UserRepository userRepository;
@@ -328,6 +333,69 @@ public class ConciergeManagerService {
         List<ConciergeNote> notes = noteRepository
             .findAllByConciergeRequest_ConciergeRequestSeqOrderByCreatedAtDesc(id);
         return toDetail(cr, notes);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // 대리 Application 생성 (★ Phase 1 PR#5 Stage A)
+    // ────────────────────────────────────────────────────────────
+
+    /**
+     * Concierge Manager가 대리 Application을 생성한다.
+     * <p>
+     * 전이 요건: ConciergeRequest.status = CONTACTING (첫 노트로 자동 전이 이후만 허용).
+     * 성공 시 ConciergeRequest.status = APPLICATION_CREATED로 자동 전이 + applicationSeq 연결.
+     * Application.viaConciergeRequestSeq = conciergeRequestSeq 기록.
+     *
+     * @param conciergeRequestId 대상 ConciergeRequest seq
+     * @param appRequest         신청서 본문 (기존 CreateApplicationRequest 재사용)
+     * @param managerSeq         Manager userSeq (감사 로그 actor)
+     */
+    @Transactional
+    public CreateOnBehalfResponse createApplicationOnBehalf(
+            Long conciergeRequestId, CreateApplicationRequest appRequest,
+            Long managerSeq, HttpServletRequest httpRequest) {
+        User actor = loadActor(managerSeq);
+        ConciergeRequest cr = loadRequest(conciergeRequestId);
+        ConciergeOwnershipValidator.assertManagerCanAccess(cr, actor);
+
+        // CONTACTING 상태에서만 대리 생성 허용 (PRD §5.2: CONTACTING → APPLICATION_CREATED)
+        if (cr.getStatus() != ConciergeRequestStatus.CONTACTING) {
+            throw new BusinessException(
+                "Application can only be created after first contact is recorded "
+                    + "(requires status=CONTACTING; current status=" + cr.getStatus() + ")",
+                HttpStatus.CONFLICT, "INVALID_STATE_FOR_APPLICATION");
+        }
+
+        User applicant = cr.getApplicantUser();
+        if (applicant == null) {
+            // 이론상 도달 불가 (ConciergeRequest.applicantUser는 nullable=false)
+            throw new BusinessException("Applicant user missing for concierge request",
+                HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL");
+        }
+
+        // 1. Application 대리 생성 — owner=applicant, viaConciergeRequestSeq=cr.seq
+        ApplicationResponse created = applicationService.createOnBehalfOf(
+            applicant.getUserSeq(), cr.getConciergeRequestSeq(), appRequest);
+
+        // 2. ConciergeRequest 자동 전이 CONTACTING → APPLICATION_CREATED + applicationSeq 세팅
+        invokeDomain(() -> cr.linkApplication(created.getApplicationSeq()));
+
+        // 3. 감사 로그 — Actor는 Manager, Subject는 Applicant, Entity는 Application
+        auditLogService.log(
+            actor.getUserSeq(), actor.getEmail(), actor.getRole().name(),
+            AuditAction.APPLICATION_CREATED_ON_BEHALF, AuditCategory.APPLICATION,
+            "application", created.getApplicationSeq().toString(),
+            "Application created on behalf of applicant " + applicant.getUserSeq()
+                + " via concierge " + cr.getPublicCode(),
+            null, null,
+            extractIp(httpRequest), userAgent(httpRequest),
+            "POST", "/api/concierge-manager/requests/{id}/applications", 201);
+
+        return CreateOnBehalfResponse.builder()
+            .applicationSeq(created.getApplicationSeq())
+            .conciergeRequestSeq(cr.getConciergeRequestSeq())
+            .conciergeStatus(cr.getStatus().name())
+            .build();
     }
 
     // ────────────────────────────────────────────────────────────

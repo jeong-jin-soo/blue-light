@@ -1,8 +1,10 @@
 package com.bluelight.backend.api.concierge;
 
+import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.concierge.dto.CancelRequest;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestDetail;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
+import com.bluelight.backend.api.concierge.dto.CreateOnBehalfResponse;
 import com.bluelight.backend.api.concierge.dto.NoteAddRequest;
 import com.bluelight.backend.api.concierge.dto.NoteResponse;
 import com.bluelight.backend.api.concierge.dto.StatusTransitionRequest;
@@ -118,6 +120,26 @@ public class ConciergeManagerController {
         Long userSeq = (Long) authentication.getPrincipal();
         managerService.resendSetupEmail(id, userSeq, httpRequest);
         return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * 대리 Application 생성 (★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A).
+     * CONTACTING 상태에서만 허용. 성공 시 ConciergeRequest는 APPLICATION_CREATED로 자동 전이.
+     * POST /api/concierge-manager/requests/{id}/applications
+     * body: CreateApplicationRequest (applicant 경로와 동일 스키마)
+     */
+    @PostMapping("/{id}/applications")
+    public ResponseEntity<CreateOnBehalfResponse> createApplicationOnBehalf(
+        Authentication authentication,
+        @PathVariable Long id,
+        @Valid @RequestBody CreateApplicationRequest request,
+        HttpServletRequest httpRequest) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Concierge on-behalf application: conciergeRequestSeq={}, managerSeq={}",
+            id, userSeq);
+        CreateOnBehalfResponse result = managerService.createApplicationOnBehalf(
+            id, request, userSeq, httpRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     /**
