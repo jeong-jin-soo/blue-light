@@ -37,7 +37,11 @@ class AdminApplicationServiceKvaGuardTest {
         applicationRepository = mock(ApplicationRepository.class);
         userRepository = mock(UserRepository.class);
         emailService = mock(EmailService.class);
-        service = new AdminApplicationService(applicationRepository, userRepository, emailService);
+        // ★ PR#7: ApplicationEventPublisher mock 추가
+        org.springframework.context.ApplicationEventPublisher eventPublisher =
+            mock(org.springframework.context.ApplicationEventPublisher.class);
+        service = new AdminApplicationService(
+            applicationRepository, userRepository, emailService, eventPublisher);
     }
 
     @Test

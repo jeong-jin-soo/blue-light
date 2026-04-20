@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.PaymentConfirmRequest;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
+import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -15,6 +16,7 @@ import com.bluelight.backend.domain.payment.PaymentStatus;
 import com.bluelight.backend.domain.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,8 @@ public class AdminPaymentService {
     private final PaymentRepository paymentRepository;
     private final EmailService emailService;
     private final NotificationService notificationService;
+    /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Confirm offline payment (creates Payment record + changes status to PAID)
@@ -66,7 +70,15 @@ public class AdminPaymentService {
         Payment savedPayment = paymentRepository.save(payment);
 
         // Update application status
+        ApplicationStatus previousStatus = application.getStatus();
         application.markAsPaid();
+
+        // ★ Phase 1 PR#7: ConciergeRequest 자동 동기화 트리거
+        eventPublisher.publishEvent(new ApplicationStatusChangedEvent(
+            applicationSeq,
+            application.getViaConciergeRequestSeq(),
+            previousStatus,
+            application.getStatus()));
 
         log.info("Payment confirmed: applicationSeq={}, paymentSeq={}, amount={}",
                 applicationSeq, savedPayment.getPaymentSeq(), savedPayment.getAmount());

@@ -49,6 +49,8 @@ public class DatabaseMigrationRunner {
             migrateApplicationsLoaSignatureSource(conn);
             // ★ Kaki Concierge Phase 1 PR#5 Stage A
             migrateApplicationsViaConciergeColumn(conn);
+            // ★ Kaki Concierge Phase 1 PR#7
+            migratePaymentsReferenceColumns(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -594,6 +596,71 @@ public class DatabaseMigrationRunner {
                 log.info("Migration [applications-via-concierge]: created idx_applications_concierge");
             } catch (SQLException e) {
                 log.debug("Migration [applications-via-concierge]: idx_applications_concierge already exists, skipping");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: payments 테이블에 reference_type/reference_seq 컬럼 추가 + application_seq nullable 전환
+     * (★ Kaki Concierge v1.5, Phase 1 PR#7)
+     * <p>
+     * 전환 순서 (안전성 우선):
+     * <ol>
+     *   <li>reference_type, reference_seq 컬럼 추가 (nullable)</li>
+     *   <li>기존 데이터 backfill: reference_type='APPLICATION', reference_seq=application_seq</li>
+     *   <li>NOT NULL 제약 전환</li>
+     *   <li>application_seq를 nullable로 완화 (Phase 2에서 CONCIERGE_REQUEST 결제는 NULL)</li>
+     *   <li>복합 인덱스 idx_payment_reference 생성</li>
+     * </ol>
+     */
+    private void migratePaymentsReferenceColumns(Connection conn) throws SQLException {
+        if (columnExists(conn, "payments", "reference_type")) {
+            log.debug("Migration [payments-reference]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [payments-reference]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            // 1. 컬럼 2종 추가 (우선 nullable)
+            stmt.executeUpdate(
+                "ALTER TABLE payments ADD COLUMN reference_type VARCHAR(30) " +
+                "DEFAULT 'APPLICATION' AFTER application_seq"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE payments ADD COLUMN reference_seq BIGINT AFTER reference_type"
+            );
+            log.info("Migration [payments-reference]: added reference_type, reference_seq columns");
+
+            // 2. Backfill: 기존 Payment는 모두 APPLICATION 결제
+            int updated = stmt.executeUpdate(
+                "UPDATE payments " +
+                "SET reference_type = 'APPLICATION', reference_seq = application_seq " +
+                "WHERE reference_seq IS NULL AND application_seq IS NOT NULL"
+            );
+            log.info("Migration [payments-reference]: backfilled {} existing payment rows", updated);
+
+            // 3. NOT NULL 제약 강화
+            stmt.executeUpdate(
+                "ALTER TABLE payments MODIFY COLUMN reference_type VARCHAR(30) NOT NULL"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE payments MODIFY COLUMN reference_seq BIGINT NOT NULL"
+            );
+
+            // 4. application_seq nullable 전환 (Phase 2 CONCIERGE_REQUEST 결제 대비)
+            stmt.executeUpdate(
+                "ALTER TABLE payments MODIFY COLUMN application_seq BIGINT"
+            );
+            log.info("Migration [payments-reference]: relaxed application_seq to nullable");
+
+            // 5. 복합 인덱스 (이미 존재 시 무시)
+            try {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_payment_reference ON payments (reference_type, reference_seq)"
+                );
+                log.info("Migration [payments-reference]: created idx_payment_reference");
+            } catch (SQLException e) {
+                log.debug("Migration [payments-reference]: idx_payment_reference already exists, skipping");
             }
         }
     }

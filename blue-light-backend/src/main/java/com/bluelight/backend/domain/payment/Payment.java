@@ -34,11 +34,27 @@ public class Payment {
     private Long paymentSeq;
 
     /**
-     * 관련 신청 (FK)
+     * 관련 신청 (FK). ★ PR#7: nullable 전환 — 향후 CONCIERGE_REQUEST 결제는 application=null.
+     * 레거시 조회 편의를 위해 필드 자체는 보존한다.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "application_seq", nullable = false)
+    @JoinColumn(name = "application_seq")
     private Application application;
+
+    /**
+     * 다형 참조 유형 (★ PR#7, PRD §3.8).
+     * APPLICATION / CONCIERGE_REQUEST / SLD_ORDER 중 하나.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "reference_type", nullable = false, length = 30)
+    private PaymentReferenceType referenceType;
+
+    /**
+     * 다형 참조 대상 엔티티의 PK (★ PR#7).
+     * referenceType에 따라 application.seq / conciergeRequest.seq / sldOrder.seq.
+     */
+    @Column(name = "reference_seq", nullable = false)
+    private Long referenceSeq;
 
     /**
      * PG사 거래 ID
@@ -97,15 +113,39 @@ public class Payment {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    /**
+     * ★ PR#7: referenceType/referenceSeq 명시 주입 또는 application으로부터 자동 추론.
+     * <p>
+     * 호환성 규칙:
+     * <ul>
+     *   <li>referenceType + referenceSeq 둘 다 주어지면 그대로 사용 (Phase 2 CONCIERGE_REQUEST 결제용)</li>
+     *   <li>그 외에 application이 주어지면 {@code APPLICATION} + application.applicationSeq 자동 설정
+     *       (기존 호출처 호환)</li>
+     *   <li>둘 다 없으면 IllegalArgumentException</li>
+     * </ul>
+     */
     @Builder
     public Payment(Application application, String transactionId, BigDecimal amount,
-                   String paymentMethod, PaymentStatus status) {
+                   String paymentMethod, PaymentStatus status,
+                   PaymentReferenceType referenceType, Long referenceSeq) {
         this.application = application;
         this.transactionId = transactionId;
         this.amount = amount;
         this.paymentMethod = paymentMethod != null ? paymentMethod : "CARD";
         this.status = status != null ? status : PaymentStatus.SUCCESS;
         this.paidAt = LocalDateTime.now();
+
+        // ★ PR#7: referenceType/referenceSeq 자동 추론 로직
+        if (referenceType != null && referenceSeq != null) {
+            this.referenceType = referenceType;
+            this.referenceSeq = referenceSeq;
+        } else if (application != null && application.getApplicationSeq() != null) {
+            this.referenceType = PaymentReferenceType.APPLICATION;
+            this.referenceSeq = application.getApplicationSeq();
+        } else {
+            throw new IllegalArgumentException(
+                "Payment requires either (application with seq) or (referenceType + referenceSeq)");
+        }
     }
 
     /**
@@ -143,6 +183,16 @@ public class Payment {
      */
     public boolean isDeleted() {
         return this.deletedAt != null;
+    }
+
+    /**
+     * ★ PR#7: 이 결제가 특정 (type, seq) 쌍을 참조하는지 확인.
+     * 권한 분기(§8.4b)에서 {@code APPLICATION}/{@code CONCIERGE_REQUEST} 소유권 체크에 사용.
+     */
+    public boolean isLinkedTo(PaymentReferenceType type, Long seq) {
+        return this.referenceType == type
+            && this.referenceSeq != null
+            && this.referenceSeq.equals(seq);
     }
 
     @PrePersist

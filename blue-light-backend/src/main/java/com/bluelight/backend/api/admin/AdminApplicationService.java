@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
+import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.*;
@@ -9,6 +10,7 @@ import com.bluelight.backend.domain.user.UserRepository;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -34,6 +36,8 @@ public class AdminApplicationService {
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Get admin dashboard summary (역할별 범위 분리)
@@ -222,9 +226,17 @@ public class AdminApplicationService {
         // Validate status transition
         validateStatusTransition(application.getStatus(), request.getStatus());
 
+        ApplicationStatus previousStatus = application.getStatus();
         application.changeStatus(request.getStatus());
         log.info("Application status updated: applicationSeq={}, oldStatus={}, newStatus={}",
-                applicationSeq, application.getStatus(), request.getStatus());
+                applicationSeq, previousStatus, request.getStatus());
+
+        // ★ Phase 1 PR#7: ConciergeRequest 자동 동기화 트리거
+        eventPublisher.publishEvent(new ApplicationStatusChangedEvent(
+            applicationSeq,
+            application.getViaConciergeRequestSeq(),
+            previousStatus,
+            application.getStatus()));
 
         return AdminApplicationResponse.from(application);
     }
@@ -244,10 +256,18 @@ public class AdminApplicationService {
             );
         }
 
+        ApplicationStatus previousStatus = application.getStatus();
         application.issueLicense(request.getLicenseNumber(), request.getLicenseExpiryDate());
 
         log.info("Application completed: applicationSeq={}, licenseNumber={}, expiryDate={}",
                 applicationSeq, request.getLicenseNumber(), request.getLicenseExpiryDate());
+
+        // ★ Phase 1 PR#7: ConciergeRequest 자동 동기화 트리거 (IN_PROGRESS → COMPLETED)
+        eventPublisher.publishEvent(new ApplicationStatusChangedEvent(
+            applicationSeq,
+            application.getViaConciergeRequestSeq(),
+            previousStatus,
+            application.getStatus()));
 
         // 신청자에게 면허 발급 완료 이메일 발송
         User applicant = application.getUser();

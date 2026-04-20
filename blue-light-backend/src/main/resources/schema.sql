@@ -124,11 +124,16 @@ CREATE TABLE IF NOT EXISTS applications (
 -- 3. 결제 로그
 CREATE TABLE IF NOT EXISTS payments (
     payment_seq    BIGINT        NOT NULL AUTO_INCREMENT,
-    application_seq BIGINT       NOT NULL,
+    -- ★ Kaki Concierge v1.5 Phase 1 PR#7: application_seq는 nullable로 완화
+    -- (향후 CONCIERGE_REQUEST 결제는 application=null). 레거시 조회 편의를 위해 컬럼 보존.
+    application_seq BIGINT,
     transaction_id VARCHAR(100),
     amount         DECIMAL(10,2) NOT NULL,
     payment_method VARCHAR(20)   DEFAULT 'CARD',
     status         VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
+    -- ★ PR#7: 다형 참조 (APPLICATION / CONCIERGE_REQUEST / SLD_ORDER)
+    reference_type VARCHAR(30)   NOT NULL DEFAULT 'APPLICATION',
+    reference_seq  BIGINT        NOT NULL,
     paid_at        DATETIME(6),
     updated_at     DATETIME(6),
     created_by     BIGINT,
@@ -136,6 +141,8 @@ CREATE TABLE IF NOT EXISTS payments (
     deleted_at     DATETIME(6),
     PRIMARY KEY (payment_seq),
     KEY idx_payments_application_seq (application_seq),
+    -- ★ PR#7: 다형 참조 조회 인덱스
+    KEY idx_payment_reference (reference_type, reference_seq),
     CONSTRAINT fk_payments_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
