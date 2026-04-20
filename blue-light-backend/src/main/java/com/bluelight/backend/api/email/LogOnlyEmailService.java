@@ -219,4 +219,18 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Applicant: {} <{}>", applicantName, applicantEmail);
         log.info("==================================================");
     }
+
+    @Override
+    public void sendConciergeLoaUploadConfirmEmail(String to, String applicantName,
+                                                    String managerName, Long applicationSeq,
+                                                    String memo) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge LOA Upload Confirm (N5-UploadConfirm) Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Applicant: {}", applicantName);
+        log.info("  Manager: {}", managerName);
+        log.info("  Application: #{}", applicationSeq);
+        log.info("  Memo: {}", memo == null ? "(none)" : memo);
+        log.info("==================================================");
+    }
 }

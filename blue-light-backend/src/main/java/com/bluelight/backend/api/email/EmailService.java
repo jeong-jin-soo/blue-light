@@ -189,4 +189,17 @@ public interface EmailService {
      */
     void sendConciergeStaffNewRequestEmail(String to, String staffName, String publicCode,
                                             String applicantName, String applicantEmail);
+
+    /**
+     * N5-UploadConfirm: Manager가 LOA 서명 파일을 대리 업로드한 후 신청자에게 확인 이메일.
+     * 7일 이의 제기 창구 안내 (PRD v1.5 §6.4-3, AC-22b, O-15).
+     *
+     * @param to             신청자 이메일
+     * @param applicantName  신청자 이름
+     * @param managerName    업로드를 수행한 Manager 이름
+     * @param applicationSeq 신청서 번호
+     * @param memo           Manager 수령 경로 메모 (nullable — 없으면 메모 섹션 미노출)
+     */
+    void sendConciergeLoaUploadConfirmEmail(String to, String applicantName, String managerName,
+                                             Long applicationSeq, String memo);
 }

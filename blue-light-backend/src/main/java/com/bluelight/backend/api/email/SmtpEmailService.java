@@ -1031,4 +1031,82 @@ public class SmtpEmailService implements EmailService {
                 </html>
                 """.formatted(name, code, aName, aEmail, dashboardUrl);
     }
+
+    // ── N5-UploadConfirm: Manager 대리 서명 업로드 확인 이메일 (PR#6 Stage A) ──
+
+    @Override
+    @Async
+    public void sendConciergeLoaUploadConfirmEmail(String to, String applicantName,
+                                                    String managerName, Long applicationSeq,
+                                                    String memo) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject(
+                "[LicenseKaki] Confirmation: Your LOA signature was uploaded by your Concierge Manager");
+
+            String htmlContent = buildConciergeLoaUploadConfirmHtml(
+                applicantName, managerName, applicationSeq, memo);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N5-UploadConfirm email sent to: {} (applicationSeq={})",
+                to, applicationSeq);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N5-UploadConfirm email to: {}", to, e);
+        }
+    }
+
+    /**
+     * N5-UploadConfirm 본문 — 신청자에게 Manager 업로드 사실 통보 + 7일 이의 제기 창구.
+     * 모든 사용자/매니저 입력은 esc()로 XSS 방어.
+     */
+    private String buildConciergeLoaUploadConfirmHtml(String applicantName, String managerName,
+                                                       Long applicationSeq, String memo) {
+        String aName = esc(applicantName);
+        String mName = esc(managerName);
+        String appLink = HtmlUtils.htmlEscape(appBaseUrl + "/applications/" + applicationSeq);
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+        String memoBlock = (memo != null && !memo.isBlank())
+            ? ("<p style=\"margin:12px 0 0 0;padding:10px 12px;background:#f3f4f6;border-left:3px solid #1a3a5c;color:#374151;font-size:13px;\">"
+                + "<strong>Manager note:</strong> " + esc(memo) + "</p>")
+            : "";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">LOA signature uploaded</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Your Concierge Manager <strong>%s</strong> has uploaded your LOA
+                         signature file to application <strong>#%d</strong> on your behalf.
+                         This confirms that we registered the signature you provided during your
+                         consultation.</p>
+                      %s
+                      <p style="margin-top:20px;padding:12px 14px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;color:#92400e;font-size:14px;">
+                        <strong>Please verify within 7 days.</strong> If this signature is not
+                        the one you provided, please notify us immediately at
+                        <a href="%s" style="color:#92400e;text-decoration:underline;">support@licensekaki.sg</a>.
+                        If we don't hear from you within 7 days, we will treat the uploaded
+                        signature as your confirmed signature.
+                      </p>
+                      <p style="text-align:center;margin:28px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Review application</a>
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(aName, mName, applicationSeq, memoBlock, supportMail, appLink);
+    }
 }

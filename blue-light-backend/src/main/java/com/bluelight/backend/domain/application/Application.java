@@ -197,33 +197,36 @@ public class Application extends BaseEntity {
     private LocalDateTime loaSignedAt;
 
     // ── LOA 서명 출처 (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3) ──
-    // PRD §3.4a / §7.2.1-LOA 3-경로 모델 — 기존 스냅샷 컬럼과 동일하게 updatable=false로 불변 보장
+    // PRD §3.4a / §7.2.1-LOA 3-경로 모델.
+    // 주의: updatable=false는 INSERT 시점에만 세팅 가능한 컬럼에 적용.
+    // 서명은 Application 생성 후 별도 시점에 발생하므로 updatable=false 적용 시 UPDATE 차단됨
+    // (PR#3에서 User.activatedAt 동일 버그로 발견). 불변성은 도메인 메서드 가드로 보장.
 
     /**
      * LOA 서명 출처 (APPLICANT_DIRECT / MANAGER_UPLOAD / REMOTE_LINK).
-     * 최초 1회만 기록되며 이후 변경 금지.
+     * 도메인 메서드 {@link #recordLoaSignatureSource}가 최초 1회 + 동일 source만 멱등 허용.
      */
     @Enumerated(EnumType.STRING)
-    @Column(name = "loa_signature_source", length = 30, updatable = false)
+    @Column(name = "loa_signature_source", length = 30)
     private LoaSignatureSource loaSignatureSource;
 
     /**
      * MANAGER_UPLOAD 경로 시 업로드한 Manager (APPLICANT_DIRECT는 null).
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "loa_signature_uploaded_by", updatable = false)
+    @JoinColumn(name = "loa_signature_uploaded_by")
     private User loaSignatureUploadedBy;
 
     /**
      * LOA 서명 출처 기록 시점.
      */
-    @Column(name = "loa_signature_uploaded_at", updatable = false)
+    @Column(name = "loa_signature_uploaded_at")
     private LocalDateTime loaSignatureUploadedAt;
 
     /**
      * Manager 대리 업로드 시 수령 경로 메모 (예: "applicant emailed PDF on 2026-04-19").
      */
-    @Column(name = "loa_signature_source_memo", length = 500, updatable = false)
+    @Column(name = "loa_signature_source_memo", length = 500)
     private String loaSignatureSourceMemo;
 
     // ── Concierge 대리 생성 연결 (★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A) ──

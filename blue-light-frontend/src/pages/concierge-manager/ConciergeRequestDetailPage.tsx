@@ -16,6 +16,7 @@ import ConciergeNotesPanel from './sections/ConciergeNotesPanel';
 import ConciergeAccountStatusPanel from './sections/ConciergeAccountStatusPanel';
 import ConciergeActionBar from './sections/ConciergeActionBar';
 import ConciergeCreateApplicationModal from './sections/ConciergeCreateApplicationModal';
+import ConciergeLoaCollectionPanel from './sections/ConciergeLoaCollectionPanel';
 import conciergeManagerApi, {
   type ConciergeRequestDetail,
   type ConciergeStatus,
@@ -207,6 +208,14 @@ export default function ConciergeRequestDetailPage() {
               </p>
             </Card>
           )}
+
+          {/* ★ PR#6 Stage B: LOA 서명 수집 패널 */}
+          <ConciergeLoaCollectionPanel
+            applicationSeq={detail.applicationSeq}
+            onChange={() => {
+              void reload();
+            }}
+          />
         </div>
 
         {/* 우측: ActionBar + Notes */}

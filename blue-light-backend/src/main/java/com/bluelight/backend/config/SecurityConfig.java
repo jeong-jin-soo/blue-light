@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -79,6 +80,13 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         // Error 페이지 (SSE 비동기 완료 시 SecurityContext 없이 디스패치됨)
                         .requestMatchers("/error").permitAll()
+                        // ★ Kaki Concierge v1.5 Phase 1 PR#6 — LOA 경로 A (Manager 대리 업로드)
+                        // URL은 /api/admin/**이지만 CONCIERGE_MANAGER가 대리 서명 업로드를 수행해야 하므로
+                        // 더 구체적인 매처를 /api/admin/** 앞에 먼저 배치.
+                        // AC-15b: LEW는 이 경로에서 제외되며, 메서드 @PreAuthorize로 이중 방어.
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/admin/applications/*/loa/upload-signature")
+                        .hasAnyRole("CONCIERGE_MANAGER", "ADMIN", "SYSTEM_ADMIN")
                         // Admin/LEW/SystemAdmin 경로 (URL-level defense-in-depth)
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
                         // SLD Manager 경로
