@@ -277,7 +277,7 @@ public class ConciergeService {
             case C1_NEW_SIGNUP ->
                 "Your concierge request is received. An account setup link has been sent to your email.";
             case C2_EXISTING_ACTIVE ->
-                "Your concierge request is received. We linked it to your existing LicenseKaki account.";
+                "Your concierge request is received. Our Kaki-Concierge agent will contact you within 24 hours.";
             case C3_EXISTING_PENDING ->
                 "Your concierge request is received. A new account setup link has been sent to your email.";
             default -> "";
