@@ -3,6 +3,7 @@ package com.bluelight.backend.api.concierge;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.domain.notification.NotificationType;
+import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -40,6 +42,7 @@ public class ConciergeNotifier {
     private final NotificationService notificationService;
     private final EmailService emailService;
     private final UserRepository userRepository;
+    private final SystemSettingRepository systemSettingRepository;
 
     @Value("${concierge.account-setup.base-url}")
     private String setupBaseUrl;
@@ -149,6 +152,64 @@ public class ConciergeNotifier {
                 log.warn("Concierge staff in-app notification failed (suppressed): userSeq={}, err={}",
                     s.getUserSeq(), e.getMessage());
             }
+        }
+    }
+
+    // ─── Quote 이메일 (Phase 1.5) ─────────────────────────────
+
+    /**
+     * 견적 이메일 발송 — 매니저가 통화 후 수수료 + 일정 + 메모를 기록하면 호출된다.
+     * afterCommit 훅으로 발송하여 트랜잭션 롤백 시 메일 미발송 보장.
+     */
+    public void notifyQuoteSent(Long conciergeRequestSeq,
+                                 String applicantEmail,
+                                 String applicantName,
+                                 String publicCode,
+                                 BigDecimal quotedAmount,
+                                 LocalDateTime callScheduledAt,
+                                 String managerNote,
+                                 String verificationPhrase) {
+        // PayNow 설정값을 tx 내에서 fetch — afterCommit 훅에선 DB 세션이 닫힘
+        String paynowUen = readSetting("payment_paynow_uen");
+        String paynowName = readSetting("payment_paynow_name");
+
+        afterCommit(() -> {
+            if (!hasEmail(applicantEmail)) return;
+            try {
+                emailService.sendConciergeQuoteEmail(
+                    applicantEmail, applicantName, publicCode,
+                    quotedAmount, callScheduledAt, managerNote,
+                    verificationPhrase, paynowUen, paynowName);
+            } catch (Exception e) {
+                log.warn("Concierge quote email send failed (suppressed): email={}, publicCode={}, err={}",
+                    applicantEmail, publicCode, e.getMessage());
+            }
+            // 인앱 알림도 병행 발송
+            try {
+                User user = userRepository.findByEmail(applicantEmail).orElse(null);
+                if (user != null) {
+                    notificationService.createNotification(
+                        user.getUserSeq(),
+                        NotificationType.CONCIERGE_REQUEST_SUBMITTED,
+                        "Quote ready for your concierge request",
+                        "We have emailed you payment details for " + publicCode + ".",
+                        "CONCIERGE_REQUEST", conciergeRequestSeq);
+                }
+            } catch (Exception e) {
+                log.warn("Concierge quote in-app notification failed (suppressed): email={}, err={}",
+                    applicantEmail, e.getMessage());
+            }
+        });
+    }
+
+    private String readSetting(String key) {
+        try {
+            return systemSettingRepository.findById(key)
+                .map(s -> s.getSettingValue())
+                .orElse(null);
+        } catch (Exception e) {
+            log.warn("SystemSetting lookup failed for {}: {}", key, e.getMessage());
+            return null;
         }
     }
 

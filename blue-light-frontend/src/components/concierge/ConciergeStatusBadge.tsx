@@ -12,6 +12,7 @@ export type ConciergeStatus =
   | 'SUBMITTED'
   | 'ASSIGNED'
   | 'CONTACTING'
+  | 'QUOTE_SENT'
   | 'APPLICATION_CREATED'
   | 'AWAITING_APPLICANT_LOA_SIGN'
   | 'AWAITING_LICENCE_PAYMENT'
@@ -30,6 +31,7 @@ const STATUS_MAP: Record<ConciergeStatus, StatusConfig> = {
   SUBMITTED:                   { label: 'Submitted',         variant: 'info' },
   ASSIGNED:                    { label: 'Assigned',          variant: 'info' },
   CONTACTING:                  { label: 'Contacting',        variant: 'info' },
+  QUOTE_SENT:                  { label: 'Quote sent',        variant: 'info' },
   APPLICATION_CREATED:         { label: 'Application ready', variant: 'info' },
   AWAITING_APPLICANT_LOA_SIGN: { label: 'Awaiting LOA',      variant: 'warning', pulse: true },
   AWAITING_LICENCE_PAYMENT:    { label: 'Awaiting payment',  variant: 'warning', pulse: true },

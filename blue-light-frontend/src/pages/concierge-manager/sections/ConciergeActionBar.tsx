@@ -19,10 +19,12 @@ interface Props {
   onCancel: (reason: string) => Promise<void>;
   /** CONTACTING 상태에서 "Create application on behalf" 클릭 시 호출 (★ PR#5 Stage B) */
   onCreateApplication?: () => void;
+  /** CONTACTING/QUOTE_SENT 상태에서 견적 이메일 발송 (★ Phase 1.5) */
+  onSendQuote?: (payload: { quotedAmount: number; callScheduledAt?: string | null; note?: string | null }) => Promise<void>;
   disabled?: boolean;
 }
 
-type ActionKind = 'transition' | 'createApplication' | 'blocked';
+type ActionKind = 'transition' | 'createApplication' | 'sendQuote' | 'blocked';
 
 interface ActionDef {
   label: string;
@@ -41,11 +43,15 @@ function actionsFor(status: ConciergeStatus): ActionDef[] {
       return [{ label: 'Mark as contacting', kind: 'transition', nextStatus: 'CONTACTING' }];
     case 'CONTACTING':
       // ★ PR#5 Stage B: 활성화 — onCreateApplication 핸들러 연결
+      // ★ Phase 1.5: 통화 후 견적 이메일 발송
       return [
-        {
-          label: 'Create application on behalf',
-          kind: 'createApplication',
-        },
+        { label: 'Send quote email', kind: 'sendQuote' },
+        { label: 'Create application on behalf', kind: 'createApplication' },
+      ];
+    case 'QUOTE_SENT':
+      return [
+        { label: 'Resend quote email', kind: 'sendQuote' },
+        { label: 'Create application on behalf', kind: 'createApplication' },
       ];
     case 'APPLICATION_CREATED':
       return [{ label: 'Request LOA signing', kind: 'transition', nextStatus: 'AWAITING_APPLICANT_LOA_SIGN' }];
@@ -73,13 +79,21 @@ function actionsFor(status: ConciergeStatus): ActionDef[] {
   }
 }
 
-export function ConciergeActionBar({ detail, onTransition, onCancel, onCreateApplication, disabled }: Props) {
+export function ConciergeActionBar({ detail, onTransition, onCancel, onCreateApplication, onSendQuote, disabled }: Props) {
   const [transitioning, setTransitioning] = useState(false);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Send Quote 모달 상태
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteAmount, setQuoteAmount] = useState(detail.quotedAmount != null ? String(detail.quotedAmount) : '');
+  const [quoteSchedule, setQuoteSchedule] = useState(detail.callScheduledAt ? detail.callScheduledAt.slice(0, 16) : '');
+  const [quoteNote, setQuoteNote] = useState('');
+  const [sendingQuote, setSendingQuote] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
   const actions = actionsFor(detail.status);
   const isTerminal = detail.status === 'COMPLETED' || detail.status === 'CANCELLED';
@@ -105,6 +119,47 @@ export function ConciergeActionBar({ detail, onTransition, onCancel, onCreateApp
     setCancelDialogOpen(false);
     setCancelReason('');
     setCancelError(null);
+  };
+
+  const openQuoteDialog = () => {
+    setQuoteAmount(detail.quotedAmount != null ? String(detail.quotedAmount) : '');
+    setQuoteSchedule(detail.callScheduledAt ? detail.callScheduledAt.slice(0, 16) : '');
+    setQuoteNote('');
+    setQuoteError(null);
+    setQuoteOpen(true);
+  };
+
+  const closeQuoteDialog = () => {
+    if (sendingQuote) return;
+    setQuoteOpen(false);
+    setQuoteError(null);
+  };
+
+  const handleQuoteSubmit = async () => {
+    if (!onSendQuote) return;
+    const amount = parseFloat(quoteAmount);
+    if (!isFinite(amount) || amount <= 0) {
+      setQuoteError('Enter a positive service fee amount.');
+      return;
+    }
+    setSendingQuote(true);
+    setQuoteError(null);
+    try {
+      await onSendQuote({
+        quotedAmount: amount,
+        callScheduledAt: quoteSchedule ? new Date(quoteSchedule).toISOString() : null,
+        note: quoteNote.trim() || null,
+      });
+      setQuoteOpen(false);
+    } catch (err) {
+      const msg =
+        err && typeof err === 'object' && 'message' in err
+          ? String((err as { message: unknown }).message)
+          : 'Failed to send quote';
+      setQuoteError(msg);
+    } finally {
+      setSendingQuote(false);
+    }
   };
 
   const handleCancelConfirm = async () => {
@@ -172,6 +227,19 @@ export function ConciergeActionBar({ detail, onTransition, onCancel, onCreateApp
               </Button>
             );
           }
+          if (a.kind === 'sendQuote') {
+            return (
+              <Button
+                key={a.label}
+                variant="concierge"
+                size="sm"
+                onClick={openQuoteDialog}
+                disabled={disabled || transitioning || !onSendQuote}
+              >
+                {a.label}
+              </Button>
+            );
+          }
           // kind='blocked'
           return (
             <Button
@@ -197,6 +265,82 @@ export function ConciergeActionBar({ detail, onTransition, onCancel, onCreateApp
           </Button>
         )}
       </div>
+
+      <Modal isOpen={quoteOpen} onClose={closeQuoteDialog} size="sm">
+        <ModalHeader title="Send quote email" onClose={closeQuoteDialog} />
+        <ModalBody>
+          <p className="text-sm text-gray-600 mb-3">
+            Enter the service fee confirmed with the applicant on the call.
+            An email with PayNow payment details and the verification phrase
+            will be sent to <strong>{detail.submitterEmail}</strong>.
+          </p>
+          {detail.verificationPhrase && (
+            <div className="mb-3 p-2 rounded bg-amber-50 border border-amber-200 text-xs">
+              <div className="font-semibold text-amber-900">Verification phrase (mention on the call):</div>
+              <div className="font-mono text-amber-800 mt-0.5 break-all">{detail.verificationPhrase}</div>
+            </div>
+          )}
+          <label htmlFor="quote-amount" className="block text-sm font-medium text-gray-700 mb-1.5">
+            Service fee (SGD) <span className="text-error-500">*</span>
+          </label>
+          <input
+            id="quote-amount"
+            type="number"
+            min="0"
+            step="0.01"
+            value={quoteAmount}
+            onChange={(e) => setQuoteAmount(e.target.value)}
+            disabled={sendingQuote}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            placeholder="e.g., 800.00"
+          />
+
+          <label htmlFor="quote-schedule" className="block text-sm font-medium text-gray-700 mb-1.5 mt-3">
+            Scheduled date (optional)
+          </label>
+          <input
+            id="quote-schedule"
+            type="datetime-local"
+            value={quoteSchedule}
+            onChange={(e) => setQuoteSchedule(e.target.value)}
+            disabled={sendingQuote}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+
+          <label htmlFor="quote-note" className="block text-sm font-medium text-gray-700 mb-1.5 mt-3">
+            Note (optional)
+          </label>
+          <textarea
+            id="quote-note"
+            value={quoteNote}
+            onChange={(e) => setQuoteNote(e.target.value)}
+            rows={3}
+            maxLength={1000}
+            disabled={sendingQuote}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            placeholder="e.g., Site visit at 10am; please have M&E diagrams ready."
+          />
+          <p className="mt-1 text-xs text-gray-500">{quoteNote.length}/1000</p>
+
+          {quoteError && (
+            <p className="mt-2 text-xs text-error-700" role="alert">{quoteError}</p>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" size="sm" onClick={closeQuoteDialog} disabled={sendingQuote}>
+            Keep open
+          </Button>
+          <Button
+            variant="concierge"
+            size="sm"
+            onClick={handleQuoteSubmit}
+            loading={sendingQuote}
+            disabled={!quoteAmount || sendingQuote}
+          >
+            Send quote
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       <Modal isOpen={cancelDialogOpen} onClose={closeCancelDialog} size="sm">
         <ModalHeader title="Cancel concierge request?" onClose={closeCancelDialog} />

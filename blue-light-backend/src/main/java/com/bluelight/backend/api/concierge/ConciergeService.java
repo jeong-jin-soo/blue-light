@@ -9,6 +9,7 @@ import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.concierge.ConciergeRequest;
 import com.bluelight.backend.domain.concierge.ConciergeRequestRepository;
+import com.bluelight.backend.domain.concierge.VerificationPhraseGenerator;
 import com.bluelight.backend.domain.user.AccountSetupToken;
 import com.bluelight.backend.domain.user.AccountSetupTokenSource;
 import com.bluelight.backend.domain.user.ConsentAction;
@@ -56,6 +57,7 @@ public class ConciergeService {
     private final UserConsentLogRepository consentLogRepository;
     private final AccountSetupTokenService tokenService;
     private final PublicCodeGenerator publicCodeGenerator;
+    private final VerificationPhraseGenerator verificationPhraseGenerator;
     private final ConciergeNotifier notifier;
     private final AuditLogService auditLogService;
     private final PasswordEncoder passwordEncoder;
@@ -107,6 +109,7 @@ public class ConciergeService {
             .signupConsentAt(now)
             .delegationConsentAt(now)
             .marketingOptIn(req.isMarketingOptIn())
+            .verificationPhrase(verificationPhraseGenerator.generate())
             .build();
         cr = conciergeRepository.save(cr);
 

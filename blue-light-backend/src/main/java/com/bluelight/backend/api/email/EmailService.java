@@ -202,4 +202,30 @@ public interface EmailService {
      */
     void sendConciergeLoaUploadConfirmEmail(String to, String applicantName, String managerName,
                                              Long applicationSeq, String memo);
+
+    /**
+     * Concierge 견적 이메일 (Phase 1.5) — 통화 후 매니저가 발송.
+     * <p>
+     * PDPA 최소화: 제목엔 금액·주소·이름 제외, publicCode 만 포함.
+     * 피싱 방지: verification phrase 를 본문에 노출하여 통화 내용과 대조 가능.
+     * 결제 reference 는 publicCode 를 명시하여 은행 세틀먼트 매칭.
+     * <p>
+     * 보안 결정: QR 이미지는 본문에 임베드하지 않고 PayNow UEN + 계좌명 텍스트만 제공.
+     * 신청자는 publicCode 를 reference 로 입력해 송금 — 모방 메일로 QR 금액·계좌 탈취 차단.
+     *
+     * @param to                 신청자 이메일
+     * @param applicantName      신청자 이름
+     * @param publicCode         C-YYYY-NNNN 형식 공개 코드 (이메일 제목·본문·결제 reference)
+     * @param quotedAmount       컨시어지 서비스 수수료 (SGD)
+     * @param callScheduledAt    통화에서 합의한 후속 일정 (nullable — null 이면 해당 섹션 생략)
+     * @param managerNote        매니저가 덧붙일 메모 (nullable)
+     * @param verificationPhrase 4단어 피싱 방지 문구 (통화 중 구두 안내된 것과 동일)
+     * @param paynowUen          PayNow UEN (system_settings.payment_paynow_uen)
+     * @param paynowAccountName  PayNow 수취 계좌명 (system_settings.payment_paynow_name)
+     * @return 발송된 이메일의 SMTP Message-ID (감사 로그 조인용, 실패 시 null)
+     */
+    String sendConciergeQuoteEmail(String to, String applicantName, String publicCode,
+                                    BigDecimal quotedAmount, java.time.LocalDateTime callScheduledAt,
+                                    String managerNote, String verificationPhrase,
+                                    String paynowUen, String paynowAccountName);
 }

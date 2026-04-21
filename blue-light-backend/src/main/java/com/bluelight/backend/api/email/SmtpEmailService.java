@@ -1109,4 +1109,123 @@ public class SmtpEmailService implements EmailService {
                 </html>
                 """.formatted(aName, mName, applicationSeq, memoBlock, supportMail, appLink);
     }
+
+    // ── Concierge Quote Email (Phase 1.5) ──
+
+    private static final DateTimeFormatter SCHEDULE_FMT =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'SGT'");
+
+    @Override
+    @Async
+    public String sendConciergeQuoteEmail(String to, String applicantName, String publicCode,
+                                           BigDecimal quotedAmount, java.time.LocalDateTime callScheduledAt,
+                                           String managerNote, String verificationPhrase,
+                                           String paynowUen, String paynowAccountName) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA: 제목에 금액·주소·이름 제외, publicCode 만 포함
+            helper.setSubject("[LicenseKaki] Payment details for your concierge request " + publicCode);
+
+            String htmlContent = buildConciergeQuoteHtml(
+                applicantName, publicCode, quotedAmount, callScheduledAt,
+                managerNote, verificationPhrase, paynowUen, paynowAccountName);
+            helper.setText(htmlContent, true);
+
+            // Message-ID 확보를 위해 saveChanges() 후 발송
+            message.saveChanges();
+            String messageId = message.getMessageID();
+            mailSender.send(message);
+            log.info("Concierge quote email sent: to={}, publicCode={}, messageId={}",
+                to, publicCode, messageId);
+            return messageId;
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge quote email to: {}, publicCode={}", to, publicCode, e);
+            return null;
+        }
+    }
+
+    private String buildConciergeQuoteHtml(String applicantName, String publicCode,
+                                             BigDecimal quotedAmount,
+                                             java.time.LocalDateTime callScheduledAt,
+                                             String managerNote, String verificationPhrase,
+                                             String paynowUen, String paynowAccountName) {
+        String aName = esc(applicantName);
+        String pCode = esc(publicCode);
+        String amountStr = quotedAmount == null ? "-" : "S$" + quotedAmount.toPlainString();
+        String scheduleBlock = (callScheduledAt != null)
+            ? ("<tr><td style=\"padding:6px 0;color:#666;\">Scheduled</td>"
+                + "<td style=\"padding:6px 0;font-weight:600;color:#111;\">"
+                + esc(callScheduledAt.format(SCHEDULE_FMT)) + "</td></tr>")
+            : "";
+        String noteBlock = (managerNote != null && !managerNote.isBlank())
+            ? ("<p style=\"margin:12px 0 0 0;padding:10px 12px;background:#f3f4f6;border-left:3px solid #1a3a5c;color:#374151;font-size:13px;\">"
+                + "<strong>From your manager:</strong> " + esc(managerNote) + "</p>")
+            : "";
+        String phrase = esc(verificationPhrase == null ? "" : verificationPhrase);
+        String uen = esc(paynowUen == null ? "" : paynowUen);
+        String acctName = esc(paynowAccountName == null ? "" : paynowAccountName);
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Your Kaki Concierge quote</h2>
+                      <p style="margin:6px 0 0 0;color:#c7d2e3;font-size:13px;">Reference: %s</p>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Thank you for speaking with us. Here are the agreed details from our call.</p>
+
+                      <table style="width:100%%;border-collapse:collapse;margin:16px 0;">
+                        <tr><td style="padding:6px 0;color:#666;width:140px;">Service fee</td>
+                            <td style="padding:6px 0;font-weight:600;color:#111;">%s</td></tr>
+                        %s
+                      </table>
+                      %s
+
+                      <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;">
+                        <div style="font-weight:600;color:#111;margin-bottom:8px;">PayNow payment instructions</div>
+                        <table style="width:100%%;border-collapse:collapse;font-size:14px;">
+                          <tr><td style="padding:4px 0;color:#666;width:140px;">UEN</td>
+                              <td style="padding:4px 0;color:#111;font-family:monospace;">%s</td></tr>
+                          <tr><td style="padding:4px 0;color:#666;">Payee name</td>
+                              <td style="padding:4px 0;color:#111;">%s</td></tr>
+                          <tr><td style="padding:4px 0;color:#666;">Amount</td>
+                              <td style="padding:4px 0;color:#111;font-weight:600;">%s</td></tr>
+                          <tr><td style="padding:4px 0;color:#c53030;">Reference (required)</td>
+                              <td style="padding:4px 0;color:#c53030;font-weight:600;font-family:monospace;">%s</td></tr>
+                        </table>
+                        <p style="margin:12px 0 0 0;font-size:13px;color:#374151;">
+                          Please enter <strong style="font-family:monospace;">%s</strong> as the PayNow reference so we can match your payment to this request.
+                        </p>
+                      </div>
+
+                      <div style="margin:20px 0;padding:14px;border:2px solid #fbbf24;border-radius:6px;background:#fffbeb;">
+                        <div style="font-weight:700;color:#92400e;font-size:14px;">Verification phrase</div>
+                        <div style="margin-top:6px;font-family:monospace;font-size:16px;color:#111;letter-spacing:0.5px;">%s</div>
+                        <p style="margin:8px 0 0 0;font-size:12px;color:#92400e;">
+                          Your manager mentioned this phrase on the call. If it does not match, this email may be fraudulent — do NOT pay. Contact support immediately.
+                        </p>
+                      </div>
+
+                      <p style="font-size:12px;color:#6b7280;margin-top:20px;">
+                        LicenseKaki will only email you from <strong>@licensekaki.com</strong>. We will never ask you to send money to a different UEN or account name.
+                        If you have any doubt, email <a href="%s" style="color:#1a3a5c;">support@licensekaki.sg</a> and reference your code %s.
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected and processed under Singapore PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(pCode, aName, amountStr, scheduleBlock, noteBlock,
+                    uen, acctName, amountStr, pCode, pCode, phrase, supportMail, pCode);
+    }
 }

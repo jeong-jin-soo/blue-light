@@ -7,6 +7,7 @@ import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
 import com.bluelight.backend.api.concierge.dto.CreateOnBehalfResponse;
 import com.bluelight.backend.api.concierge.dto.NoteAddRequest;
 import com.bluelight.backend.api.concierge.dto.NoteResponse;
+import com.bluelight.backend.api.concierge.dto.SendQuoteRequest;
 import com.bluelight.backend.api.concierge.dto.StatusTransitionRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -140,6 +141,24 @@ public class ConciergeManagerController {
         CreateOnBehalfResponse result = managerService.createApplicationOnBehalf(
             id, request, userSeq, httpRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    /**
+     * 견적 발송 (Phase 1.5) — 통화 후 견적 금액·일정을 기록하고 신청자에게 이메일 발송.
+     * POST /api/concierge-manager/requests/{id}/quote
+     * body: { quotedAmount, callScheduledAt?, note? }
+     */
+    @PostMapping("/{id}/quote")
+    public ResponseEntity<ConciergeRequestDetail> sendQuote(
+        Authentication authentication,
+        @PathVariable Long id,
+        @Valid @RequestBody SendQuoteRequest request,
+        HttpServletRequest httpRequest) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Concierge quote email: id={}, amount={}, managerSeq={}",
+            id, request.getQuotedAmount(), userSeq);
+        return ResponseEntity.ok(
+            managerService.sendQuote(id, request, userSeq, httpRequest));
     }
 
     /**

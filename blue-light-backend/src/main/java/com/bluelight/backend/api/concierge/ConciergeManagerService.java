@@ -12,6 +12,7 @@ import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
 import com.bluelight.backend.api.concierge.dto.CreateOnBehalfResponse;
 import com.bluelight.backend.api.concierge.dto.NoteAddRequest;
 import com.bluelight.backend.api.concierge.dto.NoteResponse;
+import com.bluelight.backend.api.concierge.dto.SendQuoteRequest;
 import com.bluelight.backend.api.concierge.dto.StatusTransitionRequest;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -69,6 +70,7 @@ public class ConciergeManagerService {
     private final AccountSetupTokenService tokenService;
     private final EmailService emailService;
     private final AuditLogService auditLogService;
+    private final ConciergeNotifier notifier;
 
     @Value("${concierge.account-setup.base-url}")
     private String setupBaseUrl;
@@ -313,6 +315,61 @@ public class ConciergeManagerService {
     // 취소
     // ────────────────────────────────────────────────────────────
 
+    // ────────────────────────────────────────────────────────────
+    // 견적 발송 (★ Phase 1.5 — 통화 후 이메일로 견적 + 일정 + PayNow QR 송부)
+    // ────────────────────────────────────────────────────────────
+
+    /**
+     * 매니저가 통화 후 수집한 견적과 일정을 저장하고, 신청자에게 견적 이메일을 발송한다.
+     * <p>
+     * 전이: CONTACTING → QUOTE_SENT (QUOTE_SENT 재호출은 금액/일정 덮어쓰기).
+     * 이메일 발송은 afterCommit 훅에서 실행되며, 감사 로그도 함께 기록한다.
+     */
+    @Transactional
+    public ConciergeRequestDetail sendQuote(Long id, SendQuoteRequest request,
+                                             Long actorSeq, HttpServletRequest httpRequest) {
+        User actor = loadActor(actorSeq);
+        ConciergeRequest cr = loadRequest(id);
+        ConciergeOwnershipValidator.assertManagerCanAccess(cr, actor);
+
+        ConciergeRequestStatus current = cr.getStatus();
+        if (current != ConciergeRequestStatus.CONTACTING
+                && current != ConciergeRequestStatus.QUOTE_SENT) {
+            throw new BusinessException(
+                "Quote can only be sent from CONTACTING or QUOTE_SENT state (current=" + current + ")",
+                HttpStatus.CONFLICT, "INVALID_STATE_FOR_QUOTE");
+        }
+
+        invokeDomain(() -> cr.recordQuote(request.getQuotedAmount(), request.getCallScheduledAt()));
+        // 발송 시점 마킹은 afterCommit 실제 발송 성공 여부와 무관하게 "시도됨"을 의미
+        cr.markQuoteEmailSent();
+
+        auditLogService.log(
+            actor.getUserSeq(), actor.getEmail(), actor.getRole().name(),
+            AuditAction.CONCIERGE_QUOTE_EMAIL_SENT, AuditCategory.APPLICATION,
+            "concierge_request", cr.getConciergeRequestSeq().toString(),
+            "Quote issued by manager: amount=" + request.getQuotedAmount()
+                + ", scheduled=" + request.getCallScheduledAt(),
+            null, null,
+            extractIp(httpRequest), userAgent(httpRequest),
+            "POST", "/api/concierge-manager/requests/{id}/quote", 200);
+
+        // 발송은 커밋 이후 — 실패해도 트랜잭션 롤백되지 않도록 notifier 내부에서 격리
+        notifier.notifyQuoteSent(
+            cr.getConciergeRequestSeq(),
+            cr.getSubmitterEmail(),
+            cr.getSubmitterName(),
+            cr.getPublicCode(),
+            request.getQuotedAmount(),
+            request.getCallScheduledAt(),
+            request.getNote(),
+            cr.getVerificationPhrase());
+
+        List<ConciergeNote> notes = noteRepository
+            .findAllByConciergeRequest_ConciergeRequestSeqOrderByCreatedAtDesc(id);
+        return toDetail(cr, notes);
+    }
+
     @Transactional
     public ConciergeRequestDetail cancel(Long id, CancelRequest request,
                                           Long actorSeq, HttpServletRequest httpRequest) {
@@ -358,11 +415,13 @@ public class ConciergeManagerService {
         ConciergeRequest cr = loadRequest(conciergeRequestId);
         ConciergeOwnershipValidator.assertManagerCanAccess(cr, actor);
 
-        // CONTACTING 상태에서만 대리 생성 허용 (PRD §5.2: CONTACTING → APPLICATION_CREATED)
-        if (cr.getStatus() != ConciergeRequestStatus.CONTACTING) {
+        // CONTACTING 또는 QUOTE_SENT 상태에서 대리 생성 허용
+        // (PRD §5.2: CONTACTING → APPLICATION_CREATED, Phase 1.5: QUOTE_SENT → APPLICATION_CREATED)
+        if (cr.getStatus() != ConciergeRequestStatus.CONTACTING
+                && cr.getStatus() != ConciergeRequestStatus.QUOTE_SENT) {
             throw new BusinessException(
-                "Application can only be created after first contact is recorded "
-                    + "(requires status=CONTACTING; current status=" + cr.getStatus() + ")",
+                "Application can only be created after first contact or quote is recorded "
+                    + "(requires status=CONTACTING or QUOTE_SENT; current status=" + cr.getStatus() + ")",
                 HttpStatus.CONFLICT, "INVALID_STATE_FOR_APPLICATION");
         }
 
@@ -530,6 +589,10 @@ public class ConciergeManagerService {
             .completedAt(cr.getCompletedAt())
             .cancelledAt(cr.getCancelledAt())
             .cancellationReason(cr.getCancellationReason())
+            .callScheduledAt(cr.getCallScheduledAt())
+            .quotedAmount(cr.getQuotedAmount())
+            .quoteSentAt(cr.getQuoteSentAt())
+            .verificationPhrase(cr.getVerificationPhrase())
             .notes(noteResponses)
             .applicantStatus(applicantInfo)
             .build();

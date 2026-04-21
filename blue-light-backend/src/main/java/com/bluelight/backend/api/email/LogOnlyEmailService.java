@@ -233,4 +233,24 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Memo: {}", memo == null ? "(none)" : memo);
         log.info("==================================================");
     }
+
+    @Override
+    public String sendConciergeQuoteEmail(String to, String applicantName, String publicCode,
+                                           java.math.BigDecimal quotedAmount,
+                                           java.time.LocalDateTime callScheduledAt,
+                                           String managerNote, String verificationPhrase,
+                                           String paynowUen, String paynowAccountName) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge Quote Email (Phase 1.5) (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Applicant: {}", applicantName);
+        log.info("  PublicCode: {}", publicCode);
+        log.info("  QuotedAmount: SGD {}", quotedAmount);
+        log.info("  CallScheduledAt: {}", callScheduledAt);
+        log.info("  Note: {}", managerNote == null ? "(none)" : managerNote);
+        log.info("  VerificationPhrase: {}", verificationPhrase);
+        log.info("  PayNow UEN: {} / Name: {}", paynowUen, paynowAccountName);
+        log.info("==================================================");
+        return "dev-msg-" + publicCode;
+    }
 }

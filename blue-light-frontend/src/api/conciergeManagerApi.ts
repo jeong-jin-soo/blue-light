@@ -13,6 +13,7 @@ export type ConciergeStatus =
   | 'SUBMITTED'
   | 'ASSIGNED'
   | 'CONTACTING'
+  | 'QUOTE_SENT'
   | 'APPLICATION_CREATED'
   | 'AWAITING_APPLICANT_LOA_SIGN'
   | 'AWAITING_LICENCE_PAYMENT'
@@ -73,8 +74,19 @@ export interface ConciergeRequestDetail extends ConciergeRequestSummary {
   completedAt: string | null;
   cancelledAt: string | null;
   cancellationReason: string | null;
+  // Phase 1.5 — Quote workflow
+  callScheduledAt: string | null;
+  quotedAmount: number | null;
+  quoteSentAt: string | null;
+  verificationPhrase: string | null;
   notes: NoteResponse[];
   applicantStatus: ApplicantStatusInfo | null;
+}
+
+export interface SendQuotePayload {
+  quotedAmount: number;
+  callScheduledAt?: string | null;
+  note?: string | null;
 }
 
 /** Spring Data Page 응답 */
@@ -199,6 +211,21 @@ export const cancelConciergeRequest = async (
 };
 
 /**
+ * 견적 이메일 발송 (Phase 1.5).
+ * CONTACTING 또는 QUOTE_SENT 상태에서만 성공. 성공 시 QUOTE_SENT로 전이 + 이메일 발송.
+ */
+export const sendConciergeQuote = async (
+  id: number,
+  payload: SendQuotePayload
+): Promise<ConciergeRequestDetail> => {
+  const response = await axiosClient.post<ConciergeRequestDetail>(
+    `${base}/${id}/quote`,
+    payload
+  );
+  return response.data;
+};
+
+/**
  * 대리 Application 생성 (★ PR#5 Stage B).
  * - CONTACTING 상태에서만 성공. 성공 시 ConciergeRequest는 APPLICATION_CREATED로 자동 전이.
  * - 에러 코드: INVALID_STATE_FOR_APPLICATION (409), CONCIERGE_NOT_ASSIGNED (403), 기타 400/500.
@@ -222,6 +249,7 @@ export const conciergeManagerApi = {
   resendSetupEmail: resendConciergeSetupEmail,
   cancel: cancelConciergeRequest,
   createApplicationOnBehalf,
+  sendQuote: sendConciergeQuote,
 };
 
 export default conciergeManagerApi;

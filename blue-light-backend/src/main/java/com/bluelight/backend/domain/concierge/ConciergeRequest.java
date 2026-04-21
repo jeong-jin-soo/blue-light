@@ -22,6 +22,7 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -169,6 +170,30 @@ public class ConciergeRequest extends BaseEntity {
     @Column(name = "cancellation_reason", length = 500)
     private String cancellationReason;
 
+    // ============================================================
+    // Quote Workflow (Phase 1.5) — 통화 후 견적 이메일 발송 플로우
+    // ============================================================
+
+    /** 매니저가 통화 후 신청자와 합의한 후속 일정 (미팅 · 방문 등) */
+    @Column(name = "call_scheduled_at")
+    private LocalDateTime callScheduledAt;
+
+    /** 컨시어지 서비스 수수료 견적 (SGD). 통화 후 매니저가 확정. */
+    @Column(name = "quoted_amount", precision = 10, scale = 2)
+    private BigDecimal quotedAmount;
+
+    /** 견적 이메일 발송 시점 — 발송 이후에만 non-null */
+    @Column(name = "quote_sent_at")
+    private LocalDateTime quoteSentAt;
+
+    /**
+     * 피싱 방지용 검증 문구 (4단어 랜덤 조합).
+     * 신청 생성 시 세팅되며 통화 + 이메일에 병기되어, 사칭 메일과 정상 메일을 구분할 수 있게 함.
+     * updatable=false — 신청 건별 고정 값.
+     */
+    @Column(name = "verification_phrase", length = 60, updatable = false)
+    private String verificationPhrase;
+
     /**
      * 낙관적 락 — 재배정 race 방지 (Stage 3/4 Manager 재배정 API에서 사용)
      */
@@ -181,7 +206,7 @@ public class ConciergeRequest extends BaseEntity {
                             String submitterPhone, String memo, User applicantUser,
                             LocalDateTime pdpaConsentAt, LocalDateTime termsConsentAt,
                             LocalDateTime signupConsentAt, LocalDateTime delegationConsentAt,
-                            Boolean marketingOptIn) {
+                            Boolean marketingOptIn, String verificationPhrase) {
         this.publicCode = publicCode;
         this.submitterName = submitterName;
         this.submitterEmail = submitterEmail;
@@ -193,6 +218,7 @@ public class ConciergeRequest extends BaseEntity {
         this.signupConsentAt = signupConsentAt;
         this.delegationConsentAt = delegationConsentAt;
         this.marketingOptIn = marketingOptIn != null ? marketingOptIn : false;
+        this.verificationPhrase = verificationPhrase;
         this.status = ConciergeRequestStatus.SUBMITTED;
     }
 
@@ -221,7 +247,35 @@ public class ConciergeRequest extends BaseEntity {
     }
 
     /**
-     * CONTACTING → APPLICATION_CREATED: 대리 Application 생성 완료
+     * CONTACTING → QUOTE_SENT: 통화 완료 + 견적 + 일정을 기록하고 상태 전이.
+     * 이메일 발송 자체는 호출자(서비스 레이어)가 afterCommit 훅으로 실행하며,
+     * 성공 시 {@link #markQuoteEmailSent()}로 타임스탬프를 기록한다.
+     * <p>
+     * 멱등성: 같은 값으로 재호출 시 transitionTo(self)가 허용되므로 안전.
+     *
+     * @param quotedAmount     서비스 수수료 견적 (SGD, 양수)
+     * @param callScheduledAt  통화에서 합의한 후속 일정 (nullable)
+     */
+    public void recordQuote(BigDecimal quotedAmount, LocalDateTime callScheduledAt) {
+        if (quotedAmount == null || quotedAmount.signum() <= 0) {
+            throw new IllegalArgumentException("quotedAmount must be positive");
+        }
+        transitionTo(ConciergeRequestStatus.QUOTE_SENT);
+        this.quotedAmount = quotedAmount;
+        this.callScheduledAt = callScheduledAt;
+    }
+
+    /**
+     * 견적 이메일 발송 성공 시 호출 — quoteSentAt 타임스탬프만 기록 (상태 전이 없음).
+     * 재발송 시에도 최초 발송 시점을 보존하고 싶다면 null 체크를 추가하되,
+     * 현 구현은 최신 발송 시점으로 덮어쓴다(감사 로그에서 원본 시점 추적 가능).
+     */
+    public void markQuoteEmailSent() {
+        this.quoteSentAt = LocalDateTime.now();
+    }
+
+    /**
+     * QUOTE_SENT → APPLICATION_CREATED (또는 CONTACTING → APPLICATION_CREATED, 기존 경로 유지)
      */
     public void linkApplication(Long applicationSeq) {
         transitionTo(ConciergeRequestStatus.APPLICATION_CREATED);

@@ -3,6 +3,7 @@ package com.bluelight.backend.api.concierge.dto;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -39,6 +40,16 @@ public class ConciergeRequestDetail {
     private LocalDateTime completedAt;
     private LocalDateTime cancelledAt;
     private String cancellationReason;
+
+    // ── Phase 1.5 Quote Workflow ──
+    /** 통화 후 합의한 후속 일정 */
+    private LocalDateTime callScheduledAt;
+    /** 컨시어지 서비스 수수료 견적 (SGD) */
+    private BigDecimal quotedAmount;
+    /** 견적 이메일 발송 시점 (null = 미발송) */
+    private LocalDateTime quoteSentAt;
+    /** 피싱 방지 검증 문구 — 통화 · 이메일에서 신청자와 상호 확인용 (매니저 UI에만 노출) */
+    private String verificationPhrase;
 
     /** 노트 타임라인 (최신순) */
     private List<NoteResponse> notes;

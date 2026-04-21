@@ -6,10 +6,9 @@
  * - 성공 시 /concierge/request/success로 이동 (response state 전달)
  */
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
-import axiosClient from '../../api/axiosClient';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Card } from '../../components/ui/Card';
@@ -53,23 +52,6 @@ export default function ConciergeRequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [paymentInfo, setPaymentInfo] = useState<Record<string, string>>({});
-
-  // 결제 QR·PayNow 정보 로드 (public, 인증 불필요)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data } = await axiosClient.get<Record<string, string>>('/public/payment-info');
-        if (!cancelled) setPaymentInfo(data || {});
-      } catch {
-        /* silent — 아래 UI에서 fallback 처리 */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const allRequiredChecked = useMemo(
     () =>
@@ -282,66 +264,19 @@ export default function ConciergeRequestPage() {
               }
             />
 
-            {/* Payment placeholder (Phase 2) */}
-            {/* Payment — PayNow QR + 계좌 정보 (PG 연동은 Phase 2) */}
+            {/* Phase 1.5: 결제 섹션은 신청 폼에서 제거. 매니저 통화 후 이메일로 결제 QR 발송. */}
             <div className="border border-gray-200 rounded-lg p-4 bg-surface-secondary">
-              <div className="flex items-center gap-2 mb-3">
-                <span aria-hidden>💳</span>
+              <div className="flex items-center gap-2 mb-2">
+                <span aria-hidden>📞</span>
                 <span className="text-sm font-semibold text-gray-800">
-                  Payment — PayNow
+                  What happens next
                 </span>
               </div>
-              <p className="text-xs text-gray-600 mb-3">
-                Please complete payment via PayNow after submitting your request.
-                Your Concierge Manager will confirm the exact service fee when
-                contacting you.
+              <p className="text-xs text-gray-600 leading-relaxed">
+                A Concierge Manager will call you within 24 hours to understand your
+                needs and confirm the exact service fee. Afterwards you will receive
+                an email with the PayNow payment details — no payment is required now.
               </p>
-
-              {paymentInfo.payment_paynow_qr && (
-                <div className="flex justify-center mb-3">
-                  <img
-                    src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8090/api'}${paymentInfo.payment_paynow_qr}`}
-                    alt="PayNow QR Code"
-                    className="w-44 h-44 object-contain border border-gray-200 rounded-lg bg-white p-2"
-                  />
-                </div>
-              )}
-
-              {(paymentInfo.payment_paynow_uen || paymentInfo.payment_paynow_name) && (
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-bold text-primary-700">P</span>
-                  </div>
-                  <div className="text-xs text-gray-700 space-y-0.5">
-                    <p className="text-sm font-medium text-gray-800">PayNow (QR / UEN Transfer)</p>
-                    {paymentInfo.payment_paynow_uen && (
-                      <p>
-                        UEN: <span className="font-mono font-medium">{paymentInfo.payment_paynow_uen}</span>
-                      </p>
-                    )}
-                    {paymentInfo.payment_paynow_name && (
-                      <p>
-                        Name: <span className="font-medium">{paymentInfo.payment_paynow_name}</span>
-                      </p>
-                    )}
-                    <p className="text-gray-500">
-                      Reference: use your email address
-                      {email.trim() && (
-                        <> (<span className="font-mono">{email.trim()}</span>)</>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {!paymentInfo.payment_paynow_qr
-                && !paymentInfo.payment_paynow_uen
-                && !paymentInfo.payment_paynow_name && (
-                <p className="text-xs text-gray-500 italic">
-                  Payment details will be shared by your Concierge Manager after
-                  you submit this request.
-                </p>
-              )}
             </div>
 
             {formError && (

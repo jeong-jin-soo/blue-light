@@ -91,6 +91,19 @@ export default function ConciergeRequestDetailPage() {
     setDetail(updated);
   };
 
+  const handleSendQuote = async (payload: {
+    quotedAmount: number;
+    callScheduledAt?: string | null;
+    note?: string | null;
+  }) => {
+    if (!detail) return;
+    const updated = await conciergeManagerApi.sendQuote(
+      detail.conciergeRequestSeq,
+      payload,
+    );
+    setDetail(updated);
+  };
+
   if (!id) {
     return (
       <div className="max-w-6xl mx-auto">
@@ -227,6 +240,7 @@ export default function ConciergeRequestDetailPage() {
               onTransition={handleTransition}
               onCancel={handleCancel}
               onCreateApplication={() => setCreateAppOpen(true)}
+              onSendQuote={handleSendQuote}
             />
           </Card>
 
