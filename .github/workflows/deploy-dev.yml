@@ -192,8 +192,11 @@ jobs:
             echo "MYSQL_DATABASE=$MYSQL_DATABASE" >> .env
 
             # 배포 (개발: DB는 외부 RDS)
+            # --force-recreate: IMAGE_TAG는 바뀌었지만 compose가 config hash
+            # 동일하다고 오판해 기존 컨테이너를 유지하는 사례 방지. Docker
+            # Compose가 항상 최신 이미지로 재생성하도록 강제한다.
             docker compose -f docker-compose.yml pull
-            docker compose -f docker-compose.yml up -d --remove-orphans
+            docker compose -f docker-compose.yml up -d --remove-orphans --force-recreate
 
             # 이전 이미지 정리
             docker image prune -f
