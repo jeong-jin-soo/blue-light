@@ -1,6 +1,5 @@
 package com.bluelight.backend.api.powersocketorder.dto;
 
-import jakarta.validation.constraints.Null;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,7 +13,5 @@ public class UpdatePowerSocketOrderRequest {
 
     @Size(max = 2000, message = "Applicant note must be 2000 characters or less")
     private String applicantNote;
-
-    @Null(message = "Sketch file upload not yet supported")
     private Long sketchFileSeq;
 }

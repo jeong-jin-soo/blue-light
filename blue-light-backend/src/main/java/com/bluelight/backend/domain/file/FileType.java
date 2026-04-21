@@ -45,6 +45,21 @@ public enum FileType {
     SKETCH_SLD,
 
     /**
+     * 신청자 스케치 (Lighting Layout 요청 참고용)
+     */
+    SKETCH_LIGHTING,
+
+    /**
+     * 신청자 스케치 (Power Socket 요청 참고용)
+     */
+    SKETCH_POWER_SOCKET,
+
+    /**
+     * 신청자 스케치 (LEW Service 요청 참고용)
+     */
+    SKETCH_LEW_SERVICE,
+
+    /**
      * 회로 스케줄 파일 (Excel/CSV/이미지 — AI 채팅 첨부용)
      */
     CIRCUIT_SCHEDULE

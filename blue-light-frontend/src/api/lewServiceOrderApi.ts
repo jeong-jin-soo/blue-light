@@ -29,4 +29,12 @@ export const lewServiceOrderApi = {
   getPayments: (id: number) =>
     api.get<LewServiceOrderPayment[]>(`/lew-service-orders/${id}/payments`).then(r => r.data),
 
+  uploadSketchFile: (orderId: number, file: File, fileType: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('fileType', fileType);
+    return api.post(`/lew-service-orders/${orderId}/files`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(r => r.data);
+  },
 };

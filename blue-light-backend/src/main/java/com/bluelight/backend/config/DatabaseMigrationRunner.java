@@ -64,6 +64,10 @@ public class DatabaseMigrationRunner {
             migrateApplicationsViaConciergeColumn(conn);
             // ★ Kaki Concierge Phase 1 PR#7
             migratePaymentsReferenceColumns(conn);
+            // files 테이블에 3개 신규 서비스 주문 FK 컬럼 추가
+            migrateFilesServiceOrderColumns(conn);
+            // ★ Kaki Concierge Phase 1.5 — Quote workflow (통화 후 견적 이메일)
+            migrateConciergeRequestsQuoteColumns(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -645,6 +649,39 @@ public class DatabaseMigrationRunner {
      * ConciergeRequest.seq를 기록. APPLICANT 직접 신청은 null. FK는 걸지 않음
      * (concierge_requests soft-delete와 상호작용 회피, 인덱스만).
      */
+    /**
+     * 마이그레이션: files 테이블에 lighting_order_seq / power_socket_order_seq /
+     * lew_service_order_seq 컬럼 + 인덱스 추가.
+     * 3개 신규 서비스 주문(Lighting / Power Socket / LEW Service)의 스케치 업로드
+     * 기능이 sld_order_seq와 동일한 방식으로 FileEntity를 참조하게 한다.
+     */
+    private void migrateFilesServiceOrderColumns(Connection conn) throws SQLException {
+        String[][] cols = {
+            {"lighting_order_seq",     "sld_order_seq",          "idx_files_lighting_order_seq"},
+            {"power_socket_order_seq", "lighting_order_seq",     "idx_files_power_socket_order_seq"},
+            {"lew_service_order_seq",  "power_socket_order_seq", "idx_files_lew_service_order_seq"},
+        };
+        for (String[] col : cols) {
+            String columnName = col[0];
+            String afterColumn = col[1];
+            String indexName = col[2];
+            if (columnExists(conn, "files", columnName)) {
+                continue;
+            }
+            log.info("Migration [files-service-order]: adding {}", columnName);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE files ADD COLUMN " + columnName + " BIGINT AFTER " + afterColumn
+                );
+                try {
+                    stmt.executeUpdate("CREATE INDEX " + indexName + " ON files (" + columnName + ")");
+                } catch (SQLException ignore) {
+                    log.debug("Migration [files-service-order]: {} already exists", indexName);
+                }
+            }
+        }
+    }
+
     private void migrateApplicationsViaConciergeColumn(Connection conn) throws SQLException {
         if (columnExists(conn, "applications", "via_concierge_request_seq")) {
             log.debug("Migration [applications-via-concierge]: already applied, skipping");
@@ -732,6 +769,44 @@ public class DatabaseMigrationRunner {
             } catch (SQLException e) {
                 log.debug("Migration [payments-reference]: idx_payment_reference already exists, skipping");
             }
+        }
+    }
+
+    /**
+     * 마이그레이션: concierge_requests 에 견적 워크플로 컬럼 추가
+     * (★ Kaki Concierge Phase 1.5 — 통화 후 이메일 견적 발송)
+     * <p>
+     * 추가 컬럼:
+     * - call_scheduled_at: 통화에서 합의한 미팅/후속 약속 일정
+     * - quoted_amount: 컨시어지 서비스 수수료 (매니저가 통화 후 확정)
+     * - quote_sent_at: 견적 이메일 발송 타임스탬프
+     * - verification_phrase: 피싱 방지용 4단어 토큰 (생성 시 세팅, 이메일·통화에 노출)
+     */
+    private void migrateConciergeRequestsQuoteColumns(Connection conn) throws SQLException {
+        if (columnExists(conn, "concierge_requests", "quoted_amount")) {
+            log.debug("Migration [concierge-requests-quote]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [concierge-requests-quote]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            if (!columnExists(conn, "concierge_requests", "call_scheduled_at")) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN call_scheduled_at DATETIME(6) AFTER cancellation_reason"
+                );
+            }
+            stmt.executeUpdate(
+                "ALTER TABLE concierge_requests ADD COLUMN quoted_amount DECIMAL(10,2) AFTER call_scheduled_at"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE concierge_requests ADD COLUMN quote_sent_at DATETIME(6) AFTER quoted_amount"
+            );
+            if (!columnExists(conn, "concierge_requests", "verification_phrase")) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN verification_phrase VARCHAR(60) AFTER quote_sent_at"
+                );
+            }
+            log.info("Migration [concierge-requests-quote]: added 4 columns");
         }
     }
 

@@ -1,6 +1,9 @@
 package com.bluelight.backend.domain.file;
 
 import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.lewserviceorder.LewServiceOrder;
+import com.bluelight.backend.domain.lightingorder.LightingOrder;
+import com.bluelight.backend.domain.powersocketorder.PowerSocketOrder;
 import com.bluelight.backend.domain.sldorder.SldOrder;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -47,6 +50,27 @@ public class FileEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sld_order_seq")
     private SldOrder sldOrder;
+
+    /**
+     * 관련 Lighting Layout 주문 (FK, nullable)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lighting_order_seq")
+    private LightingOrder lightingOrder;
+
+    /**
+     * 관련 Power Socket 주문 (FK, nullable)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "power_socket_order_seq")
+    private PowerSocketOrder powerSocketOrder;
+
+    /**
+     * 관련 LEW Service 주문 (FK, nullable)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "lew_service_order_seq")
+    private LewServiceOrder lewServiceOrder;
 
     /**
      * 파일 종류
@@ -106,9 +130,15 @@ public class FileEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    public FileEntity(Application application, SldOrder sldOrder, FileType fileType, String fileUrl, String originalFilename, Long fileSize) {
+    public FileEntity(Application application, SldOrder sldOrder,
+                      LightingOrder lightingOrder, PowerSocketOrder powerSocketOrder,
+                      LewServiceOrder lewServiceOrder,
+                      FileType fileType, String fileUrl, String originalFilename, Long fileSize) {
         this.application = application;
         this.sldOrder = sldOrder;
+        this.lightingOrder = lightingOrder;
+        this.powerSocketOrder = powerSocketOrder;
+        this.lewServiceOrder = lewServiceOrder;
         this.fileType = fileType;
         this.fileUrl = fileUrl;
         this.originalFilename = originalFilename;
