@@ -24,9 +24,10 @@ export interface ApiError {
 // ============================================
 
 /**
- * 사용자 역할
+ * 사용자 역할 — 단일 정의원은 `constants/roles.ts`
  */
-export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN' | 'SYSTEM_ADMIN' | 'SLD_MANAGER' | 'CONCIERGE_MANAGER';
+import type { UserRole } from '../constants/roles';
+export type { UserRole };
 
 /**
  * LEW 승인 상태
