@@ -140,7 +140,8 @@ export default function LandingPage() {
                 </h2>
                 <p className="text-sm text-gray-700 leading-relaxed mb-6">
                   Our team personally manages your entire electrical licensing
-                  process — from submission to approval.
+                  process — from submission to approval.{' '}
+                  <strong className="text-concierge-700">We come to you.</strong>
                 </p>
                 <Button
                   variant="concierge"
