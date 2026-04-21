@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useRoleStore, selectRoleLabels } from '../../stores/roleStore';
 import licensekakiLogo from '../../assets/licensekaki-logo.png';
-import { ROLE_LABELS } from '../../constants/roles';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import Footer from './Footer';
@@ -15,6 +15,13 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const loadRoles = useRoleStore((s) => s.loadRoles);
+  const roleLabels = useRoleStore(selectRoleLabels);
+
+  // 인증된 사용자가 Layout 에 진입하는 순간 1회 역할 메타데이터 로드
+  useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
 
   const isAdmin = user?.role === 'ADMIN';
   const isSystemAdmin = user?.role === 'SYSTEM_ADMIN';
@@ -49,6 +56,7 @@ export default function Layout() {
   // SYSTEM_ADMIN: 시스템 설정 전용
   const systemAdminMenu = [
     { path: '/admin/system', label: 'System', icon: '🔧' },
+    { path: '/admin/roles', label: 'Roles', icon: '🗝️' },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
     { path: '/admin/data-breaches', label: 'Data Breach', icon: '🛡️' },
   ];
@@ -79,12 +87,12 @@ export default function Layout() {
   const isActive = (path: string) => location.pathname === path;
 
   // 승인 대기 LEW는 Applicant UI로 노출하는 기존 동작을 유지 (isLew는 approved일 때만 true)
-  const roleLabel = isSystemAdmin ? ROLE_LABELS.SYSTEM_ADMIN
-    : isAdmin ? ROLE_LABELS.ADMIN
-    : isLew ? ROLE_LABELS.LEW
-    : isSldManager ? ROLE_LABELS.SLD_MANAGER
-    : isConciergeManager ? ROLE_LABELS.CONCIERGE_MANAGER
-    : ROLE_LABELS.APPLICANT;
+  const roleLabel = isSystemAdmin ? roleLabels.SYSTEM_ADMIN
+    : isAdmin ? roleLabels.ADMIN
+    : isLew ? roleLabels.LEW
+    : isSldManager ? roleLabels.SLD_MANAGER
+    : isConciergeManager ? roleLabels.CONCIERGE_MANAGER
+    : roleLabels.APPLICANT;
 
   const homePath = isSystemAdmin ? '/admin/system'
     : isAdmin ? '/admin/dashboard'

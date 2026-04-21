@@ -1,3 +1,6 @@
+// UserRole enum 상수 — 백엔드 UserRole enum 과 동기화 필요.
+// 라벨/할당 가능 여부/필터 노출 여부는 sysadmin 이 역할 메타데이터 페이지에서 관리한다.
+// 이 파일은 타입과 default 라벨만 유지하며, 런타임 값은 `stores/roleStore.ts` 를 참조.
 export const USER_ROLES = [
   'APPLICANT',
   'LEW',
@@ -9,6 +12,8 @@ export const USER_ROLES = [
 
 export type UserRole = typeof USER_ROLES[number];
 
+// 서버 응답 도착 전에도 UI 가 동작하도록 기본 라벨을 노출.
+// 실제 렌더링 값은 roleStore 를 통해 서버 데이터로 덮어써진다.
 export const ROLE_LABELS: Record<UserRole, string> = {
   APPLICANT: 'Applicant',
   LEW: 'LEW',
@@ -17,20 +22,3 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: 'Administrator',
   SYSTEM_ADMIN: 'System Admin',
 };
-
-// Admin이 UI에서 직접 할당 가능한 역할 (백엔드가 ADMIN/SYSTEM_ADMIN 할당을 차단)
-export const ASSIGNABLE_ROLES: readonly UserRole[] = [
-  'APPLICANT',
-  'LEW',
-  'SLD_MANAGER',
-  'CONCIERGE_MANAGER',
-];
-
-// Users 목록 필터 드롭다운 노출 역할
-export const FILTERABLE_ROLES: readonly UserRole[] = [
-  'APPLICANT',
-  'LEW',
-  'SLD_MANAGER',
-  'CONCIERGE_MANAGER',
-  'ADMIN',
-];

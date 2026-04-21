@@ -10,17 +10,19 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User, UserRole, ApprovalStatus } from '../../types';
-import { ROLE_LABELS, ASSIGNABLE_ROLES, FILTERABLE_ROLES } from '../../constants/roles';
-
-const ROLE_OPTIONS = [
-  { value: '', label: 'All Roles' },
-  ...FILTERABLE_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
-];
+import { useRoleStore, selectRoleLabels, selectAssignableRoles, selectFilterableRoles } from '../../stores/roleStore';
 
 const PAGE_SIZE = 20;
 
 export default function AdminUserListPage() {
   const toast = useToastStore();
+  const roleLabels = useRoleStore(selectRoleLabels);
+  const assignableRoles = useRoleStore(selectAssignableRoles);
+  const filterableRoles = useRoleStore(selectFilterableRoles);
+  const roleOptions = [
+    { value: '', label: 'All Roles' },
+    ...filterableRoles.map((role) => ({ value: role, label: roleLabels[role] })),
+  ];
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -193,8 +195,8 @@ export default function AdminUserListPage() {
               aria-label={`Change ${fullName(user.firstName, user.lastName)}'s role`}
             >
               <option value="" disabled>Change</option>
-              {ASSIGNABLE_ROLES.filter((r) => r !== user.role).map((r) => (
-                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              {assignableRoles.filter((r) => r !== user.role).map((r) => (
+                <option key={r} value={r}>{roleLabels[r]}</option>
               ))}
             </select>
           )}
@@ -305,7 +307,7 @@ export default function AdminUserListPage() {
             <Select
               value={roleFilter}
               onChange={handleRoleFilterChange}
-              options={ROLE_OPTIONS}
+              options={roleOptions}
             />
           </div>
         </div>

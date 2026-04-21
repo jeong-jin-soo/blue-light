@@ -795,3 +795,20 @@ CREATE TABLE IF NOT EXISTS user_consent_logs (
     INDEX idx_consent_log_user_type (user_seq, consent_type, created_at),
     INDEX idx_consent_log_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- role_metadata — UserRole enum 별 표시 라벨 및 노출/할당 여부 (sysadmin 관리)
+-- ============================================
+CREATE TABLE IF NOT EXISTS role_metadata (
+    role_code       VARCHAR(32)   NOT NULL,
+    display_label   VARCHAR(100)  NOT NULL,
+    assignable      BOOLEAN       NOT NULL DEFAULT TRUE,
+    filterable      BOOLEAN       NOT NULL DEFAULT TRUE,
+    sort_order      INT           NOT NULL DEFAULT 0,
+    created_at      DATETIME(6),
+    updated_at      DATETIME(6),
+    created_by      BIGINT,
+    updated_by      BIGINT,
+    deleted_at      DATETIME(6),
+    PRIMARY KEY (role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

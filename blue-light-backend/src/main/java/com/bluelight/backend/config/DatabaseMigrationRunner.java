@@ -1,5 +1,6 @@
 package com.bluelight.backend.config;
 
+import com.bluelight.backend.domain.user.UserRole;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,11 @@ import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * DB 스키마 마이그레이션 러너
@@ -54,6 +60,8 @@ public class DatabaseMigrationRunner {
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
+            // role_metadata 싱크 — UserRole enum 값을 테이블에 upsert하고 enum에 없는 row는 삭제
+            syncRoleMetadata(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -734,6 +742,80 @@ public class DatabaseMigrationRunner {
             ps.setString(2, passwordHash);
             ps.executeUpdate();
             log.info("Migration [seed-concierge-manager]: created seed account {}", email);
+        }
+    }
+
+    /**
+     * role_metadata 싱크:
+     * - UserRole enum 값 중 테이블에 없는 것은 기본값으로 INSERT (멱등)
+     * - 테이블에 있으나 enum에 없는 row 는 DELETE (enum 이 축소된 경우 정리)
+     * - 기존 row 는 sysadmin 이 수정한 값이 있을 수 있으므로 건드리지 않음
+     */
+    private void syncRoleMetadata(Connection conn) throws SQLException {
+        if (!tableExists(conn, "role_metadata")) {
+            log.warn("Migration [sync-role-metadata]: role_metadata table not found, skipping");
+            return;
+        }
+
+        // 기본값: (label, assignable, filterable, sortOrder)
+        // ADMIN/SYSTEM_ADMIN 은 UI 에서 assign 불가. SYSTEM_ADMIN 은 필터에도 노출하지 않음.
+        Object[][] defaults = {
+            {UserRole.APPLICANT,         "Applicant",         true,  true,  10},
+            {UserRole.LEW,               "LEW",               true,  true,  20},
+            {UserRole.SLD_MANAGER,       "SLD Manager",       true,  true,  30},
+            {UserRole.CONCIERGE_MANAGER, "Concierge Manager", true,  true,  40},
+            {UserRole.ADMIN,             "Administrator",     false, true,  50},
+            {UserRole.SYSTEM_ADMIN,      "System Admin",      false, false, 60},
+        };
+
+        int inserted = 0;
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM role_metadata WHERE role_code = ?");
+             PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO role_metadata (role_code, display_label, assignable, filterable, sort_order, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, NOW(6), NOW(6))")) {
+            for (Object[] row : defaults) {
+                String code = ((UserRole) row[0]).name();
+                check.setString(1, code);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) continue;
+                }
+                insert.setString(1, code);
+                insert.setString(2, (String) row[1]);
+                insert.setBoolean(3, (Boolean) row[2]);
+                insert.setBoolean(4, (Boolean) row[3]);
+                insert.setInt(5, (Integer) row[4]);
+                insert.executeUpdate();
+                inserted++;
+            }
+        }
+
+        Set<String> validCodes = new HashSet<>();
+        for (UserRole r : UserRole.values()) validCodes.add(r.name());
+
+        List<String> stale = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT role_code FROM role_metadata");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String code = rs.getString(1);
+                if (!validCodes.contains(code)) stale.add(code);
+            }
+        }
+        if (!stale.isEmpty()) {
+            try (PreparedStatement del = conn.prepareStatement(
+                    "DELETE FROM role_metadata WHERE role_code = ?")) {
+                for (String c : stale) {
+                    del.setString(1, c);
+                    del.executeUpdate();
+                }
+            }
+            log.info("Migration [sync-role-metadata]: removed stale rows {}", stale);
+        }
+
+        if (inserted > 0) {
+            log.info("Migration [sync-role-metadata]: inserted {} new role rows", inserted);
+        } else if (stale.isEmpty()) {
+            log.debug("Migration [sync-role-metadata]: in sync with UserRole enum");
         }
     }
 

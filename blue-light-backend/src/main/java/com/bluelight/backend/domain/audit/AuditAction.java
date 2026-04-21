@@ -60,6 +60,7 @@ public enum AuditAction {
     SLD_AI_GENERATION_TOGGLED,
     PRICE_UPDATED,
     SETTINGS_UPDATED,
+    ROLE_METADATA_UPDATED,
 
     // PDPA data rights
     DATA_EXPORTED,

@@ -50,6 +50,7 @@ import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 
 // System Admin pages
 import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
+import SystemRolesPage from '../pages/admin/SystemRolesPage';
 import AuditLogPage from '../pages/admin/AuditLogPage';
 import DataBreachPage from '../pages/admin/DataBreachPage';
 
@@ -183,6 +184,7 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/system', element: <SystemSettingsPage /> },
+          { path: '/admin/roles', element: <SystemRolesPage /> },
           { path: '/admin/audit-logs', element: <AuditLogPage /> },
           { path: '/admin/data-breaches', element: <DataBreachPage /> },
           { path: '/admin/notifications', element: <NotificationsPage /> },
