@@ -176,9 +176,6 @@ export default function LandingPage() {
                 &amp; more
               </span>
             </h2>
-            <p className="mt-3 text-gray-500 max-w-2xl mx-auto">
-              From application to approval, manage the entire licensing process online.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
@@ -202,6 +199,50 @@ export default function LandingPage() {
                 </ul>
               </div>
             ))}
+          </div>
+
+          {/* Request-a-service CTA — 4 direct entry points */}
+          <div className="mt-12 sm:mt-16">
+            <div className="text-center mb-6">
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
+                Start a Request
+              </h3>
+              <p className="mt-1.5 text-sm text-gray-500">
+                Choose a service to get started instantly.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto">
+              {[
+                { icon: '📐', label: 'SLD Drawing',     to: '/sld-orders/new' },
+                { icon: '💡', label: 'Lighting Layout', to: '/lighting-orders/new' },
+                { icon: '🔌', label: 'Power Socket',    to: '/power-socket-orders/new' },
+                { icon: '⚡', label: 'LEW Service',     to: '/lew-service-orders/new' },
+              ].map((item) => (
+                <button
+                  key={item.to}
+                  type="button"
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      navigate(item.to);
+                    } else {
+                      // 회원가입 후 원래 기능 요청 페이지로 리다이렉트
+                      navigate(`/signup?role=APPLICANT&returnTo=${encodeURIComponent(item.to)}`);
+                    }
+                  }}
+                  className="group flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl bg-white border border-emerald-100/80 hover:shadow-lg hover:border-primary/40 transition-all text-center"
+                >
+                  <span className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl group-hover:bg-primary/10 transition-colors">
+                    {item.icon}
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800 group-hover:text-primary transition-colors">
+                    {item.label}
+                  </span>
+                  <span className="text-xs text-gray-400 group-hover:text-primary/70 transition-colors">
+                    Request now →
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
