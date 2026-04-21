@@ -1,28 +1,62 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { useToastStore } from '../../stores/toastStore';
 import { lightingOrderApi } from '../../api/lightingOrderApi';
+import priceApi from '../../api/priceApi';
+import { BUILDING_TYPES, KVA_UNKNOWN_SENTINEL, KVA_UNKNOWN_PLACEHOLDER } from '../../constants/orderFormOptions';
+import type { MasterPrice } from '../../types';
+
+interface FormState {
+  address: string;
+  postalCode: string;
+  buildingType: string;
+  selectedKva: number | null;
+  kvaUnknown: boolean;
+  applicantNote: string;
+}
 
 export default function NewLightingOrderPage() {
   const navigate = useNavigate();
   const toast = useToastStore();
 
   const [submitting, setSubmitting] = useState(false);
+  const [priceTiers, setPriceTiers] = useState<MasterPrice[]>([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormState>({
     address: '',
     postalCode: '',
     buildingType: '',
-    selectedKva: '' as string,
+    selectedKva: null,
+    kvaUnknown: false,
     applicantNote: '',
   });
 
-  const updateField = (field: string, value: string) => {
+  // kVA 옵션을 위해 가격 tier 목록만 로드 (가격 자체는 표시하지 않음)
+  useEffect(() => {
+    priceApi.getPrices()
+      .then((tiers) => setPriceTiers(tiers.filter((t) => t.isActive)))
+      .catch(() => { /* non-critical */ });
+  }, []);
+
+  const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleKvaChange = (v: string) => {
+    if (v === KVA_UNKNOWN_SENTINEL) {
+      setFormData((prev) => ({ ...prev, kvaUnknown: true, selectedKva: null }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        kvaUnknown: false,
+        selectedKva: v ? Number(v) : null,
+      }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,8 +66,10 @@ export default function NewLightingOrderPage() {
       const payload = {
         address: formData.address.trim() || undefined,
         postalCode: formData.postalCode.trim() || undefined,
-        buildingType: formData.buildingType.trim() || undefined,
-        selectedKva: formData.selectedKva ? Number(formData.selectedKva) : undefined,
+        buildingType: formData.buildingType || undefined,
+        selectedKva: formData.kvaUnknown
+          ? KVA_UNKNOWN_PLACEHOLDER
+          : (formData.selectedKva ?? undefined),
         applicantNote: formData.applicantNote.trim() || undefined,
       };
       const order = await lightingOrderApi.createLightingOrder(payload);
@@ -63,7 +99,7 @@ export default function NewLightingOrderPage() {
         </button>
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New Lighting Layout Order</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Request a Lighting layout drawing</p>
+          <p className="text-sm text-gray-500 mt-0.5">Request a lighting layout drawing</p>
         </div>
       </div>
 
@@ -86,22 +122,32 @@ export default function NewLightingOrderPage() {
                 value={formData.postalCode}
                 onChange={(e) => updateField('postalCode', e.target.value)}
               />
-              <Input
+              <Select
                 label="Building Type"
-                placeholder="e.g., Residential, Commercial"
                 value={formData.buildingType}
                 onChange={(e) => updateField('buildingType', e.target.value)}
+                options={BUILDING_TYPES}
               />
             </div>
 
-            {/* kVA */}
-            <Input
-              label="Capacity (kVA)"
-              type="number"
-              placeholder="e.g., 45"
-              value={formData.selectedKva}
-              onChange={(e) => updateField('selectedKva', e.target.value)}
-              min={0}
+            {/* kVA — 가격표 없이 tier 선택 */}
+            <Select
+              label="Electric Box (kVA)"
+              value={
+                formData.kvaUnknown
+                  ? KVA_UNKNOWN_SENTINEL
+                  : (formData.selectedKva ? String(formData.selectedKva) : '')
+              }
+              onChange={(e) => handleKvaChange(e.target.value)}
+              options={[
+                { value: '', label: 'Select kVA capacity' },
+                { value: KVA_UNKNOWN_SENTINEL, label: "I don't know — let the team confirm later" },
+                { value: '__DIVIDER__', label: '────────────────────', disabled: true },
+                ...priceTiers.map((tier) => ({
+                  value: String(tier.kvaMin),
+                  label: tier.description || `${tier.kvaMin}–${tier.kvaMax} kVA`,
+                })),
+              ]}
             />
 
             {/* Applicant Note */}
@@ -114,7 +160,6 @@ export default function NewLightingOrderPage() {
               rows={4}
               hint={`${formData.applicantNote.length}/2000`}
             />
-
 
             {/* Submit */}
             <div className="flex justify-end pt-4 border-t border-gray-100">

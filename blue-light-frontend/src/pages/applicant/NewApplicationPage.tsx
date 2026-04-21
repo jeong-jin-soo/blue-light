@@ -26,25 +26,13 @@ import {
   validateApplicationStep2,
 } from '../../utils/validation';
 import type { MasterPrice, PriceCalculation, Application, ApplicantType, ApplicationType, CreateApplicationRequest, CompanyInfo } from '../../types';
+import { BUILDING_TYPES, KVA_UNKNOWN_SENTINEL } from '../../constants/orderFormOptions';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
   { label: 'Address', description: 'Property details' },
   { label: 'kVA & Price', description: 'Select capacity' },
   { label: 'Review', description: 'Confirm & submit' },
-];
-
-const BUILDING_TYPES = [
-  { value: '', label: 'Select building type' },
-  { value: 'Residential', label: 'Residential' },
-  { value: 'Commercial', label: 'Commercial' },
-  { value: 'Industrial', label: 'Industrial' },
-  { value: 'Hotel', label: 'Hotel' },
-  { value: 'Healthcare', label: 'Healthcare' },
-  { value: 'Education', label: 'Education' },
-  { value: 'Government', label: 'Government' },
-  { value: 'Mixed Use', label: 'Mixed Use' },
-  { value: 'Other', label: 'Other' },
 ];
 
 interface FormData {
@@ -67,9 +55,6 @@ interface FormData {
   // SLD option
   sldOption: 'SELF_UPLOAD' | 'REQUEST_LEW';
 }
-
-/** Step 2 드롭다운의 "I don't know" 특수 sentinel 값. */
-const KVA_UNKNOWN_SENTINEL = '__UNKNOWN__';
 
 export default function NewApplicationPage() {
   const navigate = useNavigate();
