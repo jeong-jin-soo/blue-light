@@ -94,6 +94,9 @@ export default function LandingPage() {
                 Electrical Installation Licences,{' '}
                 <span className="text-primary">Simplified</span>
               </h1>
+              <p className="mt-6 text-sm sm:text-base text-gray-600 leading-relaxed max-w-xl">
+                The end-to-end digital platform for applying, tracking, and managing EMA electrical installation licences in Singapore. For building, business, and shop owners, LEWs, and SLD professionals.
+              </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link to="/signup?role=APPLICANT">
                   <Button size="lg">Apply for a Licence</Button>
@@ -106,10 +109,6 @@ export default function LandingPage() {
                   more
                 </button>
               </div>
-              <p className="mt-5 text-sm sm:text-base text-gray-600 leading-relaxed max-w-md">
-                Submit NEW or RENEWAL applications online.<br />
-                Upload SLD drawings, LOA, and docs with a guided form.
-              </p>
             </div>
 
             {/* Right — Concierge CTA card (★ Kaki Concierge v1.5 — Hero inline placement, 모바일에서도 노출) */}
