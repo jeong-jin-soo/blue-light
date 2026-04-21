@@ -8,19 +8,12 @@ import licensekakiLogo from '../assets/licensekaki-logo.png';
 /*  Data                                                               */
 /* ------------------------------------------------------------------ */
 
-const features = [
-  {
-    icon: '📋',
-    title: 'Online Licence Applications',
-    desc: 'Submit NEW or RENEWAL applications for EMA electrical installation licences with a guided multi-step form. Upload SLD drawings, authorization letters, and supporting documents — all online.',
-    bullets: ['Multi-step guided form', 'Document upload & management', 'Real-time status tracking'],
-  },
-  {
-    icon: '📐',
-    title: 'Professional SLD Drawings',
-    desc: 'Order single-line diagram drawings from qualified professionals. Receive custom quotes and professional SLD generation for faster turnaround.',
-    bullets: ['Custom quote system', 'Professional generation', 'Expert review & revision'],
-  },
+const services = [
+  { icon: '📋', label: 'Apply for Licence', to: '/applications/new' },
+  { icon: '📐', label: 'SLD Drawing',       to: '/sld-orders/new' },
+  { icon: '💡', label: 'Lighting Layout',   to: '/lighting-orders/new' },
+  { icon: '🔌', label: 'Power Socket',      to: '/power-socket-orders/new' },
+  { icon: '⚡', label: 'LEW Service',        to: '/lew-service-orders/new' },
 ];
 
 const steps = [
@@ -101,24 +94,22 @@ export default function LandingPage() {
                 Electrical Installation Licences,{' '}
                 <span className="text-primary">Simplified</span>
               </h1>
-              <p className="mt-5 text-base sm:text-lg text-gray-500 leading-relaxed max-w-lg">
-                The end-to-end digital platform for applying, tracking, and managing
-                EMA electrical installation licences in Singapore.
-                For building, business, and shop owners, LEWs, and SLD professionals.
-              </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link to="/signup?role=APPLICANT">
                   <Button size="lg">Apply for a Licence</Button>
                 </Link>
-                <Button
-                  variant="ghost"
-                  size="lg"
+                <button
+                  type="button"
                   onClick={scrollToFeatures}
-                  className="italic font-extrabold bg-gradient-to-r from-emerald-500 to-green-600 bg-clip-text text-transparent hover:bg-emerald-50"
+                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg border-2 border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50 hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/30 transition-colors cursor-pointer"
                 >
-                  &amp; more
-                </Button>
+                  more
+                </button>
               </div>
+              <p className="mt-5 text-sm sm:text-base text-gray-600 leading-relaxed max-w-md">
+                Submit NEW or RENEWAL applications online.<br />
+                Upload SLD drawings, LOA, and docs with a guided form.
+              </p>
             </div>
 
             {/* Right — Concierge CTA card (★ Kaki Concierge v1.5 — Hero inline placement, 모바일에서도 노출) */}
@@ -184,71 +175,33 @@ export default function LandingPage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {features.map((f) => (
-              <div
-                key={f.title}
-                className="rounded-2xl bg-white border border-emerald-100/80 p-6 hover:shadow-lg hover:border-emerald-200 transition-all"
+          {/* Services Grid — Apply + 4 direct entry points */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 max-w-5xl mx-auto">
+            {services.map((item) => (
+              <button
+                key={item.to}
+                type="button"
+                onClick={() => {
+                  if (isAuthenticated) {
+                    navigate(item.to);
+                  } else {
+                    // 회원가입 후 원래 기능 요청 페이지로 리다이렉트
+                    navigate(`/signup?role=APPLICANT&returnTo=${encodeURIComponent(item.to)}`);
+                  }
+                }}
+                className="group flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl bg-white border border-emerald-100/80 hover:shadow-lg hover:border-primary/40 transition-all text-center"
               >
-                <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl mb-4">
-                  {f.icon}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-800 mb-2">{f.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed mb-4">{f.desc}</p>
-                <ul className="space-y-2">
-                  {f.bullets.map((b) => (
-                    <li key={b} className="flex items-center gap-2 text-sm text-gray-600">
-                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0" />
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                <span className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl group-hover:bg-primary/10 transition-colors">
+                  {item.icon}
+                </span>
+                <span className="text-sm font-semibold text-gray-800 group-hover:text-primary transition-colors">
+                  {item.label}
+                </span>
+                <span className="text-xs text-gray-400 group-hover:text-primary/70 transition-colors">
+                  Request now →
+                </span>
+              </button>
             ))}
-          </div>
-
-          {/* Request-a-service CTA — 4 direct entry points */}
-          <div className="mt-12 sm:mt-16">
-            <div className="text-center mb-6">
-              <h3 className="text-lg sm:text-xl font-semibold text-gray-800">
-                Start a Request
-              </h3>
-              <p className="mt-1.5 text-sm text-gray-500">
-                Choose a service to get started instantly.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 max-w-4xl mx-auto">
-              {[
-                { icon: '📐', label: 'SLD Drawing',     to: '/sld-orders/new' },
-                { icon: '💡', label: 'Lighting Layout', to: '/lighting-orders/new' },
-                { icon: '🔌', label: 'Power Socket',    to: '/power-socket-orders/new' },
-                { icon: '⚡', label: 'LEW Service',     to: '/lew-service-orders/new' },
-              ].map((item) => (
-                <button
-                  key={item.to}
-                  type="button"
-                  onClick={() => {
-                    if (isAuthenticated) {
-                      navigate(item.to);
-                    } else {
-                      // 회원가입 후 원래 기능 요청 페이지로 리다이렉트
-                      navigate(`/signup?role=APPLICANT&returnTo=${encodeURIComponent(item.to)}`);
-                    }
-                  }}
-                  className="group flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl bg-white border border-emerald-100/80 hover:shadow-lg hover:border-primary/40 transition-all text-center"
-                >
-                  <span className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl group-hover:bg-primary/10 transition-colors">
-                    {item.icon}
-                  </span>
-                  <span className="text-sm font-semibold text-gray-800 group-hover:text-primary transition-colors">
-                    {item.label}
-                  </span>
-                  <span className="text-xs text-gray-400 group-hover:text-primary/70 transition-colors">
-                    Request now →
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
       </section>
