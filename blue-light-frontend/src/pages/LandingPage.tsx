@@ -55,10 +55,11 @@ export default function LandingPage() {
   useEffect(() => {
     if (isAuthenticated && user) {
       const dest =
-        user.role === 'SYSTEM_ADMIN'  ? '/admin/system'
-        : user.role === 'ADMIN'       ? '/admin/dashboard'
-        : user.role === 'LEW'         ? '/lew/dashboard'
-        : user.role === 'SLD_MANAGER' ? '/sld-manager/dashboard'
+        user.role === 'SYSTEM_ADMIN'       ? '/admin/system'
+        : user.role === 'ADMIN'            ? '/admin/dashboard'
+        : user.role === 'LEW'              ? '/lew/dashboard'
+        : user.role === 'SLD_MANAGER'      ? '/sld-manager/dashboard'
+        : user.role === 'CONCIERGE_MANAGER' ? '/concierge-manager/dashboard'
         : '/dashboard';
       navigate(dest, { replace: true });
     }
