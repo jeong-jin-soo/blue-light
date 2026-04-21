@@ -478,6 +478,147 @@ CREATE TABLE IF NOT EXISTS sld_order_payments (
     CONSTRAINT fk_sld_order_payments_order FOREIGN KEY (sld_order_seq) REFERENCES sld_orders (sld_order_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 18-1. Lighting Layout 주문 (SLD 주문과 동일 구조)
+CREATE TABLE IF NOT EXISTS lighting_orders (
+    lighting_order_seq   BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq             BIGINT        NOT NULL,
+    assigned_manager_seq BIGINT,
+    address              VARCHAR(255),
+    postal_code          VARCHAR(10),
+    building_type        VARCHAR(50),
+    selected_kva         INT,
+    applicant_note       TEXT,
+    sketch_file_seq      BIGINT,
+    status               VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
+    quote_amount         DECIMAL(10,2),
+    quote_note           TEXT,
+    manager_note         TEXT,
+    uploaded_file_seq    BIGINT,
+    revision_comment     TEXT,
+    created_at           DATETIME(6),
+    updated_at           DATETIME(6),
+    created_by           BIGINT,
+    updated_by           BIGINT,
+    deleted_at           DATETIME(6),
+    PRIMARY KEY (lighting_order_seq),
+    KEY idx_lighting_orders_user (user_seq),
+    KEY idx_lighting_orders_status (status),
+    KEY idx_lighting_orders_manager (assigned_manager_seq),
+    CONSTRAINT fk_lighting_orders_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_lighting_orders_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS lighting_order_payments (
+    lighting_order_payment_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    lighting_order_seq         BIGINT        NOT NULL,
+    transaction_id             VARCHAR(100),
+    amount                     DECIMAL(10,2) NOT NULL,
+    payment_method             VARCHAR(20)   DEFAULT 'BANK_TRANSFER',
+    status                     VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
+    paid_at                    DATETIME(6),
+    updated_at                 DATETIME(6),
+    created_by                 BIGINT,
+    updated_by                 BIGINT,
+    deleted_at                 DATETIME(6),
+    PRIMARY KEY (lighting_order_payment_seq),
+    KEY idx_lighting_order_payments_order (lighting_order_seq),
+    CONSTRAINT fk_lighting_order_payments_order FOREIGN KEY (lighting_order_seq) REFERENCES lighting_orders (lighting_order_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18-2. Power Socket 주문
+CREATE TABLE IF NOT EXISTS power_socket_orders (
+    power_socket_order_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq               BIGINT        NOT NULL,
+    assigned_manager_seq   BIGINT,
+    address                VARCHAR(255),
+    postal_code            VARCHAR(10),
+    building_type          VARCHAR(50),
+    selected_kva           INT,
+    applicant_note         TEXT,
+    sketch_file_seq        BIGINT,
+    status                 VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
+    quote_amount           DECIMAL(10,2),
+    quote_note             TEXT,
+    manager_note           TEXT,
+    uploaded_file_seq      BIGINT,
+    revision_comment       TEXT,
+    created_at             DATETIME(6),
+    updated_at             DATETIME(6),
+    created_by             BIGINT,
+    updated_by             BIGINT,
+    deleted_at             DATETIME(6),
+    PRIMARY KEY (power_socket_order_seq),
+    KEY idx_power_socket_orders_user (user_seq),
+    KEY idx_power_socket_orders_status (status),
+    KEY idx_power_socket_orders_manager (assigned_manager_seq),
+    CONSTRAINT fk_power_socket_orders_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_power_socket_orders_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS power_socket_order_payments (
+    power_socket_order_payment_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    power_socket_order_seq         BIGINT        NOT NULL,
+    transaction_id                 VARCHAR(100),
+    amount                         DECIMAL(10,2) NOT NULL,
+    payment_method                 VARCHAR(20)   DEFAULT 'BANK_TRANSFER',
+    status                         VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
+    paid_at                        DATETIME(6),
+    updated_at                     DATETIME(6),
+    created_by                     BIGINT,
+    updated_by                     BIGINT,
+    deleted_at                     DATETIME(6),
+    PRIMARY KEY (power_socket_order_payment_seq),
+    KEY idx_power_socket_order_payments_order (power_socket_order_seq),
+    CONSTRAINT fk_power_socket_order_payments_order FOREIGN KEY (power_socket_order_seq) REFERENCES power_socket_orders (power_socket_order_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18-3. Request for LEW Service 주문
+CREATE TABLE IF NOT EXISTS lew_service_orders (
+    lew_service_order_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq              BIGINT        NOT NULL,
+    assigned_manager_seq  BIGINT,
+    address               VARCHAR(255),
+    postal_code           VARCHAR(10),
+    building_type         VARCHAR(50),
+    selected_kva          INT,
+    applicant_note        TEXT,
+    sketch_file_seq       BIGINT,
+    status                VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
+    quote_amount          DECIMAL(10,2),
+    quote_note            TEXT,
+    manager_note          TEXT,
+    uploaded_file_seq     BIGINT,
+    revision_comment      TEXT,
+    created_at            DATETIME(6),
+    updated_at            DATETIME(6),
+    created_by            BIGINT,
+    updated_by            BIGINT,
+    deleted_at            DATETIME(6),
+    PRIMARY KEY (lew_service_order_seq),
+    KEY idx_lew_service_orders_user (user_seq),
+    KEY idx_lew_service_orders_status (status),
+    KEY idx_lew_service_orders_manager (assigned_manager_seq),
+    CONSTRAINT fk_lew_service_orders_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_lew_service_orders_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS lew_service_order_payments (
+    lew_service_order_payment_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    lew_service_order_seq         BIGINT        NOT NULL,
+    transaction_id                VARCHAR(100),
+    amount                        DECIMAL(10,2) NOT NULL,
+    payment_method                VARCHAR(20)   DEFAULT 'BANK_TRANSFER',
+    status                        VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
+    paid_at                       DATETIME(6),
+    updated_at                    DATETIME(6),
+    created_by                    BIGINT,
+    updated_by                    BIGINT,
+    deleted_at                    DATETIME(6),
+    PRIMARY KEY (lew_service_order_payment_seq),
+    KEY idx_lew_service_order_payments_order (lew_service_order_seq),
+    CONSTRAINT fk_lew_service_order_payments_order FOREIGN KEY (lew_service_order_seq) REFERENCES lew_service_orders (lew_service_order_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 19. SLD 템플릿 DB (샘플 SLD에서 추출한 도면 정보)
 CREATE TABLE IF NOT EXISTS sld_templates (
     sld_template_seq  BIGINT        NOT NULL AUTO_INCREMENT,

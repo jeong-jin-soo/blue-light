@@ -31,6 +31,15 @@ import ProfilePage from '../pages/applicant/ProfilePage';
 import SldOrderListPage from '../pages/applicant/SldOrderListPage';
 import NewSldOrderPage from '../pages/applicant/NewSldOrderPage';
 import SldOrderDetailPage from '../pages/applicant/SldOrderDetailPage';
+import LightingOrderListPage from '../pages/applicant/LightingOrderListPage';
+import NewLightingOrderPage from '../pages/applicant/NewLightingOrderPage';
+import LightingOrderDetailPage from '../pages/applicant/LightingOrderDetailPage';
+import PowerSocketOrderListPage from '../pages/applicant/PowerSocketOrderListPage';
+import NewPowerSocketOrderPage from '../pages/applicant/NewPowerSocketOrderPage';
+import PowerSocketOrderDetailPage from '../pages/applicant/PowerSocketOrderDetailPage';
+import LewServiceOrderListPage from '../pages/applicant/LewServiceOrderListPage';
+import NewLewServiceOrderPage from '../pages/applicant/NewLewServiceOrderPage';
+import LewServiceOrderDetailPage from '../pages/applicant/LewServiceOrderDetailPage';
 
 // Admin pages
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
@@ -132,6 +141,15 @@ const router = createBrowserRouter([
           { path: '/sld-orders', element: <SldOrderListPage /> },
           { path: '/sld-orders/new', element: <NewSldOrderPage /> },
           { path: '/sld-orders/:id', element: <SldOrderDetailPage /> },
+          { path: '/lighting-orders', element: <LightingOrderListPage /> },
+          { path: '/lighting-orders/new', element: <NewLightingOrderPage /> },
+          { path: '/lighting-orders/:id', element: <LightingOrderDetailPage /> },
+          { path: '/power-socket-orders', element: <PowerSocketOrderListPage /> },
+          { path: '/power-socket-orders/new', element: <NewPowerSocketOrderPage /> },
+          { path: '/power-socket-orders/:id', element: <PowerSocketOrderDetailPage /> },
+          { path: '/lew-service-orders', element: <LewServiceOrderListPage /> },
+          { path: '/lew-service-orders/new', element: <NewLewServiceOrderPage /> },
+          { path: '/lew-service-orders/:id', element: <LewServiceOrderDetailPage /> },
           { path: '/profile', element: <ProfilePage /> },
           { path: '/notifications', element: <NotificationsPage /> },
         ],

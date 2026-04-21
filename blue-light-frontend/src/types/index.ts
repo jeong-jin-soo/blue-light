@@ -772,6 +772,144 @@ export interface SldChatMessage {
   createdAt: string;
 }
 
+// ── Lighting Layout / Power Socket / LEW Service 주문 (SldOrder와 동일 구조) ──
+// 프로세스는 SLD와 동일하며, 관리 항목은 차후 기능별로 분화될 수 있음.
+
+export type LightingOrderStatus = SldOrderStatus;
+
+export interface LightingOrder {
+  lightingOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: LightingOrderStatus;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  uploadedFileSeq?: number;
+  revisionComment?: string;
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLightingOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+export interface LightingOrderPayment {
+  lightingOrderPaymentSeq: number;
+  lightingOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
+export type PowerSocketOrderStatus = SldOrderStatus;
+
+export interface PowerSocketOrder {
+  powerSocketOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: PowerSocketOrderStatus;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  uploadedFileSeq?: number;
+  revisionComment?: string;
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePowerSocketOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+export interface PowerSocketOrderPayment {
+  powerSocketOrderPaymentSeq: number;
+  powerSocketOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
+export type LewServiceOrderStatus = SldOrderStatus;
+
+export interface LewServiceOrder {
+  lewServiceOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: LewServiceOrderStatus;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  uploadedFileSeq?: number;
+  revisionComment?: string;
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLewServiceOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+export interface LewServiceOrderPayment {
+  lewServiceOrderPaymentSeq: number;
+  lewServiceOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
 /**
  * SLD SSE 이벤트 타입
  */

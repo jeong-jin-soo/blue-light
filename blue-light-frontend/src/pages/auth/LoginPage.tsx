@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
 import { Input } from '../../components/ui/Input';
@@ -16,7 +16,14 @@ interface NormalizedHttpError {
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, isLoading, error, clearError, isAuthenticated, user } = useAuthStore();
+
+  // Applicant 가입 전 원래 요청 페이지로 돌려보낼 returnTo URL
+  const rawReturnTo = searchParams.get('returnTo');
+  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+    ? rawReturnTo
+    : null;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,6 +42,11 @@ export default function LoginPage() {
         navigate('/lew-pending', { replace: true });
         return;
       }
+      // Applicant이고 returnTo가 있으면 해당 페이지로 리다이렉트
+      if (user.role === 'APPLICANT' && returnTo) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
       const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system'
         : user.role === 'ADMIN' ? '/admin/dashboard'
         : user.role === 'LEW' ? '/lew/dashboard'
@@ -43,7 +55,7 @@ export default function LoginPage() {
         : '/dashboard';
       navigate(dest, { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, returnTo]);
 
   // 세션 만료로 인한 리다이렉트 감지
   useEffect(() => {
@@ -207,7 +219,10 @@ export default function LoginPage() {
 
       <div className="mt-4 text-center text-sm text-gray-500">
         Don&apos;t have an account?{' '}
-        <Link to="/signup" className="text-primary font-medium hover:underline">
+        <Link
+          to={returnTo ? `/signup?role=APPLICANT&returnTo=${encodeURIComponent(returnTo)}` : '/signup'}
+          className="text-primary font-medium hover:underline"
+        >
           Create account
         </Link>
       </div>

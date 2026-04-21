@@ -71,6 +71,12 @@ export default function SignupPage() {
       .finally(() => setOptionsLoading(false));
   }, [presetRole, updateField]);
 
+  // 가입 후 원래 요청 페이지로 돌려보낼 returnTo URL (Applicant 전용)
+  const rawReturnTo = searchParams.get('returnTo');
+  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+    ? rawReturnTo
+    : null;
+
   useEffect(() => {
     if (isAuthenticated && user) {
       // 미승인 LEW는 대기 페이지로
@@ -78,10 +84,15 @@ export default function SignupPage() {
         navigate('/lew-pending', { replace: true });
         return;
       }
+      // Applicant이고 returnTo가 있으면 해당 페이지로 리다이렉트
+      if (user.role === 'APPLICANT' && returnTo) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
       const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system' : user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, returnTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -300,7 +311,10 @@ export default function SignupPage() {
 
       <div className="mt-4 text-center text-sm text-gray-500">
         Already have an account?{' '}
-        <Link to="/login" className="text-primary font-medium hover:underline">
+        <Link
+          to={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login'}
+          className="text-primary font-medium hover:underline"
+        >
           Sign in
         </Link>
       </div>
