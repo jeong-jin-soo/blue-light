@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import licensekakiLogo from '../../assets/licensekaki-logo.png';
+import { ROLE_LABELS } from '../../constants/roles';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import Footer from './Footer';
@@ -32,7 +33,9 @@ export default function Layout() {
     { path: '/applications', label: 'My Applications', icon: '📋' },
     { path: '/applications/new', label: 'New Application', icon: '➕' },
     { path: '/sld-orders', label: 'SLD Orders', icon: '📐' },
-    { path: '/sld-orders/new', label: 'New SLD Order', icon: '➕' },
+    { path: '/lighting-orders', label: 'Lighting Layout', icon: '💡' },
+    { path: '/power-socket-orders', label: 'Power Socket', icon: '🔌' },
+    { path: '/lew-service-orders', label: 'LEW Service', icon: '⚡' },
     { path: '/profile', label: 'My Profile', icon: '👤' },
   ];
 
@@ -75,12 +78,13 @@ export default function Layout() {
 
   const isActive = (path: string) => location.pathname === path;
 
-  const roleLabel = isSystemAdmin ? 'System Admin'
-    : isAdmin ? 'Administrator'
-    : isLew ? 'LEW'
-    : isSldManager ? 'SLD Manager'
-    : isConciergeManager ? 'Concierge Manager'
-    : 'Applicant';
+  // 승인 대기 LEW는 Applicant UI로 노출하는 기존 동작을 유지 (isLew는 approved일 때만 true)
+  const roleLabel = isSystemAdmin ? ROLE_LABELS.SYSTEM_ADMIN
+    : isAdmin ? ROLE_LABELS.ADMIN
+    : isLew ? ROLE_LABELS.LEW
+    : isSldManager ? ROLE_LABELS.SLD_MANAGER
+    : isConciergeManager ? ROLE_LABELS.CONCIERGE_MANAGER
+    : ROLE_LABELS.APPLICANT;
 
   const homePath = isSystemAdmin ? '/admin/system'
     : isAdmin ? '/admin/dashboard'

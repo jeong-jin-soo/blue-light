@@ -10,13 +10,11 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User, UserRole, ApprovalStatus } from '../../types';
+import { ROLE_LABELS, ASSIGNABLE_ROLES, FILTERABLE_ROLES } from '../../constants/roles';
 
 const ROLE_OPTIONS = [
   { value: '', label: 'All Roles' },
-  { value: 'APPLICANT', label: 'Applicant' },
-  { value: 'LEW', label: 'LEW' },
-  { value: 'SLD_MANAGER', label: 'SLD Manager' },
-  { value: 'ADMIN', label: 'Admin' },
+  ...FILTERABLE_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] })),
 ];
 
 const PAGE_SIZE = 20;
@@ -195,9 +193,9 @@ export default function AdminUserListPage() {
               aria-label={`Change ${fullName(user.firstName, user.lastName)}'s role`}
             >
               <option value="" disabled>Change</option>
-              {user.role !== 'APPLICANT' && <option value="APPLICANT">Applicant</option>}
-              {user.role !== 'LEW' && <option value="LEW">LEW</option>}
-              {user.role !== 'SLD_MANAGER' && <option value="SLD_MANAGER">SLD Manager</option>}
+              {ASSIGNABLE_ROLES.filter((r) => r !== user.role).map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
             </select>
           )}
         </div>
