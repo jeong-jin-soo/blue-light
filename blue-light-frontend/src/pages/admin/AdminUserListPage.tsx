@@ -10,15 +10,17 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User, UserRole, ApprovalStatus } from '../../types';
+import { useShallow } from 'zustand/react/shallow';
 import { useRoleStore, selectRoleLabels, selectAssignableRoles, selectFilterableRoles } from '../../stores/roleStore';
 
 const PAGE_SIZE = 20;
 
 export default function AdminUserListPage() {
   const toast = useToastStore();
-  const roleLabels = useRoleStore(selectRoleLabels);
-  const assignableRoles = useRoleStore(selectAssignableRoles);
-  const filterableRoles = useRoleStore(selectFilterableRoles);
+  // useShallow: 각 selector가 매 호출마다 새 객체/배열을 반환하므로 얕은 비교 필수
+  const roleLabels = useRoleStore(useShallow(selectRoleLabels));
+  const assignableRoles = useRoleStore(useShallow(selectAssignableRoles));
+  const filterableRoles = useRoleStore(useShallow(selectFilterableRoles));
   const roleOptions = [
     { value: '', label: 'All Roles' },
     ...filterableRoles.map((role) => ({ value: role, label: roleLabels[role] })),

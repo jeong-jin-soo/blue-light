@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../stores/authStore';
 import { useRoleStore, selectRoleLabels } from '../../stores/roleStore';
 import licensekakiLogo from '../../assets/licensekaki-logo.png';
@@ -16,7 +17,9 @@ export default function Layout() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const loadRoles = useRoleStore((s) => s.loadRoles);
-  const roleLabels = useRoleStore(selectRoleLabels);
+  // useShallow: selectRoleLabels가 매 호출마다 새 객체({...})를 반환하므로
+  // 얕은 비교로 래핑하지 않으면 Layout이 무한 리렌더 → React error #185.
+  const roleLabels = useRoleStore(useShallow(selectRoleLabels));
 
   // 인증된 사용자가 Layout 에 진입하는 순간 1회 역할 메타데이터 로드
   useEffect(() => {
