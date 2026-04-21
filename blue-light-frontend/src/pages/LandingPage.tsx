@@ -115,9 +115,9 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right — Concierge CTA card (★ Kaki Concierge v1.5 — Hero inline placement) */}
-            <div className="hidden lg:block relative mt-12 lg:mt-0">
-              <div className="bg-concierge-50 border-2 border-concierge-300 rounded-2xl shadow-lg p-8 transform rotate-1 hover:rotate-0 transition-transform duration-300">
+            {/* Right — Concierge CTA card (★ Kaki Concierge v1.5 — Hero inline placement, 모바일에서도 노출) */}
+            <div className="relative mt-10 lg:mt-0">
+              <div className="bg-concierge-50 border-2 border-concierge-300 rounded-2xl shadow-md p-6 sm:p-8">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-concierge-100 text-concierge-700 text-xs font-semibold mb-4">
                   <svg
                     aria-hidden="true"
@@ -135,7 +135,7 @@ export default function LandingPage() {
                   </svg>
                   White-Glove Service
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
                   Let us handle your licensing
                 </h2>
                 <p className="text-sm text-gray-700 leading-relaxed mb-6">
@@ -154,16 +154,16 @@ export default function LandingPage() {
                   A Concierge Manager will contact you within 24 hours.
                 </p>
               </div>
-              {/* Decorative blobs (concierge 톤으로 조정) */}
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-concierge-100/60 rounded-full -z-10" />
-              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-concierge-50 rounded-full -z-10" />
+              {/* Decorative blobs — desktop만 (모바일 공간 절약) */}
+              <div className="hidden lg:block absolute -top-4 -right-4 w-24 h-24 bg-concierge-100/60 rounded-full -z-10" />
+              <div className="hidden lg:block absolute -bottom-6 -left-6 w-32 h-32 bg-concierge-50 rounded-full -z-10" />
             </div>
           </div>
         </div>
       </section>
 
       {/* ── C. Features Grid ── */}
-      <section id="features" className="py-16 sm:py-24">
+      <section id="features" className="py-16 sm:py-24 bg-gradient-to-br from-emerald-50 to-green-50/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="text-xs font-semibold tracking-widest text-primary uppercase">
@@ -184,7 +184,7 @@ export default function LandingPage() {
             {features.map((f) => (
               <div
                 key={f.title}
-                className="rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:border-gray-200 transition-all"
+                className="rounded-2xl bg-white border border-emerald-100/80 p-6 hover:shadow-lg hover:border-emerald-200 transition-all"
               >
                 <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl mb-4">
                   {f.icon}
