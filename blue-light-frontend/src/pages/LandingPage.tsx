@@ -109,8 +109,13 @@ export default function LandingPage() {
                 <Link to="/signup?role=APPLICANT">
                   <Button size="lg">Apply for a Licence</Button>
                 </Link>
-                <Button variant="ghost" size="lg" onClick={scrollToFeatures}>
-                  Learn More
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  onClick={scrollToFeatures}
+                  className="italic font-extrabold bg-gradient-to-r from-emerald-500 to-green-600 bg-clip-text text-transparent hover:bg-emerald-50"
+                >
+                  &amp; more
                 </Button>
               </div>
             </div>
