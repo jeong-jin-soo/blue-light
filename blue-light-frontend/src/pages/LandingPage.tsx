@@ -115,80 +115,50 @@ export default function LandingPage() {
               </div>
             </div>
 
-            {/* Right — Visual mockup (hidden on mobile) */}
+            {/* Right — Concierge CTA card (★ Kaki Concierge v1.5 — Hero inline placement) */}
             <div className="hidden lg:block relative mt-12 lg:mt-0">
-              <div className="bg-white rounded-2xl shadow-lg p-6 transform rotate-1 hover:rotate-0 transition-transform duration-300">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-medium text-gray-400 tracking-wide">APPLICATION #2026-0142</span>
-                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">In Progress</span>
+              <div className="bg-concierge-50 border-2 border-concierge-300 rounded-2xl shadow-lg p-8 transform rotate-1 hover:rotate-0 transition-transform duration-300">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-concierge-100 text-concierge-700 text-xs font-semibold mb-4">
+                  <svg
+                    aria-hidden="true"
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
+                    />
+                  </svg>
+                  White-Glove Service
                 </div>
-                <div className="space-y-4">
-                  {statusSteps.map((s, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div
-                        className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                          s.current
-                            ? 'bg-primary ring-4 ring-primary/20'
-                            : s.done
-                              ? 'bg-emerald-500'
-                              : 'bg-gray-200'
-                        }`}
-                      />
-                      <span className={`text-sm ${s.current ? 'font-semibold text-primary' : s.done ? 'text-gray-600' : 'text-gray-400'}`}>
-                        {s.label}
-                      </span>
-                      {s.done && <span className="text-emerald-500 text-xs ml-auto">✓</span>}
-                      {s.current && <span className="text-primary text-xs ml-auto font-medium">Processing…</span>}
-                    </div>
-                  ))}
-                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                  Let us handle your licensing
+                </h2>
+                <p className="text-sm text-gray-700 leading-relaxed mb-6">
+                  Our team personally manages your entire electrical licensing
+                  process — from submission to approval.
+                </p>
+                <Button
+                  variant="concierge"
+                  size="lg"
+                  fullWidth
+                  onClick={() => navigate('/concierge/request')}
+                >
+                  Start Kaki Concierge
+                </Button>
+                <p className="mt-3 text-xs text-gray-500 text-center">
+                  A Concierge Manager will contact you within 24 hours.
+                </p>
               </div>
-              {/* Decorative blobs */}
-              <div className="absolute -top-4 -right-4 w-24 h-24 bg-primary/5 rounded-full -z-10" />
-              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-blue-100/50 rounded-full -z-10" />
+              {/* Decorative blobs (concierge 톤으로 조정) */}
+              <div className="absolute -top-4 -right-4 w-24 h-24 bg-concierge-100/60 rounded-full -z-10" />
+              <div className="absolute -bottom-6 -left-6 w-32 h-32 bg-concierge-50 rounded-full -z-10" />
             </div>
           </div>
-        </div>
-      </section>
-
-      {/* ── B2. Concierge CTA (★ Kaki Concierge v1.5 Phase 1 PR#3) ── */}
-      <section className="bg-concierge-50 border-y border-concierge-200 py-12 sm:py-16">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-concierge-100 text-concierge-700 text-xs font-semibold mb-4">
-            <svg
-              aria-hidden="true"
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"
-              />
-            </svg>
-            White-Glove Service
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">
-            Let us handle your licensing
-          </h2>
-          <p className="text-base sm:text-lg text-gray-700 max-w-2xl mx-auto mb-8">
-            LicenseKaki offers a White-Glove Licensing Service, where our team
-            personally manages your entire electrical licensing process — from
-            submission to approval.
-          </p>
-          <Button
-            variant="concierge"
-            size="lg"
-            onClick={() => navigate('/concierge/request')}
-          >
-            Start Kaki Concierge
-          </Button>
-          <p className="mt-4 text-xs text-gray-500">
-            A Concierge Manager will contact you within 24 hours.
-          </p>
         </div>
       </section>
 
@@ -245,37 +215,57 @@ export default function LandingPage() {
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-gray-900">
               Get Your Licence in 4 Simple Steps
             </h2>
+            <p className="mt-3 text-gray-500 max-w-xl mx-auto">
+              Track your application in real time — here's how a licence progresses.
+            </p>
           </div>
 
-          {/* Desktop: horizontal with connectors */}
-          <div className="hidden lg:grid lg:grid-cols-4 gap-8 relative">
-            {/* Connector line */}
-            <div className="absolute top-6 left-[12.5%] right-[12.5%] h-0.5 bg-gray-200" aria-hidden="true">
-              <div className="h-full w-1/2 bg-primary" />
+          <div className="lg:grid lg:grid-cols-[1fr_auto] lg:gap-16 lg:items-center">
+            {/* 좌측: 4-step vertical timeline */}
+            <div className="space-y-6 sm:space-y-8 relative">
+              <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden="true" />
+              {steps.map((s) => (
+                <div key={s.num} className="relative pl-14">
+                  <div className="absolute left-0 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center text-sm font-bold z-10">
+                    {s.num}
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-1">{s.title}</h3>
+                  <p className="text-sm text-gray-500 leading-relaxed">{s.desc}</p>
+                </div>
+              ))}
             </div>
-            {steps.map((s) => (
-              <div key={s.num} className="relative text-center">
-                <div className="w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-4 relative z-10">
-                  {s.num}
-                </div>
-                <h3 className="font-semibold text-gray-800 mb-2">{s.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{s.desc}</p>
-              </div>
-            ))}
-          </div>
 
-          {/* Mobile / Tablet: vertical timeline */}
-          <div className="lg:hidden space-y-8 relative">
-            <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gray-200" aria-hidden="true" />
-            {steps.map((s) => (
-              <div key={s.num} className="relative pl-14">
-                <div className="absolute left-0 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center text-sm font-bold z-10">
-                  {s.num}
+            {/* 우측: APPLICATION status mockup (desktop only) */}
+            <div className="hidden lg:block relative mt-0 w-80">
+              <div className="bg-white rounded-2xl shadow-lg p-6 transform -rotate-1 hover:rotate-0 transition-transform duration-300">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs font-medium text-gray-400 tracking-wide">APPLICATION #2026-0142</span>
+                  <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold">In Progress</span>
                 </div>
-                <h3 className="font-semibold text-gray-800 mb-1">{s.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{s.desc}</p>
+                <div className="space-y-4">
+                  {statusSteps.map((s, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div
+                        className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                          s.current
+                            ? 'bg-primary ring-4 ring-primary/20'
+                            : s.done
+                              ? 'bg-emerald-500'
+                              : 'bg-gray-200'
+                        }`}
+                      />
+                      <span className={`text-sm ${s.current ? 'font-semibold text-primary' : s.done ? 'text-gray-600' : 'text-gray-400'}`}>
+                        {s.label}
+                      </span>
+                      {s.done && <span className="text-emerald-500 text-xs ml-auto">✓</span>}
+                      {s.current && <span className="text-primary text-xs ml-auto font-medium">Processing…</span>}
+                    </div>
+                  ))}
+                </div>
               </div>
-            ))}
+              <div className="absolute -top-4 -right-4 w-20 h-20 bg-primary/5 rounded-full -z-10" />
+              <div className="absolute -bottom-6 -left-6 w-28 h-28 bg-blue-100/50 rounded-full -z-10" />
+            </div>
           </div>
         </div>
       </section>
