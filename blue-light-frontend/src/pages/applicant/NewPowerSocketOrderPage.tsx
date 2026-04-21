@@ -172,7 +172,7 @@ export default function NewPowerSocketOrderPage() {
               hint={`${formData.applicantNote.length}/2000`}
             />
 
-            {{/* Sketch File */}}
+            {/* Sketch File */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Sketch File
@@ -181,54 +181,54 @@ export default function NewPowerSocketOrderPage() {
                 Upload a sketch or reference drawing. Accepted: images, PDF, DWG.
               </p>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                {{sketchFile ? (
+                {sketchFile ? (
                   <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-lg">📄</span>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">{{sketchFile.name}}</p>
+                        <p className="text-sm font-medium text-gray-700 truncate">{sketchFile.name}</p>
                         <p className="text-xs text-gray-400">
-                          {{sketchFile.size < 1024 * 1024
-                            ? `${{(sketchFile.size / 1024).toFixed(1)}} KB`
-                            : `${{(sketchFile.size / (1024 * 1024)).toFixed(1)}} MB`}}
+                          {sketchFile.size < 1024 * 1024
+                            ? `${(sketchFile.size / 1024).toFixed(1)} KB`
+                            : `${(sketchFile.size / (1024 * 1024)).toFixed(1)} MB`}
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
-                      onClick={{() => setSketchFile(null)}}
+                      onClick={() => setSketchFile(null)}
                       className="text-gray-400 hover:text-red-500 transition-colors p-1"
                       aria-label="Remove sketch file"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={{2}} d="M6 18L18 6M6 6l12 12" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     </button>
                   </div>
                 ) : (
                   <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
                     <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={{2}} d="M12 4v16m8-8H4" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                     <span className="text-sm text-gray-600">Choose sketch file</span>
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
                       className="hidden"
-                      onChange={{(e) => {{
+                      onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) {{
-                          if (file.size > 10 * 1024 * 1024) {{
+                        if (file) {
+                          if (file.size > 10 * 1024 * 1024) {
                             toast.error('File size must be less than 10MB');
                             return;
-                          }}
+                          }
                           setSketchFile(file);
-                        }}
+                        }
                         e.target.value = '';
-                      }}}}
+                      }}
                     />
                   </label>
-                )}}
+                )}
               </div>
             </div>
 
