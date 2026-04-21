@@ -6,9 +6,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +40,10 @@ public class DatabaseMigrationRunner {
 
     private void migrateAll() {
         try (Connection conn = dataSource.getConnection()) {
+            // ★ 새 CREATE TABLE이 schema.sql에 추가되어도 기존 DB에 자동 반영되도록,
+            //   schema.sql의 모든 `CREATE TABLE IF NOT EXISTS` 문을 idempotent 하게 실행.
+            //   ALTER는 기존 migrate*Columns() 메서드들이 계속 담당.
+            syncCreateTablesFromSchemaSql(conn);
             migrateUserNameSplit(conn);
             migrateApplicationsLoaColumns(conn);
             migrateSldTemplatesTable(conn);
@@ -66,6 +73,61 @@ public class DatabaseMigrationRunner {
         } catch (SQLException e) {
             log.error("Database migration failed", e);
             throw new RuntimeException("Database migration failed", e);
+        }
+    }
+
+    /**
+     * schema.sql의 모든 `CREATE TABLE IF NOT EXISTS ...` 문을 idempotent 하게 실행한다.
+     * <p>
+     * 배경: schema.sql에 신규 테이블을 추가할 때마다 DatabaseMigrationRunner에
+     * 별도 {@code migrate*Table()} 메서드를 추가하는 방식은 누락 사고가 반복됨
+     * (예: lew_service_orders, lighting_orders, power_socket_orders, role_metadata).
+     * 이 메서드는 schema.sql 전체를 파싱하여 CREATE TABLE만 재실행하므로
+     * IF NOT EXISTS 덕분에 기존 테이블은 영향 받지 않고 신규 테이블만 자동 생성된다.
+     * <p>
+     * ALTER/프로시저/트리거는 이 메서드가 건드리지 않는다 — 기존 migrate*Columns()
+     * 메서드들이 계속 담당한다.
+     */
+    private void syncCreateTablesFromSchemaSql(Connection conn) {
+        String sql;
+        try (InputStream is = new ClassPathResource("schema.sql").getInputStream()) {
+            sql = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.warn("syncCreateTablesFromSchemaSql: schema.sql read failed — skipping: {}", e.getMessage());
+            return;
+        }
+
+        // 주석(--) 제거 후 ';' 기준으로 문장 분리. 프로시저/트리거가 없으므로 이 단순 분리로 충분.
+        StringBuilder cleaned = new StringBuilder();
+        for (String line : sql.split("\\R")) {
+            String trimmed = line.replaceAll("--.*$", "").trim();
+            if (!trimmed.isEmpty()) cleaned.append(trimmed).append('\n');
+        }
+        String[] statements = cleaned.toString().split(";");
+
+        int created = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String raw : statements) {
+                String s = raw.trim();
+                if (s.isEmpty()) continue;
+                // CREATE TABLE IF NOT EXISTS만 실행 (대소문자 무시, 공백 관대)
+                if (!s.toUpperCase().matches("(?s)^CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+.*")) continue;
+                try {
+                    stmt.executeUpdate(s);
+                    created++;
+                } catch (SQLException e) {
+                    // 이미 다른 스키마/버전이면 warn만 (다음 migration에서 해결)
+                    log.warn("syncCreateTables statement warn: {} — err: {}",
+                        s.substring(0, Math.min(80, s.length())), e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("syncCreateTables statement execution aborted: {}", e.getMessage());
+        }
+        if (created > 0) {
+            log.info("Migration [sync-create-tables]: processed {} CREATE TABLE IF NOT EXISTS statements", created);
+        } else {
+            log.debug("Migration [sync-create-tables]: no statements processed");
         }
     }
 
