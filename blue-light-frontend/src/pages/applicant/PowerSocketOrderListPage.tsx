@@ -71,7 +71,7 @@ export default function PowerSocketOrderListPage() {
             title="No Power Socket orders yet"
             description="Request your first Power Socket to get started."
             action={
-              <Button variant="outline" size="sm" onClick={() => navigate('/power-socket-orders/new')}>
+              <Button onClick={() => navigate('/power-socket-orders/new')}>
                 Create Power Socket Order
               </Button>
             }

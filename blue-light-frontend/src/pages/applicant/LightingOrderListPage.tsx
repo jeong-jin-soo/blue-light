@@ -71,7 +71,7 @@ export default function LightingOrderListPage() {
             title="No Lighting Layout orders yet"
             description="Request your first Lighting Layout to get started."
             action={
-              <Button variant="outline" size="sm" onClick={() => navigate('/lighting-orders/new')}>
+              <Button onClick={() => navigate('/lighting-orders/new')}>
                 Create Lighting Layout Order
               </Button>
             }

@@ -71,7 +71,7 @@ export default function LewServiceOrderListPage() {
             title="No LEW Service orders yet"
             description="Request your first LEW Service to get started."
             action={
-              <Button variant="outline" size="sm" onClick={() => navigate('/lew-service-orders/new')}>
+              <Button onClick={() => navigate('/lew-service-orders/new')}>
                 Create LEW Service Order
               </Button>
             }
