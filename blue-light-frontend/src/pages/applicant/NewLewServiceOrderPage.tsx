@@ -62,8 +62,8 @@ export default function NewLewServiceOrderPage() {
           <span>Back</span>
         </button>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New LEW Service Order</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Request a LEW service request</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Request a LEW Service</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Submit a request for on-site electrical work</p>
         </div>
       </div>
 

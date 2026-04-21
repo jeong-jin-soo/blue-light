@@ -59,7 +59,7 @@ export default function LewServiceOrderListPage() {
           <p className="text-sm text-gray-500 mt-1">Your LEW Service order history</p>
         </div>
         <Button onClick={() => navigate('/lew-service-orders/new')}>
-          + New LEW Service Order
+          + Request a LEW Service
         </Button>
       </div>
 
