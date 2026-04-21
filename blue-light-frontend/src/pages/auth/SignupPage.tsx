@@ -194,20 +194,20 @@ export default function SignupPage() {
           placeholder="you@example.com"
         />
 
-        {/* Role indicator — 랜딩 페이지 링크의 ?role= 로 확정 */}
-        <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-          <span className="text-lg">{form.role === 'LEW' ? '⚡' : '🏢'}</span>
-          <div className="flex-1">
-            <div className="text-sm font-medium text-primary">
-              {form.role === 'LEW' ? 'LEW (Licensed Electrical Worker)' : 'Building Owner'}
-            </div>
-            <div className="text-xs text-gray-500">
-              {form.role === 'LEW'
-                ? 'Signing up as a Licensed Electrical Worker'
-                : 'Signing up as a building / business / shop owner'}
+        {/* Role indicator — LEW 전용. 일반 Applicant는 기본값이므로 노출 생략 */}
+        {form.role === 'LEW' && (
+          <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <span className="text-lg">⚡</span>
+            <div className="flex-1">
+              <div className="text-sm font-medium text-primary">
+                LEW (Licensed Electrical Worker)
+              </div>
+              <div className="text-xs text-gray-500">
+                Signing up as a Licensed Electrical Worker
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* LEW additional fields */}
         {form.role === 'LEW' && (
