@@ -45,7 +45,7 @@ public class LewServiceManagerService {
                 .pendingPayment(lewServiceOrderRepository.countByStatus(LewServiceOrderStatus.PENDING_PAYMENT))
                 .paid(lewServiceOrderRepository.countByStatus(LewServiceOrderStatus.PAID))
                 .inProgress(lewServiceOrderRepository.countByStatus(LewServiceOrderStatus.IN_PROGRESS))
-                .sldUploaded(lewServiceOrderRepository.countByStatus(LewServiceOrderStatus.SLD_UPLOADED))
+                .deliverableUploaded(lewServiceOrderRepository.countByStatus(LewServiceOrderStatus.SLD_UPLOADED))
                 .completed(lewServiceOrderRepository.countByStatus(LewServiceOrderStatus.COMPLETED))
                 .build();
     }
@@ -93,7 +93,8 @@ public class LewServiceManagerService {
                 .orElseThrow(() -> new BusinessException(
                         "Manager not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
-        if (manager.getRole() != UserRole.SLD_MANAGER) {
+        UserRole role = manager.getRole();
+        if (role != UserRole.SLD_MANAGER && role != UserRole.ADMIN && role != UserRole.SYSTEM_ADMIN) {
             throw new BusinessException(
                     "User is not an LewService Manager", HttpStatus.BAD_REQUEST, "INVALID_ROLE");
         }

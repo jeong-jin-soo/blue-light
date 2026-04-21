@@ -4,7 +4,7 @@ package com.bluelight.backend.domain.powersocketorder;
  * Power Socket 주문 상태
  */
 public enum PowerSocketOrderStatus {
-    /** PowerSocket_MANAGER 견적 대기 */
+    /** SLD_MANAGER 견적 대기 */
     PENDING_QUOTE,
 
     /** 견적 제안됨, 신청자 확인 대기 */
@@ -19,7 +19,7 @@ public enum PowerSocketOrderStatus {
     /** 결제 완료 */
     PAID,
 
-    /** SLD 생성 중 (AI/수동) */
+    /** 작업 진행 중 */
     IN_PROGRESS,
 
     /** Power Socket 업로드 완료, 신청자 확인 대기 */

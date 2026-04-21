@@ -5,6 +5,7 @@ import AuthLayout from '../../components/common/AuthLayout';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { requestActivationLink } from '../../api/authApi';
+import { parseReturnTo } from '../../utils/safeReturnTo';
 import type { ApiError } from '../../types';
 
 /** axiosClient interceptor가 정규화한 에러(spread된 객체) + AxiosError 양쪽에서 code/status 추출 */
@@ -20,10 +21,7 @@ export default function LoginPage() {
   const { login, isLoading, error, clearError, isAuthenticated, user } = useAuthStore();
 
   // Applicant 가입 전 원래 요청 페이지로 돌려보낼 returnTo URL
-  const rawReturnTo = searchParams.get('returnTo');
-  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
-    ? rawReturnTo
-    : null;
+  const returnTo = parseReturnTo(searchParams.get('returnTo'));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

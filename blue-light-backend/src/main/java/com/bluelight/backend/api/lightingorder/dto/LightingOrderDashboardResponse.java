@@ -16,6 +16,6 @@ public class LightingOrderDashboardResponse {
     private long pendingPayment;
     private long paid;
     private long inProgress;
-    private long sldUploaded;
+    private long deliverableUploaded;
     private long completed;
 }

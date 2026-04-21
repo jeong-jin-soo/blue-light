@@ -126,7 +126,7 @@ public class LewServiceOrderService {
         LewServiceOrder order = findOrderOrThrow(orderSeq);
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
         order.requestRevision(comment);
-        log.info("SLD 수정 요청: orderSeq={}, userSeq={}", orderSeq, userSeq);
+        log.info("Request for LEW Service 수정 요청: orderSeq={}, userSeq={}", orderSeq, userSeq);
         return LewServiceOrderResponse.from(order);
     }
 

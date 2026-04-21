@@ -91,6 +91,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
                         // SLD Manager 경로
                         .requestMatchers("/api/sld-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // Lighting Manager 경로 (SLD_MANAGER 역할 공유)
+                        .requestMatchers("/api/lighting-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // Power Socket Manager 경로 (SLD_MANAGER 역할 공유)
+                        .requestMatchers("/api/power-socket-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // LEW Service Manager 경로 (SLD_MANAGER 역할 공유)
+                        .requestMatchers("/api/lew-service-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
                         // Concierge Manager 경로 (★ Kaki Concierge v1.5 Phase 1 PR#4)
                         .requestMatchers("/api/concierge-manager/**").hasAnyRole("CONCIERGE_MANAGER", "ADMIN", "SYSTEM_ADMIN")
                         // 그 외 모든 요청은 인증 필요

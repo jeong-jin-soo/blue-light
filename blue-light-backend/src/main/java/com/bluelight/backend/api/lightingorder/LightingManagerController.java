@@ -26,7 +26,7 @@ import java.util.Map;
 @PreAuthorize("hasAnyRole('SLD_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
 public class LightingManagerController {
 
-    private final LightingManagerService sldManagerService;
+    private final LightingManagerService lightingManagerService;
 
     /**
      * 대시보드 통계 조회
@@ -35,7 +35,7 @@ public class LightingManagerController {
     @GetMapping("/dashboard")
     public ResponseEntity<LightingOrderDashboardResponse> getDashboard() {
         log.info("Lighting Manager 대시보드 조회");
-        LightingOrderDashboardResponse dashboard = sldManagerService.getDashboard();
+        LightingOrderDashboardResponse dashboard = lightingManagerService.getDashboard();
         return ResponseEntity.ok(dashboard);
     }
 
@@ -49,7 +49,7 @@ public class LightingManagerController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         log.info("Lighting Manager 주문 목록 조회: status={}, page={}, size={}", status, page, size);
-        Page<LightingOrderResponse> orders = sldManagerService.getAllOrders(status, PageRequest.of(page, size));
+        Page<LightingOrderResponse> orders = lightingManagerService.getAllOrders(status, PageRequest.of(page, size));
         return ResponseEntity.ok(orders);
     }
 
@@ -60,7 +60,7 @@ public class LightingManagerController {
     @GetMapping("/orders/{id}")
     public ResponseEntity<LightingOrderResponse> getOrder(@PathVariable Long id) {
         log.info("Lighting Manager 주문 상세 조회: orderSeq={}", id);
-        LightingOrderResponse response = sldManagerService.getOrder(id);
+        LightingOrderResponse response = lightingManagerService.getOrder(id);
         return ResponseEntity.ok(response);
     }
 
@@ -73,7 +73,7 @@ public class LightingManagerController {
             @PathVariable Long id,
             @Valid @RequestBody ProposeQuoteRequest request) {
         log.info("Lighting Layout 견적 제안: orderSeq={}, amount={}", id, request.getQuoteAmount());
-        LightingOrderResponse response = sldManagerService.proposeQuote(id, request);
+        LightingOrderResponse response = lightingManagerService.proposeQuote(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -87,7 +87,7 @@ public class LightingManagerController {
             @RequestBody Map<String, Long> body) {
         Long managerUserSeq = body.get("managerUserSeq");
         log.info("Lighting 매니저 배정: orderSeq={}, managerSeq={}", id, managerUserSeq);
-        LightingOrderResponse response = sldManagerService.assignManager(id, managerUserSeq);
+        LightingOrderResponse response = lightingManagerService.assignManager(id, managerUserSeq);
         return ResponseEntity.ok(response);
     }
 
@@ -98,7 +98,7 @@ public class LightingManagerController {
     @DeleteMapping("/orders/{id}/assign")
     public ResponseEntity<LightingOrderResponse> unassignManager(@PathVariable Long id) {
         log.info("Lighting 매니저 배정 해제: orderSeq={}", id);
-        LightingOrderResponse response = sldManagerService.unassignManager(id);
+        LightingOrderResponse response = lightingManagerService.unassignManager(id);
         return ResponseEntity.ok(response);
     }
 
@@ -111,7 +111,7 @@ public class LightingManagerController {
             @PathVariable Long id,
             @Valid @RequestBody LightingManagerUploadDto request) {
         log.info("Lighting Layout 업로드 완료: orderSeq={}, fileSeq={}", id, request.getFileSeq());
-        LightingOrderResponse response = sldManagerService.uploadSld(id, request);
+        LightingOrderResponse response = lightingManagerService.uploadSld(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -126,7 +126,7 @@ public class LightingManagerController {
         String transactionId = body.get("transactionId");
         String paymentMethod = body.get("paymentMethod");
         log.info("Lighting Layout 결제 확인: orderSeq={}, transactionId={}", id, transactionId);
-        LightingOrderResponse response = sldManagerService.confirmPayment(id, transactionId, paymentMethod);
+        LightingOrderResponse response = lightingManagerService.confirmPayment(id, transactionId, paymentMethod);
         return ResponseEntity.ok(response);
     }
 
@@ -137,7 +137,7 @@ public class LightingManagerController {
     @PostMapping("/orders/{id}/complete")
     public ResponseEntity<LightingOrderResponse> markComplete(@PathVariable Long id) {
         log.info("Lighting Layout 주문 완료 처리: orderSeq={}", id);
-        LightingOrderResponse response = sldManagerService.markComplete(id);
+        LightingOrderResponse response = lightingManagerService.markComplete(id);
         return ResponseEntity.ok(response);
     }
 }

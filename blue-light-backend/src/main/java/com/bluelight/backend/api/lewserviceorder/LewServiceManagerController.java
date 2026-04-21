@@ -26,7 +26,7 @@ import java.util.Map;
 @PreAuthorize("hasAnyRole('SLD_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
 public class LewServiceManagerController {
 
-    private final LewServiceManagerService sldManagerService;
+    private final LewServiceManagerService lewServiceManagerService;
 
     /**
      * 대시보드 통계 조회
@@ -35,7 +35,7 @@ public class LewServiceManagerController {
     @GetMapping("/dashboard")
     public ResponseEntity<LewServiceOrderDashboardResponse> getDashboard() {
         log.info("LewService Manager 대시보드 조회");
-        LewServiceOrderDashboardResponse dashboard = sldManagerService.getDashboard();
+        LewServiceOrderDashboardResponse dashboard = lewServiceManagerService.getDashboard();
         return ResponseEntity.ok(dashboard);
     }
 
@@ -49,7 +49,7 @@ public class LewServiceManagerController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         log.info("LewService Manager 주문 목록 조회: status={}, page={}, size={}", status, page, size);
-        Page<LewServiceOrderResponse> orders = sldManagerService.getAllOrders(status, PageRequest.of(page, size));
+        Page<LewServiceOrderResponse> orders = lewServiceManagerService.getAllOrders(status, PageRequest.of(page, size));
         return ResponseEntity.ok(orders);
     }
 
@@ -60,7 +60,7 @@ public class LewServiceManagerController {
     @GetMapping("/orders/{id}")
     public ResponseEntity<LewServiceOrderResponse> getOrder(@PathVariable Long id) {
         log.info("LewService Manager 주문 상세 조회: orderSeq={}", id);
-        LewServiceOrderResponse response = sldManagerService.getOrder(id);
+        LewServiceOrderResponse response = lewServiceManagerService.getOrder(id);
         return ResponseEntity.ok(response);
     }
 
@@ -73,7 +73,7 @@ public class LewServiceManagerController {
             @PathVariable Long id,
             @Valid @RequestBody ProposeQuoteRequest request) {
         log.info("Request for LEW Service 견적 제안: orderSeq={}, amount={}", id, request.getQuoteAmount());
-        LewServiceOrderResponse response = sldManagerService.proposeQuote(id, request);
+        LewServiceOrderResponse response = lewServiceManagerService.proposeQuote(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -87,7 +87,7 @@ public class LewServiceManagerController {
             @RequestBody Map<String, Long> body) {
         Long managerUserSeq = body.get("managerUserSeq");
         log.info("LewService 매니저 배정: orderSeq={}, managerSeq={}", id, managerUserSeq);
-        LewServiceOrderResponse response = sldManagerService.assignManager(id, managerUserSeq);
+        LewServiceOrderResponse response = lewServiceManagerService.assignManager(id, managerUserSeq);
         return ResponseEntity.ok(response);
     }
 
@@ -98,7 +98,7 @@ public class LewServiceManagerController {
     @DeleteMapping("/orders/{id}/assign")
     public ResponseEntity<LewServiceOrderResponse> unassignManager(@PathVariable Long id) {
         log.info("LewService 매니저 배정 해제: orderSeq={}", id);
-        LewServiceOrderResponse response = sldManagerService.unassignManager(id);
+        LewServiceOrderResponse response = lewServiceManagerService.unassignManager(id);
         return ResponseEntity.ok(response);
     }
 
@@ -111,7 +111,7 @@ public class LewServiceManagerController {
             @PathVariable Long id,
             @Valid @RequestBody LewServiceManagerUploadDto request) {
         log.info("Request for LEW Service 업로드 완료: orderSeq={}, fileSeq={}", id, request.getFileSeq());
-        LewServiceOrderResponse response = sldManagerService.uploadSld(id, request);
+        LewServiceOrderResponse response = lewServiceManagerService.uploadSld(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -126,7 +126,7 @@ public class LewServiceManagerController {
         String transactionId = body.get("transactionId");
         String paymentMethod = body.get("paymentMethod");
         log.info("Request for LEW Service 결제 확인: orderSeq={}, transactionId={}", id, transactionId);
-        LewServiceOrderResponse response = sldManagerService.confirmPayment(id, transactionId, paymentMethod);
+        LewServiceOrderResponse response = lewServiceManagerService.confirmPayment(id, transactionId, paymentMethod);
         return ResponseEntity.ok(response);
     }
 
@@ -137,7 +137,7 @@ public class LewServiceManagerController {
     @PostMapping("/orders/{id}/complete")
     public ResponseEntity<LewServiceOrderResponse> markComplete(@PathVariable Long id) {
         log.info("Request for LEW Service 주문 완료 처리: orderSeq={}", id);
-        LewServiceOrderResponse response = sldManagerService.markComplete(id);
+        LewServiceOrderResponse response = lewServiceManagerService.markComplete(id);
         return ResponseEntity.ok(response);
     }
 }

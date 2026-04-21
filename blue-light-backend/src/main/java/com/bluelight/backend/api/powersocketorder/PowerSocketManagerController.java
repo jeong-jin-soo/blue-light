@@ -26,7 +26,7 @@ import java.util.Map;
 @PreAuthorize("hasAnyRole('SLD_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
 public class PowerSocketManagerController {
 
-    private final PowerSocketManagerService sldManagerService;
+    private final PowerSocketManagerService powerSocketManagerService;
 
     /**
      * 대시보드 통계 조회
@@ -35,7 +35,7 @@ public class PowerSocketManagerController {
     @GetMapping("/dashboard")
     public ResponseEntity<PowerSocketOrderDashboardResponse> getDashboard() {
         log.info("PowerSocket Manager 대시보드 조회");
-        PowerSocketOrderDashboardResponse dashboard = sldManagerService.getDashboard();
+        PowerSocketOrderDashboardResponse dashboard = powerSocketManagerService.getDashboard();
         return ResponseEntity.ok(dashboard);
     }
 
@@ -49,7 +49,7 @@ public class PowerSocketManagerController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         log.info("PowerSocket Manager 주문 목록 조회: status={}, page={}, size={}", status, page, size);
-        Page<PowerSocketOrderResponse> orders = sldManagerService.getAllOrders(status, PageRequest.of(page, size));
+        Page<PowerSocketOrderResponse> orders = powerSocketManagerService.getAllOrders(status, PageRequest.of(page, size));
         return ResponseEntity.ok(orders);
     }
 
@@ -60,7 +60,7 @@ public class PowerSocketManagerController {
     @GetMapping("/orders/{id}")
     public ResponseEntity<PowerSocketOrderResponse> getOrder(@PathVariable Long id) {
         log.info("PowerSocket Manager 주문 상세 조회: orderSeq={}", id);
-        PowerSocketOrderResponse response = sldManagerService.getOrder(id);
+        PowerSocketOrderResponse response = powerSocketManagerService.getOrder(id);
         return ResponseEntity.ok(response);
     }
 
@@ -73,7 +73,7 @@ public class PowerSocketManagerController {
             @PathVariable Long id,
             @Valid @RequestBody ProposeQuoteRequest request) {
         log.info("Power Socket 견적 제안: orderSeq={}, amount={}", id, request.getQuoteAmount());
-        PowerSocketOrderResponse response = sldManagerService.proposeQuote(id, request);
+        PowerSocketOrderResponse response = powerSocketManagerService.proposeQuote(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -87,7 +87,7 @@ public class PowerSocketManagerController {
             @RequestBody Map<String, Long> body) {
         Long managerUserSeq = body.get("managerUserSeq");
         log.info("PowerSocket 매니저 배정: orderSeq={}, managerSeq={}", id, managerUserSeq);
-        PowerSocketOrderResponse response = sldManagerService.assignManager(id, managerUserSeq);
+        PowerSocketOrderResponse response = powerSocketManagerService.assignManager(id, managerUserSeq);
         return ResponseEntity.ok(response);
     }
 
@@ -98,7 +98,7 @@ public class PowerSocketManagerController {
     @DeleteMapping("/orders/{id}/assign")
     public ResponseEntity<PowerSocketOrderResponse> unassignManager(@PathVariable Long id) {
         log.info("PowerSocket 매니저 배정 해제: orderSeq={}", id);
-        PowerSocketOrderResponse response = sldManagerService.unassignManager(id);
+        PowerSocketOrderResponse response = powerSocketManagerService.unassignManager(id);
         return ResponseEntity.ok(response);
     }
 
@@ -111,7 +111,7 @@ public class PowerSocketManagerController {
             @PathVariable Long id,
             @Valid @RequestBody PowerSocketManagerUploadDto request) {
         log.info("Power Socket 업로드 완료: orderSeq={}, fileSeq={}", id, request.getFileSeq());
-        PowerSocketOrderResponse response = sldManagerService.uploadSld(id, request);
+        PowerSocketOrderResponse response = powerSocketManagerService.uploadSld(id, request);
         return ResponseEntity.ok(response);
     }
 
@@ -126,7 +126,7 @@ public class PowerSocketManagerController {
         String transactionId = body.get("transactionId");
         String paymentMethod = body.get("paymentMethod");
         log.info("Power Socket 결제 확인: orderSeq={}, transactionId={}", id, transactionId);
-        PowerSocketOrderResponse response = sldManagerService.confirmPayment(id, transactionId, paymentMethod);
+        PowerSocketOrderResponse response = powerSocketManagerService.confirmPayment(id, transactionId, paymentMethod);
         return ResponseEntity.ok(response);
     }
 
@@ -137,7 +137,7 @@ public class PowerSocketManagerController {
     @PostMapping("/orders/{id}/complete")
     public ResponseEntity<PowerSocketOrderResponse> markComplete(@PathVariable Long id) {
         log.info("Power Socket 주문 완료 처리: orderSeq={}", id);
-        PowerSocketOrderResponse response = sldManagerService.markComplete(id);
+        PowerSocketOrderResponse response = powerSocketManagerService.markComplete(id);
         return ResponseEntity.ok(response);
     }
 }

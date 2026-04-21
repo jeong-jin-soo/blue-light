@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { authApi } from '../../api/authApi';
+import { parseReturnTo } from '../../utils/safeReturnTo';
 
 /**
  * Phase 1 (2026-04-17): 회원가입 간소화.
@@ -72,10 +73,7 @@ export default function SignupPage() {
   }, [presetRole, updateField]);
 
   // 가입 후 원래 요청 페이지로 돌려보낼 returnTo URL (Applicant 전용)
-  const rawReturnTo = searchParams.get('returnTo');
-  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
-    ? rawReturnTo
-    : null;
+  const returnTo = parseReturnTo(searchParams.get('returnTo'));
 
   useEffect(() => {
     if (isAuthenticated && user) {

@@ -126,7 +126,7 @@ public class LightingOrderService {
         LightingOrder order = findOrderOrThrow(orderSeq);
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
         order.requestRevision(comment);
-        log.info("SLD 수정 요청: orderSeq={}, userSeq={}", orderSeq, userSeq);
+        log.info("Lighting Layout 수정 요청: orderSeq={}, userSeq={}", orderSeq, userSeq);
         return LightingOrderResponse.from(order);
     }
 

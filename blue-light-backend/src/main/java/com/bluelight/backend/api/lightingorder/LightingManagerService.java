@@ -45,7 +45,7 @@ public class LightingManagerService {
                 .pendingPayment(lightingOrderRepository.countByStatus(LightingOrderStatus.PENDING_PAYMENT))
                 .paid(lightingOrderRepository.countByStatus(LightingOrderStatus.PAID))
                 .inProgress(lightingOrderRepository.countByStatus(LightingOrderStatus.IN_PROGRESS))
-                .sldUploaded(lightingOrderRepository.countByStatus(LightingOrderStatus.SLD_UPLOADED))
+                .deliverableUploaded(lightingOrderRepository.countByStatus(LightingOrderStatus.SLD_UPLOADED))
                 .completed(lightingOrderRepository.countByStatus(LightingOrderStatus.COMPLETED))
                 .build();
     }
@@ -93,7 +93,8 @@ public class LightingManagerService {
                 .orElseThrow(() -> new BusinessException(
                         "Manager not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
-        if (manager.getRole() != UserRole.SLD_MANAGER) {
+        UserRole role = manager.getRole();
+        if (role != UserRole.SLD_MANAGER && role != UserRole.ADMIN && role != UserRole.SYSTEM_ADMIN) {
             throw new BusinessException(
                     "User is not an Lighting Manager", HttpStatus.BAD_REQUEST, "INVALID_ROLE");
         }

@@ -45,7 +45,7 @@ public class PowerSocketManagerService {
                 .pendingPayment(powerSocketOrderRepository.countByStatus(PowerSocketOrderStatus.PENDING_PAYMENT))
                 .paid(powerSocketOrderRepository.countByStatus(PowerSocketOrderStatus.PAID))
                 .inProgress(powerSocketOrderRepository.countByStatus(PowerSocketOrderStatus.IN_PROGRESS))
-                .sldUploaded(powerSocketOrderRepository.countByStatus(PowerSocketOrderStatus.SLD_UPLOADED))
+                .deliverableUploaded(powerSocketOrderRepository.countByStatus(PowerSocketOrderStatus.SLD_UPLOADED))
                 .completed(powerSocketOrderRepository.countByStatus(PowerSocketOrderStatus.COMPLETED))
                 .build();
     }
@@ -93,7 +93,8 @@ public class PowerSocketManagerService {
                 .orElseThrow(() -> new BusinessException(
                         "Manager not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
-        if (manager.getRole() != UserRole.SLD_MANAGER) {
+        UserRole role = manager.getRole();
+        if (role != UserRole.SLD_MANAGER && role != UserRole.ADMIN && role != UserRole.SYSTEM_ADMIN) {
             throw new BusinessException(
                     "User is not an PowerSocket Manager", HttpStatus.BAD_REQUEST, "INVALID_ROLE");
         }
