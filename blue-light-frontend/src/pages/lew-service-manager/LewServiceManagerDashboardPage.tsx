@@ -74,7 +74,7 @@ export default function LewServiceManagerDashboardPage() {
           onClick={() => navigate('/lew-service-manager/orders?status=IN_PROGRESS')}
         />
         <DashboardCard
-          label="Uploaded"
+          label="Report Submitted"
           value={dashboard?.deliverableUploaded ?? 0}
           icon="📄"
           onClick={() => navigate('/lew-service-manager/orders?status=SLD_UPLOADED')}

@@ -19,9 +19,9 @@ const STATUS_CONFIG: Record<LewServiceOrderStatus, { label: string; color: strin
   QUOTE_REJECTED: { label: 'Quote Rejected', color: 'bg-red-100 text-red-800' },
   PENDING_PAYMENT: { label: 'Pending Payment', color: 'bg-orange-100 text-orange-800' },
   PAID: { label: 'Paid', color: 'bg-green-100 text-green-800' },
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
-  SLD_UPLOADED: { label: 'Deliverable Uploaded', color: 'bg-purple-100 text-purple-800' },
-  REVISION_REQUESTED: { label: 'Revision Requested', color: 'bg-orange-100 text-orange-800' },
+  IN_PROGRESS: { label: 'Visit Scheduled', color: 'bg-blue-100 text-blue-800' },
+  SLD_UPLOADED: { label: 'Report Ready for Review', color: 'bg-purple-100 text-purple-800' },
+  REVISION_REQUESTED: { label: 'Revisit Requested', color: 'bg-orange-100 text-orange-800' },
   COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-800' },
 };
 
@@ -121,17 +121,17 @@ export default function LewServiceOrderDetailPage() {
 
   const handleRequestRevision = async () => {
     if (!revisionComment.trim()) {
-      toast.error('Please enter a revision comment');
+      toast.error('Please tell your LEW what still needs attention');
       return;
     }
     setActionLoading(true);
     try {
       await lewServiceOrderApi.requestRevision(orderId, revisionComment.trim());
-      toast.success('Revision requested.');
+      toast.success('Revisit requested.');
       setShowRevisionForm(false);
       setRevisionComment('');
       fetchData();
-    } catch { toast.error('Failed to request revision'); }
+    } catch { toast.error('Failed to request a revisit'); }
     finally { setActionLoading(false); }
   };
 
@@ -336,7 +336,7 @@ export default function LewServiceOrderDetailPage() {
                   <div>
                     <p className="text-sm font-medium text-green-800">Payment Confirmed</p>
                     <p className="text-xs text-green-700 mt-1">
-                      Payment confirmed. LEW Service work will begin shortly.
+                      Payment confirmed. Your LEW will be in touch to schedule the on-site visit.
                     </p>
                   </div>
                 </div>
@@ -350,9 +350,9 @@ export default function LewServiceOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128736;</span>
                   <div>
-                    <p className="text-sm font-medium text-blue-800">LEW Service In Progress</p>
+                    <p className="text-sm font-medium text-blue-800">On-site Visit Scheduled</p>
                     <p className="text-xs text-blue-700 mt-1">
-                      Your LEW Service work is being prepared. You will be notified once it is uploaded.
+                      Your LEW has scheduled the on-site visit. You'll be notified when the work starts and when the visit report is submitted.
                     </p>
                   </div>
                 </div>
@@ -362,20 +362,20 @@ export default function LewServiceOrderDetailPage() {
 
           {order.status === 'SLD_UPLOADED' && (
             <Card>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Review LEW Service</h2>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Review Visit Report</h2>
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128196;</span>
                   <div>
-                    <p className="text-sm font-medium text-purple-800">LEW Service deliverable has been uploaded</p>
+                    <p className="text-sm font-medium text-purple-800">Visit report has been submitted</p>
                     <p className="text-xs text-purple-700 mt-1">
-                      Please review the deliverable and confirm completion, or request revision.
+                      Please review the visit report and confirm completion, or request a revisit.
                     </p>
                   </div>
                 </div>
                 {order.managerNote && (
                   <div className="bg-white rounded p-2 border border-purple-100">
-                    <p className="text-xs text-gray-500">Manager note:</p>
+                    <p className="text-xs text-gray-500">LEW note:</p>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.managerNote}</p>
                   </div>
                 )}
@@ -383,9 +383,9 @@ export default function LewServiceOrderDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LewService_Deliverable')}
+                    onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LewService_VisitReport')}
                   >
-                    Download LEW Service
+                    Download Visit Report
                   </Button>
                 )}
               </div>
@@ -395,7 +395,7 @@ export default function LewServiceOrderDetailPage() {
                 <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
                   <iframe
                     src={pdfPreviewUrl}
-                    title="LEW Service Deliverable Preview"
+                    title="Visit Report Preview"
                     className="w-full bg-white"
                     style={{ height: '500px' }}
                   />
@@ -406,8 +406,8 @@ export default function LewServiceOrderDetailPage() {
               {showRevisionForm ? (
                 <div className="mt-4 space-y-3">
                   <Textarea
-                    label="Revision Details"
-                    placeholder="Please describe what needs to be revised..."
+                    label="Revisit Details"
+                    placeholder="What still needs attention? (e.g. additional socket didn't work, measurement missing)"
                     value={revisionComment}
                     onChange={(e) => setRevisionComment(e.target.value)}
                     maxLength={2000}
@@ -444,7 +444,7 @@ export default function LewServiceOrderDetailPage() {
                     variant="outline"
                     onClick={() => setShowRevisionForm(true)}
                   >
-                    Request Revision
+                    Request Revisit
                   </Button>
                 </div>
               )}
@@ -457,13 +457,13 @@ export default function LewServiceOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128221;</span>
                   <div>
-                    <p className="text-sm font-medium text-orange-800">Revision Requested</p>
+                    <p className="text-sm font-medium text-orange-800">Revisit Requested</p>
                     <p className="text-xs text-orange-700 mt-1">
-                      Your revision request has been sent. The manager is working on the update.
+                      Your revisit request has been sent. Your LEW will reach out to arrange a follow-up visit.
                     </p>
                     {order.revisionComment && (
                       <div className="mt-2 bg-white rounded p-2 border border-orange-100">
-                        <p className="text-xs text-gray-500">Your revision comment:</p>
+                        <p className="text-xs text-gray-500">What you asked to be addressed:</p>
                         <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.revisionComment}</p>
                       </div>
                     )}
@@ -488,9 +488,9 @@ export default function LewServiceOrderDetailPage() {
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LewService_Deliverable')}
+                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LewService_VisitReport')}
                       >
-                        Download LEW Service
+                        Download Visit Report
                       </Button>
                     )}
                   </div>
@@ -501,7 +501,7 @@ export default function LewServiceOrderDetailPage() {
                 <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
                   <iframe
                     src={pdfPreviewUrl}
-                    title="LEW Service Deliverable Preview"
+                    title="Visit Report Preview"
                     className="w-full bg-white"
                     style={{ height: '500px' }}
                   />

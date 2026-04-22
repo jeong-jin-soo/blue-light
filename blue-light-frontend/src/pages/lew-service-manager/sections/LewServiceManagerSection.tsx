@@ -8,7 +8,9 @@ interface Props {
 }
 
 /**
- * LEW Service Manager Deliverable Section — manual upload only.
+ * LEW Service — Visit Report upload section (manual only).
+ * LEW가 현장 방문 후 작성한 보고서(PDF 권장) 또는 첨부(사진·측정 시트 ZIP)를 업로드한다.
+ * 업로드가 끝나면 주문은 SLD_UPLOADED 상태로 전이되며 신청자가 검토·확정한다.
  */
 export function LewServiceManagerSection({ onDeliverableUpload }: Props) {
   const [managerNote, setManagerNote] = useState('');
@@ -20,23 +22,23 @@ export function LewServiceManagerSection({ onDeliverableUpload }: Props) {
 
   return (
     <Card>
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">LEW Service Deliverable</h2>
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">Submit Visit Report</h2>
       <div className="space-y-3">
         <Textarea
-          label="Manager Note (Optional)"
+          label="LEW Note (Optional)"
           rows={2}
           maxLength={2000}
           value={managerNote}
           onChange={(e) => setManagerNote(e.target.value)}
-          placeholder="Optional note about the LEW Service deliverable"
+          placeholder="Optional note on what was done, measurements, or follow-up needed"
           className="resize-none"
         />
         <FileUpload
           onUpload={handleUpload}
           files={[]}
-          label="Upload LEW Service Deliverable"
-          hint="PDF, JPG, PNG, DWG, DXF, DGN, TIF, GIF, ZIP up to 10MB"
-          accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
+          label="Upload Visit Report"
+          hint="PDF (preferred) for the report, or a ZIP bundle of photos/measurement sheets — up to 10MB"
+          accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,.gif,.zip"
           maxSizeMb={10}
         />
       </div>

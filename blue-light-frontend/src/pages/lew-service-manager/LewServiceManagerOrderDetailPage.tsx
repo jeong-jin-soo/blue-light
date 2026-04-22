@@ -81,7 +81,7 @@ export default function LewServiceManagerOrderDetailPage() {
   const handleDeliverableUpload = async (file: File, managerNote?: string) => {
     const uploadedFile = await lewServiceManagerApi.uploadFile(orderId, file, 'DRAWING_SLD');
     await lewServiceManagerApi.uploadDeliverableComplete(orderId, uploadedFile.fileSeq, managerNote);
-    toast.success('LEW Service deliverable uploaded and marked as complete');
+    toast.success('Visit report submitted and order marked as complete');
     fetchData();
   };
 
@@ -258,9 +258,9 @@ export default function LewServiceManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#9989;</span>
                   <div>
-                    <p className="text-sm font-medium text-green-800">Payment confirmed. Begin work on the LEW Service deliverable.</p>
+                    <p className="text-sm font-medium text-green-800">Payment confirmed. Schedule the on-site visit with the applicant.</p>
                     <p className="text-xs text-green-700 mt-1">
-                      Payment has been confirmed. You can now prepare and upload the LEW Service deliverable.
+                      Payment has been confirmed. Coordinate a visit time with the applicant, then perform the work on site and submit the visit report.
                     </p>
                   </div>
                 </div>
@@ -274,9 +274,9 @@ export default function LewServiceManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128736;</span>
                   <div>
-                    <p className="text-sm font-medium text-blue-800">LEW Service Work In Progress</p>
+                    <p className="text-sm font-medium text-blue-800">On-site Visit In Progress</p>
                     <p className="text-xs text-blue-700 mt-1">
-                      Use the section below to upload the LEW Service deliverable.
+                      Use the section below to submit the visit report after completing the on-site work.
                     </p>
                   </div>
                 </div>
@@ -290,13 +290,13 @@ export default function LewServiceManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128221;</span>
                   <div>
-                    <p className="text-sm font-medium text-orange-800">Revision Requested</p>
+                    <p className="text-sm font-medium text-orange-800">Revisit Requested</p>
                     <p className="text-xs text-orange-700 mt-1">
-                      The applicant has requested a revision.
+                      The applicant has requested a follow-up visit.
                     </p>
                     {order.revisionComment && (
                       <div className="mt-2 bg-white rounded p-2 border border-orange-100">
-                        <p className="text-xs text-gray-500">Revision comment:</p>
+                        <p className="text-xs text-gray-500">Revisit reason:</p>
                         <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.revisionComment}</p>
                       </div>
                     )}
@@ -316,14 +316,14 @@ export default function LewServiceManagerOrderDetailPage() {
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128196;</span>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-purple-800">LEW Service deliverable uploaded. Waiting for applicant review.</p>
+                    <p className="text-sm font-medium text-purple-800">Visit report submitted. Waiting for applicant review.</p>
                     <p className="text-xs text-purple-700 mt-1">
-                      The deliverable has been uploaded. The applicant will review and confirm completion.
-                      You can re-upload a new version using the section above if needed.
+                      The visit report has been submitted. The applicant will review and confirm completion.
+                      You can submit an updated report using the section above if needed.
                     </p>
                     {order.managerNote && (
                       <div className="mt-2 bg-white rounded p-2 border border-purple-100">
-                        <p className="text-xs text-gray-500">Manager note:</p>
+                        <p className="text-xs text-gray-500">LEW note:</p>
                         <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.managerNote}</p>
                       </div>
                     )}
@@ -332,9 +332,9 @@ export default function LewServiceManagerOrderDetailPage() {
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LEW_Service_Deliverable')}
+                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LEW_Service_Visit_Report')}
                       >
-                        Download Deliverable
+                        Download Visit Report
                       </Button>
                     )}
                   </div>
@@ -351,16 +351,16 @@ export default function LewServiceManagerOrderDetailPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-green-800">Completed</p>
                     <p className="text-xs text-green-700 mt-1">
-                      This LEW Service order has been completed successfully.
+                      This on-site service order has been completed successfully.
                     </p>
                     {order.uploadedFileSeq && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LEW_Service_Deliverable')}
+                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LEW_Service_Visit_Report')}
                       >
-                        Download Deliverable
+                        Download Visit Report
                       </Button>
                     )}
                   </div>
