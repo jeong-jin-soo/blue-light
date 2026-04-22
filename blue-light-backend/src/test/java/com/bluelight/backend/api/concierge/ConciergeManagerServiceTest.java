@@ -57,6 +57,7 @@ class ConciergeManagerServiceTest {
     private AccountSetupTokenService tokenService;
     private EmailService emailService;
     private AuditLogService auditLogService;
+    private ConciergeNotifier notifier;
     private com.bluelight.backend.api.application.ApplicationService applicationService;
     private ConciergeManagerService service;
 
@@ -69,12 +70,13 @@ class ConciergeManagerServiceTest {
         tokenService = mock(AccountSetupTokenService.class);
         emailService = mock(EmailService.class);
         auditLogService = mock(AuditLogService.class);
+        notifier = mock(ConciergeNotifier.class);
         applicationService = mock(com.bluelight.backend.api.application.ApplicationService.class);
 
         service = new ConciergeManagerService(
             applicationService,
             conciergeRepository, noteRepository, userRepository,
-            tokenRepository, tokenService, emailService, auditLogService);
+            tokenRepository, tokenService, emailService, auditLogService, notifier);
         ReflectionTestUtils.setField(service, "setupBaseUrl", "http://localhost:5174");
 
         when(noteRepository.save(any(ConciergeNote.class))).thenAnswer(inv -> {

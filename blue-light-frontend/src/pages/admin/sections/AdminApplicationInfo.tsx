@@ -43,10 +43,16 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
             Business Details
             <span className="text-xs text-gray-400 ml-1.5">(Required for Letter of Appointment)</span>
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <InfoField label="Company Name" value={application.userCompanyName || '—'} />
-            <InfoField label="UEN" value={application.userUen || '—'} />
-          </div>
+          {application.applicantType === 'INDIVIDUAL' ? (
+            <div className="text-sm text-gray-500 italic py-2">
+              Individual applicant — no business registration.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InfoField label="Company Name" value={application.userCompanyName || '—'} />
+              <InfoField label="UEN" value={application.userUen || '—'} />
+            </div>
+          )}
         </div>
 
         {/* Correspondence Address */}

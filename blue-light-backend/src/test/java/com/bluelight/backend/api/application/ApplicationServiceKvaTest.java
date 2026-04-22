@@ -4,6 +4,7 @@ import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.domain.application.ApplicantType;
 import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.application.ApplicationDeclarationLogRepository;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.KvaStatus;
 import com.bluelight.backend.domain.application.SldRequestRepository;
@@ -45,6 +46,7 @@ class ApplicationServiceKvaTest {
     private UserRepository userRepository;
     private FileRepository fileRepository;
     private AuditLogService auditLogService;
+    private ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
     private ApplicationService service;
 
     @BeforeEach
@@ -56,9 +58,11 @@ class ApplicationServiceKvaTest {
         userRepository = mock(UserRepository.class);
         fileRepository = mock(FileRepository.class);
         auditLogService = mock(AuditLogService.class);
+        applicationDeclarationLogRepository = mock(ApplicationDeclarationLogRepository.class);
         service = new ApplicationService(
                 applicationRepository, sldRequestRepository, masterPriceRepository,
-                paymentRepository, userRepository, fileRepository, auditLogService);
+                paymentRepository, userRepository, fileRepository, auditLogService,
+                applicationDeclarationLogRepository);
     }
 
     private CreateApplicationRequest baseReq(Integer kva, Boolean unknown) {

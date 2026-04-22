@@ -9,6 +9,7 @@ import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.concierge.ConciergeRequest;
 import com.bluelight.backend.domain.concierge.ConciergeRequestRepository;
 import com.bluelight.backend.domain.concierge.ConciergeRequestStatus;
+import com.bluelight.backend.domain.concierge.VerificationPhraseGenerator;
 import com.bluelight.backend.domain.user.AccountSetupToken;
 import com.bluelight.backend.domain.user.AccountSetupTokenSource;
 import com.bluelight.backend.domain.user.ConsentType;
@@ -50,6 +51,7 @@ class ConciergeServiceTest {
     private UserConsentLogRepository consentLogRepository;
     private AccountSetupTokenService tokenService;
     private PublicCodeGenerator publicCodeGenerator;
+    private VerificationPhraseGenerator verificationPhraseGenerator;
     private ConciergeNotifier notifier;
     private AuditLogService auditLogService;
     private PasswordEncoder passwordEncoder;
@@ -62,16 +64,19 @@ class ConciergeServiceTest {
         consentLogRepository = mock(UserConsentLogRepository.class);
         tokenService = mock(AccountSetupTokenService.class);
         publicCodeGenerator = mock(PublicCodeGenerator.class);
+        verificationPhraseGenerator = mock(VerificationPhraseGenerator.class);
         notifier = mock(ConciergeNotifier.class);
         auditLogService = mock(AuditLogService.class);
         passwordEncoder = mock(PasswordEncoder.class);
 
         service = new ConciergeService(
             conciergeRepository, userRepository, consentLogRepository,
-            tokenService, publicCodeGenerator, notifier, auditLogService, passwordEncoder);
+            tokenService, publicCodeGenerator, verificationPhraseGenerator,
+            notifier, auditLogService, passwordEncoder);
 
         // 공통 stubbing
         when(publicCodeGenerator.generate()).thenReturn("C-2026-0001");
+        when(verificationPhraseGenerator.generate()).thenReturn("amber-cedar-willow-opal");
         when(passwordEncoder.encode(anyString())).thenAnswer(inv -> "ENC:" + inv.getArgument(0));
         when(conciergeRepository.save(any(ConciergeRequest.class))).thenAnswer(inv -> {
             ConciergeRequest cr = inv.getArgument(0);
