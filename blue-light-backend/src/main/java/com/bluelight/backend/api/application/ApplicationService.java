@@ -293,6 +293,11 @@ public class ApplicationService {
                 saved.getApplicationSeq(), appType, userSeq,
                 request.getSelectedKva(), quoteAmount, sldFee, sldOption);
 
+        // C.1: Snapshot-at-submit — Application을 "신청 당시 정본"으로 격상
+        // JIT 결과(applyCorporateJitCompanyInfo)가 User에 반영됐든 persistToProfile=false로 반영 안 됐든
+        // 동일하게 request.companyInfo 우선 → User fallback 순으로 스냅샷 저장.
+        recordApplicationSubmitSnapshot(saved, user, request);
+
         // SLD 요청 시 자동으로 SldRequest 생성
         if (sldOption == SldOption.REQUEST_LEW) {
             SldRequest sldRequest = SldRequest.builder()
@@ -308,6 +313,59 @@ public class ApplicationService {
         recordApplicationDeclarations(saved, user, request, clientIp, userAgent);
 
         return ApplicationResponse.from(saved);
+    }
+
+    /**
+     * C.1 — 신청 Submit 시점에 Application을 "신청 당시 정본"으로 스냅샷.
+     * <p>
+     * 처리 규칙 (감사 리포트 §8 수정 권고 + §9 아키텍처 재정의):
+     * <ul>
+     *   <li>INDIVIDUAL: companyName = 신청자 성명, uen = null, designation = "Owner" 기본값.</li>
+     *   <li>CORPORATE: {@code request.companyInfo}가 있으면 그 값을 우선 사용
+     *       ({@code persistToProfile=false}라서 User에 저장되지 않은 경우도 스냅샷은 기록).
+     *       없으면 User.companyName/uen/designation fallback.</li>
+     *   <li>phone/email은 항상 User에서 읽는다.</li>
+     * </ul>
+     * {@code @Column(updatable=false)}로 인해 두 번째 호출은 no-op.
+     */
+    private void recordApplicationSubmitSnapshot(Application app, User user, CreateApplicationRequest request) {
+        String applicantName = user.getFullName();
+
+        boolean isIndividual = request.getApplicantType() == ApplicantType.INDIVIDUAL;
+
+        String companyName;
+        String uen;
+        String designation;
+
+        if (isIndividual) {
+            // INDIVIDUAL 자동 대체값 (EMA ELISE 양식: 개인은 본인 이름/Owner)
+            companyName = applicantName;
+            uen = null;
+            designation = "Owner";
+        } else {
+            // CORPORATE — request.companyInfo(persistToProfile 무관) > user profile
+            CompanyInfoRequest info = request.getCompanyInfo();
+            if (info != null) {
+                companyName = trimOrNull(info.getCompanyName());
+                uen = trimOrNull(info.getUen());
+                designation = trimOrNull(info.getDesignation());
+            } else {
+                companyName = user.getCompanyName();
+                uen = user.getUen();
+                designation = user.getDesignation();
+            }
+        }
+
+        String phone = user.getPhone();
+        String email = user.getEmail();
+
+        app.recordLoaSnapshot(applicantName, companyName, uen, designation, phone, email);
+    }
+
+    private String trimOrNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 
     /**
@@ -568,6 +626,9 @@ public class ApplicationService {
         log.info("Application created ON-BEHALF: seq={}, targetApplicantSeq={}, conciergeRequestSeq={}, type={}, kva={}, amount={}",
                 saved.getApplicationSeq(), targetApplicantSeq, conciergeRequestSeq, appType,
                 request.getSelectedKva(), quoteAmount);
+
+        // C.1: Snapshot-at-submit (Concierge 대리 생성 경로도 동일 로직 적용)
+        recordApplicationSubmitSnapshot(saved, user, request);
 
         // SLD 요청 자동 생성 (applicant 경로와 동일)
         if (sldOption == SldOption.REQUEST_LEW) {

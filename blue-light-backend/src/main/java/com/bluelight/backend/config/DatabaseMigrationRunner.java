@@ -77,6 +77,8 @@ public class DatabaseMigrationRunner {
             // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
             migrateApplicationsEmaFields(conn);
             migrateApplicationDeclarationLogsTable(conn);
+            // ── C.1: Snapshot-at-submit — applications.loa_phone_snapshot, loa_email_snapshot ──
+            migrateApplicationsLoaPhoneEmailSnapshots(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -1106,6 +1108,35 @@ public class DatabaseMigrationRunner {
                             ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
             log.info("Migration [application-declaration-logs]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션 (C.1): applications 테이블에 loa_phone_snapshot / loa_email_snapshot 컬럼 추가.
+     * Snapshot-at-submit 정책 — LOA 스냅샷 4개 컬럼과 같이 신청 시점 phone/email을 불변 기록.
+     * 엔티티 레벨 {@code @Column(updatable=false)}로 UPDATE 차단.
+     */
+    private void migrateApplicationsLoaPhoneEmailSnapshots(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] cols = {
+                {"loa_phone_snapshot", "VARCHAR(20)"},
+                {"loa_email_snapshot", "VARCHAR(100)"}
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : cols) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [loa-phone-email-snapshot]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [loa-phone-email-snapshot]: all columns exist, skipping");
         }
     }
 

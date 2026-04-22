@@ -3,6 +3,7 @@ package com.bluelight.backend.api.loa;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.application.ApplicantType;
 import com.bluelight.backend.domain.user.User;
 import com.lowagie.text.Image;
 import com.lowagie.text.pdf.BaseFont;
@@ -44,14 +45,13 @@ public class LoaGenerationService {
      * @return 생성된 PDF의 저장 경로 (FileStorageService 기준)
      */
     public String generateNewLicenceLoa(Application application) {
-        User applicant = application.getUser();
         User lew = application.getAssignedLew();
 
         if (lew == null) {
             throw new BusinessException("LEW must be assigned before generating LOA",
                     HttpStatus.BAD_REQUEST, "LEW_NOT_ASSIGNED");
         }
-        validateApplicantProfile(applicant);
+        validateApplicantProfile(application);
 
         String subDirectory = "applications/" + application.getApplicationSeq();
         String filename = "LOA_" + application.getApplicationSeq() + "_"
@@ -100,25 +100,28 @@ public class LoaGenerationService {
             over.showText("SINGAPORE " + (application.getPostalCode() != null ? application.getPostalCode() : ""));
             over.endText();
 
-            // 회사명 (FOR): y_bu=516
+            // 회사명 (FOR): y_bu=516 — Application snapshot 우선
+            String companyNameForLoa = resolveCompanyName(application);
             over.beginText();
             over.setFontAndSize(bfBold, 10);
             over.setTextMatrix(86, 516);
-            over.showText(applicant.getCompanyName() != null ? applicant.getCompanyName().toUpperCase() : "");
+            over.showText(companyNameForLoa != null ? companyNameForLoa.toUpperCase() : "");
             over.endText();
 
-            // 신청자 이름+직함: y_bu=375
+            // 신청자 이름+직함: y_bu=375 — Application snapshot 우선
+            String applicantNameForLoa = resolveApplicantName(application);
+            String designationForLoa = resolveDesignation(application);
             over.beginText();
             over.setFontAndSize(bf, 10);
             over.setTextMatrix(57, 375);
-            String nameDesignation = applicant.getFullName()
-                    + (applicant.getDesignation() != null ? "    " + applicant.getDesignation() : "");
+            String nameDesignation = applicantNameForLoa
+                    + (designationForLoa != null && !designationForLoa.isBlank()
+                            ? "    " + designationForLoa : "");
             over.showText(nameDesignation);
             over.endText();
 
-            // 우편주소 (Correspondence Address)
-            String corrAddr = applicant.getCorrespondenceAddress() != null
-                    ? applicant.getCorrespondenceAddress() : "";
+            // 우편주소 (Correspondence Address) — 5-part > User legacy > Installation fallback
+            String corrAddr = resolveCorrespondenceAddress(application);
             if (corrAddr.length() > 50) {
                 over.beginText();
                 over.setFontAndSize(bf, 9);
@@ -139,9 +142,10 @@ public class LoaGenerationService {
                 over.endText();
             }
 
-            // UEN: 9개 박스
-            if (applicant.getUen() != null && !applicant.getUen().isBlank()) {
-                String uen = applicant.getUen();
+            // UEN: 9개 박스 — Application snapshot 우선
+            String uenForLoa = resolveUen(application);
+            if (uenForLoa != null && !uenForLoa.isBlank()) {
+                String uen = uenForLoa;
                 float[] boxCenterX = {374.5f, 395.0f, 415.6f, 436.1f, 456.7f, 477.2f, 497.8f, 518.3f, 538.9f};
                 float uenY = 228;
 
@@ -168,38 +172,40 @@ public class LoaGenerationService {
                 }
             }
 
-            // Postal Code: y_bu=230
-            if (applicant.getCorrespondencePostalCode() != null
-                    && !applicant.getCorrespondencePostalCode().isBlank()) {
+            // Postal Code: y_bu=230 — Application 5-part > User legacy
+            String corrPostalForLoa = resolveCorrespondencePostalCode(application);
+            if (corrPostalForLoa != null && !corrPostalForLoa.isBlank()) {
                 over.beginText();
                 over.setFontAndSize(bf, 10);
                 over.setTextMatrix(129, 230);
-                over.showText(applicant.getCorrespondencePostalCode());
+                over.showText(corrPostalForLoa);
                 over.endText();
             }
 
-            // Email: y_bu=206
-            if (applicant.getEmail() != null && !applicant.getEmail().isBlank()) {
+            // Email: y_bu=206 — Application snapshot 우선
+            String emailForLoa = resolveEmail(application);
+            if (emailForLoa != null && !emailForLoa.isBlank()) {
                 over.beginText();
                 over.setFontAndSize(bf, 10);
                 over.setTextMatrix(94, 206);
-                over.showText(applicant.getEmail());
+                over.showText(emailForLoa);
                 over.endText();
             }
 
-            // Tel No: y_bu=182
-            if (applicant.getPhone() != null && !applicant.getPhone().isBlank()) {
+            // Tel No: y_bu=182 — Application snapshot 우선
+            String phoneForLoa = resolvePhone(application);
+            if (phoneForLoa != null && !phoneForLoa.isBlank()) {
                 over.beginText();
                 over.setFontAndSize(bf, 10);
                 over.setTextMatrix(103, 182);
-                over.showText(applicant.getPhone());
+                over.showText(phoneForLoa);
                 over.endText();
 
                 // SMS: y_bu=130
                 over.beginText();
                 over.setFontAndSize(bf, 10);
                 over.setTextMatrix(289, 130);
-                over.showText(applicant.getPhone());
+                over.showText(phoneForLoa);
                 over.endText();
             }
 
@@ -366,19 +372,35 @@ public class LoaGenerationService {
     }
 
     /**
-     * 신청자 프로필 필수 필드 검증
+     * 신청자 프로필 필수 필드 검증 (Layer B 정본).
+     * <p>
+     * C.2 JIT 재요청 감사 §8 P0 반영:
+     * <ul>
+     *   <li>CORPORATE: Company Name / Designation 누락 시 차단.</li>
+     *   <li>INDIVIDUAL: 회사명/직함은 EMA 양식 규칙상 자동 대체되므로 검증 생략.</li>
+     *   <li>Correspondence Address: 렌더 단계에서 Application 5-part → User legacy →
+     *       Installation 주소 순으로 항상 fallback이 보장되므로 검증 대상에서 제외.</li>
+     * </ul>
+     * 스냅샷(Layer B)이 우선이고, 비어 있을 때만 User(Layer A)로 fallback.
      */
-    public void validateApplicantProfile(User applicant) {
+    public void validateApplicantProfile(Application application) {
+        ApplicantType applicantType = application.getApplicantType();
         StringBuilder missing = new StringBuilder();
 
-        if (applicant.getCompanyName() == null || applicant.getCompanyName().isBlank()) {
-            missing.append("Company Name, ");
-        }
-        if (applicant.getDesignation() == null || applicant.getDesignation().isBlank()) {
-            missing.append("Designation, ");
-        }
-        if (applicant.getCorrespondenceAddress() == null || applicant.getCorrespondenceAddress().isBlank()) {
-            missing.append("Correspondence Address, ");
+        if (applicantType == ApplicantType.CORPORATE) {
+            String companyName = firstNonBlank(
+                    application.getLoaCompanyNameSnapshot(),
+                    application.getUser() != null ? application.getUser().getCompanyName() : null);
+            if (companyName == null || companyName.isBlank()) {
+                missing.append("Company Name, ");
+            }
+
+            String designation = firstNonBlank(
+                    application.getLoaDesignationSnapshot(),
+                    application.getUser() != null ? application.getUser().getDesignation() : null);
+            if (designation == null || designation.isBlank()) {
+                missing.append("Designation, ");
+            }
         }
 
         if (!missing.isEmpty()) {
@@ -387,5 +409,136 @@ public class LoaGenerationService {
                     "Applicant profile is incomplete. Missing: " + fields,
                     HttpStatus.BAD_REQUEST, "INCOMPLETE_PROFILE");
         }
+    }
+
+    // ── Layer B (Application snapshot) 우선, User fallback 헬퍼 ─────────────
+
+    /** 신청자 성명: 스냅샷 → User.fullName. */
+    private String resolveApplicantName(Application app) {
+        String snap = app.getLoaApplicantNameSnapshot();
+        if (snap != null && !snap.isBlank()) return snap;
+        return app.getUser() != null && app.getUser().getFullName() != null
+                ? app.getUser().getFullName() : "";
+    }
+
+    /**
+     * 회사명: INDIVIDUAL 은 본인 성명으로 대체 (EMA 양식 규칙).
+     * CORPORATE: 스냅샷 → User.companyName.
+     */
+    private String resolveCompanyName(Application app) {
+        if (app.getApplicantType() == ApplicantType.INDIVIDUAL) {
+            return resolveApplicantName(app);
+        }
+        String snap = app.getLoaCompanyNameSnapshot();
+        if (snap != null && !snap.isBlank()) return snap;
+        return app.getUser() != null && app.getUser().getCompanyName() != null
+                ? app.getUser().getCompanyName() : "";
+    }
+
+    /** UEN: INDIVIDUAL 은 공란. CORPORATE: 스냅샷 → User.uen. */
+    private String resolveUen(Application app) {
+        if (app.getApplicantType() == ApplicantType.INDIVIDUAL) return "";
+        String snap = app.getLoaUenSnapshot();
+        if (snap != null && !snap.isBlank()) return snap;
+        return app.getUser() != null && app.getUser().getUen() != null
+                ? app.getUser().getUen() : "";
+    }
+
+    /**
+     * 직함: 스냅샷 → INDIVIDUAL 은 "Owner" 기본값, CORPORATE 는 User.designation.
+     */
+    private String resolveDesignation(Application app) {
+        String snap = app.getLoaDesignationSnapshot();
+        if (snap != null && !snap.isBlank()) return snap;
+        if (app.getApplicantType() == ApplicantType.INDIVIDUAL) return "Owner";
+        return app.getUser() != null && app.getUser().getDesignation() != null
+                ? app.getUser().getDesignation() : "";
+    }
+
+    /** Phone: 스냅샷 → User.phone. */
+    private String resolvePhone(Application app) {
+        String snap = app.getLoaPhoneSnapshot();
+        if (snap != null && !snap.isBlank()) return snap;
+        return app.getUser() != null && app.getUser().getPhone() != null
+                ? app.getUser().getPhone() : "";
+    }
+
+    /** Email: 스냅샷 → User.email. */
+    private String resolveEmail(Application app) {
+        String snap = app.getLoaEmailSnapshot();
+        if (snap != null && !snap.isBlank()) return snap;
+        return app.getUser() != null && app.getUser().getEmail() != null
+                ? app.getUser().getEmail() : "";
+    }
+
+    /**
+     * Correspondence 주소(단일 문자열): Application 5-part → User legacy →
+     * Installation address 재사용 (EMA 양식 상 동일 주소 허용).
+     */
+    private String resolveCorrespondenceAddress(Application app) {
+        String block = app.getCorrespondenceAddressBlock();
+        String unit = app.getCorrespondenceAddressUnit();
+        String street = app.getCorrespondenceAddressStreet();
+        String building = app.getCorrespondenceAddressBuilding();
+        String postal = app.getCorrespondenceAddressPostalCode();
+        if (anyNotBlank(block, unit, street, building, postal)) {
+            return joinParts(block, unit, street, building, postal);
+        }
+        String legacy = app.getUser() != null ? app.getUser().getCorrespondenceAddress() : null;
+        if (legacy != null && !legacy.isBlank()) return legacy;
+        log.info("LOA correspondence address: falling back to installation address (applicationSeq={})",
+                app.getApplicationSeq());
+        return app.getAddress() != null ? app.getAddress() : "";
+    }
+
+    /**
+     * Correspondence postal code: Application 5-part → User legacy.
+     * Installation 주소 fallback 시엔 Application.postalCode 로도 대체하지 않는다
+     * (PDF 별도 필드이므로 공란 허용).
+     */
+    private String resolveCorrespondencePostalCode(Application app) {
+        String postal = app.getCorrespondenceAddressPostalCode();
+        if (postal != null && !postal.isBlank()) return postal;
+        if (app.getUser() != null && app.getUser().getCorrespondencePostalCode() != null
+                && !app.getUser().getCorrespondencePostalCode().isBlank()) {
+            return app.getUser().getCorrespondencePostalCode();
+        }
+        // Installation 주소로 폴백된 경우 설치 postalCode 재사용 (Correspondence resolver 와 일관)
+        String block = app.getCorrespondenceAddressBlock();
+        String unit = app.getCorrespondenceAddressUnit();
+        String street = app.getCorrespondenceAddressStreet();
+        String building = app.getCorrespondenceAddressBuilding();
+        String legacy = app.getUser() != null ? app.getUser().getCorrespondenceAddress() : null;
+        boolean noneResolved = !anyNotBlank(block, unit, street, building)
+                && (legacy == null || legacy.isBlank());
+        if (noneResolved && app.getPostalCode() != null && !app.getPostalCode().isBlank()) {
+            return app.getPostalCode();
+        }
+        return "";
+    }
+
+    private String firstNonBlank(String... candidates) {
+        for (String c : candidates) {
+            if (c != null && !c.isBlank()) return c;
+        }
+        return null;
+    }
+
+    private boolean anyNotBlank(String... s) {
+        for (String v : s) {
+            if (v != null && !v.isBlank()) return true;
+        }
+        return false;
+    }
+
+    private String joinParts(String... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p != null && !p.isBlank()) {
+                if (sb.length() > 0) sb.append(", ");
+                sb.append(p);
+            }
+        }
+        return sb.toString();
     }
 }

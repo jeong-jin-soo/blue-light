@@ -13,6 +13,18 @@ interface Props {
  * - 신청자 정보, 물건 정보, 면허 기간, 갱신 정보, 가격 정보
  */
 export function AdminApplicationInfo({ application, onNavigateToOriginal }: Props) {
+  // CORPORATE 신청자만 Company/UEN/Designation 필요.
+  // INDIVIDUAL은 EMA 양식상 본인 이름으로 자동 대체되므로 경고 대상 아님.
+  // Correspondence Address는 LOA 렌더 시 Installation address로 fallback되므로 경고 제외.
+  const missingCorporateFields: string[] =
+    application.applicantType === 'CORPORATE'
+      ? [
+          !application.userCompanyName && 'Company Name',
+          !application.userUen && 'UEN',
+          !application.userDesignation && 'Designation',
+        ].filter((v): v is string => !!v)
+      : [];
+
   return (
     <>
       {/* Applicant Info */}
@@ -49,22 +61,16 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
           </div>
         </div>
 
-        {/* Missing info warning */}
-        {(!application.userCompanyName || !application.userUen || !application.userDesignation || !application.userCorrespondenceAddress) && (
+        {/* Missing info warning — CORPORATE 전용 */}
+        {missingCorporateFields.length > 0 && (
           <div className="mt-4 bg-warning-50 border border-warning-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <span className="text-sm">⚠️</span>
               <div>
-                <p className="text-xs font-medium text-warning-800">Incomplete Applicant Profile</p>
+                <p className="text-xs font-medium text-warning-800">Corporate Applicant Profile Incomplete</p>
                 <p className="text-xs text-warning-700 mt-0.5">
-                  The following are required for Letter of Appointment:{' '}
-                  {[
-                    !application.userCompanyName && 'Company Name',
-                    !application.userUen && 'UEN',
-                    !application.userDesignation && 'Designation',
-                    !application.userCorrespondenceAddress && 'Correspondence Address',
-                  ].filter(Boolean).join(', ')}.
-                  Please ask the applicant to update their profile.
+                  Missing: {missingCorporateFields.join(', ')}.
+                  Ask the applicant to update their profile before generating LOA.
                 </p>
               </div>
             </div>

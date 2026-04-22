@@ -273,6 +273,20 @@ public class Application extends BaseEntity {
     private String loaDesignationSnapshot;
 
     /**
+     * 신청 시점 phone 스냅샷 (C.1 Snapshot-at-submit / SMS 용).
+     * {@code updatable=false} — LOA 스냅샷 불변 정책 동일 적용.
+     */
+    @Column(name = "loa_phone_snapshot", length = 20, updatable = false)
+    private String loaPhoneSnapshot;
+
+    /**
+     * 신청 시점 email 스냅샷 (C.1 Snapshot-at-submit).
+     * {@code updatable=false} — LOA 스냅샷 불변 정책 동일 적용.
+     */
+    @Column(name = "loa_email_snapshot", length = 100, updatable = false)
+    private String loaEmailSnapshot;
+
+    /**
      * 스냅샷이 백필로 채워진 시각(Security R-2).
      * 신규 LOA 생성 시에는 null, V_04 마이그레이션 백필 대상은 NOW() 기록.
      */
@@ -642,10 +656,27 @@ public class Application extends BaseEntity {
      * {@code snapshotBackfilledAt}는 항상 null로 설정 — 이 메서드는 실시간 생성 경로이므로
      * 백필이 아님을 명시한다.
      *
+     * <p>4-arg 시그니처는 {@link #recordLoaSnapshot(String, String, String, String, String, String)}의 래퍼로
+     * 유지된다 (LEW/Admin 경로 호환성). phone/email 은 null 로 전달.
+     *
      * @return true: 신규 기록됨, false: 이미 스냅샷이 존재해 건너뜀
      */
     public boolean recordLoaSnapshot(String applicantName, String companyName,
                                      String uen, String designation) {
+        return recordLoaSnapshot(applicantName, companyName, uen, designation, null, null);
+    }
+
+    /**
+     * LOA 스냅샷 + phone/email 통합 기록 (C.1 Snapshot-at-submit).
+     * <p>
+     * 신청 Submit 시점에 Application을 "신청 당시 정본"으로 격상하기 위한 확장 시그니처.
+     * phone/email 컬럼도 {@code @Column(updatable=false)}이므로 동일한 불변 정책을 따른다.
+     *
+     * @return true: 신규 기록됨, false: 이미 스냅샷이 존재해 건너뜀(멱등)
+     */
+    public boolean recordLoaSnapshot(String applicantName, String companyName,
+                                     String uen, String designation,
+                                     String phone, String email) {
         if (this.loaApplicantNameSnapshot != null && !this.loaApplicantNameSnapshot.isBlank()) {
             return false;
         }
@@ -653,6 +684,8 @@ public class Application extends BaseEntity {
         this.loaCompanyNameSnapshot = companyName;
         this.loaUenSnapshot = uen;
         this.loaDesignationSnapshot = designation;
+        this.loaPhoneSnapshot = phone;
+        this.loaEmailSnapshot = email;
         this.loaSnapshotBackfilledAt = null;
         return true;
     }

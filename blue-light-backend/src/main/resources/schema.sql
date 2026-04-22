@@ -85,6 +85,9 @@ CREATE TABLE IF NOT EXISTS applications (
     uen_snapshot             VARCHAR(20)   NULL,
     designation_snapshot     VARCHAR(50)   NULL,
     snapshot_backfilled_at   DATETIME(6)   NULL,
+    -- C.1 Snapshot-at-submit: 신청 시점 phone/email (SMS + EMA 양식용, updatable=false)
+    loa_phone_snapshot       VARCHAR(20)   NULL,
+    loa_email_snapshot       VARCHAR(100)  NULL,
     expiry_notified_at       DATETIME(6),
     -- Phase 5: kVA 확정 상태 (phase5-kva-ux/01-spec.md §3)
     kva_status               VARCHAR(20)   NOT NULL DEFAULT 'CONFIRMED' COMMENT 'UNKNOWN | CONFIRMED',
