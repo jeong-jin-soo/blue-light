@@ -58,6 +58,20 @@ interface FormData {
   isRentalPremises: boolean;            // NEW + 임대 체크
   renewalCompanyNameChanged: boolean;   // RENEWAL 시 변경 체크박스 2개
   renewalAddressChanged: boolean;
+  // ── P1 Step 2: Installation Name ──
+  useCustomInstallationName: boolean;   // 기본 false → "이름 자동 생성"
+  installationName: string;             // useCustomInstallationName=true일 때만 편집 가능
+  // ── P1 Step 4: Declaration 3-group + Correspondence + Landlord JIT ──
+  declarationGroup1Accepted: boolean;   // "정보 사실·허위기재 법적 책임" (pre-check 허용)
+  declarationGroup2Accepted: boolean;   // "전기 설비가 SG 전기 규정/SP 기술요건 부합"
+  declarationGroup3Accepted: boolean;   // "LEW의 정기 점검·EMA 보고 동의"
+  correspondenceSameAsInstallation: boolean;  // 기본 true
+  correspondenceBlock: string;
+  correspondenceUnit: string;
+  correspondenceStreet: string;
+  correspondenceBuilding: string;
+  correspondencePostalCode: string;
+  landlordEiLicenceNo: string;          // NEW + 임대 시 Step 4에서 수집
 }
 
 export default function NewApplicationPage() {
@@ -97,6 +111,18 @@ export default function NewApplicationPage() {
     isRentalPremises: false,
     renewalCompanyNameChanged: false,
     renewalAddressChanged: false,
+    useCustomInstallationName: false,
+    installationName: '',
+    declarationGroup1Accepted: true,   // 이미 상식에 속하는 사실 서약은 기본 체크 (UX 스펙 §5)
+    declarationGroup2Accepted: false,
+    declarationGroup3Accepted: false,
+    correspondenceSameAsInstallation: true,
+    correspondenceBlock: '',
+    correspondenceUnit: '',
+    correspondenceStreet: '',
+    correspondenceBuilding: '',
+    correspondencePostalCode: '',
+    landlordEiLicenceNo: '',
   });
 
   // Price data
@@ -256,6 +282,28 @@ export default function NewApplicationPage() {
       renewalAddressChanged: formData.applicationType === 'RENEWAL'
         ? formData.renewalAddressChanged
         : undefined,
+      // ── P1.4: Step 2·4에서 수집된 EMA 필드 ──
+      installationName: formData.useCustomInstallationName && formData.installationName.trim()
+        ? formData.installationName.trim()
+        : undefined,
+      landlordEiLicenceNo: formData.isRentalPremises && formData.landlordEiLicenceNo.trim()
+        ? formData.landlordEiLicenceNo.trim()
+        : undefined,
+      correspondenceAddressBlock: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceBlock.trim() || undefined
+        : undefined,
+      correspondenceAddressUnit: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceUnit.trim() || undefined
+        : undefined,
+      correspondenceAddressStreet: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceStreet.trim() || undefined
+        : undefined,
+      correspondenceAddressBuilding: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceBuilding.trim() || undefined
+        : undefined,
+      correspondenceAddressPostalCode: !formData.correspondenceSameAsInstallation
+        ? formData.correspondencePostalCode.trim() || undefined
+        : undefined,
     };
     if (formData.applicationType === 'RENEWAL') {
       if (formData.renewalReferenceNo.trim()) {
@@ -385,6 +433,18 @@ export default function NewApplicationPage() {
       isRentalPremises: false,
       renewalCompanyNameChanged: false,
       renewalAddressChanged: false,
+      useCustomInstallationName: false,
+      installationName: '',
+      declarationGroup1Accepted: true,
+      declarationGroup2Accepted: false,
+      declarationGroup3Accepted: false,
+      correspondenceSameAsInstallation: true,
+      correspondenceBlock: '',
+      correspondenceUnit: '',
+      correspondenceStreet: '',
+      correspondenceBuilding: '',
+      correspondencePostalCode: '',
+      landlordEiLicenceNo: '',
     }));
     setErrors({});
     setPriceResult(null);
@@ -863,6 +923,35 @@ export default function NewApplicationPage() {
                 options={BUILDING_TYPES}
               />
             </div>
+
+            {/* ── P1.4: Installation Name — 기본 자동 생성, "다르게 지정" 토글 시 편집 ── */}
+            {formData.applicationType === 'NEW' && (
+              <div className="space-y-2 border-t border-gray-100 pt-4">
+                <label className="inline-flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.useCustomInstallationName}
+                    onChange={(e) => updateField('useCustomInstallationName', e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Use a custom installation name
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Default: your applicant name + "Premises". Toggle to override.
+                    </span>
+                  </span>
+                </label>
+                {formData.useCustomInstallationName && (
+                  <Input
+                    label="Installation Name"
+                    placeholder="e.g., ABC Factory Block A"
+                    value={formData.installationName}
+                    onChange={(e) => updateField('installationName', e.target.value)}
+                    maxLength={200}
+                  />
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -931,7 +1020,125 @@ export default function NewApplicationPage() {
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <StepReview formData={formData} priceResult={priceResult} />
+          <div className="space-y-5">
+            <StepReview formData={formData} priceResult={priceResult} />
+
+            {/* ── P1.4: Correspondence Address — 기본은 Installation과 동일, 해제 시 5-part 노출 ── */}
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-100">
+              <label className="inline-flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.correspondenceSameAsInstallation}
+                  onChange={(e) => updateField('correspondenceSameAsInstallation', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  Correspondence address is the same as installation address
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Uncheck to enter a different postal address.
+                  </span>
+                </span>
+              </label>
+              {!formData.correspondenceSameAsInstallation && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                  <Input
+                    label="Block / House No"
+                    value={formData.correspondenceBlock}
+                    onChange={(e) => updateField('correspondenceBlock', e.target.value)}
+                    maxLength={20}
+                  />
+                  <Input
+                    label="Unit #"
+                    value={formData.correspondenceUnit}
+                    onChange={(e) => updateField('correspondenceUnit', e.target.value)}
+                    maxLength={20}
+                  />
+                  <Input
+                    label="Street Name"
+                    className="sm:col-span-2"
+                    value={formData.correspondenceStreet}
+                    onChange={(e) => updateField('correspondenceStreet', e.target.value)}
+                    maxLength={200}
+                  />
+                  <Input
+                    label="Building"
+                    value={formData.correspondenceBuilding}
+                    onChange={(e) => updateField('correspondenceBuilding', e.target.value)}
+                    maxLength={200}
+                  />
+                  <Input
+                    label="Postal Code"
+                    value={formData.correspondencePostalCode}
+                    onChange={(e) => updateField('correspondencePostalCode', e.target.value)}
+                    maxLength={10}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── P1.4: Landlord EI Licence — NEW + 임대 체크 시에만 노출 ── */}
+            {formData.applicationType === 'NEW' && formData.isRentalPremises && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                <h3 className="text-sm font-semibold text-amber-900">Landlord's Installation Licence</h3>
+                <p className="text-xs text-amber-800">
+                  Rental premises require the landlord's EI Licence number. It will be
+                  stored encrypted and visible only to the assigned LEW.
+                </p>
+                <Input
+                  label="Landlord EI Licence No"
+                  value={formData.landlordEiLicenceNo}
+                  onChange={(e) => updateField('landlordEiLicenceNo', e.target.value)}
+                  placeholder="e.g., E-12345"
+                  maxLength={100}
+                />
+              </div>
+            )}
+
+            {/* ── P1.4: Declaration 3-group (EMA 조항 4개를 의미 단위로 축약) ── */}
+            <div className="border-2 border-gray-200 rounded-lg p-4 space-y-3 bg-white">
+              <h3 className="text-sm font-semibold text-gray-800">Declaration</h3>
+              <p className="text-xs text-gray-500">
+                All three must be acknowledged before submission.
+              </p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.declarationGroup1Accepted}
+                  onChange={(e) => updateField('declarationGroup1Accepted', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I confirm that the information provided is <strong>true and complete</strong>,
+                  and I understand that false declarations are subject to legal liability
+                  under EMA regulations.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.declarationGroup2Accepted}
+                  onChange={(e) => updateField('declarationGroup2Accepted', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  My electrical installation <strong>complies with Singapore's electrical
+                  safety regulations</strong> and SP Group technical requirements.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.declarationGroup3Accepted}
+                  onChange={(e) => updateField('declarationGroup3Accepted', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I authorize the assigned LEW to perform <strong>periodic inspections
+                  and report results to EMA</strong> on my behalf.
+                </span>
+              </label>
+            </div>
+          </div>
         )}
 
         {/* Navigation buttons */}
@@ -945,7 +1152,17 @@ export default function NewApplicationPage() {
           {currentStep < 3 ? (
             <Button onClick={handleNext}>Continue</Button>
           ) : (
-            <Button onClick={() => setShowSubmitConfirm(true)} loading={submitting}>Submit Application</Button>
+            <Button
+              onClick={() => setShowSubmitConfirm(true)}
+              loading={submitting}
+              disabled={
+                !formData.declarationGroup1Accepted ||
+                !formData.declarationGroup2Accepted ||
+                !formData.declarationGroup3Accepted ||
+                (formData.applicationType === 'NEW' && formData.isRentalPremises &&
+                  !formData.landlordEiLicenceNo.trim())
+              }
+            >Submit Application</Button>
           )}
         </div>
       </Card>}
