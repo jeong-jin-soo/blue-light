@@ -1,7 +1,6 @@
 package com.bluelight.backend.api.invoice;
 
 import com.bluelight.backend.common.exception.BusinessException;
-import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
@@ -40,7 +39,14 @@ public class InvoiceService {
      */
     public InvoiceResponse getByApplicationForApplicant(Long applicationSeq, Long userSeq) {
         Application application = findApplicationOrThrow(applicationSeq);
-        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
+        // 본인 소유 검증 — 실패 시 INVOICE_FORBIDDEN 403 + 감사 로그 기록 (spec §9 AC-9)
+        Long ownerSeq = application.getUser().getUserSeq();
+        if (!ownerSeq.equals(userSeq)) {
+            recordForbiddenAttempt(applicationSeq, userSeq);
+            throw new BusinessException(
+                    "Invoice access is forbidden",
+                    HttpStatus.FORBIDDEN, "INVOICE_FORBIDDEN");
+        }
 
         assertPaymentConfirmed(application);
 
@@ -129,6 +135,26 @@ public class InvoiceService {
         } catch (Exception e) {
             log.warn("Audit log write failed for invoice download: invoiceSeq={}, err={}",
                     invoice.getInvoiceSeq(), e.getMessage());
+        }
+    }
+
+    /**
+     * 소유권 검증 실패를 감사 로그로 기록한다. 스펙 §9 AC-9 — 타인 접근 시 403 + 감사.
+     * Invoice 엔티티는 타인 것이라 불러오지 않고, Application seq를 참조 ID로 사용한다.
+     */
+    private void recordForbiddenAttempt(Long applicationSeq, Long userSeq) {
+        try {
+            auditLogService.logAsync(
+                    userSeq,
+                    AuditAction.INVOICE_DOWNLOADED,
+                    AuditCategory.APPLICATION,
+                    "Application", String.valueOf(applicationSeq),
+                    "Invoice download forbidden — not owner",
+                    null, null,
+                    null, null, "GET", "/api/applications/**/invoice", 403);
+        } catch (Exception e) {
+            log.warn("Audit log write failed for forbidden invoice attempt: applicationSeq={}, err={}",
+                    applicationSeq, e.getMessage());
         }
     }
 }

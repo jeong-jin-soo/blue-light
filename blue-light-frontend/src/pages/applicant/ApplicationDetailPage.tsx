@@ -23,8 +23,6 @@ import { ApplicationPayment } from './sections/ApplicationPayment';
 import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
 import { DocumentUploadSection } from '../../components/document/DocumentUploadSection';
-import { ProvidedInfoCard } from '../../components/applicant/ProvidedInfoCard';
-import { hasAnyProvidedInfo } from '../../components/applicant/providedInfoUtils';
 import { useAuthStore } from '../../stores/authStore';
 import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus, SampleFileInfo } from '../../types';
 
@@ -422,12 +420,6 @@ export default function ApplicationDetailPage() {
             onResubmit={() => setShowResubmitConfirm(true)}
             onCancelEdit={() => setEditMode(false)}
           />
-
-          {/* P2.C — 신청자가 제공한 fast-track hint 정보 카드.
-              제공된 항목이 0개면 섹션 자체가 렌더되지 않는다(부채감 제거 원칙). */}
-          {hasAnyProvidedInfo(application) && (
-            <ProvidedInfoCard application={application} />
-          )}
 
           <ApplicationPayment
             application={application}

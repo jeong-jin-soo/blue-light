@@ -27,9 +27,11 @@ public class InvoiceController {
 
     /**
      * 신청자 본인 — Application의 Invoice 메타데이터 조회.
-     * PAID 이후에만 응답, 본인 검증 실패 시 403.
+     * PAID 이후에만 응답, 본인 검증 실패 시 403. LEW는 이 경로로 접근할 수 없다
+     * (spec §4 — 영수증은 신청자에게 귀속, LEW는 /api/admin 경로 사용).
      */
     @GetMapping("/api/applications/{id}/invoice")
+    @PreAuthorize("!hasRole('LEW')")
     public ResponseEntity<InvoiceResponse> getMyInvoice(
             Authentication authentication,
             @PathVariable Long id) {
