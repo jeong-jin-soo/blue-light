@@ -1088,9 +1088,13 @@ export default function NewApplicationPage() {
                   label="Landlord EI Licence No"
                   value={formData.landlordEiLicenceNo}
                   onChange={(e) => updateField('landlordEiLicenceNo', e.target.value)}
-                  placeholder="e.g., E-12345"
+                  placeholder="e.g., E-12345 (leave blank if unknown)"
                   maxLength={100}
                 />
+                <p className="text-xs text-amber-700 mt-1">
+                  If you don't have this number right now, you can submit and the
+                  assigned LEW will collect it later.
+                </p>
               </div>
             )}
 
@@ -1151,19 +1155,21 @@ export default function NewApplicationPage() {
           </Button>
           {currentStep < 3 ? (
             <Button onClick={handleNext}>Continue</Button>
-          ) : (
-            <Button
-              onClick={() => setShowSubmitConfirm(true)}
-              loading={submitting}
-              disabled={
-                !formData.declarationGroup1Accepted ||
-                !formData.declarationGroup2Accepted ||
-                !formData.declarationGroup3Accepted ||
-                (formData.applicationType === 'NEW' && formData.isRentalPremises &&
-                  !formData.landlordEiLicenceNo.trim())
-              }
-            >Submit Application</Button>
-          )}
+          ) : (() => {
+            // Declaration 3개 미체크 시에만 차단. Landlord EI 공란 허용 (LEW가 나중에 수집).
+            const submitDisabled =
+              !formData.declarationGroup1Accepted ||
+              !formData.declarationGroup2Accepted ||
+              !formData.declarationGroup3Accepted;
+            return (
+              <Button
+                onClick={() => setShowSubmitConfirm(true)}
+                loading={submitting}
+                disabled={submitDisabled}
+                aria-disabled={submitDisabled}
+              >Submit Application</Button>
+            );
+          })()}
         </div>
       </Card>}
 

@@ -112,11 +112,9 @@ public class ApplicationService {
                         "PRICE_TIER_NOT_FOUND"
                 ));
 
-        // Parse SLD option early (needed for fee calculation)
-        SldOption sldOption = SldOption.SELF_UPLOAD;
-        if ("REQUEST_LEW".equals(request.getSldOption())) {
-            sldOption = SldOption.REQUEST_LEW;
-        }
+        // Parse SLD option early (needed for fee calculation).
+        // P1.4: SUBMIT_WITHIN_3_MONTHS 지원 — 미지정/오타는 SELF_UPLOAD 기본.
+        SldOption sldOption = parseSldOption(request.getSldOption());
 
         // SLD fee: only when REQUEST_LEW
         BigDecimal sldFee = (sldOption == SldOption.REQUEST_LEW)
@@ -194,6 +192,32 @@ public class ApplicationService {
                 // Auto-fill from original
                 existingLicenceNo = originalApp.getLicenseNumber();
                 existingExpiryDate = originalApp.getLicenseExpiryDate();
+
+                // ── P1.4: Renewal 변경 체크박스 서버 검증 (tester [MEDIUM]) ──
+                // 플래그가 false인데 실제 값이 변경되면 악의적 조작 의심 → 400.
+                Boolean companyChangedFlag = request.getRenewalCompanyNameChanged();
+                if (Boolean.FALSE.equals(companyChangedFlag) || companyChangedFlag == null) {
+                    String prevCompany = originalApp.getUser() != null ? originalApp.getUser().getCompanyName() : null;
+                    String curCompany = user.getCompanyName();
+                    if (prevCompany != null && curCompany != null
+                            && !java.util.Objects.equals(prevCompany, curCompany)) {
+                        throw new BusinessException(
+                                "Company name has changed since the previous application. "
+                                + "Please check 'Company name has changed' in the renewal section.",
+                                HttpStatus.BAD_REQUEST, "RENEWAL_COMPANY_CHANGE_UNFLAGGED");
+                    }
+                }
+                Boolean addressChangedFlag = request.getRenewalAddressChanged();
+                if (Boolean.FALSE.equals(addressChangedFlag) || addressChangedFlag == null) {
+                    String prevAddr = originalApp.getAddress();
+                    String curAddr = request.getAddress();
+                    if (prevAddr != null && curAddr != null && !prevAddr.equals(curAddr)) {
+                        throw new BusinessException(
+                                "Installation address has changed since the previous application. "
+                                + "Please check 'Installation address has changed' in the renewal section.",
+                                HttpStatus.BAD_REQUEST, "RENEWAL_ADDRESS_CHANGE_UNFLAGGED");
+                    }
+                }
             } else {
                 // Manual entry
                 existingLicenceNo = request.getExistingLicenceNo();
@@ -345,6 +369,20 @@ public class ApplicationService {
     }
 
     /**
+     * SLD 옵션 파싱 — 3-way enum. 미지정/오타는 SELF_UPLOAD 기본.
+     * Tester 리포트 HIGH 버그 수정: 기존에는 REQUEST_LEW만 인식하고
+     * SUBMIT_WITHIN_3_MONTHS 전송 시 SELF_UPLOAD로 잘못 저장됐다.
+     */
+    private SldOption parseSldOption(String raw) {
+        if (raw == null) return SldOption.SELF_UPLOAD;
+        try {
+            return SldOption.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            return SldOption.SELF_UPLOAD;
+        }
+    }
+
+    /**
      * Concierge Manager가 대리 생성하는 Application (★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A).
      * <p>
      * Owner = targetApplicant (Application.user). Actor(created_by)는 SecurityContext의
@@ -385,10 +423,7 @@ public class ApplicationService {
                         "No price tier found for " + request.getSelectedKva() + " kVA",
                         HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
 
-        SldOption sldOption = SldOption.SELF_UPLOAD;
-        if ("REQUEST_LEW".equals(request.getSldOption())) {
-            sldOption = SldOption.REQUEST_LEW;
-        }
+        SldOption sldOption = parseSldOption(request.getSldOption());
 
         BigDecimal sldFee = (sldOption == SldOption.REQUEST_LEW)
                 ? masterPrice.getSldPrice() : null;
@@ -491,6 +526,26 @@ public class ApplicationService {
                         ? null
                         : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)
                 .viaConciergeRequestSeq(conciergeRequestSeq)
+                // ── P1.4: Concierge 대리 생성 경로도 EMA 필드 전파 (tester [HIGH] 수정) ──
+                .installationName(request.getInstallationName())
+                .premisesType(request.getPremisesType())
+                .isRentalPremises(request.getIsRentalPremises())
+                .landlordEiLicenceNo(
+                        Boolean.TRUE.equals(request.getIsRentalPremises())
+                                ? request.getLandlordEiLicenceNo()
+                                : null)
+                .renewalCompanyNameChanged(request.getRenewalCompanyNameChanged())
+                .renewalAddressChanged(request.getRenewalAddressChanged())
+                .installationAddressBlock(request.getInstallationAddressBlock())
+                .installationAddressUnit(request.getInstallationAddressUnit())
+                .installationAddressStreet(request.getInstallationAddressStreet())
+                .installationAddressBuilding(request.getInstallationAddressBuilding())
+                .installationAddressPostalCode(request.getInstallationAddressPostalCode())
+                .correspondenceAddressBlock(request.getCorrespondenceAddressBlock())
+                .correspondenceAddressUnit(request.getCorrespondenceAddressUnit())
+                .correspondenceAddressStreet(request.getCorrespondenceAddressStreet())
+                .correspondenceAddressBuilding(request.getCorrespondenceAddressBuilding())
+                .correspondenceAddressPostalCode(request.getCorrespondenceAddressPostalCode())
                 .build();
 
         // 승인된 LEW 자동 할당 (applicant 경로와 동일)
