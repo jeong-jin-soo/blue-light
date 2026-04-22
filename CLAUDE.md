@@ -77,6 +77,28 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 - File storage: LocalFileStorageService (S3 인터페이스 대비)
 - API: Public `/api/auth/**`, `/api/prices/**` | Applicant `/api/applications/**` | Admin `/api/admin/**`
 
+## 🟢 설계 원칙 — 절대 위반 금지
+
+### 1. "설정 우선" 원칙 (Single Source of Truth)
+관리자가 설정한 값(master_prices, system_settings, role_metadata, master data 테이블 등)이 존재하는 도메인 정보는 **UI·서비스·검증 어디에서든 반드시 그 설정을 소비**해야 한다. **하드코딩 금지**.
+
+대표 사례:
+- **kVA tier 목록** → `master_prices` 테이블(`priceApi.getPrices()`) 사용. UI 옵션 하드코딩 금지. (KvaConfirmModal.tsx 참고)
+- **권한·역할 라벨** → `role_metadata` / `constants/roles.ts` 사용. 하드코딩된 역할 배열 금지.
+- **PayNow 계좌·수수료 등 정산 정보** → `system_settings`에서 조회.
+- **Retailer/Consumer Type 등 마스터 데이터** → 관리자 설정 테이블을 만들어 거기서 읽는다.
+
+검토 체크리스트:
+- [ ] 새 드롭다운/옵션/상수를 만들 때: 이미 admin 설정에 있는가?
+- [ ] 있다면 그 설정을 API로 로드하는가?
+- [ ] 하드코딩 상수는 오직 **JIT·보안·법적 고정 값**(예: JWT 만료, 암호 최소 길이)일 때만 허용.
+
+특수 예외 (기록 필수):
+- 하드코딩이 불가피하면 **코드에 `// 설정 우선 원칙 예외: <이유>` 주석** + `doc/Project Analysis/`에 사유 기재.
+
+### 2. JIT 정보 수집
+신청자에게서 받을 정보는 "반드시 필요한 시점"에만 요청. 이미 받은 정보는 재요청 금지. 상세: `doc/Project Analysis/ema-field-jit-plan.md`, `doc/Project Analysis/jit-reask-audit.md` §9 Layer 정의 (Application Layer B = 신청 당시 정본 / User Layer A = 기본값 제공자).
+
 ## Environment Variables
 
 ```

@@ -6,7 +6,8 @@ import { Modal, ModalHeader, ModalBody, ModalFooter } from '../ui/Modal';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import { confirmKva as confirmKvaApi } from '../../api/adminApplicationApi';
-import type { AdminApplication } from '../../types';
+import priceApi from '../../api/priceApi';
+import type { AdminApplication, MasterPrice } from '../../types';
 
 /**
  * Phase 5 PR#3 — LEW/ADMIN kVA 확정 모달.
@@ -25,16 +26,6 @@ import type { AdminApplication } from '../../types';
  *   </li>
  * </ul>
  */
-
-const KVA_TIERS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 45, label: '45 kVA' },
-  { value: 100, label: '100 kVA' },
-  { value: 200, label: '200 kVA' },
-  { value: 300, label: '300 kVA' },
-  { value: 500, label: '500 kVA' },
-  { value: 800, label: '800 kVA' },
-  { value: 1000, label: '1000 kVA' },
-];
 
 const NOTE_MIN = 10;
 const NOTE_MIN_OVERRIDE = 20;
@@ -64,6 +55,34 @@ export function KvaConfirmModal({
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Admin이 설정한 Master Price 테이블에서 active tier 목록을 동적으로 로드.
+  // 하드코딩된 옵션을 쓰면 admin이 추가/삭제한 tier가 반영되지 않아
+  // 백엔드가 INVALID_KVA_TIER로 거부하는 불일치가 발생한다.
+  const [tierOptions, setTierOptions] = useState<Array<{ value: number; label: string }>>([]);
+  const [tiersLoading, setTiersLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setTiersLoading(true);
+    priceApi.getPrices()
+      .then((tiers: MasterPrice[]) => {
+        const active = tiers
+          .filter((t) => t.isActive)
+          .map((t) => ({
+            value: t.kvaMin,
+            label: t.description || `${t.kvaMin}${t.kvaMax > t.kvaMin ? `–${t.kvaMax}` : ''} kVA`,
+          }))
+          .sort((a, b) => a.value - b.value);
+        setTierOptions(active);
+      })
+      .catch(() => {
+        // 로드 실패 시 빈 목록 — 사용자가 Cancel 하고 재시도하도록 toast
+        toast.error('Failed to load kVA tiers. Please close and reopen.');
+        setTierOptions([]);
+      })
+      .finally(() => setTiersLoading(false));
+  }, [isOpen]);
+
   useEffect(() => {
     if (isOpen) {
       setSelectedKva(application.selectedKva || 45);
@@ -71,10 +90,22 @@ export function KvaConfirmModal({
     }
   }, [isOpen, application.selectedKva]);
 
+  // tier 목록이 로드된 후 현재 selectedKva 가 목록에 없으면 첫 번째 tier 로 자동 교정.
+  // (Admin 이 기존 tier 를 제거·수정한 뒤 legacy 신청이 들어오는 케이스)
+  useEffect(() => {
+    if (tierOptions.length === 0) return;
+    if (!tierOptions.some((t) => t.value === selectedKva)) {
+      setSelectedKva(tierOptions[0].value);
+    }
+  }, [tierOptions, selectedKva]);
+
   const noteTrimmed = note.trim();
   const errors = useMemo(() => {
     const errs: string[] = [];
     if (!selectedKva) errs.push('Select a kVA tier.');
+    if (tierOptions.length > 0 && !tierOptions.some((t) => t.value === selectedKva)) {
+      errs.push('Selected kVA is not in the current Admin price table. Choose another.');
+    }
     if (noteTrimmed.length < minNoteLen) {
       errs.push(`Note must be at least ${minNoteLen} characters.`);
     }
@@ -85,7 +116,7 @@ export function KvaConfirmModal({
       errs.push('Only ADMIN can override a confirmed kVA.');
     }
     return errs;
-  }, [selectedKva, noteTrimmed, minNoteLen, isOverride, isAdmin]);
+  }, [selectedKva, tierOptions, noteTrimmed, minNoteLen, isOverride, isAdmin]);
 
   const canSubmit = errors.length === 0 && !submitting;
 
@@ -217,11 +248,18 @@ export function KvaConfirmModal({
             required
             value={String(selectedKva)}
             onChange={(e) => setSelectedKva(Number(e.target.value))}
-            options={KVA_TIERS.map((t) => ({
+            options={tierOptions.map((t) => ({
               value: String(t.value),
               label: t.label,
             }))}
-            disabled={submitting}
+            disabled={submitting || tiersLoading || tierOptions.length === 0}
+            hint={
+              tiersLoading
+                ? 'Loading tiers configured by Admin…'
+                : tierOptions.length === 0
+                  ? 'No active kVA tiers. Configure them in Admin → Prices.'
+                  : `Based on Admin master price table (${tierOptions.length} active ${tierOptions.length === 1 ? 'tier' : 'tiers'})`
+            }
           />
 
           <Textarea
