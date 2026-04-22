@@ -945,6 +945,20 @@ export interface CreateLightingOrderRequest {
   applicantNote?: string;
 }
 
+/**
+ * Lighting Manager 대시보드 (백엔드 LightingOrderDashboardResponse)
+ */
+export interface LightingOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  inProgress: number;
+  deliverableUploaded: number;
+  completed: number;
+}
+
 export interface LightingOrderPayment {
   lightingOrderPaymentSeq: number;
   lightingOrderSeq: number;
@@ -990,6 +1004,20 @@ export interface CreatePowerSocketOrderRequest {
   applicantNote?: string;
 }
 
+/**
+ * PowerSocket Manager 대시보드 (백엔드 PowerSocketOrderDashboardResponse)
+ */
+export interface PowerSocketOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  inProgress: number;
+  deliverableUploaded: number;
+  completed: number;
+}
+
 export interface PowerSocketOrderPayment {
   powerSocketOrderPaymentSeq: number;
   powerSocketOrderSeq: number;
@@ -1033,6 +1061,20 @@ export interface CreateLewServiceOrderRequest {
   buildingType?: string;
   selectedKva?: number;
   applicantNote?: string;
+}
+
+/**
+ * LewService Manager 대시보드 (백엔드 LewServiceOrderDashboardResponse)
+ */
+export interface LewServiceOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  inProgress: number;
+  deliverableUploaded: number;
+  completed: number;
 }
 
 export interface LewServiceOrderPayment {

@@ -62,6 +62,21 @@ import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPag
 import SldManagerOrderListPage from '../pages/sld-manager/SldManagerOrderListPage';
 import SldManagerOrderDetailPage from '../pages/sld-manager/SldManagerOrderDetailPage';
 
+// Lighting Manager pages
+import LightingManagerDashboardPage from '../pages/lighting-manager/LightingManagerDashboardPage';
+import LightingManagerOrderListPage from '../pages/lighting-manager/LightingManagerOrderListPage';
+import LightingManagerOrderDetailPage from '../pages/lighting-manager/LightingManagerOrderDetailPage';
+
+// Power Socket Manager pages
+import PowerSocketManagerDashboardPage from '../pages/power-socket-manager/PowerSocketManagerDashboardPage';
+import PowerSocketManagerOrderListPage from '../pages/power-socket-manager/PowerSocketManagerOrderListPage';
+import PowerSocketManagerOrderDetailPage from '../pages/power-socket-manager/PowerSocketManagerOrderDetailPage';
+
+// LEW Service Manager pages
+import LewServiceManagerDashboardPage from '../pages/lew-service-manager/LewServiceManagerDashboardPage';
+import LewServiceManagerOrderListPage from '../pages/lew-service-manager/LewServiceManagerOrderListPage';
+import LewServiceManagerOrderDetailPage from '../pages/lew-service-manager/LewServiceManagerOrderDetailPage';
+
 // Concierge Manager pages (★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B)
 import ConciergeManagerDashboardPage from '../pages/concierge-manager/ConciergeManagerDashboardPage';
 import ConciergeRequestListPage from '../pages/concierge-manager/ConciergeRequestListPage';
@@ -225,6 +240,33 @@ const router = createBrowserRouter([
           { path: '/sld-manager/orders', element: <SldManagerOrderListPage /> },
           { path: '/sld-manager/orders/:id', element: <SldManagerOrderDetailPage /> },
           { path: '/sld-manager/notifications', element: <NotificationsPage /> },
+        ],
+      },
+    ],
+  },
+
+  // Lighting / Power Socket / LEW Service Manager routes
+  // Backend allows SLD_MANAGER / ADMIN / SYSTEM_ADMIN (see LightingManagerController etc.)
+  {
+    element: <ProtectedRoute allowedRoles={['SLD_MANAGER', 'ADMIN', 'SYSTEM_ADMIN']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/lighting-manager/dashboard', element: <LightingManagerDashboardPage /> },
+          { path: '/lighting-manager/orders', element: <LightingManagerOrderListPage /> },
+          { path: '/lighting-manager/orders/:id', element: <LightingManagerOrderDetailPage /> },
+          { path: '/lighting-manager/notifications', element: <NotificationsPage /> },
+
+          { path: '/power-socket-manager/dashboard', element: <PowerSocketManagerDashboardPage /> },
+          { path: '/power-socket-manager/orders', element: <PowerSocketManagerOrderListPage /> },
+          { path: '/power-socket-manager/orders/:id', element: <PowerSocketManagerOrderDetailPage /> },
+          { path: '/power-socket-manager/notifications', element: <NotificationsPage /> },
+
+          { path: '/lew-service-manager/dashboard', element: <LewServiceManagerDashboardPage /> },
+          { path: '/lew-service-manager/orders', element: <LewServiceManagerOrderListPage /> },
+          { path: '/lew-service-manager/orders/:id', element: <LewServiceManagerOrderDetailPage /> },
+          { path: '/lew-service-manager/notifications', element: <NotificationsPage /> },
         ],
       },
     ],

@@ -70,8 +70,14 @@ export default function Layout() {
   ];
 
   const sldManagerMenu = [
-    { path: '/sld-manager/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/sld-manager/orders', label: 'Orders', icon: '📐' },
+    { path: '/sld-manager/dashboard', label: 'SLD Dashboard', icon: '📊' },
+    { path: '/sld-manager/orders', label: 'SLD Orders', icon: '📐' },
+    { path: '/lighting-manager/dashboard', label: 'Lighting Dashboard', icon: '📊' },
+    { path: '/lighting-manager/orders', label: 'Lighting Orders', icon: '💡' },
+    { path: '/power-socket-manager/dashboard', label: 'Power Socket Dashboard', icon: '📊' },
+    { path: '/power-socket-manager/orders', label: 'Power Socket Orders', icon: '🔌' },
+    { path: '/lew-service-manager/dashboard', label: 'LEW Service Dashboard', icon: '📊' },
+    { path: '/lew-service-manager/orders', label: 'LEW Service Orders', icon: '⚡' },
   ];
 
   // ★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B
