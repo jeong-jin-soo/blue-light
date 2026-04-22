@@ -170,7 +170,7 @@ export default function NewSldOrderPage() {
               label="Ampere (optional)"
               value={formData.ampere}
               onChange={(e) => updateField('ampere', e.target.value)}
-              placeholder="e.g., 63A"
+              placeholder="e.g., 63A DP / TPN"
               maxLength={30}
             />
 
