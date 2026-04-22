@@ -1048,11 +1048,24 @@ export interface LewServiceOrder {
   managerNote?: string;
   uploadedFileSeq?: number;
   revisionComment?: string;
+  // LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약
+  visitScheduledAt?: string;
+  visitScheduleNote?: string;
   assignedManagerSeq?: number;
   assignedManagerFirstName?: string;
   assignedManagerLastName?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * LEW Service 방문 일정 예약 요청 (Manager 측)
+ * POST /api/lew-service-manager/orders/{id}/schedule-visit
+ */
+export interface ScheduleVisitRequest {
+  /** ISO-8601 LocalDateTime (예: "2026-04-23T14:00:00") */
+  visitScheduledAt: string;
+  visitScheduleNote?: string;
 }
 
 export interface CreateLewServiceOrderRequest {

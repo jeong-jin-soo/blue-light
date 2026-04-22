@@ -5,6 +5,7 @@ import type {
   LewServiceOrderPayment,
   Page,
   ProposeQuoteRequest,
+  ScheduleVisitRequest,
 } from '../types';
 
 /**
@@ -38,6 +39,13 @@ export const lewServiceManagerApi = {
 
   markComplete: (id: number) =>
     api.post<LewServiceOrder>(`/lew-service-manager/orders/${id}/complete`).then(r => r.data),
+
+  /**
+   * 방문 일정 예약 / 재예약 (LEW Service 방문형 리스키닝 PR 2)
+   * PAID / IN_PROGRESS / REVISION_REQUESTED 에서 호출. 상태 전이 없음.
+   */
+  scheduleVisit: (orderId: number, payload: ScheduleVisitRequest) =>
+    api.post<LewServiceOrder>(`/lew-service-manager/orders/${orderId}/schedule-visit`, payload).then(r => r.data),
 
   uploadFile: (orderId: number, file: File, fileType: string) => {
     const formData = new FormData();

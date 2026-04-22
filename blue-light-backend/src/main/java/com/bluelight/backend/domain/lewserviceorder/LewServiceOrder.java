@@ -11,6 +11,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 /**
  * Request for LEW Service 주문 Entity
@@ -117,15 +118,31 @@ public class LewServiceOrder extends BaseEntity {
     @Column(name = "revision_comment", columnDefinition = "TEXT")
     private String revisionComment;
 
+    /**
+     * 합의된 방문 예정 일시 (LEW Service 방문형 리스키닝 PR 2)
+     * null 이면 아직 일정 미확정
+     */
+    @Column(name = "visit_scheduled_at")
+    private LocalDateTime visitScheduledAt;
+
+    /**
+     * 방문 일정 관련 메모 (예: "현관 벨 고장, 전화 주세요")
+     */
+    @Column(name = "visit_schedule_note", length = 2000, columnDefinition = "TEXT")
+    private String visitScheduleNote;
+
     @Builder
     public LewServiceOrder(User user, String address, String postalCode,
-                    String buildingType, Integer selectedKva, String applicantNote) {
+                    String buildingType, Integer selectedKva, String applicantNote,
+                    LocalDateTime visitScheduledAt, String visitScheduleNote) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
         this.applicantNote = applicantNote;
+        this.visitScheduledAt = visitScheduledAt;
+        this.visitScheduleNote = visitScheduleNote;
         this.status = LewServiceOrderStatus.PENDING_QUOTE;
     }
 
@@ -250,5 +267,29 @@ public class LewServiceOrder extends BaseEntity {
         if (this.status == LewServiceOrderStatus.PAID) {
             this.status = LewServiceOrderStatus.IN_PROGRESS;
         }
+    }
+
+    /**
+     * 방문 일정 예약 (LEW Service 방문형 리스키닝 PR 2)
+     * <p>
+     * 상태 전이 없음 — 일정 데이터만 덮어쓴다. 재예약(Reschedule) 시에도 동일 메서드 호출.
+     * PAID / IN_PROGRESS / REVISION_REQUESTED 상태에서만 호출 가능.
+     *
+     * @param when 합의된 방문 예정 일시 (null 불가)
+     * @param note 방문 관련 메모 (nullable)
+     */
+    public void scheduleVisit(LocalDateTime when, String note) {
+        if (when == null) {
+            throw new IllegalArgumentException("visitScheduledAt must not be null");
+        }
+        if (this.status != LewServiceOrderStatus.PAID
+                && this.status != LewServiceOrderStatus.IN_PROGRESS
+                && this.status != LewServiceOrderStatus.REVISION_REQUESTED) {
+            throw new IllegalStateException(
+                    "Visit can only be scheduled in PAID, IN_PROGRESS, or REVISION_REQUESTED state. Current: "
+                            + this.status);
+        }
+        this.visitScheduledAt = when;
+        this.visitScheduleNote = note;
     }
 }

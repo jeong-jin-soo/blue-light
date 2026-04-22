@@ -4,6 +4,7 @@ import com.bluelight.backend.api.lewserviceorder.dto.ProposeQuoteRequest;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceManagerUploadDto;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceOrderDashboardResponse;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceOrderResponse;
+import com.bluelight.backend.api.lewserviceorder.dto.ScheduleVisitRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -138,6 +140,25 @@ public class LewServiceManagerController {
     public ResponseEntity<LewServiceOrderResponse> markComplete(@PathVariable Long id) {
         log.info("Request for LEW Service 주문 완료 처리: orderSeq={}", id);
         LewServiceOrderResponse response = lewServiceManagerService.markComplete(id);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 방문 일정 예약 / 재예약 (LEW Service 방문형 리스키닝 PR 2)
+     * POST /api/lew-service-manager/orders/{id}/schedule-visit
+     * <p>
+     * 상태 전이 없음 — visitScheduledAt / visitScheduleNote 데이터만 세팅.
+     * PAID / IN_PROGRESS / REVISION_REQUESTED 상태에서만 허용.
+     */
+    @PostMapping("/orders/{id}/schedule-visit")
+    public ResponseEntity<LewServiceOrderResponse> scheduleVisit(
+            @PathVariable Long id,
+            @Valid @RequestBody ScheduleVisitRequest request,
+            Authentication authentication) {
+        Long managerUserSeq = (Long) authentication.getPrincipal();
+        log.info("LEW Service 방문 일정 예약: orderSeq={}, managerSeq={}, visitAt={}",
+                id, managerUserSeq, request.getVisitScheduledAt());
+        LewServiceOrderResponse response = lewServiceManagerService.scheduleVisit(id, managerUserSeq, request);
         return ResponseEntity.ok(response);
     }
 }

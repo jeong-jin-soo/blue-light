@@ -74,6 +74,8 @@ public class DatabaseMigrationRunner {
             migrateConciergeRequestsQuoteColumns(conn);
             // sld_orders.ampere — 신청자가 주문 시 입력하는 ampere 정보
             migrateSldOrdersAmpereColumn(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약 컬럼
+            migrateLewServiceOrdersVisitScheduleColumns(conn);
             // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
             migrateApplicationsEmaFields(conn);
             migrateApplicationDeclarationLogsTable(conn);
@@ -887,6 +889,46 @@ public class DatabaseMigrationRunner {
                 "ALTER TABLE sld_orders ADD COLUMN ampere VARCHAR(30) AFTER selected_kva"
             );
             log.info("Migration [sld-orders-ampere]: added ampere column");
+        }
+    }
+
+    /**
+     * 마이그레이션: lew_service_orders 에 방문 일정 예약 컬럼 2종 추가
+     * (★ LEW Service 방문형 리스키닝 PR 2)
+     * <p>
+     * 추가 컬럼:
+     * - visit_scheduled_at: 합의된 방문 예정 일시
+     * - visit_schedule_note: 방문 일정 관련 메모 (도어벨 고장 등)
+     * <p>
+     * 상태 전이는 변경하지 않음 — 기존 row 는 NULL 로 두고 무해하게 동작.
+     */
+    private void migrateLewServiceOrdersVisitScheduleColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) {
+            log.debug("Migration [lew-service-visit-schedule]: lew_service_orders table not found, skipping");
+            return;
+        }
+        boolean hasScheduledAt = columnExists(conn, "lew_service_orders", "visit_scheduled_at");
+        boolean hasScheduleNote = columnExists(conn, "lew_service_orders", "visit_schedule_note");
+        if (hasScheduledAt && hasScheduleNote) {
+            log.debug("Migration [lew-service-visit-schedule]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [lew-service-visit-schedule]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            if (!hasScheduledAt) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN visit_scheduled_at DATETIME(6) NULL AFTER revision_comment"
+                );
+                log.info("Migration [lew-service-visit-schedule]: added visit_scheduled_at column");
+            }
+            if (!hasScheduleNote) {
+                String after = hasScheduledAt ? "revision_comment" : "visit_scheduled_at";
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN visit_schedule_note TEXT NULL AFTER " + after
+                );
+                log.info("Migration [lew-service-visit-schedule]: added visit_schedule_note column");
+            }
         }
     }
 

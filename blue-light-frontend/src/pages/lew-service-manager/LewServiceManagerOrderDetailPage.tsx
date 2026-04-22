@@ -29,6 +29,12 @@ export default function LewServiceManagerOrderDetailPage() {
 
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
 
+  // LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약
+  const [visitScheduleEditing, setVisitScheduleEditing] = useState(false);
+  const [visitScheduledAtInput, setVisitScheduledAtInput] = useState('');
+  const [visitScheduleNoteInput, setVisitScheduleNoteInput] = useState('');
+  const [visitScheduleSaving, setVisitScheduleSaving] = useState(false);
+
   const orderId = Number(id);
 
   const fetchData = useCallback(async () => {
@@ -93,6 +99,53 @@ export default function LewServiceManagerOrderDetailPage() {
     }
   };
 
+  /** <input type="datetime-local"> 값 "YYYY-MM-DDTHH:mm" → 백엔드 LocalDateTime 포맷 */
+  const toBackendLocalDateTime = (value: string): string => {
+    // HTML datetime-local 은 초가 없을 수 있어 ":00" 보정
+    if (!value) return value;
+    return value.length === 16 ? `${value}:00` : value;
+  };
+
+  /** 백엔드 ISO 문자열 → <input type="datetime-local"> 용 "YYYY-MM-DDTHH:mm" */
+  const toInputLocalDateTime = (iso?: string): string => {
+    if (!iso) return '';
+    // 백엔드는 "2026-04-23T14:00:00" 형태로 내려옴 (offset 없음)
+    return iso.slice(0, 16);
+  };
+
+  const handleStartEditSchedule = () => {
+    setVisitScheduledAtInput(toInputLocalDateTime(order?.visitScheduledAt));
+    setVisitScheduleNoteInput(order?.visitScheduleNote ?? '');
+    setVisitScheduleEditing(true);
+  };
+
+  const handleCancelEditSchedule = () => {
+    setVisitScheduleEditing(false);
+    setVisitScheduledAtInput('');
+    setVisitScheduleNoteInput('');
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!visitScheduledAtInput) {
+      toast.error('Please pick a visit date & time');
+      return;
+    }
+    setVisitScheduleSaving(true);
+    try {
+      await lewServiceManagerApi.scheduleVisit(orderId, {
+        visitScheduledAt: toBackendLocalDateTime(visitScheduledAtInput),
+        visitScheduleNote: visitScheduleNoteInput.trim() || undefined,
+      });
+      toast.success('Visit time saved');
+      setVisitScheduleEditing(false);
+      fetchData();
+    } catch {
+      toast.error('Failed to save visit schedule');
+    } finally {
+      setVisitScheduleSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -104,6 +157,18 @@ export default function LewServiceManagerOrderDetailPage() {
   if (!order) return null;
 
   const showDeliverableSection = ['PAID', 'IN_PROGRESS', 'REVISION_REQUESTED', 'SLD_UPLOADED'].includes(order.status);
+  // PR 2 — 방문 일정은 PAID/IN_PROGRESS 에서 편집 가능 (REVISION_REQUESTED 은 PR 3 재방문 흐름)
+  const showVisitScheduleSection = ['PAID', 'IN_PROGRESS'].includes(order.status);
+  const visitScheduledAtDisplay = order.visitScheduledAt
+    ? new Date(order.visitScheduledAt).toLocaleString(undefined, {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : null;
 
   return (
     <div className="space-y-6">
@@ -265,6 +330,89 @@ export default function LewServiceManagerOrderDetailPage() {
                   </div>
                 </div>
               </div>
+            </Card>
+          )}
+
+          {/* LEW Service 방문형 리스키닝 PR 2 — Visit Schedule Section */}
+          {showVisitScheduleSection && (
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">Visit Schedule</h2>
+
+              {/* 저장된 예약이 있고 편집 중이 아닐 때 */}
+              {order.visitScheduledAt && !visitScheduleEditing && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg" aria-hidden>&#128197;</span>
+                      <div>
+                        <p className="text-sm font-medium text-blue-900">
+                          Scheduled for {visitScheduledAtDisplay}
+                        </p>
+                        {order.visitScheduleNote && (
+                          <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
+                            {order.visitScheduleNote}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleStartEditSchedule}>
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* 저장된 예약이 없고 편집 중이 아닐 때 */}
+              {!order.visitScheduledAt && !visitScheduleEditing && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    No visit has been scheduled yet. Agree on a date &amp; time with the applicant,
+                    then save it here so they can plan accordingly.
+                  </p>
+                  <Button variant="primary" size="sm" onClick={handleStartEditSchedule}>
+                    Schedule Visit
+                  </Button>
+                </div>
+              )}
+
+              {/* 편집 모드 */}
+              {visitScheduleEditing && (
+                <div className="space-y-4">
+                  <Input
+                    label="Visit Date &amp; Time"
+                    type="datetime-local"
+                    value={visitScheduledAtInput}
+                    onChange={(e) => setVisitScheduledAtInput(e.target.value)}
+                    required
+                  />
+                  <Textarea
+                    label="Note (Optional)"
+                    placeholder="e.g. Doorbell is broken — please call on arrival"
+                    value={visitScheduleNoteInput}
+                    onChange={(e) => setVisitScheduleNoteInput(e.target.value)}
+                    maxLength={2000}
+                    rows={3}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={handleSaveSchedule}
+                      loading={visitScheduleSaving}
+                    >
+                      Save Visit Time
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEditSchedule}
+                      disabled={visitScheduleSaving}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
 

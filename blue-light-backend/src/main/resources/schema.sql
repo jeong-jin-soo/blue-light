@@ -662,6 +662,8 @@ CREATE TABLE IF NOT EXISTS lew_service_orders (
     manager_note          TEXT,
     uploaded_file_seq     BIGINT,
     revision_comment      TEXT,
+    visit_scheduled_at    DATETIME(6) NULL,
+    visit_schedule_note   TEXT NULL,
     created_at            DATETIME(6),
     updated_at            DATETIME(6),
     created_by            BIGINT,

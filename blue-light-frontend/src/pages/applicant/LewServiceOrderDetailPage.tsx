@@ -328,35 +328,67 @@ export default function LewServiceOrderDetailPage() {
             </Card>
           )}
 
-          {order.status === 'PAID' && (
+          {/* LEW Service 방문형 리스키닝 PR 2 — Visit Schedule Card (applicant read-only) */}
+          {(order.status === 'PAID' || order.status === 'IN_PROGRESS') && (
             <Card>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-lg">&#9989;</span>
-                  <div>
-                    <p className="text-sm font-medium text-green-800">Payment Confirmed</p>
-                    <p className="text-xs text-green-700 mt-1">
-                      Payment confirmed. Your LEW will be in touch to schedule the on-site visit.
-                    </p>
+              {order.visitScheduledAt ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg" aria-hidden>&#128197;</span>
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">
+                        Your LEW will visit on {new Date(order.visitScheduledAt).toLocaleString(undefined, {
+                          weekday: 'short',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                      {order.visitScheduleNote && (
+                        <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
+                          {order.visitScheduleNote}
+                        </p>
+                      )}
+                      {order.status === 'PAID' && (
+                        <p className="text-xs text-blue-700 mt-2">
+                          Please make sure someone is available at the site at the scheduled time.
+                        </p>
+                      )}
+                      {order.status === 'IN_PROGRESS' && (
+                        <p className="text-xs text-blue-700 mt-2">
+                          Your LEW will submit a visit report after completing the on-site work.
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          )}
-
-          {order.status === 'IN_PROGRESS' && (
-            <Card>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-lg">&#128736;</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">On-site Visit Scheduled</p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      Your LEW has scheduled the on-site visit. You'll be notified when the work starts and when the visit report is submitted.
-                    </p>
+              ) : order.status === 'PAID' ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">&#9989;</span>
+                    <div>
+                      <p className="text-sm font-medium text-green-800">Payment Confirmed</p>
+                      <p className="text-xs text-green-700 mt-1">
+                        Your LEW will contact you to schedule the visit.
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">&#128736;</span>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">On-site Visit In Progress</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Your LEW is working on the on-site visit. You'll be notified when the visit report is submitted.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </Card>
           )}
 

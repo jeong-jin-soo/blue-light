@@ -115,5 +115,8 @@ public enum AuditAction {
     INVOICE_GENERATED,
     INVOICE_DOWNLOADED,
     INVOICE_REGENERATED,
-    INVOICE_GENERATION_FAILED
+    INVOICE_GENERATION_FAILED,
+
+    // LEW Service 방문형 리스키닝 (lew-service-visit-redesign-spec.md PR 2+)
+    LEW_SERVICE_VISIT_SCHEDULED
 }

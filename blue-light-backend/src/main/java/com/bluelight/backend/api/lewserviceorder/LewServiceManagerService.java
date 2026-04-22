@@ -4,6 +4,7 @@ import com.bluelight.backend.api.lewserviceorder.dto.ProposeQuoteRequest;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceManagerUploadDto;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceOrderDashboardResponse;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceOrderResponse;
+import com.bluelight.backend.api.lewserviceorder.dto.ScheduleVisitRequest;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.lewserviceorder.LewServiceOrder;
 import com.bluelight.backend.domain.lewserviceorder.LewServiceOrderPayment;
@@ -164,6 +165,49 @@ public class LewServiceManagerService {
         order.complete();
         log.info("Request for LEW Service 주문 완료 처리: orderSeq={}", orderSeq);
         return LewServiceOrderResponse.from(order);
+    }
+
+    /**
+     * 방문 일정 예약 / 재예약 (LEW Service 방문형 리스키닝 PR 2)
+     * <p>
+     * 상태 전이는 유발하지 않음 — visitScheduledAt / visitScheduleNote 데이터만 세팅.
+     * Access: 배정된 매니저가 있는 경우 본인 또는 ADMIN/SYSTEM_ADMIN 만 호출 가능.
+     * 배정 매니저가 없으면 (상위 @PreAuthorize 에서 이미 역할은 검증됨) 해당 역할 모두 허용.
+     */
+    @Transactional
+    public LewServiceOrderResponse scheduleVisit(Long orderSeq, Long managerUserSeq, ScheduleVisitRequest request) {
+        LewServiceOrder order = findOrderOrThrow(orderSeq);
+        validateManagerAccess(order, managerUserSeq);
+        order.scheduleVisit(request.getVisitScheduledAt(), request.getVisitScheduleNote());
+        log.info("LEW Service 방문 일정 예약: orderSeq={}, managerSeq={}, visitAt={}",
+                orderSeq, managerUserSeq, request.getVisitScheduledAt());
+        return LewServiceOrderResponse.from(order);
+    }
+
+    /**
+     * Access 검증 — 배정된 매니저가 있으면 본인 혹은 ADMIN/SYSTEM_ADMIN 만 접근 허용.
+     * (@PreAuthorize 에서 이미 SLD_MANAGER/ADMIN/SYSTEM_ADMIN 역할 검증됨)
+     */
+    private void validateManagerAccess(LewServiceOrder order, Long callerUserSeq) {
+        User assigned = order.getAssignedManager();
+        if (assigned == null) {
+            return; // 미배정 상태에서는 역할 검증만으로 충분
+        }
+        if (assigned.getUserSeq().equals(callerUserSeq)) {
+            return;
+        }
+        // 본인이 아니면 ADMIN / SYSTEM_ADMIN 은 우회 허용
+        User caller = userRepository.findById(callerUserSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+        UserRole role = caller.getRole();
+        if (role == UserRole.ADMIN || role == UserRole.SYSTEM_ADMIN) {
+            return;
+        }
+        throw new BusinessException(
+                "Only the assigned manager or an administrator can schedule the visit",
+                HttpStatus.FORBIDDEN,
+                "LEW_SERVICE_NOT_ASSIGNED_MANAGER");
     }
 
     // ── 내부 유틸 ──────────────────────────────────────

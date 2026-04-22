@@ -27,6 +27,9 @@ public class LewServiceOrderResponse {
     private String managerNote;
     private Long uploadedFileSeq;
     private String revisionComment;
+    // LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약
+    private LocalDateTime visitScheduledAt;
+    private String visitScheduleNote;
     private String assignedManagerFirstName;
     private String assignedManagerLastName;
     private Long assignedManagerSeq;
@@ -54,6 +57,8 @@ public class LewServiceOrderResponse {
                 .managerNote(order.getManagerNote())
                 .uploadedFileSeq(order.getUploadedFileSeq())
                 .revisionComment(order.getRevisionComment())
+                .visitScheduledAt(order.getVisitScheduledAt())
+                .visitScheduleNote(order.getVisitScheduleNote())
                 .assignedManagerFirstName(order.getAssignedManager() != null
                         ? order.getAssignedManager().getFirstName() : null)
                 .assignedManagerLastName(order.getAssignedManager() != null
