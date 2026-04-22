@@ -79,6 +79,8 @@ public class DatabaseMigrationRunner {
             migrateApplicationDeclarationLogsTable(conn);
             // ── C.1: Snapshot-at-submit — applications.loa_phone_snapshot, loa_email_snapshot ──
             migrateApplicationsLoaPhoneEmailSnapshots(conn);
+            // ── LEW Review Form P1.B: applications 테이블에 신청자 hint 8 컬럼 ──
+            migrateApplicationsApplicantHintColumns(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -1154,6 +1156,41 @@ public class DatabaseMigrationRunner {
             log.info("Migration [loa-phone-email-snapshot]: added {} column(s)", added);
         } else {
             log.debug("Migration [loa-phone-email-snapshot]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Review Form P1.B): applications 테이블에 신청자 hint 컬럼 8개 추가.
+     * <p>LEW Review Form Step 2에서 CoF Draft 초기값으로 prefill되는 용도. 형식 오류는 경고 수준이며
+     * 어떤 CHECK 제약도 걸지 않는다(스펙 §5.3). 기존 `sp_account_no` 컬럼은 legacy 병행 유지.</p>
+     */
+    private void migrateApplicationsApplicantHintColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] cols = {
+                {"applicant_mssl_hint_enc",         "VARCHAR(255)"},
+                {"applicant_mssl_hint_hmac",        "CHAR(64)"},
+                {"applicant_mssl_hint_last4",       "VARCHAR(4)"},
+                {"applicant_supply_voltage_hint",   "INT"},
+                {"applicant_consumer_type_hint",    "VARCHAR(20)"},
+                {"applicant_retailer_hint",         "VARCHAR(32)"},
+                {"applicant_has_generator_hint",    "TINYINT(1)"},
+                {"applicant_generator_capacity_hint", "INT"}
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : cols) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [applicant-hint-columns]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [applicant-hint-columns]: all columns exist, skipping");
         }
     }
 
