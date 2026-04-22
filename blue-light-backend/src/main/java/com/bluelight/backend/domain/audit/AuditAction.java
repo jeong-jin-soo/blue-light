@@ -101,5 +101,19 @@ public enum AuditAction {
     LOA_SIGNATURE_IMPLICIT_CONSENT_LAPSED, // O-15, 7일 이의 제기 창구 만료
     LOGIN_FAILED_UNKNOWN_EMAIL,            // v1.5 AC-29 관련
     LOGIN_FAILED_BAD_PASSWORD,             // v1.5 AC-29 관련
-    LOGIN_FAILED_DELETED                   // v1.5 AC-29 관련
+    LOGIN_FAILED_DELETED,                  // v1.5 AC-29 관련
+
+    // LEW Review Form — Certificate of Fitness (P1.A)
+    // lew-review-form-spec.md §7 감사 로그
+    APPLICATION_VIEWED_BY_LEW,
+    CERTIFICATE_OF_FITNESS_CREATED,
+    CERTIFICATE_OF_FITNESS_UPDATED,
+    CERTIFICATE_OF_FITNESS_FINALIZED,
+    MSSL_UNMASKED_VIEW,
+
+    // E-Invoice (invoice-spec.md §9 감사 로그)
+    INVOICE_GENERATED,
+    INVOICE_DOWNLOADED,
+    INVOICE_REGENERATED,
+    INVOICE_GENERATION_FAILED
 }

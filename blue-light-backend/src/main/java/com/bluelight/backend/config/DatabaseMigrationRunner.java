@@ -898,6 +898,23 @@ public class DatabaseMigrationRunner {
             {"sld_ai_generation_enabled", "true", "Enable AI-powered SLD generation"},
             {"chat_system_prompt", "", "AI Chatbot system prompt"},
             {"sld_system_prompt", "", "AI SLD generation system prompt"},
+
+            // ── E-Invoice 회사/결제 정보 (invoice-spec.md §3) ──
+            {"invoice_company_name", "HanVision holdings Private Ltd.", "E-Invoice company name"},
+            {"invoice_company_alias", "Licensekaki", "E-Invoice company brand alias"},
+            {"invoice_company_uen", "202627777H", "E-Invoice company UEN"},
+            {"invoice_company_address_line1", "12 WOODLANDS SQUARE", "E-Invoice company address line 1"},
+            {"invoice_company_address_line2", "#13-79 WOODS SQUARE TOWER ONE,", "E-Invoice company address line 2"},
+            {"invoice_company_address_line3", "SINGAPORE 737715", "E-Invoice company address line 3"},
+            {"invoice_company_email", "Admin@licensekaki.com", "E-Invoice company email"},
+            {"invoice_company_website", "Licensekaki.com", "E-Invoice company website"},
+            {"invoice_paynow_uen", "202627777H", "E-Invoice PayNow UEN"},
+            {"invoice_paynow_qr_file_seq", "", "E-Invoice PayNow QR FileEntity seq (empty = not configured)"},
+            {"invoice_number_prefix", "IN", "E-Invoice number prefix (default: IN)"},
+            {"invoice_currency", "SGD", "E-Invoice default currency"},
+            {"invoice_footer_note",
+             "No electronic signature is necessary, as this document serves as an official E-Invoice.",
+             "E-Invoice footer note"},
         };
 
         int seeded = 0;

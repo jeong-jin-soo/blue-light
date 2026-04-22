@@ -2,10 +2,14 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.PaymentConfirmRequest;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
+import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.invoice.InvoiceGenerationService;
 import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -38,6 +42,10 @@ public class AdminPaymentService {
     private final NotificationService notificationService;
     /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
     private final ApplicationEventPublisher eventPublisher;
+    /** invoice-spec §5: 결제 확인 직후 자동 영수증 발행 */
+    private final InvoiceGenerationService invoiceGenerationService;
+    /** invoice-spec §5: 자동 발행 실패 시 감사 로그 기록 */
+    private final AuditLogService auditLogService;
 
     /**
      * Confirm offline payment (creates Payment record + changes status to PAID)
@@ -109,6 +117,27 @@ public class AdminPaymentService {
                     applicationSeq,
                     application.getAddress(),
                     savedPayment.getAmount());
+        }
+
+        // invoice-spec §5: 결제 확인 직후 자동 영수증 발행.
+        // 실패해도 결제 트랜잭션은 롤백하지 않음 — 관리자가 /regenerate 로 수동 복구.
+        try {
+            invoiceGenerationService.generateFromPayment(savedPayment, application);
+        } catch (Exception e) {
+            log.error("Invoice generation failed for payment {}: {}",
+                    savedPayment.getPaymentSeq(), e.getMessage(), e);
+            try {
+                auditLogService.log(
+                        null, null, null,
+                        AuditAction.INVOICE_GENERATION_FAILED,
+                        AuditCategory.APPLICATION,
+                        "Payment",
+                        String.valueOf(savedPayment.getPaymentSeq()),
+                        "Invoice auto-generation failed: " + e.getMessage(),
+                        null, null, null, null, null, null, null);
+            } catch (Exception auditEx) {
+                log.warn("Failed to record INVOICE_GENERATION_FAILED audit: {}", auditEx.getMessage());
+            }
         }
 
         return PaymentResponse.from(savedPayment);

@@ -14,13 +14,17 @@ import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
 import priceApi from '../../api/priceApi';
 import loaApi from '../../api/loaApi';
+import invoiceApi from '../../api/invoiceApi';
 import sampleFileApi from '../../api/sampleFileApi';
+import type { Invoice } from '../../types';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import { ApplicationInfo } from './sections/ApplicationInfo';
 import { ApplicationPayment } from './sections/ApplicationPayment';
 import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
 import { DocumentUploadSection } from '../../components/document/DocumentUploadSection';
+import { ProvidedInfoCard } from '../../components/applicant/ProvidedInfoCard';
+import { hasAnyProvidedInfo } from '../../components/applicant/providedInfoUtils';
 import { useAuthStore } from '../../stores/authStore';
 import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus, SampleFileInfo } from '../../types';
 
@@ -40,6 +44,8 @@ export default function ApplicationDetailPage() {
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
   const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
+  // E-Invoice 메타 (PAID/IN_PROGRESS/COMPLETED 일 때만 조회)
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -71,6 +77,17 @@ export default function ApplicationDetailPage() {
         const loaData = await loaApi.getLoaStatus(applicationId);
         setLoaStatus(loaData);
       } catch { /* LOA status might not be available */ }
+
+      // Invoice 메타 — 결제 확정 이후에만 존재. 404는 정상 케이스(아직 발행 안 됨)이므로 무시.
+      const paid = ['PAID', 'IN_PROGRESS', 'COMPLETED'].includes(appData.status);
+      if (paid) {
+        try {
+          const invoiceData = await invoiceApi.getMyInvoice(applicationId);
+          setInvoice(invoiceData);
+        } catch { /* Invoice may not be ready yet; non-critical */ }
+      } else {
+        setInvoice(null);
+      }
 
       // Sample files (non-critical)
       try {
@@ -295,7 +312,24 @@ export default function ApplicationDetailPage() {
             </p>
           </div>
         </div>
-        <StatusBadge status={application.status} />
+        <div className="flex items-center gap-2">
+          {/* P2.C — CoF 발급 배지. cofFinalized=true일 때 status와 나란히 표시.
+              툴팁: LEW가 CoF를 발급해 결제 단계로 이행됐음을 안내. */}
+          {application.cofFinalized && (
+            <span
+              title="Your LEW issued the Certificate of Fitness. The application is ready for payment."
+              className="inline-flex"
+            >
+              <Badge variant="success">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                CoF issued
+              </Badge>
+            </span>
+          )}
+          <StatusBadge status={application.status} />
+        </div>
       </div>
 
       {/* PENDING_REVIEW Banner */}
@@ -389,6 +423,12 @@ export default function ApplicationDetailPage() {
             onCancelEdit={() => setEditMode(false)}
           />
 
+          {/* P2.C — 신청자가 제공한 fast-track hint 정보 카드.
+              제공된 항목이 0개면 섹션 자체가 렌더되지 않는다(부채감 제거 원칙). */}
+          {hasAnyProvidedInfo(application) && (
+            <ProvidedInfoCard application={application} />
+          )}
+
           <ApplicationPayment
             application={application}
             payments={payments}
@@ -397,6 +437,35 @@ export default function ApplicationDetailPage() {
             onPaymentAdviceUpload={handlePaymentAdviceUpload}
             onPaymentAdviceDelete={handlePaymentAdviceDelete}
           />
+
+          {/* E-Invoice 다운로드 — PAID 이후에만 노출 */}
+          {invoice && (
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">E-Invoice</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-500">
+                      {invoice.invoiceNumber}
+                    </span>
+                    <Badge variant="success">Issued</Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(invoice.issuedAt).toLocaleString()} · {invoice.currency} ${Number(invoice.totalAmount).toLocaleString()}
+                  </p>
+                </div>
+                <a
+                  href={invoiceApi.buildInvoicePdfDownloadUrl(invoice.pdfFileSeq)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                >
+                  <span aria-hidden>📄</span>
+                  <span>Download Invoice</span>
+                </a>
+              </div>
+            </Card>
+          )}
 
           <ApplicationLoaSection
             application={application}

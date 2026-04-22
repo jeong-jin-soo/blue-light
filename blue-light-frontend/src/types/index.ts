@@ -208,6 +208,29 @@ export interface Application {
   correspondenceAddressStreet?: string;
   correspondenceAddressBuilding?: string;
   correspondenceAddressPostalCode?: string;
+  // ── P2.A: LEW Review Form hint 응답 필드 (스펙 §5.5) ──
+  /** MSSL hint — last4만 노출(평문·enc는 LEW 전용 응답에서만). */
+  msslHintLast4?: string;
+  supplyVoltageHint?: number;
+  consumerTypeHint?: string;
+  retailerHint?: string;
+  hasGeneratorHint?: boolean;
+  generatorCapacityHint?: number;
+  /** CoF finalize 여부 — 상세 화면 "CoF 발급됨" 배지용 (P2.C에서 사용). */
+  cofFinalized?: boolean;
+  cofCertifiedAt?: string;
+  /** 경고 수준 검증 결과. 200 OK 차단하지 않음. */
+  warnings?: ApplicantHintWarning[];
+}
+
+/**
+ * 신청자 hint 필드에 대한 경고 수준 검증 결과.
+ * 백엔드 {@code ApplicantHintWarning} DTO와 1:1 매핑.
+ */
+export interface ApplicantHintWarning {
+  field: string;
+  code: string;
+  reason: string;
 }
 
 /** Declaration consent types — Submit 시 3건 append-only 로그에 기록. */
@@ -275,6 +298,34 @@ export interface Inspection {
   signatureUrl?: string;
   inspectedAt: string;
   updatedAt: string;
+}
+
+// ============================================
+// Invoice Types (E-Invoice)
+// ============================================
+
+/**
+ * E-Invoice 메타데이터.
+ * PDF 바이너리는 {@code pdfFileSeq} 를 기존 {@code /api/files/{id}/download} 로 조합해 받는다.
+ */
+export interface Invoice {
+  invoiceSeq: number;
+  invoiceNumber: string;
+  paymentSeq: number;
+  referenceType: string;
+  referenceSeq: number;
+  applicationSeq?: number;
+  issuedAt: string;
+  totalAmount: number;
+  currency: string;
+  pdfFileSeq: number;
+  billingRecipientName: string;
+  billingRecipientCompany?: string;
+}
+
+/** Admin 재발행 요청 — 스냅샷은 불변, PDF만 재생성. 사유 필수. */
+export interface RegenerateInvoiceRequest {
+  reason: string;
 }
 
 // ============================================
@@ -416,6 +467,19 @@ export interface CreateApplicationRequest {
   correspondenceAddressPostalCode?: string;
   /** 제출 시점 폼 스냅샷 해시 (Declaration 감사 로그용). 미제공 시 서버가 재계산. */
   formSnapshotHash?: string;
+  // ── P2.A: LEW Review Form hint 필드 (모두 optional, warning-only 검증) ──
+  /** MSSL Account No 평문 힌트 (예: "123-45-6789-0"). */
+  msslHint?: string;
+  /** 공급 전압 힌트(V): 230 / 400 / 6600 / 22000. */
+  supplyVoltageHint?: number;
+  /** Consumer Type 힌트. */
+  consumerTypeHint?: 'NON_CONTESTABLE' | 'CONTESTABLE';
+  /** Retailer 힌트: RetailerCode enum 문자열. */
+  retailerHint?: string;
+  /** 발전기 보유 여부 힌트. */
+  hasGeneratorHint?: boolean;
+  /** 발전기 용량 힌트(kVA). */
+  generatorCapacityHint?: number;
 }
 
 /**
@@ -428,6 +492,13 @@ export interface UpdateApplicationRequest {
   selectedKva: number;
   spAccountNo?: string;
   renewalPeriodMonths?: number;
+  // ── P2.A: LEW Review Form hint 필드 ──
+  msslHint?: string;
+  supplyVoltageHint?: number;
+  consumerTypeHint?: 'NON_CONTESTABLE' | 'CONTESTABLE';
+  retailerHint?: string;
+  hasGeneratorHint?: boolean;
+  generatorCapacityHint?: number;
 }
 
 /**

@@ -113,6 +113,16 @@ CREATE TABLE IF NOT EXISTS applications (
     correspondence_address_street      VARCHAR(500),
     correspondence_address_building    VARCHAR(500),
     correspondence_address_postal_code VARCHAR(10),
+    -- ── LEW Review Form — Applicant Hint 컬럼 (P1.B, lew-review-form-spec.md §5.3) ──
+    -- 신청자 "알면 입력" 선택 필드. 모두 nullable, CHECK 제약 없음. 형식 오류는 경고 수준.
+    applicant_mssl_hint_enc            VARCHAR(255),
+    applicant_mssl_hint_hmac           CHAR(64),
+    applicant_mssl_hint_last4          VARCHAR(4),
+    applicant_supply_voltage_hint      INT,
+    applicant_consumer_type_hint       VARCHAR(20),
+    applicant_retailer_hint            VARCHAR(32),
+    applicant_has_generator_hint       TINYINT(1),
+    applicant_generator_capacity_hint  INT,
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -362,6 +372,42 @@ CREATE TABLE IF NOT EXISTS data_breach_notifications (
     PRIMARY KEY (breach_seq),
     KEY idx_breach_status (status),
     KEY idx_breach_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 11b. LEW Review Form — Certificate of Fitness (P1.A)
+-- lew-review-form-spec.md §2.1 — Application과 1:1, LEW Draft Save 시 생성
+CREATE TABLE IF NOT EXISTS certificate_of_fitness (
+    cof_seq                    BIGINT        NOT NULL AUTO_INCREMENT,
+    application_seq            BIGINT        NOT NULL,
+    mssl_account_no_enc        VARCHAR(255),
+    mssl_account_no_hmac       CHAR(64),
+    mssl_account_no_last4      VARCHAR(4),
+    consumer_type              VARCHAR(20)   NOT NULL DEFAULT 'NON_CONTESTABLE',
+    retailer_code              VARCHAR(32)   DEFAULT 'SP_SERVICES_LIMITED',
+    supply_voltage_v           INT           NOT NULL,
+    approved_load_kva          INT           NOT NULL,
+    has_generator              BOOLEAN       NOT NULL DEFAULT FALSE,
+    generator_capacity_kva     INT,
+    inspection_interval_months INT           NOT NULL,
+    lew_appointment_date       DATE          NOT NULL,
+    lew_consent_date           DATE,
+    certified_by_lew_seq       BIGINT,
+    certified_at               DATETIME(6),
+    draft_saved_at             DATETIME(6),
+    version                    INT           NOT NULL DEFAULT 0,
+    created_at                 DATETIME(6),
+    updated_at                 DATETIME(6),
+    created_by                 BIGINT,
+    updated_by                 BIGINT,
+    deleted_at                 DATETIME(6),
+    PRIMARY KEY (cof_seq),
+    UNIQUE KEY uk_cof_application (application_seq),
+    KEY idx_cof_hmac (mssl_account_no_hmac),
+    KEY idx_cof_lew (certified_by_lew_seq),
+    CONSTRAINT fk_cof_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
+    CONSTRAINT fk_cof_lew FOREIGN KEY (certified_by_lew_seq) REFERENCES users (user_seq),
+    CONSTRAINT chk_cof_voltage CHECK (supply_voltage_v IN (230, 400, 6600, 22000)),
+    CONSTRAINT chk_cof_interval CHECK (inspection_interval_months IN (6, 12, 24, 36, 60))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 12. 감사 로그 (append-only)
@@ -682,6 +728,64 @@ CREATE TABLE IF NOT EXISTS application_declaration_logs (
     KEY idx_decl_log_user (user_seq),
     CONSTRAINT fk_decl_log_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
     CONSTRAINT fk_decl_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 21. E-Invoice (결제 확인 후 자동 발행되는 영수증). 스펙: doc/Project Analysis/invoice-spec.md
+-- 스냅샷 컬럼은 JPA @Column(updatable=false) 로 불변 보장 (Immutability 원칙).
+CREATE TABLE IF NOT EXISTS invoices (
+    invoice_seq                         BIGINT        NOT NULL AUTO_INCREMENT,
+    invoice_number                      VARCHAR(30)   NOT NULL,
+    payment_seq                         BIGINT        NOT NULL,
+    reference_type                      VARCHAR(30)   NOT NULL,
+    reference_seq                       BIGINT        NOT NULL,
+    application_seq                     BIGINT        NULL,
+    recipient_user_seq                  BIGINT        NOT NULL,
+    issued_by_user_seq                  BIGINT        NULL,
+    issued_at                           DATETIME(6)   NOT NULL,
+    total_amount                        DECIMAL(12,2) NOT NULL,
+    qty_snapshot                        INT           NOT NULL DEFAULT 1,
+    rate_amount_snapshot                DECIMAL(12,2) NOT NULL,
+    currency_snapshot                   VARCHAR(5)    NOT NULL DEFAULT 'SGD',
+    company_name_snapshot               VARCHAR(150)  NOT NULL,
+    company_alias_snapshot              VARCHAR(80),
+    company_uen_snapshot                VARCHAR(30)   NOT NULL,
+    company_address_line1_snapshot      VARCHAR(200),
+    company_address_line2_snapshot      VARCHAR(200),
+    company_address_line3_snapshot      VARCHAR(200),
+    company_email_snapshot              VARCHAR(120),
+    company_website_snapshot            VARCHAR(120),
+    billing_recipient_name_snapshot     VARCHAR(150)  NOT NULL,
+    billing_recipient_company_snapshot  VARCHAR(200),
+    billing_address_line1_snapshot      VARCHAR(300),
+    billing_address_line2_snapshot      VARCHAR(300),
+    billing_address_line3_snapshot      VARCHAR(300),
+    billing_address_line4_snapshot      VARCHAR(300),
+    installation_name_snapshot          VARCHAR(200),
+    installation_address_line1_snapshot VARCHAR(300),
+    installation_address_line2_snapshot VARCHAR(300),
+    installation_address_line3_snapshot VARCHAR(300),
+    installation_address_line4_snapshot VARCHAR(300),
+    description_snapshot                TEXT          NOT NULL,
+    paynow_uen_snapshot                 VARCHAR(30),
+    paynow_qr_file_seq_snapshot         BIGINT,
+    footer_note_snapshot                VARCHAR(500),
+    pdf_file_seq                        BIGINT        NOT NULL,
+    created_at                          DATETIME(6),
+    updated_at                          DATETIME(6),
+    created_by                          BIGINT,
+    updated_by                          BIGINT,
+    deleted_at                          DATETIME(6),
+    PRIMARY KEY (invoice_seq),
+    UNIQUE KEY uk_invoices_number (invoice_number),
+    UNIQUE KEY uk_invoices_payment (payment_seq),
+    KEY idx_invoices_ref (reference_type, reference_seq),
+    KEY idx_invoices_application (application_seq),
+    KEY idx_invoices_recipient (recipient_user_seq),
+    CONSTRAINT fk_invoices_payment   FOREIGN KEY (payment_seq)                 REFERENCES payments (payment_seq),
+    CONSTRAINT fk_invoices_pdf       FOREIGN KEY (pdf_file_seq)                REFERENCES files (file_seq),
+    CONSTRAINT fk_invoices_paynow_qr FOREIGN KEY (paynow_qr_file_seq_snapshot) REFERENCES files (file_seq),
+    CONSTRAINT fk_invoices_recipient FOREIGN KEY (recipient_user_seq)          REFERENCES users (user_seq),
+    CONSTRAINT fk_invoices_issuer    FOREIGN KEY (issued_by_user_seq)          REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 마이그레이션: sld_requests.sketch_file_seq — MySQL에서 직접 실행:
