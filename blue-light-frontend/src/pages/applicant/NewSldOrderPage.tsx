@@ -17,6 +17,7 @@ interface FormState {
   buildingType: string;
   selectedKva: number | null;
   kvaUnknown: boolean;
+  ampere: string;
   applicantNote: string;
 }
 
@@ -34,6 +35,7 @@ export default function NewSldOrderPage() {
     buildingType: '',
     selectedKva: null,
     kvaUnknown: false,
+    ampere: '',
     applicantNote: '',
   });
 
@@ -71,6 +73,7 @@ export default function NewSldOrderPage() {
         selectedKva: formData.kvaUnknown
           ? KVA_UNKNOWN_PLACEHOLDER
           : (formData.selectedKva ?? undefined),
+        ampere: formData.ampere.trim() || undefined,
         applicantNote: formData.applicantNote.trim() || undefined,
       };
       const order = await sldOrderApi.createSldOrder(payload);
@@ -160,6 +163,15 @@ export default function NewSldOrderPage() {
                   label: tier.description || `${tier.kvaMin}–${tier.kvaMax} kVA`,
                 })),
               ]}
+            />
+
+            {/* Ampere (optional, free-form text) */}
+            <Input
+              label="Ampere (optional)"
+              value={formData.ampere}
+              onChange={(e) => updateField('ampere', e.target.value)}
+              placeholder="e.g., 63A"
+              maxLength={30}
             />
 
             {/* Applicant Note */}

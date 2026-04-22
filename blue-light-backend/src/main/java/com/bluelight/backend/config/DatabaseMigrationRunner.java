@@ -68,6 +68,8 @@ public class DatabaseMigrationRunner {
             migrateFilesServiceOrderColumns(conn);
             // ★ Kaki Concierge Phase 1.5 — Quote workflow (통화 후 견적 이메일)
             migrateConciergeRequestsQuoteColumns(conn);
+            // sld_orders.ampere — 신청자가 주문 시 입력하는 ampere 정보
+            migrateSldOrdersAmpereColumn(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -807,6 +809,26 @@ public class DatabaseMigrationRunner {
                 );
             }
             log.info("Migration [concierge-requests-quote]: added 4 columns");
+        }
+    }
+
+    /**
+     * sld_orders.ampere — 신청자가 주문 시 선택적으로 입력하는 암페어 값 (VARCHAR, 단위 자유입력).
+     */
+    private void migrateSldOrdersAmpereColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "sld_orders")) {
+            log.debug("Migration [sld-orders-ampere]: sld_orders table not found, skipping");
+            return;
+        }
+        if (columnExists(conn, "sld_orders", "ampere")) {
+            log.debug("Migration [sld-orders-ampere]: already applied, skipping");
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE sld_orders ADD COLUMN ampere VARCHAR(30) AFTER selected_kva"
+            );
+            log.info("Migration [sld-orders-ampere]: added ampere column");
         }
     }
 

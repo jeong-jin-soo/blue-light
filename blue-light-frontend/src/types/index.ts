@@ -702,6 +702,7 @@ export interface SldOrder {
   postalCode?: string;
   buildingType?: string;
   selectedKva?: number;
+  ampere?: string;
   applicantNote?: string;
   sketchFileSeq?: number;
   status: SldOrderStatus;
@@ -725,6 +726,7 @@ export interface CreateSldOrderRequest {
   postalCode?: string;
   buildingType?: string;
   selectedKva?: number;
+  ampere?: string;
   applicantNote?: string;
 }
 

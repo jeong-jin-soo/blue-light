@@ -24,6 +24,9 @@ public class CreateSldOrderRequest {
     @Positive(message = "Selected kVA must be a positive number")
     private Integer selectedKva;
 
+    @Size(max = 30, message = "Ampere must be 30 characters or less")
+    private String ampere;
+
     @Size(max = 2000, message = "Applicant note must be 2000 characters or less")
     private String applicantNote;
 }

@@ -445,6 +445,7 @@ CREATE TABLE IF NOT EXISTS sld_orders (
     postal_code          VARCHAR(10),
     building_type        VARCHAR(50),
     selected_kva         INT,
+    ampere               VARCHAR(30),
     applicant_note       TEXT,
     sketch_file_seq      BIGINT,
     status               VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',

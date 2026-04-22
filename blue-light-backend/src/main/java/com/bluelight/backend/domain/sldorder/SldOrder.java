@@ -69,6 +69,12 @@ public class SldOrder extends BaseEntity {
     private Integer selectedKva;
 
     /**
+     * 암페어 (선택 — 신청자 자유 입력, 단위 포함 가능)
+     */
+    @Column(name = "ampere", length = 30)
+    private String ampere;
+
+    /**
      * 신청자 요구사항 메모
      */
     @Column(name = "applicant_note", columnDefinition = "TEXT")
@@ -119,12 +125,13 @@ public class SldOrder extends BaseEntity {
 
     @Builder
     public SldOrder(User user, String address, String postalCode,
-                    String buildingType, Integer selectedKva, String applicantNote) {
+                    String buildingType, Integer selectedKva, String ampere, String applicantNote) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
         this.selectedKva = selectedKva;
+        this.ampere = ampere;
         this.applicantNote = applicantNote;
         this.status = SldOrderStatus.PENDING_QUOTE;
     }
