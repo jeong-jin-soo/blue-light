@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
-import licensekakiLogo from '../assets/licensekaki-logo.png';
+import licensekakiLogo from '../assets/logo-licensekaki.png';
 
 /* ------------------------------------------------------------------ */
 /*  Data                                                               */

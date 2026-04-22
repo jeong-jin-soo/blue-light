@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import licensekakiLogo from '../../assets/licensekaki-logo.png';
+import licensekakiLogo from '../../assets/logo-licensekaki.png';
 
 export default function DisclaimerPage() {
   return (
