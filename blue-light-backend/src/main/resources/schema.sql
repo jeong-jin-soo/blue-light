@@ -93,6 +93,23 @@ CREATE TABLE IF NOT EXISTS applications (
     kva_confirmed_at         DATETIME(6)   NULL,
     -- Phase 5 B-2: 낙관적 락 (동시성 공격 방어)
     version                  BIGINT        NOT NULL DEFAULT 0,
+    -- EMA ELISE 확장 필드 (P1.1) — 모두 nullable. 주소 일부는 필드 단위 암호화(v1:...)
+    installation_name                  VARCHAR(200),
+    premises_type                      VARCHAR(30),
+    is_rental_premises                 TINYINT(1),
+    landlord_ei_licence_no             VARCHAR(255),
+    renewal_company_name_changed       TINYINT(1),
+    renewal_address_changed            TINYINT(1),
+    installation_address_block         VARCHAR(20),
+    installation_address_unit          VARCHAR(20),
+    installation_address_street        VARCHAR(200),
+    installation_address_building      VARCHAR(200),
+    installation_address_postal_code   VARCHAR(10),
+    correspondence_address_block       VARCHAR(255),
+    correspondence_address_unit        VARCHAR(255),
+    correspondence_address_street      VARCHAR(500),
+    correspondence_address_building    VARCHAR(500),
+    correspondence_address_postal_code VARCHAR(10),
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -644,6 +661,24 @@ CREATE TABLE IF NOT EXISTS sld_templates (
     KEY idx_sld_templates_kva (kva),
     KEY idx_sld_templates_breaker (main_breaker_type),
     KEY idx_sld_templates_phase_kva (phase, kva)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. 신청 동의/선언 감사 로그 (append-only, EMA ELISE 약관 + PDPA 동의 기록)
+CREATE TABLE IF NOT EXISTS application_declaration_logs (
+    declaration_log_seq BIGINT       NOT NULL AUTO_INCREMENT,
+    application_seq     BIGINT       NOT NULL,
+    user_seq            BIGINT       NOT NULL,
+    consent_type        VARCHAR(60)  NOT NULL,
+    document_version    VARCHAR(30),
+    form_snapshot_hash  VARCHAR(64),
+    ip_address          VARCHAR(45),
+    user_agent          VARCHAR(500),
+    declared_at         DATETIME(6)  NOT NULL,
+    PRIMARY KEY (declaration_log_seq),
+    KEY idx_decl_log_application (application_seq),
+    KEY idx_decl_log_user (user_seq),
+    CONSTRAINT fk_decl_log_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
+    CONSTRAINT fk_decl_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 마이그레이션: sld_requests.sketch_file_seq — MySQL에서 직접 실행:

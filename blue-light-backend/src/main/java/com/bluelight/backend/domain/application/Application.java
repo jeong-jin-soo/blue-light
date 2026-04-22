@@ -1,5 +1,6 @@
 package com.bluelight.backend.domain.application;
 
+import com.bluelight.backend.common.crypto.EncryptedStringConverter;
 import com.bluelight.backend.domain.common.BaseEntity;
 import com.bluelight.backend.domain.user.User;
 import jakarta.persistence.*;
@@ -330,6 +331,70 @@ public class Application extends BaseEntity {
     @Column(name = "version", nullable = false)
     private Long version = 0L;
 
+    // ── P1.1: EMA ELISE 필드 — 저장소 준비 (DTO/Service 전파는 P1.2에서) ──
+
+    /** EMA ELISE "Installation Name" — 사이트 호칭. */
+    @Column(name = "installation_name", length = 200)
+    private String installationName;
+
+    /** EMA ELISE "Premises Type" — 용도 분류. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "premises_type", length = 30)
+    private PremisesType premisesType;
+
+    /** 설치 장소가 임대 건물인지 여부. */
+    @Column(name = "is_rental_premises")
+    private Boolean isRentalPremises;
+
+    /** 임대주의 EI Licence 번호 — 임대일 때만 수집 (PDPA: 개인정보, 암호화 대상). */
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "landlord_ei_licence_no", length = 255)
+    private String landlordEiLicenceNo;
+
+    /** 갱신 시: 회사명이 바뀌었는지 여부 (바뀌면 추가 서류 필요). */
+    @Column(name = "renewal_company_name_changed")
+    private Boolean renewalCompanyNameChanged;
+
+    /** 갱신 시: 주소가 바뀌었는지 여부. */
+    @Column(name = "renewal_address_changed")
+    private Boolean renewalAddressChanged;
+
+    // Installation Address — 5-part, 평문 (ELISE가 block/unit/street/building/postal 개별 전송 요구)
+    @Column(name = "installation_address_block", length = 20)
+    private String installationAddressBlock;
+
+    @Column(name = "installation_address_unit", length = 20)
+    private String installationAddressUnit;
+
+    @Column(name = "installation_address_street", length = 200)
+    private String installationAddressStreet;
+
+    @Column(name = "installation_address_building", length = 200)
+    private String installationAddressBuilding;
+
+    @Column(name = "installation_address_postal_code", length = 10)
+    private String installationAddressPostalCode;
+
+    // Correspondence Address — Block/Unit/Street/Building은 암호화, Postal은 평문 (PDPA 분석서 지침)
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "correspondence_address_block", length = 255)
+    private String correspondenceAddressBlock;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "correspondence_address_unit", length = 255)
+    private String correspondenceAddressUnit;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "correspondence_address_street", length = 500)
+    private String correspondenceAddressStreet;
+
+    @Convert(converter = EncryptedStringConverter.class)
+    @Column(name = "correspondence_address_building", length = 500)
+    private String correspondenceAddressBuilding;
+
+    @Column(name = "correspondence_address_postal_code", length = 10)
+    private String correspondenceAddressPostalCode;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
@@ -340,7 +405,24 @@ public class Application extends BaseEntity {
                        LocalDate existingExpiryDate, Integer renewalPeriodMonths,
                        BigDecimal emaFee,
                        KvaStatus kvaStatus, KvaSource kvaSource,
-                       Long viaConciergeRequestSeq) {
+                       Long viaConciergeRequestSeq,
+                       // ── P1.1: EMA ELISE 필드 (기존 빌더 호출부는 이 파라미터를 생략 가능 — 모두 null 허용) ──
+                       String installationName,
+                       PremisesType premisesType,
+                       Boolean isRentalPremises,
+                       String landlordEiLicenceNo,
+                       Boolean renewalCompanyNameChanged,
+                       Boolean renewalAddressChanged,
+                       String installationAddressBlock,
+                       String installationAddressUnit,
+                       String installationAddressStreet,
+                       String installationAddressBuilding,
+                       String installationAddressPostalCode,
+                       String correspondenceAddressBlock,
+                       String correspondenceAddressUnit,
+                       String correspondenceAddressStreet,
+                       String correspondenceAddressBuilding,
+                       String correspondenceAddressPostalCode) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
@@ -364,6 +446,23 @@ public class Application extends BaseEntity {
         this.kvaSource = kvaSource;
         // ★ PR#5 Stage A: Concierge 대리 생성 연결 (null이면 APPLICANT 직접 신청)
         this.viaConciergeRequestSeq = viaConciergeRequestSeq;
+        // EMA ELISE 필드 — 모두 nullable (기존 호출부는 생략해도 Lombok Builder가 null 주입)
+        this.installationName = installationName;
+        this.premisesType = premisesType;
+        this.isRentalPremises = isRentalPremises;
+        this.landlordEiLicenceNo = landlordEiLicenceNo;
+        this.renewalCompanyNameChanged = renewalCompanyNameChanged;
+        this.renewalAddressChanged = renewalAddressChanged;
+        this.installationAddressBlock = installationAddressBlock;
+        this.installationAddressUnit = installationAddressUnit;
+        this.installationAddressStreet = installationAddressStreet;
+        this.installationAddressBuilding = installationAddressBuilding;
+        this.installationAddressPostalCode = installationAddressPostalCode;
+        this.correspondenceAddressBlock = correspondenceAddressBlock;
+        this.correspondenceAddressUnit = correspondenceAddressUnit;
+        this.correspondenceAddressStreet = correspondenceAddressStreet;
+        this.correspondenceAddressBuilding = correspondenceAddressBuilding;
+        this.correspondenceAddressPostalCode = correspondenceAddressPostalCode;
     }
 
     /**

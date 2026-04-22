@@ -92,8 +92,27 @@ export type ApplicantType = 'INDIVIDUAL' | 'CORPORATE';
 
 /**
  * SLD 제출 방식
+ * - SELF_UPLOAD: 신청자가 지금 업로드
+ * - SUBMIT_WITHIN_3_MONTHS: 3개월 내 제출 약속 (JIT — 신청 시점에 SLD 준비 불필요)
+ * - REQUEST_LEW: LEW에게 작성 의뢰
  */
-export type SldOption = 'SELF_UPLOAD' | 'REQUEST_LEW';
+export type SldOption = 'SELF_UPLOAD' | 'SUBMIT_WITHIN_3_MONTHS' | 'REQUEST_LEW';
+
+/**
+ * EMA ELISE Premises Type (시설 용도)
+ */
+export type PremisesType =
+  | 'COMMERCIAL'
+  | 'FACTORIES'
+  | 'FARM'
+  | 'RESIDENTIAL'
+  | 'INDUSTRIAL'
+  | 'HOTEL'
+  | 'HEALTHCARE'
+  | 'EDUCATION'
+  | 'GOVERNMENT'
+  | 'MIXED_USE'
+  | 'OTHER';
 
 /**
  * SLD 요청 상태
@@ -171,7 +190,31 @@ export interface Application {
   // LOA 서명 정보
   loaSignatureUrl?: string;
   loaSignedAt?: string;
+  // ── P1.2: EMA ELISE 필드 (신청자 수집 / 일부는 LEW 추가 예정) ──
+  installationName?: string;
+  premisesType?: PremisesType;
+  isRentalPremises?: boolean;
+  /** Landlord EI Licence 는 서버 응답에서 앞 5자 마스킹 처리됨 (LEW 전용 응답에서만 원본). */
+  landlordEiLicenceMasked?: string;
+  renewalCompanyNameChanged?: boolean;
+  renewalAddressChanged?: boolean;
+  installationAddressBlock?: string;
+  installationAddressUnit?: string;
+  installationAddressStreet?: string;
+  installationAddressBuilding?: string;
+  installationAddressPostalCode?: string;
+  correspondenceAddressBlock?: string;
+  correspondenceAddressUnit?: string;
+  correspondenceAddressStreet?: string;
+  correspondenceAddressBuilding?: string;
+  correspondenceAddressPostalCode?: string;
 }
+
+/** Declaration consent types — Submit 시 3건 append-only 로그에 기록. */
+export type DeclarationConsentType =
+  | 'APPLICATION_DECLARATION_V1_GROUP1'
+  | 'APPLICATION_DECLARATION_V1_GROUP2'
+  | 'APPLICATION_DECLARATION_V1_GROUP3';
 
 // ============================================
 // File Types
@@ -354,6 +397,25 @@ export interface CreateApplicationRequest {
   companyInfo?: CompanyInfo;
   // Phase 5: kVA UNKNOWN 플래그 — true면 서버가 selectedKva=45 강제
   kvaUnknown?: boolean;
+  // ── P1.2: EMA ELISE 확장 필드 (전부 선택, JIT) ──
+  installationName?: string;
+  premisesType?: PremisesType;
+  isRentalPremises?: boolean;
+  landlordEiLicenceNo?: string;
+  renewalCompanyNameChanged?: boolean;
+  renewalAddressChanged?: boolean;
+  installationAddressBlock?: string;
+  installationAddressUnit?: string;
+  installationAddressStreet?: string;
+  installationAddressBuilding?: string;
+  installationAddressPostalCode?: string;
+  correspondenceAddressBlock?: string;
+  correspondenceAddressUnit?: string;
+  correspondenceAddressStreet?: string;
+  correspondenceAddressBuilding?: string;
+  correspondenceAddressPostalCode?: string;
+  /** 제출 시점 폼 스냅샷 해시 (Declaration 감사 로그용). 미제공 시 서버가 재계산. */
+  formSnapshotHash?: string;
 }
 
 /**

@@ -70,6 +70,9 @@ public class DatabaseMigrationRunner {
             migrateConciergeRequestsQuoteColumns(conn);
             // sld_orders.ampere — 신청자가 주문 시 입력하는 ampere 정보
             migrateSldOrdersAmpereColumn(conn);
+            // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
+            migrateApplicationsEmaFields(conn);
+            migrateApplicationDeclarationLogsTable(conn);
             seedSystemSettings(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
@@ -975,6 +978,83 @@ public class DatabaseMigrationRunner {
             log.info("Migration [sync-role-metadata]: inserted {} new role rows", inserted);
         } else if (stale.isEmpty()) {
             log.debug("Migration [sync-role-metadata]: in sync with UserRole enum");
+        }
+    }
+
+    /**
+     * 마이그레이션 (P1.1): applications 테이블에 EMA ELISE 확장 컬럼 16개 추가.
+     * 각 컬럼을 개별적으로 columnExists 로 체크해 멱등성 보장.
+     * 데이터 저장소 준비만 담당 — 추후 P1.2 에서 DTO/Service 에 전파한다.
+     */
+    private void migrateApplicationsEmaFields(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] columns = {
+                {"installation_name",                  "VARCHAR(200)"},
+                {"premises_type",                      "VARCHAR(30)"},
+                {"is_rental_premises",                 "TINYINT(1)"},
+                {"landlord_ei_licence_no",             "VARCHAR(255)"},
+                {"renewal_company_name_changed",       "TINYINT(1)"},
+                {"renewal_address_changed",            "TINYINT(1)"},
+                {"installation_address_block",         "VARCHAR(20)"},
+                {"installation_address_unit",          "VARCHAR(20)"},
+                {"installation_address_street",        "VARCHAR(200)"},
+                {"installation_address_building",      "VARCHAR(200)"},
+                {"installation_address_postal_code",   "VARCHAR(10)"},
+                {"correspondence_address_block",       "VARCHAR(255)"},
+                {"correspondence_address_unit",        "VARCHAR(255)"},
+                {"correspondence_address_street",      "VARCHAR(500)"},
+                {"correspondence_address_building",    "VARCHAR(500)"},
+                {"correspondence_address_postal_code", "VARCHAR(10)"}
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : columns) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [applications-ema-fields]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [applications-ema-fields]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (P1.1): application_declaration_logs 테이블 생성.
+     * 신청 동의/선언 append-only 감사 로그.
+     */
+    private void migrateApplicationDeclarationLogsTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "application_declaration_logs")) {
+            log.debug("Migration [application-declaration-logs]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [application-declaration-logs]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "CREATE TABLE application_declaration_logs (" +
+                            "  declaration_log_seq BIGINT       NOT NULL AUTO_INCREMENT," +
+                            "  application_seq     BIGINT       NOT NULL," +
+                            "  user_seq            BIGINT       NOT NULL," +
+                            "  consent_type        VARCHAR(60)  NOT NULL," +
+                            "  document_version    VARCHAR(30)," +
+                            "  form_snapshot_hash  VARCHAR(64)," +
+                            "  ip_address          VARCHAR(45)," +
+                            "  user_agent          VARCHAR(500)," +
+                            "  declared_at         DATETIME(6)  NOT NULL," +
+                            "  PRIMARY KEY (declaration_log_seq)," +
+                            "  KEY idx_decl_log_application (application_seq)," +
+                            "  KEY idx_decl_log_user (user_seq)," +
+                            "  CONSTRAINT fk_decl_log_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)," +
+                            "  CONSTRAINT fk_decl_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [application-declaration-logs]: table created");
         }
     }
 

@@ -52,8 +52,12 @@ interface FormData {
   renewalPeriodMonths: number | null;
   renewalReferenceNo: string;
   manualEntry: boolean;
-  // SLD option
-  sldOption: 'SELF_UPLOAD' | 'REQUEST_LEW';
+  // SLD option (P1.2: 3-way로 확장)
+  sldOption: 'SELF_UPLOAD' | 'SUBMIT_WITHIN_3_MONTHS' | 'REQUEST_LEW';
+  // ── P1 Step 1: EMA 확장 플래그 ──
+  isRentalPremises: boolean;            // NEW + 임대 체크
+  renewalCompanyNameChanged: boolean;   // RENEWAL 시 변경 체크박스 2개
+  renewalAddressChanged: boolean;
 }
 
 export default function NewApplicationPage() {
@@ -90,6 +94,9 @@ export default function NewApplicationPage() {
     renewalReferenceNo: '',
     manualEntry: false,
     sldOption: 'SELF_UPLOAD',
+    isRentalPremises: false,
+    renewalCompanyNameChanged: false,
+    renewalAddressChanged: false,
   });
 
   // Price data
@@ -241,6 +248,14 @@ export default function NewApplicationPage() {
       spAccountNo: formData.spAccountNo.trim() || undefined,
       sldOption: formData.sldOption,
       kvaUnknown: formData.kvaUnknown || undefined,
+      // ── P1.3: EMA ELISE 확장 필드 (Step 1에서 수집된 플래그) ──
+      isRentalPremises: formData.isRentalPremises || undefined,
+      renewalCompanyNameChanged: formData.applicationType === 'RENEWAL'
+        ? formData.renewalCompanyNameChanged
+        : undefined,
+      renewalAddressChanged: formData.applicationType === 'RENEWAL'
+        ? formData.renewalAddressChanged
+        : undefined,
     };
     if (formData.applicationType === 'RENEWAL') {
       if (formData.renewalReferenceNo.trim()) {
@@ -367,6 +382,9 @@ export default function NewApplicationPage() {
       renewalReferenceNo: '',
       manualEntry: false,
       sldOption: 'SELF_UPLOAD',
+      isRentalPremises: false,
+      renewalCompanyNameChanged: false,
+      renewalAddressChanged: false,
     }));
     setErrors({});
     setPriceResult(null);
@@ -549,7 +567,7 @@ export default function NewApplicationPage() {
               <p className="text-xs text-gray-500 mb-2">
                 An SLD is required for your application. Choose how you'd like to provide it.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => updateField('sldOption', 'SELF_UPLOAD')}
@@ -564,7 +582,26 @@ export default function NewApplicationPage() {
                     <div>
                       <p className="font-semibold text-gray-800">Upload Myself</p>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        I have an SLD ready and will attach it now or upload later
+                        I have an SLD ready and will attach it now
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('sldOption', 'SUBMIT_WITHIN_3_MONTHS')}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    formData.sldOption === 'SUBMIT_WITHIN_3_MONTHS'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0 mt-0.5">⏳</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Submit Within 3 Months</p>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        EMA allows submission within 3 months of application
                       </p>
                     </div>
                   </div>
@@ -586,13 +623,33 @@ export default function NewApplicationPage() {
                         A Licensed Electrical Worker will prepare the SLD for you
                       </p>
                       <p className="text-xs text-emerald-600 font-medium mt-1">
-                        Additional fee may apply (to be determined)
+                        Additional fee may apply
                       </p>
                     </div>
                   </div>
                 </button>
               </div>
             </div>
+
+            {/* ── P1.3: NEW 경로 전용 — 임대 시설 체크 (Landlord EI Licence는 Step 4에서 JIT로 수집) ── */}
+            {formData.applicationType === 'NEW' && (
+              <div className="border-t border-gray-100 pt-5">
+                <label className="inline-flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isRentalPremises}
+                    onChange={(e) => updateField('isRentalPremises', e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    This is a rental premises
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      We'll ask for the landlord's EI licence number before you submit.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* Renewal-specific fields */}
             {formData.applicationType === 'RENEWAL' && (
@@ -721,6 +778,41 @@ export default function NewApplicationPage() {
                   error={errors.renewalReferenceNo}
                   required
                 />
+
+                {/* ── P1.3: 이전 신청 대비 변경 사항 체크박스 2개 ── */}
+                <div className="border-t border-gray-100 pt-5 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    Changes since your last application
+                  </p>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.renewalCompanyNameChanged}
+                      onChange={(e) => updateField('renewalCompanyNameChanged', e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Company name has changed
+                      <span className="block text-xs text-gray-500 mt-0.5">
+                        We'll ask you to re-confirm company info before submit.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.renewalAddressChanged}
+                      onChange={(e) => updateField('renewalAddressChanged', e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Installation address has changed
+                      <span className="block text-xs text-gray-500 mt-0.5">
+                        The address step will require your re-entry.
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </div>
             )}
 

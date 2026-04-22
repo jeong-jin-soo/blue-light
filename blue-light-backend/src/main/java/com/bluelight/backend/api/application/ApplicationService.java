@@ -16,6 +16,11 @@ import com.bluelight.backend.api.application.dto.SldRequestResponse;
 import com.bluelight.backend.api.application.dto.UpdateSldRequestDto;
 import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.file.FileEntity;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
 import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
 import com.bluelight.backend.domain.payment.PaymentRepository;
@@ -54,12 +59,34 @@ public class ApplicationService {
     private final UserRepository userRepository;
     private final FileRepository fileRepository;
     private final AuditLogService auditLogService;
+    private final ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
+
+    /** Declaration 문서 버전 상수 — 문구가 바뀌면 증가시켜 법적 증거 체인을 분리한다. */
+    private static final String DECLARATION_DOCUMENT_VERSION = "2026-04-declaration-v1";
+
+    /** JIT 스펙에 정의된 Declaration 3개 그룹 consent_type. */
+    private static final String[] DECLARATION_CONSENT_TYPES = {
+            "APPLICATION_DECLARATION_V1_GROUP1",
+            "APPLICATION_DECLARATION_V1_GROUP2",
+            "APPLICATION_DECLARATION_V1_GROUP3"
+    };
 
     /**
-     * Create a new licence application (NEW or RENEWAL)
+     * Create a new licence application (NEW or RENEWAL).
+     * <p>기존 호출부 호환을 위해 래퍼 시그니처(IP/UA 없음)를 함께 제공한다.
      */
     @Transactional(rollbackFor = Exception.class)
     public ApplicationResponse createApplication(Long userSeq, CreateApplicationRequest request) {
+        return createApplication(userSeq, request, null, null);
+    }
+
+    /**
+     * Create a new licence application (NEW or RENEWAL).
+     * Declaration 로그를 append하기 위해 IP/UA를 함께 기록한다.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ApplicationResponse createApplication(Long userSeq, CreateApplicationRequest request,
+                                                 String clientIp, String userAgent) {
         // Find user
         User user = userRepository.findById(userSeq)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
@@ -202,6 +229,26 @@ public class ApplicationService {
                 .kvaSource(kvaUnknown
                         ? null
                         : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)
+                // ── P1.2: EMA ELISE 필드 전파 (nullable, JIT) ──
+                .installationName(request.getInstallationName())
+                .premisesType(request.getPremisesType())
+                .isRentalPremises(request.getIsRentalPremises())
+                .landlordEiLicenceNo(
+                        Boolean.TRUE.equals(request.getIsRentalPremises())
+                                ? request.getLandlordEiLicenceNo()
+                                : null)
+                .renewalCompanyNameChanged(request.getRenewalCompanyNameChanged())
+                .renewalAddressChanged(request.getRenewalAddressChanged())
+                .installationAddressBlock(request.getInstallationAddressBlock())
+                .installationAddressUnit(request.getInstallationAddressUnit())
+                .installationAddressStreet(request.getInstallationAddressStreet())
+                .installationAddressBuilding(request.getInstallationAddressBuilding())
+                .installationAddressPostalCode(request.getInstallationAddressPostalCode())
+                .correspondenceAddressBlock(request.getCorrespondenceAddressBlock())
+                .correspondenceAddressUnit(request.getCorrespondenceAddressUnit())
+                .correspondenceAddressStreet(request.getCorrespondenceAddressStreet())
+                .correspondenceAddressBuilding(request.getCorrespondenceAddressBuilding())
+                .correspondenceAddressPostalCode(request.getCorrespondenceAddressPostalCode())
                 .build();
 
         // 승인된 LEW가 1명이면 자동 할당
@@ -227,7 +274,74 @@ public class ApplicationService {
             log.info("SLD request auto-created: applicationSeq={}", saved.getApplicationSeq());
         }
 
+        // ── P1.2: Declaration 3개 그룹을 append-only 로그에 기록 ──
+        // 신청서 제출은 법적 선언에 해당하므로 3개 그룹 각각 한 행씩 불변 기록.
+        recordApplicationDeclarations(saved, user, request, clientIp, userAgent);
+
         return ApplicationResponse.from(saved);
+    }
+
+    /**
+     * 신청 Submit 시 Declaration 3개 그룹(UX 스펙의 축약 버전)을 application_declaration_logs에 append.
+     * 실패해도 신청 자체는 롤백하지 않고 경고만 남긴다 (법적 추적성과 사용자 경험 사이의 절충).
+     */
+    private void recordApplicationDeclarations(Application saved, User user,
+                                               CreateApplicationRequest request,
+                                               String clientIp, String userAgent) {
+        String formHash = resolveFormHash(request);
+        LocalDateTime now = LocalDateTime.now();
+        for (String consentType : DECLARATION_CONSENT_TYPES) {
+            try {
+                ApplicationDeclarationLog logEntry = ApplicationDeclarationLog.builder()
+                        .application(saved)
+                        .user(user)
+                        .consentType(consentType)
+                        .documentVersion(DECLARATION_DOCUMENT_VERSION)
+                        .formSnapshotHash(formHash)
+                        .ipAddress(truncate(clientIp, 45))
+                        .userAgent(truncate(userAgent, 500))
+                        .declaredAt(now)
+                        .build();
+                applicationDeclarationLogRepository.save(logEntry);
+            } catch (Exception e) {
+                log.warn("Declaration log append failed: applicationSeq={}, consentType={}, err={}",
+                        saved.getApplicationSeq(), consentType, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * formSnapshotHash 결정. 클라이언트가 전송한 값이 있으면 그대로 쓰고,
+     * 없으면 핵심 필드들을 직렬화해 SHA-256 계산. 둘 다 실패 시 빈 문자열.
+     */
+    private String resolveFormHash(CreateApplicationRequest request) {
+        if (request.getFormSnapshotHash() != null && !request.getFormSnapshotHash().isBlank()) {
+            return request.getFormSnapshotHash();
+        }
+        String serialized = String.join("|",
+                String.valueOf(request.getApplicantType()),
+                String.valueOf(request.getApplicationType()),
+                String.valueOf(request.getSelectedKva()),
+                String.valueOf(request.getSldOption()),
+                String.valueOf(request.getPostalCode()),
+                String.valueOf(request.getAddress()),
+                String.valueOf(request.getInstallationName()),
+                String.valueOf(request.getPremisesType()),
+                String.valueOf(request.getIsRentalPremises()),
+                String.valueOf(request.getRenewalCompanyNameChanged()),
+                String.valueOf(request.getRenewalAddressChanged())
+        );
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(serialized.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            return "";
+        }
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
     /**

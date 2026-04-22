@@ -83,6 +83,12 @@ file:
     region: ${AWS_S3_REGION:ap-southeast-1}
     endpoint: ${AWS_S3_ENDPOINT:}                   # 로컬 테스트용 (LocalStack 등, 비어있으면 AWS 기본)
 
+# 필드(컬럼) 단위 암호화 키 — 파일 키와 분리 운영 (키 스코프 누출 방지)
+# Base64 인코딩 AES-256 키. 비어있으면 평문 passthrough (로컬/테스트 편의).
+field:
+  encryption:
+    key: ${FIELD_ENCRYPTION_KEY:}
+
 # 비밀번호 재설정 설정
 password-reset:
   token-expiry-minutes: ${PASSWORD_RESET_TOKEN_EXPIRY:60}

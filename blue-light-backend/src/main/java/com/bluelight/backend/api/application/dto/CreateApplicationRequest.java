@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.application.dto;
 
 import com.bluelight.backend.domain.application.ApplicantType;
+import com.bluelight.backend.domain.application.PremisesType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
@@ -111,6 +112,47 @@ public class CreateApplicationRequest {
      */
     @Valid
     private CompanyInfoRequest companyInfo;
+
+    // ── P1.2: EMA ELISE 필드 — 모두 선택 (JIT 원칙). 비어있으면 LEW 검토 단계에서 확정. ──
+
+    /** EMA ELISE "Installation Name" — 현장/시설 호칭. 미입력 시 자동 생성 허용. */
+    @Size(max = 200, message = "Installation name must be 200 characters or less")
+    private String installationName;
+
+    /** EMA ELISE "Premises Type" enum. 미입력 시 LEW가 판단. */
+    private PremisesType premisesType;
+
+    /** 임대 건물 여부. NEW + 체크 시 landlordEiLicenceNo 동반. */
+    private Boolean isRentalPremises;
+
+    /** 임대주 EI Licence 번호 — isRentalPremises=true일 때만 의미. 서버에서 암호화 저장. */
+    @Size(max = 100, message = "Landlord EI licence number must be 100 characters or less")
+    private String landlordEiLicenceNo;
+
+    /** RENEWAL 시: 회사명 변경 여부 플래그. */
+    private Boolean renewalCompanyNameChanged;
+
+    /** RENEWAL 시: 설치 주소 변경 여부 플래그. */
+    private Boolean renewalAddressChanged;
+
+    // Installation Address 5-part — 신청자는 단일 address 필드만 입력하므로 선택값.
+    // 추후 OneMap 파싱 또는 LEW/Admin 보정 단계에서 채움.
+    @Size(max = 20) private String installationAddressBlock;
+    @Size(max = 20) private String installationAddressUnit;
+    @Size(max = 200) private String installationAddressStreet;
+    @Size(max = 200) private String installationAddressBuilding;
+    @Size(max = 10) private String installationAddressPostalCode;
+
+    // Correspondence Address 5-part — "Installation과 동일" 체크 해제 시만 클라이언트가 전송.
+    @Size(max = 255) private String correspondenceAddressBlock;
+    @Size(max = 255) private String correspondenceAddressUnit;
+    @Size(max = 500) private String correspondenceAddressStreet;
+    @Size(max = 500) private String correspondenceAddressBuilding;
+    @Size(max = 10) private String correspondenceAddressPostalCode;
+
+    /** 제출 시점 form hash (감사 로그용). 없으면 서버가 요청 body로 재계산. */
+    @Size(max = 64)
+    private String formSnapshotHash;
 
     /**
      * Bean Validation 조건부 검증 — applicantType=CORPORATE인데 companyInfo가 누락된 경우를

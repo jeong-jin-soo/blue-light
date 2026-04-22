@@ -5,6 +5,7 @@ import com.bluelight.backend.api.application.dto.*;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +35,24 @@ public class ApplicationController {
     @PostMapping
     public ResponseEntity<ApplicationResponse> createApplication(
             Authentication authentication,
-            @Valid @RequestBody CreateApplicationRequest request) {
+            @Valid @RequestBody CreateApplicationRequest request,
+            HttpServletRequest httpRequest) {
         Long userSeq = (Long) authentication.getPrincipal();
         log.info("Create application request: userSeq={}, kva={}", userSeq, request.getSelectedKva());
-        ApplicationResponse response = applicationService.createApplication(userSeq, request);
+        String clientIp = extractClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        ApplicationResponse response = applicationService.createApplication(userSeq, request, clientIp, userAgent);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /** Prefer the first X-Forwarded-For entry (proxy/LB), fallback to direct remote addr. */
+    private String extractClientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            int comma = xff.indexOf(',');
+            return (comma > 0 ? xff.substring(0, comma) : xff).trim();
+        }
+        return req.getRemoteAddr();
     }
 
     /**

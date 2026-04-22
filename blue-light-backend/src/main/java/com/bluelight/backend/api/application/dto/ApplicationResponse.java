@@ -62,6 +62,33 @@ public class ApplicationResponse {
     private String kvaSource;           // USER_INPUT | LEW_VERIFIED | null
     private LocalDateTime kvaConfirmedAt;
 
+    // ── P1.2: EMA ELISE 필드 ──
+    private String installationName;
+    private String premisesType;
+    private Boolean isRentalPremises;
+    /** Landlord EI Licence 는 마스킹된 표시값만 노출 (앞 5자 *) — 원본은 LEW 전용 응답에서만 제공 예정. */
+    private String landlordEiLicenceMasked;
+    private Boolean renewalCompanyNameChanged;
+    private Boolean renewalAddressChanged;
+    private String installationAddressBlock;
+    private String installationAddressUnit;
+    private String installationAddressStreet;
+    private String installationAddressBuilding;
+    private String installationAddressPostalCode;
+    private String correspondenceAddressBlock;
+    private String correspondenceAddressUnit;
+    private String correspondenceAddressStreet;
+    private String correspondenceAddressBuilding;
+    private String correspondenceAddressPostalCode;
+
+    /** Landlord EI Licence 를 본인 입력값 확인 용도로 앞 5자만 마스킹. null/blank 이면 null 반환. */
+    private static String maskLandlord(String value) {
+        if (value == null || value.isBlank()) return null;
+        int n = value.length();
+        if (n <= 4) return "*".repeat(n);
+        return "*".repeat(Math.max(0, n - 4)) + value.substring(n - 4);
+    }
+
     public static ApplicationResponse from(Application application) {
         return ApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -105,6 +132,23 @@ public class ApplicationResponse {
                 .kvaStatus(application.getKvaStatus() != null ? application.getKvaStatus().name() : null)
                 .kvaSource(application.getKvaSource() != null ? application.getKvaSource().name() : null)
                 .kvaConfirmedAt(application.getKvaConfirmedAt())
+                // ── P1.2: EMA ELISE 필드 ──
+                .installationName(application.getInstallationName())
+                .premisesType(application.getPremisesType() != null ? application.getPremisesType().name() : null)
+                .isRentalPremises(application.getIsRentalPremises())
+                .landlordEiLicenceMasked(maskLandlord(application.getLandlordEiLicenceNo()))
+                .renewalCompanyNameChanged(application.getRenewalCompanyNameChanged())
+                .renewalAddressChanged(application.getRenewalAddressChanged())
+                .installationAddressBlock(application.getInstallationAddressBlock())
+                .installationAddressUnit(application.getInstallationAddressUnit())
+                .installationAddressStreet(application.getInstallationAddressStreet())
+                .installationAddressBuilding(application.getInstallationAddressBuilding())
+                .installationAddressPostalCode(application.getInstallationAddressPostalCode())
+                .correspondenceAddressBlock(application.getCorrespondenceAddressBlock())
+                .correspondenceAddressUnit(application.getCorrespondenceAddressUnit())
+                .correspondenceAddressStreet(application.getCorrespondenceAddressStreet())
+                .correspondenceAddressBuilding(application.getCorrespondenceAddressBuilding())
+                .correspondenceAddressPostalCode(application.getCorrespondenceAddressPostalCode())
                 .build();
     }
 }
