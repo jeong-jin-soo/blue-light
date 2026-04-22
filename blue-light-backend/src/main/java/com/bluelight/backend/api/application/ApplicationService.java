@@ -275,12 +275,17 @@ public class ApplicationService {
                 .correspondenceAddressPostalCode(request.getCorrespondenceAddressPostalCode())
                 .build();
 
-        // 승인된 LEW가 1명이면 자동 할당
-        List<User> approvedLews = userRepository.findByRoleAndApprovedStatus(
-                UserRole.LEW, ApprovalStatus.APPROVED);
-        if (approvedLews.size() == 1) {
-            application.assignLew(approvedLews.get(0));
-            log.info("LEW auto-assigned: lewSeq={}", approvedLews.get(0).getUserSeq());
+        // 승인된 LEW 중 이 신청의 kVA 를 처리 가능한(lewGrade 세팅된) LEW 가 1명이면 자동 할당.
+        // 주의: lewGrade==null 인 LEW 는 admin 의 수동 지정 드롭다운(/api/admin/lews)에서도 제외되므로
+        //       auto-assign 에서도 동일하게 제외해야 두 경로의 "배정 가능한 LEW" 정의가 일치한다.
+        Integer kva = request.getSelectedKva();
+        List<User> eligibleLews = userRepository.findByRoleAndApprovedStatus(
+                UserRole.LEW, ApprovalStatus.APPROVED).stream()
+                .filter(lew -> kva != null && lew.canHandleKva(kva))
+                .toList();
+        if (eligibleLews.size() == 1) {
+            application.assignLew(eligibleLews.get(0));
+            log.info("LEW auto-assigned: lewSeq={}", eligibleLews.get(0).getUserSeq());
         }
 
         Application saved = applicationRepository.save(application);
@@ -548,12 +553,15 @@ public class ApplicationService {
                 .correspondenceAddressPostalCode(request.getCorrespondenceAddressPostalCode())
                 .build();
 
-        // 승인된 LEW 자동 할당 (applicant 경로와 동일)
-        List<User> approvedLews = userRepository.findByRoleAndApprovedStatus(
-                UserRole.LEW, ApprovalStatus.APPROVED);
-        if (approvedLews.size() == 1) {
-            application.assignLew(approvedLews.get(0));
-            log.info("LEW auto-assigned on-behalf: lewSeq={}", approvedLews.get(0).getUserSeq());
+        // 승인된 LEW 자동 할당 (applicant 경로와 동일 — kVA 처리 가능한 LEW 만 카운트)
+        Integer kvaForOnBehalf = request.getSelectedKva();
+        List<User> eligibleLewsOnBehalf = userRepository.findByRoleAndApprovedStatus(
+                UserRole.LEW, ApprovalStatus.APPROVED).stream()
+                .filter(lew -> kvaForOnBehalf != null && lew.canHandleKva(kvaForOnBehalf))
+                .toList();
+        if (eligibleLewsOnBehalf.size() == 1) {
+            application.assignLew(eligibleLewsOnBehalf.get(0));
+            log.info("LEW auto-assigned on-behalf: lewSeq={}", eligibleLewsOnBehalf.get(0).getUserSeq());
         }
 
         Application saved = applicationRepository.save(application);
