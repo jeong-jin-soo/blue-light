@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS applications (
     existing_expiry_date     DATE,
     renewal_period_months    INT,
     ema_fee                  DECIMAL(10,2),
-    sld_option               VARCHAR(20)   DEFAULT 'SELF_UPLOAD',
+    sld_option               VARCHAR(40)   DEFAULT 'SELF_UPLOAD',
     loa_signature_url        VARCHAR(255),
     loa_signed_at            DATETIME(6),
     -- ★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3 — LOA 서명 출처 (3경로 모델)

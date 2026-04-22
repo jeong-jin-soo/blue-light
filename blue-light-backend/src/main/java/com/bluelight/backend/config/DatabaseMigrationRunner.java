@@ -46,6 +46,10 @@ public class DatabaseMigrationRunner {
             syncCreateTablesFromSchemaSql(conn);
             migrateUserNameSplit(conn);
             migrateApplicationsLoaColumns(conn);
+            // sld_option VARCHAR(20) → VARCHAR(40)
+            // SldOption enum에 SUBMIT_WITHIN_3_MONTHS(22자)가 추가되어 기존 컬럼 폭을 초과.
+            // 레거시 DB(dev RDS)가 VARCHAR(20)인 채로 있어 INSERT 시 Data truncation 발생.
+            migrateApplicationsSldOptionWidth(conn);
             migrateSldTemplatesTable(conn);
             migrateSampleFilesTable(conn);
             migrateSampleFilesMultiFile(conn);
@@ -204,6 +208,53 @@ public class DatabaseMigrationRunner {
                 "ALTER TABLE applications ADD COLUMN loa_signed_at DATETIME(6) AFTER loa_signature_url"
             );
             log.info("Migration [applications-loa-columns]: added loa_signature_url, loa_signed_at columns");
+        }
+    }
+
+    /**
+     * 마이그레이션: applications.sld_option VARCHAR(20) → VARCHAR(40)
+     * <p>
+     * 배경: SldOption enum에 {@code SUBMIT_WITHIN_3_MONTHS}(22자)가 추가되면서
+     * 기존 컬럼 폭(20)을 초과하여 INSERT 시 MySQL이 Data truncation 에러를 발생.
+     * schema.sql은 신규 DB에 대해 이미 VARCHAR(40)으로 수정되었으나,
+     * 레거시 DB(dev RDS 등)는 ALTER로 확장해야 함.
+     * <p>
+     * 멱등성: information_schema에서 현재 크기를 조회하여 40 미만일 때만 실행.
+     */
+    private void migrateApplicationsSldOptionWidth(Connection conn) throws SQLException {
+        Integer currentSize = getColumnCharLength(conn, "applications", "sld_option");
+        if (currentSize == null) {
+            log.debug("Migration [applications-sld-option-width]: column not found, skipping");
+            return;
+        }
+        if (currentSize >= 40) {
+            log.debug("Migration [applications-sld-option-width]: already {} chars, skipping", currentSize);
+            return;
+        }
+        log.info("Migration [applications-sld-option-width]: widening sld_option {} → 40", currentSize);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications MODIFY COLUMN sld_option VARCHAR(40) DEFAULT 'SELF_UPLOAD'"
+            );
+            log.info("Migration [applications-sld-option-width]: done");
+        }
+    }
+
+    /**
+     * information_schema에서 VARCHAR 컬럼의 문자 길이를 조회한다.
+     * 컬럼이 없으면 null.
+     */
+    private Integer getColumnCharLength(Connection conn, String table, String column) throws SQLException {
+        String sql = "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS " +
+                     "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, table);
+            ps.setString(2, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                long len = rs.getLong(1);
+                return rs.wasNull() ? null : (int) len;
+            }
         }
     }
 
