@@ -662,8 +662,12 @@ CREATE TABLE IF NOT EXISTS lew_service_orders (
     manager_note          TEXT,
     uploaded_file_seq     BIGINT,
     revision_comment      TEXT,
+    revisit_comment       TEXT,
     visit_scheduled_at    DATETIME(6) NULL,
     visit_schedule_note   TEXT NULL,
+    check_in_at           DATETIME(6) NULL,
+    check_out_at          DATETIME(6) NULL,
+    visit_report_file_seq BIGINT      NULL,
     created_at            DATETIME(6),
     updated_at            DATETIME(6),
     created_by            BIGINT,
@@ -675,6 +679,21 @@ CREATE TABLE IF NOT EXISTS lew_service_orders (
     KEY idx_lew_service_orders_manager (assigned_manager_seq),
     CONSTRAINT fk_lew_service_orders_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_lew_service_orders_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 18-3-b. LEW Service 방문 사진 (PR 3)
+CREATE TABLE IF NOT EXISTS lew_service_visit_photos (
+    photo_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    order_seq   BIGINT       NOT NULL,
+    file_seq    BIGINT       NOT NULL,
+    caption     TEXT         NULL,
+    uploaded_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    deleted_at  DATETIME(6)  NULL,
+    PRIMARY KEY (photo_seq),
+    KEY idx_lew_visit_photos_order (order_seq),
+    KEY idx_lew_visit_photos_file  (file_seq),
+    CONSTRAINT fk_lew_visit_photos_order FOREIGN KEY (order_seq) REFERENCES lew_service_orders (lew_service_order_seq),
+    CONSTRAINT fk_lew_visit_photos_file  FOREIGN KEY (file_seq) REFERENCES files (file_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS lew_service_order_payments (

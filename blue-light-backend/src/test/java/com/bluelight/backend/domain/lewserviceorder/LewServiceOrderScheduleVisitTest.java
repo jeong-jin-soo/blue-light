@@ -44,7 +44,7 @@ class LewServiceOrderScheduleVisitTest {
 
     @ParameterizedTest
     @EnumSource(value = LewServiceOrderStatus.class,
-            names = {"PAID", "IN_PROGRESS", "REVISION_REQUESTED"})
+            names = {"PAID", "VISIT_SCHEDULED", "REVISIT_REQUESTED"})
     @DisplayName("허용 상태에서는 일정이 세팅되고 status 는 불변")
     void 허용_상태에서_일정_세팅(LewServiceOrderStatus status) {
         LewServiceOrder order = newOrderWithStatus(status);
@@ -60,7 +60,7 @@ class LewServiceOrderScheduleVisitTest {
     @ParameterizedTest
     @EnumSource(value = LewServiceOrderStatus.class,
             names = {"PENDING_QUOTE", "QUOTE_PROPOSED", "QUOTE_REJECTED",
-                    "PENDING_PAYMENT", "SLD_UPLOADED", "COMPLETED"})
+                    "PENDING_PAYMENT", "VISIT_COMPLETED", "COMPLETED"})
     @DisplayName("허용되지 않은 상태에서는 IllegalStateException")
     void 비허용_상태에서_예외(LewServiceOrderStatus status) {
         LewServiceOrder order = newOrderWithStatus(status);

@@ -14,9 +14,9 @@ const STATUS_CONFIG: Record<LewServiceOrderStatus, { label: string; color: strin
   QUOTE_REJECTED: { label: 'Quote Rejected', color: 'bg-red-100 text-red-800' },
   PENDING_PAYMENT: { label: 'Pending Payment', color: 'bg-orange-100 text-orange-800' },
   PAID: { label: 'Paid', color: 'bg-green-100 text-green-800' },
-  IN_PROGRESS: { label: 'Visit Scheduled', color: 'bg-blue-100 text-blue-800' },
-  SLD_UPLOADED: { label: 'Report Ready for Review', color: 'bg-purple-100 text-purple-800' },
-  REVISION_REQUESTED: { label: 'Revisit Requested', color: 'bg-orange-100 text-orange-800' },
+  VISIT_SCHEDULED: { label: 'Visit Scheduled', color: 'bg-blue-100 text-blue-800' },
+  VISIT_COMPLETED: { label: 'Report Ready for Review', color: 'bg-purple-100 text-purple-800' },
+  REVISIT_REQUESTED: { label: 'Revisit Requested', color: 'bg-orange-100 text-orange-800' },
   COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-800' },
 };
 

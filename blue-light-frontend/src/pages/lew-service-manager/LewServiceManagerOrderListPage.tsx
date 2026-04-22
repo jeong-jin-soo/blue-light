@@ -9,9 +9,9 @@ import { Pagination } from '../../components/data/Pagination';
 import { useToastStore } from '../../stores/toastStore';
 import { lewServiceManagerApi } from '../../api/lewServiceManagerApi';
 import {
-  ManagerOrderStatusBadge,
-  MANAGER_ORDER_STATUS_OPTIONS,
-} from '../../components/domain/ManagerOrderStatusBadge';
+  LewServiceStatusBadge,
+  LEW_SERVICE_STATUS_OPTIONS,
+} from '../../components/domain/LewServiceStatusBadge';
 import type { LewServiceOrder } from '../../types';
 
 const PAGE_SIZE = 15;
@@ -71,7 +71,7 @@ export default function LewServiceManagerOrderListPage() {
             <Select
               value={statusFilter}
               onChange={(e) => handleStatusChange(e.target.value)}
-              options={MANAGER_ORDER_STATUS_OPTIONS}
+              options={LEW_SERVICE_STATUS_OPTIONS}
             />
           </div>
         </div>
@@ -112,7 +112,7 @@ export default function LewServiceManagerOrderListPage() {
                     <p className="font-medium text-gray-800">{fullName(order.userFirstName, order.userLastName)}</p>
                     <p className="text-xs text-gray-400">{order.userEmail}</p>
                   </div>
-                  <ManagerOrderStatusBadge status={order.status} />
+                  <LewServiceStatusBadge status={order.status} />
                 </div>
                 <p className="text-sm text-gray-700 truncate mb-1">{order.address || '-'}</p>
                 <div className="flex items-center justify-between text-sm">
@@ -160,7 +160,7 @@ export default function LewServiceManagerOrderListPage() {
                         <div className="text-gray-700 truncate max-w-[200px]">{order.address || '-'}</div>
                       </td>
                       <td className="py-3 px-4">
-                        <ManagerOrderStatusBadge status={order.status} />
+                        <LewServiceStatusBadge status={order.status} />
                       </td>
                       <td className="py-3 px-4 text-right font-medium text-gray-800">
                         {order.quoteAmount != null ? `$${order.quoteAmount.toLocaleString()}` : '-'}

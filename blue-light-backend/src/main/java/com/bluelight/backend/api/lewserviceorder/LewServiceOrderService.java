@@ -9,6 +9,8 @@ import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.domain.lewserviceorder.LewServiceOrder;
 import com.bluelight.backend.domain.lewserviceorder.LewServiceOrderPaymentRepository;
 import com.bluelight.backend.domain.lewserviceorder.LewServiceOrderRepository;
+import com.bluelight.backend.domain.lewserviceorder.LewServiceVisitPhoto;
+import com.bluelight.backend.domain.lewserviceorder.LewServiceVisitPhotoRepository;
 import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -19,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,6 +35,7 @@ public class LewServiceOrderService {
 
     private final LewServiceOrderRepository lewServiceOrderRepository;
     private final LewServiceOrderPaymentRepository lewServiceOrderPaymentRepository;
+    private final LewServiceVisitPhotoRepository lewServiceVisitPhotoRepository;
     private final UserRepository userRepository;
 
     /**
@@ -60,7 +64,7 @@ public class LewServiceOrderService {
 
         lewServiceOrderRepository.save(order);
         log.info("Request for LEW Service 주문 생성: orderSeq={}, userSeq={}", order.getLewServiceOrderSeq(), userSeq);
-        return LewServiceOrderResponse.from(order);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
@@ -69,7 +73,7 @@ public class LewServiceOrderService {
     public List<LewServiceOrderResponse> getMyOrders(Long userSeq) {
         return lewServiceOrderRepository.findByUserUserSeqOrderByCreatedAtDesc(userSeq)
                 .stream()
-                .map(LewServiceOrderResponse::from)
+                .map(order -> LewServiceOrderResponse.from(order, loadPhotos(order)))
                 .toList();
     }
 
@@ -79,7 +83,7 @@ public class LewServiceOrderService {
     public LewServiceOrderResponse getOrder(Long orderSeq, Long userSeq) {
         LewServiceOrder order = findOrderOrThrow(orderSeq);
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
-        return LewServiceOrderResponse.from(order);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
@@ -91,7 +95,7 @@ public class LewServiceOrderService {
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
         order.updateDetails(request.getApplicantNote(), request.getSketchFileSeq());
         log.info("Request for LEW Service 주문 수정: orderSeq={}, userSeq={}", orderSeq, userSeq);
-        return LewServiceOrderResponse.from(order);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
@@ -103,7 +107,7 @@ public class LewServiceOrderService {
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
         order.acceptQuote();
         log.info("Request for LEW Service 견적 수락: orderSeq={}, userSeq={}", orderSeq, userSeq);
-        return LewServiceOrderResponse.from(order);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
@@ -115,23 +119,24 @@ public class LewServiceOrderService {
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
         order.rejectQuote();
         log.info("Request for LEW Service 견적 거절: orderSeq={}, userSeq={}", orderSeq, userSeq);
-        return LewServiceOrderResponse.from(order);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
-     * 수정 요청 (SLD_UPLOADED 상태에서만)
+     * 재방문 요청 (VISIT_COMPLETED 상태에서만) — PR 3.
+     * 기존 {@code requestRevision} 엔드포인트도 어댑터로 이 메서드를 호출.
      */
     @Transactional
-    public LewServiceOrderResponse requestRevision(Long orderSeq, Long userSeq, String comment) {
+    public LewServiceOrderResponse requestRevisit(Long orderSeq, Long userSeq, String comment) {
         LewServiceOrder order = findOrderOrThrow(orderSeq);
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
-        order.requestRevision(comment);
-        log.info("Request for LEW Service 수정 요청: orderSeq={}, userSeq={}", orderSeq, userSeq);
-        return LewServiceOrderResponse.from(order);
+        order.requestRevisit(comment);
+        log.info("LEW Service 재방문 요청: orderSeq={}, userSeq={}", orderSeq, userSeq);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
-     * 완료 확인 (SLD_UPLOADED 상태에서 신청자가 확인)
+     * 완료 확인 (VISIT_COMPLETED 상태에서 신청자가 확인)
      */
     @Transactional
     public LewServiceOrderResponse confirmCompletion(Long orderSeq, Long userSeq) {
@@ -139,7 +144,7 @@ public class LewServiceOrderService {
         OwnershipValidator.validateOwner(order.getUser().getUserSeq(), userSeq);
         order.complete();
         log.info("Request for LEW Service 주문 완료 확인: orderSeq={}, userSeq={}", orderSeq, userSeq);
-        return LewServiceOrderResponse.from(order);
+        return LewServiceOrderResponse.from(order, loadPhotos(order));
     }
 
     /**
@@ -160,5 +165,11 @@ public class LewServiceOrderService {
         return lewServiceOrderRepository.findById(orderSeq)
                 .orElseThrow(() -> new BusinessException(
                         "Request for LEW Service order not found", HttpStatus.NOT_FOUND, "LEW_SERVICE_ORDER_NOT_FOUND"));
+    }
+
+    private List<LewServiceVisitPhoto> loadPhotos(LewServiceOrder order) {
+        if (order.getLewServiceOrderSeq() == null) return new ArrayList<>();
+        return lewServiceVisitPhotoRepository
+                .findByOrderLewServiceOrderSeqOrderByUploadedAtAsc(order.getLewServiceOrderSeq());
     }
 }

@@ -68,16 +68,22 @@ export default function LewServiceManagerDashboardPage() {
           onClick={() => navigate('/lew-service-manager/orders?status=PAID')}
         />
         <DashboardCard
-          label="In Progress"
-          value={dashboard?.inProgress ?? 0}
-          icon="🔄"
-          onClick={() => navigate('/lew-service-manager/orders?status=IN_PROGRESS')}
+          label="Visit Scheduled"
+          value={dashboard?.visitScheduled ?? 0}
+          icon="📅"
+          onClick={() => navigate('/lew-service-manager/orders?status=VISIT_SCHEDULED')}
         />
         <DashboardCard
           label="Report Submitted"
-          value={dashboard?.deliverableUploaded ?? 0}
+          value={dashboard?.visitCompleted ?? 0}
           icon="📄"
-          onClick={() => navigate('/lew-service-manager/orders?status=SLD_UPLOADED')}
+          onClick={() => navigate('/lew-service-manager/orders?status=VISIT_COMPLETED')}
+        />
+        <DashboardCard
+          label="Revisit Requested"
+          value={dashboard?.revisitRequested ?? 0}
+          icon="🔁"
+          onClick={() => navigate('/lew-service-manager/orders?status=REVISIT_REQUESTED')}
         />
         <DashboardCard
           label="Completed"

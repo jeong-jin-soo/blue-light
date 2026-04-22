@@ -15,8 +15,8 @@ import java.time.LocalDateTime;
 
 /**
  * Request for LEW Service 주문 Entity
- * - 라이센스 신청 없이 SLD 도면만 요청하는 경우
- * - SLD_MANAGER가 견적 제안 → 신청자 수락 → 결제 → SLD 생성 → 완료
+ * - LEW (licensed electrical worker) 가 현장을 방문해 전기 공사/검사를 수행하는 서비스 주문.
+ * - 견적 → 결제 → 방문 일정 → 체크인/체크아웃 → 보고서 제출 → 신청자 확인 → 완료.
  */
 @Entity
 @Table(name = "lew_service_orders")
@@ -107,16 +107,18 @@ public class LewServiceOrder extends BaseEntity {
     private String managerNote;
 
     /**
-     * 완성된 Request for LEW Service 파일 (FK → files)
+     * 완성된 Request for LEW Service 파일 (FK → files).
+     * <p>Legacy — PR 3 에서 {@link #visitReportFileSeq} 로 대체. 하위호환용으로 유지
+     * (기존 {@code /sld-uploaded} 어댑터가 여전히 사용).
      */
     @Column(name = "uploaded_file_seq")
     private Long uploadedFileSeq;
 
     /**
-     * 수정 요청 사유 (신청자)
+     * 재방문 요청 사유 (신청자). PR 3 에서 {@code revision_comment} 에서 rename.
      */
-    @Column(name = "revision_comment", columnDefinition = "TEXT")
-    private String revisionComment;
+    @Column(name = "revisit_comment", columnDefinition = "TEXT")
+    private String revisitComment;
 
     /**
      * 합의된 방문 예정 일시 (LEW Service 방문형 리스키닝 PR 2)
@@ -130,6 +132,25 @@ public class LewServiceOrder extends BaseEntity {
      */
     @Column(name = "visit_schedule_note", length = 2000, columnDefinition = "TEXT")
     private String visitScheduleNote;
+
+    /**
+     * LEW 체크인 시각 (현장 도착, PR 3).
+     * <p>{@code status=VISIT_SCHEDULED && checkInAt IS NOT NULL} 을 "ON_SITE"로 해석.
+     */
+    @Column(name = "check_in_at")
+    private LocalDateTime checkInAt;
+
+    /**
+     * LEW 체크아웃 시각 (현장 작업 종료, PR 3).
+     */
+    @Column(name = "check_out_at")
+    private LocalDateTime checkOutAt;
+
+    /**
+     * 방문 보고서 파일 (FK → files). PR 3 — {@code uploadedFileSeq} 를 대체.
+     */
+    @Column(name = "visit_report_file_seq")
+    private Long visitReportFileSeq;
 
     @Builder
     public LewServiceOrder(User user, String address, String postalCode,
@@ -191,46 +212,124 @@ public class LewServiceOrder extends BaseEntity {
     }
 
     /**
-     * SLD 작업 시작
+     * 방문 작업 시작 — PAID → VISIT_SCHEDULED.
+     * (과거 {@code startWork()} 의 계승. 이름을 바꾸지 않아도 안전하지만
+     * "Visit Scheduled" 시맨틱으로 정렬하기 위해 리네임.)
      */
-    public void startWork() {
+    public void startVisit() {
         if (this.status != LewServiceOrderStatus.PAID) {
-            throw new IllegalStateException("작업 시작은 PAID 상태에서만 가능합니다. 현재: " + this.status);
+            throw new IllegalStateException("방문 시작은 PAID 상태에서만 가능합니다. 현재: " + this.status);
         }
-        this.status = LewServiceOrderStatus.IN_PROGRESS;
+        this.status = LewServiceOrderStatus.VISIT_SCHEDULED;
     }
 
     /**
-     * Request for LEW Service 업로드 완료 (SLD_MANAGER)
+     * LEW 체크인 (현장 도착, PR 3).
+     * <p>{@code VISIT_SCHEDULED} 에서만 호출 가능. 상태는 바뀌지 않고 {@link #checkInAt} 만 기록.
+     * UI 에서는 {@code status=VISIT_SCHEDULED && checkInAt != null} 를 "ON_SITE"로 해석.
      */
-    public void uploadSld(Long fileSeq, String managerNote) {
-        if (this.status != LewServiceOrderStatus.IN_PROGRESS
-                && this.status != LewServiceOrderStatus.REVISION_REQUESTED
-                && this.status != LewServiceOrderStatus.SLD_UPLOADED) {
-            throw new IllegalStateException("Request for LEW Service 업로드는 IN_PROGRESS, REVISION_REQUESTED 또는 SLD_UPLOADED 상태에서만 가능합니다. 현재: " + this.status);
+    public void checkIn() {
+        if (this.status != LewServiceOrderStatus.VISIT_SCHEDULED) {
+            throw new IllegalStateException(
+                    "Check-in is only allowed in VISIT_SCHEDULED state. Current: " + this.status);
         }
+        this.checkInAt = LocalDateTime.now();
+    }
+
+    /**
+     * LEW 체크아웃 + 방문 보고서 제출 (PR 3).
+     * <p>{@code VISIT_SCHEDULED} 에서 {@link #checkInAt} 가 세팅되어 있어야 호출 가능.
+     * 상태는 {@link LewServiceOrderStatus#VISIT_COMPLETED} 로 전이.
+     *
+     * @param visitReportFileSeq 방문 보고서 파일 seq (필수)
+     * @param managerNote        LEW 메모 (nullable)
+     */
+    public void checkOut(Long visitReportFileSeq, String managerNote) {
+        if (this.status != LewServiceOrderStatus.VISIT_SCHEDULED) {
+            throw new IllegalStateException(
+                    "Check-out is only allowed in VISIT_SCHEDULED state. Current: " + this.status);
+        }
+        if (this.checkInAt == null) {
+            throw new IllegalStateException("Check-out requires prior check-in");
+        }
+        if (visitReportFileSeq == null) {
+            throw new IllegalArgumentException("visitReportFileSeq is required");
+        }
+        this.checkOutAt = LocalDateTime.now();
+        this.visitReportFileSeq = visitReportFileSeq;
+        // 하위호환 — legacy 소비자를 위해 uploadedFileSeq 에도 미러링
+        this.uploadedFileSeq = visitReportFileSeq;
+        this.managerNote = managerNote;
+        this.status = LewServiceOrderStatus.VISIT_COMPLETED;
+    }
+
+    /**
+     * 하위호환 어댑터 — 구 {@code uploadSld()} 호출 경로 유지.
+     * <p>기존 {@code /sld-uploaded} 엔드포인트는 PR 3 에서 deprecate 되었으나 1 개월간 유지.
+     * 방문 일정/체크인이 아직 없는 경우 자동 보강하여 VISIT_COMPLETED 로 전이시킨다.
+     * <ul>
+     *   <li>PAID → VISIT_SCHEDULED 로 전이 후 진행</li>
+     *   <li>VISIT_SCHEDULED + checkInAt==null → 즉시 checkIn() 수행</li>
+     *   <li>REVISIT_REQUESTED → 방문 재시작으로 간주 (VISIT_SCHEDULED + checkIn + checkOut)</li>
+     *   <li>VISIT_COMPLETED → 보고서 재제출 (visitReportFileSeq 만 갱신)</li>
+     * </ul>
+     */
+    public void legacyUploadDeliverable(Long fileSeq, String managerNote) {
+        if (fileSeq == null) {
+            throw new IllegalArgumentException("fileSeq is required");
+        }
+        LocalDateTime now = LocalDateTime.now();
+
+        switch (this.status) {
+            case PAID -> {
+                this.status = LewServiceOrderStatus.VISIT_SCHEDULED;
+                this.checkInAt = now;
+                this.checkOutAt = now;
+                this.status = LewServiceOrderStatus.VISIT_COMPLETED;
+            }
+            case VISIT_SCHEDULED -> {
+                if (this.checkInAt == null) this.checkInAt = now;
+                this.checkOutAt = now;
+                this.status = LewServiceOrderStatus.VISIT_COMPLETED;
+            }
+            case REVISIT_REQUESTED -> {
+                this.status = LewServiceOrderStatus.VISIT_SCHEDULED;
+                this.checkInAt = now;
+                this.checkOutAt = now;
+                this.status = LewServiceOrderStatus.VISIT_COMPLETED;
+            }
+            case VISIT_COMPLETED -> {
+                // 보고서 재제출 — 체크아웃 시각만 갱신
+                this.checkOutAt = now;
+            }
+            default -> throw new IllegalStateException(
+                    "Legacy upload is not allowed in state: " + this.status);
+        }
+
+        this.visitReportFileSeq = fileSeq;
         this.uploadedFileSeq = fileSeq;
         this.managerNote = managerNote;
-        this.status = LewServiceOrderStatus.SLD_UPLOADED;
     }
 
     /**
-     * 수정 요청 (신청자)
+     * 재방문 요청 (신청자). PR 3 — 기존 {@code requestRevision} rename.
      */
-    public void requestRevision(String comment) {
-        if (this.status != LewServiceOrderStatus.SLD_UPLOADED) {
-            throw new IllegalStateException("수정 요청은 SLD_UPLOADED 상태에서만 가능합니다. 현재: " + this.status);
+    public void requestRevisit(String comment) {
+        if (this.status != LewServiceOrderStatus.VISIT_COMPLETED) {
+            throw new IllegalStateException(
+                    "Revisit request is only allowed in VISIT_COMPLETED state. Current: " + this.status);
         }
-        this.revisionComment = comment;
-        this.status = LewServiceOrderStatus.REVISION_REQUESTED;
+        this.revisitComment = comment;
+        this.status = LewServiceOrderStatus.REVISIT_REQUESTED;
     }
 
     /**
-     * 완료 확인 (신청자)
+     * 완료 확인 (신청자) — PR 3: VISIT_COMPLETED 에서만 호출.
      */
     public void complete() {
-        if (this.status != LewServiceOrderStatus.SLD_UPLOADED) {
-            throw new IllegalStateException("완료는 SLD_UPLOADED 상태에서만 가능합니다. 현재: " + this.status);
+        if (this.status != LewServiceOrderStatus.VISIT_COMPLETED) {
+            throw new IllegalStateException(
+                    "Completion is only allowed in VISIT_COMPLETED state. Current: " + this.status);
         }
         this.status = LewServiceOrderStatus.COMPLETED;
     }
@@ -261,11 +360,11 @@ public class LewServiceOrder extends BaseEntity {
     }
 
     /**
-     * AI 생성 시작 (PAID → IN_PROGRESS 자동 전환)
+     * PAID → VISIT_SCHEDULED 자동 전환 (하위호환 어댑터 등에서 사용).
      */
-    public void ensureInProgress() {
+    public void ensureVisitScheduled() {
         if (this.status == LewServiceOrderStatus.PAID) {
-            this.status = LewServiceOrderStatus.IN_PROGRESS;
+            this.status = LewServiceOrderStatus.VISIT_SCHEDULED;
         }
     }
 
@@ -273,7 +372,7 @@ public class LewServiceOrder extends BaseEntity {
      * 방문 일정 예약 (LEW Service 방문형 리스키닝 PR 2)
      * <p>
      * 상태 전이 없음 — 일정 데이터만 덮어쓴다. 재예약(Reschedule) 시에도 동일 메서드 호출.
-     * PAID / IN_PROGRESS / REVISION_REQUESTED 상태에서만 호출 가능.
+     * PAID / VISIT_SCHEDULED / REVISIT_REQUESTED 상태에서만 호출 가능.
      *
      * @param when 합의된 방문 예정 일시 (null 불가)
      * @param note 방문 관련 메모 (nullable)
@@ -283,13 +382,20 @@ public class LewServiceOrder extends BaseEntity {
             throw new IllegalArgumentException("visitScheduledAt must not be null");
         }
         if (this.status != LewServiceOrderStatus.PAID
-                && this.status != LewServiceOrderStatus.IN_PROGRESS
-                && this.status != LewServiceOrderStatus.REVISION_REQUESTED) {
+                && this.status != LewServiceOrderStatus.VISIT_SCHEDULED
+                && this.status != LewServiceOrderStatus.REVISIT_REQUESTED) {
             throw new IllegalStateException(
-                    "Visit can only be scheduled in PAID, IN_PROGRESS, or REVISION_REQUESTED state. Current: "
+                    "Visit can only be scheduled in PAID, VISIT_SCHEDULED, or REVISIT_REQUESTED state. Current: "
                             + this.status);
         }
         this.visitScheduledAt = when;
         this.visitScheduleNote = note;
+    }
+
+    /**
+     * ON_SITE 파생 상태 확인 — status=VISIT_SCHEDULED && checkInAt != null.
+     */
+    public boolean isOnSite() {
+        return this.status == LewServiceOrderStatus.VISIT_SCHEDULED && this.checkInAt != null;
     }
 }

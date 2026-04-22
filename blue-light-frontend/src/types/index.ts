@@ -1028,7 +1028,30 @@ export interface PowerSocketOrderPayment {
   transactionId?: string;
 }
 
-export type LewServiceOrderStatus = SldOrderStatus;
+/**
+ * LEW Service 주문 상태 (방문형 서비스 기준 — PR 3 rename).
+ * <p>SldOrderStatus 와 공유하지 않는다(Backend 에서 enum 분리).
+ */
+export type LewServiceOrderStatus =
+  | 'PENDING_QUOTE'
+  | 'QUOTE_PROPOSED'
+  | 'QUOTE_REJECTED'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'VISIT_SCHEDULED'
+  | 'VISIT_COMPLETED'
+  | 'REVISIT_REQUESTED'
+  | 'COMPLETED';
+
+/**
+ * LEW Service 방문 사진 (PR 3).
+ */
+export interface VisitPhoto {
+  photoSeq: number;
+  fileSeq: number;
+  caption?: string;
+  uploadedAt: string;
+}
 
 export interface LewServiceOrder {
   lewServiceOrderSeq: number;
@@ -1043,19 +1066,43 @@ export interface LewServiceOrder {
   applicantNote?: string;
   sketchFileSeq?: number;
   status: LewServiceOrderStatus;
+  /**
+   * 파생 상태: status=VISIT_SCHEDULED && checkInAt 있음.
+   * 백엔드에서 계산되어 내려옴.
+   */
+  onSite?: boolean;
   quoteAmount?: number;
   quoteNote?: string;
   managerNote?: string;
+  /** PR 3 — 방문 보고서 (기존 uploadedFileSeq 와 같은 값, alias) */
+  visitReportFileSeq?: number;
+  /** @deprecated PR 3 — visitReportFileSeq 사용 권장 */
   uploadedFileSeq?: number;
+  /** PR 3 — 재방문 요청 사유 */
+  revisitComment?: string;
+  /** @deprecated PR 3 — revisitComment 사용 권장 */
   revisionComment?: string;
   // LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약
   visitScheduledAt?: string;
   visitScheduleNote?: string;
+  // PR 3 — 체크인/아웃 + 방문 사진
+  checkInAt?: string;
+  checkOutAt?: string;
+  visitPhotos?: VisitPhoto[];
   assignedManagerSeq?: number;
   assignedManagerFirstName?: string;
   assignedManagerLastName?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * LEW Service check-out 요청 (Manager 측, PR 3).
+ * POST /api/lew-service-manager/orders/{id}/check-out
+ */
+export interface CheckOutRequest {
+  visitReportFileSeq: number;
+  managerNote?: string;
 }
 
 /**
@@ -1077,7 +1124,8 @@ export interface CreateLewServiceOrderRequest {
 }
 
 /**
- * LewService Manager 대시보드 (백엔드 LewServiceOrderDashboardResponse)
+ * LewService Manager 대시보드 (백엔드 LewServiceOrderDashboardResponse).
+ * <p>PR 3 — 신규 visit* 필드 + 하위호환 alias.
  */
 export interface LewServiceOrderDashboard {
   total: number;
@@ -1085,9 +1133,17 @@ export interface LewServiceOrderDashboard {
   quoteProposed: number;
   pendingPayment: number;
   paid: number;
-  inProgress: number;
-  deliverableUploaded: number;
+  /** PR 3 — VISIT_SCHEDULED 건수 */
+  visitScheduled: number;
+  /** PR 3 — VISIT_COMPLETED 건수 */
+  visitCompleted: number;
+  /** PR 3 — REVISIT_REQUESTED 건수 */
+  revisitRequested: number;
   completed: number;
+  /** @deprecated PR 3 — visitScheduled 사용 권장 */
+  inProgress?: number;
+  /** @deprecated PR 3 — visitCompleted 사용 권장 */
+  deliverableUploaded?: number;
 }
 
 export interface LewServiceOrderPayment {

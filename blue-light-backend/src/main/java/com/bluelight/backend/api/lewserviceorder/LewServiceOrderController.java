@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.lewserviceorder;
 
 import com.bluelight.backend.api.lewserviceorder.dto.RevisionRequestDto;
+import com.bluelight.backend.api.lewserviceorder.dto.RevisitRequestDto;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceOrderPaymentResponse;
 import com.bluelight.backend.api.lewserviceorder.dto.LewServiceOrderResponse;
 import com.bluelight.backend.api.lewserviceorder.dto.CreateLewServiceOrderRequest;
@@ -111,22 +112,40 @@ public class LewServiceOrderController {
     }
 
     /**
-     * 수정 요청 (SLD_UPLOADED 상태에서)
-     * POST /api/lew-service-orders/{id}/request-revision
+     * @deprecated PR 3 — 재방문 요청으로 rename.
+     *   신규 엔드포인트: {@link #requestRevisit}. 구 엔드포인트는 1 개월간 유지.
+     * <p>POST /api/lew-service-orders/{id}/request-revision
      */
+    @Deprecated
     @PostMapping("/{id}/request-revision")
     public ResponseEntity<LewServiceOrderResponse> requestRevision(
             Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody RevisionRequestDto request) {
         Long userSeq = (Long) authentication.getPrincipal();
-        log.info("SLD 수정 요청: userSeq={}, orderSeq={}", userSeq, id);
-        LewServiceOrderResponse response = lewServiceOrderService.requestRevision(id, userSeq, request.getComment());
+        log.warn("LEW Service legacy /request-revision 호출 (PR 3 에서 deprecate): userSeq={}, orderSeq={}",
+                userSeq, id);
+        LewServiceOrderResponse response = lewServiceOrderService.requestRevisit(id, userSeq, request.getComment());
         return ResponseEntity.ok(response);
     }
 
     /**
-     * 완료 확인 (SLD_UPLOADED 상태에서 신청자가 확인)
+     * 재방문 요청 — PR 3.
+     * <p>POST /api/lew-service-orders/{id}/request-revisit
+     */
+    @PostMapping("/{id}/request-revisit")
+    public ResponseEntity<LewServiceOrderResponse> requestRevisit(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody RevisitRequestDto request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("LEW Service 재방문 요청: userSeq={}, orderSeq={}", userSeq, id);
+        LewServiceOrderResponse response = lewServiceOrderService.requestRevisit(id, userSeq, request.getComment());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 완료 확인 (VISIT_COMPLETED 상태에서 신청자가 확인)
      * POST /api/lew-service-orders/{id}/confirm
      */
     @PostMapping("/{id}/confirm")

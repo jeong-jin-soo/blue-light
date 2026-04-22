@@ -8,9 +8,11 @@ interface Props {
 }
 
 /**
- * LEW Service — Visit Report upload section (manual only).
- * LEW가 현장 방문 후 작성한 보고서(PDF 권장) 또는 첨부(사진·측정 시트 ZIP)를 업로드한다.
- * 업로드가 끝나면 주문은 SLD_UPLOADED 상태로 전이되며 신청자가 검토·확정한다.
+ * @deprecated PR 3 — VisitCompletionForm 으로 대체됨 (체크인/아웃 + 사진 + 보고서 분리).
+ *   구 `/sld-uploaded` 엔드포인트 어댑터 호출이 필요한 경우에만 재사용.
+ *
+ * LEW Service — Visit Report upload section (manual only, legacy).
+ * 업로드가 끝나면 주문은 VISIT_COMPLETED 상태로 전이 (구 SLD_UPLOADED 에서 rename).
  */
 export function LewServiceManagerSection({ onDeliverableUpload }: Props) {
   const [managerNote, setManagerNote] = useState('');

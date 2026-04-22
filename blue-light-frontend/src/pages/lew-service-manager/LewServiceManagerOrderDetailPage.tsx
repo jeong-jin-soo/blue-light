@@ -8,11 +8,12 @@ import { Textarea } from '../../components/ui/Textarea';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { InfoField } from '../../components/common/InfoField';
-import { ManagerOrderStatusBadge } from '../../components/domain/ManagerOrderStatusBadge';
+import { LewServiceStatusBadge } from '../../components/domain/LewServiceStatusBadge';
 import { useToastStore } from '../../stores/toastStore';
 import { lewServiceManagerApi } from '../../api/lewServiceManagerApi';
 import fileApi from '../../api/fileApi';
-import { LewServiceManagerSection } from './sections/LewServiceManagerSection';
+import { OnSiteChecklistCard } from './sections/OnSiteChecklistCard';
+import { VisitCompletionForm } from './sections/VisitCompletionForm';
 import type { LewServiceOrder } from '../../types';
 
 export default function LewServiceManagerOrderDetailPage() {
@@ -84,13 +85,6 @@ export default function LewServiceManagerOrderDetailPage() {
     finally { setActionLoading(false); }
   };
 
-  const handleDeliverableUpload = async (file: File, managerNote?: string) => {
-    const uploadedFile = await lewServiceManagerApi.uploadFile(orderId, file, 'DRAWING_SLD');
-    await lewServiceManagerApi.uploadDeliverableComplete(orderId, uploadedFile.fileSeq, managerNote);
-    toast.success('Visit report submitted and order marked as complete');
-    fetchData();
-  };
-
   const handleDownloadFile = async (fileSeq: number, filename: string) => {
     try {
       await fileApi.downloadFile(fileSeq, filename);
@@ -101,7 +95,6 @@ export default function LewServiceManagerOrderDetailPage() {
 
   /** <input type="datetime-local"> 값 "YYYY-MM-DDTHH:mm" → 백엔드 LocalDateTime 포맷 */
   const toBackendLocalDateTime = (value: string): string => {
-    // HTML datetime-local 은 초가 없을 수 있어 ":00" 보정
     if (!value) return value;
     return value.length === 16 ? `${value}:00` : value;
   };
@@ -109,7 +102,6 @@ export default function LewServiceManagerOrderDetailPage() {
   /** 백엔드 ISO 문자열 → <input type="datetime-local"> 용 "YYYY-MM-DDTHH:mm" */
   const toInputLocalDateTime = (iso?: string): string => {
     if (!iso) return '';
-    // 백엔드는 "2026-04-23T14:00:00" 형태로 내려옴 (offset 없음)
     return iso.slice(0, 16);
   };
 
@@ -156,9 +148,9 @@ export default function LewServiceManagerOrderDetailPage() {
 
   if (!order) return null;
 
-  const showDeliverableSection = ['PAID', 'IN_PROGRESS', 'REVISION_REQUESTED', 'SLD_UPLOADED'].includes(order.status);
-  // PR 2 — 방문 일정은 PAID/IN_PROGRESS 에서 편집 가능 (REVISION_REQUESTED 은 PR 3 재방문 흐름)
-  const showVisitScheduleSection = ['PAID', 'IN_PROGRESS'].includes(order.status);
+  const isOnSite = order.status === 'VISIT_SCHEDULED' && !!order.checkInAt;
+  // 방문 일정은 PAID / VISIT_SCHEDULED 에서 편집 가능
+  const showVisitScheduleSection = ['PAID', 'VISIT_SCHEDULED'].includes(order.status);
   const visitScheduledAtDisplay = order.visitScheduledAt
     ? new Date(order.visitScheduledAt).toLocaleString(undefined, {
         weekday: 'short',
@@ -169,6 +161,7 @@ export default function LewServiceManagerOrderDetailPage() {
         minute: '2-digit',
       })
     : null;
+  const reportFileSeq = order.visitReportFileSeq ?? order.uploadedFileSeq;
 
   return (
     <div className="space-y-6">
@@ -191,7 +184,7 @@ export default function LewServiceManagerOrderDetailPage() {
             <p className="text-sm text-gray-500 mt-0.5">Manager view</p>
           </div>
         </div>
-        <ManagerOrderStatusBadge status={order.status} />
+        <LewServiceStatusBadge status={order.status} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -416,23 +409,33 @@ export default function LewServiceManagerOrderDetailPage() {
             </Card>
           )}
 
-          {order.status === 'IN_PROGRESS' && (
-            <Card>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-lg">&#128736;</span>
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">On-site Visit In Progress</p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      Use the section below to submit the visit report after completing the on-site work.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
+          {/* PR 3: VISIT_SCHEDULED + not checked in → OnSiteChecklistCard */}
+          {order.status === 'VISIT_SCHEDULED' && !order.checkInAt && (
+            <OnSiteChecklistCard orderId={orderId} onCheckedIn={fetchData} />
           )}
 
-          {order.status === 'REVISION_REQUESTED' && (
+          {/* PR 3: VISIT_SCHEDULED + ON_SITE → VisitCompletionForm */}
+          {isOnSite && (
+            <>
+              <Card>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-lg">&#128736;</span>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">On-site Visit In Progress</p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Checked in at {new Date(order.checkInAt!).toLocaleString()}. Complete the
+                        on-site work, upload photos and the report, then check out.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+              <VisitCompletionForm orderId={orderId} order={order} onCompleted={fetchData} />
+            </>
+          )}
+
+          {order.status === 'REVISIT_REQUESTED' && (
             <Card>
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
@@ -440,12 +443,14 @@ export default function LewServiceManagerOrderDetailPage() {
                   <div>
                     <p className="text-sm font-medium text-orange-800">Revisit Requested</p>
                     <p className="text-xs text-orange-700 mt-1">
-                      The applicant has requested a follow-up visit.
+                      The applicant has requested a follow-up visit. Schedule a new visit time above.
                     </p>
-                    {order.revisionComment && (
+                    {(order.revisitComment || order.revisionComment) && (
                       <div className="mt-2 bg-white rounded p-2 border border-orange-100">
                         <p className="text-xs text-gray-500">Revisit reason:</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.revisionComment}</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {order.revisitComment || order.revisionComment}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -454,11 +459,7 @@ export default function LewServiceManagerOrderDetailPage() {
             </Card>
           )}
 
-          {showDeliverableSection && (
-            <LewServiceManagerSection onDeliverableUpload={handleDeliverableUpload} />
-          )}
-
-          {order.status === 'SLD_UPLOADED' && (
+          {order.status === 'VISIT_COMPLETED' && (
             <Card>
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
@@ -466,8 +467,7 @@ export default function LewServiceManagerOrderDetailPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-purple-800">Visit report submitted. Waiting for applicant review.</p>
                     <p className="text-xs text-purple-700 mt-1">
-                      The visit report has been submitted. The applicant will review and confirm completion.
-                      You can submit an updated report using the section above if needed.
+                      The applicant will review and either confirm completion or request a revisit.
                     </p>
                     {order.managerNote && (
                       <div className="mt-2 bg-white rounded p-2 border border-purple-100">
@@ -475,12 +475,12 @@ export default function LewServiceManagerOrderDetailPage() {
                         <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.managerNote}</p>
                       </div>
                     )}
-                    {order.uploadedFileSeq && (
+                    {reportFileSeq && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LEW_Service_Visit_Report')}
+                        onClick={() => handleDownloadFile(reportFileSeq, 'LEW_Service_Visit_Report')}
                       >
                         Download Visit Report
                       </Button>
@@ -501,12 +501,12 @@ export default function LewServiceManagerOrderDetailPage() {
                     <p className="text-xs text-green-700 mt-1">
                       This on-site service order has been completed successfully.
                     </p>
-                    {order.uploadedFileSeq && (
+                    {reportFileSeq && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LEW_Service_Visit_Report')}
+                        onClick={() => handleDownloadFile(reportFileSeq, 'LEW_Service_Visit_Report')}
                       >
                         Download Visit Report
                       </Button>
@@ -528,7 +528,7 @@ export default function LewServiceManagerOrderDetailPage() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Status</span>
-                <ManagerOrderStatusBadge status={order.status} />
+                <LewServiceStatusBadge status={order.status} />
               </div>
               {order.quoteAmount != null && (
                 <div className="flex justify-between">
@@ -548,6 +548,22 @@ export default function LewServiceManagerOrderDetailPage() {
                   {new Date(order.updatedAt).toLocaleDateString()}
                 </span>
               </div>
+              {order.checkInAt && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Checked In</span>
+                  <span className="font-medium text-gray-700">
+                    {new Date(order.checkInAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
+              {order.checkOutAt && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Checked Out</span>
+                  <span className="font-medium text-gray-700">
+                    {new Date(order.checkOutAt).toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           </Card>
 

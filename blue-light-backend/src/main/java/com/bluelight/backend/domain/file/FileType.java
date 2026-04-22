@@ -62,5 +62,15 @@ public enum FileType {
     /**
      * 회로 스케줄 파일 (Excel/CSV/이미지 — AI 채팅 첨부용)
      */
-    CIRCUIT_SCHEDULE
+    CIRCUIT_SCHEDULE,
+
+    /**
+     * LEW Service 방문 사진 (여러 장 업로드, LEW Service 방문형 리스키닝 PR 3)
+     */
+    LEW_SERVICE_VISIT_PHOTO,
+
+    /**
+     * LEW Service 방문 보고서 PDF (LEW Service 방문형 리스키닝 PR 3)
+     */
+    LEW_SERVICE_VISIT_REPORT
 }

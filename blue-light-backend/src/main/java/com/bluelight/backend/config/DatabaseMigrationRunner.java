@@ -76,6 +76,14 @@ public class DatabaseMigrationRunner {
             migrateSldOrdersAmpereColumn(conn);
             // ★ LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약 컬럼
             migrateLewServiceOrdersVisitScheduleColumns(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — 체크인/아웃 + 보고서 컬럼
+            migrateLewServiceOrdersVisitColumns(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — revision_comment → revisit_comment rename
+            migrateLewServiceOrdersRevisitRename(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — 상태 enum rename
+            migrateLewServiceOrdersStatusRename(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — visit_photos 테이블
+            createLewServiceVisitPhotosTable(conn);
             // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
             migrateApplicationsEmaFields(conn);
             migrateApplicationDeclarationLogsTable(conn);
@@ -1233,6 +1241,156 @@ public class DatabaseMigrationRunner {
             log.info("Migration [applicant-hint-columns]: added {} column(s)", added);
         } else {
             log.debug("Migration [applicant-hint-columns]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): lew_service_orders 에 체크인/아웃/보고서 컬럼 추가.
+     * <p>추가 컬럼: check_in_at, check_out_at, visit_report_file_seq.
+     * <p>visit_report_file_seq 는 기존 uploaded_file_seq 가 있는 경우 값을 복사하여 이관한다
+     * (uploaded_file_seq 는 하위호환을 위해 DROP 하지 않음).
+     */
+    private void migrateLewServiceOrdersVisitColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) {
+            log.debug("Migration [lew-service-visit-columns]: lew_service_orders not found, skipping");
+            return;
+        }
+        boolean hasCheckIn = columnExists(conn, "lew_service_orders", "check_in_at");
+        boolean hasCheckOut = columnExists(conn, "lew_service_orders", "check_out_at");
+        boolean hasVisitReport = columnExists(conn, "lew_service_orders", "visit_report_file_seq");
+        if (hasCheckIn && hasCheckOut && hasVisitReport) {
+            log.debug("Migration [lew-service-visit-columns]: already applied, skipping");
+            return;
+        }
+        log.info("Migration [lew-service-visit-columns]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            if (!hasCheckIn) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN check_in_at DATETIME(6) NULL AFTER visit_schedule_note"
+                );
+                log.info("Migration [lew-service-visit-columns]: added check_in_at");
+            }
+            if (!hasCheckOut) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN check_out_at DATETIME(6) NULL AFTER check_in_at"
+                );
+                log.info("Migration [lew-service-visit-columns]: added check_out_at");
+            }
+            if (!hasVisitReport) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN visit_report_file_seq BIGINT NULL AFTER check_out_at"
+                );
+                log.info("Migration [lew-service-visit-columns]: added visit_report_file_seq");
+                // Backfill from legacy uploaded_file_seq
+                if (columnExists(conn, "lew_service_orders", "uploaded_file_seq")) {
+                    int copied = stmt.executeUpdate(
+                        "UPDATE lew_service_orders SET visit_report_file_seq = uploaded_file_seq " +
+                        "WHERE visit_report_file_seq IS NULL AND uploaded_file_seq IS NOT NULL"
+                    );
+                    log.info("Migration [lew-service-visit-columns]: copied {} uploaded_file_seq → visit_report_file_seq", copied);
+                }
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): revision_comment → revisit_comment rename.
+     * <p>두 컬럼이 모두 없거나 revisit_comment 가 이미 있으면 스킵.
+     * <p>둘 다 있는 경우: revision_comment 값을 revisit_comment 로 복사 (revisit_comment 가 비어있을 때만).
+     * <p>revision_comment 만 있는 경우: revisit_comment 추가 후 데이터 복사.
+     * <p>revision_comment DROP 은 별도 PR 에서 수행 (하위호환 유지).
+     */
+    private void migrateLewServiceOrdersRevisitRename(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) return;
+        boolean hasRevision = columnExists(conn, "lew_service_orders", "revision_comment");
+        boolean hasRevisit = columnExists(conn, "lew_service_orders", "revisit_comment");
+        if (hasRevisit && !hasRevision) {
+            log.debug("Migration [lew-service-revisit-rename]: already applied, skipping");
+            return;
+        }
+        log.info("Migration [lew-service-revisit-rename]: starting (hasRevision={}, hasRevisit={})",
+                hasRevision, hasRevisit);
+        try (Statement stmt = conn.createStatement()) {
+            if (!hasRevisit) {
+                // 새 컬럼 추가 — revision_comment 뒤에
+                String after = hasRevision ? "revision_comment" : "manager_note";
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN revisit_comment TEXT NULL AFTER " + after
+                );
+                log.info("Migration [lew-service-revisit-rename]: added revisit_comment");
+            }
+            if (hasRevision) {
+                // 데이터 복사 (revisit_comment 가 비어있을 때만)
+                int copied = stmt.executeUpdate(
+                    "UPDATE lew_service_orders SET revisit_comment = revision_comment " +
+                    "WHERE revisit_comment IS NULL AND revision_comment IS NOT NULL"
+                );
+                log.info("Migration [lew-service-revisit-rename]: copied {} rows revision_comment → revisit_comment", copied);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): status enum 값 rename.
+     * <p>MySQL 상 컬럼은 VARCHAR(30) 이므로 DDL 변경 불필요, 기존 row 만 UPDATE.
+     * <ul>
+     *   <li>IN_PROGRESS → VISIT_SCHEDULED</li>
+     *   <li>SLD_UPLOADED → VISIT_COMPLETED</li>
+     *   <li>REVISION_REQUESTED → REVISIT_REQUESTED</li>
+     * </ul>
+     */
+    private void migrateLewServiceOrdersStatusRename(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) return;
+        try (Statement stmt = conn.createStatement()) {
+            int inProgress = stmt.executeUpdate(
+                "UPDATE lew_service_orders SET status = 'VISIT_SCHEDULED' WHERE status = 'IN_PROGRESS'"
+            );
+            int sldUploaded = stmt.executeUpdate(
+                "UPDATE lew_service_orders SET status = 'VISIT_COMPLETED' WHERE status = 'SLD_UPLOADED'"
+            );
+            int revRequested = stmt.executeUpdate(
+                "UPDATE lew_service_orders SET status = 'REVISIT_REQUESTED' WHERE status = 'REVISION_REQUESTED'"
+            );
+            int total = inProgress + sldUploaded + revRequested;
+            if (total > 0) {
+                log.info("Migration [lew-service-status-rename]: renamed {} rows " +
+                        "(IN_PROGRESS→VISIT_SCHEDULED={}, SLD_UPLOADED→VISIT_COMPLETED={}, " +
+                        "REVISION_REQUESTED→REVISIT_REQUESTED={})",
+                        total, inProgress, sldUploaded, revRequested);
+            } else {
+                log.debug("Migration [lew-service-status-rename]: no rows to rename");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): lew_service_visit_photos 테이블 생성.
+     */
+    private void createLewServiceVisitPhotosTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "lew_service_visit_photos")) {
+            log.debug("Migration [lew-service-visit-photos-table]: already exists, skipping");
+            return;
+        }
+        log.info("Migration [lew-service-visit-photos-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE lew_service_visit_photos (" +
+                "  photo_seq   BIGINT       NOT NULL AUTO_INCREMENT," +
+                "  order_seq   BIGINT       NOT NULL," +
+                "  file_seq    BIGINT       NOT NULL," +
+                "  caption     TEXT         NULL," +
+                "  uploaded_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)," +
+                "  deleted_at  DATETIME(6)  NULL," +
+                "  PRIMARY KEY (photo_seq)," +
+                "  KEY idx_lew_visit_photos_order (order_seq)," +
+                "  KEY idx_lew_visit_photos_file  (file_seq)," +
+                "  CONSTRAINT fk_lew_visit_photos_order " +
+                "    FOREIGN KEY (order_seq) REFERENCES lew_service_orders (lew_service_order_seq)," +
+                "  CONSTRAINT fk_lew_visit_photos_file " +
+                "    FOREIGN KEY (file_seq) REFERENCES files (file_seq)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [lew-service-visit-photos-table]: table created");
         }
     }
 

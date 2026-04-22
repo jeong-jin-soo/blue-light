@@ -20,6 +20,15 @@ export const lewServiceOrderApi = {
   rejectQuote: (id: number) =>
     api.post<LewServiceOrder>(`/lew-service-orders/${id}/reject-quote`).then(r => r.data),
 
+  /**
+   * 재방문 요청 — PR 3. 기존 requestRevision 엔드포인트 대체.
+   */
+  requestRevisit: (id: number, comment: string) =>
+    api.post<LewServiceOrder>(`/lew-service-orders/${id}/request-revisit`, { comment }).then(r => r.data),
+
+  /**
+   * @deprecated PR 3 — requestRevisit 사용 권장. 하위호환용으로 1 개월 유지.
+   */
   requestRevision: (id: number, comment: string) =>
     api.post<LewServiceOrder>(`/lew-service-orders/${id}/request-revision`, { comment }).then(r => r.data),
 

@@ -19,9 +19,9 @@ const STATUS_CONFIG: Record<LewServiceOrderStatus, { label: string; color: strin
   QUOTE_REJECTED: { label: 'Quote Rejected', color: 'bg-red-100 text-red-800' },
   PENDING_PAYMENT: { label: 'Pending Payment', color: 'bg-orange-100 text-orange-800' },
   PAID: { label: 'Paid', color: 'bg-green-100 text-green-800' },
-  IN_PROGRESS: { label: 'Visit Scheduled', color: 'bg-blue-100 text-blue-800' },
-  SLD_UPLOADED: { label: 'Report Ready for Review', color: 'bg-purple-100 text-purple-800' },
-  REVISION_REQUESTED: { label: 'Revisit Requested', color: 'bg-orange-100 text-orange-800' },
+  VISIT_SCHEDULED: { label: 'Visit Scheduled', color: 'bg-blue-100 text-blue-800' },
+  VISIT_COMPLETED: { label: 'Report Ready for Review', color: 'bg-purple-100 text-purple-800' },
+  REVISIT_REQUESTED: { label: 'Revisit Requested', color: 'bg-orange-100 text-orange-800' },
   COMPLETED: { label: 'Completed', color: 'bg-green-100 text-green-800' },
 };
 
@@ -34,6 +34,18 @@ function LewServiceStatusBadge({ status }: { status: LewServiceOrderStatus }) {
   );
 }
 
+function formatDateTime(iso?: string): string | null {
+  if (!iso) return null;
+  return new Date(iso).toLocaleString(undefined, {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 export default function LewServiceOrderDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -44,9 +56,9 @@ export default function LewServiceOrderDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<Record<string, string>>({});
 
-  // Revision request
-  const [showRevisionForm, setShowRevisionForm] = useState(false);
-  const [revisionComment, setRevisionComment] = useState('');
+  // Revisit request
+  const [showRevisitForm, setShowRevisitForm] = useState(false);
+  const [revisitComment, setRevisitComment] = useState('');
 
   // Confirm dialogs
   const [showAcceptConfirm, setShowAcceptConfirm] = useState(false);
@@ -79,13 +91,14 @@ export default function LewServiceOrderDetailPage() {
     fetchData();
   }, [fetchData]);
 
-  // Load PDF preview for SLD_UPLOADED / COMPLETED status
+  // Load PDF preview for visit report (VISIT_COMPLETED / COMPLETED)
+  const reportFileSeq = order?.visitReportFileSeq ?? order?.uploadedFileSeq;
   useEffect(() => {
-    if (!order?.uploadedFileSeq) return;
-    if (order.status !== 'SLD_UPLOADED' && order.status !== 'COMPLETED') return;
+    if (!reportFileSeq) return;
+    if (order?.status !== 'VISIT_COMPLETED' && order?.status !== 'COMPLETED') return;
 
     let revoked = false;
-    fileApi.getFilePreviewUrl(order.uploadedFileSeq).then((url) => {
+    fileApi.getFilePreviewUrl(reportFileSeq).then((url) => {
       if (!revoked) setPdfPreviewUrl(url);
     }).catch(() => { /* non-critical */ });
 
@@ -93,7 +106,7 @@ export default function LewServiceOrderDetailPage() {
       revoked = true;
       if (pdfPreviewUrl) window.URL.revokeObjectURL(pdfPreviewUrl);
     };
-  }, [order?.uploadedFileSeq, order?.status]);
+  }, [reportFileSeq, order?.status]);
 
   // ── Actions ──
 
@@ -119,17 +132,17 @@ export default function LewServiceOrderDetailPage() {
     finally { setActionLoading(false); }
   };
 
-  const handleRequestRevision = async () => {
-    if (!revisionComment.trim()) {
+  const handleRequestRevisit = async () => {
+    if (!revisitComment.trim()) {
       toast.error('Please tell your LEW what still needs attention');
       return;
     }
     setActionLoading(true);
     try {
-      await lewServiceOrderApi.requestRevision(orderId, revisionComment.trim());
+      await lewServiceOrderApi.requestRevisit(orderId, revisitComment.trim());
       toast.success('Revisit requested.');
-      setShowRevisionForm(false);
-      setRevisionComment('');
+      setShowRevisitForm(false);
+      setRevisitComment('');
       fetchData();
     } catch { toast.error('Failed to request a revisit'); }
     finally { setActionLoading(false); }
@@ -166,8 +179,30 @@ export default function LewServiceOrderDetailPage() {
 
   if (!order) return null;
 
+  const isOnSite = order.status === 'VISIT_SCHEDULED' && !!order.checkInAt;
+  const visitScheduledDisplay = formatDateTime(order.visitScheduledAt);
+  const checkInDisplay = formatDateTime(order.checkInAt);
+  const checkOutDisplay = formatDateTime(order.checkOutAt);
+
   return (
     <div className="space-y-6">
+      {/* ON_SITE sticky banner */}
+      {isOnSite && (
+        <div className="sticky top-0 z-10 -mx-4 sm:mx-0">
+          <div className="bg-blue-600 text-white shadow-lg p-3 sm:rounded-lg">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl" aria-hidden>&#128736;</span>
+              <div>
+                <p className="font-semibold">Your LEW is on site</p>
+                <p className="text-xs text-blue-100">
+                  {checkInDisplay ? `Checked in at ${checkInDisplay}` : 'Work in progress'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -328,8 +363,8 @@ export default function LewServiceOrderDetailPage() {
             </Card>
           )}
 
-          {/* LEW Service 방문형 리스키닝 PR 2 — Visit Schedule Card (applicant read-only) */}
-          {(order.status === 'PAID' || order.status === 'IN_PROGRESS') && (
+          {/* PAID / VISIT_SCHEDULED — Visit schedule card */}
+          {(order.status === 'PAID' || order.status === 'VISIT_SCHEDULED') && (
             <Card>
               {order.visitScheduledAt ? (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -337,14 +372,7 @@ export default function LewServiceOrderDetailPage() {
                     <span className="text-lg" aria-hidden>&#128197;</span>
                     <div>
                       <p className="text-sm font-medium text-blue-900">
-                        Your LEW will visit on {new Date(order.visitScheduledAt).toLocaleString(undefined, {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        Your LEW will visit on {visitScheduledDisplay}
                       </p>
                       {order.visitScheduleNote && (
                         <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
@@ -356,9 +384,9 @@ export default function LewServiceOrderDetailPage() {
                           Please make sure someone is available at the site at the scheduled time.
                         </p>
                       )}
-                      {order.status === 'IN_PROGRESS' && (
+                      {order.status === 'VISIT_SCHEDULED' && !isOnSite && (
                         <p className="text-xs text-blue-700 mt-2">
-                          Your LEW will submit a visit report after completing the on-site work.
+                          Your LEW will check in on arrival and submit a report after completing the work.
                         </p>
                       )}
                     </div>
@@ -379,11 +407,11 @@ export default function LewServiceOrderDetailPage() {
               ) : (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <span className="text-lg">&#128736;</span>
+                    <span className="text-lg">&#128197;</span>
                     <div>
-                      <p className="text-sm font-medium text-blue-800">On-site Visit In Progress</p>
+                      <p className="text-sm font-medium text-blue-800">Visit Scheduled</p>
                       <p className="text-xs text-blue-700 mt-1">
-                        Your LEW is working on the on-site visit. You'll be notified when the visit report is submitted.
+                        Waiting for your LEW to confirm the exact date &amp; time.
                       </p>
                     </div>
                   </div>
@@ -392,17 +420,25 @@ export default function LewServiceOrderDetailPage() {
             </Card>
           )}
 
-          {order.status === 'SLD_UPLOADED' && (
+          {/* VISIT_COMPLETED — Visit Report Viewer */}
+          {order.status === 'VISIT_COMPLETED' && (
             <Card>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Review Visit Report</h2>
               <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
                 <div className="flex items-start gap-3">
                   <span className="text-lg">&#128196;</span>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-purple-800">Visit report has been submitted</p>
                     <p className="text-xs text-purple-700 mt-1">
                       Please review the visit report and confirm completion, or request a revisit.
                     </p>
+                    {(checkInDisplay || checkOutDisplay) && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        {checkInDisplay && <>Checked in: {checkInDisplay}</>}
+                        {checkInDisplay && checkOutDisplay && <> &middot; </>}
+                        {checkOutDisplay && <>Checked out: {checkOutDisplay}</>}
+                      </p>
+                    )}
                   </div>
                 </div>
                 {order.managerNote && (
@@ -411,11 +447,11 @@ export default function LewServiceOrderDetailPage() {
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.managerNote}</p>
                   </div>
                 )}
-                {order.uploadedFileSeq && (
+                {reportFileSeq && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LewService_VisitReport')}
+                    onClick={() => handleDownloadFile(reportFileSeq, 'LewService_VisitReport')}
                   >
                     Download Visit Report
                   </Button>
@@ -434,14 +470,27 @@ export default function LewServiceOrderDetailPage() {
                 </div>
               )}
 
-              {/* Revision request form */}
-              {showRevisionForm ? (
+              {/* Visit photos gallery */}
+              {order.visitPhotos && order.visitPhotos.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Site Photos ({order.visitPhotos.length})
+                  </p>
+                  <VisitPhotoGallery
+                    photos={order.visitPhotos}
+                    onDownload={(fs) => handleDownloadFile(fs, 'LewService_SitePhoto')}
+                  />
+                </div>
+              )}
+
+              {/* Revisit request form */}
+              {showRevisitForm ? (
                 <div className="mt-4 space-y-3">
                   <Textarea
                     label="Revisit Details"
                     placeholder="What still needs attention? (e.g. additional socket didn't work, measurement missing)"
-                    value={revisionComment}
-                    onChange={(e) => setRevisionComment(e.target.value)}
+                    value={revisitComment}
+                    onChange={(e) => setRevisitComment(e.target.value)}
                     maxLength={2000}
                     rows={3}
                   />
@@ -449,15 +498,15 @@ export default function LewServiceOrderDetailPage() {
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={handleRequestRevision}
+                      onClick={handleRequestRevisit}
                       loading={actionLoading}
                     >
-                      Submit Revision Request
+                      Submit Revisit Request
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => { setShowRevisionForm(false); setRevisionComment(''); }}
+                      onClick={() => { setShowRevisitForm(false); setRevisitComment(''); }}
                     >
                       Cancel
                     </Button>
@@ -474,7 +523,7 @@ export default function LewServiceOrderDetailPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => setShowRevisionForm(true)}
+                    onClick={() => setShowRevisitForm(true)}
                   >
                     Request Revisit
                   </Button>
@@ -483,7 +532,7 @@ export default function LewServiceOrderDetailPage() {
             </Card>
           )}
 
-          {order.status === 'REVISION_REQUESTED' && (
+          {order.status === 'REVISIT_REQUESTED' && (
             <Card>
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <div className="flex items-start gap-3">
@@ -493,10 +542,12 @@ export default function LewServiceOrderDetailPage() {
                     <p className="text-xs text-orange-700 mt-1">
                       Your revisit request has been sent. Your LEW will reach out to arrange a follow-up visit.
                     </p>
-                    {order.revisionComment && (
+                    {(order.revisitComment || order.revisionComment) && (
                       <div className="mt-2 bg-white rounded p-2 border border-orange-100">
                         <p className="text-xs text-gray-500">What you asked to be addressed:</p>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.revisionComment}</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {order.revisitComment || order.revisionComment}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -515,12 +566,12 @@ export default function LewServiceOrderDetailPage() {
                     <p className="text-xs text-green-700 mt-1">
                       Your LEW Service order has been completed.
                     </p>
-                    {order.uploadedFileSeq && (
+                    {reportFileSeq && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="mt-2"
-                        onClick={() => handleDownloadFile(order.uploadedFileSeq!, 'LewService_VisitReport')}
+                        onClick={() => handleDownloadFile(reportFileSeq, 'LewService_VisitReport')}
                       >
                         Download Visit Report
                       </Button>
@@ -536,6 +587,17 @@ export default function LewServiceOrderDetailPage() {
                     title="Visit Report Preview"
                     className="w-full bg-white"
                     style={{ height: '500px' }}
+                  />
+                </div>
+              )}
+              {order.visitPhotos && order.visitPhotos.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Site Photos ({order.visitPhotos.length})
+                  </p>
+                  <VisitPhotoGallery
+                    photos={order.visitPhotos}
+                    onDownload={(fs) => handleDownloadFile(fs, 'LewService_SitePhoto')}
                   />
                 </div>
               )}
@@ -622,11 +684,45 @@ export default function LewServiceOrderDetailPage() {
         onClose={() => setShowCompleteConfirm(false)}
         onConfirm={handleConfirmCompletion}
         title="Confirm Completion"
-        message="Confirm that the uploaded LEW Service is complete and acceptable? This action cannot be undone. Once confirmed, no further revisions can be requested."
+        message="Confirm that the visit is complete and the report is acceptable? This action cannot be undone. Once confirmed, no further revisits can be requested."
         confirmLabel="Confirm Completion"
         variant="danger"
         loading={actionLoading}
       />
+    </div>
+  );
+}
+
+/**
+ * 방문 사진 썸네일 그리드 (PR 3).
+ */
+function VisitPhotoGallery({
+  photos,
+  onDownload,
+}: {
+  photos: NonNullable<LewServiceOrder['visitPhotos']>;
+  onDownload: (fileSeq: number) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+      {photos.map((p) => (
+        <button
+          key={p.photoSeq}
+          type="button"
+          onClick={() => onDownload(p.fileSeq)}
+          className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden border border-gray-200 hover:border-primary-400 transition-colors"
+          title={p.caption || 'Site photo'}
+        >
+          <div className="absolute inset-0 flex items-center justify-center text-3xl">
+            <span aria-hidden>&#128247;</span>
+          </div>
+          {p.caption && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1 truncate">
+              {p.caption}
+            </div>
+          )}
+        </button>
+      ))}
     </div>
   );
 }
