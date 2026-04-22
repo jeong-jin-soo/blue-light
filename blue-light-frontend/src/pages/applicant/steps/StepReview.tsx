@@ -14,7 +14,7 @@ interface FormData {
   existingExpiryDate: string;
   renewalPeriodMonths: number | null;
   renewalReferenceNo: string;
-  sldOption: 'SELF_UPLOAD' | 'REQUEST_LEW';
+  sldOption: 'SELF_UPLOAD' | 'SUBMIT_WITHIN_3_MONTHS' | 'REQUEST_LEW';
 }
 
 interface StepReviewProps {
@@ -118,6 +118,8 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
           }`}>
             {formData.sldOption === 'REQUEST_LEW'
               ? 'LEW will prepare the SLD for you'
+              : formData.sldOption === 'SUBMIT_WITHIN_3_MONTHS'
+              ? 'You will submit the SLD within 3 months'
               : 'You will upload the SLD yourself'}
           </span>
         </div>
@@ -130,6 +132,12 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
         {formData.sldOption === 'SELF_UPLOAD' && (
           <p className="text-xs text-gray-500 mt-1">
             You can upload your SLD from the application detail page after submission.
+          </p>
+        )}
+        {formData.sldOption === 'SUBMIT_WITHIN_3_MONTHS' && (
+          <p className="text-xs text-gray-500 mt-1">
+            EMA allows SLD submission within 3 months of the application.
+            We'll remind you as the deadline approaches.
           </p>
         )}
       </div>
