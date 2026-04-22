@@ -14,6 +14,9 @@ import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import com.bluelight.backend.service.application.ApplicantHintValidationResult;
+import com.bluelight.backend.service.application.ApplicantHintValidator;
+import com.bluelight.backend.service.application.NormalizedHints;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -47,6 +50,7 @@ class ApplicationServiceKvaTest {
     private FileRepository fileRepository;
     private AuditLogService auditLogService;
     private ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
+    private ApplicantHintValidator applicantHintValidator;
     private ApplicationService service;
 
     @BeforeEach
@@ -59,10 +63,17 @@ class ApplicationServiceKvaTest {
         fileRepository = mock(FileRepository.class);
         auditLogService = mock(AuditLogService.class);
         applicationDeclarationLogRepository = mock(ApplicationDeclarationLogRepository.class);
+        applicantHintValidator = mock(ApplicantHintValidator.class);
+        // 기본 stub — hint 미사용 테스트에서도 NPE 방지
+        when(applicantHintValidator.validateAndNormalize(any(), any(), any(), any(), any(), any()))
+                .thenReturn(ApplicantHintValidationResult.builder()
+                        .normalized(NormalizedHints.builder().build())
+                        .warnings(java.util.List.of())
+                        .build());
         service = new ApplicationService(
                 applicationRepository, sldRequestRepository, masterPriceRepository,
                 paymentRepository, userRepository, fileRepository, auditLogService,
-                applicationDeclarationLogRepository);
+                applicationDeclarationLogRepository, applicantHintValidator);
     }
 
     private CreateApplicationRequest baseReq(Integer kva, Boolean unknown) {

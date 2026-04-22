@@ -201,9 +201,35 @@ export default function AdminApplicationListPage() {
     {
       key: '_action',
       header: '',
-      width: '40px',
+      width: '120px',
       align: 'center',
-      render: () => <span className="text-gray-400">→</span>,
+      render: (app) => {
+        // P2.C — LEW + 본인에게 배정 + PENDING_REVIEW + CoF 미finalize 시 "Review" 링크 노출.
+        // 그 외는 기본 화살표로 상세 페이지(AdminApplicationDetailPage)로 이동.
+        const showReviewLink =
+          currentUser?.role === 'LEW' &&
+          app.assignedLewSeq === currentUser.userSeq &&
+          app.status === 'PENDING_REVIEW' &&
+          !app.cofFinalized;
+        if (showReviewLink) {
+          return (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/lew/applications/${app.applicationSeq}/review`);
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              Start CoF Review
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          );
+        }
+        return <span className="text-gray-400">→</span>;
+      },
     },
   ];
 
@@ -295,6 +321,22 @@ export default function AdminApplicationListPage() {
                 </span>
               </div>
             )}
+            {/* P2.C — LEW + 배정 + PENDING_REVIEW일 때 모바일 카드에도 Review 진입 버튼 */}
+            {currentUser?.role === 'LEW' &&
+              app.assignedLewSeq === currentUser.userSeq &&
+              app.status === 'PENDING_REVIEW' &&
+              !app.cofFinalized && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/lew/applications/${app.applicationSeq}/review`);
+                  }}
+                  className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100"
+                >
+                  Start CoF Review →
+                </button>
+              )}
           </div>
         )}
       />

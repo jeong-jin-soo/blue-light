@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS certificate_of_fitness (
 );
 ```
 
-**Application 쪽 추가 코드**: `Application.java`에 `@OneToOne(mappedBy = "application", cascade = {PERSIST, MERGE}, fetch = LAZY) private CertificateOfFitness certificateOfFitness;` 만 추가. 기존 컬럼 변경 없음.
+**Application 쪽 추가 코드**: `Application.java`에 `@OneToOne(mappedBy = "application", cascade = {PERSIST, MERGE}, fetch = LAZY) private CertificateOfFitness certificateOfFitness;` 추가. Application에 신청자 선택 hint 컬럼 추가(§5 참조). 기존 CoF 매핑 필드 이외 변경 없음.
 
 ## 3. API 엔드포인트 스펙
 
@@ -127,7 +127,58 @@ CREATE TABLE IF NOT EXISTS certificate_of_fitness (
 
 **REVISION 상호작용**: LEW가 Draft 저장 중 관리자가 REVISION_REQUESTED를 트리거할 수 없게 하거나, 트리거 시 CoF Draft는 보존하되 UI에서 "신청자 수정 대기 중"으로 Read-only 표시. finalize는 `PENDING_REVIEW` 상태에서만 허용.
 
-## 5. LEW Review Form UI 설계
+## 5. 신청자 선택 입력 모델 (Optional Prefill)
+
+**목적**: 신청자가 이미 알고 있는 CoF 관련 정보를 신청 단계에서 선택적으로 입력받아 LEW 검토 시간을 단축한다. 어떤 필드도 필수가 아니며, 신청 제출을 차단하지 않는다.
+
+### 5.1 핵심 UX 원칙
+
+- **필수 아님 명시**: 선택 섹션의 어떤 필드에도 `*`, "필수", "required" 표시 없음. 라벨과 help text 모두 "선택" 톤.
+- **빈 칸·부정확 허용**: 비워둬도 신청 제출 가능. 서버는 선택 필드 형식 검증을 **경고 수준**으로만 수행하고, 부적합 값은 저장 생략 + warning 반환, 신청 자체는 계속 진행.
+- **이득 부각 카피**: 섹션 제목은 "더 빠른 처리를 위한 선택 정보 (Optional, for faster review)" 형태.
+- **상단 안내 배너**: "아래는 LEW가 현장에서 확인하는 항목입니다. 미리 알고 계시면 입력해주세요 — 검토가 더 빨리 진행됩니다." (구체 수치는 TODO: 실제 처리시간 측정 후 반영)
+- **실시간 힌트**: 각 필드 help text에 "잘 모르시면 비워두셔도 돼요" 문구.
+- **부채감 제거**: 제출 완료 화면은 신청자가 **입력한 항목만** "제공됨" 배지로 요약 표시. 미입력 항목은 화면에 언급하지 않는다(부재 알림 없음).
+
+### 5.2 신청자가 입력 가능한 필드
+
+| 필드 | 제공 여부 | 이유 |
+|---|---|---|
+| MSSL Account No | 신청자 선택 | SP 고지서에 있음, 기존 `spAccountNo` 필드 재활용 |
+| Supply Voltage | 신청자 선택 | 230V(1P) / 400V(3P)는 kVA로 추정 가능 |
+| Consumer Type | 신청자 선택 | kVA≥45 → Contestable 기본값 자동 추정, 본인 확정 가능 |
+| Retailer | 신청자 선택 | 본인 계약 리테일러 앎 |
+| Has Generator / Capacity kVA | 신청자 선택 | 본인 설비, 가장 잘 앎 |
+| Approved Load kVA | prefill만 | 기존 `selectedKva` 재사용, 별도 입력 없음 |
+| Inspection Interval | ❌ LEW 전용 | 규정·현장 판단 |
+| LEW Appointment Date / Consent Date | ❌ LEW 전용 | LEW 서명 행위 |
+
+### 5.3 데이터 저장 위치
+
+- 신청자가 입력한 값은 **`Application` 엔티티**에 별도 prefill 컬럼으로 저장한다. CoF 엔티티와 분리 — CoF 레코드는 LEW finalize 시에만 insert된다(§3 유지).
+- 새 컬럼(모두 NULLABLE, CHECK 제약 없음 — 부정확 허용):
+  - `applicant_mssl_hint_enc` / `applicant_mssl_hint_hmac` / `applicant_mssl_hint_last4` — 기존 `sp_account_no*` 컬럼이 있다면 의미 승격하여 재활용(§11 참조)
+  - `applicant_supply_voltage_hint` (INT)
+  - `applicant_consumer_type_hint` (VARCHAR(20))
+  - `applicant_retailer_hint` (VARCHAR(32))
+  - `applicant_has_generator_hint` (BOOLEAN)
+  - `applicant_generator_capacity_hint` (INT)
+- LEW Review Form Step 2 로드 시 이 hint 값을 **CoF Draft 초기값으로 prefill**. LEW는 자유롭게 덮어쓸 수 있다.
+- UI에 "신청자 기입값" 배지로 출처 표시. LEW가 값을 변경한 순간 배지는 "신청자 기입값(수정됨)"으로 전환.
+
+### 5.4 제출 시 서버 검증 (경고 수준)
+
+- 형식 정합성만 검증 (예: MSSL regex `^\d{3}-\d{2}-\d{4}-\d$`, voltage는 230/400/6600/22000).
+- 검증 실패 필드는 저장하지 않고 응답 `warnings[]` 배열에 `{ field, reason }` 포함. 신청은 계속 성공(200 OK).
+- 전체 비즈니스 검증(필수/조합)은 LEW finalize 단계에서만 강제(§3.3).
+
+### 5.5 DTO 변경
+
+- `CreateApplicationRequest` / `UpdateApplicationRequest`에 §5.2의 선택 필드 전부 nullable로 추가.
+- APPLICANT는 CoF 엔티티를 직접 수정할 수 없는 기존 정책 유지. 대신 Application의 hint 컬럼만 수정 가능.
+- `ApplicationResponse`에 hint 값을 포함하되 MSSL은 신청자 본인에게도 마스킹 표시(§6 PDPA 정책 동일 적용).
+
+## 6. LEW Review Form UI 설계
 
 **접근 경로**: `/lew/applications/:id/review`. LEW 대시보드 "내 배정 신청" 리스트에서 항목 클릭 시 진입. 3-step 스텝퍼.
 
@@ -137,7 +188,10 @@ CREATE TABLE IF NOT EXISTS certificate_of_fitness (
 - "다음" 클릭 시 Step 2로.
 
 ### Step 2 — Certificate of Fitness Inputs (CoF 10 필드)
-- **MSSL Account No**: 4개 개별 input (`3-2-4-1`자리) + 자동 포맷팅 + 공란 허용("모른다" 토글: 확정 시 에러). 기존에 신청자가 선택적으로 입력한 `spAccountNo`가 있으면 파싱하여 prefill.
+
+**공통**: Step 2 로드 시 §5.3의 Application hint 컬럼 값(MSSL/Supply Voltage/Consumer Type/Retailer/Has Generator/Generator Capacity)을 CoF Draft 초기값으로 prefill. prefill된 필드 라벨 옆에 "신청자 기입값" 배지 표시. LEW가 해당 필드를 편집한 순간 배지는 "신청자 기입값(수정됨)"으로 전환.
+
+- **MSSL Account No**: 4개 개별 input (`3-2-4-1`자리) + 자동 포맷팅 + 공란 허용("모른다" 토글: 확정 시 에러). 신청자 hint(`applicant_mssl_hint_*`)가 있으면 파싱하여 prefill.
 - **Consumer Type**: 라디오 2개(Non-contestable 기본). (복잡도 L)
 - **Retailer**: 드롭다운. Non-contestable 선택 시 `SP_SERVICES_LIMITED` 고정·비활성. Contestable 선택 시 마스터(SP Services, Keppel Electric, Tuas Power Supply, Sembcorp Power, Geneco, Senoko Energy Supply, Best Electricity, PacificLight Energy, Diamond Electric, Union Power, Sunseap Energy, 기타) 확장.
 - **Supply Voltage**: 드롭다운(230V / 400V / 6.6kV / 22kV).
@@ -160,7 +214,7 @@ CREATE TABLE IF NOT EXISTS certificate_of_fitness (
 - Draft Save는 Step 2 내 어느 시점에서도 가능(모든 필드 선택적).
 - Finalize는 필수 필드 누락 시 비활성(버튼 disabled + 사유 툴팁).
 
-## 6. PDPA·보안 고려사항
+## 7. PDPA·보안 고려사항
 
 - **MSSL 저장 패턴**: `ema-pdpa-assessment.md` §9(①) — AES-256-GCM 암호문(앞 12자리) + HMAC-SHA256 검색 해시 + 뒤 4자리 평문. `@Convert(converter = EncryptedStringConverter.class)` 재사용. FIELD_ENCRYPTION_KEY 별도 키.
 - **Access Control**: `/api/lew/**` 전용 경로로 분리하여 `/api/admin/**` 공유 혼선 차단. `@appSec.isAssignedLew(#id, auth)` 공통 SpEL 컴포넌트 신설(ConciergeOwnershipValidator 패턴 재사용).
@@ -169,16 +223,16 @@ CREATE TABLE IF NOT EXISTS certificate_of_fitness (
 - **낙관적 락**: 동일 신청을 다른 기기에서 동시 편집 시 `version` 충돌 시 409 + 클라이언트 재로드 유도.
 - **소프트 삭제**: 신청 삭제 시 CoF는 함께 소프트 삭제하되, 감사 로그로 사유 기록.
 
-## 7. Phase 계획
+## 8. Phase 계획
 
-- **P1 (Backend Core, ~1 sprint, 복잡도 중)**: `CertificateOfFitness` 엔티티 + schema migration + `AuditAction` 확장 + `AppSecurity.isAssignedLew` 공통 컴포넌트 + GET/PUT/finalize API + DTO 3종 + `Application.changeStatusToPendingPayment()` 재사용.
-- **P2 (LEW UI, ~1 sprint, 복잡도 중)**: LEW Review Form 3-step + LEW 배정 대시보드 링크 + 상태 머신 선택안 A 적용 + 신청자 조회 화면에 "CoF 발급됨" 배지.
+- **P1 (Backend Core, ~1 sprint, 복잡도 중)**: `CertificateOfFitness` 엔티티 + schema migration + `AuditAction` 확장 + `AppSecurity.isAssignedLew` 공통 컴포넌트 + GET/PUT/finalize API + DTO 3종 + `Application.changeStatusToPendingPayment()` 재사용 + **Application hint 컬럼 추가 및 경고 수준 검증 서비스(§5.3·§5.4)**.
+- **P2 (LEW UI, ~1 sprint, 복잡도 중)**: LEW Review Form 3-step + LEW 배정 대시보드 링크 + 상태 머신 선택안 A 적용 + 신청자 조회 화면에 "CoF 발급됨" 배지 + **신청자 NewApplicationPage 선택 섹션(Optional Prefill) 구축 및 제출 완료 화면 부채감 제거 로직(§5.1)**.
 - **P3 (폴리시/마스터, ~0.5 sprint, 복잡도 하)**: Retailer 마스터 데이터 (ENUM 상수 + 관리자 조회 UI), Consumer Type 자동 추정(45kVA 이상→Contestable 기본값), MSSL unmask 로그 뷰어, Generator 용량 가이드 툴팁.
 
-## 8. Acceptance Criteria
+## 9. Acceptance Criteria
 
-1. APPLICANT가 보는 어떤 화면에도 Supply Voltage/Consumer Type/Retailer/Inspection Interval/LEW Consent Date/LEW Appointment Date/Generator 용량 입력 컨트롤이 존재하지 않는다.
-2. `PUT /api/applications/{id}` (신청자 PATCH)로 CoF 필드 중 어느 것도 수정될 수 없다(DTO 화이트리스트에 부재).
+1. APPLICANT가 보는 어떤 화면에도 Inspection Interval / LEW Consent Date / LEW Appointment Date 입력 컨트롤이 존재하지 않는다. Supply Voltage/Consumer Type/Retailer/Generator 용량은 **§5 선택 섹션에서만** 입력 가능하며 필수 표시가 없다.
+2. `PUT /api/applications/{id}` (신청자 PATCH)로 CoF 엔티티 필드는 수정될 수 없다. 단 §5.3의 Application hint 컬럼은 신청자가 수정할 수 있다(DTO 화이트리스트에 한정).
 3. LEW가 배정되지 않은 다른 신청 `{id}`에 `GET/PUT/POST /api/lew/applications/{id}/cof` 시도 시 403.
 4. ADMIN이 `/api/admin/applications/{id}`를 호출하면 MSSL이 `***-**-****-NNNN` 형태로 마스킹되고, 평문 조회는 `mssl/unmask` 경로에서만 가능하며 `MSSL_UNMASKED_VIEW` 감사 로그가 기록된다.
 5. CoF finalize 이후 동일 엔드포인트 재호출 시 409 반환하고 `certified_at`·`certified_by_lew_seq`는 변경되지 않는다.
@@ -190,17 +244,24 @@ CREATE TABLE IF NOT EXISTS certificate_of_fitness (
 11. CoF 엔티티에 `@SQLRestriction("deleted_at IS NULL")` + `@SQLDelete` soft delete 패턴이 적용된다.
 12. 동시 편집 시 `version` 충돌은 409 + 에러 코드 `COF_VERSION_CONFLICT`를 반환한다.
 13. ema-field-jit-plan.md §4의 10개 필드 전원이 본 스펙의 CertificateOfFitness에 매핑된다.
+14. 신청자가 §5 선택 섹션의 모든 필드를 비워도 신청 제출이 200 OK로 성공한다.
+15. 신청 폼 UI에 필수 표시(`*`, 'required', '필수')가 §5 선택 섹션 어디에도 나타나지 않는다(DOM·스크린리더 텍스트 포함).
+16. §5 선택 필드에 형식 오류가 있는 값을 제출해도 신청은 200 OK로 성공하며, 해당 필드만 저장되지 않고 응답 `warnings[]`에 사유가 담긴다(클라이언트는 경고 토스트 표시).
+17. 제출 완료 화면은 신청자가 **입력한 §5 항목만** "제공됨" 배지로 표시하고, 미입력 항목은 화면 어디에도 언급되지 않는다.
+18. LEW Review Form Step 2 로드 시, 신청자가 입력한 hint 값이 CoF Draft 초기값으로 prefill되며 각 필드에 "신청자 기입값" 배지가 표시된다.
+19. LEW가 prefill된 값을 편집한 순간 해당 필드의 배지는 "신청자 기입값(수정됨)"으로 변경된다.
 
-## 9. 마이그레이션 전략
+## 10. 마이그레이션 전략
 
 - **이미 COMPLETED / IN_PROGRESS / PAID 상태인 legacy Application**: CoF 레코드 없음(null). UI에서 "CoF Pre-LicenseKaki(수기 기록)" 배지 표시. `Application.legacy_ema_submitted = TRUE` 플래그를 새로 추가하여 finalize 우회(이미 외부 시스템에서 확정). P3 이후 optional "재확인" 플로우에서 LEW가 사후 기입 가능하지만 `certified_at`은 수기 입력 허용.
 - **PENDING_REVIEW 상태인 inflight Application**: LEW가 배정되어 있으면 CoF Draft를 새로 만들어 채우도록 강제. PENDING_PAYMENT 전이 조건이 "CoF finalized OR legacy_ema_submitted"로 병합된다.
 - **schema.sql 업데이트 + 기존 `resources/db/migration/`의 Flyway 컨벤션 재사용** (예: `V_2026_04_22__add_certificate_of_fitness.sql`).
 
-## 10. 의존 작업
+## 11. 의존 작업
 
 - **LOA 스냅샷 정책**: 기존 `applications.loa_*_snapshot @Column(updatable=false)` 패턴을 유지. CoF는 LOA와 독립이며, LOA 발급 후에도 CoF는 Draft 가능(역순서 발생). 단, finalize 시 LOA가 존재하지 않으면 경고 레벨 로그.
 - **OwnershipValidator 재사용**: `ConciergeOwnershipValidator` 구조를 참조하여 `ApplicationAssignmentValidator` (또는 `AppSecurity.isAssignedLew`) 공통 빈 신설. 기존 `@PreAuthorize` 패턴 유지.
 - **AuditAction 확장**: `AuditService` 시그니처 변경 없이 enum 상수 추가. 기존 `APPLICATION_UPDATED`의 세분화 정책(ema-pdpa-assessment.md §4)과 일관.
 - **SecurityConfig**: `/api/lew/**` 경로가 HttpSecurity matcher에 `hasRole("LEW")` 으로 등록되어 있어야 하며, 현재 `/api/admin/**`가 LEW에게도 허용된 H-4 이슈(kaki-concierge-security-review §H-4)와 별개로 선행 수정 필요.
 - **프런트 공통 컴포넌트**: MSSL 4-part input은 신청자 측 "알면 입력" 필드(ema-field-jit-plan.md §6 P2 범위)와 **동일 컴포넌트 재사용**이 가능하도록 `MsslAccountInput.tsx` 독립 컴포넌트로 설계.
+- **기존 `spAccountNo` 필드(optional) 재활용**: 신청자 측 MSSL hint로 의미를 승격하여 §5.3의 `applicant_mssl_hint_*` 3종 컬럼으로 이관한다. 마이그레이션 스크립트는 기존 데이터(평문/암호화 여부에 따라)를 보존하여 복사하고, 이관 완료 검증 후 레거시 컬럼 제거는 별도 릴리즈에서 수행(무손실 원칙).

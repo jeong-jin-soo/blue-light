@@ -154,6 +154,23 @@ public class CreateApplicationRequest {
     @Size(max = 64)
     private String formSnapshotHash;
 
+    // ── P1.B: LEW Review Form hint 필드 (스펙 §5.3·§5.4·§5.5) ──
+    // 모두 optional. @Pattern/@Size 같은 엄격 검증을 쓰지 않는다 — 형식 오류는 ApplicantHintValidator가
+    // warning-only로 처리 (신청 200 OK 유지, 부적합 값은 저장 생략 + 응답 warnings[]).
+
+    /** MSSL Account No 평문 힌트 (예: "123-45-6789-0"). 저장 시 enc/hmac/last4로 분리. */
+    private String msslHint;
+    /** 공급 전압 힌트(V): 230/400/6600/22000 권장. 밖의 값은 경고. */
+    private Integer supplyVoltageHint;
+    /** Consumer Type 힌트: "NON_CONTESTABLE" | "CONTESTABLE". */
+    private String consumerTypeHint;
+    /** Retailer 힌트: RetailerCode enum 문자열. */
+    private String retailerHint;
+    /** 발전기 보유 여부 힌트. */
+    private Boolean hasGeneratorHint;
+    /** 발전기 용량 힌트(kVA). */
+    private Integer generatorCapacityHint;
+
     /**
      * Bean Validation 조건부 검증 — applicantType=CORPORATE인데 companyInfo가 누락된 경우를
      * 탐지한다. 단, User에 이미 companyName이 있는 케이스는 여기서 알 수 없으므로 서비스

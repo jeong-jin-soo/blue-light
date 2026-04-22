@@ -39,4 +39,13 @@ public class UpdateApplicationRequest {
      * 갱신 기간 수정 (Admin/LEW, 3 or 12)
      */
     private Integer renewalPeriodMonths;
+
+    // ── P1.B: LEW Review Form hint 필드 (스펙 §5.3·§5.5) ──
+    // 재제출 시에도 신청자는 hint를 수정할 수 있다. 모두 optional + warning-only 검증.
+    private String msslHint;
+    private Integer supplyVoltageHint;
+    private String consumerTypeHint;
+    private String retailerHint;
+    private Boolean hasGeneratorHint;
+    private Integer generatorCapacityHint;
 }

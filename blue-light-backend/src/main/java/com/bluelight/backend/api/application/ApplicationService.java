@@ -30,6 +30,9 @@ import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
+import com.bluelight.backend.service.application.ApplicantHintValidationResult;
+import com.bluelight.backend.service.application.ApplicantHintValidator;
+import com.bluelight.backend.service.application.NormalizedHints;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -60,6 +63,8 @@ public class ApplicationService {
     private final FileRepository fileRepository;
     private final AuditLogService auditLogService;
     private final ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
+    /** P1.B — LEW Review Form 신청자 hint 경고 수준 검증. */
+    private final ApplicantHintValidator applicantHintValidator;
 
     /** Declaration 문서 버전 상수 — 문구가 바뀌면 증가시켜 법적 증거 체인을 분리한다. */
     private static final String DECLARATION_DOCUMENT_VERSION = "2026-04-declaration-v1";
@@ -288,10 +293,30 @@ public class ApplicationService {
             log.info("LEW auto-assigned: lewSeq={}", eligibleLews.get(0).getUserSeq());
         }
 
+        // ── P1.B: 신청자 hint 경고 수준 검증 + 엔티티 반영 ──
+        // Application.builder에 hint를 넣지 않고 save 전에 updateApplicantHints() 호출.
+        // 빌더 파라미터 폭발 억제 + hint 재계산이 변경 시 재사용 가능.
+        ApplicantHintValidationResult hintResult = applicantHintValidator.validateAndNormalize(
+                request.getMsslHint(),
+                request.getSupplyVoltageHint(),
+                request.getConsumerTypeHint(),
+                request.getRetailerHint(),
+                request.getHasGeneratorHint(),
+                request.getGeneratorCapacityHint());
+        NormalizedHints nh = hintResult.getNormalized();
+        application.updateApplicantHints(
+                nh.getMsslEnc(), nh.getMsslHmac(), nh.getMsslLast4(),
+                nh.getSupplyVoltage(), nh.getConsumerType(), nh.getRetailer(),
+                nh.getHasGenerator(), nh.getGeneratorCapacity());
+
         Application saved = applicationRepository.save(application);
         log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, sldFee={}, sldOption={}",
                 saved.getApplicationSeq(), appType, userSeq,
                 request.getSelectedKva(), quoteAmount, sldFee, sldOption);
+        if (hintResult.hasWarnings()) {
+            log.info("Applicant hint warnings on create: applicationSeq={}, count={}",
+                    saved.getApplicationSeq(), hintResult.getWarnings().size());
+        }
 
         // C.1: Snapshot-at-submit — Application을 "신청 당시 정본"으로 격상
         // JIT 결과(applyCorporateJitCompanyInfo)가 User에 반영됐든 persistToProfile=false로 반영 안 됐든
@@ -312,7 +337,7 @@ public class ApplicationService {
         // 신청서 제출은 법적 선언에 해당하므로 3개 그룹 각각 한 행씩 불변 기록.
         recordApplicationDeclarations(saved, user, request, clientIp, userAgent);
 
-        return ApplicationResponse.from(saved);
+        return ApplicationResponse.from(saved).withWarnings(hintResult.getWarnings());
     }
 
     /**
@@ -622,6 +647,20 @@ public class ApplicationService {
             log.info("LEW auto-assigned on-behalf: lewSeq={}", eligibleLewsOnBehalf.get(0).getUserSeq());
         }
 
+        // ── P1.B: Concierge 대리 생성 경로도 동일 hint 검증 + 반영 ──
+        ApplicantHintValidationResult hintResultObo = applicantHintValidator.validateAndNormalize(
+                request.getMsslHint(),
+                request.getSupplyVoltageHint(),
+                request.getConsumerTypeHint(),
+                request.getRetailerHint(),
+                request.getHasGeneratorHint(),
+                request.getGeneratorCapacityHint());
+        NormalizedHints nhObo = hintResultObo.getNormalized();
+        application.updateApplicantHints(
+                nhObo.getMsslEnc(), nhObo.getMsslHmac(), nhObo.getMsslLast4(),
+                nhObo.getSupplyVoltage(), nhObo.getConsumerType(), nhObo.getRetailer(),
+                nhObo.getHasGenerator(), nhObo.getGeneratorCapacity());
+
         Application saved = applicationRepository.save(application);
         log.info("Application created ON-BEHALF: seq={}, targetApplicantSeq={}, conciergeRequestSeq={}, type={}, kva={}, amount={}",
                 saved.getApplicationSeq(), targetApplicantSeq, conciergeRequestSeq, appType,
@@ -640,7 +679,7 @@ public class ApplicationService {
             log.info("SLD request auto-created on-behalf: applicationSeq={}", saved.getApplicationSeq());
         }
 
-        return ApplicationResponse.from(saved);
+        return ApplicationResponse.from(saved).withWarnings(hintResultObo.getWarnings());
     }
 
     /**
@@ -711,13 +750,31 @@ public class ApplicationService {
             application.updateSpAccountNo(request.getSpAccountNo());
         }
 
+        // ── P1.B: 재제출 시에도 신청자 hint를 갱신할 수 있다 (스펙 §5·§5.5) ──
+        ApplicantHintValidationResult hintResult = applicantHintValidator.validateAndNormalize(
+                request.getMsslHint(),
+                request.getSupplyVoltageHint(),
+                request.getConsumerTypeHint(),
+                request.getRetailerHint(),
+                request.getHasGeneratorHint(),
+                request.getGeneratorCapacityHint());
+        NormalizedHints nh = hintResult.getNormalized();
+        application.updateApplicantHints(
+                nh.getMsslEnc(), nh.getMsslHmac(), nh.getMsslLast4(),
+                nh.getSupplyVoltage(), nh.getConsumerType(), nh.getRetailer(),
+                nh.getHasGenerator(), nh.getGeneratorCapacity());
+
         // Auto-transition status back to PENDING_REVIEW
         application.resubmit();
 
         log.info("Application updated and resubmitted: applicationSeq={}, userSeq={}",
                 applicationSeq, userSeq);
+        if (hintResult.hasWarnings()) {
+            log.info("Applicant hint warnings on update: applicationSeq={}, count={}",
+                    applicationSeq, hintResult.getWarnings().size());
+        }
 
-        return ApplicationResponse.from(application);
+        return ApplicationResponse.from(application).withWarnings(hintResult.getWarnings());
     }
 
     /**

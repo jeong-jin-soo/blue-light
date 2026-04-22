@@ -126,10 +126,8 @@ export function validateApplicationStep1(formData: ApplicationFormData): Record<
     errors.postalCode = 'Postal code must be 6 digits (Singapore format)';
   }
 
-  // SP Account No: optional but if provided, validate format
-  if (formData.spAccountNo.trim() && !minLength(formData.spAccountNo, 3)) {
-    errors.spAccountNo = 'SP Account number seems too short';
-  }
+  // P2.A: spAccountNo (legacy)는 msslHint로 통합되었고, hint 검증은 서버 warning-only이므로
+  // 클라이언트 차단 없음. 어떤 hint 필드도 유효성 검증으로 신청을 막지 않는다(스펙 §5.1).
 
   return errors;
 }

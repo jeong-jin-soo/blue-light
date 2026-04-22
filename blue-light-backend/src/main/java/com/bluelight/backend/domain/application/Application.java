@@ -1,6 +1,7 @@
 package com.bluelight.backend.domain.application;
 
 import com.bluelight.backend.common.crypto.EncryptedStringConverter;
+import com.bluelight.backend.domain.cof.CertificateOfFitness;
 import com.bluelight.backend.domain.common.BaseEntity;
 import com.bluelight.backend.domain.user.User;
 import jakarta.persistence.*;
@@ -409,6 +410,56 @@ public class Application extends BaseEntity {
     @Column(name = "correspondence_address_postal_code", length = 10)
     private String correspondenceAddressPostalCode;
 
+    // ── LEW Review Form — Applicant Hint 컬럼 (P1.B, 스펙 §5.3) ──
+    // 신청자가 "알면 선택적으로" 입력하는 CoF 관련 힌트. 모두 nullable, CHECK 제약 없음.
+    // LEW Review Form Step 2에서 CoF Draft 초기값으로 prefill되는 용도.
+    // 형식·범위 오류는 경고 수준(ApplicantHintValidator) — 신청 자체는 저장 후 200 OK.
+    // 기존 {@link #spAccountNo}는 legacy 유지, 신규 hint 컬럼과 병행 운영.
+
+    /** MSSL Account No 앞 12자리 암호문(v1:BASE64...) — 신청자 hint. */
+    @Convert(converter = com.bluelight.backend.common.crypto.EncryptedStringConverter.class)
+    @Column(name = "applicant_mssl_hint_enc", length = 255)
+    private String applicantMsslHintEnc;
+
+    /** MSSL Account No 전체의 HMAC-SHA256 검색 해시(64자 hex) — 신청자 hint. */
+    @Convert(converter = com.bluelight.backend.common.crypto.HmacStringConverter.class)
+    @Column(name = "applicant_mssl_hint_hmac", length = 64)
+    private String applicantMsslHintHmac;
+
+    /** MSSL Account No 뒤 4자리 평문 — 마스킹 UI 표시용. */
+    @Column(name = "applicant_mssl_hint_last4", length = 4)
+    private String applicantMsslHintLast4;
+
+    /** 공급 전압 힌트(V). 형식 무효 시 저장 안 됨(경고). */
+    @Column(name = "applicant_supply_voltage_hint")
+    private Integer applicantSupplyVoltageHint;
+
+    /** Consumer Type 힌트(Enum 문자열). 형식 무효 시 저장 안 됨. */
+    @Column(name = "applicant_consumer_type_hint", length = 20)
+    private String applicantConsumerTypeHint;
+
+    /** Retailer 힌트(Enum 문자열). 형식 무효 시 저장 안 됨. */
+    @Column(name = "applicant_retailer_hint", length = 32)
+    private String applicantRetailerHint;
+
+    /** 발전기 보유 힌트. */
+    @Column(name = "applicant_has_generator_hint")
+    private Boolean applicantHasGeneratorHint;
+
+    /** 발전기 용량 힌트(kVA). hasGenerator=false여도 저장 허용(경고), LEW finalize에서만 엄격 차단. */
+    @Column(name = "applicant_generator_capacity_hint")
+    private Integer applicantGeneratorCapacityHint;
+
+    // ── LEW Review Form — Certificate of Fitness 매핑 (P1.A) ──
+
+    /**
+     * Certificate of Fitness (1:1). 신청 당시에는 null, LEW Draft Save 시 생성.
+     * <p>owning side는 {@link CertificateOfFitness#getApplication()} — 여기는 mappedBy로 inverse.</p>
+     * <p>cascade = PERSIST, MERGE — Application 저장 시 CoF도 함께 저장/갱신 (삭제는 soft delete 각자).</p>
+     */
+    @OneToOne(mappedBy = "application", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
+    private CertificateOfFitness certificateOfFitness;
+
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
@@ -535,6 +586,35 @@ public class Application extends BaseEntity {
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.sldFee = sldFee;
+    }
+
+    // ── LEW Review Form — Applicant Hint 도메인 메서드 (P1.B, 스펙 §5.3) ──
+
+    /**
+     * 신청자 힌트(CoF 관련 prefill 정보)를 일괄 갱신한다.
+     * <p>모든 인자는 nullable. null은 "변경하지 않음"이 아니라 "해당 필드를 null로 세팅"을 의미한다
+     * (서비스 레이어의 {@code ApplicantHintValidator}가 경고 수준으로 정상화한 후 호출).</p>
+     *
+     * <p>MSSL 3종(enc/hmac/last4)는 평문을 그대로 받지 않고 서비스에서 분리해서 전달한다
+     * (평문을 DB까지 가져가지 않는 원칙 — {@code EncryptedStringConverter}가 저장 직전
+     * 컬럼 단위에서만 암호화하므로, 엔티티 속성에 평문을 두면 메모리에 잔존).</p>
+     */
+    public void updateApplicantHints(String msslHintEnc,
+                                     String msslHintHmac,
+                                     String msslHintLast4,
+                                     Integer supplyVoltageHint,
+                                     String consumerTypeHint,
+                                     String retailerHint,
+                                     Boolean hasGeneratorHint,
+                                     Integer generatorCapacityHint) {
+        this.applicantMsslHintEnc = msslHintEnc;
+        this.applicantMsslHintHmac = msslHintHmac;
+        this.applicantMsslHintLast4 = msslHintLast4;
+        this.applicantSupplyVoltageHint = supplyVoltageHint;
+        this.applicantConsumerTypeHint = consumerTypeHint;
+        this.applicantRetailerHint = retailerHint;
+        this.applicantHasGeneratorHint = hasGeneratorHint;
+        this.applicantGeneratorCapacityHint = generatorCapacityHint;
     }
 
     // ── Phase 5: kVA 확정 도메인 메서드 ──

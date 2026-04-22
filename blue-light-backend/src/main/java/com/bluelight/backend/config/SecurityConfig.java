@@ -87,6 +87,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/admin/applications/*/loa/upload-signature")
                         .hasAnyRole("CONCIERGE_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // ── LEW Review Form (P1.B, lew-review-form-spec.md §7) ──
+                        // /api/lew/** 는 LEW 전용 경로. /api/admin/** 의 LEW 공유 이슈(H-4)와 별개로
+                        // URL 단에서 역할 필터링하고, 배정 여부 검증은 메서드 @PreAuthorize("@appSec.isAssignedLew(...)")로.
+                        .requestMatchers("/api/lew/**").hasRole("LEW")
                         // Admin/LEW/SystemAdmin 경로 (URL-level defense-in-depth)
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
                         // SLD Manager 경로

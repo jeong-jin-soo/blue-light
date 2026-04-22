@@ -10,6 +10,7 @@ import { ApplicantTypeCard } from '../../components/applicant/ApplicantTypeCard'
 import { CompanyInfoModal } from '../../components/applicant/CompanyInfoModal';
 import { KvaTipBox } from '../../components/applicant/KvaTipBox';
 import { KvaPriceCard } from '../../components/applicant/KvaPriceCard';
+import { OptionalFastTrackSection } from '../../components/applicant/OptionalFastTrackSection';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
@@ -27,6 +28,7 @@ import {
 } from '../../utils/validation';
 import type { MasterPrice, PriceCalculation, Application, ApplicantType, ApplicationType, CreateApplicationRequest, CompanyInfo } from '../../types';
 import { BUILDING_TYPES, KVA_UNKNOWN_SENTINEL } from '../../constants/orderFormOptions';
+import { normalizeMsslHint, type ConsumerType, type RetailerCode } from '../../constants/cof';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
@@ -72,6 +74,13 @@ interface FormData {
   correspondenceBuilding: string;
   correspondencePostalCode: string;
   landlordEiLicenceNo: string;          // NEW + 임대 시 Step 4에서 수집
+  // ── P2.A: Optional fast-track hint 필드 (모두 optional, 서버 warning-only) ──
+  msslHint: string;                     // "AAA-BB-CCCC-D" 포맷 문자열. 빈 값 허용.
+  supplyVoltageHint?: number;
+  consumerTypeHint?: ConsumerType;
+  retailerHint?: RetailerCode;
+  hasGeneratorHint: boolean;
+  generatorCapacityHint?: number;
 }
 
 export default function NewApplicationPage() {
@@ -123,6 +132,13 @@ export default function NewApplicationPage() {
     correspondenceBuilding: '',
     correspondencePostalCode: '',
     landlordEiLicenceNo: '',
+    // P2.A — 전 hint 필드 빈 값으로 시작 (신청자가 펼치지 않으면 그대로 비어 있음)
+    msslHint: '',
+    supplyVoltageHint: undefined,
+    consumerTypeHint: undefined,
+    retailerHint: undefined,
+    hasGeneratorHint: false,
+    generatorCapacityHint: undefined,
   });
 
   // Price data
@@ -137,8 +153,8 @@ export default function NewApplicationPage() {
   // Form leave guard — warn when navigating away with unsaved data
   const isFormDirty = useMemo(() => {
     if (showGuide || submitting) return false;
-    return !!(formData.address || formData.postalCode || formData.spAccountNo || formData.selectedKva || formData.kvaUnknown);
-  }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva, formData.kvaUnknown]);
+    return !!(formData.address || formData.postalCode || formData.msslHint || formData.selectedKva || formData.kvaUnknown);
+  }, [showGuide, submitting, formData.address, formData.postalCode, formData.msslHint, formData.selectedKva, formData.kvaUnknown]);
   useFormGuard(isFormDirty);
 
   // 폼 자동 저장 — sessionStorage 기반 (새로고침 시 복원)
@@ -263,6 +279,12 @@ export default function NewApplicationPage() {
   const buildPayload = (companyInfo?: CompanyInfo): CreateApplicationRequest | null => {
     // Phase 5: kvaUnknown 시 selectedKva는 placeholder 45 — 서버가 강제 덮어쓰지만 미리 세팅
     if (!formData.kvaUnknown && !formData.selectedKva) return null;
+    // P2.A — MSSL hint를 정규화(10자리 → "AAA-BB-CCCC-D"). spAccountNo(legacy)는 동일 소스로 동기화.
+    const msslNormalized = normalizeMsslHint(formData.msslHint);
+    const spAccountFromMssl =
+      formData.msslHint && formData.msslHint.replace(/\D/g, '')
+        ? formData.msslHint.replace(/\D/g, '')
+        : undefined;
     const payload: CreateApplicationRequest = {
       address: formData.address.trim(),
       postalCode: formData.postalCode.trim(),
@@ -271,9 +293,19 @@ export default function NewApplicationPage() {
       applicantType: formData.applicantType,
       applicationType: formData.applicationType,
       renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
-      spAccountNo: formData.spAccountNo.trim() || undefined,
+      // legacy spAccountNo는 msslHint와 동기화 (백엔드 하위호환). 둘 다 비어있으면 omit.
+      spAccountNo: spAccountFromMssl,
       sldOption: formData.sldOption,
       kvaUnknown: formData.kvaUnknown || undefined,
+      // P2.A — optional hint 필드 (비어있으면 omit)
+      msslHint: msslNormalized,
+      supplyVoltageHint: formData.supplyVoltageHint,
+      consumerTypeHint: formData.consumerTypeHint,
+      retailerHint: formData.retailerHint,
+      hasGeneratorHint: formData.hasGeneratorHint || undefined,
+      generatorCapacityHint: formData.hasGeneratorHint
+        ? formData.generatorCapacityHint
+        : undefined,
       // ── P1.3: EMA ELISE 확장 필드 (Step 1에서 수집된 플래그) ──
       isRentalPremises: formData.isRentalPremises || undefined,
       renewalCompanyNameChanged: formData.applicationType === 'RENEWAL'
@@ -327,6 +359,12 @@ export default function NewApplicationPage() {
     const result = await applicationApi.createApplication(payload);
     clearDraft();
     toast.success('Application submitted successfully!');
+    // P2.A — 선택 hint 형식 오류가 있었던 경우 info 토스트로 안내 (에러 아님, 신청은 성공).
+    if (result.warnings && result.warnings.length > 0) {
+      toast.info(
+        "Some optional details couldn't be saved due to formatting — your LEW will confirm them on site.",
+      );
+    }
     navigate(`/applications/${result.applicationSeq}`);
     return result;
   };
@@ -445,6 +483,13 @@ export default function NewApplicationPage() {
       correspondenceBuilding: '',
       correspondencePostalCode: '',
       landlordEiLicenceNo: '',
+      // P2.A — 신청 타입 전환 시 hint도 초기화 (사용자가 방금 입력 중이었던 것 아님)
+      msslHint: '',
+      supplyVoltageHint: undefined,
+      consumerTypeHint: undefined,
+      retailerHint: undefined,
+      hasGeneratorHint: false,
+      generatorCapacityHint: undefined,
     }));
     setErrors({});
     setPriceResult(null);
@@ -566,17 +611,9 @@ export default function NewApplicationPage() {
               )}
             </fieldset>
 
-            {/* SP Account Number — optional text only (no file upload) */}
-            <div className="space-y-2 border-t border-gray-100 pt-5">
-              <Input
-                id="spAccountNo"
-                label="SP Account Number (optional)"
-                placeholder="e.g. 1234567890"
-                value={formData.spAccountNo}
-                onChange={(e) => updateField('spAccountNo', e.target.value)}
-                hint="If you have it on hand. Otherwise your LEW will ask later."
-              />
-            </div>
+            {/* P2.A — 기존 SP Account Number 입력은 Review Step의 Optional Fast-Track 섹션으로
+                MSSL Account No로 승격 이동됨. spAccountNo는 msslHint에서 자동 동기화되므로 여기
+                입력 필드는 제거한다. formData.spAccountNo 자체는 하위호환 위해 타입 유지. */}
 
             {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
@@ -704,7 +741,8 @@ export default function NewApplicationPage() {
                   <span className="text-sm text-gray-700">
                     This is a rental premises
                     <span className="block text-xs text-gray-500 mt-0.5">
-                      We'll ask for the landlord's EI licence number before you submit.
+                      You can add the landlord's EI licence number at Step 4, or leave it blank
+                      — the assigned LEW will collect it later if missing.
                     </span>
                   </span>
                 </label>
@@ -1021,6 +1059,18 @@ export default function NewApplicationPage() {
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
           <div className="space-y-5">
+            {/* P2.A — Optional fast-track 섹션. 기본 접힘 (localStorage 기억).
+                Declaration 위, Review 카드 맨 위에 위치 — 사용자가 submit 직전에 한 번 더
+                "아는 게 있으면 추가" 기회를 제공. */}
+            <OptionalFastTrackSection
+              formData={formData}
+              // 슬라이스 키는 모두 FormData의 키이므로 런타임 안전. 제네릭 variance 우회를 위해
+              // 단일 지점에서 캐스팅.
+              updateField={((field: string, value: unknown) =>
+                (updateField as (f: string, v: unknown) => void)(field, value)
+              ) as never}
+            />
+
             <StepReview formData={formData} priceResult={priceResult} />
 
             {/* ── P1.4: Correspondence Address — 기본은 Installation과 동일, 해제 시 5-part 노출 ── */}
@@ -1079,22 +1129,22 @@ export default function NewApplicationPage() {
             {/* ── P1.4: Landlord EI Licence — NEW + 임대 체크 시에만 노출 ── */}
             {formData.applicationType === 'NEW' && formData.isRentalPremises && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
-                <h3 className="text-sm font-semibold text-amber-900">Landlord's Installation Licence</h3>
+                <h3 className="text-sm font-semibold text-amber-900">
+                  Landlord's Installation Licence <span className="font-normal text-amber-700">(Optional)</span>
+                </h3>
                 <p className="text-xs text-amber-800">
-                  Rental premises require the landlord's EI Licence number. It will be
-                  stored encrypted and visible only to the assigned LEW.
+                  If you know the landlord's EI Licence number, you can enter it now. It
+                  will be stored encrypted and visible only to the assigned LEW. If you
+                  don't know it, leave this blank — the assigned LEW will follow up with
+                  you to collect it before the application is finalized.
                 </p>
                 <Input
-                  label="Landlord EI Licence No"
+                  label="Landlord EI Licence No (optional)"
                   value={formData.landlordEiLicenceNo}
                   onChange={(e) => updateField('landlordEiLicenceNo', e.target.value)}
-                  placeholder="e.g., E-12345 (leave blank if unknown)"
+                  placeholder="e.g., E-12345 — leave blank if unknown"
                   maxLength={100}
                 />
-                <p className="text-xs text-amber-700 mt-1">
-                  If you don't have this number right now, you can submit and the
-                  assigned LEW will collect it later.
-                </p>
               </div>
             )}
 

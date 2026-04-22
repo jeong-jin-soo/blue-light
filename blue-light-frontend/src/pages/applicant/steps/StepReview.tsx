@@ -1,5 +1,14 @@
 import type { PriceCalculation, ApplicationType } from '../../../types';
 import { KvaPendingBadge } from '../../../components/applicant/KvaPendingBadge';
+import { Badge } from '../../../components/ui/Badge';
+import {
+  CONSUMER_TYPE_OPTIONS,
+  RETAILER_OPTIONS,
+  SUPPLY_VOLTAGE_OPTIONS,
+  normalizeMsslHint,
+  type ConsumerType,
+  type RetailerCode,
+} from '../../../constants/cof';
 
 interface FormData {
   applicationType: ApplicationType;
@@ -15,6 +24,13 @@ interface FormData {
   renewalPeriodMonths: number | null;
   renewalReferenceNo: string;
   sldOption: 'SELF_UPLOAD' | 'SUBMIT_WITHIN_3_MONTHS' | 'REQUEST_LEW';
+  // ── P2.A: Optional fast-track hint 필드 ──
+  msslHint?: string;
+  supplyVoltageHint?: number;
+  consumerTypeHint?: ConsumerType;
+  retailerHint?: RetailerCode;
+  hasGeneratorHint?: boolean;
+  generatorCapacityHint?: number;
 }
 
 interface StepReviewProps {
@@ -41,16 +57,9 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
         </span>
       </div>
 
-      {/* SP Account Number (if provided) */}
-      {formData.spAccountNo.trim() && (
-        <div className="bg-blue-50 rounded-lg p-4 space-y-2 border border-blue-100">
-          <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">SP Group Account</h3>
-          <div>
-            <dt className="text-xs text-blue-600">Account Number</dt>
-            <dd className="text-sm font-medium text-blue-800 mt-0.5">{formData.spAccountNo}</dd>
-          </div>
-        </div>
-      )}
+      {/* P2.A — "더 빠른 처리를 위해 제공하신 정보" 요약.
+          입력된 hint만 나열하며, 비어 있으면 섹션 자체를 렌더하지 않는다(부채감 제거, 스펙 §5.1 §9-17). */}
+      <HintSummary formData={formData} />
 
       {/* Licence Period (both NEW and RENEWAL) */}
       {formData.renewalPeriodMonths && (
@@ -232,6 +241,75 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * P2.A — 신청자가 Optional Fast-Track 섹션에 입력한 hint만 요약 노출.
+ * - 입력된 항목 0건이면 섹션 자체를 null 반환 (부재 언급 금지, 스펙 §5.1 부채감 제거).
+ * - MSSL은 last4만 노출. 다른 필드는 값 그대로.
+ */
+function HintSummary({ formData }: { formData: FormData }) {
+  // 입력된 항목 수집
+  const items: Array<{ label: string; display: string }> = [];
+
+  // MSSL — 10자리 정규화 후 last1만 표시 (백엔드 last4 정책과 동일 UX: "•••-••-••••-D")
+  const msslNormalized = normalizeMsslHint(formData.msslHint);
+  const msslDigits = (formData.msslHint ?? '').replace(/\D/g, '');
+  if (msslDigits.length > 0) {
+    // 10자리 완성 시 일관 마스킹. 부분 입력은 raw digits의 마지막 1자리만 노출.
+    const lastDigit = msslDigits.slice(-1);
+    const masked = msslNormalized && msslDigits.length === 10
+      ? `•••-••-••••-${lastDigit}`
+      : `•••-${lastDigit}`;
+    items.push({ label: 'MSSL Account No', display: masked });
+  }
+
+  if (formData.consumerTypeHint) {
+    const opt = CONSUMER_TYPE_OPTIONS.find((o) => o.value === formData.consumerTypeHint);
+    if (opt) items.push({ label: 'Consumer Type', display: opt.label });
+  }
+
+  if (formData.retailerHint) {
+    const opt = RETAILER_OPTIONS.find((o) => o.value === formData.retailerHint);
+    if (opt) items.push({ label: 'Retailer', display: opt.label });
+  }
+
+  if (formData.supplyVoltageHint) {
+    const opt = SUPPLY_VOLTAGE_OPTIONS.find((o) => o.value === formData.supplyVoltageHint);
+    items.push({ label: 'Supply Voltage', display: opt ? opt.label : `${formData.supplyVoltageHint}V` });
+  }
+
+  if (formData.hasGeneratorHint) {
+    const capDisplay =
+      formData.generatorCapacityHint != null
+        ? `Yes — ${formData.generatorCapacityHint} kVA`
+        : 'Yes';
+    items.push({ label: 'Generator', display: capDisplay });
+  }
+
+  if (items.length === 0) {
+    // 미입력 섹션은 완전히 숨김 — 미입력 항목을 화면 어디에도 언급하지 않는다(스펙 §9-17).
+    return null;
+  }
+
+  return (
+    <div className="bg-blue-50 rounded-lg p-4 space-y-3 border border-blue-100">
+      <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">
+        Details you shared to speed up review
+      </h3>
+      <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {items.map((it) => (
+          <div key={it.label}>
+            <dt className="text-xs text-blue-600 flex items-center gap-1.5">
+              <Badge variant="info">Provided</Badge>
+              <span>{it.label}</span>
+            </dt>
+            <dd className="text-sm font-medium text-blue-800 mt-1">{it.display}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

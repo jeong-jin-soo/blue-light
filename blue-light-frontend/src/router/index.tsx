@@ -54,6 +54,9 @@ import SystemRolesPage from '../pages/admin/SystemRolesPage';
 import AuditLogPage from '../pages/admin/AuditLogPage';
 import DataBreachPage from '../pages/admin/DataBreachPage';
 
+// LEW pages
+import LewReviewFormPage from '../pages/lew/LewReviewFormPage';
+
 // SLD Manager pages
 import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPage';
 import SldManagerOrderListPage from '../pages/sld-manager/SldManagerOrderListPage';
@@ -203,6 +206,8 @@ const router = createBrowserRouter([
           { path: '/lew/dashboard', element: <AdminDashboardPage /> },
           { path: '/lew/applications', element: <AdminApplicationListPage /> },
           { path: '/lew/applications/:id', element: <AdminApplicationDetailPage /> },
+          // LEW Review Form (P2.B) — CoF 3-step
+          { path: '/lew/applications/:id/review', element: <LewReviewFormPage /> },
           { path: '/lew/notifications', element: <NotificationsPage /> },
         ],
       },

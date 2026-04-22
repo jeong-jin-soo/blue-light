@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
@@ -362,6 +363,30 @@ export default function AdminApplicationDetailPage() {
         </div>
         <StatusBadge status={application.status} />
       </div>
+
+      {/* P2.B — LEW Review Form 진입 배너. LEW 역할 + 본인에게 배정된 신청 + 확정 전일 때만. */}
+      {currentUser?.role === 'LEW' &&
+        application.assignedLewSeq === currentUser.userSeq &&
+        application.status === 'PENDING_REVIEW' && (
+          <div className="rounded-lg border border-primary-200 bg-primary-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-primary-800">
+                  Certificate of Fitness review
+                </p>
+                <p className="text-xs text-primary-700 mt-0.5">
+                  Enter the 10 CoF fields in a guided 3-step flow. Draft save is supported;
+                  finalize moves the application to payment stage.
+                </p>
+              </div>
+              <Button
+                onClick={() => navigate(`/lew/applications/${application.applicationSeq}/review`)}
+              >
+                Start CoF Review
+              </Button>
+            </div>
+          </div>
+        )}
 
       {/* Review Comment */}
       {application.reviewComment && (

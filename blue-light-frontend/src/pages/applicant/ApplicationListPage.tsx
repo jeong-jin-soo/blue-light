@@ -26,6 +26,18 @@ function PendingDocsBadge({ count }: { count: number }) {
   );
 }
 
+/** P2.C — CoF 발급 배지 (목록 행용, 작은 크기). */
+function CofIssuedBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-success-700 bg-success-50 border border-success-500/40 rounded-full"
+      title="Your LEW issued the Certificate of Fitness."
+    >
+      ✓ CoF
+    </span>
+  );
+}
+
 const STATUS_FILTER_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'PENDING_REVIEW', label: 'Pending Review' },
@@ -146,8 +158,9 @@ export default function ApplicationListPage() {
       key: 'status',
       header: 'Status',
       render: (app) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={app.status} />
+          {app.cofFinalized && <CofIssuedBadge />}
           <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
         </div>
       ),
@@ -244,8 +257,9 @@ export default function ApplicationListPage() {
                 <p className="font-medium text-gray-800 truncate">{app.address}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                 {app.kvaStatus === 'UNKNOWN' && <KvaPendingBadge />}
+                {app.cofFinalized && <CofIssuedBadge />}
                 <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
                 <StatusBadge status={app.status} />
               </div>
