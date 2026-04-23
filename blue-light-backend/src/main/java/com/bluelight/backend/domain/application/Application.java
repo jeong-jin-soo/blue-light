@@ -588,6 +588,35 @@ public class Application extends BaseEntity {
         this.sldFee = sldFee;
     }
 
+    /**
+     * Installation Address 5-part 갱신 — EMA ELISE 양식 대응.
+     * <p>재제출 시 신청자가 Block/Unit/Street/Building/PostalCode 각각을 정정할 수 있다.
+     * null 값은 "해당 서브필드를 지움" 의미 (UpdateApplicationRequest 로부터 일괄 덮어쓰기).</p>
+     * <p>legacy {@code address}/{@code postalCode} 는 컨트롤러·프론트에서 concat 하여
+     * {@link #updateDetails} 로 동시에 갱신되므로, 본 메서드는 5-part 컬럼만 관리.</p>
+     */
+    public void updateInstallationAddressParts(String block, String unit, String street,
+                                               String building, String postalCode) {
+        this.installationAddressBlock = block;
+        this.installationAddressUnit = unit;
+        this.installationAddressStreet = street;
+        this.installationAddressBuilding = building;
+        this.installationAddressPostalCode = postalCode;
+    }
+
+    /**
+     * Correspondence Address 5-part 갱신. Installation 과 동일한 정책.
+     * 모든 인자 null 이면 "Correspondence = Installation" 으로 해석 (LoA 생성 경로가 이미 이렇게 처리).
+     */
+    public void updateCorrespondenceAddressParts(String block, String unit, String street,
+                                                 String building, String postalCode) {
+        this.correspondenceAddressBlock = block;
+        this.correspondenceAddressUnit = unit;
+        this.correspondenceAddressStreet = street;
+        this.correspondenceAddressBuilding = building;
+        this.correspondenceAddressPostalCode = postalCode;
+    }
+
     // ── LEW Review Form — Applicant Hint 도메인 메서드 (P1.B, 스펙 §5.3) ──
 
     /**

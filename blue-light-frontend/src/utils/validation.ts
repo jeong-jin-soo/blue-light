@@ -68,6 +68,12 @@ export interface ApplicationFormData {
   spAccountNo: string;
   address: string;
   postalCode: string;
+  /** P2.B — EMA ELISE 5-part Installation Address. 신규 폼에서 필수. */
+  installationBlock?: string;
+  installationUnit?: string;
+  installationStreet?: string;
+  installationBuilding?: string;
+  installationPostalCode?: string;
   buildingType: string;
   selectedKva: number | null;
   /** Phase 5: "I don't know" 선택 시 true. true면 selectedKva 필수 검증 면제. */
@@ -114,16 +120,22 @@ export function validateApplicationStep0(formData: ApplicationFormData): Record<
 export function validateApplicationStep1(formData: ApplicationFormData): Record<string, string> {
   const errors: Record<string, string> = {};
 
-  if (!isRequired(formData.address)) {
-    errors.address = 'Address is required';
-  } else if (!minLength(formData.address, 5)) {
-    errors.address = 'Address must be at least 5 characters';
+  // P2.B — EMA ELISE 5-part Installation Address 필수 검증.
+  // Block / Street / PostalCode 는 EMA 양식상 필수 3필드. Unit/Building 은 선택.
+  // (Backend 는 아직 legacy address/postalCode 만 NotBlank 로 받지만, 프론트는 5-part 를 기준으로 잡는다.)
+  if (!isRequired(formData.installationBlock || '')) {
+    errors.installationBlock = 'Block / House No is required';
+  }
+  if (!isRequired(formData.installationStreet || '')) {
+    errors.installationStreet = 'Street name is required';
+  } else if (!minLength(formData.installationStreet || '', 3)) {
+    errors.installationStreet = 'Street must be at least 3 characters';
   }
 
-  if (!isRequired(formData.postalCode)) {
-    errors.postalCode = 'Postal code is required';
-  } else if (!isValidPostalCode(formData.postalCode)) {
-    errors.postalCode = 'Postal code must be 6 digits (Singapore format)';
+  if (!isRequired(formData.installationPostalCode || '')) {
+    errors.installationPostalCode = 'Postal code is required';
+  } else if (!isValidPostalCode(formData.installationPostalCode || '')) {
+    errors.installationPostalCode = 'Postal code must be 6 digits (Singapore format)';
   }
 
   // P2.A: spAccountNo (legacy)는 msslHint로 통합되었고, hint 검증은 서버 warning-only이므로

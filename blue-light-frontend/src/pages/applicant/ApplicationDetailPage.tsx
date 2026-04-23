@@ -19,6 +19,10 @@ import sampleFileApi from '../../api/sampleFileApi';
 import type { Invoice } from '../../types';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import { ApplicationInfo } from './sections/ApplicationInfo';
+import {
+  joinAddressParts,
+  type AddressInputValues,
+} from '../../components/domain/AddressInputGroup';
 import { ApplicationPayment } from './sections/ApplicationPayment';
 import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
@@ -52,6 +56,14 @@ export default function ApplicationDetailPage() {
   const [editBuildingType, setEditBuildingType] = useState('');
   const [editKva, setEditKva] = useState<number>(0);
   const [editPrice, setEditPrice] = useState<number | null>(null);
+  // P2.B — EMA ELISE 5-part 수정용 상태
+  const [editInstallation, setEditInstallation] = useState<AddressInputValues>({
+    block: '',
+    unit: '',
+    street: '',
+    building: '',
+    postalCode: '',
+  });
   const [prices, setPrices] = useState<MasterPrice[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
@@ -134,6 +146,17 @@ export default function ApplicationDetailPage() {
       setEditBuildingType(application.buildingType || '');
       setEditKva(application.selectedKva);
       setEditPrice(application.quoteAmount);
+      // P2.B — 저장된 5-part 가 있으면 그대로 사용, 없으면 legacy 단일 address 를 street 에 임시 배치 +
+      // postalCode 는 그대로 매핑. (사용자에게 나머지 필드를 직접 정정 기회 제공.)
+      setEditInstallation({
+        block: application.installationAddressBlock ?? '',
+        unit: application.installationAddressUnit ?? '',
+        street:
+          application.installationAddressStreet ??
+          (application.installationAddressBlock ? '' : (application.address ?? '')),
+        building: application.installationAddressBuilding ?? '',
+        postalCode: application.installationAddressPostalCode ?? (application.postalCode ?? ''),
+      });
       setEditMode(true);
     } catch {
       toast.error('Failed to load price information');
@@ -152,12 +175,23 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  const handleEditStateChange = (field: string, value: string | number) => {
+  const handleEditStateChange = (
+    field: string,
+    value: string | number | AddressInputValues,
+  ) => {
     switch (field) {
       case 'address': setEditAddress(value as string); break;
       case 'postalCode': setEditPostalCode(value as string); break;
       case 'buildingType': setEditBuildingType(value as string); break;
       case 'kva': setEditKva(value as number); break;
+      case 'installation': {
+        const next = value as AddressInputValues;
+        setEditInstallation(next);
+        // legacy mirror — auto-concat for resubmit payload
+        setEditAddress(joinAddressParts(next));
+        setEditPostalCode(next.postalCode);
+        break;
+      }
     }
   };
 
@@ -165,11 +199,32 @@ export default function ApplicationDetailPage() {
     if (!application) return;
     setSubmitting(true);
     try {
+      // P2.B — 5-part 는 개별 컬럼 + legacy address(auto-concat) 양쪽 모두 송신.
+      // 5-part 가 하나라도 있으면 백엔드가 5개 컬럼을 덮어쓰고, 없으면 legacy 만 갱신.
+      const concat = joinAddressParts(editInstallation);
+      const hasAny5Part = !!(
+        editInstallation.block.trim() ||
+        editInstallation.unit.trim() ||
+        editInstallation.street.trim() ||
+        editInstallation.building.trim() ||
+        editInstallation.postalCode.trim()
+      );
+      const addressForPayload = concat || editAddress;
+      const postalForPayload = editInstallation.postalCode.trim() || editPostalCode;
       const updated = await applicationApi.updateApplication(applicationId, {
-        address: editAddress,
-        postalCode: editPostalCode,
+        address: addressForPayload,
+        postalCode: postalForPayload,
         buildingType: editBuildingType || undefined,
         selectedKva: editKva,
+        ...(hasAny5Part
+          ? {
+              installationAddressBlock: editInstallation.block.trim() || undefined,
+              installationAddressUnit: editInstallation.unit.trim() || undefined,
+              installationAddressStreet: editInstallation.street.trim() || undefined,
+              installationAddressBuilding: editInstallation.building.trim() || undefined,
+              installationAddressPostalCode: editInstallation.postalCode.trim() || undefined,
+            }
+          : {}),
       });
       setApplication(updated);
       setEditMode(false);
@@ -412,6 +467,7 @@ export default function ApplicationDetailPage() {
               buildingType: editBuildingType,
               kva: editKva,
               price: editPrice,
+              installation: editInstallation,
             }}
             prices={prices}
             submitting={submitting}

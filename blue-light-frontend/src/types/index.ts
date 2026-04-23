@@ -499,6 +499,17 @@ export interface UpdateApplicationRequest {
   retailerHint?: string;
   hasGeneratorHint?: boolean;
   generatorCapacityHint?: number;
+  // ── EMA ELISE 5-part 주소 (재제출 시 갱신) ──
+  installationAddressBlock?: string;
+  installationAddressUnit?: string;
+  installationAddressStreet?: string;
+  installationAddressBuilding?: string;
+  installationAddressPostalCode?: string;
+  correspondenceAddressBlock?: string;
+  correspondenceAddressUnit?: string;
+  correspondenceAddressStreet?: string;
+  correspondenceAddressBuilding?: string;
+  correspondenceAddressPostalCode?: string;
 }
 
 /**

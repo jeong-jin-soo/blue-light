@@ -12,6 +12,12 @@ import { KvaTipBox } from '../../components/applicant/KvaTipBox';
 import { KvaPriceCard } from '../../components/applicant/KvaPriceCard';
 import { OptionalFastTrackSection } from '../../components/applicant/OptionalFastTrackSection';
 import { StepTracker } from '../../components/domain/StepTracker';
+import {
+  AddressInputGroup,
+  joinAddressParts,
+  hasAnyAddressPart,
+  type AddressInputValues,
+} from '../../components/domain/AddressInputGroup';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
@@ -41,8 +47,16 @@ interface FormData {
   applicationType: ApplicationType;
   applicantType: ApplicantType;
   spAccountNo: string;
+  // Legacy 단일 address/postalCode — 5-part 에서 auto-concat되어 채워진다.
+  // Backend UpdateApplicationRequest 가 아직 legacy 만 받기 때문에 유지.
   address: string;
   postalCode: string;
+  // EMA ELISE 5-part Installation Address (P2.B)
+  installationBlock: string;
+  installationUnit: string;
+  installationStreet: string;
+  installationBuilding: string;
+  installationPostalCode: string;
   buildingType: string;
   selectedKva: number | null;
   // Phase 5: kVA UNKNOWN 플래그 (I don't know 선택 시 true)
@@ -107,6 +121,11 @@ export default function NewApplicationPage() {
     spAccountNo: '',
     address: '',
     postalCode: '',
+    installationBlock: '',
+    installationUnit: '',
+    installationStreet: '',
+    installationBuilding: '',
+    installationPostalCode: '',
     buildingType: '',
     selectedKva: null,
     kvaUnknown: false,
@@ -153,8 +172,28 @@ export default function NewApplicationPage() {
   // Form leave guard — warn when navigating away with unsaved data
   const isFormDirty = useMemo(() => {
     if (showGuide || submitting) return false;
-    return !!(formData.address || formData.postalCode || formData.msslHint || formData.selectedKva || formData.kvaUnknown);
-  }, [showGuide, submitting, formData.address, formData.postalCode, formData.msslHint, formData.selectedKva, formData.kvaUnknown]);
+    return !!(
+      formData.address ||
+      formData.postalCode ||
+      formData.installationBlock ||
+      formData.installationStreet ||
+      formData.installationPostalCode ||
+      formData.msslHint ||
+      formData.selectedKva ||
+      formData.kvaUnknown
+    );
+  }, [
+    showGuide,
+    submitting,
+    formData.address,
+    formData.postalCode,
+    formData.installationBlock,
+    formData.installationStreet,
+    formData.installationPostalCode,
+    formData.msslHint,
+    formData.selectedKva,
+    formData.kvaUnknown,
+  ]);
   useFormGuard(isFormDirty);
 
   // 폼 자동 저장 — sessionStorage 기반 (새로고침 시 복원)
@@ -229,6 +268,8 @@ export default function NewApplicationPage() {
     }
     const app = completedApps.find((a) => a.applicationSeq === appSeq);
     if (app) {
+      // RENEWAL prefill: 5-part 가 이전 신청에 저장되어 있으면 그대로 복원,
+      // 없으면 legacy single address 만 채우고 5-part 는 공란 유지 (사용자가 5-part 에 재입력).
       setFormData((prev) => ({
         ...prev,
         originalApplicationSeq: app.applicationSeq,
@@ -236,6 +277,11 @@ export default function NewApplicationPage() {
         existingExpiryDate: app.licenseExpiryDate || '',
         address: app.address,
         postalCode: app.postalCode,
+        installationBlock: app.installationAddressBlock || '',
+        installationUnit: app.installationAddressUnit || '',
+        installationStreet: app.installationAddressStreet || '',
+        installationBuilding: app.installationAddressBuilding || '',
+        installationPostalCode: app.installationAddressPostalCode || app.postalCode || '',
         buildingType: app.buildingType || '',
         selectedKva: app.selectedKva,
       }));
@@ -285,9 +331,23 @@ export default function NewApplicationPage() {
       formData.msslHint && formData.msslHint.replace(/\D/g, '')
         ? formData.msslHint.replace(/\D/g, '')
         : undefined;
+    // Installation 5-part → legacy 단일 address/postalCode auto-concat
+    // (Backend 는 여전히 legacy 필드가 NotBlank. 5-part 가 있으면 concat, 없으면 formData.address 그대로.)
+    const installationValues: AddressInputValues = {
+      block: formData.installationBlock,
+      unit: formData.installationUnit,
+      street: formData.installationStreet,
+      building: formData.installationBuilding,
+      postalCode: formData.installationPostalCode,
+    };
+    const concatAddress = joinAddressParts(installationValues);
+    const legacyAddress = concatAddress || formData.address.trim();
+    const legacyPostalCode =
+      formData.installationPostalCode.trim() || formData.postalCode.trim();
+
     const payload: CreateApplicationRequest = {
-      address: formData.address.trim(),
-      postalCode: formData.postalCode.trim(),
+      address: legacyAddress,
+      postalCode: legacyPostalCode,
       buildingType: formData.buildingType || undefined,
       selectedKva: formData.kvaUnknown ? 45 : (formData.selectedKva as number),
       applicantType: formData.applicantType,
@@ -321,6 +381,12 @@ export default function NewApplicationPage() {
       landlordEiLicenceNo: formData.isRentalPremises && formData.landlordEiLicenceNo.trim()
         ? formData.landlordEiLicenceNo.trim()
         : undefined,
+      // Installation 5-part (P2.B) — 있는 값만 전송, legacy address/postalCode 와 병행.
+      installationAddressBlock: formData.installationBlock.trim() || undefined,
+      installationAddressUnit: formData.installationUnit.trim() || undefined,
+      installationAddressStreet: formData.installationStreet.trim() || undefined,
+      installationAddressBuilding: formData.installationBuilding.trim() || undefined,
+      installationAddressPostalCode: formData.installationPostalCode.trim() || undefined,
       correspondenceAddressBlock: !formData.correspondenceSameAsInstallation
         ? formData.correspondenceBlock.trim() || undefined
         : undefined,
@@ -458,6 +524,11 @@ export default function NewApplicationPage() {
       spAccountNo: '',
       address: '',
       postalCode: '',
+      installationBlock: '',
+      installationUnit: '',
+      installationStreet: '',
+      installationBuilding: '',
+      installationPostalCode: '',
       buildingType: '',
       selectedKva: null,
       kvaUnknown: false,
@@ -937,30 +1008,63 @@ export default function NewApplicationPage() {
                   : 'Enter the address of the electrical installation'}
               </p>
             </div>
-            <Input
-              label="Installation Address"
-              placeholder="e.g., 123 Orchard Road, #10-01, Singapore"
-              value={formData.address}
-              onChange={(e) => updateField('address', e.target.value)}
-              error={errors.address}
+            {/* EMA ELISE 5-part Installation Address.
+                legacy 단일 address/postalCode 는 buildPayload 시점에 concat 된다. */}
+            <AddressInputGroup
+              title="Installation Address"
+              description="EMA ELISE renewal form: Block / Unit / Street / Building / Postal."
+              values={{
+                block: formData.installationBlock,
+                unit: formData.installationUnit,
+                street: formData.installationStreet,
+                building: formData.installationBuilding,
+                postalCode: formData.installationPostalCode,
+              }}
+              onChange={(next) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  installationBlock: next.block,
+                  installationUnit: next.unit,
+                  installationStreet: next.street,
+                  installationBuilding: next.building,
+                  installationPostalCode: next.postalCode,
+                  // legacy mirror — 즉시 동기화 (auto-save draft 에서도 그대로 보임).
+                  address: [next.block, next.unit, next.street, next.building]
+                    .map((v) => v.trim())
+                    .filter((v) => v.length > 0)
+                    .join(', '),
+                  postalCode: next.postalCode,
+                }))
+              }
+              errors={{
+                block: errors.installationBlock,
+                street: errors.installationStreet,
+                postalCode: errors.installationPostalCode,
+              }}
               required
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Postal Code"
-                placeholder="e.g., 238888"
-                value={formData.postalCode}
-                onChange={(e) => updateField('postalCode', e.target.value)}
-                error={errors.postalCode}
-                required
-              />
-              <Select
-                label="Building Type"
-                value={formData.buildingType}
-                onChange={(e) => updateField('buildingType', e.target.value)}
-                options={BUILDING_TYPES}
-              />
-            </div>
+            {/* Legacy 단일 address 폴백 안내 — 5-part 비어 있는 draft 에서 복원된 케이스. */}
+            {!hasAnyAddressPart({
+              block: formData.installationBlock,
+              unit: formData.installationUnit,
+              street: formData.installationStreet,
+              building: formData.installationBuilding,
+              postalCode: formData.installationPostalCode,
+            }) && formData.address && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                We have the previous installation address on file as:
+                <span className="block mt-1 font-medium text-amber-900">
+                  "{formData.address}"
+                </span>
+                Please split it into the 5 fields above so it matches the EMA ELISE form.
+              </div>
+            )}
+            <Select
+              label="Building Type"
+              value={formData.buildingType}
+              onChange={(e) => updateField('buildingType', e.target.value)}
+              options={BUILDING_TYPES}
+            />
 
             {/* ── P1.4: Installation Name — 기본 자동 생성, "다르게 지정" 토글 시 편집 ── */}
             {formData.applicationType === 'NEW' && (
@@ -1090,37 +1194,25 @@ export default function NewApplicationPage() {
                 </span>
               </label>
               {!formData.correspondenceSameAsInstallation && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                  <Input
-                    label="Block / House No"
-                    value={formData.correspondenceBlock}
-                    onChange={(e) => updateField('correspondenceBlock', e.target.value)}
-                    maxLength={20}
-                  />
-                  <Input
-                    label="Unit #"
-                    value={formData.correspondenceUnit}
-                    onChange={(e) => updateField('correspondenceUnit', e.target.value)}
-                    maxLength={20}
-                  />
-                  <Input
-                    label="Street Name"
-                    className="sm:col-span-2"
-                    value={formData.correspondenceStreet}
-                    onChange={(e) => updateField('correspondenceStreet', e.target.value)}
-                    maxLength={200}
-                  />
-                  <Input
-                    label="Building"
-                    value={formData.correspondenceBuilding}
-                    onChange={(e) => updateField('correspondenceBuilding', e.target.value)}
-                    maxLength={200}
-                  />
-                  <Input
-                    label="Postal Code"
-                    value={formData.correspondencePostalCode}
-                    onChange={(e) => updateField('correspondencePostalCode', e.target.value)}
-                    maxLength={10}
+                <div className="pt-2">
+                  <AddressInputGroup
+                    values={{
+                      block: formData.correspondenceBlock,
+                      unit: formData.correspondenceUnit,
+                      street: formData.correspondenceStreet,
+                      building: formData.correspondenceBuilding,
+                      postalCode: formData.correspondencePostalCode,
+                    }}
+                    onChange={(next) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        correspondenceBlock: next.block,
+                        correspondenceUnit: next.unit,
+                        correspondenceStreet: next.street,
+                        correspondenceBuilding: next.building,
+                        correspondencePostalCode: next.postalCode,
+                      }))
+                    }
                   />
                 </div>
               )}

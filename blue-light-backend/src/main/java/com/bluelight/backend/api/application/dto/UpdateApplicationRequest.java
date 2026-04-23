@@ -48,4 +48,40 @@ public class UpdateApplicationRequest {
     private String retailerHint;
     private Boolean hasGeneratorHint;
     private Integer generatorCapacityHint;
+
+    // ── EMA ELISE 5-part 주소 (Installation + Correspondence) ──
+    // 재제출 시에도 applicant 가 5-part 구조를 갱신할 수 있어야 한다. 모두 optional —
+    // null 값은 "해당 서브필드를 지움" 의미 (서비스에서 일괄 덮어쓰기).
+    // legacy `address`/`postalCode` 는 클라이언트가 5-part 를 concat 해 전달하므로
+    // 둘 중 하나만 편집해도 일관성 유지된다.
+
+    @Size(max = 20, message = "Installation block must be 20 characters or less")
+    private String installationAddressBlock;
+
+    @Size(max = 20, message = "Installation unit must be 20 characters or less")
+    private String installationAddressUnit;
+
+    @Size(max = 200, message = "Installation street must be 200 characters or less")
+    private String installationAddressStreet;
+
+    @Size(max = 200, message = "Installation building must be 200 characters or less")
+    private String installationAddressBuilding;
+
+    @Size(max = 10, message = "Installation postal code must be 10 characters or less")
+    private String installationAddressPostalCode;
+
+    @Size(max = 20, message = "Correspondence block must be 20 characters or less")
+    private String correspondenceAddressBlock;
+
+    @Size(max = 20, message = "Correspondence unit must be 20 characters or less")
+    private String correspondenceAddressUnit;
+
+    @Size(max = 200, message = "Correspondence street must be 200 characters or less")
+    private String correspondenceAddressStreet;
+
+    @Size(max = 200, message = "Correspondence building must be 200 characters or less")
+    private String correspondenceAddressBuilding;
+
+    @Size(max = 10, message = "Correspondence postal code must be 10 characters or less")
+    private String correspondenceAddressPostalCode;
 }

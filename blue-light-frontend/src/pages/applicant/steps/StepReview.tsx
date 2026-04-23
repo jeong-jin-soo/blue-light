@@ -15,6 +15,12 @@ interface FormData {
   spAccountNo: string;
   address: string;
   postalCode: string;
+  // P2.B — EMA ELISE 5-part (optional, 없으면 legacy address 로 폴백)
+  installationBlock?: string;
+  installationUnit?: string;
+  installationStreet?: string;
+  installationBuilding?: string;
+  installationPostalCode?: string;
   buildingType: string;
   selectedKva: number | null;
   /** Phase 5: "I don't know" 선택 시 true — 가격은 "From ..." 표시 */
@@ -151,23 +157,36 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
         )}
       </div>
 
-      {/* Property Details */}
+      {/* Property Details — EMA ELISE 5-part 우선 표시, 없으면 legacy address 라인으로 폴백 */}
       <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Property Details</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <dt className="text-xs text-gray-500">Address</dt>
-            <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.address}</dd>
+        <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Installation Address</h3>
+        {(formData.installationBlock || formData.installationStreet) ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <ReviewLine label="Block / House No" value={formData.installationBlock} />
+            <ReviewLine label="Unit #" value={formData.installationUnit} />
+            <div className="sm:col-span-2">
+              <ReviewLine label="Street" value={formData.installationStreet} />
+            </div>
+            <ReviewLine label="Building" value={formData.installationBuilding} />
+            <ReviewLine label="Postal Code" value={formData.installationPostalCode} />
+            <ReviewLine label="Building Type" value={formData.buildingType} />
           </div>
-          <div>
-            <dt className="text-xs text-gray-500">Postal Code</dt>
-            <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.postalCode}</dd>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <dt className="text-xs text-gray-500">Address</dt>
+              <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.address}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-500">Postal Code</dt>
+              <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.postalCode}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-gray-500">Building Type</dt>
+              <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.buildingType || 'Not specified'}</dd>
+            </div>
           </div>
-          <div>
-            <dt className="text-xs text-gray-500">Building Type</dt>
-            <dd className="text-sm font-medium text-gray-800 mt-0.5">{formData.buildingType || 'Not specified'}</dd>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Capacity & Price */}
@@ -310,6 +329,18 @@ function HintSummary({ formData }: { formData: FormData }) {
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+/** 리뷰 화면 5-part 주소 라인 (빈 값은 — 로 표시). */
+function ReviewLine({ label, value }: { label: string; value?: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-gray-500">{label}</dt>
+      <dd className="text-sm font-medium text-gray-800 mt-0.5">
+        {value && value.trim() ? value : '—'}
+      </dd>
     </div>
   );
 }

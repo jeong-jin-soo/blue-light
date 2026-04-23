@@ -17,22 +17,30 @@ export interface CofStepApplicationSummaryProps {
 export function CofStepApplicationSummary({ data, onNext }: CofStepApplicationSummaryProps) {
   const app = data.application;
 
-  // Correspondence 평문 4-part (block/unit/street/building)
-  const correspondenceLines = [
-    data.correspondenceAddressBlockPlain,
-    data.correspondenceAddressUnitPlain,
-    data.correspondenceAddressStreetPlain,
-    data.correspondenceAddressBuildingPlain,
-    app.correspondenceAddressPostalCode,
-  ].filter((v): v is string => !!v && v.trim().length > 0);
+  // Installation 5-part — EMA 양식 순서 (Block / Unit / Street / Building / Postal).
+  // 하나라도 값이 있으면 5-line breakdown 을 렌더, 모두 비어 있으면 legacy 단일 address 폴백.
+  const installation5 = {
+    block: app.installationAddressBlock ?? '',
+    unit: app.installationAddressUnit ?? '',
+    street: app.installationAddressStreet ?? '',
+    building: app.installationAddressBuilding ?? '',
+    postalCode: app.installationAddressPostalCode ?? '',
+  };
+  const hasInstallation5 = Object.values(installation5).some(
+    (v) => v && v.trim().length > 0,
+  );
 
-  const installationLines = [
-    app.installationAddressBlock,
-    app.installationAddressUnit,
-    app.installationAddressStreet,
-    app.installationAddressBuilding,
-    app.installationAddressPostalCode,
-  ].filter((v): v is string => !!v && v.trim().length > 0);
+  // Correspondence 5-part — LEW 전용 평문 4 필드 + postalCode 는 plain 이 아니어도 ApplicationResponse 에 있음
+  const correspondence5 = {
+    block: data.correspondenceAddressBlockPlain ?? '',
+    unit: data.correspondenceAddressUnitPlain ?? '',
+    street: data.correspondenceAddressStreetPlain ?? '',
+    building: data.correspondenceAddressBuildingPlain ?? '',
+    postalCode: app.correspondenceAddressPostalCode ?? '',
+  };
+  const hasCorrespondence5 = Object.values(correspondence5).some(
+    (v) => v && v.trim().length > 0,
+  );
 
   return (
     <div className="space-y-5">
@@ -58,18 +66,36 @@ export function CofStepApplicationSummary({ data, onNext }: CofStepApplicationSu
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <SummaryField label="Installation Name" value={app.installationName} />
             <SummaryField label="Premises Type" value={app.premisesType} />
-            <SummaryField
-              label="Address"
-              value={installationLines.length > 0 ? installationLines.join(', ') : app.address}
-              full
-            />
-            <SummaryField label="Postal Code" value={app.postalCode} />
             <SummaryField label="Building Type" value={app.buildingType} />
             <SummaryField
               label="Rental Premises"
               value={app.isRentalPremises ? 'Yes' : 'No'}
             />
           </dl>
+          {/* EMA ELISE 양식 준수: 5-part breakdown (Block → Unit → Street → Building → Postal).
+              5-part 가 저장돼 있지 않은 legacy 신청은 단일 address 를 그대로 표시한다. */}
+          <div className="border-t border-gray-100 pt-3 mt-2">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Installation Address
+            </h4>
+            {hasInstallation5 ? (
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SummaryField label="Block / House No" value={installation5.block} />
+                <SummaryField label="Unit #" value={installation5.unit} />
+                <SummaryField label="Street" value={installation5.street} full />
+                <SummaryField label="Building" value={installation5.building} />
+                <SummaryField
+                  label="Postal Code"
+                  value={installation5.postalCode || app.postalCode}
+                />
+              </dl>
+            ) : (
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SummaryField label="Address (legacy)" value={app.address} full />
+                <SummaryField label="Postal Code" value={app.postalCode} />
+              </dl>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -81,24 +107,38 @@ export function CofStepApplicationSummary({ data, onNext }: CofStepApplicationSu
           </h3>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <SummaryField label="Applicant Type" value={app.applicantType} />
-            <SummaryField
-              label="Correspondence Address"
-              value={
-                correspondenceLines.length > 0
-                  ? correspondenceLines.join(', ')
-                  : 'Same as installation address'
-              }
-              full
-            />
-            {data.landlordEiLicenceNo && (
-              <SummaryField
-                label="Landlord EI Licence (plain, LEW-only)"
-                value={data.landlordEiLicenceNo}
-                emphasis
-                full
-              />
-            )}
           </dl>
+          {/* Correspondence — EMA 양식 순서 5-part. 값 없으면 "동일" 문구로 폴백. */}
+          <div className="border-t border-gray-100 pt-3 mt-2">
+            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              Correspondence Address
+            </h4>
+            {hasCorrespondence5 ? (
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <SummaryField label="Block / House No" value={correspondence5.block} />
+                <SummaryField label="Unit #" value={correspondence5.unit} />
+                <SummaryField label="Street" value={correspondence5.street} full />
+                <SummaryField label="Building" value={correspondence5.building} />
+                <SummaryField label="Postal Code" value={correspondence5.postalCode} />
+              </dl>
+            ) : (
+              <p className="text-sm text-gray-500 italic">
+                Same as installation address.
+              </p>
+            )}
+          </div>
+          {data.landlordEiLicenceNo && (
+            <div className="border-t border-gray-100 pt-3 mt-2">
+              <dl>
+                <SummaryField
+                  label="Landlord EI Licence (plain, LEW-only)"
+                  value={data.landlordEiLicenceNo}
+                  emphasis
+                  full
+                />
+              </dl>
+            </div>
+          )}
         </div>
       </Card>
 

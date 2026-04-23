@@ -5,6 +5,11 @@ import { Select } from '../../../components/ui/Select';
 import { Badge } from '../../../components/ui/Badge';
 import { InfoField } from '../../../components/common/InfoField';
 import { KvaPendingBadge } from '../../../components/applicant/KvaPendingBadge';
+import {
+  AddressInputGroup,
+  hasAnyAddressPart,
+  type AddressInputValues,
+} from '../../../components/domain/AddressInputGroup';
 import type { Application, MasterPrice } from '../../../types';
 
 interface EditState {
@@ -13,6 +18,8 @@ interface EditState {
   buildingType: string;
   kva: number;
   price: number | null;
+  /** P2.B — EMA 5-part 입력 값 (수정 모드에서만). */
+  installation: AddressInputValues;
 }
 
 interface ApplicationInfoProps {
@@ -21,7 +28,7 @@ interface ApplicationInfoProps {
   editState: EditState;
   prices: MasterPrice[];
   submitting: boolean;
-  onEditStateChange: (field: keyof EditState, value: string | number) => void;
+  onEditStateChange: (field: keyof EditState, value: string | number | AddressInputValues) => void;
   onKvaChange: (kva: number) => void;
   onResubmit: () => void;
   onCancelEdit: () => void;
@@ -46,28 +53,19 @@ export function ApplicationInfo({
 
         {editMode ? (
           <div className="space-y-4">
-            <Input
-              label="Installation Address"
+            <AddressInputGroup
+              title="Installation Address"
+              description="EMA ELISE renewal form: Block / Unit / Street / Building / Postal."
+              values={editState.installation}
+              onChange={(next) => onEditStateChange('installation', next)}
               required
-              maxLength={255}
-              value={editState.address}
-              onChange={(e) => onEditStateChange('address', e.target.value)}
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Postal Code"
-                required
-                maxLength={10}
-                value={editState.postalCode}
-                onChange={(e) => onEditStateChange('postalCode', e.target.value)}
-              />
-              <Input
-                label="Building Type"
-                maxLength={50}
-                value={editState.buildingType}
-                onChange={(e) => onEditStateChange('buildingType', e.target.value)}
-              />
-            </div>
+            <Input
+              label="Building Type"
+              maxLength={50}
+              value={editState.buildingType}
+              onChange={(e) => onEditStateChange('buildingType', e.target.value)}
+            />
             <Select
               label="Electric Box (kVA)"
               required
@@ -90,7 +88,12 @@ export function ApplicationInfo({
               <Button
                 onClick={onResubmit}
                 loading={submitting}
-                disabled={!editState.address || !editState.postalCode || !editState.kva}
+                disabled={
+                  !editState.installation.block.trim() ||
+                  !editState.installation.street.trim() ||
+                  !editState.installation.postalCode.trim() ||
+                  !editState.kva
+                }
               >
                 Resubmit Application
               </Button>
@@ -100,33 +103,7 @@ export function ApplicationInfo({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <InfoField label="Installation Address" value={application.address} />
-            <InfoField label="Postal Code" value={application.postalCode} />
-            <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-            {/* Phase 5 — kVA UNKNOWN 시 pending 배지, CONFIRMED 시 값 + source 배지 */}
-            <div>
-              <dt className="text-xs text-gray-500 mb-0.5">Electric Box (kVA)</dt>
-              {application.kvaStatus === 'UNKNOWN' ? (
-                <div className="space-y-1">
-                  <KvaPendingBadge label="kVA pending LEW review" />
-                  <p className="text-xs text-gray-500">
-                    Your LEW will confirm the kVA based on your main breaker or SP account information.
-                  </p>
-                </div>
-              ) : (
-                <dd className="text-sm font-medium text-gray-800 flex items-center gap-2">
-                  <span>{application.selectedKva} kVA</span>
-                  {application.kvaSource === 'LEW_VERIFIED' && (
-                    <Badge variant="success">Confirmed by LEW</Badge>
-                  )}
-                </dd>
-              )}
-            </div>
-            {application.spAccountNo && (
-              <InfoField label="SP Account No." value={application.spAccountNo} />
-            )}
-          </div>
+          <ReadOnlyInstallationDetails application={application} />
         )}
       </Card>
 
@@ -163,5 +140,78 @@ export function ApplicationInfo({
         </Card>
       )}
     </>
+  );
+}
+
+/**
+ * 읽기 모드 Installation Address 렌더.
+ *
+ * - 5-part 중 하나라도 있으면 EMA ELISE 양식 순서대로 5 줄 표시.
+ * - 모두 비어 있으면 legacy 단일 `application.address` / postalCode 를 2열로 폴백.
+ */
+function ReadOnlyInstallationDetails({ application }: { application: Application }) {
+  const fiveParts: AddressInputValues = {
+    block: application.installationAddressBlock ?? '',
+    unit: application.installationAddressUnit ?? '',
+    street: application.installationAddressStreet ?? '',
+    building: application.installationAddressBuilding ?? '',
+    postalCode: application.installationAddressPostalCode ?? '',
+  };
+  const hasFiveParts = hasAnyAddressPart(fiveParts);
+
+  const KvaLine = () => (
+    <div>
+      <dt className="text-xs text-gray-500 mb-0.5">Electric Box (kVA)</dt>
+      {application.kvaStatus === 'UNKNOWN' ? (
+        <div className="space-y-1">
+          <KvaPendingBadge label="kVA pending LEW review" />
+          <p className="text-xs text-gray-500">
+            Your LEW will confirm the kVA based on your main breaker or SP account information.
+          </p>
+        </div>
+      ) : (
+        <dd className="text-sm font-medium text-gray-800 flex items-center gap-2">
+          <span>{application.selectedKva} kVA</span>
+          {application.kvaSource === 'LEW_VERIFIED' && (
+            <Badge variant="success">Confirmed by LEW</Badge>
+          )}
+        </dd>
+      )}
+    </div>
+  );
+
+  if (!hasFiveParts) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoField label="Installation Address" value={application.address} />
+        <InfoField label="Postal Code" value={application.postalCode} />
+        <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+        <KvaLine />
+        {application.spAccountNo && (
+          <InfoField label="SP Account No." value={application.spAccountNo} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoField label="Block / House No" value={fiveParts.block || '—'} />
+        <InfoField label="Unit #" value={fiveParts.unit || '—'} />
+        <div className="sm:col-span-2">
+          <InfoField label="Street" value={fiveParts.street || '—'} />
+        </div>
+        <InfoField label="Building" value={fiveParts.building || '—'} />
+        <InfoField label="Postal Code" value={fiveParts.postalCode || application.postalCode || '—'} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+        <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+        <KvaLine />
+        {application.spAccountNo && (
+          <InfoField label="SP Account No." value={application.spAccountNo} />
+        )}
+      </div>
+    </div>
   );
 }

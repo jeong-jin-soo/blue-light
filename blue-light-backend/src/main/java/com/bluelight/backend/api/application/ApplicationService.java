@@ -745,6 +745,25 @@ public class ApplicationService {
                 quoteAmount, sldFee
         );
 
+        // ── EMA ELISE 5-part 주소 동기화 (재제출 경로) ──
+        // 클라이언트가 5-part 를 송신하면 각 컬럼 덮어쓰기. 송신 안 했으면 기존 값 유지.
+        if (anyInstallationAddressPartPresent(request)) {
+            application.updateInstallationAddressParts(
+                    request.getInstallationAddressBlock(),
+                    request.getInstallationAddressUnit(),
+                    request.getInstallationAddressStreet(),
+                    request.getInstallationAddressBuilding(),
+                    request.getInstallationAddressPostalCode());
+        }
+        if (anyCorrespondenceAddressPartPresent(request)) {
+            application.updateCorrespondenceAddressParts(
+                    request.getCorrespondenceAddressBlock(),
+                    request.getCorrespondenceAddressUnit(),
+                    request.getCorrespondenceAddressStreet(),
+                    request.getCorrespondenceAddressBuilding(),
+                    request.getCorrespondenceAddressPostalCode());
+        }
+
         // SP Account No 수정
         if (request.getSpAccountNo() != null) {
             application.updateSpAccountNo(request.getSpAccountNo());
@@ -1047,5 +1066,25 @@ public class ApplicationService {
             return new BigDecimal("50.00");
         }
         return new BigDecimal("100.00");
+    }
+
+    // ── EMA ELISE 5-part 주소 갱신 감지 헬퍼 ──
+    // 하나라도 값이 넘어왔으면 "사용자가 5-part 를 편집함" 으로 간주하고 일괄 덮어쓴다.
+    // 모든 서브필드가 null이면 기존 값을 건드리지 않는다 (legacy 단일 address 만 편집한 케이스).
+
+    private boolean anyInstallationAddressPartPresent(UpdateApplicationRequest request) {
+        return request.getInstallationAddressBlock() != null
+                || request.getInstallationAddressUnit() != null
+                || request.getInstallationAddressStreet() != null
+                || request.getInstallationAddressBuilding() != null
+                || request.getInstallationAddressPostalCode() != null;
+    }
+
+    private boolean anyCorrespondenceAddressPartPresent(UpdateApplicationRequest request) {
+        return request.getCorrespondenceAddressBlock() != null
+                || request.getCorrespondenceAddressUnit() != null
+                || request.getCorrespondenceAddressStreet() != null
+                || request.getCorrespondenceAddressBuilding() != null
+                || request.getCorrespondenceAddressPostalCode() != null;
     }
 }

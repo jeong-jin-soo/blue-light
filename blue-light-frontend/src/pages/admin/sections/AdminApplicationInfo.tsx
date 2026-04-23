@@ -1,6 +1,10 @@
 import { Card } from '../../../components/ui/Card';
 import { InfoField } from '../../../components/common/InfoField';
 import { fullName } from '../../../utils/formatName';
+import {
+  hasAnyAddressPart,
+  type AddressInputValues,
+} from '../../../components/domain/AddressInputGroup';
 import type { AdminApplication } from '../../../types';
 
 interface Props {
@@ -87,15 +91,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
       {/* Property Details */}
       <Card>
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Property Details</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <InfoField label="Installation Address" value={application.address} />
-          <InfoField label="Postal Code" value={application.postalCode} />
-          <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-          <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
-          {application.spAccountNo && (
-            <InfoField label="SP Account No." value={application.spAccountNo} />
-          )}
-        </div>
+        <AdminInstallationDetails application={application} />
       </Card>
 
       {/* Licence Period */}
@@ -184,5 +180,55 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
         </div>
       </Card>
     </>
+  );
+}
+
+/**
+ * Admin/System Admin Property Details 블록 — 5-part 있으면 EMA ELISE 양식 순서로,
+ * 없으면 legacy 단일 address 로 폴백.
+ */
+function AdminInstallationDetails({ application }: { application: AdminApplication }) {
+  const fiveParts: AddressInputValues = {
+    block: application.installationAddressBlock ?? '',
+    unit: application.installationAddressUnit ?? '',
+    street: application.installationAddressStreet ?? '',
+    building: application.installationAddressBuilding ?? '',
+    postalCode: application.installationAddressPostalCode ?? '',
+  };
+  const hasFiveParts = hasAnyAddressPart(fiveParts);
+
+  if (!hasFiveParts) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoField label="Installation Address" value={application.address} />
+        <InfoField label="Postal Code" value={application.postalCode} />
+        <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+        <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
+        {application.spAccountNo && (
+          <InfoField label="SP Account No." value={application.spAccountNo} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoField label="Block / House No" value={fiveParts.block || '—'} />
+        <InfoField label="Unit #" value={fiveParts.unit || '—'} />
+        <div className="sm:col-span-2">
+          <InfoField label="Street" value={fiveParts.street || '—'} />
+        </div>
+        <InfoField label="Building" value={fiveParts.building || '—'} />
+        <InfoField label="Postal Code" value={fiveParts.postalCode || application.postalCode || '—'} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+        <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+        <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
+        {application.spAccountNo && (
+          <InfoField label="SP Account No." value={application.spAccountNo} />
+        )}
+      </div>
+    </div>
   );
 }
