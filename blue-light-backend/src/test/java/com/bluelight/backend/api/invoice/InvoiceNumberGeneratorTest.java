@@ -1,135 +1,77 @@
 package com.bluelight.backend.api.invoice;
 
-import com.bluelight.backend.common.exception.BusinessException;
-import com.bluelight.backend.domain.invoice.InvoiceRepository;
-import com.bluelight.backend.domain.setting.SystemSetting;
-import com.bluelight.backend.domain.setting.SystemSettingRepository;
+import com.bluelight.backend.api.docnumber.DocumentNumberService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * AC-6 & AC-15: 영수증 번호 생성 규칙 + 충돌 재시도 로직 검증.
+ * InvoiceNumberGenerator — 공통 문서번호 엔진에 올바르게 위임하는지 검증.
+ *
+ * <p>번호 포맷·충돌 제어·오버플로 등의 실제 로직은 {@code DocumentNumberServiceTest}에서 검증한다.
+ * 이 테스트는 Facade의 위임 계약(DOC_TYPE_CODE="RECEIPT" 전달, 반환값 그대로 전파)만 확인한다.</p>
  */
-@DisplayName("InvoiceNumberGenerator - AC-6/AC-15")
+@DisplayName("InvoiceNumberGenerator - 공통 엔진 위임 검증 (Phase 1.4 리팩터링 후)")
 class InvoiceNumberGeneratorTest {
 
-    private InvoiceRepository invoiceRepository;
-    private SystemSettingRepository systemSettingRepository;
+    private DocumentNumberService documentNumberService;
     private InvoiceNumberGenerator generator;
-
-    private static final LocalDate TEST_DATE = LocalDate.of(2026, 4, 22);
-    private static final String DATE_PART = "20260422";
 
     @BeforeEach
     void setUp() {
-        invoiceRepository = mock(InvoiceRepository.class);
-        systemSettingRepository = mock(SystemSettingRepository.class);
-
-        // 기본: prefix 설정 없음 → DEFAULT_PREFIX "IN" 사용
-        when(systemSettingRepository.findById("invoice_number_prefix"))
-                .thenReturn(Optional.empty());
-
-        generator = new InvoiceNumberGenerator(invoiceRepository, systemSettingRepository);
+        documentNumberService = mock(DocumentNumberService.class);
+        generator = new InvoiceNumberGenerator(documentNumberService);
     }
 
-    // ── AC-6: 형식 IN + yyyyMMdd + 3자리 순번 ────────────────────────────────
-
     @Test
-    @DisplayName("shouldReturnIN001WhenNoPreviousInvoicesExist")
-    void shouldReturnIN001WhenNoPreviousInvoicesExist() {
-        // AC-6: 당일 첫 번째 인보이스 → IN20260422001
-        // Given
-        when(invoiceRepository.countByInvoiceNumberStartingWith("IN" + DATE_PART)).thenReturn(0L);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "001")).thenReturn(false);
+    @DisplayName("shouldDelegateToDocumentNumberServiceWithReceiptDocTypeCode")
+    void shouldDelegateToDocumentNumberServiceWithReceiptDocTypeCode() {
+        // Given: 공통 엔진이 유효한 번호를 반환
+        when(documentNumberService.generate("RECEIPT"))
+                .thenReturn("LK-RCP-20260423-0001");
 
         // When
-        String result = generator.next(TEST_DATE);
+        String result = generator.next(LocalDate.of(2026, 4, 23));
 
-        // Then
-        assertThat(result).isEqualTo("IN20260422001");
+        // Then: 공통 엔진이 "RECEIPT" 타입 코드로 호출되고, 반환값이 그대로 전파됨
+        assertThat(result).isEqualTo("LK-RCP-20260423-0001");
+        verify(documentNumberService).generate(eq("RECEIPT"));
+        verifyNoMoreInteractions(documentNumberService);
     }
 
     @Test
-    @DisplayName("shouldReturn003WhenTwoPreviousInvoicesExist")
-    void shouldReturn003WhenTwoPreviousInvoicesExist() {
-        // AC-6: 기존 2건이면 세 번째 → IN20260422003
-        // Given
-        when(invoiceRepository.countByInvoiceNumberStartingWith("IN" + DATE_PART)).thenReturn(2L);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "003")).thenReturn(false);
+    @DisplayName("shouldPassthroughEvenWhenDateArgumentIsNull")
+    void shouldPassthroughEvenWhenDateArgumentIsNull() {
+        // date 인자는 시그니처 호환용(무시됨). null이어도 정상 위임되어야 함.
+        when(documentNumberService.generate("RECEIPT"))
+                .thenReturn("LK-RCP-20260423-0002");
 
-        // When
-        String result = generator.next(TEST_DATE);
+        String result = generator.next(null);
 
-        // Then
-        assertThat(result).isEqualTo("IN20260422003");
+        assertThat(result).isEqualTo("LK-RCP-20260423-0002");
+        verify(documentNumberService).generate("RECEIPT");
     }
 
     @Test
-    @DisplayName("shouldUseCustomPrefixWhenConfigured")
-    void shouldUseCustomPrefixWhenConfigured() {
-        // AC-6: invoice_number_prefix 설정값이 있으면 그 값 사용
-        // Given
-        SystemSetting prefixSetting = new SystemSetting("invoice_number_prefix", "REC", "custom prefix");
-        when(systemSettingRepository.findById("invoice_number_prefix"))
-                .thenReturn(Optional.of(prefixSetting));
-        when(invoiceRepository.countByInvoiceNumberStartingWith("REC" + DATE_PART)).thenReturn(0L);
-        when(invoiceRepository.existsByInvoiceNumber("REC" + DATE_PART + "001")).thenReturn(false);
+    @DisplayName("shouldPropagateExceptionFromDocumentNumberService")
+    void shouldPropagateExceptionFromDocumentNumberService() {
+        // 공통 엔진에서 발생한 예외는 호출자로 그대로 전파되어야 함.
+        RuntimeException underlying = new RuntimeException("overflow");
+        when(documentNumberService.generate("RECEIPT")).thenThrow(underlying);
 
-        // When
-        String result = generator.next(TEST_DATE);
-
-        // Then
-        assertThat(result).startsWith("REC").contains(DATE_PART).endsWith("001");
-    }
-
-    // ── AC-15: 충돌 재시도 ────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("shouldReturnIN005WhenFirst4AttemptsCollide")
-    void shouldReturnIN005WhenFirst4AttemptsCollide() {
-        // AC-15: existsByInvoiceNumber 처음 4번 true, 5번째 false → IN{date}005 반환
-        // Given: countByInvoiceNumberStartingWith가 0 → 첫 시도는 seq=1
-        // 충돌로 attempt 0 → seq=1, attempt 1 → seq=2, ... attempt 4 → seq=5
-        when(invoiceRepository.countByInvoiceNumberStartingWith("IN" + DATE_PART)).thenReturn(0L);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "001")).thenReturn(true);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "002")).thenReturn(true);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "003")).thenReturn(true);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "004")).thenReturn(true);
-        when(invoiceRepository.existsByInvoiceNumber("IN" + DATE_PART + "005")).thenReturn(false);
-
-        // When
-        String result = generator.next(TEST_DATE);
-
-        // Then
-        assertThat(result).contains("005");
-        assertThat(result).isEqualTo("IN" + DATE_PART + "005");
-    }
-
-    @Test
-    @DisplayName("shouldThrowINVOICE_NUMBER_COLLISIONWhenAll5AttemptsCollide")
-    void shouldThrowINVOICE_NUMBER_COLLISIONWhenAll5AttemptsCollide() {
-        // AC-15: 5회 모두 true → INVOICE_NUMBER_COLLISION 500 예외
-        // Given
-        when(invoiceRepository.countByInvoiceNumberStartingWith("IN" + DATE_PART)).thenReturn(0L);
-        when(invoiceRepository.existsByInvoiceNumber(anyString())).thenReturn(true);
-
-        // When / Then
-        assertThatThrownBy(() -> generator.next(TEST_DATE))
-                .isInstanceOf(BusinessException.class)
-                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
-                        .isEqualTo("INVOICE_NUMBER_COLLISION"))
-                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus().value())
-                        .isEqualTo(500));
+        try {
+            generator.next(LocalDate.now());
+        } catch (RuntimeException e) {
+            assertThat(e).isSameAs(underlying);
+        }
     }
 }
