@@ -70,6 +70,9 @@ public class DatabaseMigrationRunner {
             migratePaymentsReferenceColumns(conn);
             // files 테이블에 3개 신규 서비스 주문 FK 컬럼 추가
             migrateFilesServiceOrderColumns(conn);
+            // ★ Expired License Order — files.expired_license_order_seq FK + file_type VARCHAR(40)
+            migrateFilesExpiredLicenseColumn(conn);
+            migrateFilesFileTypeWidth(conn);
             // ★ Kaki Concierge Phase 1.5 — Quote workflow (통화 후 견적 이메일)
             migrateConciergeRequestsQuoteColumns(conn);
             // sld_orders.ampere — 신청자가 주문 시 입력하는 ampere 정보
@@ -752,6 +755,53 @@ public class DatabaseMigrationRunner {
                     log.debug("Migration [files-service-order]: {} already exists", indexName);
                 }
             }
+        }
+    }
+
+    /**
+     * 마이그레이션: files 테이블에 expired_license_order_seq 컬럼 + 인덱스 추가.
+     */
+    private void migrateFilesExpiredLicenseColumn(Connection conn) throws SQLException {
+        if (columnExists(conn, "files", "expired_license_order_seq")) {
+            log.debug("Migration [files-expired-license]: already applied, skipping");
+            return;
+        }
+        log.info("Migration [files-expired-license]: adding expired_license_order_seq");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE files ADD COLUMN expired_license_order_seq BIGINT AFTER lew_service_order_seq"
+            );
+            try {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_files_expired_license_order_seq ON files (expired_license_order_seq)"
+                );
+            } catch (SQLException ignore) {
+                log.debug("Migration [files-expired-license]: index already exists");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: files.file_type VARCHAR(30) → VARCHAR(40)
+     * <p>Expired License 관련 enum 값이 30자에 근접 (EXPIRED_LICENSE_SUPPORTING_DOC = 30자) 하여
+     * 향후 확장성 확보를 위해 40으로 확대. 멱등성 보장.
+     */
+    private void migrateFilesFileTypeWidth(Connection conn) throws SQLException {
+        Integer currentSize = getColumnCharLength(conn, "files", "file_type");
+        if (currentSize == null) {
+            log.debug("Migration [files-file-type-width]: column not found, skipping");
+            return;
+        }
+        if (currentSize >= 40) {
+            log.debug("Migration [files-file-type-width]: already {} chars, skipping", currentSize);
+            return;
+        }
+        log.info("Migration [files-file-type-width]: widening file_type {} → 40", currentSize);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE files MODIFY COLUMN file_type VARCHAR(40) NOT NULL"
+            );
+            log.info("Migration [files-file-type-width]: done");
         }
     }
 
