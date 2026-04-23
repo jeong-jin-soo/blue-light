@@ -72,5 +72,20 @@ public enum FileType {
     /**
      * LEW Service 방문 보고서 PDF (LEW Service 방문형 리스키닝 PR 3)
      */
-    LEW_SERVICE_VISIT_REPORT
+    LEW_SERVICE_VISIT_REPORT,
+
+    /**
+     * Expired License 주문 참고 문서 (신청자가 업로드, 최대 10개/파일당 20MB, 임의 포맷)
+     */
+    EXPIRED_LICENSE_SUPPORTING_DOC,
+
+    /**
+     * Expired License 주문 방문 사진
+     */
+    EXPIRED_LICENSE_VISIT_PHOTO,
+
+    /**
+     * Expired License 주문 방문 보고서 PDF
+     */
+    EXPIRED_LICENSE_VISIT_REPORT
 }

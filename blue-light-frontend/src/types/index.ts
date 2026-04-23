@@ -1167,6 +1167,88 @@ export interface LewServiceOrderPayment {
   transactionId?: string;
 }
 
+// ────────────────────────────────────────────────────────────
+//  Expired License Order (LEW Service 와 동일 생애주기, 다중 참고 문서 업로드)
+// ────────────────────────────────────────────────────────────
+
+export type ExpiredLicenseOrderStatus = LewServiceOrderStatus;
+
+export interface ExpiredLicenseVisitPhoto {
+  photoSeq: number;
+  fileSeq: number;
+  caption?: string;
+  uploadedAt: string;
+}
+
+export interface ExpiredLicenseSupportingDocument {
+  fileSeq: number;
+  fileType: string;
+  originalFilename?: string;
+  fileSize?: number;
+  uploadedAt: string;
+}
+
+export interface ExpiredLicenseOrder {
+  expiredLicenseOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  status: ExpiredLicenseOrderStatus;
+  onSite?: boolean;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  visitReportFileSeq?: number;
+  revisitComment?: string;
+  visitScheduledAt?: string;
+  visitScheduleNote?: string;
+  checkInAt?: string;
+  checkOutAt?: string;
+  visitPhotos?: ExpiredLicenseVisitPhoto[];
+  supportingDocuments?: ExpiredLicenseSupportingDocument[];
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateExpiredLicenseOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+export interface ExpiredLicenseOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  visitScheduled: number;
+  visitCompleted: number;
+  revisitRequested: number;
+  completed: number;
+}
+
+export interface ExpiredLicenseOrderPayment {
+  expiredLicenseOrderPaymentSeq: number;
+  expiredLicenseOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
 /**
  * SLD SSE 이벤트 타입
  */

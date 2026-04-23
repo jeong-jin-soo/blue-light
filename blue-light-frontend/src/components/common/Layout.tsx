@@ -46,6 +46,7 @@ export default function Layout() {
     { path: '/lighting-orders', label: 'Lighting Layout', icon: '💡' },
     { path: '/power-socket-orders', label: 'Power Socket', icon: '🔌' },
     { path: '/lew-service-orders', label: 'LEW Service', icon: '⚡' },
+    { path: '/expired-license-orders', label: 'Expired License', icon: '🔄' },
     { path: '/profile', label: 'My Profile', icon: '👤' },
   ];
 
@@ -78,6 +79,8 @@ export default function Layout() {
     { path: '/power-socket-manager/orders', label: 'Power Socket Orders', icon: '🔌' },
     { path: '/lew-service-manager/dashboard', label: 'LEW Service Dashboard', icon: '📊' },
     { path: '/lew-service-manager/orders', label: 'LEW Service Orders', icon: '⚡' },
+    { path: '/expired-license-manager/dashboard', label: 'Expired License Dashboard', icon: '📊' },
+    { path: '/expired-license-manager/orders', label: 'Expired License Orders', icon: '🔄' },
   ];
 
   // ★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B

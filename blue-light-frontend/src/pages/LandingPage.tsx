@@ -14,6 +14,7 @@ const services = [
   { icon: '💡', label: 'Lighting Layout',   to: '/lighting-orders/new' },
   { icon: '🔌', label: 'Power Socket',      to: '/power-socket-orders/new' },
   { icon: '⚡', label: 'LEW Service',        to: '/lew-service-orders/new' },
+  { icon: '🔄', label: 'Expired License',   to: '/expired-license-orders/new' },
 ];
 
 const steps = [
@@ -175,7 +176,7 @@ export default function LandingPage() {
           </div>
 
           {/* Services Grid — Apply + 4 direct entry points */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 max-w-5xl mx-auto">
             {services.map((item) => (
               <button
                 key={item.to}

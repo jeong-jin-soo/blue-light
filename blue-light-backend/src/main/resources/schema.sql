@@ -715,6 +715,70 @@ CREATE TABLE IF NOT EXISTS lew_service_order_payments (
     CONSTRAINT fk_lew_service_order_payments_order FOREIGN KEY (lew_service_order_seq) REFERENCES lew_service_orders (lew_service_order_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 18-4. Expired License 주문 (LEW Service 와 동일한 생애주기, 다중 참고 문서 업로드)
+CREATE TABLE IF NOT EXISTS expired_license_orders (
+    expired_license_order_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq                  BIGINT        NOT NULL,
+    assigned_manager_seq      BIGINT,
+    address                   VARCHAR(255),
+    postal_code               VARCHAR(10),
+    building_type             VARCHAR(50),
+    selected_kva              INT,
+    applicant_note            TEXT,
+    status                    VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
+    quote_amount              DECIMAL(10,2),
+    quote_note                TEXT,
+    manager_note              TEXT,
+    revisit_comment           TEXT,
+    visit_scheduled_at        DATETIME(6) NULL,
+    visit_schedule_note       TEXT NULL,
+    check_in_at               DATETIME(6) NULL,
+    check_out_at              DATETIME(6) NULL,
+    visit_report_file_seq     BIGINT      NULL,
+    created_at                DATETIME(6),
+    updated_at                DATETIME(6),
+    created_by                BIGINT,
+    updated_by                BIGINT,
+    deleted_at                DATETIME(6),
+    PRIMARY KEY (expired_license_order_seq),
+    KEY idx_expired_license_orders_user (user_seq),
+    KEY idx_expired_license_orders_status (status),
+    KEY idx_expired_license_orders_manager (assigned_manager_seq),
+    CONSTRAINT fk_expired_license_orders_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_expired_license_orders_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS expired_license_visit_photos (
+    photo_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    order_seq   BIGINT       NOT NULL,
+    file_seq    BIGINT       NOT NULL,
+    caption     TEXT         NULL,
+    uploaded_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    deleted_at  DATETIME(6)  NULL,
+    PRIMARY KEY (photo_seq),
+    KEY idx_expired_license_visit_photos_order (order_seq),
+    KEY idx_expired_license_visit_photos_file  (file_seq),
+    CONSTRAINT fk_expired_license_visit_photos_order FOREIGN KEY (order_seq) REFERENCES expired_license_orders (expired_license_order_seq),
+    CONSTRAINT fk_expired_license_visit_photos_file  FOREIGN KEY (file_seq) REFERENCES files (file_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS expired_license_order_payments (
+    expired_license_order_payment_seq BIGINT        NOT NULL AUTO_INCREMENT,
+    expired_license_order_seq         BIGINT        NOT NULL,
+    transaction_id                    VARCHAR(100),
+    amount                            DECIMAL(10,2) NOT NULL,
+    payment_method                    VARCHAR(20)   DEFAULT 'BANK_TRANSFER',
+    status                            VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
+    paid_at                           DATETIME(6),
+    updated_at                        DATETIME(6),
+    created_by                        BIGINT,
+    updated_by                        BIGINT,
+    deleted_at                        DATETIME(6),
+    PRIMARY KEY (expired_license_order_payment_seq),
+    KEY idx_expired_license_order_payments_order (expired_license_order_seq),
+    CONSTRAINT fk_expired_license_order_payments_order FOREIGN KEY (expired_license_order_seq) REFERENCES expired_license_orders (expired_license_order_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- 19. SLD 템플릿 DB (샘플 SLD에서 추출한 도면 정보)
 CREATE TABLE IF NOT EXISTS sld_templates (
     sld_template_seq  BIGINT        NOT NULL AUTO_INCREMENT,

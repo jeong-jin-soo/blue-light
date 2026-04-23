@@ -1,6 +1,7 @@
 package com.bluelight.backend.domain.file;
 
 import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.expiredlicenseorder.ExpiredLicenseOrder;
 import com.bluelight.backend.domain.lewserviceorder.LewServiceOrder;
 import com.bluelight.backend.domain.lightingorder.LightingOrder;
 import com.bluelight.backend.domain.powersocketorder.PowerSocketOrder;
@@ -73,6 +74,13 @@ public class FileEntity {
     private LewServiceOrder lewServiceOrder;
 
     /**
+     * 관련 Expired License 주문 (FK, nullable)
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "expired_license_order_seq")
+    private ExpiredLicenseOrder expiredLicenseOrder;
+
+    /**
      * 파일 종류
      */
     @Enumerated(EnumType.STRING)
@@ -132,13 +140,14 @@ public class FileEntity {
     @Builder
     public FileEntity(Application application, SldOrder sldOrder,
                       LightingOrder lightingOrder, PowerSocketOrder powerSocketOrder,
-                      LewServiceOrder lewServiceOrder,
+                      LewServiceOrder lewServiceOrder, ExpiredLicenseOrder expiredLicenseOrder,
                       FileType fileType, String fileUrl, String originalFilename, Long fileSize) {
         this.application = application;
         this.sldOrder = sldOrder;
         this.lightingOrder = lightingOrder;
         this.powerSocketOrder = powerSocketOrder;
         this.lewServiceOrder = lewServiceOrder;
+        this.expiredLicenseOrder = expiredLicenseOrder;
         this.fileType = fileType;
         this.fileUrl = fileUrl;
         this.originalFilename = originalFilename;

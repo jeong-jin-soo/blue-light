@@ -40,6 +40,9 @@ import PowerSocketOrderDetailPage from '../pages/applicant/PowerSocketOrderDetai
 import LewServiceOrderListPage from '../pages/applicant/LewServiceOrderListPage';
 import NewLewServiceOrderPage from '../pages/applicant/NewLewServiceOrderPage';
 import LewServiceOrderDetailPage from '../pages/applicant/LewServiceOrderDetailPage';
+import ExpiredLicenseOrderListPage from '../pages/applicant/ExpiredLicenseOrderListPage';
+import NewExpiredLicenseOrderPage from '../pages/applicant/NewExpiredLicenseOrderPage';
+import ExpiredLicenseOrderDetailPage from '../pages/applicant/ExpiredLicenseOrderDetailPage';
 
 // Admin pages
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
@@ -76,6 +79,11 @@ import PowerSocketManagerOrderDetailPage from '../pages/power-socket-manager/Pow
 import LewServiceManagerDashboardPage from '../pages/lew-service-manager/LewServiceManagerDashboardPage';
 import LewServiceManagerOrderListPage from '../pages/lew-service-manager/LewServiceManagerOrderListPage';
 import LewServiceManagerOrderDetailPage from '../pages/lew-service-manager/LewServiceManagerOrderDetailPage';
+
+// Expired License Manager pages
+import ExpiredLicenseManagerDashboardPage from '../pages/expired-license-manager/ExpiredLicenseManagerDashboardPage';
+import ExpiredLicenseManagerOrderListPage from '../pages/expired-license-manager/ExpiredLicenseManagerOrderListPage';
+import ExpiredLicenseManagerOrderDetailPage from '../pages/expired-license-manager/ExpiredLicenseManagerOrderDetailPage';
 
 // Concierge Manager pages (★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B)
 import ConciergeManagerDashboardPage from '../pages/concierge-manager/ConciergeManagerDashboardPage';
@@ -169,6 +177,9 @@ const router = createBrowserRouter([
           { path: '/lew-service-orders', element: <LewServiceOrderListPage /> },
           { path: '/lew-service-orders/new', element: <NewLewServiceOrderPage /> },
           { path: '/lew-service-orders/:id', element: <LewServiceOrderDetailPage /> },
+          { path: '/expired-license-orders', element: <ExpiredLicenseOrderListPage /> },
+          { path: '/expired-license-orders/new', element: <NewExpiredLicenseOrderPage /> },
+          { path: '/expired-license-orders/:id', element: <ExpiredLicenseOrderDetailPage /> },
           { path: '/profile', element: <ProfilePage /> },
           { path: '/notifications', element: <NotificationsPage /> },
         ],
@@ -267,6 +278,11 @@ const router = createBrowserRouter([
           { path: '/lew-service-manager/orders', element: <LewServiceManagerOrderListPage /> },
           { path: '/lew-service-manager/orders/:id', element: <LewServiceManagerOrderDetailPage /> },
           { path: '/lew-service-manager/notifications', element: <NotificationsPage /> },
+
+          { path: '/expired-license-manager/dashboard', element: <ExpiredLicenseManagerDashboardPage /> },
+          { path: '/expired-license-manager/orders', element: <ExpiredLicenseManagerOrderListPage /> },
+          { path: '/expired-license-manager/orders/:id', element: <ExpiredLicenseManagerOrderDetailPage /> },
+          { path: '/expired-license-manager/notifications', element: <NotificationsPage /> },
         ],
       },
     ],
