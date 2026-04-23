@@ -222,26 +222,28 @@ CREATE TABLE IF NOT EXISTS document_type_catalog (
 -- 5. 첨부 파일
 CREATE TABLE IF NOT EXISTS files (
     file_seq               BIGINT       NOT NULL AUTO_INCREMENT,
-    application_seq        BIGINT,
-    sld_order_seq          BIGINT,
-    lighting_order_seq     BIGINT,
-    power_socket_order_seq BIGINT,
-    lew_service_order_seq  BIGINT,
-    file_type              VARCHAR(30)  NOT NULL,
-    file_url               VARCHAR(500) NOT NULL,
-    original_filename      VARCHAR(255),
-    file_size              BIGINT,
-    uploaded_at            DATETIME(6),
-    updated_at             DATETIME(6),
-    created_by             BIGINT,
-    updated_by             BIGINT,
-    deleted_at             DATETIME(6),
+    application_seq          BIGINT,
+    sld_order_seq            BIGINT,
+    lighting_order_seq       BIGINT,
+    power_socket_order_seq   BIGINT,
+    lew_service_order_seq    BIGINT,
+    expired_license_order_seq BIGINT,
+    file_type                VARCHAR(40)  NOT NULL,
+    file_url                 VARCHAR(500) NOT NULL,
+    original_filename        VARCHAR(255),
+    file_size                BIGINT,
+    uploaded_at              DATETIME(6),
+    updated_at               DATETIME(6),
+    created_by               BIGINT,
+    updated_by               BIGINT,
+    deleted_at               DATETIME(6),
     PRIMARY KEY (file_seq),
     KEY idx_files_application_seq (application_seq),
     KEY idx_files_sld_order_seq (sld_order_seq),
     KEY idx_files_lighting_order_seq (lighting_order_seq),
     KEY idx_files_power_socket_order_seq (power_socket_order_seq),
     KEY idx_files_lew_service_order_seq (lew_service_order_seq),
+    KEY idx_files_expired_license_order_seq (expired_license_order_seq),
     CONSTRAINT fk_files_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -986,4 +988,44 @@ CREATE TABLE IF NOT EXISTS role_metadata (
     updated_by      BIGINT,
     deleted_at      DATETIME(6),
     PRIMARY KEY (role_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- Document Number Generator — 공통 문서번호 채번 엔진
+-- 스펙: doc/Project Analysis/document-number-generator-spec.md
+-- 형식: LK-{DOC_PREFIX}-YYYYMMDD-NNNN  (예: LK-RCP-20260423-0001)
+-- ============================================
+
+-- 문서 타입 마스터 (설정 우선 원칙 준수 — hardcoding 금지)
+CREATE TABLE IF NOT EXISTS document_number_types (
+    code            VARCHAR(40)   NOT NULL,          -- 논리 식별자 (예: RECEIPT)
+    prefix          VARCHAR(10)   NOT NULL,          -- 번호의 2차 접두어 (예: RCP)
+    label_ko        VARCHAR(120)  NOT NULL,
+    label_en        VARCHAR(120)  NOT NULL,
+    description     VARCHAR(500),
+    active          BOOLEAN       NOT NULL DEFAULT TRUE,
+    display_order   INT           NOT NULL DEFAULT 0,
+    created_at      DATETIME(6),
+    updated_at      DATETIME(6),
+    created_by      BIGINT,
+    updated_by      BIGINT,
+    deleted_at      DATETIME(6),
+    PRIMARY KEY (code),
+    UNIQUE KEY uk_document_number_types_prefix (prefix),
+    CONSTRAINT ck_docnumtypes_prefix_fmt CHECK (prefix REGEXP '^[A-Z]{2,5}$'),
+    CONSTRAINT ck_docnumtypes_code_fmt   CHECK (code REGEXP '^[A-Z_]{3,40}$')
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 일별 시퀀스 카운터 (type × issue_date 복합 PK, SELECT ... FOR UPDATE 로 원자적 증가)
+CREATE TABLE IF NOT EXISTS document_number_sequence (
+    doc_type_code    VARCHAR(40)   NOT NULL,
+    issue_date       DATE          NOT NULL,
+    next_value       INT           NOT NULL DEFAULT 1,  -- 다음 발번될 시퀀스 (1부터 시작)
+    last_issued_at   DATETIME(6),
+    last_issued_by   BIGINT,
+    created_at       DATETIME(6),
+    updated_at       DATETIME(6),
+    PRIMARY KEY (doc_type_code, issue_date),
+    CONSTRAINT fk_docnumseq_type FOREIGN KEY (doc_type_code)
+        REFERENCES document_number_types (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

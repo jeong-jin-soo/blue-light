@@ -92,6 +92,9 @@ public class DatabaseMigrationRunner {
             // ── LEW Review Form P1.B: applications 테이블에 신청자 hint 8 컬럼 ──
             migrateApplicationsApplicantHintColumns(conn);
             seedSystemSettings(conn);
+            // ── Document Number Generator (공통 문서번호 채번) P1.1 + P1.3 ──
+            createDocumentNumberTables(conn);
+            seedDocumentNumberTypes(conn);
             // ★ Kaki Concierge Phase 1 PR#4 Stage A
             seedConciergeManager(conn);
             // role_metadata 싱크 — UserRole enum 값을 테이블에 upsert하고 enum에 없는 row는 삭제
@@ -962,7 +965,8 @@ public class DatabaseMigrationRunner {
             {"invoice_company_website", "Licensekaki.com", "E-Invoice company website"},
             {"invoice_paynow_uen", "202627777H", "E-Invoice PayNow UEN"},
             {"invoice_paynow_qr_file_seq", "", "E-Invoice PayNow QR FileEntity seq (empty = not configured)"},
-            {"invoice_number_prefix", "IN", "E-Invoice number prefix (default: IN)"},
+            // @Deprecated 2026-04: DocumentNumberService로 대체됨. Phase 2에서 row 제거 예정.
+            {"invoice_number_prefix", "IN", "[DEPRECATED 2026-04] Replaced by DocumentNumberService — see document-number-generator-spec.md"},
             {"invoice_currency", "SGD", "E-Invoice default currency"},
             {"invoice_footer_note",
              "No electronic signature is necessary, as this document serves as an official E-Invoice.",
@@ -991,6 +995,100 @@ public class DatabaseMigrationRunner {
             log.info("Migration [seed-system-settings]: seeded {} new settings", seeded);
         } else {
             log.debug("Migration [seed-system-settings]: all settings exist, skipping");
+        }
+    }
+
+    // ===================================================================
+    // Document Number Generator (공통 문서번호 채번 엔진)
+    // 스펙: doc/Project Analysis/document-number-generator-spec.md
+    // ===================================================================
+
+    /**
+     * 문서번호 관련 테이블 생성 (멱등). schema.sql 시드와 동일한 DDL을 런타임에도 실행하여,
+     * SQL_INIT_MODE=never 환경(운영 DB) 대응.
+     */
+    private void createDocumentNumberTables(Connection conn) throws SQLException {
+        final String createTypes = """
+                CREATE TABLE IF NOT EXISTS document_number_types (
+                    code            VARCHAR(40)   NOT NULL,
+                    prefix          VARCHAR(10)   NOT NULL,
+                    label_ko        VARCHAR(120)  NOT NULL,
+                    label_en        VARCHAR(120)  NOT NULL,
+                    description     VARCHAR(500),
+                    active          BOOLEAN       NOT NULL DEFAULT TRUE,
+                    display_order   INT           NOT NULL DEFAULT 0,
+                    created_at      DATETIME(6),
+                    updated_at      DATETIME(6),
+                    created_by      BIGINT,
+                    updated_by      BIGINT,
+                    deleted_at      DATETIME(6),
+                    PRIMARY KEY (code),
+                    UNIQUE KEY uk_document_number_types_prefix (prefix),
+                    CONSTRAINT ck_docnumtypes_prefix_fmt CHECK (prefix REGEXP '^[A-Z]{2,5}$'),
+                    CONSTRAINT ck_docnumtypes_code_fmt   CHECK (code REGEXP '^[A-Z_]{3,40}$')
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """;
+
+        final String createSequence = """
+                CREATE TABLE IF NOT EXISTS document_number_sequence (
+                    doc_type_code    VARCHAR(40)   NOT NULL,
+                    issue_date       DATE          NOT NULL,
+                    next_value       INT           NOT NULL DEFAULT 1,
+                    last_issued_at   DATETIME(6),
+                    last_issued_by   BIGINT,
+                    created_at       DATETIME(6),
+                    updated_at       DATETIME(6),
+                    PRIMARY KEY (doc_type_code, issue_date),
+                    CONSTRAINT fk_docnumseq_type FOREIGN KEY (doc_type_code)
+                        REFERENCES document_number_types (code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """;
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(createTypes);
+            stmt.executeUpdate(createSequence);
+            log.debug("Migration [document-number-tables]: verified (idempotent)");
+        }
+    }
+
+    /**
+     * 문서 타입 카탈로그 시드 — P1에서는 RECEIPT 하나만. Phase 2에서 Admin UI를 통해 확장.
+     * 멱등성: 이미 존재하면 스킵.
+     */
+    private void seedDocumentNumberTypes(Connection conn) throws SQLException {
+        // {code, prefix, label_ko, label_en, description, display_order}
+        final String[][] types = {
+            {"RECEIPT", "RCP", "영수증", "Receipt",
+             "결제 영수증 (E-Invoice) — 기존 Invoice 엔티티의 번호 생성에 사용", "10"},
+        };
+
+        int seeded = 0;
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM document_number_types WHERE code = ?");
+             PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO document_number_types "
+              + "(code, prefix, label_ko, label_en, description, active, display_order, created_at, updated_at) "
+              + "VALUES (?, ?, ?, ?, ?, TRUE, ?, NOW(), NOW())")) {
+
+            for (String[] t : types) {
+                check.setString(1, t[0]);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) continue;
+                }
+                insert.setString(1, t[0]);
+                insert.setString(2, t[1]);
+                insert.setString(3, t[2]);
+                insert.setString(4, t[3]);
+                insert.setString(5, t[4]);
+                insert.setInt(6, Integer.parseInt(t[5]));
+                insert.executeUpdate();
+                seeded++;
+            }
+        }
+        if (seeded > 0) {
+            log.info("Migration [seed-document-number-types]: seeded {} new types", seeded);
+        } else {
+            log.debug("Migration [seed-document-number-types]: all types exist, skipping");
         }
     }
 

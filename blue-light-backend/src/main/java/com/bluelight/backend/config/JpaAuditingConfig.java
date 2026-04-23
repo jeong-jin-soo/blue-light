@@ -12,6 +12,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 import javax.sql.DataSource;
+import java.time.Clock;
+import java.time.ZoneId;
 
 /**
  * JPA Auditing + Scheduling + Async + ShedLock 설정
@@ -31,6 +33,15 @@ public class JpaAuditingConfig {
     @Bean
     public AuditorAware<Long> auditorProvider() {
         return new AuditorAwareImpl();
+    }
+
+    /**
+     * 시스템 Clock — 테스트에서 {@code FixedClock}으로 주입 가능하도록 빈으로 제공.
+     * 기본은 Asia/Singapore (프로젝트 표준 타임존) 기준. 사용처: DocumentNumberService 등.
+     */
+    @Bean
+    public Clock clock() {
+        return Clock.system(ZoneId.of("Asia/Singapore"));
     }
 
     /**
