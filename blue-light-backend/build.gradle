@@ -63,7 +63,7 @@ tasks.named('test') {
 	useJUnitPlatform {
 		// 'timing' 태그는 기본 test 태스크에서 제외 (CI 노이즈 + MySQL 의존 회피).
 		// 수동 실행: ./gradlew timingTest
-		excludeTags 'timing'
+		excludeTags 'timing', 'integration'
 	}
 }
 
@@ -75,6 +75,18 @@ tasks.register('timingTest', Test) {
 	testClassesDirs = sourceSets.test.output.classesDirs
 	classpath = sourceSets.test.runtimeClasspath
 	// 타이밍 측정은 다른 테스트와 병렬 실행하지 않음
+	maxParallelForks = 1
+}
+
+// 통합 테스트 수동 실행용 태스크 (MySQL 컨테이너 필요).
+// 수동 실행: docker compose up -d && ./gradlew integrationTest
+tasks.register('integrationTest', Test) {
+	useJUnitPlatform {
+		includeTags 'integration'
+	}
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	// 동시성 테스트가 포함되므로 순차 실행
 	maxParallelForks = 1
 }
 
