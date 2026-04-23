@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import licensekakiLogo from '../../assets/logo-licensekaki.png';
+import licensekakiLogo from '../../assets/licensekaki-logo.png';
 
 interface AuthLayoutProps {
   children: ReactNode;
