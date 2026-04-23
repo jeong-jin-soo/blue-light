@@ -90,14 +90,17 @@ export default function AdminApplicationDetailPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [appData, filesData, paymentsData] = await Promise.all([
-        adminApi.getApplication(applicationId),
+      // Application 상세는 필수. files/payments는 역할에 따라 권한이 제한적이므로
+      // allSettled로 부분 실패 허용(LEW는 files/payments 열람 권한이 없을 수 있음).
+      const appData = await adminApi.getApplication(applicationId);
+      setApplication(appData);
+
+      const [filesResult, paymentsResult] = await Promise.allSettled([
         fileApi.getFilesByApplication(applicationId),
         adminApi.getPayments(applicationId),
       ]);
-      setApplication(appData);
-      setFiles(filesData);
-      setPayments(paymentsData);
+      setFiles(filesResult.status === 'fulfilled' ? filesResult.value : []);
+      setPayments(paymentsResult.status === 'fulfilled' ? paymentsResult.value : []);
 
       // LOA status
       try {
