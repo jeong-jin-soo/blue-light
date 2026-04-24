@@ -120,12 +120,8 @@ export function CofStepInputs({
   // Retailer는 Consumer Type이 NON_CONTESTABLE이면 SP 고정 + disabled
   const retailerDisabled = draft.consumerType !== 'CONTESTABLE';
 
-  // approved_load_kva와 applicantKva의 차이 — 경고 배지
-  const approvedLoadDiffers =
-    !kvaUnknown &&
-    applicantKva != null &&
-    draft.approvedLoadKva != null &&
-    draft.approvedLoadKva !== applicantKva;
+  // Phase 6: CoF.approvedLoadKva 는 Application.selectedKva SSOT. LEW 는 CoF 화면에서 편집 불가
+  // (kVA 탭에서 Confirm/Override 해야 함). 값이 비어 있으면 kVA 탭으로 이동을 안내한다.
 
   return (
     <div className="space-y-6">
@@ -284,36 +280,31 @@ export function CofStepInputs({
         />
       </div>
 
-      {/* 5. Approved Load kVA */}
+      {/* 5. Approved Load kVA — Phase 6: Application.selectedKva SSOT, read-only here */}
       <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <label className="block text-sm font-medium text-gray-700">
             Approved Load (kVA) <span className="text-error-500">*</span>
           </label>
-          {approvedLoadDiffers && (
-            <Badge variant="warning">Differs from applicant estimate ({applicantKva} kVA)</Badge>
+          {kvaUnknown ? (
+            <Badge variant="warning">kVA not confirmed</Badge>
+          ) : (
+            <Badge variant="success">LEW confirmed</Badge>
           )}
         </div>
-        <Input
-          type="number"
-          min={1}
-          step={1}
-          value={draft.approvedLoadKva ?? ''}
-          onChange={(e) => {
-            const raw = e.target.value;
-            onDraftChange({
-              approvedLoadKva: raw === '' ? undefined : Math.max(0, Number(raw)),
-            });
-          }}
-          disabled={readOnly}
-          rightIcon={<span className="text-xs font-medium text-gray-500">kVA</span>}
-          hint={
-            kvaUnknown
-              ? 'Applicant marked capacity as UNKNOWN — confirm on site.'
-              : `Applicant estimated ${applicantKva} kVA.`
-          }
-          error={errors.approvedLoadKva}
-        />
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 flex items-center justify-between">
+          <span className="text-base font-semibold text-gray-800">
+            {draft.approvedLoadKva != null ? `${draft.approvedLoadKva} kVA` : '—'}
+          </span>
+          <span className="text-xs text-gray-500">
+            {kvaUnknown
+              ? 'Open the kVA tab to confirm capacity on site.'
+              : 'Synced from Application. Use the kVA tab to override.'}
+          </span>
+        </div>
+        {errors.approvedLoadKva && (
+          <p className="text-xs text-error-600">{errors.approvedLoadKva}</p>
+        )}
       </div>
 
       {/* 6. Generator */}
