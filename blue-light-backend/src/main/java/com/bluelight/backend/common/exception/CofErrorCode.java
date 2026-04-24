@@ -24,6 +24,15 @@ public final class CofErrorCode {
     /** 인증 LEW가 해당 Application의 배정자가 아님 (AC §9-3). HTTP 403. */
     public static final String APPLICATION_NOT_ASSIGNED = "APPLICATION_NOT_ASSIGNED";
 
+    /** Phase 6: CoF finalize 시 Application.kvaStatus가 CONFIRMED 아님. HTTP 400. */
+    public static final String KVA_NOT_CONFIRMED = "KVA_NOT_CONFIRMED";
+
+    /** Phase 6: CoF finalize 시 미해결 DocumentRequest 존재 (REQUESTED/UPLOADED). HTTP 400. */
+    public static final String DOCUMENT_REQUESTS_PENDING = "DOCUMENT_REQUESTS_PENDING";
+
+    /** Phase 6: CoF finalize 시 sldOption=REQUEST_LEW 이고 SLD가 CONFIRMED가 아님. HTTP 400. */
+    public static final String SLD_NOT_CONFIRMED = "SLD_NOT_CONFIRMED";
+
     private CofErrorCode() {
         // no instance
     }

@@ -17,6 +17,10 @@ public enum NotificationType {
     // Phase 5 — LEW kVA 확정 알림 (이메일은 범위 외)
     KVA_CONFIRMED,
 
+    // Phase 6 — 통합 LEW 리뷰 (CoF finalize 및 kVA override 재발급)
+    CERTIFICATE_OF_FITNESS_FINALIZED,   // 신청자: CoF 서명 완료 → 결제 단계 진입 안내
+    COF_REISSUED_BY_KVA_OVERRIDE,       // LEW/신청자: kVA override로 CoF 재서명 필요
+
     // Phase 1 — Kaki Concierge Service (v1.5)
     CONCIERGE_REQUEST_SUBMITTED,              // N1/N2: 신청 접수 시 신청자/관리자
     CONCIERGE_REQUEST_ASSIGNED,               // N3: 담당자 배정 시 담당자

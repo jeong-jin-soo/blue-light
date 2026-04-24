@@ -12,6 +12,9 @@ import com.bluelight.backend.domain.application.ApplicationType;
 import com.bluelight.backend.domain.application.KvaSource;
 import com.bluelight.backend.domain.application.KvaStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.cof.CertificateOfFitness;
+import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
+import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
 import com.bluelight.backend.domain.user.User;
@@ -51,6 +54,7 @@ class ApplicationKvaServiceTest {
     private UserRepository userRepository;
     private AuditLogService auditLogService;
     private NotificationService notificationService;
+    private CertificateOfFitnessRepository cofRepository;
     private ApplicationKvaService service;
 
     @BeforeEach
@@ -60,9 +64,10 @@ class ApplicationKvaServiceTest {
         userRepository = mock(UserRepository.class);
         auditLogService = mock(AuditLogService.class);
         notificationService = mock(NotificationService.class);
+        cofRepository = mock(CertificateOfFitnessRepository.class);
         service = new ApplicationKvaService(
                 applicationRepository, masterPriceRepository, userRepository,
-                auditLogService, notificationService);
+                auditLogService, notificationService, cofRepository);
     }
 
     private Application mockApp(Long id, ApplicationStatus status, KvaStatus kvaStatus,
@@ -208,5 +213,119 @@ class ApplicationKvaServiceTest {
                 anyString(), anyString(), anyString(),
                 any(), any(), any(), any(), any(), anyString(), any());
         assertThat(actionCap.getValue()).isEqualTo(AuditAction.KVA_OVERRIDDEN_BY_ADMIN);
+    }
+
+    // ── Phase 6: 통합 LEW 리뷰 — CoF 재발급 분기 ──────────────────────
+
+    @Test
+    void Phase6_CoF_finalized_상태에서_kVA_override_시_CoF_reopen_및_상태_회귀() {
+        // Setup: PENDING_PAYMENT + kVA CONFIRMED + CoF finalized
+        Application app = mockApp(1L, ApplicationStatus.PENDING_PAYMENT,
+                KvaStatus.CONFIRMED, 10L, 20L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        MasterPrice mp200 = mockPrice();
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp200));
+        User admin = mock(User.class);
+        when(admin.getUserSeq()).thenReturn(99L);
+        when(userRepository.findById(99L)).thenReturn(Optional.of(admin));
+
+        CertificateOfFitness cof = mock(CertificateOfFitness.class);
+        when(cof.isFinalized()).thenReturn(true);
+        when(cofRepository.findByApplication_ApplicationSeq(1L)).thenReturn(Optional.of(cof));
+
+        service.confirm(1L, req(200, "Override after CoF finalized"),
+                /* force */ true, 99L, "ROLE_ADMIN");
+
+        // CoF 재발급 + Application 상태 회귀 호출 검증
+        verify(cof).reopenForReissue(200);
+        verify(app).reopenForCofReissue();
+        verify(cofRepository).save(cof);
+
+        // 감사: KVA_OVERRIDDEN_BY_ADMIN + COF_REISSUED_BY_KVA_OVERRIDE 두 번 기록
+        ArgumentCaptor<AuditAction> actionCap = ArgumentCaptor.forClass(AuditAction.class);
+        verify(auditLogService, org.mockito.Mockito.times(2)).logAsync(
+                eq(99L), actionCap.capture(), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), any(), anyString(), any());
+        assertThat(actionCap.getAllValues())
+                .contains(AuditAction.KVA_OVERRIDDEN_BY_ADMIN,
+                        AuditAction.COF_REISSUED_BY_KVA_OVERRIDE);
+
+        // Notification: kVA_CONFIRMED + COF_REISSUED_BY_KVA_OVERRIDE × 2 (LEW + 신청자)
+        verify(notificationService).createNotification(
+                eq(10L), eq(NotificationType.KVA_CONFIRMED),
+                anyString(), anyString(), anyString(), eq(1L));
+        verify(notificationService).createNotification(
+                eq(20L), eq(NotificationType.COF_REISSUED_BY_KVA_OVERRIDE),
+                anyString(), anyString(), anyString(), eq(1L));
+        verify(notificationService).createNotification(
+                eq(10L), eq(NotificationType.COF_REISSUED_BY_KVA_OVERRIDE),
+                anyString(), anyString(), anyString(), eq(1L));
+    }
+
+    @Test
+    void Phase6_CoF_미존재_상태에서_kVA_override_시_재발급_분기_미실행() {
+        Application app = mockApp(1L, ApplicationStatus.PENDING_PAYMENT,
+                KvaStatus.CONFIRMED, 10L, 20L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        MasterPrice mp200 = mockPrice();
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp200));
+        User admin = mock(User.class);
+        when(admin.getUserSeq()).thenReturn(99L);
+        when(userRepository.findById(99L)).thenReturn(Optional.of(admin));
+
+        when(cofRepository.findByApplication_ApplicationSeq(1L)).thenReturn(Optional.empty());
+
+        service.confirm(1L, req(200, "Override with no CoF"),
+                /* force */ true, 99L, "ROLE_ADMIN");
+
+        verify(app, never()).reopenForCofReissue();
+        // KVA_OVERRIDDEN_BY_ADMIN 만 1회, COF_REISSUED_BY_KVA_OVERRIDE 는 미기록
+        verify(auditLogService, org.mockito.Mockito.times(1)).logAsync(
+                eq(99L), eq(AuditAction.KVA_OVERRIDDEN_BY_ADMIN),
+                any(), anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), any(), anyString(), any());
+    }
+
+    @Test
+    void Phase6_CoF_Draft_상태에서_kVA_override_시_재발급_미실행() {
+        Application app = mockApp(1L, ApplicationStatus.PENDING_REVIEW,
+                KvaStatus.CONFIRMED, 10L, 20L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        MasterPrice mp200 = mockPrice();
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp200));
+        User admin = mock(User.class);
+        when(admin.getUserSeq()).thenReturn(99L);
+        when(userRepository.findById(99L)).thenReturn(Optional.of(admin));
+
+        CertificateOfFitness draftCof = mock(CertificateOfFitness.class);
+        when(draftCof.isFinalized()).thenReturn(false);
+        when(cofRepository.findByApplication_ApplicationSeq(1L)).thenReturn(Optional.of(draftCof));
+
+        service.confirm(1L, req(200, "Override on draft CoF"),
+                /* force */ true, 99L, "ROLE_ADMIN");
+
+        // Draft CoF는 reopen 호출 없음
+        verify(draftCof, never()).reopenForReissue(any());
+        verify(app, never()).reopenForCofReissue();
+    }
+
+    @Test
+    void Phase6_force_false_신규_확정_시_재발급_분기_미실행() {
+        // 신규 kVA 확정 (force=false, previousStatus=UNKNOWN) → reissue 조건 불충족
+        Application app = mockApp(1L, ApplicationStatus.PENDING_REVIEW,
+                KvaStatus.UNKNOWN, 10L, 20L);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        MasterPrice mp100 = mockPrice();
+        when(masterPriceRepository.findByKva(100)).thenReturn(Optional.of(mp100));
+        User lew = mock(User.class);
+        when(lew.getUserSeq()).thenReturn(20L);
+        when(userRepository.findById(20L)).thenReturn(Optional.of(lew));
+
+        service.confirm(1L, req(100, "Initial confirmation"),
+                /* force */ false, 20L, "ROLE_LEW");
+
+        verify(cofRepository, never()).findByApplication_ApplicationSeq(any());
+        verify(app, never()).reopenForCofReissue();
     }
 }

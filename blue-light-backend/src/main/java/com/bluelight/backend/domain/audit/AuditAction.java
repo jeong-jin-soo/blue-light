@@ -74,6 +74,9 @@ public enum AuditAction {
     KVA_OVERRIDDEN_BY_ADMIN,
     KVA_CONFIRMATION_DENIED,
 
+    // Phase 6: 통합 LEW 리뷰 — finalize된 CoF가 kVA override로 재발급 요구
+    COF_REISSUED_BY_KVA_OVERRIDE,
+
     // Data breach
     DATA_BREACH_REPORTED,
     DATA_BREACH_PDPC_NOTIFIED,

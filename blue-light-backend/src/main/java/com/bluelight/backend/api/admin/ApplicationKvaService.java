@@ -13,6 +13,8 @@ import com.bluelight.backend.domain.application.ApplicationType;
 import com.bluelight.backend.domain.application.KvaStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.cof.CertificateOfFitness;
+import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
 import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
@@ -59,6 +61,8 @@ public class ApplicationKvaService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    // Phase 6: 통합 LEW 리뷰 — finalize된 CoF가 kVA override로 재발급 필요 시 조회/갱신
+    private final CertificateOfFitnessRepository cofRepository;
 
     /**
      * kVA 확정 (LEW/ADMIN).
@@ -159,6 +163,25 @@ public class ApplicationKvaService {
                 applicationId, previousKva, previousQuote,
                 request.getSelectedKva(), newQuote, force, actorSeq);
 
+        // Phase 6 — 통합 LEW 리뷰: finalize된 CoF가 있는 상태에서 kVA override 발생 시 재발급.
+        // 결제 완료 이후 override는 위의 isLockedStatus 가드에서 이미 차단되므로, 여기 도달하는 force=true는
+        // 반드시 PENDING_PAYMENT 이하 상태. CoF가 finalized && status==PENDING_PAYMENT 조건을 만족하면
+        // 아래 재발급 분기가 트리거된다.
+        boolean cofReissued = false;
+        if (force && previousStatus == KvaStatus.CONFIRMED) {
+            CertificateOfFitness existingCof = cofRepository.findByApplication_ApplicationSeq(applicationId)
+                    .orElse(null);
+            if (existingCof != null && existingCof.isFinalized()
+                    && application.getStatus() == ApplicationStatus.PENDING_PAYMENT) {
+                existingCof.reopenForReissue(request.getSelectedKva());
+                application.reopenForCofReissue();
+                cofRepository.save(existingCof);
+                cofReissued = true;
+                log.info("CoF reissued due to kVA override: applicationId={}, newKva={}, prevKva={}",
+                        applicationId, request.getSelectedKva(), previousKva);
+            }
+        }
+
         // B-4: 감사 이벤트 분리 기록
         AuditAction action = force
                 ? AuditAction.KVA_OVERRIDDEN_BY_ADMIN
@@ -173,8 +196,27 @@ public class ApplicationKvaService {
                 null, metadata,
                 null, null, "PATCH", "/api/admin/applications/" + applicationId + "/kva", 200);
 
+        // Phase 6: 재발급 감사 로그 (별도 이벤트로 기록하여 override와 구분)
+        if (cofReissued) {
+            Map<String, Object> reissueMeta = new LinkedHashMap<>(metadata);
+            reissueMeta.put("cofReissued", true);
+            reissueMeta.put("priorApplicationStatus", "PENDING_PAYMENT");
+            reissueMeta.put("newApplicationStatus", "PENDING_REVIEW");
+            auditLogService.logAsync(
+                    actorSeq, AuditAction.COF_REISSUED_BY_KVA_OVERRIDE, AuditCategory.ADMIN,
+                    "Application", String.valueOf(applicationId),
+                    "CoF reopened for re-signature after kVA override",
+                    null, reissueMeta,
+                    null, null, "PATCH", "/api/admin/applications/" + applicationId + "/kva", 200);
+        }
+
         // 신청자 인앱 알림 (이메일은 범위 외, spec §9 out of scope #6)
         notifyApplicant(application, request.getSelectedKva(), newQuote);
+
+        // Phase 6: 재발급 발생 시 LEW/신청자 모두에게 재서명 알림
+        if (cofReissued) {
+            notifyCofReissued(application, request.getSelectedKva());
+        }
 
         return ConfirmKvaResponse.from(application);
     }
@@ -249,6 +291,41 @@ public class ApplicationKvaService {
         } catch (RuntimeException ex) {
             // 알림 실패가 확정 트랜잭션을 롤백시키지 않도록 방어 (AC-P1 의도)
             log.warn("kVA 확정 알림 발송 실패: applicationId={}, err={}",
+                    application.getApplicationSeq(), ex.getMessage());
+        }
+    }
+
+    /**
+     * Phase 6: CoF 재발급 시 LEW에게 "재서명 필요", 신청자에게 "재서명 진행 중" 알림 발송.
+     * 알림 실패는 swallow — 확정 트랜잭션을 롤백하지 않는다.
+     */
+    private void notifyCofReissued(Application application, Integer newKva) {
+        try {
+            Long applicantSeq = application.getUser() != null
+                    ? application.getUser().getUserSeq() : null;
+            Long lewSeq = application.getAssignedLew() != null
+                    ? application.getAssignedLew().getUserSeq() : null;
+
+            if (lewSeq != null) {
+                notificationService.createNotification(
+                        lewSeq, NotificationType.COF_REISSUED_BY_KVA_OVERRIDE,
+                        "CoF re-signature required",
+                        String.format(
+                                "kVA was updated to %d. Please re-review and re-sign the Certificate of Fitness.",
+                                newKva),
+                        "Application", application.getApplicationSeq());
+            }
+            if (applicantSeq != null) {
+                notificationService.createNotification(
+                        applicantSeq, NotificationType.COF_REISSUED_BY_KVA_OVERRIDE,
+                        "kVA updated — awaiting LEW re-signature",
+                        String.format(
+                                "Your kVA was updated to %d. Your LEW will re-sign the Certificate of Fitness shortly.",
+                                newKva),
+                        "Application", application.getApplicationSeq());
+            }
+        } catch (RuntimeException ex) {
+            log.warn("CoF 재발급 알림 발송 실패: applicationId={}, err={}",
                     application.getApplicationSeq(), ex.getMessage());
         }
     }
