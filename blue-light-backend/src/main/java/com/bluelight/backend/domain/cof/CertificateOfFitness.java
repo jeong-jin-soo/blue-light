@@ -251,6 +251,50 @@ public class CertificateOfFitness extends BaseEntity {
     }
 
     /**
+     * Phase 6: finalize 직전 approvedLoadKva를 Application.selectedKva로 스냅샷.
+     *
+     * <p>CoF의 approvedLoadKva는 법적 기록이므로 LEW가 임의 수정하는 필드가 아니라
+     * finalize 순간 Application의 확정 kVA에서 복사되는 값이다. 이 메서드는 finalize
+     * 직전 서비스 레이어에서 호출되어 스냅샷 값을 기록한다.</p>
+     *
+     * @param value Application.selectedKva (필수, non-null)
+     * @throws IllegalStateException 이미 finalized된 CoF
+     * @throws IllegalArgumentException value가 null인 경우
+     */
+    public void snapshotApprovedLoadKva(Integer value) {
+        if (isFinalized()) {
+            throw new IllegalStateException("Cannot snapshot approvedLoadKva on a finalized CoF");
+        }
+        if (value == null) {
+            throw new IllegalArgumentException("approvedLoadKva snapshot value must not be null");
+        }
+        this.approvedLoadKva = value;
+    }
+
+    /**
+     * Phase 6: kVA override 후 CoF 재서명을 위해 finalized 상태를 draft로 되돌린다.
+     *
+     * <p>{@code certifiedAt}과 {@code lewConsentDate}를 null로 초기화하여 {@link #isFinalized()}
+     * 가 false를 반환하게 하고, 새 Application.selectedKva를 snapshot 한다. {@code certifiedByLew}는
+     * 이력 추적을 위해 그대로 유지(재서명 시 새 User로 덮어써짐).</p>
+     *
+     * @param newApprovedLoadKva 새 Application.selectedKva (필수)
+     * @throws IllegalStateException 아직 finalized 되지 않은 CoF에 호출
+     * @throws IllegalArgumentException newApprovedLoadKva가 null인 경우
+     */
+    public void reopenForReissue(Integer newApprovedLoadKva) {
+        if (!isFinalized()) {
+            throw new IllegalStateException("Cannot reopen a CoF that is not finalized");
+        }
+        if (newApprovedLoadKva == null) {
+            throw new IllegalArgumentException("newApprovedLoadKva must not be null");
+        }
+        this.certifiedAt = null;
+        this.lewConsentDate = null;
+        this.approvedLoadKva = newApprovedLoadKva;
+    }
+
+    /**
      * CoF 10 필드(Draft Save) 일괄 갱신. MSSL은 별도 {@link #updateMssl(String, String, String)}로 처리.
      */
     public void updateFields(ConsumerType consumerType,

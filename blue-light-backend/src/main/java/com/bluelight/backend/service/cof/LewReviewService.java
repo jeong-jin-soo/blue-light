@@ -4,6 +4,7 @@ import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.lew.dto.CertificateOfFitnessRequest;
 import com.bluelight.backend.api.lew.dto.CertificateOfFitnessResponse;
 import com.bluelight.backend.api.lew.dto.LewApplicationResponse;
+import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.crypto.FieldEncryptionUtil;
 import com.bluelight.backend.common.crypto.HmacUtil;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -11,10 +12,18 @@ import com.bluelight.backend.common.exception.CofErrorCode;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.KvaStatus;
+import com.bluelight.backend.domain.application.SldOption;
+import com.bluelight.backend.domain.application.SldRequest;
+import com.bluelight.backend.domain.application.SldRequestRepository;
+import com.bluelight.backend.domain.application.SldRequestStatus;
 import com.bluelight.backend.domain.cof.CertificateOfFitness;
 import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
 import com.bluelight.backend.domain.cof.ConsumerType;
 import com.bluelight.backend.domain.cof.RetailerCode;
+import com.bluelight.backend.domain.document.DocumentRequestRepository;
+import com.bluelight.backend.domain.document.DocumentRequestStatus;
+import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -57,11 +67,19 @@ public class LewReviewService {
     /** 허용 점검 주기 집합 (스펙 §2.1 CHECK). */
     private static final Set<Integer> ALLOWED_INTERVALS = Set.of(6, 12, 24, 36, 60);
 
+    /** Phase 6: finalize 가드 3종 중 DocumentRequest 미해결 판정에 사용 */
+    private static final Set<DocumentRequestStatus> DOCUMENT_PENDING_STATUSES =
+            Set.of(DocumentRequestStatus.REQUESTED, DocumentRequestStatus.UPLOADED);
+
     private final ApplicationRepository applicationRepository;
     private final CertificateOfFitnessRepository cofRepository;
     private final UserRepository userRepository;
     private final FieldEncryptionUtil fieldEncryptionUtil;
     private final HmacUtil hmacUtil;
+    // Phase 6: 통합 LEW 리뷰 — finalize 가드 및 알림
+    private final DocumentRequestRepository documentRequestRepository;
+    private final SldRequestRepository sldRequestRepository;
+    private final NotificationService notificationService;
 
     /** 배정 신청 상세 조회 (스펙 §3.1). */
     public LewApplicationResponse getAssignedApplication(Long applicationSeq, Long lewUserSeq) {
@@ -123,6 +141,11 @@ public class LewReviewService {
                     HttpStatus.BAD_REQUEST, CofErrorCode.COF_VALIDATION_FAILED);
         }
 
+        // Phase 6: CoF.approvedLoadKva는 Application.selectedKva에서 유도하는 snapshot 필드.
+        // Draft 중에는 항상 Application의 현재 값을 reflect 하며, finalize 시점에 최종 스냅샷한다.
+        // request.approvedLoadKva는 ignore한다 (SSOT 원칙: Application.selectedKva).
+        Integer derivedApprovedLoadKva = application.getSelectedKva();
+
         boolean creating = (cof == null);
         if (creating) {
             cof = CertificateOfFitness.builder()
@@ -130,7 +153,7 @@ public class LewReviewService {
                     .consumerType(request.getConsumerType())
                     .retailerCode(request.getRetailerCode())
                     .supplyVoltageV(request.getSupplyVoltageV())
-                    .approvedLoadKva(request.getApprovedLoadKva())
+                    .approvedLoadKva(derivedApprovedLoadKva)
                     .hasGenerator(request.getHasGenerator())
                     .generatorCapacityKva(request.getGeneratorCapacityKva())
                     .inspectionIntervalMonths(request.getInspectionIntervalMonths())
@@ -143,7 +166,7 @@ public class LewReviewService {
                     request.getConsumerType(),
                     request.getRetailerCode(),
                     request.getSupplyVoltageV(),
-                    request.getApprovedLoadKva(),
+                    derivedApprovedLoadKva,
                     request.getHasGenerator(),
                     request.getGeneratorCapacityKva(),
                     request.getInspectionIntervalMonths(),
@@ -165,13 +188,24 @@ public class LewReviewService {
     }
 
     /**
-     * CoF 확정 (스펙 §3.3, AC §9-5/6/7/9/10).
+     * CoF 확정 (스펙 §3.3, AC §9-5/6/7/9/10 + Phase 6 통합 LEW 리뷰 가드).
+     *
+     * <h3>Phase 6 가드 (finalize 직전 3종)</h3>
+     * <ol>
+     *   <li>Application.kvaStatus != CONFIRMED → 400 {@code KVA_NOT_CONFIRMED}</li>
+     *   <li>미해결 DocumentRequest (REQUESTED/UPLOADED) 존재 → 400 {@code DOCUMENT_REQUESTS_PENDING}</li>
+     *   <li>sldOption=REQUEST_LEW 이고 SldRequest 상태가 CONFIRMED 아님 → 400 {@code SLD_NOT_CONFIRMED}</li>
+     * </ol>
+     *
+     * <h3>스냅샷</h3>
+     * finalize 직전 CoF.approvedLoadKva := Application.selectedKva 로 덮어쓴다 (법적 기록 스냅샷).
      *
      * <ul>
      *   <li>이미 finalized면 409</li>
      *   <li>MSSL 공란 / hasGenerator=true 인데 capacity null / Contestable 인데 retailer null / 필수필드 누락 → 400</li>
      *   <li>Application.status는 PENDING_REVIEW 여야 하며, 성공 시 PENDING_PAYMENT로 전이</li>
      *   <li>lewConsentDate null이면 today로 자동</li>
+     *   <li>성공 시 신청자에게 {@code CERTIFICATE_OF_FITNESS_FINALIZED} 알림 발송</li>
      * </ul>
      */
     @Transactional(rollbackFor = Exception.class)
@@ -198,6 +232,14 @@ public class LewReviewService {
                     HttpStatus.CONFLICT, CofErrorCode.COF_VALIDATION_FAILED);
         }
 
+        // Phase 6 가드 3종 (통합 LEW 리뷰)
+        assertKvaConfirmed(application);
+        assertNoPendingDocumentRequests(applicationSeq);
+        assertSldConfirmedIfRequired(application, applicationSeq);
+
+        // Phase 6: finalize 직전 Application.selectedKva를 CoF.approvedLoadKva에 스냅샷
+        cof.snapshotApprovedLoadKva(application.getSelectedKva());
+
         // 필수 필드 전수 재검증
         validateForFinalize(cof);
 
@@ -214,6 +256,9 @@ public class LewReviewService {
         application.approveForPayment();
         log.info("CoF finalized: cofSeq={}, applicationSeq={}, lewUserSeq={}",
                 cof.getCofSeq(), applicationSeq, lewUserSeq);
+
+        // Phase 6: 신청자 알림 — 알림 실패가 확정 트랜잭션을 롤백시키지 않도록 방어
+        notifyApplicantCofFinalized(application);
 
         return ApplicationResponse.from(application);
     }
@@ -321,5 +366,65 @@ public class LewReviewService {
         return new BusinessException(
                 "CoF was updated concurrently — refresh and retry",
                 HttpStatus.CONFLICT, CofErrorCode.COF_VERSION_CONFLICT);
+    }
+
+    // ── Phase 6: 통합 LEW 리뷰 가드 및 알림 ──────────────────────
+
+    /** Phase 6 가드 1: Application.kvaStatus 가 CONFIRMED 이어야 finalize 가능. */
+    private void assertKvaConfirmed(Application application) {
+        if (application.getKvaStatus() != KvaStatus.CONFIRMED) {
+            throw new BusinessException(
+                    "kVA must be confirmed before finalizing CoF (current kvaStatus: "
+                            + application.getKvaStatus() + ")",
+                    HttpStatus.BAD_REQUEST, CofErrorCode.KVA_NOT_CONFIRMED);
+        }
+    }
+
+    /** Phase 6 가드 2: 미해결 DocumentRequest(REQUESTED/UPLOADED) 가 없어야 finalize 가능. */
+    private void assertNoPendingDocumentRequests(Long applicationSeq) {
+        long pending = documentRequestRepository.countByApplicationAndStatusIn(
+                applicationSeq, DOCUMENT_PENDING_STATUSES);
+        if (pending > 0) {
+            throw new BusinessException(
+                    "There are " + pending + " pending document request(s) — resolve them before finalizing",
+                    HttpStatus.BAD_REQUEST, CofErrorCode.DOCUMENT_REQUESTS_PENDING);
+        }
+    }
+
+    /** Phase 6 가드 3: sldOption=REQUEST_LEW 이면 SldRequest.status 가 CONFIRMED 이어야 finalize 가능. */
+    private void assertSldConfirmedIfRequired(Application application, Long applicationSeq) {
+        if (application.getSldOption() != SldOption.REQUEST_LEW) {
+            return;
+        }
+        SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
+                .orElse(null);
+        if (sldRequest == null || sldRequest.getStatus() != SldRequestStatus.CONFIRMED) {
+            throw new BusinessException(
+                    "SLD must be uploaded and confirmed before finalizing CoF (current: "
+                            + (sldRequest == null ? "NONE" : sldRequest.getStatus()) + ")",
+                    HttpStatus.BAD_REQUEST, CofErrorCode.SLD_NOT_CONFIRMED);
+        }
+    }
+
+    /**
+     * 신청자에게 CoF finalize 알림 발송. 알림 실패는 swallow 하여 확정 트랜잭션을 롤백하지 않는다
+     * ({@link #notifyApplicant}와 동일 원칙).
+     */
+    private void notifyApplicantCofFinalized(Application application) {
+        try {
+            Long recipientSeq = application.getUser() != null
+                    ? application.getUser().getUserSeq() : null;
+            if (recipientSeq == null) {
+                return;
+            }
+            notificationService.createNotification(
+                    recipientSeq, NotificationType.CERTIFICATE_OF_FITNESS_FINALIZED,
+                    "Certificate of Fitness signed",
+                    "Your LEW has signed the Certificate of Fitness. Your application is now awaiting payment.",
+                    "Application", application.getApplicationSeq());
+        } catch (RuntimeException ex) {
+            log.warn("CoF finalize 알림 발송 실패: applicationId={}, err={}",
+                    application.getApplicationSeq(), ex.getMessage());
+        }
     }
 }

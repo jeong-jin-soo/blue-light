@@ -15,6 +15,21 @@ import type { CertificateOfFitnessRequest } from '../../../types/cof';
  * LEW에게는 모든 CoF 값이 평문으로 노출된다. 동시에 "신청자가 보게 될 화면" 미리보기 박스를
  * 제공하여 마스킹 결과를 확인시킨다 (스펙 §6 Step 3).
  */
+/**
+ * Phase 6: Finalize 가드 상태.
+ * <p>Finalize 버튼 disabled + 미충족 항목별 안내 배너 렌더링용.</p>
+ */
+export interface CofFinalizeGuards {
+  /** Application.kvaStatus === 'CONFIRMED' */
+  kvaConfirmed: boolean;
+  /** 미해결 DocumentRequest (REQUESTED/UPLOADED) 개수 */
+  pendingDocCount: number;
+  /** sldOption === 'REQUEST_LEW' 이면 true, 그 외 false */
+  sldRequired: boolean;
+  /** sldRequired 일 때 SLD.status === 'CONFIRMED' */
+  sldReady: boolean;
+}
+
 export interface CofStepReviewFinalizeProps {
   draft: CertificateOfFitnessRequest;
   confirmed: boolean;
@@ -25,6 +40,10 @@ export interface CofStepReviewFinalizeProps {
   saving: boolean;
   finalizing: boolean;
   readOnly?: boolean;
+  /** Phase 6: Finalize 가드 상태. 전달되지 않으면 가드 검사를 건너뛴다. */
+  guards?: CofFinalizeGuards;
+  /** Phase 6: 가드 미충족 시 해당 탭으로 이동 콜백. */
+  onJumpToTab?: (tabKey: 'documents' | 'kva' | 'sld') => void;
 }
 
 export function CofStepReviewFinalize({
@@ -37,8 +56,17 @@ export function CofStepReviewFinalize({
   saving,
   finalizing,
   readOnly = false,
+  guards,
+  onJumpToTab,
 }: CofStepReviewFinalizeProps) {
-  const finalizeDisabled = !confirmed || readOnly || finalizing;
+  // Phase 6: 가드 미충족 시 Finalize 버튼 disabled
+  const guardsSatisfied =
+    !guards ||
+    (guards.kvaConfirmed &&
+      guards.pendingDocCount === 0 &&
+      (!guards.sldRequired || guards.sldReady));
+
+  const finalizeDisabled = !confirmed || readOnly || finalizing || !guardsSatisfied;
 
   return (
     <div className="space-y-5">
@@ -49,6 +77,9 @@ export function CofStepReviewFinalize({
           cannot be edited afterwards.
         </p>
       </div>
+
+      {/* Phase 6: Finalize 가드 상태 */}
+      {guards && <GuardChecklist guards={guards} onJumpToTab={onJumpToTab} />}
 
       {/* LEW-visible full plain summary */}
       <Card>
@@ -231,6 +262,95 @@ function labelForRetailer(v?: string): string | undefined {
 function labelForVoltage(v?: number): string | undefined {
   if (v == null) return undefined;
   return SUPPLY_VOLTAGE_OPTIONS.find((o) => o.value === v)?.label ?? `${v}V`;
+}
+
+/**
+ * Phase 6: Finalize 전제조건 체크리스트.
+ * <p>3개 가드(kVA / Documents / SLD) 각각의 통과/미통과를 나열하고, 미통과 항목은 해당 탭으로
+ * 이동하는 링크를 제공한다.</p>
+ */
+function GuardChecklist({
+  guards,
+  onJumpToTab,
+}: {
+  guards: CofFinalizeGuards;
+  onJumpToTab?: (key: 'documents' | 'kva' | 'sld') => void;
+}) {
+  const items: {
+    key: 'kva' | 'documents' | 'sld';
+    ok: boolean;
+    label: string;
+    hint: string;
+  }[] = [
+    {
+      key: 'kva',
+      ok: guards.kvaConfirmed,
+      label: 'kVA confirmed',
+      hint: guards.kvaConfirmed
+        ? 'LEW has confirmed the electrical capacity.'
+        : 'Confirm the kVA on the kVA tab before finalizing.',
+    },
+    {
+      key: 'documents',
+      ok: guards.pendingDocCount === 0,
+      label: 'Document requests resolved',
+      hint:
+        guards.pendingDocCount === 0
+          ? 'No pending document requests.'
+          : `${guards.pendingDocCount} request(s) still pending — resolve them on the Documents tab.`,
+    },
+    ...(guards.sldRequired
+      ? [{
+          key: 'sld' as const,
+          ok: guards.sldReady,
+          label: 'SLD uploaded and confirmed',
+          hint: guards.sldReady
+            ? 'SLD is confirmed.'
+            : 'Upload and confirm the SLD on the SLD tab before finalizing.',
+        }]
+      : []),
+  ];
+
+  const allOk = items.every((i) => i.ok);
+  return (
+    <div
+      className={`rounded-lg border p-4 ${
+        allOk ? 'border-success-200 bg-success-50' : 'border-warning-200 bg-warning-50'
+      }`}
+    >
+      <p
+        className={`text-sm font-semibold ${
+          allOk ? 'text-success-800' : 'text-warning-800'
+        }`}
+      >
+        {allOk ? 'All prerequisites satisfied' : 'Finalize is blocked'}
+      </p>
+      <ul className="mt-3 space-y-2">
+        {items.map((item) => (
+          <li key={item.key} className="flex items-start gap-2 text-sm">
+            <span aria-hidden className={item.ok ? 'text-success-600' : 'text-warning-600'}>
+              {item.ok ? '✓' : '•'}
+            </span>
+            <span className="flex-1">
+              <span className={`font-medium ${item.ok ? 'text-success-800' : 'text-warning-800'}`}>
+                {item.label}
+              </span>
+              <span className="block text-xs text-gray-600">{item.hint}</span>
+            </span>
+            {!item.ok && onJumpToTab && (
+              <button
+                type="button"
+                onClick={() => onJumpToTab(item.key)}
+                className="text-xs font-medium text-primary-600 hover:text-primary-800 underline"
+              >
+                Go to tab →
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /**

@@ -561,6 +561,22 @@ public class Application extends BaseEntity {
     }
 
     /**
+     * Phase 6: CoF finalize 후 ADMIN이 kVA override 시 CoF 재서명을 요구하며 상태를 되돌린다.
+     *
+     * <p>PENDING_PAYMENT → PENDING_REVIEW. reviewComment는 덮어쓰지 않는다(재서명 맥락은
+     * 감사 로그와 notification에서 전달).</p>
+     *
+     * @throws IllegalStateException 현재 상태가 PENDING_PAYMENT 이외인 경우
+     */
+    public void reopenForCofReissue() {
+        if (this.status != ApplicationStatus.PENDING_PAYMENT) {
+            throw new IllegalStateException(
+                    "Can only reopen from PENDING_PAYMENT (current: " + this.status + ")");
+        }
+        this.status = ApplicationStatus.PENDING_REVIEW;
+    }
+
+    /**
      * 신청 내용 수정 (보완 시).
      *
      * <p><b>Phase 5 보안 가드 (재제출 허점 차단)</b>: 이미 {@code kvaStatus=CONFIRMED} 인 신청에서

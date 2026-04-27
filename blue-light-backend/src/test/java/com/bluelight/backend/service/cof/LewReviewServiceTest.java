@@ -3,6 +3,7 @@ package com.bluelight.backend.service.cof;
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.lew.dto.CertificateOfFitnessRequest;
 import com.bluelight.backend.api.lew.dto.CertificateOfFitnessResponse;
+import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.crypto.FieldEncryptionUtil;
 import com.bluelight.backend.common.crypto.HmacUtil;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -10,10 +11,18 @@ import com.bluelight.backend.common.exception.CofErrorCode;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.KvaStatus;
+import com.bluelight.backend.domain.application.SldOption;
+import com.bluelight.backend.domain.application.SldRequest;
+import com.bluelight.backend.domain.application.SldRequestRepository;
+import com.bluelight.backend.domain.application.SldRequestStatus;
 import com.bluelight.backend.domain.cof.CertificateOfFitness;
 import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
 import com.bluelight.backend.domain.cof.ConsumerType;
 import com.bluelight.backend.domain.cof.RetailerCode;
+import com.bluelight.backend.domain.document.DocumentRequestRepository;
+import com.bluelight.backend.domain.document.DocumentRequestStatus;
+import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,12 +35,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -48,6 +64,9 @@ class LewReviewServiceTest {
     private UserRepository userRepository;
     private FieldEncryptionUtil fieldEncryptionUtil;
     private HmacUtil hmacUtil;
+    private DocumentRequestRepository documentRequestRepository;
+    private SldRequestRepository sldRequestRepository;
+    private NotificationService notificationService;
     private LewReviewService service;
 
     @BeforeEach
@@ -55,6 +74,9 @@ class LewReviewServiceTest {
         applicationRepository = mock(ApplicationRepository.class);
         cofRepository = mock(CertificateOfFitnessRepository.class);
         userRepository = mock(UserRepository.class);
+        documentRequestRepository = mock(DocumentRequestRepository.class);
+        sldRequestRepository = mock(SldRequestRepository.class);
+        notificationService = mock(NotificationService.class);
 
         String key = Base64.getEncoder().encodeToString(new byte[32]);
         fieldEncryptionUtil = new FieldEncryptionUtil();
@@ -65,7 +87,13 @@ class LewReviewServiceTest {
         hmacUtil.init();
 
         service = new LewReviewService(applicationRepository, cofRepository, userRepository,
-                fieldEncryptionUtil, hmacUtil);
+                fieldEncryptionUtil, hmacUtil,
+                documentRequestRepository, sldRequestRepository, notificationService);
+
+        // Phase 6 기본 state: kVA CONFIRMED, 미해결 DocumentRequest 없음, SLD_OPTION SELF_UPLOAD
+        // (개별 테스트가 필요하면 override)
+        when(documentRequestRepository.countByApplicationAndStatusIn(anyLong(), anyCollection()))
+                .thenReturn(0L);
     }
 
     private User userWithSeq(long seq) {
@@ -377,6 +405,200 @@ class LewReviewServiceTest {
         assertThatThrownBy(() -> service.finalizeCof(1L, 10L))
                 .isInstanceOf(BusinessException.class)
                 .extracting("code").isEqualTo(CofErrorCode.COF_NOT_FOUND);
+    }
+
+    // ── Phase 6: 통합 LEW 리뷰 가드 ──────────────────────
+
+    @Test
+    @DisplayName("Phase6_Finalize_kvaStatus가_UNKNOWN이면_400_KVA_NOT_CONFIRMED")
+    void phase6_finalize_kva_not_confirmed_400() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        // kvaStatus 를 UNKNOWN 으로 설정 (기본값 CONFIRMED 를 덮어씀)
+        ReflectionTestUtils.setField(app, "kvaStatus", KvaStatus.UNKNOWN);
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+
+        CertificateOfFitness draft = validDraft(app);
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+
+        assertThatThrownBy(() -> service.finalizeCof(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(CofErrorCode.KVA_NOT_CONFIRMED);
+        // 알림 미발송 확인
+        verify(notificationService, never())
+                .createNotification(anyLong(), any(NotificationType.class),
+                        anyString(), anyString(), anyString(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Phase6_Finalize_미해결_DocumentRequest_있으면_400_DOCUMENT_REQUESTS_PENDING")
+    void phase6_finalize_pending_documents_400() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+
+        CertificateOfFitness draft = validDraft(app);
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+
+        // REQUESTED/UPLOADED 가 3건 존재
+        when(documentRequestRepository.countByApplicationAndStatusIn(
+                eq(1L), eq(Set.of(DocumentRequestStatus.REQUESTED, DocumentRequestStatus.UPLOADED))))
+                .thenReturn(3L);
+
+        assertThatThrownBy(() -> service.finalizeCof(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(CofErrorCode.DOCUMENT_REQUESTS_PENDING);
+    }
+
+    @Test
+    @DisplayName("Phase6_Finalize_sldOption_REQUEST_LEW_이고_SLD_미확정이면_400_SLD_NOT_CONFIRMED")
+    void phase6_finalize_sld_not_confirmed_400() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        ReflectionTestUtils.setField(app, "sldOption", SldOption.REQUEST_LEW);
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+
+        CertificateOfFitness draft = validDraft(app);
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+
+        // SLD 가 UPLOADED 상태 (CONFIRMED 아님)
+        SldRequest sldUploaded = SldRequest.builder().build();
+        ReflectionTestUtils.setField(sldUploaded, "status", SldRequestStatus.UPLOADED);
+        when(sldRequestRepository.findByApplicationApplicationSeq(eq(1L)))
+                .thenReturn(Optional.of(sldUploaded));
+
+        assertThatThrownBy(() -> service.finalizeCof(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(CofErrorCode.SLD_NOT_CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("Phase6_Finalize_sldOption_REQUEST_LEW_이고_SLD_레코드_없으면_400_SLD_NOT_CONFIRMED")
+    void phase6_finalize_sld_missing_400() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        ReflectionTestUtils.setField(app, "sldOption", SldOption.REQUEST_LEW);
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+
+        CertificateOfFitness draft = validDraft(app);
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+
+        when(sldRequestRepository.findByApplicationApplicationSeq(eq(1L))).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.finalizeCof(1L, 10L))
+                .isInstanceOf(BusinessException.class)
+                .extracting("code").isEqualTo(CofErrorCode.SLD_NOT_CONFIRMED);
+    }
+
+    @Test
+    @DisplayName("Phase6_Finalize_sldOption_REQUEST_LEW_이고_SLD_CONFIRMED이면_성공")
+    void phase6_finalize_sld_confirmed_ok() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        ReflectionTestUtils.setField(app, "sldOption", SldOption.REQUEST_LEW);
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(lew));
+
+        CertificateOfFitness draft = validDraft(app);
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+        when(cofRepository.save(any(CertificateOfFitness.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        SldRequest sldConfirmed = SldRequest.builder().build();
+        ReflectionTestUtils.setField(sldConfirmed, "status", SldRequestStatus.CONFIRMED);
+        when(sldRequestRepository.findByApplicationApplicationSeq(eq(1L)))
+                .thenReturn(Optional.of(sldConfirmed));
+
+        ApplicationResponse res = service.finalizeCof(1L, 10L);
+
+        assertThat(res.getStatus()).isEqualTo(ApplicationStatus.PENDING_PAYMENT);
+        assertThat(draft.isFinalized()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Phase6_Finalize_시_approvedLoadKva가_Application_selectedKva로_스냅샷된다")
+    void phase6_finalize_snapshots_approved_load_kva() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        // Application.selectedKva = 45 (기본), CoF.approvedLoadKva 를 다른 값 100 으로 초기 설정
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(lew));
+
+        CertificateOfFitness draft = CertificateOfFitness.builder()
+                .application(app)
+                .supplyVoltageV(400).approvedLoadKva(100) // 기존 잘못된 값
+                .inspectionIntervalMonths(12)
+                .lewAppointmentDate(LocalDate.now())
+                .consumerType(ConsumerType.NON_CONTESTABLE)
+                .retailerCode(RetailerCode.SP_SERVICES_LIMITED)
+                .hasGenerator(false)
+                .build();
+        draft.updateMssl("v1:enc", "abc123", "7890");
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+        when(cofRepository.save(any(CertificateOfFitness.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.finalizeCof(1L, 10L);
+
+        // Application.selectedKva = 45 로 snapshot 되어 CoF.approvedLoadKva 덮어써졌는지 확인
+        assertThat(draft.getApprovedLoadKva()).isEqualTo(45);
+        assertThat(draft.isFinalized()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Phase6_Finalize_성공_시_신청자에게_CERTIFICATE_OF_FITNESS_FINALIZED_알림_발송")
+    void phase6_finalize_sends_notification_to_applicant() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+        when(userRepository.findById(eq(10L))).thenReturn(Optional.of(lew));
+
+        CertificateOfFitness draft = validDraft(app);
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.of(draft));
+        when(cofRepository.save(any(CertificateOfFitness.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.finalizeCof(1L, 10L);
+
+        verify(notificationService, atLeastOnce()).createNotification(
+                eq(99L), // applicant userSeq (applicationAssignedTo 에서 userWithSeq(99L))
+                eq(NotificationType.CERTIFICATE_OF_FITNESS_FINALIZED),
+                anyString(), anyString(),
+                eq("Application"), eq(1L));
+    }
+
+    @Test
+    @DisplayName("Phase6_SaveDraft_request_approvedLoadKva를_무시하고_Application_selectedKva로_유도한다")
+    void phase6_save_draft_derives_approved_load_kva_from_application() {
+        User lew = userWithSeq(10L);
+        Application app = applicationAssignedTo(1L, lew);
+        // Application.selectedKva = 45
+        when(applicationRepository.findById(eq(1L))).thenReturn(Optional.of(app));
+        when(cofRepository.findByApplication_ApplicationSeq(eq(1L))).thenReturn(Optional.empty());
+        when(cofRepository.save(any(CertificateOfFitness.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        CertificateOfFitnessRequest r = validFinalizeRequest();
+        r.setApprovedLoadKva(999); // 악의적/잘못된 값 — 무시되어야 함
+
+        CertificateOfFitnessResponse res = service.saveDraftCof(1L, 10L, r);
+
+        // 응답에는 Application.selectedKva(45)가 반영되어야 함
+        assertThat(res.getApprovedLoadKva()).isEqualTo(45);
+    }
+
+    // Phase 6 테스트 헬퍼 — 유효 상태의 CoF draft
+    private CertificateOfFitness validDraft(Application app) {
+        CertificateOfFitness draft = CertificateOfFitness.builder()
+                .application(app)
+                .supplyVoltageV(400).approvedLoadKva(45).inspectionIntervalMonths(12)
+                .lewAppointmentDate(LocalDate.now())
+                .consumerType(ConsumerType.NON_CONTESTABLE)
+                .retailerCode(RetailerCode.SP_SERVICES_LIMITED)
+                .hasGenerator(false)
+                .build();
+        draft.updateMssl("v1:enc", "abc123", "7890");
+        return draft;
     }
 
     // ── getAssignedApplication ──────────────────────
