@@ -258,7 +258,7 @@ async def chat_stream(
                     api_key=request.api_key,
                     attached_file=request.attached_file,
                 ),
-                interval=15,
+                interval=settings.sse_heartbeat_interval,
             ):
                 event_type = event.get("type", "token")
                 event_count += 1

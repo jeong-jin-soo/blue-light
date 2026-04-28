@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     # Layout Optimizer (3-Tier)
     layout_optimizer_enabled: bool = False  # LAYOUT_OPTIMIZER_ENABLED=true로 활성화
 
+    # SSE 타임아웃 정합 (단위: 초)
+    # - sse_heartbeat_interval: AI service가 SSE 응답에 keepalive 이벤트를 보내는 주기.
+    #   짧으면 트래픽↑, 길면 ReadTimeout 위험↑. 기본 15s.
+    # - sse_emitter_timeout_seconds: Spring Boot SseEmitter / WebClient ReadTimeout과
+    #   동일해야 한다. 한쪽만 길면 다른 쪽이 끊겨 클라이언트가 무응답을 본다.
+    #   참고 — backend `sld.agent.timeout-seconds` 와 정렬할 것.
+    sse_heartbeat_interval: int = 15
+    sse_emitter_timeout_seconds: int = 600
+
     # Environment (development | production)
     environment: str = "development"
 

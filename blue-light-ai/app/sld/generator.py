@@ -327,7 +327,18 @@ class SldPipeline:
 
         # Overflow metrics
         overflow = layout_result.overflow_metrics
-        warnings = overflow.warnings if overflow else []
+        warnings = list(overflow.warnings) if overflow else []
+
+        # Singapore SP/SS 638/EMA 사후 컴플라이언스 검증
+        # 배치 자체는 바꾸지 않고 워닝만 layout_warnings에 합친다.
+        try:
+            from app.sld.layout.sg_compliance import run_all_checks
+            for issue in run_all_checks(layout_result,
+                                        requirements=requirements,
+                                        application_info=app_info):
+                warnings.append(f"[{issue.rule}] {issue.detail}")
+        except Exception as e:
+            logger.warning("SG compliance check failed (skipped): %s", e)
 
         if backend_type == "dxf":
             # DXF-first: derive PDF/SVG from the DXF document

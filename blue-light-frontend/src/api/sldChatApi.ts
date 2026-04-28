@@ -10,6 +10,8 @@ export interface SldStreamCallbacks {
   onToolResult: (tool: string, summary: string) => void;
   onSldPreview: (svg: string) => void;
   onFileGenerated: (fileId: string) => void;
+  onAppliedDefaults?: (items: string[]) => void;
+  onLayoutWarnings?: (items: string[]) => void;
   onDone: (fullMessage: string) => void;
   onError: (error: string) => void;
   onProgress?: (stage: SldProgressStage, message: string, elapsed: number) => void;
@@ -137,6 +139,12 @@ export const sendSldChatStream = async (
               break;
             case 'file_generated':
               if (parsed.fileId) callbacks.onFileGenerated(parsed.fileId);
+              break;
+            case 'applied_defaults':
+              if (parsed.items?.length) callbacks.onAppliedDefaults?.(parsed.items);
+              break;
+            case 'layout_warnings':
+              if (parsed.items?.length) callbacks.onLayoutWarnings?.(parsed.items);
               break;
             case 'done':
               receivedDone = true;

@@ -30,10 +30,13 @@ logger = logging.getLogger(__name__)
 TEMPLATES_BASE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "sld-info"
 
 # 스코어링 가중치
+# breaker_rating은 레이아웃 형태(케이블 굵기·busbar 길이·CT 필요 여부)를 좌우하므로
+# breaker_type만 보던 기존 로직보다 매칭 정밀도를 높인다.
 _WEIGHTS = {
-    "kva": 0.25,
-    "circuit_count": 0.30,
-    "breaker_type": 0.20,
+    "kva": 0.20,
+    "circuit_count": 0.25,
+    "breaker_type": 0.10,
+    "breaker_rating": 0.20,   # 신규 — 100A vs 500A는 도면이 완전히 다르다
     "metering": 0.15,
     "elcb_type": 0.10,
 }
@@ -79,6 +82,11 @@ def find_similar_templates(spec: dict, limit: int = 3) -> list[dict]:
     # 선택적 매칭 차원
     circuit_count = spec.get("circuit_count", 0) or 0
     main_breaker_type = (spec.get("main_breaker_type", "") or "").upper()
+    main_breaker_rating = spec.get("main_breaker_rating", 0) or 0  # Amps
+    try:
+        main_breaker_rating = float(main_breaker_rating)
+    except (TypeError, ValueError):
+        main_breaker_rating = 0.0
     metering_type = (spec.get("metering_type", "") or "").lower()
     elcb_type = (spec.get("elcb_type", "") or "").upper()
 
@@ -146,11 +154,32 @@ def find_similar_templates(spec: dict, limit: int = 3) -> list[dict]:
         metering_score = 1.0 if (not metering_type or row_metering == metering_type) else 0.0
         elcb_score = 1.0 if (not elcb_type or row_elcb == elcb_type) else 0.0
 
+        # breaker_rating: detail.main_breaker.rating_a 비교 (Amps 단위, 가까울수록 1.0)
+        # 없으면 중립 (0.5) — 사용자가 등급 안 줬거나 템플릿이 비어있을 때 패널티 회피.
+        row_breaker_rating = 0.0
+        if isinstance(detail, dict):
+            mb = detail.get("main_breaker", {})
+            if isinstance(mb, dict):
+                _r = mb.get("rating_a") or mb.get("rating") or 0
+                try:
+                    row_breaker_rating = float(_r)
+                except (TypeError, ValueError):
+                    row_breaker_rating = 0.0
+        if main_breaker_rating > 0 and row_breaker_rating > 0:
+            # 16A → 100A 차이는 큰 변화. 100A → 125A는 작은 변화.
+            # log 스케일 기반 — abs(log ratio) 0.0=완전일치, 1.0=10배 차이
+            import math
+            ratio = max(row_breaker_rating, main_breaker_rating) / max(min(row_breaker_rating, main_breaker_rating), 1.0)
+            breaker_rating_score = max(0.0, 1.0 - math.log10(ratio))
+        else:
+            breaker_rating_score = 0.5
+
         # 가중 합산
         total = (
             kva_score * _WEIGHTS["kva"]
             + circuit_score * _WEIGHTS["circuit_count"]
             + breaker_score * _WEIGHTS["breaker_type"]
+            + breaker_rating_score * _WEIGHTS["breaker_rating"]
             + metering_score * _WEIGHTS["metering"]
             + elcb_score * _WEIGHTS["elcb_type"]
         )

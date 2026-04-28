@@ -1258,6 +1258,8 @@ export type SldSseEventType =
   | 'tool_result'
   | 'sld_preview'
   | 'file_generated'
+  | 'applied_defaults'
+  | 'layout_warnings'
   | 'done'
   | 'error'
   | 'status'
@@ -1298,6 +1300,8 @@ export interface SldSseEvent {
   stage?: SldProgressStage;
   message?: string;
   elapsed?: number;
+  // applied_defaults / layout_warnings 이벤트 필드
+  items?: string[];
 }
 
 // ============================================

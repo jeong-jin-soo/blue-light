@@ -41,9 +41,13 @@ export function SldChatPanel({ applicationSeq, onSldUpdated, existingSldFiles = 
     isToolCompleted,
     progressStage,
     progressMessage,
+    appliedDefaults,
+    layoutWarnings,
     sendMessage,
     loadHistory,
     resetChat,
+    dismissAppliedDefaults,
+    dismissLayoutWarnings,
   } = useSldChatStore();
 
   // AI SLD 생성 토글 상태 조회
@@ -348,6 +352,69 @@ export function SldChatPanel({ applicationSeq, onSldUpdated, existingSldFiles = 
 
         {/* Right: SVG Preview (40%) */}
         <div className="w-2/5 flex flex-col">
+          {/* LEW 자동 보완값 칩 — 사용자가 명시 안 한 항목들이 자동 채워졌음을 알림 */}
+          {appliedDefaults.length > 0 && (
+            <div
+              data-testid="applied-defaults-banner"
+              className="px-3 py-2 bg-blue-50 border-b border-blue-200"
+            >
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div className="text-xs font-semibold text-blue-900">
+                  Auto-filled defaults ({appliedDefaults.length})
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissAppliedDefaults}
+                  className="text-xs text-blue-600 hover:text-blue-800"
+                  aria-label="Dismiss auto-fill notice"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {appliedDefaults.map((item, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-[11px] bg-blue-100 text-blue-800 border border-blue-200"
+                    title={item}
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="text-[11px] text-blue-700 mt-1.5">
+                Override any value by replying with your specification (e.g., "use 300/5A CT ratio").
+              </div>
+            </div>
+          )}
+
+          {/* SP/SS 638/EMA 컴플라이언스 워닝 */}
+          {layoutWarnings.length > 0 && (
+            <div
+              data-testid="layout-warnings-banner"
+              className="px-3 py-2 bg-amber-50 border-b border-amber-200"
+            >
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <div className="text-xs font-semibold text-amber-900">
+                  Compliance / layout warnings ({layoutWarnings.length})
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissLayoutWarnings}
+                  className="text-xs text-amber-700 hover:text-amber-900"
+                  aria-label="Dismiss warnings"
+                >
+                  ×
+                </button>
+              </div>
+              <ul className="text-[11px] text-amber-900 space-y-0.5 list-disc list-inside">
+                {layoutWarnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <SvgPreviewViewer
             svg={svgPreview || ''}
             className="flex-1"

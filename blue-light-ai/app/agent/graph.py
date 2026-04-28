@@ -474,6 +474,20 @@ async def process_message(
                                         "type": "file_generated",
                                         "fileId": file_id,
                                     }
+                                    # LEW 자동 보완값을 별도 이벤트로 노출 — UI에서 칩으로 렌더
+                                    applied = result.get("applied_defaults") or []
+                                    if applied:
+                                        yield {
+                                            "type": "applied_defaults",
+                                            "items": applied,
+                                        }
+                                    # 컴플라이언스 워닝도 별도 이벤트
+                                    layout_warnings = result.get("layout_warnings") or []
+                                    if layout_warnings:
+                                        yield {
+                                            "type": "layout_warnings",
+                                            "items": layout_warnings,
+                                        }
                         except (json.JSONDecodeError, TypeError):
                             pass
 

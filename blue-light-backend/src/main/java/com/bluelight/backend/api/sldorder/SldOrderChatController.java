@@ -6,6 +6,7 @@ import com.bluelight.backend.api.sldorder.dto.SldOrderResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,6 +32,14 @@ public class SldOrderChatController {
     private final SldOrderAgentService sldOrderAgentService;
 
     /**
+     * SSE Emitter timeout (ms).
+     * <p>WebClient ReadTimeout (SldAgentConfig)·AI service heartbeat 간격과 정합되어야 한다.
+     * heartbeat 누락이나 Gemini 장기 호출에서 가장 마지막에 발동하는 timeout이다.
+     */
+    @Value("${sld.agent.sse-timeout-ms:600000}")
+    private long sseTimeoutMs;
+
+    /**
      * SSE 스트리밍 채팅
      * POST /api/sld-manager/orders/{id}/sld-chat/stream
      */
@@ -44,7 +53,8 @@ public class SldOrderChatController {
         log.info("SLD Order chat stream: sldOrderSeq={}, userSeq={}, message={}",
                 id, userSeq, request.getMessage().substring(0, Math.min(request.getMessage().length(), 50)));
 
-        SseEmitter emitter = new SseEmitter(600_000L);  // 10분 (Gemini API 호출 시 긴 대기 가능)
+        // sld.agent.sse-timeout-ms (기본 10분). WebClient ReadTimeout과 동일해야 한다.
+        SseEmitter emitter = new SseEmitter(sseTimeoutMs);
         sldOrderAgentService.chatStream(id, userSeq, request.getMessage(), request.getAttachedFileSeq(), emitter);
 
         return emitter;

@@ -34,15 +34,29 @@ TEMPLATES_DIR = DATA_DIR / "slds"
 
 
 def load_json_data() -> list[dict]:
-    """sld_database.json 파일 로드."""
+    """sld_database.json + (옵션) sld_database_dwg_extras.json 파일 로드.
+
+    Extras 파일은 ``scripts/index_sld_dwg_old.py`` 가 생성한다.
+    파일이 있으면 자동으로 머지해 매칭 풀을 확장한다.
+    """
     if not JSON_FILE.exists():
         logger.error(f"JSON 파일이 존재하지 않습니다: {JSON_FILE}")
         sys.exit(1)
 
     with open(JSON_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
+    logger.info(f"JSON 파일 로드 완료: {len(data)}건 — {JSON_FILE.name}")
 
-    logger.info(f"JSON 파일 로드 완료: {len(data)}건")
+    extras_file = DATA_DIR / "sld_database_dwg_extras.json"
+    if extras_file.exists():
+        with extras_file.open(encoding="utf-8") as f:
+            extras = json.load(f)
+        # filename 중복은 신규(extras) 우선
+        existing = {e.get("filename") for e in data if e.get("filename")}
+        added = [e for e in extras if e.get("filename") not in existing]
+        data.extend(added)
+        logger.info(f"DWG extras 머지: +{len(added)}건 (총 {len(data)}건)")
+
     return data
 
 

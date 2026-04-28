@@ -242,7 +242,13 @@ public class SldOrderAgentService {
             log.warn("SSE emitter timed out: sldOrderSeq={}", sldOrderSeq);
             sendSseEvent(emitter, "error", Map.of(
                     "type", "error",
-                    "content", "Connection timed out. The AI processing took too long. Please try again."));
+                    "error_category", "timeout",
+                    "content", "AI 응답이 지연되어 연결이 종료되었습니다. 잠시 후 다시 시도해주세요. "
+                            + "동일 증상이 반복되면 Vision 검증 임시 비활성화나 입력 단순화를 검토해주세요.",
+                    "next_steps", List.of(
+                            "1~2분 후 동일 메시지 재전송",
+                            "회로 수가 많다면 일부 회로를 줄여 재시도",
+                            "반복되면 관리자에게 sldOrderSeq=" + sldOrderSeq + " 와 함께 문의")));
             clientDisconnected.set(true);
             subscription.dispose();
         });

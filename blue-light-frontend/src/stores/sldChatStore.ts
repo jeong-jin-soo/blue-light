@@ -14,6 +14,9 @@ interface SldChatState {
   // Progress tracking (AI 요청 생명주기)
   progressStage: SldProgressStage | null;
   progressMessage: string | null;
+  // 가장 최근 generate_sld 결과의 LEW 자동 보완값 + 컴플라이언스 워닝
+  appliedDefaults: string[];
+  layoutWarnings: string[];
 
   // Actions
   sendMessage: (applicationId: number, content: string, attachedFileSeq?: number) => Promise<void>;
@@ -21,6 +24,8 @@ interface SldChatState {
   resetChat: (applicationId: number) => Promise<void>;
   clearState: () => void;
   setSvgPreview: (svg: string | null) => void;
+  dismissAppliedDefaults: () => void;
+  dismissLayoutWarnings: () => void;
 }
 
 let messageSeq = 0;
@@ -36,6 +41,8 @@ export const useSldChatStore = create<SldChatState>((set) => ({
   isToolCompleted: false,
   progressStage: null,
   progressMessage: null,
+  appliedDefaults: [],
+  layoutWarnings: [],
 
   sendMessage: async (applicationId: number, content: string, attachedFileSeq?: number) => {
     // 사용자 메시지 즉시 표시
@@ -121,6 +128,14 @@ export const useSldChatStore = create<SldChatState>((set) => ({
 
         onFileGenerated: (fileId) => {
           set({ generatedFileId: fileId });
+        },
+
+        onAppliedDefaults: (items) => {
+          set({ appliedDefaults: items });
+        },
+
+        onLayoutWarnings: (items) => {
+          set({ layoutWarnings: items });
         },
 
         onProgress: (stage, message) => {
@@ -231,6 +246,8 @@ export const useSldChatStore = create<SldChatState>((set) => ({
         isToolCompleted: false,
         progressStage: null,
         progressMessage: null,
+        appliedDefaults: [],
+        layoutWarnings: [],
       });
     } catch {
       // API 실패 시 로컬 상태 유지 (서버와 불일치 방지)
@@ -250,7 +267,12 @@ export const useSldChatStore = create<SldChatState>((set) => ({
       isToolCompleted: false,
       progressStage: null,
       progressMessage: null,
+      appliedDefaults: [],
+      layoutWarnings: [],
     }),
+
+  dismissAppliedDefaults: () => set({ appliedDefaults: [] }),
+  dismissLayoutWarnings: () => set({ layoutWarnings: [] }),
 
   setSvgPreview: (svg: string | null) => set({ svgPreview: svg }),
 }));
