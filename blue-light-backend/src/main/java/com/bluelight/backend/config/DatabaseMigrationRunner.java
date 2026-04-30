@@ -102,6 +102,10 @@ public class DatabaseMigrationRunner {
             seedConciergeManager(conn);
             // role_metadata 싱크 — UserRole enum 값을 테이블에 upsert하고 enum에 없는 row는 삭제
             syncRoleMetadata(conn);
+            // ★ Soft-deleted 계정 이메일 익명화 백필 (PDPA + uk_users_email 충돌 회피)
+            // User.anonymize() 패치 이전에 삭제된 row는 원본 이메일을 점유하고 있어
+            // 동일 이메일 재가입 시 INSERT가 unique 제약으로 실패한다.
+            backfillDeletedUserEmails(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -1539,6 +1543,37 @@ public class DatabaseMigrationRunner {
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
             log.info("Migration [lew-service-visit-photos-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: soft-deleted 계정의 원본 이메일을 익명화 형식으로 일괄 치환.
+     * <p>
+     * 배경: User.anonymize() 패치(2026-04-30) 이전에 PDPA 삭제된 row는
+     * email이 원본 그대로 남아 uk_users_email UNIQUE 제약을 점유한다.
+     * @SQLRestriction("deleted_at IS NULL")이 existsByEmail()를 가리므로
+     * 재가입 시 중복 검사를 통과한 뒤 INSERT 단계에서 unique 제약 충돌로 500 발생.
+     * <p>
+     * 익명화 형식은 도메인 anonymize()와 동일: deleted-{user_seq}@deleted.licensekaki.sg
+     * 멱등성: 이미 익명화된 row(LIKE 패턴 매칭)는 제외한다.
+     */
+    private void backfillDeletedUserEmails(Connection conn) throws SQLException {
+        if (!columnExists(conn, "users", "deleted_at")) {
+            log.debug("Migration [backfill-deleted-emails]: users.deleted_at not present, skipping");
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE users " +
+                "SET email = CONCAT('deleted-', user_seq, '@deleted.licensekaki.sg') " +
+                "WHERE deleted_at IS NOT NULL " +
+                "  AND email NOT LIKE 'deleted-%@deleted.licensekaki.sg'"
+            );
+            if (updated > 0) {
+                log.info("Migration [backfill-deleted-emails]: anonymized {} legacy soft-deleted emails", updated);
+            } else {
+                log.debug("Migration [backfill-deleted-emails]: no legacy rows to backfill");
+            }
         }
     }
 
