@@ -57,9 +57,11 @@ public class InvoiceGenerationService {
             throw new BusinessException("Application required for invoice generation",
                     HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
         }
-        if (invoiceRepository.existsByPaymentSeq(payment.getPaymentSeq())) {
+        // 활성(ACTIVE) 영수증만 중복 발행 차단. INVALIDATED 영수증이 있으면 같은 payment 에 대해
+        // 신규 영수증을 발행할 수 있다 (kva-postpayment-adjustment-spec.md §10 D3).
+        if (invoiceRepository.existsByPaymentSeqAndStatus(payment.getPaymentSeq(), "ACTIVE")) {
             throw new BusinessException(
-                    "Invoice already exists for payment " + payment.getPaymentSeq(),
+                    "Active invoice already exists for payment " + payment.getPaymentSeq(),
                     HttpStatus.CONFLICT,
                     "INVOICE_ALREADY_EXISTS");
         }

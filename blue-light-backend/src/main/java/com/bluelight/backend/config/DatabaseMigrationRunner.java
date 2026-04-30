@@ -94,6 +94,9 @@ public class DatabaseMigrationRunner {
             migrateApplicationsLoaPhoneEmailSnapshots(conn);
             // ── LEW Review Form P1.B: applications 테이블에 신청자 hint 8 컬럼 ──
             migrateApplicationsApplicantHintColumns(conn);
+            // ── 결제 후 kVA 사후 변경 (PR-1) ──
+            // invoices 테이블 status/invalidated_reason/invalidated_at 컬럼 + uk_invoices_payment 제거
+            migrateInvoicesStatusColumns(conn);
             seedSystemSettings(conn);
             // ── Document Number Generator (공통 문서번호 채번) P1.1 + P1.3 ──
             createDocumentNumberTables(conn);
@@ -1584,6 +1587,81 @@ public class DatabaseMigrationRunner {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet rs = meta.getColumns(conn.getCatalog(), null, table, column)) {
             return rs.next();
+        }
+    }
+
+    /**
+     * 마이그레이션: 결제 후 kVA 사후 변경 (PR-1).
+     * <p>
+     * invoices 테이블 변경:
+     * <ul>
+     *   <li>status / invalidated_reason / invalidated_at 컬럼 추가 (멱등).</li>
+     *   <li>uk_invoices_payment UNIQUE 제거 + idx_invoices_payment 일반 인덱스 추가
+     *       — INVALIDATED 후 같은 payment_seq 의 신규 영수증 발행 허용.</li>
+     * </ul>
+     * 스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §10 D3.
+     */
+    private void migrateInvoicesStatusColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "invoices")) {
+            log.debug("Migration [invoices-status-columns]: table missing, skipping");
+            return;
+        }
+
+        // 1) status 컬럼 추가 (멱등)
+        if (!columnExists(conn, "invoices", "status")) {
+            log.info("Migration [invoices-status-columns]: adding status column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE invoices ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' AFTER pdf_file_seq"
+                );
+                stmt.executeUpdate(
+                    "ALTER TABLE invoices ADD COLUMN invalidated_reason VARCHAR(200) NULL AFTER status"
+                );
+                stmt.executeUpdate(
+                    "ALTER TABLE invoices ADD COLUMN invalidated_at DATETIME(6) NULL AFTER invalidated_reason"
+                );
+                log.info("Migration [invoices-status-columns]: added status/invalidated_reason/invalidated_at");
+            }
+        }
+
+        // 2) uk_invoices_payment UNIQUE 제거 + idx_invoices_payment 추가 (멱등)
+        // ★ FK fk_invoices_payment 가 payment_seq 인덱스에 의존하므로, UNIQUE 를 바로 DROP 하면
+        //   "needed in a foreign key constraint" 에러. 대체 일반 인덱스를 먼저 생성한 뒤 UNIQUE 만 DROP.
+        if (indexExists(conn, "invoices", "uk_invoices_payment")) {
+            log.info("Migration [invoices-status-columns]: replacing uk_invoices_payment UNIQUE with regular indexes...");
+            try (Statement stmt = conn.createStatement()) {
+                if (!indexExists(conn, "invoices", "idx_invoices_payment")) {
+                    stmt.executeUpdate("ALTER TABLE invoices ADD INDEX idx_invoices_payment (payment_seq)");
+                }
+                if (!indexExists(conn, "invoices", "idx_invoices_payment_status")) {
+                    stmt.executeUpdate(
+                        "ALTER TABLE invoices ADD INDEX idx_invoices_payment_status (payment_seq, status)"
+                    );
+                }
+                if (!indexExists(conn, "invoices", "idx_invoices_application_status")) {
+                    stmt.executeUpdate(
+                        "ALTER TABLE invoices ADD INDEX idx_invoices_application_status (application_seq, status)"
+                    );
+                }
+                // FK 가 의존하는 인덱스가 만들어진 다음에야 UNIQUE 를 안전하게 제거할 수 있다.
+                stmt.executeUpdate("ALTER TABLE invoices DROP INDEX uk_invoices_payment");
+                log.info("Migration [invoices-status-columns]: UNIQUE replaced with regular indexes");
+            }
+        }
+    }
+
+    /**
+     * 특정 테이블에 특정 이름의 인덱스가 존재하는지 확인 (멱등 마이그레이션 가드용).
+     */
+    private boolean indexExists(Connection conn, String table, String indexName) throws SQLException {
+        String sql = "SELECT 1 FROM information_schema.STATISTICS " +
+                     "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, table);
+            ps.setString(2, indexName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 

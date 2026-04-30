@@ -697,6 +697,55 @@ public class Application extends BaseEntity {
     }
 
     /**
+     * 결제 후 kVA 사후 변경 도메인 메서드.
+     *
+     * <p>스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §3, §6.1.
+     * ADMIN 이 결제 완료 이후 단계({@link ApplicationStatus#PAID}/{@link ApplicationStatus#IN_PROGRESS}/
+     * {@link ApplicationStatus#COMPLETED}) 에서만 호출 가능. EXPIRED 상태는 서비스 레이어에서 차단.</p>
+     *
+     * <h3>상태 전이 규칙</h3>
+     * <ul>
+     *   <li>{@code Application.status} 는 변경하지 않는다 (PR3 모델 — CoF 는 결제 후 단계이므로 reopen 불필요).</li>
+     *   <li>{@code kvaStatus} 는 {@link KvaStatus#CONFIRMED} 그대로 유지.</li>
+     *   <li>{@code kvaSource} 는 변경하지 않는다 — 최초 확정 시 출처를 보존하기 위함
+     *       (변경 이력은 {@code KvaAdjustmentRecord} 에서 추적).</li>
+     *   <li>{@code selectedKva}/{@code quoteAmount} 갱신, {@code kvaConfirmedBy}/{@code kvaConfirmedAt}
+     *       는 ADMIN override 자로 갱신.</li>
+     * </ul>
+     *
+     * @throws IllegalStateException 호출 시점 status 가 결제 후 허용 상태가 아닌 경우
+     * @throws IllegalArgumentException newKva/newQuote 인자가 null 인 경우
+     */
+    public void overrideKvaPostPayment(Integer newKva, BigDecimal newQuoteAmount, User overrider) {
+        if (newKva == null) {
+            throw new IllegalArgumentException("newKva must not be null");
+        }
+        if (newQuoteAmount == null) {
+            throw new IllegalArgumentException("newQuoteAmount must not be null");
+        }
+        if (!isPostPaymentStatus()) {
+            throw new IllegalStateException(
+                    "overrideKvaPostPayment is only allowed for post-payment statuses (current: "
+                            + this.status + ")");
+        }
+        this.selectedKva = newKva;
+        this.quoteAmount = newQuoteAmount;
+        // kvaStatus 는 CONFIRMED 그대로, kvaSource 는 보존. 변경 이력은 KvaAdjustmentRecord 에서 추적.
+        this.kvaConfirmedBy = overrider;
+        this.kvaConfirmedAt = LocalDateTime.now();
+    }
+
+    /**
+     * 본 신청이 결제 후 단계인지 (PAID/IN_PROGRESS/COMPLETED).
+     * EXPIRED 는 본 메서드에서 false — 결제 자체가 closed 된 상태.
+     */
+    public boolean isPostPaymentStatus() {
+        return this.status == ApplicationStatus.PAID
+                || this.status == ApplicationStatus.IN_PROGRESS
+                || this.status == ApplicationStatus.COMPLETED;
+    }
+
+    /**
      * SP 계정 번호 수정
      */
     public void updateSpAccountNo(String spAccountNo) {

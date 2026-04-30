@@ -61,7 +61,8 @@ class InvoiceGenerationServiceTest {
                 systemSettingRepository, auditLogService);
 
         // 기본 stub: 중복 없음, 번호 생성, PDF 렌더 성공
-        when(invoiceRepository.existsByPaymentSeq(PAYMENT_SEQ)).thenReturn(false);
+        // ★ kva-postpayment-adjustment-spec.md §10 D3 — 활성(ACTIVE) 영수증만 중복 차단.
+        when(invoiceRepository.existsByPaymentSeqAndStatus(PAYMENT_SEQ, "ACTIVE")).thenReturn(false);
         when(invoiceNumberGenerator.next(any())).thenReturn("IN20260422001");
         when(invoicePdfRenderer.render(any(Invoice.class))).thenReturn(PDF_FILE_SEQ);
         when(invoiceRepository.save(any(Invoice.class))).thenAnswer(inv -> {
@@ -146,10 +147,10 @@ class InvoiceGenerationServiceTest {
     @Test
     @DisplayName("shouldReturnExistingInvoiceWhenDuplicatePaymentDetected")
     void shouldReturnExistingInvoiceWhenDuplicatePaymentDetected() {
-        // AC-8: existsByPaymentSeq = true → INVOICE_ALREADY_EXISTS 409
+        // AC-8: existsByPaymentSeqAndStatus(.., ACTIVE) = true → INVOICE_ALREADY_EXISTS 409
         // Given
         Payment payment = mockPayment();
-        when(invoiceRepository.existsByPaymentSeq(PAYMENT_SEQ)).thenReturn(true);
+        when(invoiceRepository.existsByPaymentSeqAndStatus(PAYMENT_SEQ, "ACTIVE")).thenReturn(true);
 
         Application app = mock(Application.class);
         when(app.getApplicationSeq()).thenReturn(APP_SEQ);

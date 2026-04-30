@@ -1,0 +1,358 @@
+package com.bluelight.backend.service.kva;
+
+import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideRequest;
+import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideResponse;
+import com.bluelight.backend.api.audit.AuditLogService;
+import com.bluelight.backend.api.invoice.InvoiceGenerationService;
+import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.application.ApplicationRepository;
+import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.ApplicationType;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.cof.CertificateOfFitness;
+import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
+import com.bluelight.backend.domain.invoice.Invoice;
+import com.bluelight.backend.domain.invoice.InvoiceRepository;
+import com.bluelight.backend.domain.kva.AdminPaymentAdjustment;
+import com.bluelight.backend.domain.kva.ChangedByRole;
+import com.bluelight.backend.domain.kva.KvaAdjustmentRecord;
+import com.bluelight.backend.domain.kva.KvaAdjustmentRepository;
+import com.bluelight.backend.domain.kva.KvaAdjustmentStatus;
+import com.bluelight.backend.domain.payment.Payment;
+import com.bluelight.backend.domain.payment.PaymentRepository;
+import com.bluelight.backend.domain.payment.PaymentStatus;
+import com.bluelight.backend.domain.price.MasterPrice;
+import com.bluelight.backend.domain.price.MasterPriceRepository;
+import com.bluelight.backend.domain.user.User;
+import com.bluelight.backend.domain.user.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.math.BigDecimal;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+/**
+ * 결제 후 kVA 사후 변경 서비스 단위 테스트 (PR-1).
+ *
+ * <p>스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.</p>
+ *
+ * <h2>커버되는 수용 기준</h2>
+ * <ul>
+ *   <li>AC-A1: ADMIN 직접 변경 정상 흐름 (PAID 상태)</li>
+ *   <li>AC-A2: PRE-PAYMENT 상태 거부 (PENDING_PAYMENT 등)</li>
+ *   <li>AC-A3: COMPLETED 허용, EXPIRED 거부</li>
+ *   <li>AC-A4: master_prices 미존재 → 400 INVALID_KVA_TIER</li>
+ *   <li>AC-A5: 동일 newKva → 400 KVA_NO_CHANGE</li>
+ *   <li>AC-C1: CoF finalized → unfinalize + cofReissueTriggered=true</li>
+ *   <li>D3 Invoice invalidate + 재발행 검증</li>
+ *   <li>masterPriceSeqUsed 기록 검증</li>
+ * </ul>
+ */
+class KvaPostPaymentServiceTest {
+
+    private ApplicationRepository applicationRepository;
+    private MasterPriceRepository masterPriceRepository;
+    private UserRepository userRepository;
+    private KvaAdjustmentRepository kvaAdjustmentRepository;
+    private CertificateOfFitnessRepository cofRepository;
+    private InvoiceRepository invoiceRepository;
+    private PaymentRepository paymentRepository;
+    private InvoiceGenerationService invoiceGenerationService;
+    private AuditLogService auditLogService;
+    private KvaPostPaymentService service;
+
+    private static final Long APP_ID = 1L;
+    private static final Long ADMIN_SEQ = 99L;
+
+    @BeforeEach
+    void setUp() {
+        applicationRepository = mock(ApplicationRepository.class);
+        masterPriceRepository = mock(MasterPriceRepository.class);
+        userRepository = mock(UserRepository.class);
+        kvaAdjustmentRepository = mock(KvaAdjustmentRepository.class);
+        cofRepository = mock(CertificateOfFitnessRepository.class);
+        invoiceRepository = mock(InvoiceRepository.class);
+        paymentRepository = mock(PaymentRepository.class);
+        invoiceGenerationService = mock(InvoiceGenerationService.class);
+        auditLogService = mock(AuditLogService.class);
+
+        service = new KvaPostPaymentService(
+                applicationRepository, masterPriceRepository, userRepository,
+                kvaAdjustmentRepository, cofRepository, invoiceRepository,
+                paymentRepository, invoiceGenerationService, auditLogService);
+
+        // 저장 시 동일 객체 반환 (id 미세팅이라도 record 가 setter 없으니 반환만 흉내)
+        when(kvaAdjustmentRepository.save(any(KvaAdjustmentRecord.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    // ── 헬퍼 ────────────────────────────────────────────────
+
+    private Application mockApp(ApplicationStatus status, Integer currentKva,
+                                BigDecimal currentQuote) {
+        Application app = mock(Application.class);
+        when(app.getApplicationSeq()).thenReturn(APP_ID);
+        when(app.getStatus()).thenReturn(status);
+        when(app.getSelectedKva()).thenReturn(currentKva);
+        when(app.getQuoteAmount()).thenReturn(currentQuote);
+        when(app.getApplicationType()).thenReturn(ApplicationType.NEW);
+        // isPostPaymentStatus 는 실제 메서드 호출되도록 한다 (Mockito 의 default 는 false 반환)
+        when(app.isPostPaymentStatus()).thenAnswer(inv ->
+                status == ApplicationStatus.PAID
+                        || status == ApplicationStatus.IN_PROGRESS
+                        || status == ApplicationStatus.COMPLETED);
+        return app;
+    }
+
+    private MasterPrice mockPrice(Long seq, BigDecimal price) {
+        MasterPrice mp = mock(MasterPrice.class);
+        when(mp.getMasterPriceSeq()).thenReturn(seq);
+        when(mp.getPrice()).thenReturn(price);
+        when(mp.getRenewalPrice()).thenReturn(BigDecimal.ZERO);
+        when(mp.getSldPrice()).thenReturn(BigDecimal.ZERO);
+        return mp;
+    }
+
+    private KvaPostPaymentOverrideRequest req(Integer newKva, String reason) {
+        KvaPostPaymentOverrideRequest r = new KvaPostPaymentOverrideRequest();
+        r.setNewKva(newKva);
+        r.setReason(reason);
+        r.setAdminMemo("memo");
+        r.setPaymentAdjustment(AdminPaymentAdjustment.PAID_DIFFERENCE);
+        return r;
+    }
+
+    private void stubActiveInvoice() {
+        Invoice inv = mock(Invoice.class);
+        when(inv.getInvoiceSeq()).thenReturn(7L);
+        when(inv.getInvalidatedReason()).thenReturn("KVA_ADJUSTMENT_*");
+        when(invoiceRepository.findFirstByApplicationSeqAndReferenceTypeAndStatus(
+                APP_ID, "APPLICATION", "ACTIVE"))
+                .thenReturn(Optional.of(inv));
+
+        Payment payment = mock(Payment.class);
+        when(payment.getPaymentSeq()).thenReturn(33L);
+        when(paymentRepository.findByApplicationApplicationSeqAndStatus(
+                APP_ID, PaymentStatus.SUCCESS))
+                .thenReturn(Optional.of(payment));
+
+        Invoice newInvoice = mock(Invoice.class);
+        when(newInvoice.getInvoiceSeq()).thenReturn(8L);
+        when(invoiceGenerationService.generateFromPayment(eq(payment), any()))
+                .thenReturn(newInvoice);
+    }
+
+    // ── ACs ─────────────────────────────────────────────────
+
+    @Test
+    void AC_A1_PAID_상태에서_정상_변경_KvaAdjustmentRecord_생성() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450.00"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650.00"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+        stubActiveInvoice();
+
+        KvaPostPaymentOverrideResponse resp =
+                service.overrideKva(APP_ID, req(200, "Site survey: actual 200 kVA"), ADMIN_SEQ);
+
+        // Application 도메인 메서드가 정확히 호출됐는가
+        verify(app).overrideKvaPostPayment(eq(200), eq(new BigDecimal("650.00")), eq(admin));
+
+        // KvaAdjustmentRecord 저장 검증
+        ArgumentCaptor<KvaAdjustmentRecord> recCap =
+                ArgumentCaptor.forClass(KvaAdjustmentRecord.class);
+        verify(kvaAdjustmentRepository).save(recCap.capture());
+        KvaAdjustmentRecord saved = recCap.getValue();
+        assertThat(saved.getStatus()).isEqualTo(KvaAdjustmentStatus.APPLIED);
+        assertThat(saved.getChangedByRole()).isEqualTo(ChangedByRole.ADMIN);
+        assertThat(saved.getChangedByUserSeq()).isEqualTo(ADMIN_SEQ);
+        assertThat(saved.getPreviousKva()).isEqualTo(100);
+        assertThat(saved.getNewKva()).isEqualTo(200);
+        assertThat(saved.getPreviousQuoteAmount()).isEqualByComparingTo("450.00");
+        assertThat(saved.getNewQuoteAmount()).isEqualByComparingTo("650.00");
+        assertThat(saved.getAmountDifference()).isEqualByComparingTo("200.00");
+        // D1: masterPriceSeqUsed 기록
+        assertThat(saved.getMasterPriceSeqUsed()).isEqualTo(5L);
+        assertThat(saved.getReason()).isEqualTo("Site survey: actual 200 kVA");
+        assertThat(saved.getAdminPaymentAdjustment()).isEqualTo(AdminPaymentAdjustment.PAID_DIFFERENCE);
+
+        // 응답 DTO
+        assertThat(resp.getNewKva()).isEqualTo(200);
+        assertThat(resp.getPreviousKva()).isEqualTo(100);
+        assertThat(resp.getCofReissueTriggered()).isFalse();
+
+        // KVA_OVERRIDE_POSTPAYMENT 감사 기록
+        ArgumentCaptor<AuditAction> actionCap = ArgumentCaptor.forClass(AuditAction.class);
+        verify(auditLogService, times(2)).logAsync(
+                any(), actionCap.capture(), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), any(), anyString(), any());
+        // 2회 호출: KVA_OVERRIDE_POSTPAYMENT, INVOICE_REGENERATED
+        assertThat(actionCap.getAllValues()).contains(AuditAction.KVA_OVERRIDE_POSTPAYMENT);
+        assertThat(actionCap.getAllValues()).contains(AuditAction.INVOICE_REGENERATED);
+    }
+
+    @Test
+    void AC_A2_PRE_PAYMENT_상태_PENDING_PAYMENT_거부_409_KVA_NOT_POSTPAYMENT() {
+        Application app = mockApp(ApplicationStatus.PENDING_PAYMENT, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.overrideKva(APP_ID, req(200, "x"), ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_NOT_POSTPAYMENT"));
+
+        verify(app, never()).overrideKvaPostPayment(any(), any(), any());
+        verify(kvaAdjustmentRepository, never()).save(any());
+    }
+
+    @Test
+    void AC_A3_EXPIRED_거부_409_KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED() {
+        Application app = mockApp(ApplicationStatus.EXPIRED, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.overrideKva(APP_ID, req(200, "x"), ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED"));
+
+        verify(app, never()).overrideKvaPostPayment(any(), any(), any());
+    }
+
+    @Test
+    void AC_A3_COMPLETED_허용() {
+        Application app = mockApp(ApplicationStatus.COMPLETED, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+        stubActiveInvoice();
+
+        KvaPostPaymentOverrideResponse resp =
+                service.overrideKva(APP_ID, req(200, "License correction in progress"), ADMIN_SEQ);
+
+        assertThat(resp).isNotNull();
+        verify(app).overrideKvaPostPayment(eq(200), any(BigDecimal.class), eq(admin));
+    }
+
+    @Test
+    void AC_A4_master_prices_미존재_400_INVALID_KVA_TIER() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        when(masterPriceRepository.findByKva(999)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.overrideKva(APP_ID, req(999, "weird"), ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("INVALID_KVA_TIER"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+    }
+
+    @Test
+    void AC_A5_동일_newKva_400_KVA_NO_CHANGE() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.overrideKva(APP_ID, req(100, "noop"), ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_NO_CHANGE"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+        verify(masterPriceRepository, never()).findByKva(any());
+    }
+
+    @Test
+    void AC_C1_CoF_finalized면_unfinalize_cofReissueTriggered_true() {
+        Application app = mockApp(ApplicationStatus.IN_PROGRESS, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        stubActiveInvoice();
+
+        CertificateOfFitness cof = mock(CertificateOfFitness.class);
+        when(cof.isFinalized()).thenReturn(true);
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.of(cof));
+
+        KvaPostPaymentOverrideResponse resp =
+                service.overrideKva(APP_ID, req(200, "Field measurement"), ADMIN_SEQ);
+
+        // CoF.reopenForReissue 호출됨
+        verify(cof).reopenForReissue(200);
+        assertThat(resp.getCofReissueTriggered()).isTrue();
+
+        // KvaAdjustmentRecord row 의 cofReissueTriggered=true 마킹 검증
+        ArgumentCaptor<KvaAdjustmentRecord> recCap =
+                ArgumentCaptor.forClass(KvaAdjustmentRecord.class);
+        verify(kvaAdjustmentRepository).save(recCap.capture());
+        // 저장 시점에는 false 로 build 되지만 markCofReissueTriggered 호출됐는지 record 에서 확인.
+        assertThat(recCap.getValue().getCofReissueTriggered()).isTrue();
+
+        // COF_UNFINALIZED_BY_KVA_ADJUSTMENT 감사 기록
+        ArgumentCaptor<AuditAction> actionCap = ArgumentCaptor.forClass(AuditAction.class);
+        verify(auditLogService, times(3)).logAsync(
+                any(), actionCap.capture(), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), any(), anyString(), any());
+        assertThat(actionCap.getAllValues())
+                .contains(AuditAction.COF_UNFINALIZED_BY_KVA_ADJUSTMENT);
+    }
+
+    @Test
+    void AC_D3_활성_Invoice_invalidate_후_신규_발행_호출_검증() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+
+        // 활성 Invoice + Payment + 신규 Invoice
+        Invoice activeInv = mock(Invoice.class);
+        when(activeInv.getInvoiceSeq()).thenReturn(7L);
+        when(activeInv.getInvalidatedReason()).thenReturn("KVA_ADJUSTMENT_*");
+        when(invoiceRepository.findFirstByApplicationSeqAndReferenceTypeAndStatus(
+                APP_ID, "APPLICATION", "ACTIVE"))
+                .thenReturn(Optional.of(activeInv));
+
+        Payment payment = mock(Payment.class);
+        when(payment.getPaymentSeq()).thenReturn(33L);
+        when(paymentRepository.findByApplicationApplicationSeqAndStatus(
+                APP_ID, PaymentStatus.SUCCESS))
+                .thenReturn(Optional.of(payment));
+
+        Invoice newInvoice = mock(Invoice.class);
+        when(newInvoice.getInvoiceSeq()).thenReturn(8L);
+        when(invoiceGenerationService.generateFromPayment(eq(payment), eq(app)))
+                .thenReturn(newInvoice);
+
+        service.overrideKva(APP_ID, req(200, "verify"), ADMIN_SEQ);
+
+        // 기존 Invoice invalidate 호출
+        verify(activeInv).invalidate(anyString());
+        // 신규 Invoice 자동 발행 호출
+        verify(invoiceGenerationService).generateFromPayment(eq(payment), eq(app));
+    }
+}

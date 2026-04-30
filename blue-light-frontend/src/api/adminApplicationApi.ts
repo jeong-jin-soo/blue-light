@@ -111,6 +111,43 @@ export const confirmKva = async (
   return response.data;
 };
 
+// ── 결제 후 kVA 사후 변경 (PR-1) ──────────────────────────────
+// 스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §4.1
+
+export interface KvaPostPaymentOverridePayload {
+  newKva: number;
+  reason: string;
+  adminMemo?: string;
+  paymentAdjustment?: string; // PENDING | PAID_DIFFERENCE | REFUNDED | WAIVED
+  settledAmount?: number;
+  receiptReferenceNumber?: string;
+}
+
+export interface KvaPostPaymentOverrideResponse {
+  adjustmentSeq: number;
+  previousKva: number;
+  newKva: number;
+  previousQuoteAmount: number;
+  newQuoteAmount: number;
+  amountDifference: number;
+  cofReissueTriggered: boolean;
+}
+
+/**
+ * 결제 후 kVA 사후 변경 (ADMIN 전용).
+ * 결제 전 신청은 {@link confirmKva} 의 force=true 를 사용해야 한다.
+ */
+export const overrideKvaPostPayment = async (
+  applicationSeq: number,
+  data: KvaPostPaymentOverridePayload
+): Promise<KvaPostPaymentOverrideResponse> => {
+  const response = await axiosClient.post<KvaPostPaymentOverrideResponse>(
+    `/admin/applications/${applicationSeq}/kva-override-postpayment`,
+    data
+  );
+  return response.data;
+};
+
 export const completeApplication = async (
   id: number,
   data: CompleteApplicationRequest

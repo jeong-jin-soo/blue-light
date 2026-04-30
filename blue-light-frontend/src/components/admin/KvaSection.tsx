@@ -3,6 +3,7 @@ import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { KvaConfirmModal } from './KvaConfirmModal';
+import { KvaPostPaymentOverrideModal } from './KvaPostPaymentOverrideModal';
 import { useAuthStore } from '../../stores/authStore';
 import type { AdminApplication } from '../../types';
 
@@ -19,7 +20,12 @@ import type { AdminApplication } from '../../types';
  *       <li>LEW (unassigned): 조회 + "Not assigned" 안내만.</li>
  *     </ul>
  *   </li>
- *   <li>PAID/IN_PROGRESS/COMPLETED/EXPIRED: 서버가 KVA_LOCKED_AFTER_PAYMENT 로 차단하므로 UI 도 버튼 비활성.</li>
+ *   <li>PRE-PAYMENT(PENDING_REVIEW/REVISION_REQUESTED/PENDING_PAYMENT): {@link KvaConfirmModal}
+ *       의 force=true override 사용.</li>
+ *   <li>POST-PAYMENT(PAID/IN_PROGRESS/COMPLETED): ADMIN 전용 [Override (post-payment)] 버튼 노출.
+ *       {@link KvaPostPaymentOverrideModal} 호출 — 별도 엔드포인트.
+ *       스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.1.</li>
+ *   <li>EXPIRED: 어떤 변경도 불가.</li>
  * </ul>
  */
 interface KvaSectionProps {
@@ -27,7 +33,8 @@ interface KvaSectionProps {
   onUpdated: () => void;
 }
 
-const LOCKED_STATUSES = new Set(['PAID', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED']);
+const PRE_PAYMENT_LOCKED_STATUSES = new Set(['PAID', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED']);
+const POST_PAYMENT_STATUSES = new Set(['PAID', 'IN_PROGRESS', 'COMPLETED']);
 
 export function KvaSection({ application, onUpdated }: KvaSectionProps) {
   const { user } = useAuthStore();
@@ -39,8 +46,10 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
     application.assignedLewSeq === user?.userSeq;
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [postPaymentModalOpen, setPostPaymentModalOpen] = useState(false);
 
-  const locked = LOCKED_STATUSES.has(application.status);
+  // PR3 PRE-PAYMENT 가드 (기존 confirm/override 동선)
+  const locked = PRE_PAYMENT_LOCKED_STATUSES.has(application.status);
   const kvaStatus = application.kvaStatus ?? 'CONFIRMED';
   const kvaSource = application.kvaSource;
 
@@ -54,6 +63,11 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
     !locked &&
     kvaStatus === 'CONFIRMED' &&
     isAdmin;
+
+  // PR-1: 결제 후 kVA 사후 변경 — ADMIN 전용, PAID/IN_PROGRESS/COMPLETED 에서만 노출.
+  const canOverridePostPayment =
+    isAdmin &&
+    POST_PAYMENT_STATUSES.has(application.status);
 
   const confirmedAt = application.kvaConfirmedAt
     ? new Date(application.kvaConfirmedAt).toLocaleDateString()
@@ -126,15 +140,26 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
               )}
             </div>
           </div>
-          {canOverride && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setModalOpen(true)}
-            >
-              Override
-            </Button>
-          )}
+          <div className="flex flex-col items-end gap-2">
+            {canOverride && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setModalOpen(true)}
+              >
+                Override
+              </Button>
+            )}
+            {canOverridePostPayment && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPostPaymentModalOpen(true)}
+              >
+                Override (post-payment)
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
       {canOverride && (
@@ -142,6 +167,14 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
           isOpen={modalOpen}
           application={application}
           onClose={() => setModalOpen(false)}
+          onSuccess={onUpdated}
+        />
+      )}
+      {canOverridePostPayment && (
+        <KvaPostPaymentOverrideModal
+          isOpen={postPaymentModalOpen}
+          application={application}
+          onClose={() => setPostPaymentModalOpen(false)}
           onSuccess={onUpdated}
         />
       )}
