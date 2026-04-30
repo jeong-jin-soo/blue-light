@@ -59,6 +59,7 @@ import DataBreachPage from '../pages/admin/DataBreachPage';
 
 // LEW pages
 import LewReviewFormPage from '../pages/lew/LewReviewFormPage';
+import LewApplicationDetailPage from '../pages/lew/LewApplicationDetailPage';
 
 // SLD Manager pages
 import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPage';
@@ -231,7 +232,7 @@ const router = createBrowserRouter([
         children: [
           { path: '/lew/dashboard', element: <AdminDashboardPage /> },
           { path: '/lew/applications', element: <AdminApplicationListPage /> },
-          { path: '/lew/applications/:id', element: <AdminApplicationDetailPage /> },
+          { path: '/lew/applications/:id', element: <LewApplicationDetailPage /> },
           // LEW Review Form (P2.B) — CoF 3-step
           { path: '/lew/applications/:id/review', element: <LewReviewFormPage /> },
           { path: '/lew/notifications', element: <NotificationsPage /> },

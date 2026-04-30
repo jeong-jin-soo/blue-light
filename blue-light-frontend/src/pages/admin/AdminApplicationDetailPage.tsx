@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
@@ -76,15 +75,9 @@ export default function AdminApplicationDetailPage() {
   const basePath = getBasePath(currentUser?.role);
   const applicationId = Number(id);
 
-  // Phase 3 PR#2 — 서류 요청 모달 권한 가드 (AC-R4 UI 레벨)
-  //   · ADMIN/SYSTEM_ADMIN: 모든 신청 허용
-  //   · LEW: assigned_lew_seq == currentUser.seq 일 때만
-  //   · 그 외: 버튼 미노출
-  const canRequestDocuments =
-    isAdmin ||
-    (currentUser?.role === 'LEW' &&
-      !!application?.assignedLewSeq &&
-      application.assignedLewSeq === currentUser.userSeq);
+  // 서류 요청 모달 권한 가드 — ADMIN/SYSTEM_ADMIN 전용.
+  // LEW는 별도 LEW 페이지(/lew/applications/:id, /lew/applications/:id/review)에서 처리.
+  const canRequestDocuments = isAdmin;
 
   // ── Data Fetching ──────────────────────────────────
 
@@ -367,30 +360,6 @@ export default function AdminApplicationDetailPage() {
         <StatusBadge status={application.status} />
       </div>
 
-      {/* P2.B — LEW Review Form 진입 배너. LEW 역할 + 본인에게 배정된 신청 + 확정 전일 때만. */}
-      {currentUser?.role === 'LEW' &&
-        application.assignedLewSeq === currentUser.userSeq &&
-        application.status === 'PENDING_REVIEW' && (
-          <div className="rounded-lg border border-primary-200 bg-primary-50 p-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-primary-800">
-                  Certificate of Fitness review
-                </p>
-                <p className="text-xs text-primary-700 mt-0.5">
-                  Enter the 10 CoF fields in a guided 3-step flow. Draft save is supported;
-                  finalize moves the application to payment stage.
-                </p>
-              </div>
-              <Button
-                onClick={() => navigate(`/lew/applications/${application.applicationSeq}/review`)}
-              >
-                Start CoF Review
-              </Button>
-            </div>
-          </div>
-        )}
-
       {/* Review Comment */}
       {application.reviewComment && (
         <Card>
@@ -516,6 +485,7 @@ export default function AdminApplicationDetailPage() {
         isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
         onConfirm={handleConfirmPayment} quoteAmount={application.quoteAmount}
         paymentForm={paymentForm} setPaymentForm={setPaymentForm} loading={actionLoading}
+        assignedLewSeq={application.assignedLewSeq ?? null}
       />
       <CompleteModal
         isOpen={showCompleteModal} onClose={() => setShowCompleteModal(false)}

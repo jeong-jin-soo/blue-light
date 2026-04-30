@@ -97,7 +97,9 @@ export default function LewReviewFormPage() {
   const [showSldConfirm, setShowSldConfirm] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<TabKey>('cof');
+  // 기본 활성 탭은 데이터 로드 후 useEffect에서 "첫 미완료 탭"으로 동적 설정한다.
+  // 정적으로 'cof'로 두면 가드 미충족 상태에서 빈 탭에 떨어져 LEW가 거꾸로 이동해야 함.
+  const [activeTab, setActiveTab] = useState<TabKey | null>(null);
   const [currentStep, setCurrentStep] = useState<0 | 1 | 2>(0);
   const [draft, setDraft] = useState<CertificateOfFitnessRequest>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -172,6 +174,23 @@ export default function LewReviewFormPage() {
   const guardsSatisfied = kvaConfirmed && pendingDocCount === 0 && sldReady;
 
   const cofFinalized = lewData?.cof?.finalized === true;
+
+  // 기본 활성 탭 — 첫 미완료 탭. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
+  useEffect(() => {
+    if (activeTab !== null) return;
+    if (!adminApp || !lewData) return;
+    let next: TabKey;
+    if (pendingDocCount > 0) {
+      next = 'documents';
+    } else if (!kvaConfirmed) {
+      next = 'kva';
+    } else if (sldRequired && !sldReady) {
+      next = 'sld';
+    } else {
+      next = 'cof';
+    }
+    setActiveTab(next);
+  }, [activeTab, adminApp, lewData, pendingDocCount, kvaConfirmed, sldRequired, sldReady]);
 
   // Phase 3 권한: LEW는 assigned_lew_seq 일치 시만 서류 요청 가능
   const canRequestDocuments =
@@ -258,7 +277,8 @@ export default function LewReviewFormPage() {
     try {
       await lewReviewApi.saveDraftCof(applicationId, draft);
       await lewReviewApi.finalizeCof(applicationId);
-      toast.success('Certificate of Fitness finalized. Application moved to payment stage.');
+      // PR3 옵션 R: finalize는 결제 후 단계 — status 전이 없음. 메시지에서 "moved to payment stage" 제거.
+      toast.success('Certificate of Fitness finalized.');
       navigate('/lew/applications');
     } catch (err) {
       const { code, message } = extractError(err);
@@ -271,6 +291,10 @@ export default function LewReviewFormPage() {
       } else if (code === 'APPLICATION_NOT_ASSIGNED') {
         toast.error('You are not assigned to this application.');
         navigate('/lew/applications');
+      } else if (code === 'APPLICATION_NOT_PAID') {
+        // PR3: CoF는 결제(PAID/IN_PROGRESS) 이후에만 finalize 가능. SS 638 §13 준수.
+        toast.error('Payment must be confirmed before finalizing CoF.');
+        await loadData();
       } else if (code === 'KVA_NOT_CONFIRMED') {
         toast.error('kVA must be confirmed before finalizing CoF.');
         setActiveTab('kva');
@@ -452,7 +476,12 @@ export default function LewReviewFormPage() {
       {/* Tabs */}
       <Card padding="none">
         <div className="px-2">
-          <Tabs tabs={tabs} activeKey={activeTab} onChange={setActiveTab} />
+          {/* activeTab은 useEffect에서 첫 미완료 탭으로 동적 설정됨. 첫 렌더에서 null일 수 있어 fallback. */}
+          <Tabs
+            tabs={tabs}
+            activeKey={activeTab ?? 'documents'}
+            onChange={(key) => setActiveTab(key as TabKey)}
+          />
         </div>
         <div className="p-6">
           <TabPanel active={activeTab === 'documents'}>
