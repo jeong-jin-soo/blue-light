@@ -34,7 +34,9 @@ spring:
     open-in-view: false
     defer-datasource-initialization: true
 
-  # 이메일 설정 (AWS SES SMTP or 기타 SMTP)
+  # 이메일 설정 — 운영은 Resend SMTP (smtp.resend.com:465)
+  # AWS SES production access 거부로 인해 Resend로 전환 (2026-04-29)
+  # Local: MAIL_SMTP_ENABLED=false 시 LogOnlyEmailService로 폴백
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}
@@ -128,6 +130,11 @@ sld:
 mail:
   smtp:
     enabled: ${MAIL_SMTP_ENABLED:false}
+  # AWS SES Configuration Set — SES 백엔드 사용 시에만 설정 (헤더로 부착됨).
+  # 현재 운영은 Resend SMTP를 사용하므로 빈 값(헤더 미부착) 유지.
+  # Resend는 자체 트래킹·suppression·webhook을 제공하므로 SES Configuration Set 불필요.
+  ses:
+    configuration-set: ${SES_CONFIGURATION_SET:}
 
 # 감사 로그 설정
 audit:

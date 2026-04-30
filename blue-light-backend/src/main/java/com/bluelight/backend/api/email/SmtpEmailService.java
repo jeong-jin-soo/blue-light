@@ -45,6 +45,15 @@ public class SmtpEmailService implements EmailService {
     @Value("${password-reset.base-url:http://localhost:5174}")
     private String appBaseUrl;
 
+    /**
+     * AWS SES Configuration Set 이름.
+     * 설정 시 {@code X-SES-CONFIGURATION-SET} 헤더를 모든 발송 메시지에 부착하여
+     * SES가 해당 Configuration Set으로 이벤트(SEND/BOUNCE/COMPLAINT/DELIVERY 등)를
+     * 처리하도록 한다. 비어있으면(다른 SMTP 서버) 헤더 미부착.
+     */
+    @Value("${mail.ses.configuration-set:}")
+    private String sesConfigurationSet;
+
     // ── B-2 · HTML 이스케이프 유틸 ─────────────────────────
     // 모든 사용자 입력 주입 지점(userName, comment, rejectionReason, customLabel 등)에 적용.
     // 기존 템플릿도 회귀 방지 차원에서 동일 유틸을 통과시킨다.
@@ -52,11 +61,24 @@ public class SmtpEmailService implements EmailService {
         return s == null ? "" : HtmlUtils.htmlEscape(s);
     }
 
+    /**
+     * MimeMessage 생성 시 SES Configuration Set 헤더를 자동 부착하는 팩토리.
+     * Spring의 JavaMailSender가 그대로 전송하므로 SMTP 레벨에서 헤더가 유지된다.
+     * {@code mail.ses.configuration-set} 설정이 비어있으면 일반 createMimeMessage()와 동일.
+     */
+    private MimeMessage createMessageWithConfigSet() throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        if (sesConfigurationSet != null && !sesConfigurationSet.isBlank()) {
+            message.setHeader("X-SES-CONFIGURATION-SET", sesConfigurationSet);
+        }
+        return message;
+    }
+
     @Override
     @Async
     public void sendPasswordResetEmail(String to, String userName, String resetLink) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -78,7 +100,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendEmailVerificationEmail(String to, String userName, String verificationLink) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -101,7 +123,7 @@ public class SmtpEmailService implements EmailService {
                                                String licenseNumber, String address,
                                                LocalDate expiryDate, int daysRemaining) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -122,7 +144,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendRevisionRequestEmail(String to, String userName, Long appSeq, String address, String comment) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -139,7 +161,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendPaymentRequestEmail(String to, String userName, Long appSeq, String address, BigDecimal amount) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -156,7 +178,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendPaymentConfirmEmail(String to, String userName, Long appSeq, String address, BigDecimal amount) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -174,7 +196,7 @@ public class SmtpEmailService implements EmailService {
     public void sendLicenseIssuedEmail(String to, String userName, Long appSeq,
                                         String address, String licenseNo, LocalDate expiryDate) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -191,7 +213,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendLewAssignedEmail(String to, String lewName, Long appSeq, String address, String applicantName) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -208,7 +230,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -608,7 +630,7 @@ public class SmtpEmailService implements EmailService {
     public void sendDocumentRequestCreatedEmail(String to, String userName, Long appSeq,
                                                  int requestedCount, List<String> documentLabels) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -625,7 +647,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendDocumentRequestFulfilledEmail(String to, String lewName, Long appSeq, String documentLabel) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -644,7 +666,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendDocumentRequestApprovedEmail(String to, String userName, Long appSeq, String documentLabel) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -662,7 +684,7 @@ public class SmtpEmailService implements EmailService {
     public void sendDocumentRequestRejectedEmail(String to, String userName, Long appSeq,
                                                   String documentLabel, String rejectionReason) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -796,7 +818,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendAccountSetupLinkEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -859,7 +881,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendConciergeRequestReceivedEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -879,7 +901,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendConciergeRequestReceivedExistingUserEmail(String to, String fullName) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -900,7 +922,7 @@ public class SmtpEmailService implements EmailService {
     public void sendConciergeStaffNewRequestEmail(String to, String staffName, String publicCode,
                                                    String applicantName, String applicantEmail) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -1040,7 +1062,7 @@ public class SmtpEmailService implements EmailService {
                                                     String managerName, Long applicationSeq,
                                                     String memo) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -1122,7 +1144,7 @@ public class SmtpEmailService implements EmailService {
                                            String managerNote, String verificationPhrase,
                                            String paynowUen, String paynowAccountName) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
