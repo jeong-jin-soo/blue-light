@@ -1349,6 +1349,8 @@ export interface AuditLog {
 
 export type NotificationType =
   | 'PAYMENT_CONFIRMED'
+  // PR4 — ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 알림
+  | 'PAYMENT_CONFIRMED_LEW'
   // Phase 3 — LEW 서류 요청 워크플로
   | 'DOCUMENT_REQUEST_CREATED'
   | 'DOCUMENT_REQUEST_FULFILLED'

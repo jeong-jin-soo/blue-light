@@ -16,6 +16,8 @@ import type { AppNotification, NotificationType } from '../types';
  */
 const NOTIFICATION_ICON: Record<NotificationType, string> = {
   PAYMENT_CONFIRMED: '💳',
+  // PR4 — ADMIN의 결제 확인 후 배정된 LEW에게 전달되는 Phase 2 시작 알림
+  PAYMENT_CONFIRMED_LEW: '💳',
   DOCUMENT_REQUEST_CREATED: '🔔',
   DOCUMENT_REQUEST_FULFILLED: '📤',
   DOCUMENT_REQUEST_APPROVED: '✅',
@@ -70,7 +72,14 @@ export default function NotificationsPage() {
     //         reference_id=document_request_id. 백엔드가 metadata.applicationSeq를 같이
     //         싣지 않는 한 현재는 일반 APPLICATION 라우팅 fallback만 수행.
     if (n.referenceType === 'APPLICATION' && n.referenceId) {
-      navigate(`${basePath}/applications/${n.referenceId}`);
+      // PR4: PAYMENT_CONFIRMED_LEW 는 항상 LEW 워크스페이스로 deeplink.
+      // (수신자가 LEW 인 알림이므로 user.role 기준 basePath 와도 일치하지만,
+      //  type이 곧 라우트를 의미하도록 명시적으로 처리.)
+      if (n.type === 'PAYMENT_CONFIRMED_LEW') {
+        navigate(`/lew/applications/${n.referenceId}`);
+      } else {
+        navigate(`${basePath}/applications/${n.referenceId}`);
+      }
     } else if (n.referenceType === 'DOCUMENT_REQUEST' && n.referenceId) {
       // PR#4에서 referenceType=APPLICATION + metadata로 정규화 예정.
       // 임시: 알림 message에서 applicationSeq 파싱 불가 → 알림 목록 유지.
