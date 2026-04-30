@@ -1,6 +1,7 @@
 package com.bluelight.backend.service.cof;
 
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
+import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.lew.dto.CertificateOfFitnessRequest;
 import com.bluelight.backend.api.lew.dto.CertificateOfFitnessResponse;
 import com.bluelight.backend.api.lew.dto.LewApplicationResponse;
@@ -39,7 +40,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * LEW Review Form — CoF 조회/저장/확정 서비스 (lew-review-form-spec.md §3).
+ * LEW Review Form — CoF 조회/저장/확정 + 결제 요청 서비스 (lew-review-form-spec.md §3, PR3 옵션 R).
  *
  * <p>접근 제어는 컨트롤러의 {@code @PreAuthorize("@appSec.isAssignedLew(#id, authentication)")}에서
  * 일차 방어하고, 서비스 진입 시 {@link #assertAssignedLew(Application, Long)}로 이중 방어한다
@@ -49,7 +50,10 @@ import java.util.regex.Pattern;
  * <ul>
  *   <li>{@link #getAssignedApplication} — 조회, 감사는 컨트롤러 어노테이션으로</li>
  *   <li>{@link #saveDraftCof} — CoF Upsert, finalized 이후 호출 시 409</li>
- *   <li>{@link #finalizeCof} — 필수 필드 전수 재검증 + 상태 전이 PENDING_REVIEW → PENDING_PAYMENT</li>
+ *   <li>{@link #requestPayment} — PR3: Phase 1(검토·서류·kVA) 종료 후 LEW가 결제 단계로 전이를 트리거.
+ *       PENDING_REVIEW/REVISION_REQUESTED → PENDING_PAYMENT</li>
+ *   <li>{@link #finalizeCof} — PR3 옵션 R: 결제 완료(PAID/IN_PROGRESS) 후에만 호출 가능. status 전이 없음.
+ *       SS 638 §13(시공·테스트 후 CoF 발행) 준수.</li>
  * </ul>
  */
 @Slf4j
@@ -80,6 +84,8 @@ public class LewReviewService {
     private final DocumentRequestRepository documentRequestRepository;
     private final SldRequestRepository sldRequestRepository;
     private final NotificationService notificationService;
+    // PR3: LEW가 결제 요청 트리거 시 신청자 메일 발송 (ADMIN 흐름과 동일)
+    private final EmailService emailService;
 
     /** 배정 신청 상세 조회 (스펙 §3.1). */
     public LewApplicationResponse getAssignedApplication(Long applicationSeq, Long lewUserSeq) {
@@ -188,23 +194,31 @@ public class LewReviewService {
     }
 
     /**
-     * CoF 확정 (스펙 §3.3, AC §9-5/6/7/9/10 + Phase 6 통합 LEW 리뷰 가드).
+     * CoF 확정 (스펙 §3.3 + PR3 옵션 R: 결제 후 발행).
      *
-     * <h3>Phase 6 가드 (finalize 직전 3종)</h3>
+     * <h3>PR3 도메인 모델 변경</h3>
+     * <p>SS 638 §13 (sg-lew-expert 검증) — CoF는 시공·테스트 후 발행되어야 하므로,
+     * 결제 완료 이후(PAID/IN_PROGRESS)에만 finalize 호출 가능. 이전 모델은 finalize가
+     * PENDING_REVIEW → PENDING_PAYMENT 전이를 일으켜 도메인 부정합이었다.
+     * PR3에서 결제 트리거는 별도 endpoint({@link #requestPayment})로 분리.</p>
+     *
+     * <h3>가드</h3>
      * <ol>
-     *   <li>Application.kvaStatus != CONFIRMED → 400 {@code KVA_NOT_CONFIRMED}</li>
-     *   <li>미해결 DocumentRequest (REQUESTED/UPLOADED) 존재 → 400 {@code DOCUMENT_REQUESTS_PENDING}</li>
-     *   <li>sldOption=REQUEST_LEW 이고 SldRequest 상태가 CONFIRMED 아님 → 400 {@code SLD_NOT_CONFIRMED}</li>
+     *   <li>이미 finalized → 409 {@code COF_ALREADY_FINALIZED}</li>
+     *   <li>{@link Application#getStatus()} ∉ {PAID, IN_PROGRESS} → 409 {@code APPLICATION_NOT_PAID}
+     *       (PR3 신규 가드 — 결제 게이트)</li>
+     *   <li>kvaStatus != CONFIRMED → 400 {@code KVA_NOT_CONFIRMED}</li>
+     *   <li>미해결 DocumentRequest 존재 → 400 {@code DOCUMENT_REQUESTS_PENDING}</li>
+     *   <li>sldOption=REQUEST_LEW 이고 SldRequest CONFIRMED 아님 → 400 {@code SLD_NOT_CONFIRMED}</li>
+     *   <li>필수 필드 누락(MSSL 공란, hasGenerator=true에 capacity null, Contestable에 retailer null 등)
+     *       → 400 {@code COF_VALIDATION_FAILED}</li>
      * </ol>
      *
-     * <h3>스냅샷</h3>
-     * finalize 직전 CoF.approvedLoadKva := Application.selectedKva 로 덮어쓴다 (법적 기록 스냅샷).
-     *
+     * <h3>스냅샷 / 사이드이펙트</h3>
      * <ul>
-     *   <li>이미 finalized면 409</li>
-     *   <li>MSSL 공란 / hasGenerator=true 인데 capacity null / Contestable 인데 retailer null / 필수필드 누락 → 400</li>
-     *   <li>Application.status는 PENDING_REVIEW 여야 하며, 성공 시 PENDING_PAYMENT로 전이</li>
-     *   <li>lewConsentDate null이면 today로 자동</li>
+     *   <li>finalize 직전 CoF.approvedLoadKva := Application.selectedKva 로 덮어쓴다 (법적 기록 스냅샷)</li>
+     *   <li>certifiedBy/at + lewConsentDate(null이면 today) 기록</li>
+     *   <li><b>Application.status 전이는 발생하지 않는다</b> (이미 PAID/IN_PROGRESS 상태)</li>
      *   <li>성공 시 신청자에게 {@code CERTIFICATE_OF_FITNESS_FINALIZED} 알림 발송</li>
      * </ul>
      */
@@ -224,15 +238,16 @@ public class LewReviewService {
                     HttpStatus.CONFLICT, CofErrorCode.COF_ALREADY_FINALIZED);
         }
 
-        // Application 상태 전제 (스펙 §3.3)
+        // PR3 결제 게이트: PAID/IN_PROGRESS 가 아닌 상태에서 finalize 호출 시 거부.
+        // SS 638 §13에 따라 시공·테스트 후 CoF 발행 — 결제 완료가 시공 진입의 전제.
         ApplicationStatus cur = application.getStatus();
-        if (cur != ApplicationStatus.PENDING_REVIEW) {
+        if (cur != ApplicationStatus.PAID && cur != ApplicationStatus.IN_PROGRESS) {
             throw new BusinessException(
-                    "Application must be in PENDING_REVIEW to finalize CoF (current: " + cur + ")",
-                    HttpStatus.CONFLICT, CofErrorCode.COF_VALIDATION_FAILED);
+                    "Payment must be confirmed before finalizing CoF (current status: " + cur + ")",
+                    HttpStatus.CONFLICT, CofErrorCode.APPLICATION_NOT_PAID);
         }
 
-        // Phase 6 가드 3종 (통합 LEW 리뷰)
+        // Phase 6 가드 3종 — Phase 1 완료 + SLD 충족이 finalize 전제 (결제 게이트와 별개로 유지)
         assertKvaConfirmed(application);
         assertNoPendingDocumentRequests(applicationSeq);
         assertSldConfirmedIfRequired(application, applicationSeq);
@@ -248,17 +263,69 @@ public class LewReviewService {
                 .orElseThrow(() -> new BusinessException(
                         "LEW user not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
-        // finalize 기록 (certifiedBy/at + lewConsentDate 보정)
+        // finalize 기록 (certifiedBy/at + lewConsentDate 보정).
+        // PR3: status 전이는 없다 — 이미 PAID/IN_PROGRESS 상태이므로 LEW가 시공 후 CoF만 서명한다.
         cof.finalize(lewUser, cof.getLewConsentDate());
         cofRepository.save(cof);
 
-        // 상태 전이 (AC §9-10)
-        application.approveForPayment();
-        log.info("CoF finalized: cofSeq={}, applicationSeq={}, lewUserSeq={}",
-                cof.getCofSeq(), applicationSeq, lewUserSeq);
+        log.info("CoF finalized (status unchanged): cofSeq={}, applicationSeq={}, status={}, lewUserSeq={}",
+                cof.getCofSeq(), applicationSeq, cur, lewUserSeq);
 
-        // Phase 6: 신청자 알림 — 알림 실패가 확정 트랜잭션을 롤백시키지 않도록 방어
+        // 신청자 알림 — 알림 실패가 확정 트랜잭션을 롤백시키지 않도록 방어
         notifyApplicantCofFinalized(application);
+
+        return ApplicationResponse.from(application);
+    }
+
+    /**
+     * PR3: LEW가 명시적으로 결제 요청을 트리거 (옵션 R — sg-lew-expert + 사용자 결정).
+     *
+     * <p>Phase 1 (검토 + 서류 보강 + kVA 확정) 종료 후, LEW가 직접 호출하여 status 를
+     * {@code PENDING_REVIEW/REVISION_REQUESTED → PENDING_PAYMENT} 로 전이시킨다. CoF/SLD/LOA 작업은
+     * 결제 후 단계로 이동.</p>
+     *
+     * <h3>가드 (서버측 재검증 필수)</h3>
+     * <ol>
+     *   <li>현재 status ∈ {PENDING_REVIEW, REVISION_REQUESTED} 가 아니면 → 409 {@code INVALID_STATUS_TRANSITION}.
+     *       ADMIN의 별도 approveForPayment 와 race 발생 시 두 번째 호출이 이 코드로 거부된다.</li>
+     *   <li>{@code Application.kvaStatus != CONFIRMED} → 409 {@code KVA_NOT_CONFIRMED}</li>
+     *   <li>미해결 DocumentRequest(REQUESTED/UPLOADED) 존재 → 409 {@code DOCUMENT_REQUESTS_PENDING}</li>
+     * </ol>
+     *
+     * <p>SLD 가드는 PR3 범위에서 적용하지 않는다 — sldOption=REQUEST_LEW 이면 SLD 작업은 결제 후
+     * 수행되며, 결제 요청 시점에는 SLD가 아직 미준비 상태일 수 있다.</p>
+     *
+     * <h3>사이드이펙트</h3>
+     * <ul>
+     *   <li>{@link Application#approveForPayment()} 호출 → status PENDING_PAYMENT</li>
+     *   <li>신청자에게 결제 요청 이메일 발송 (ADMIN 흐름과 동일한 메일 사용)</li>
+     * </ul>
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ApplicationResponse requestPayment(Long applicationSeq, Long lewUserSeq) {
+        Application application = loadApplication(applicationSeq);
+        assertAssignedLew(application, lewUserSeq);
+
+        // 1) status 가드: PENDING_REVIEW 또는 REVISION_REQUESTED 만 허용
+        ApplicationStatus cur = application.getStatus();
+        if (cur != ApplicationStatus.PENDING_REVIEW && cur != ApplicationStatus.REVISION_REQUESTED) {
+            throw new BusinessException(
+                    "Payment can only be requested from PENDING_REVIEW or REVISION_REQUESTED (current: "
+                            + cur + ")",
+                    HttpStatus.CONFLICT, CofErrorCode.INVALID_STATUS_TRANSITION);
+        }
+
+        // 2) Phase 1 종료 가드 (LEW가 검토를 끝냈는지 재확인) — 상태 충돌이므로 409
+        assertKvaConfirmed(application, HttpStatus.CONFLICT);
+        assertNoPendingDocumentRequests(applicationSeq, HttpStatus.CONFLICT);
+
+        // 상태 전이 — 도메인 메서드 사용 (reviewComment 클리어 포함)
+        application.approveForPayment();
+        log.info("LEW requested payment: applicationSeq={}, lewUserSeq={}, prevStatus={}",
+                applicationSeq, lewUserSeq, cur);
+
+        // 신청자에게 결제 요청 이메일 발송 — ADMIN 흐름과 동일. 실패가 트랜잭션을 깨뜨리지 않도록 방어.
+        notifyPaymentRequested(application);
 
         return ApplicationResponse.from(application);
     }
@@ -370,24 +437,37 @@ public class LewReviewService {
 
     // ── Phase 6: 통합 LEW 리뷰 가드 및 알림 ──────────────────────
 
-    /** Phase 6 가드 1: Application.kvaStatus 가 CONFIRMED 이어야 finalize 가능. */
+    /**
+     * Phase 6 가드 1: {@link Application#getKvaStatus()} 가 CONFIRMED 이어야 finalize/requestPayment 가능.
+     *
+     * <p>HTTP 상태는 호출자가 결정한다 — finalize 경로는 입력 부정합으로 400, requestPayment 경로는
+     * 상태 충돌로 409 (PR3 spec).</p>
+     */
     private void assertKvaConfirmed(Application application) {
+        assertKvaConfirmed(application, HttpStatus.BAD_REQUEST);
+    }
+
+    private void assertKvaConfirmed(Application application, HttpStatus status) {
         if (application.getKvaStatus() != KvaStatus.CONFIRMED) {
             throw new BusinessException(
-                    "kVA must be confirmed before finalizing CoF (current kvaStatus: "
+                    "kVA must be confirmed first (current kvaStatus: "
                             + application.getKvaStatus() + ")",
-                    HttpStatus.BAD_REQUEST, CofErrorCode.KVA_NOT_CONFIRMED);
+                    status, CofErrorCode.KVA_NOT_CONFIRMED);
         }
     }
 
-    /** Phase 6 가드 2: 미해결 DocumentRequest(REQUESTED/UPLOADED) 가 없어야 finalize 가능. */
+    /** Phase 6 가드 2: 미해결 DocumentRequest(REQUESTED/UPLOADED) 가 없어야 finalize/requestPayment 가능. */
     private void assertNoPendingDocumentRequests(Long applicationSeq) {
+        assertNoPendingDocumentRequests(applicationSeq, HttpStatus.BAD_REQUEST);
+    }
+
+    private void assertNoPendingDocumentRequests(Long applicationSeq, HttpStatus status) {
         long pending = documentRequestRepository.countByApplicationAndStatusIn(
                 applicationSeq, DOCUMENT_PENDING_STATUSES);
         if (pending > 0) {
             throw new BusinessException(
-                    "There are " + pending + " pending document request(s) — resolve them before finalizing",
-                    HttpStatus.BAD_REQUEST, CofErrorCode.DOCUMENT_REQUESTS_PENDING);
+                    "There are " + pending + " pending document request(s) — resolve them first",
+                    status, CofErrorCode.DOCUMENT_REQUESTS_PENDING);
         }
     }
 
@@ -407,8 +487,10 @@ public class LewReviewService {
     }
 
     /**
-     * 신청자에게 CoF finalize 알림 발송. 알림 실패는 swallow 하여 확정 트랜잭션을 롤백하지 않는다
-     * ({@link #notifyApplicant}와 동일 원칙).
+     * 신청자에게 CoF finalize 알림 발송. 알림 실패는 swallow 하여 확정 트랜잭션을 롤백하지 않는다.
+     *
+     * <p>PR3 옵션 R: finalize는 결제 후(PAID/IN_PROGRESS)에 일어나므로 메시지에서 "awaiting payment"
+     * 문구를 제거하고 "license is being processed" 로 변경한다.</p>
      */
     private void notifyApplicantCofFinalized(Application application) {
         try {
@@ -420,10 +502,36 @@ public class LewReviewService {
             notificationService.createNotification(
                     recipientSeq, NotificationType.CERTIFICATE_OF_FITNESS_FINALIZED,
                     "Certificate of Fitness signed",
-                    "Your LEW has signed the Certificate of Fitness. Your application is now awaiting payment.",
+                    "Your LEW has signed the Certificate of Fitness. Your licence is being processed.",
                     "Application", application.getApplicationSeq());
         } catch (RuntimeException ex) {
             log.warn("CoF finalize 알림 발송 실패: applicationId={}, err={}",
+                    application.getApplicationSeq(), ex.getMessage());
+        }
+    }
+
+    /**
+     * PR3: LEW가 결제 요청을 트리거하면 신청자에게 결제 요청 이메일 발송.
+     * ADMIN 흐름({@code AdminApplicationService.approveForPayment})과 동일한 메일 템플릿 사용.
+     * 메일 발송 실패는 swallow 하여 상태 전이 트랜잭션을 롤백하지 않는다.
+     */
+    private void notifyPaymentRequested(Application application) {
+        try {
+            User applicant = application.getUser();
+            if (applicant == null || applicant.getEmail() == null) {
+                log.warn("결제 요청 메일 발송 스킵 — 신청자 정보 없음: applicationId={}",
+                        application.getApplicationSeq());
+                return;
+            }
+            emailService.sendPaymentRequestEmail(
+                    applicant.getEmail(),
+                    (applicant.getFirstName() != null ? applicant.getFirstName() : "") + " "
+                            + (applicant.getLastName() != null ? applicant.getLastName() : ""),
+                    application.getApplicationSeq(),
+                    application.getAddress(),
+                    application.getQuoteAmount());
+        } catch (RuntimeException ex) {
+            log.warn("결제 요청 메일 발송 실패 (LEW trigger): applicationId={}, err={}",
                     application.getApplicationSeq(), ex.getMessage());
         }
     }

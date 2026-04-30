@@ -264,20 +264,34 @@ class LewReviewControllerTest {
     // ── AC 10: finalize 성공 시 status=PENDING_PAYMENT + Auditable 매핑 ──────────────────────
 
     @Test
-    @DisplayName("AC10 - finalize 성공 시 응답 status=PENDING_PAYMENT")
-    void ac10_finalize_success_returns_pending_payment() throws Exception {
+    @DisplayName("AC10 - PR3 옵션 R: finalize 성공 시 응답 status=PAID (전이 없음)")
+    void ac10_finalize_success_returns_paid_status() throws Exception {
+        // PR3 이전: PENDING_PAYMENT 로 전이. PR3 이후: status 전이 없음 — 호출 전 상태 유지(PAID/IN_PROGRESS).
         ApplicationResponse appRes = ApplicationResponse.builder()
             .applicationSeq(APP_SEQ)
             .address("1 Test Rd").postalCode("111111").selectedKva(45)
             .quoteAmount(new BigDecimal("100.00"))
-            .status(ApplicationStatus.PENDING_PAYMENT)
+            .status(ApplicationStatus.PAID)
             .applicationType("NEW")
             .build();
         when(service.finalizeCof(eq(APP_SEQ), eq(LEW_SEQ))).thenReturn(appRes);
 
         mockMvc.perform(withAuth(post("/api/lew/applications/{id}/cof/finalize", APP_SEQ)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+            .andExpect(jsonPath("$.status").value("PAID"));
+    }
+
+    @Test
+    @DisplayName("PR3 - finalize 시 결제 미완료(APPLICATION_NOT_PAID)이면 409")
+    void pr3_finalize_application_not_paid_409() throws Exception {
+        when(service.finalizeCof(eq(APP_SEQ), eq(LEW_SEQ)))
+            .thenThrow(new BusinessException(
+                "Payment must be confirmed before finalizing CoF",
+                HttpStatus.CONFLICT, CofErrorCode.APPLICATION_NOT_PAID));
+
+        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/cof/finalize", APP_SEQ)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("APPLICATION_NOT_PAID"));
     }
 
     @Test
@@ -405,5 +419,85 @@ class LewReviewControllerTest {
         mockMvc.perform(withAuth(post("/api/lew/applications/{id}/cof/finalize", APP_SEQ)))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("COF_VERSION_CONFLICT"));
+    }
+
+    // ── PR3: POST /api/lew/applications/{id}/request-payment ──────────────────────
+
+    @Test
+    @DisplayName("PR3 - request-payment 성공 시 응답 status=PENDING_PAYMENT")
+    void pr3_request_payment_success_returns_pending_payment() throws Exception {
+        ApplicationResponse appRes = ApplicationResponse.builder()
+            .applicationSeq(APP_SEQ)
+            .address("1 Test Rd").postalCode("111111").selectedKva(45)
+            .quoteAmount(new BigDecimal("100.00"))
+            .status(ApplicationStatus.PENDING_PAYMENT)
+            .applicationType("NEW")
+            .build();
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ))).thenReturn(appRes);
+
+        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("PENDING_PAYMENT"));
+    }
+
+    @Test
+    @DisplayName("PR3 - request-payment 시 status 전제 위반은 409 INVALID_STATUS_TRANSITION")
+    void pr3_request_payment_invalid_transition_409() throws Exception {
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+            .thenThrow(new BusinessException(
+                "Already at PENDING_PAYMENT", HttpStatus.CONFLICT,
+                CofErrorCode.INVALID_STATUS_TRANSITION));
+
+        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("INVALID_STATUS_TRANSITION"));
+    }
+
+    @Test
+    @DisplayName("PR3 - request-payment 시 kVA 미확정은 409 KVA_NOT_CONFIRMED")
+    void pr3_request_payment_kva_not_confirmed_409() throws Exception {
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+            .thenThrow(new BusinessException(
+                "kVA must be confirmed", HttpStatus.CONFLICT,
+                CofErrorCode.KVA_NOT_CONFIRMED));
+
+        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("KVA_NOT_CONFIRMED"));
+    }
+
+    @Test
+    @DisplayName("PR3 - request-payment 시 미해결 서류 요청은 409 DOCUMENT_REQUESTS_PENDING")
+    void pr3_request_payment_documents_pending_409() throws Exception {
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+            .thenThrow(new BusinessException(
+                "Pending docs", HttpStatus.CONFLICT,
+                CofErrorCode.DOCUMENT_REQUESTS_PENDING));
+
+        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("DOCUMENT_REQUESTS_PENDING"));
+    }
+
+    @Test
+    @DisplayName("PR3 - request-payment 미배정 LEW 호출은 403 APPLICATION_NOT_ASSIGNED")
+    void pr3_request_payment_unassigned_lew_403() throws Exception {
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+            .thenThrow(new BusinessException(
+                "Not assigned", HttpStatus.FORBIDDEN,
+                CofErrorCode.APPLICATION_NOT_ASSIGNED));
+
+        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("PR3 - request-payment 메서드에 @Auditable(APPLICATION_PAYMENT_REQUESTED_BY_LEW) 부착 확인")
+    void pr3_request_payment_has_auditable() throws Exception {
+        Method m = LewReviewController.class.getMethod(
+            "requestPayment", Long.class, Authentication.class);
+        Auditable auditable = m.getAnnotation(Auditable.class);
+        assertThat(auditable).as("@Auditable 누락 — 감사 로그가 기록되지 않음").isNotNull();
+        assertThat(auditable.action()).isEqualTo(AuditAction.APPLICATION_PAYMENT_REQUESTED_BY_LEW);
     }
 }

@@ -69,7 +69,13 @@ public class LewReviewController {
         return ResponseEntity.ok(res);
     }
 
-    /** §3.3 — CoF 확정 (status PENDING_REVIEW → PENDING_PAYMENT). */
+    /**
+     * §3.3 — CoF 확정 (PR3 옵션 R: 결제 후 단계).
+     *
+     * <p>PR3 이전: PENDING_REVIEW → PENDING_PAYMENT 전이를 일으켰음(도메인 부정합).</p>
+     * <p>PR3 이후: PAID/IN_PROGRESS 상태에서만 호출 가능하며 status 전이는 발생하지 않는다.
+     * SS 638 §13 준수.</p>
+     */
     @PostMapping("/{id}/cof/finalize")
     @PreAuthorize("@appSec.isAssignedLew(#id, authentication)")
     @Auditable(action = AuditAction.CERTIFICATE_OF_FITNESS_FINALIZED,
@@ -80,5 +86,32 @@ public class LewReviewController {
         Long lewUserSeq = (Long) authentication.getPrincipal();
         log.info("LEW finalizeCof: lewUserSeq={}, applicationSeq={}", lewUserSeq, id);
         return ResponseEntity.ok(lewReviewService.finalizeCof(id, lewUserSeq));
+    }
+
+    /**
+     * PR3: LEW가 명시적으로 결제 요청을 트리거 (옵션 R).
+     *
+     * <p>Phase 1(검토 + 서류 + kVA) 종료 후, LEW가 호출하여 status를
+     * {@code PENDING_REVIEW/REVISION_REQUESTED → PENDING_PAYMENT}로 전이.
+     * ADMIN의 별도 {@code approveForPayment} 흐름과 공존하며, race 발생 시 두 번째 호출은
+     * {@code INVALID_STATUS_TRANSITION}(409)으로 거부된다.</p>
+     *
+     * <h3>가드 위반 코드 (모두 HTTP 409)</h3>
+     * <ul>
+     *   <li>{@code INVALID_STATUS_TRANSITION} — status 전제 위반</li>
+     *   <li>{@code KVA_NOT_CONFIRMED} — kVA 미확정</li>
+     *   <li>{@code DOCUMENT_REQUESTS_PENDING} — 미해결 서류 요청 존재</li>
+     * </ul>
+     */
+    @PostMapping("/{id}/request-payment")
+    @PreAuthorize("@appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.APPLICATION_PAYMENT_REQUESTED_BY_LEW,
+            category = AuditCategory.APPLICATION, entityType = "Application")
+    public ResponseEntity<ApplicationResponse> requestPayment(
+            @PathVariable("id") Long id,
+            Authentication authentication) {
+        Long lewUserSeq = (Long) authentication.getPrincipal();
+        log.info("LEW requestPayment: lewUserSeq={}, applicationSeq={}", lewUserSeq, id);
+        return ResponseEntity.ok(lewReviewService.requestPayment(id, lewUserSeq));
     }
 }

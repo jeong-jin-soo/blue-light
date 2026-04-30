@@ -114,6 +114,10 @@ public enum AuditAction {
     CERTIFICATE_OF_FITNESS_FINALIZED,
     MSSL_UNMASKED_VIEW,
 
+    // PR3: LEW가 명시적으로 결제 요청을 트리거 (옵션 R — Phase 1 종료 후)
+    // CoF finalize 와 분리되어 status PENDING_REVIEW/REVISION_REQUESTED → PENDING_PAYMENT 전이를 일으킨다.
+    APPLICATION_PAYMENT_REQUESTED_BY_LEW,
+
     // E-Invoice (invoice-spec.md §9 감사 로그)
     INVOICE_GENERATED,
     INVOICE_DOWNLOADED,
