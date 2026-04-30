@@ -408,8 +408,11 @@ public class User extends BaseEntity {
     /**
      * PDPA 계정 삭제: 개인정보 익명화 (soft delete + 데이터 마스킹)
      * - 법적 보존 의무가 있는 신청 기록은 유지하되, 개인 식별 정보는 마스킹
+     * - email도 익명화: 원본 이메일을 PII로 폐기하고, 동일 이메일 재가입을 허용
+     *   (UNIQUE 제약 uk_users_email은 deleted_at을 포함하지 않으므로 원본을 남기면 재가입 시 충돌)
      */
     public void anonymize() {
+        this.email = "deleted-" + this.userSeq + "@deleted.licensekaki.sg";
         this.firstName = "Deleted";
         this.lastName = "User";
         this.phone = null;

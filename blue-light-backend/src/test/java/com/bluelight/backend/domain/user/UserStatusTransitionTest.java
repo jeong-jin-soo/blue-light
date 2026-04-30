@@ -2,6 +2,7 @@ package com.bluelight.backend.domain.user;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 
@@ -191,5 +192,19 @@ class UserStatusTransitionTest {
         assertThat(user.getFirstName()).isEqualTo("Deleted");
         assertThat(user.getLastName()).isEqualTo("User");
         assertThat(user.getPassword()).isEqualTo("DELETED");
+    }
+
+    @Test
+    @DisplayName("anonymize() - 이메일도 익명화하여 동일 이메일 재가입을 허용")
+    void anonymize_alsoAnonymizesEmail() {
+        User user = User.builder()
+            .email("foo@example.com").password("h").firstName("A").lastName("B")
+            .build();
+        ReflectionTestUtils.setField(user, "userSeq", 42L);
+
+        user.anonymize();
+
+        assertThat(user.getEmail()).isEqualTo("deleted-42@deleted.licensekaki.sg");
+        assertThat(user.getEmail()).doesNotContain("foo@example.com");
     }
 }
