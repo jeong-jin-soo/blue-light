@@ -7,6 +7,12 @@ package com.bluelight.backend.domain.notification;
  */
 public enum NotificationType {
     PAYMENT_CONFIRMED,
+    /**
+     * PR4: ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 인앱 알림.
+     * Phase 2(SLD/LOA/CoF) 시작 시점을 LEW가 명시적으로 인지하도록 분리된 신규 타입.
+     * (기존 PAYMENT_CONFIRMED 는 신청자 채널과 legacy 호환을 위해 보존)
+     */
+    PAYMENT_CONFIRMED_LEW,
 
     // Phase 3 PR#1 — LEW 서류 요청 워크플로 인앱 알림
     DOCUMENT_REQUEST_CREATED,

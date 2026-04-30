@@ -6,11 +6,9 @@ import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.invoice.InvoiceGenerationService;
-import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
-import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
@@ -25,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -39,8 +38,10 @@ public class AdminPaymentService {
     private final ApplicationRepository applicationRepository;
     private final PaymentRepository paymentRepository;
     private final EmailService emailService;
-    private final NotificationService notificationService;
-    /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
+    /**
+     * ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행<br>
+     * ★ PR4: 결제 확인 → LEW 알림 (인앱+이메일) 트리거용 {@link PaymentConfirmedEvent} 발행
+     */
     private final ApplicationEventPublisher eventPublisher;
     /** invoice-spec §5: 결제 확인 직후 자동 영수증 발행 */
     private final InvoiceGenerationService invoiceGenerationService;
@@ -100,24 +101,14 @@ public class AdminPaymentService {
                 application.getAddress(),
                 savedPayment.getAmount());
 
-        // 배정된 LEW에게 알림 (인앱 + 이메일)
-        User lew = application.getAssignedLew();
-        if (lew != null) {
-            notificationService.createNotification(
-                    lew.getUserSeq(),
-                    NotificationType.PAYMENT_CONFIRMED,
-                    "Payment Confirmed",
-                    "Payment of $" + savedPayment.getAmount() + " confirmed for Application #" + applicationSeq + " at " + application.getAddress(),
-                    "APPLICATION",
-                    applicationSeq
-            );
-            emailService.sendPaymentConfirmedToLewEmail(
-                    lew.getEmail(),
-                    lew.getFirstName() + " " + lew.getLastName(),
-                    applicationSeq,
-                    application.getAddress(),
-                    savedPayment.getAmount());
-        }
+        // ★ PR4: 배정된 LEW 에게 인앱 알림 + 이메일 발송은 LewPaymentNotificationListener 가
+        // AFTER_COMMIT 단계에서 처리한다. 여기서는 이벤트만 발행 — 알림 발송 실패가
+        // 결제 확정 트랜잭션을 롤백하지 않도록 보장하기 위함.
+        eventPublisher.publishEvent(new PaymentConfirmedEvent(
+                applicationSeq,
+                savedPayment.getPaymentSeq(),
+                savedPayment.getAmount(),
+                LocalDateTime.now()));
 
         // invoice-spec §5: 결제 확인 직후 자동 영수증 발행.
         // 실패해도 결제 트랜잭션은 롤백하지 않음 — 관리자가 /regenerate 로 수동 복구.

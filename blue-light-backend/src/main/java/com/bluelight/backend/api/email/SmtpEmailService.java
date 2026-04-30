@@ -234,7 +234,8 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Payment Confirmed for Application #" + appSeq + " - LicenseKaki");
+            // PR4: LEW가 메일 제목만 보고도 Phase 2 시작 시점임을 인지하도록 명시.
+            helper.setSubject("[LicenseKaki] Payment confirmed — Application #" + appSeq + " ready for certification");
             helper.setText(buildPaymentConfirmedToLewHtml(lewName, appSeq, address, amount), true);
             mailSender.send(message);
             log.info("Payment confirmed (LEW) email sent to: {}, appSeq={}", to, appSeq);
@@ -576,6 +577,10 @@ public class SmtpEmailService implements EmailService {
     }
 
     private String buildPaymentConfirmedToLewHtml(String lewName, Long appSeq, String address, BigDecimal amount) {
+        // PR4: Phase 2 (SLD/LOA/CoF) 작업 시작점을 명시적으로 안내 + LEW 워크스페이스 deeplink 제공.
+        // appBaseUrl 은 password-reset.base-url 을 재사용 (기존 패턴, 별도 설정 부담 회피).
+        String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
         return """
                 <!DOCTYPE html>
                 <html>
@@ -586,10 +591,11 @@ public class SmtpEmailService implements EmailService {
                       <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
                     </div>
                     <div style="padding: 32px 24px;">
-                      <h2 style="color: #333333; margin-top: 0;">Payment Confirmed</h2>
-                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <h2 style="color: #333333; margin-top: 0;">Payment confirmed — ready for certification</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hi %s,</p>
                       <p style="color: #555555; line-height: 1.6;">
-                        Payment of <strong>$%s</strong> has been confirmed for an application assigned to you.
+                        Payment of <strong>$%s</strong> for Application <strong>#%d</strong> has been confirmed.
+                        You can now proceed with the post-payment certification work.
                       </p>
                       <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
                         <table style="width: 100%%; font-size: 14px; color: #555555;">
@@ -607,8 +613,20 @@ public class SmtpEmailService implements EmailService {
                           </tr>
                         </table>
                       </div>
-                      <p style="color: #555555; line-height: 1.6;">
-                        You can now proceed with processing this application. Please log in to your LicenseKaki account to continue.
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 8px;">Next steps for Phase 2:</p>
+                      <ul style="color: #555555; line-height: 1.6; margin: 0 0 16px 20px; padding: 0;">
+                        <li>Prepare or review the SLD (if applicable)</li>
+                        <li>Finalize the Letter of Authority signing</li>
+                        <li>Complete the Certificate of Fitness</li>
+                      </ul>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
                       </p>
                       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
                       <p style="color: #aaaaaa; font-size: 12px;">
@@ -618,7 +636,10 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(esc(lewName), amount, appSeq, esc(address), amount);
+                """.formatted(
+                        esc(lewName), amount, appSeq,
+                        appSeq, esc(address), amount,
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
     }
 
     // ──────────────────────────────────────────────────────────────────
