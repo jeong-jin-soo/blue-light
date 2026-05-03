@@ -77,6 +77,10 @@ public enum AuditAction {
     // Phase 6: 통합 LEW 리뷰 — finalize된 CoF가 kVA override로 재발급 요구
     COF_REISSUED_BY_KVA_OVERRIDE,
 
+    // 결제 후 kVA 사후 변경 (kva-postpayment-adjustment-spec.md PR-1)
+    KVA_OVERRIDE_POSTPAYMENT,
+    COF_UNFINALIZED_BY_KVA_ADJUSTMENT,
+
     // Data breach
     DATA_BREACH_REPORTED,
     DATA_BREACH_PDPC_NOTIFIED,

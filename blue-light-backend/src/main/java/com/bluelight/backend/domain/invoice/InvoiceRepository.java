@@ -16,8 +16,18 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     /** 중복 발행 방지용 선검사. */
     boolean existsByPaymentSeq(Long paymentSeq);
 
+    /**
+     * 결제 후 kVA 변경 시: 활성 영수증만 존재 여부 확인 (INVALIDATED 는 제외).
+     * 신규 영수증은 같은 payment_seq 라도 기존 row 가 INVALIDATED 면 발행 가능.
+     */
+    boolean existsByPaymentSeqAndStatus(Long paymentSeq, String status);
+
     /** Application 경유 조회 (reference_type=APPLICATION 인 경우). */
     Optional<Invoice> findByApplicationSeqAndReferenceType(Long applicationSeq, String referenceType);
+
+    /** Application + status 기준 활성 영수증 조회 (kVA 사후 변경 시 invalidate 대상 식별). */
+    Optional<Invoice> findFirstByApplicationSeqAndReferenceTypeAndStatus(
+            Long applicationSeq, String referenceType, String status);
 
     /**
      * 영수증 번호 접두(예: "IN20260422") 기준 카운트.

@@ -857,6 +857,11 @@ CREATE TABLE IF NOT EXISTS invoices (
     paynow_qr_file_seq_snapshot         BIGINT,
     footer_note_snapshot                VARCHAR(500),
     pdf_file_seq                        BIGINT        NOT NULL,
+    -- ★ kva-postpayment-adjustment-spec.md §10 D3 — 결제 후 kVA 변경 시 INVALIDATED 마킹.
+    --   같은 payment_seq 의 신규 영수증 발행 가능. 활성 영수증 1건 보장은 서비스 레이어에서 담당.
+    status                              VARCHAR(20)   NOT NULL DEFAULT 'ACTIVE',
+    invalidated_reason                  VARCHAR(200),
+    invalidated_at                      DATETIME(6),
     created_at                          DATETIME(6),
     updated_at                          DATETIME(6),
     created_by                          BIGINT,
@@ -864,9 +869,12 @@ CREATE TABLE IF NOT EXISTS invoices (
     deleted_at                          DATETIME(6),
     PRIMARY KEY (invoice_seq),
     UNIQUE KEY uk_invoices_number (invoice_number),
-    UNIQUE KEY uk_invoices_payment (payment_seq),
+    -- ★ payment_seq 의 UNIQUE 제약 제거 (INVALIDATED 후 신규 발행 허용). 조회용 일반 인덱스만 유지.
+    KEY idx_invoices_payment (payment_seq),
+    KEY idx_invoices_payment_status (payment_seq, status),
     KEY idx_invoices_ref (reference_type, reference_seq),
     KEY idx_invoices_application (application_seq),
+    KEY idx_invoices_application_status (application_seq, status),
     KEY idx_invoices_recipient (recipient_user_seq),
     CONSTRAINT fk_invoices_payment   FOREIGN KEY (payment_seq)                 REFERENCES payments (payment_seq),
     CONSTRAINT fk_invoices_pdf       FOREIGN KEY (pdf_file_seq)                REFERENCES files (file_seq),
@@ -1092,4 +1100,51 @@ CREATE TABLE IF NOT EXISTS document_number_sequence (
     PRIMARY KEY (doc_type_code, issue_date),
     CONSTRAINT fk_docnumseq_type FOREIGN KEY (doc_type_code)
         REFERENCES document_number_types (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 결제 후 kVA 사후 변경 + 수기 정산 ledger (PR-1)
+-- 스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §5.1, §13.2
+-- 정책: 감사 무결성 — soft delete 미적용 (deleted_at 컬럼은 BaseEntity 호환을 위해 보존만, 사용 금지)
+-- ============================================
+CREATE TABLE IF NOT EXISTS kva_adjustment_record (
+    adjustment_seq            BIGINT         NOT NULL AUTO_INCREMENT,
+    application_seq           BIGINT         NOT NULL,
+    -- LEW 요청 row(PR-3) 연결. ADMIN 단독 변경(PR-1)은 항상 NULL.
+    lew_request_seq           BIGINT         NULL,
+    previous_kva              INT            NOT NULL,
+    new_kva                   INT            NULL,
+    proposed_kva              INT            NULL,
+    reason                    VARCHAR(1000)  NOT NULL,
+    -- KvaAdjustmentStatus: PENDING_ADMIN_REVIEW | APPLIED | RESOLVED_BY_ADMIN_OVERRIDE | REJECTED | CANCELLED
+    status                    VARCHAR(30)    NOT NULL,
+    -- ChangedByRole: LEW | ADMIN
+    changed_by_role           VARCHAR(20)    NOT NULL,
+    changed_by_user_seq       BIGINT         NULL,
+    previous_quote_amount     DECIMAL(10,2)  NULL,
+    new_quote_amount          DECIMAL(10,2)  NULL,
+    amount_difference         DECIMAL(10,2)  NULL,
+    master_price_seq_used     BIGINT         NULL,
+    admin_memo                VARCHAR(2000)  NULL,
+    -- AdminPaymentAdjustment: PENDING | PAID_DIFFERENCE | REFUNDED | WAIVED
+    admin_payment_adjustment  VARCHAR(20)    NULL,
+    settled_amount            DECIMAL(10,2)  NULL,
+    receipt_reference_number  VARCHAR(100)   NULL,
+    settlement_memo           VARCHAR(1000)  NULL,
+    admin_adjustment_at       DATETIME(6)    NULL,
+    cof_reissue_triggered     BOOLEAN        NOT NULL DEFAULT FALSE,
+    -- BaseEntity audit (deleted_at 은 보존만, soft delete 미적용)
+    created_at                DATETIME(6),
+    updated_at                DATETIME(6),
+    created_by                BIGINT,
+    updated_by                BIGINT,
+    deleted_at                DATETIME(6),
+    PRIMARY KEY (adjustment_seq),
+    KEY idx_kva_adj_application (application_seq),
+    KEY idx_kva_adj_status (status),
+    KEY idx_kva_adj_created_at (created_at),
+    CONSTRAINT fk_kva_adj_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
+    -- self-FK (LEW 요청 row → ADMIN row 연결, PR-3)
+    CONSTRAINT fk_kva_adj_lew_request FOREIGN KEY (lew_request_seq) REFERENCES kva_adjustment_record (adjustment_seq),
+    CONSTRAINT fk_kva_adj_master_price FOREIGN KEY (master_price_seq_used) REFERENCES master_prices (master_price_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

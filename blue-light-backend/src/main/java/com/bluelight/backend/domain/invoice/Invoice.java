@@ -70,6 +70,29 @@ public class Invoice extends BaseEntity {
     @Column(name = "issued_at", nullable = false, updatable = false)
     private LocalDateTime issuedAt;
 
+    /**
+     * 영수증 활성 상태.
+     * <ul>
+     *   <li>{@code ACTIVE} — 통상 활성 영수증.</li>
+     *   <li>{@code INVALIDATED} — 결제 후 kVA 사후 변경 등으로 무효화된 영수증.
+     *       해당 결제(payment_seq) 에 대한 신규 영수증이 같은 application 에 발행될 수 있다.</li>
+     * </ul>
+     * <p>스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §10 D3.</p>
+     */
+    @Column(name = "status", nullable = false, length = 20)
+    private String status = "ACTIVE";
+
+    /**
+     * 무효화 사유 (예: {@code KVA_ADJUSTMENT_<adjustmentSeq>}).
+     * INVALIDATED 전이 시 함께 기록되어 어떤 변경 이벤트에 연결됐는지 추적 가능.
+     */
+    @Column(name = "invalidated_reason", length = 200)
+    private String invalidatedReason;
+
+    /** 무효화 시각. */
+    @Column(name = "invalidated_at")
+    private LocalDateTime invalidatedAt;
+
     // ── 금액 ──
 
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 2, updatable = false)
@@ -252,5 +275,31 @@ public class Invoice extends BaseEntity {
         }
         this.pdfFileSeq = newPdfFileSeq;
         this.issuedByUserSeq = regeneratedByUserSeq;
+    }
+
+    /**
+     * 영수증 무효화 (status = INVALIDATED).
+     *
+     * <p>스냅샷 데이터는 그대로 보존하며 {@code status}/{@code invalidatedReason}/{@code invalidatedAt}
+     * 만 갱신된다. 결제 후 kVA 사후 변경({@code KvaPostPaymentService.overrideKva}) 등에서 호출.</p>
+     *
+     * @throws IllegalStateException 이미 INVALIDATED 인 영수증
+     * @throws IllegalArgumentException reason 이 비어있는 경우
+     */
+    public void invalidate(String reason) {
+        if (reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("invalidate reason must not be blank");
+        }
+        if ("INVALIDATED".equals(this.status)) {
+            throw new IllegalStateException("Invoice is already invalidated");
+        }
+        this.status = "INVALIDATED";
+        this.invalidatedReason = reason;
+        this.invalidatedAt = LocalDateTime.now();
+    }
+
+    /** 활성 영수증 여부. */
+    public boolean isActive() {
+        return "ACTIVE".equals(this.status);
     }
 }
