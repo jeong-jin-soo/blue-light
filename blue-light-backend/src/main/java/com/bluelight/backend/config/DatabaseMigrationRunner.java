@@ -97,6 +97,9 @@ public class DatabaseMigrationRunner {
             // ── 결제 후 kVA 사후 변경 (PR-1) ──
             // invoices 테이블 status/invalidated_reason/invalidated_at 컬럼 + uk_invoices_payment 제거
             migrateInvoicesStatusColumns(conn);
+            // ── 결제 후 kVA 사후 변경 (PR-4) ──
+            // kva_adjustment_record 테이블에 settled_at 컬럼 추가 (settlement 마킹 시각)
+            migrateKvaAdjustmentRecordSettledAt(conn);
             seedSystemSettings(conn);
             // ── Document Number Generator (공통 문서번호 채번) P1.1 + P1.3 ──
             createDocumentNumberTables(conn);
@@ -1647,6 +1650,37 @@ public class DatabaseMigrationRunner {
                 stmt.executeUpdate("ALTER TABLE invoices DROP INDEX uk_invoices_payment");
                 log.info("Migration [invoices-status-columns]: UNIQUE replaced with regular indexes");
             }
+        }
+    }
+
+    /**
+     * 마이그레이션: 결제 후 kVA 사후 변경 (PR-4).
+     * <p>
+     * kva_adjustment_record 테이블에 settled_at 컬럼을 멱등 추가한다.
+     * <ul>
+     *   <li>PR-1~3 시점에는 schema.sql 신규 생성 + JPA 엔티티에서 settled_at 미정의.</li>
+     *   <li>PR-4 에서 settlement 마킹 엔드포인트({@code PATCH .../settlement}) 도입과 함께 추가.</li>
+     *   <li>이미 PR-1~3 으로 운영 중인 DB 에 본 컬럼이 누락되어 있을 수 있으므로 idempotent ALTER 보강.</li>
+     * </ul>
+     * 스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.3 / PR-4.
+     */
+    private void migrateKvaAdjustmentRecordSettledAt(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kva_adjustment_record")) {
+            log.debug("Migration [kva-adj-settled-at]: table missing, skipping");
+            return;
+        }
+        if (columnExists(conn, "kva_adjustment_record", "settled_at")) {
+            return;
+        }
+        log.info("Migration [kva-adj-settled-at]: adding settled_at column...");
+        try (Statement stmt = conn.createStatement()) {
+            // admin_adjustment_at 다음에 두어 정산 관련 컬럼이 시간순으로 인접.
+            // 기존 행은 NULL — settlement 가 아직 마킹되지 않은 상태로 자연스럽게 동작.
+            stmt.executeUpdate(
+                "ALTER TABLE kva_adjustment_record "
+                + "ADD COLUMN settled_at DATETIME(6) NULL AFTER admin_adjustment_at"
+            );
+            log.info("Migration [kva-adj-settled-at]: added settled_at column");
         }
     }
 

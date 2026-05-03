@@ -148,6 +148,104 @@ export const overrideKvaPostPayment = async (
   return response.data;
 };
 
+// ── 결제 후 kVA 사후 변경 — 이력 + Settlement (PR-4) ──────────────────────
+// 스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §4.3 / §8 PR-4
+
+/** PR-4: KvaAdjustmentRecord 의 status enum (백엔드 mirror). */
+export type KvaAdjustmentStatus =
+  | 'PENDING_ADMIN_REVIEW'
+  | 'APPLIED'
+  | 'RESOLVED_BY_ADMIN_OVERRIDE'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+/** PR-4: 변경 주체 역할 (ADMIN | LEW). */
+export type KvaAdjustmentChangedByRole = 'ADMIN' | 'LEW';
+
+/** PR-4: 정산 상태 enum (PENDING | PAID_DIFFERENCE | REFUNDED | WAIVED). */
+export type KvaPaymentAdjustment =
+  | 'PENDING'
+  | 'PAID_DIFFERENCE'
+  | 'REFUNDED'
+  | 'WAIVED';
+
+/**
+ * PR-4: 이력 카드 row.
+ *
+ * <p>{@code lewRequestSeq} 가 있으면 ADMIN 변경 row 가 어떤 LEW 요청 row 에 응답한 것인지 self-FK
+ * 로 가리킨다. 프론트는 이를 기준으로 timeline 에 그룹 표시.</p>
+ */
+export interface KvaAdjustmentHistoryItem {
+  adjustmentSeq: number;
+  status: KvaAdjustmentStatus;
+  changedByRole: KvaAdjustmentChangedByRole;
+  changedByUserName?: string;
+  previousKva: number;
+  newKva?: number;
+  proposedKva?: number;
+  previousQuoteAmount?: number;
+  newQuoteAmount?: number;
+  amountDifference?: number;
+  reason: string;
+  adminMemo?: string;
+  paymentAdjustment?: KvaPaymentAdjustment;
+  settledAmount?: number;
+  receiptReferenceNumber?: string;
+  settlementMemo?: string;
+  settledAt?: string;
+  cofReissueTriggered: boolean;
+  lewRequestSeq?: number;
+  createdAt: string;
+  adminAdjustmentAt?: string;
+}
+
+/** PR-4: settlement 마킹 요청 payload. */
+export interface KvaSettlementUpdatePayload {
+  /** PAID_DIFFERENCE / REFUNDED / WAIVED. PENDING 은 백엔드에서 거부됨. */
+  paymentAdjustment: 'PAID_DIFFERENCE' | 'REFUNDED' | 'WAIVED';
+  settledAmount?: number;
+  receiptReferenceNumber?: string;
+  settlementMemo?: string;
+  /** LEW 알림 발송 여부. 기본 true. */
+  notifyLew?: boolean;
+}
+
+/**
+ * PR-4: 결제 후 kVA 변경 이력 조회.
+ *
+ * <p>응답은 시간 내림차순. 빈 배열도 정상.</p>
+ * <p>권한: ADMIN/SYSTEM_ADMIN 또는 신청에 배정된 LEW.</p>
+ */
+export const getKvaAdjustments = async (
+  applicationSeq: number
+): Promise<KvaAdjustmentHistoryItem[]> => {
+  const response = await axiosClient.get<KvaAdjustmentHistoryItem[]>(
+    `/admin/applications/${applicationSeq}/kva-adjustments`
+  );
+  return response.data;
+};
+
+/**
+ * PR-4: settlement 마킹.
+ *
+ * 가드 위반 코드:
+ * - 404 KVA_ADJUSTMENT_NOT_FOUND — row 미존재 또는 다른 application 의 row
+ * - 409 KVA_SETTLEMENT_NOT_APPLICABLE — row.status 가 APPLIED/RESOLVED_BY_ADMIN_OVERRIDE 가 아님
+ * - 409 KVA_SETTLEMENT_ALREADY_FINALIZED — D6 거부 (이미 PAID_DIFFERENCE/REFUNDED/WAIVED)
+ * - 400 KVA_SETTLEMENT_INVALID_VALUE — paymentAdjustment 누락 또는 PENDING
+ */
+export const markKvaSettlement = async (
+  applicationSeq: number,
+  adjustmentSeq: number,
+  payload: KvaSettlementUpdatePayload
+): Promise<KvaAdjustmentHistoryItem> => {
+  const response = await axiosClient.patch<KvaAdjustmentHistoryItem>(
+    `/admin/applications/${applicationSeq}/kva-adjustments/${adjustmentSeq}/settlement`,
+    payload
+  );
+  return response.data;
+};
+
 export const completeApplication = async (
   id: number,
   data: CompleteApplicationRequest

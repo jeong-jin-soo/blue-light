@@ -1,7 +1,10 @@
 package com.bluelight.backend.service.kva;
 
+import com.bluelight.backend.api.admin.KvaSettlementMarkedEvent;
+import com.bluelight.backend.api.admin.dto.KvaAdjustmentHistoryItem;
 import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideRequest;
 import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideResponse;
+import com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.invoice.InvoiceGenerationService;
 import com.bluelight.backend.api.lew.LewKvaAdjustmentRequestedEvent;
@@ -185,6 +188,7 @@ public class KvaPostPaymentService {
                 .receiptReferenceNumber(request.getReceiptReferenceNumber())
                 .settlementMemo(null)
                 .adminAdjustmentAt(LocalDateTime.now())
+                .settledAt(null)
                 .cofReissueTriggered(false)
                 .build();
         record = kvaAdjustmentRepository.save(record);
@@ -421,6 +425,7 @@ public class KvaPostPaymentService {
                 .receiptReferenceNumber(null)
                 .settlementMemo(null)
                 .adminAdjustmentAt(null)
+                .settledAt(null)
                 .cofReissueTriggered(false)
                 .build();
         record = kvaAdjustmentRepository.save(record);
@@ -456,6 +461,257 @@ public class KvaPostPaymentService {
                 request.getReason()));
 
         return LewKvaAdjustmentResponse.from(record);
+    }
+
+    // ──────────────────────────────────────────────────────────
+    // PR-4: 이력 조회 + Settlement 마킹
+    // 스펙: kva-postpayment-adjustment-spec.md §4.3 / PR-4 / §8 PR-4
+    // ──────────────────────────────────────────────────────────
+
+    /**
+     * §8 PR-4 / 이력 조회 — 특정 신청의 모든 KvaAdjustmentRecord 를 최신순으로 반환.
+     *
+     * <p>각 row 의 {@code changedByUserSeq} 를 일괄 조회하여 표시 이름({@code firstName +
+     * lastName} 또는 {@code email}) 을 채워준다 — 사용자가 soft-delete 되었을 수 있으므로
+     * lookup 실패는 {@code null} 로 통과 (응답에 빈 문자열 대신 그대로 노출).</p>
+     *
+     * <p>readOnly 트랜잭션 — 이력 조회는 부수효과 없음.</p>
+     *
+     * @param applicationSeq 신청 ID (path variable)
+     * @return 시간 내림차순 이력 row 목록 (LEW 요청 row 와 ADMIN 변경 row 모두 포함)
+     */
+    @Transactional(readOnly = true)
+    public List<KvaAdjustmentHistoryItem> getAdjustmentHistory(Long applicationSeq) {
+        // 신청 존재 검증 — 없으면 404. 권한은 컨트롤러 @PreAuthorize 에서 처리.
+        applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found",
+                        HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+        List<KvaAdjustmentRecord> records = kvaAdjustmentRepository
+                .findByApplication_ApplicationSeqOrderByCreatedAtDescAdjustmentSeqDesc(applicationSeq);
+        if (records.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // changedByUserSeq → User 일괄 조회 (N+1 방지). null 인 row 는 lookup 대상 제외.
+        java.util.Set<Long> userSeqs = new java.util.HashSet<>();
+        for (KvaAdjustmentRecord r : records) {
+            if (r.getChangedByUserSeq() != null) {
+                userSeqs.add(r.getChangedByUserSeq());
+            }
+        }
+        java.util.Map<Long, String> nameByUserSeq = new java.util.HashMap<>();
+        if (!userSeqs.isEmpty()) {
+            // findAllById 는 가용 row 만 반환 (soft-deleted/없는 user 는 자연스럽게 누락 → null 통과).
+            for (User u : userRepository.findAllById(userSeqs)) {
+                nameByUserSeq.put(u.getUserSeq(), formatUserDisplayName(u));
+            }
+        }
+
+        List<KvaAdjustmentHistoryItem> items = new ArrayList<>(records.size());
+        for (KvaAdjustmentRecord r : records) {
+            String name = (r.getChangedByUserSeq() != null)
+                    ? nameByUserSeq.get(r.getChangedByUserSeq())
+                    : null;
+            items.add(KvaAdjustmentHistoryItem.from(r, name));
+        }
+        return items;
+    }
+
+    /**
+     * §4.3 / PR-4 — Settlement 마킹.
+     *
+     * <h3>가드</h3>
+     * <ul>
+     *   <li>row 존재 검증 (404 KVA_ADJUSTMENT_NOT_FOUND).</li>
+     *   <li>path 의 {@code applicationSeq} 와 row 의 application 이 일치 (404 동일 코드 — 정보 노출 방지).</li>
+     *   <li>row.status ∈ (APPLIED, RESOLVED_BY_ADMIN_OVERRIDE) — 그 외는 409 KVA_SETTLEMENT_NOT_APPLICABLE.</li>
+     *   <li>row.adminPaymentAdjustment 가 이미 PAID_DIFFERENCE/REFUNDED/WAIVED — D6 거부, 409 KVA_SETTLEMENT_ALREADY_FINALIZED.</li>
+     *   <li>요청 paymentAdjustment 가 PENDING/null — 400 (validation).</li>
+     * </ul>
+     *
+     * <h3>트랜잭션 경계</h3>
+     * 단일 {@code @Transactional} — 도메인 메서드 호출 + audit 기록 + 이벤트 publish 를 단일 트랜잭션 내에 보관.
+     * 알림 발송은 AFTER_COMMIT (KvaSettlementNotificationListener).
+     *
+     * @param applicationSeq path variable applicationSeq (정보 노출 방지 — row 의 application 과 매칭 검증)
+     * @param adjustmentSeq  path variable adjustmentSeq
+     * @param request        Settlement 마킹 요청 DTO
+     * @param adminUserSeq   요청자 ADMIN userSeq
+     */
+    @Transactional
+    public KvaAdjustmentHistoryItem markSettlement(Long applicationSeq,
+                                                    Long adjustmentSeq,
+                                                    KvaSettlementUpdateRequest request,
+                                                    Long adminUserSeq) {
+        KvaAdjustmentRecord record = kvaAdjustmentRepository.findById(adjustmentSeq)
+                .orElseThrow(() -> {
+                    logSettlementDenied(adminUserSeq, applicationSeq, adjustmentSeq, request,
+                            "KVA_ADJUSTMENT_NOT_FOUND",
+                            "Adjustment row not found");
+                    return new BusinessException(
+                            "Adjustment record not found",
+                            HttpStatus.NOT_FOUND, "KVA_ADJUSTMENT_NOT_FOUND");
+                });
+
+        // path 와 row 의 application 일치 검증 — 다른 application 의 row 를 PATCH 하려는 시도 차단.
+        // 정보 노출 방지를 위해 동일한 KVA_ADJUSTMENT_NOT_FOUND 로 응답 (실제 row 가 다른 application 에 존재함을 노출하지 않음).
+        Long rowApplicationSeq = record.getApplication() != null
+                ? record.getApplication().getApplicationSeq() : null;
+        if (rowApplicationSeq == null || !rowApplicationSeq.equals(applicationSeq)) {
+            logSettlementDenied(adminUserSeq, applicationSeq, adjustmentSeq, request,
+                    "KVA_ADJUSTMENT_NOT_FOUND",
+                    "Adjustment row " + adjustmentSeq + " belongs to a different application");
+            throw new BusinessException(
+                    "Adjustment record not found",
+                    HttpStatus.NOT_FOUND, "KVA_ADJUSTMENT_NOT_FOUND");
+        }
+
+        // status 가드 — APPLIED / RESOLVED_BY_ADMIN_OVERRIDE 만 settlement 가능.
+        KvaAdjustmentStatus rowStatus = record.getStatus();
+        if (rowStatus != KvaAdjustmentStatus.APPLIED
+                && rowStatus != KvaAdjustmentStatus.RESOLVED_BY_ADMIN_OVERRIDE) {
+            logSettlementDenied(adminUserSeq, applicationSeq, adjustmentSeq, request,
+                    "KVA_SETTLEMENT_NOT_APPLICABLE",
+                    "Settlement not applicable to status " + rowStatus);
+            throw new BusinessException(
+                    "Settlement is only applicable to APPLIED or RESOLVED_BY_ADMIN_OVERRIDE rows",
+                    HttpStatus.CONFLICT, "KVA_SETTLEMENT_NOT_APPLICABLE");
+        }
+
+        // request paymentAdjustment 가드 — PENDING/null 거부 (jakarta validation 으로도 잡히지만 방어).
+        if (request.getPaymentAdjustment() == null
+                || request.getPaymentAdjustment() == AdminPaymentAdjustment.PENDING) {
+            logSettlementDenied(adminUserSeq, applicationSeq, adjustmentSeq, request,
+                    "KVA_SETTLEMENT_INVALID_VALUE",
+                    "paymentAdjustment must be PAID_DIFFERENCE / REFUNDED / WAIVED");
+            throw new BusinessException(
+                    "paymentAdjustment must be a finalize value (PAID_DIFFERENCE / REFUNDED / WAIVED)",
+                    HttpStatus.BAD_REQUEST, "KVA_SETTLEMENT_INVALID_VALUE");
+        }
+
+        // D6: 이미 finalize 된 row 는 다시 마킹할 수 없다.
+        AdminPaymentAdjustment current = record.getAdminPaymentAdjustment();
+        if (current == AdminPaymentAdjustment.PAID_DIFFERENCE
+                || current == AdminPaymentAdjustment.REFUNDED
+                || current == AdminPaymentAdjustment.WAIVED) {
+            logSettlementDenied(adminUserSeq, applicationSeq, adjustmentSeq, request,
+                    "KVA_SETTLEMENT_ALREADY_FINALIZED",
+                    "Settlement already finalized as " + current
+                            + " — create a new adjustment record to correct (D6)");
+            throw new BusinessException(
+                    "Settlement is already finalized — create a new adjustment record to correct",
+                    HttpStatus.CONFLICT, "KVA_SETTLEMENT_ALREADY_FINALIZED");
+        }
+
+        // 도메인 메서드 호출 — 추가 가드 (race condition 방어).
+        try {
+            record.markSettlement(
+                    request.getPaymentAdjustment(),
+                    request.getSettledAmount(),
+                    request.getReceiptReferenceNumber(),
+                    request.getSettlementMemo(),
+                    LocalDateTime.now());
+        } catch (IllegalStateException ise) {
+            // 동시성 또는 의외 케이스 — 상위 status 가드를 통과했으나 도메인 레벨에서 다시 막힌 경우.
+            logSettlementDenied(adminUserSeq, applicationSeq, adjustmentSeq, request,
+                    "KVA_SETTLEMENT_ALREADY_FINALIZED",
+                    "Domain-level settlement guard rejected: " + ise.getMessage());
+            throw new BusinessException(
+                    ise.getMessage(),
+                    HttpStatus.CONFLICT, "KVA_SETTLEMENT_ALREADY_FINALIZED");
+        }
+        // 명시적으로 adminAdjustmentAt 도 갱신 (AC-S1: settlement 마킹 시각 기록).
+        // ※ KvaAdjustmentRecord 의 adminAdjustmentAt 은 여러 시점(직접 변경 시각 또는 settlement 시각) 에
+        //    의해 갱신될 수 있다 — settlement 만 갱신 시 별도 setter 가 없으므로 reflection 대신
+        //    settledAt 으로 모든 시각 표시를 통일한다 (UI 는 settledAt 우선 사용).
+
+        // ── Audit log (REQUIRES_NEW) ─────────────────────
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("adjustmentSeq", adjustmentSeq);
+        meta.put("applicationSeq", applicationSeq);
+        meta.put("paymentAdjustment", request.getPaymentAdjustment().name());
+        meta.put("settledAmount", request.getSettledAmount());
+        meta.put("receiptReferenceNumber", request.getReceiptReferenceNumber());
+        meta.put("settlementMemo", request.getSettlementMemo());
+        meta.put("rowStatus", rowStatus.name());
+        meta.put("notifyLew", Boolean.TRUE.equals(request.getNotifyLew()));
+        auditLogService.logAsync(
+                adminUserSeq, AuditAction.KVA_SETTLEMENT_MARKED, AuditCategory.ADMIN,
+                "KvaAdjustmentRecord", String.valueOf(adjustmentSeq),
+                "kVA settlement marked by ADMIN",
+                null, meta,
+                null, null, "PATCH",
+                "/api/admin/applications/" + applicationSeq + "/kva-adjustments/" + adjustmentSeq + "/settlement", 200);
+
+        log.info("kVA settlement marked: applicationSeq={}, adjustmentSeq={}, paymentAdjustment={}, settledAmount={}, adminUserSeq={}",
+                applicationSeq, adjustmentSeq, request.getPaymentAdjustment(),
+                request.getSettledAmount(), adminUserSeq);
+
+        // ── notifyLew=true (기본) 인 경우에만 AFTER_COMMIT 알림 이벤트 발행 ──
+        // 가드: 본 트랜잭션은 ledger 갱신 + audit 가 본질이고, 알림은 부수효과. notifyLew=false 면 listener 가
+        // 깨어나지 않도록 publish 자체를 스킵한다 (listener 내부 가드보다 명확).
+        if (Boolean.TRUE.equals(request.getNotifyLew())) {
+            Application app = record.getApplication();
+            Long lewUserSeq = (app != null && app.getAssignedLew() != null)
+                    ? app.getAssignedLew().getUserSeq() : null;
+            eventPublisher.publishEvent(new KvaSettlementMarkedEvent(
+                    applicationSeq,
+                    adjustmentSeq,
+                    lewUserSeq,
+                    request.getPaymentAdjustment(),
+                    request.getSettledAmount(),
+                    request.getReceiptReferenceNumber(),
+                    adminUserSeq));
+        }
+
+        // 응답 — entity 의 갱신된 state 를 그대로 DTO 변환. changedByUserName 은 lookup.
+        String changedByUserName = (record.getChangedByUserSeq() != null)
+                ? userRepository.findById(record.getChangedByUserSeq())
+                    .map(this::formatUserDisplayName)
+                    .orElse(null)
+                : null;
+        return KvaAdjustmentHistoryItem.from(record, changedByUserName);
+    }
+
+    /** PR-4: User 표시 이름 — firstName + lastName, 없으면 email, 없으면 null. */
+    private String formatUserDisplayName(User u) {
+        if (u == null) return null;
+        String first = u.getFirstName() != null ? u.getFirstName() : "";
+        String last = u.getLastName() != null ? u.getLastName() : "";
+        String full = (first + " " + last).trim();
+        if (!full.isEmpty()) return full;
+        return u.getEmail();
+    }
+
+    /** PR-4: settlement 마킹 거부 케이스 audit 로그. */
+    private void logSettlementDenied(Long adminUserSeq, Long applicationSeq, Long adjustmentSeq,
+                                       KvaSettlementUpdateRequest req,
+                                       String errorCode, String reason) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("errorCode", errorCode);
+        m.put("reason", reason);
+        m.put("requestedPaymentAdjustment",
+                req != null && req.getPaymentAdjustment() != null
+                        ? req.getPaymentAdjustment().name() : null);
+        m.put("requestedSettledAmount", req != null ? req.getSettledAmount() : null);
+        m.put("applicationSeq", applicationSeq);
+        m.put("adjustmentSeq", adjustmentSeq);
+        int httpStatus = switch (errorCode) {
+            case "KVA_ADJUSTMENT_NOT_FOUND" -> 404;
+            case "KVA_SETTLEMENT_NOT_APPLICABLE", "KVA_SETTLEMENT_ALREADY_FINALIZED" -> 409;
+            case "KVA_SETTLEMENT_INVALID_VALUE" -> 400;
+            default -> 400;
+        };
+        auditLogService.logAsync(
+                adminUserSeq, AuditAction.KVA_SETTLEMENT_DENIED, AuditCategory.ADMIN,
+                "KvaAdjustmentRecord", String.valueOf(adjustmentSeq),
+                "kVA settlement denied: " + errorCode,
+                null, m,
+                null, null, "PATCH",
+                "/api/admin/applications/" + applicationSeq + "/kva-adjustments/" + adjustmentSeq + "/settlement",
+                httpStatus);
     }
 
     // ── Helpers ──────────────────────────────────────────────

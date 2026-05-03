@@ -128,6 +128,15 @@ public class KvaAdjustmentRecord extends BaseEntity {
     @Column(name = "admin_adjustment_at")
     private LocalDateTime adminAdjustmentAt;
 
+    /**
+     * PR-4: settlement final 처리 시각.
+     * PAID_DIFFERENCE/REFUNDED/WAIVED 로 finalize 마킹할 때 한 번만 기록되며 D6 정책에 의해
+     * 동일 row 의 재마킹은 거부된다. PR-3 까지는 컬럼·필드 없이 운영되었으나
+     * PR-4 settlement 마킹 엔드포인트({@code PATCH .../settlement}) 도입 시점에 추가.
+     */
+    @Column(name = "settled_at")
+    private LocalDateTime settledAt;
+
     /** CoF unfinalize 가 본 변경에 의해 트리거되었는지 (이력 카드 배지용). */
     @Column(name = "cof_reissue_triggered", nullable = false)
     private Boolean cofReissueTriggered = false;
@@ -152,6 +161,7 @@ public class KvaAdjustmentRecord extends BaseEntity {
                                String receiptReferenceNumber,
                                String settlementMemo,
                                LocalDateTime adminAdjustmentAt,
+                               LocalDateTime settledAt,
                                Boolean cofReissueTriggered) {
         this.application = application;
         this.lewRequestSeq = lewRequestSeq;
@@ -172,6 +182,7 @@ public class KvaAdjustmentRecord extends BaseEntity {
         this.receiptReferenceNumber = receiptReferenceNumber;
         this.settlementMemo = settlementMemo;
         this.adminAdjustmentAt = adminAdjustmentAt;
+        this.settledAt = settledAt;
         this.cofReissueTriggered = cofReissueTriggered != null ? cofReissueTriggered : false;
     }
 
@@ -207,5 +218,57 @@ public class KvaAdjustmentRecord extends BaseEntity {
      */
     public void linkLewRequest(Long lewRequestSeq) {
         this.lewRequestSeq = lewRequestSeq;
+    }
+
+    /**
+     * PR-4: settlement 마킹.
+     *
+     * <p>D6 (거부) 정책: 이미 finalize 된 row 는 다시 finalize 할 수 없다. 이미
+     * {@link AdminPaymentAdjustment#PAID_DIFFERENCE}/{@link AdminPaymentAdjustment#REFUNDED}/
+     * {@link AdminPaymentAdjustment#WAIVED} 중 하나라면 {@link IllegalStateException} 을
+     * 던지고, 호출 측 서비스가 409 {@code KVA_SETTLEMENT_ALREADY_FINALIZED} 로 변환한다.</p>
+     *
+     * <p>또한 본 도메인 메서드는 {@link KvaAdjustmentStatus#APPLIED} 또는
+     * {@link KvaAdjustmentStatus#RESOLVED_BY_ADMIN_OVERRIDE} 상태의 row 에서만 호출 가능하다.
+     * (PR-3 의 PENDING/REJECTED/CANCELLED LEW 요청 row 는 settlement 가 무관하므로 호출 자체가 차단됨.)</p>
+     *
+     * @param newStatus    마킹할 정산 상태 (PAID_DIFFERENCE / REFUNDED / WAIVED)
+     * @param settledAmount  실제 송금/환불 금액 (양수 절댓값, nullable)
+     * @param receiptReferenceNumber  외부 채널 참조번호 (PayNow ref 등, nullable)
+     * @param settlementMemo  정산 마킹 메모 (nullable)
+     * @param now            settled_at 기록 시각 (테스트 가능성 위해 인자로 주입)
+     */
+    public void markSettlement(AdminPaymentAdjustment newStatus,
+                               java.math.BigDecimal settledAmount,
+                               String receiptReferenceNumber,
+                               String settlementMemo,
+                               LocalDateTime now) {
+        if (this.status != KvaAdjustmentStatus.APPLIED
+                && this.status != KvaAdjustmentStatus.RESOLVED_BY_ADMIN_OVERRIDE) {
+            throw new IllegalStateException(
+                    "Settlement is only applicable to APPLIED or RESOLVED_BY_ADMIN_OVERRIDE rows "
+                            + "(current: " + this.status + ")");
+        }
+        if (newStatus == null
+                || newStatus == AdminPaymentAdjustment.PENDING) {
+            // PENDING 으로 되돌리는 것은 finalize 가 아니므로 D6 와 무관하지만, 본 도메인
+            // 메서드는 finalize 전용이다. PENDING 재설정은 별도 경로(서비스에서 거부)로 차단.
+            throw new IllegalArgumentException(
+                    "markSettlement requires a finalize value (PAID_DIFFERENCE / REFUNDED / WAIVED)");
+        }
+        AdminPaymentAdjustment current = this.adminPaymentAdjustment;
+        if (current == AdminPaymentAdjustment.PAID_DIFFERENCE
+                || current == AdminPaymentAdjustment.REFUNDED
+                || current == AdminPaymentAdjustment.WAIVED) {
+            // D6: 이미 finalize 된 row 는 다시 마킹할 수 없다.
+            throw new IllegalStateException(
+                    "Settlement is already finalized as " + current
+                            + " — create a new adjustment record to correct (D6)");
+        }
+        this.adminPaymentAdjustment = newStatus;
+        this.settledAmount = settledAmount;
+        this.receiptReferenceNumber = receiptReferenceNumber;
+        this.settlementMemo = settlementMemo;
+        this.settledAt = (now != null) ? now : LocalDateTime.now();
     }
 }

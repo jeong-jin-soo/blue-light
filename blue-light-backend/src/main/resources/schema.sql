@@ -1132,6 +1132,8 @@ CREATE TABLE IF NOT EXISTS kva_adjustment_record (
     receipt_reference_number  VARCHAR(100)   NULL,
     settlement_memo           VARCHAR(1000)  NULL,
     admin_adjustment_at       DATETIME(6)    NULL,
+    -- PR-4: settlement 마킹 시각. PAID_DIFFERENCE/REFUNDED/WAIVED 로 finalize 될 때 한번만 기록.
+    settled_at                DATETIME(6)    NULL,
     cof_reissue_triggered     BOOLEAN        NOT NULL DEFAULT FALSE,
     -- BaseEntity audit (deleted_at 은 보존만, soft delete 미적용)
     created_at                DATETIME(6),

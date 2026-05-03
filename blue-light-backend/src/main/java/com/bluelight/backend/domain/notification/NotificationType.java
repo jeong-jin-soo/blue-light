@@ -33,6 +33,10 @@ public enum NotificationType {
     // PR-3 (kva-postpayment-adjustment-spec §4.2) — LEW 가 결제 후 kVA 변경을 ADMIN 에게 요청.
     // ADMIN/SYSTEM_ADMIN 역할 사용자에게 인앱 알림 + 이메일 발송. 클릭 시 /admin/applications/{seq}.
     KVA_ADJUSTMENT_REQUESTED_ADMIN,
+    // PR-4 (kva-postpayment-adjustment-spec §8 PR-4) — ADMIN 이 settlement 를 마킹한 직후 배정 LEW 통지.
+    // 본 알림은 ADMIN 모달에서 notifyLew=true 로 체크된 경우에만 발행된다 (기본값 true).
+    // 클릭 시 /lew/applications/{seq} 로 라우팅 — Subject 는 PDPA 최소화를 위해 금액 미포함.
+    KVA_ADJUSTMENT_SETTLED_LEW,
 
     // Phase 1 — Kaki Concierge Service (v1.5)
     CONCIERGE_REQUEST_SUBMITTED,              // N1/N2: 신청 접수 시 신청자/관리자

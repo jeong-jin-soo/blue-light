@@ -16,6 +16,7 @@ import { getBasePath } from '../../utils/routeUtils';
 // Section components
 import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
 import { KvaSection } from '../../components/admin/KvaSection';
+import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
 import { AdminLoaSection } from './sections/AdminLoaSection';
 import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
@@ -411,6 +412,12 @@ export default function AdminApplicationDetailPage() {
 
           {/* Phase 5 PR#3 — kVA 확정 섹션 (ADMIN/LEW) */}
           <KvaSection application={application} onUpdated={fetchData} />
+
+          {/* PR-4 — 결제 후 kVA 사후 변경 이력 섹션 (PAID/IN_PROGRESS/COMPLETED 에서만 노출) */}
+          <AdminKvaAdjustmentSection
+            applicationSeq={applicationId}
+            applicationStatus={application.status}
+          />
 
           <AdminLoaSection
             application={application}
