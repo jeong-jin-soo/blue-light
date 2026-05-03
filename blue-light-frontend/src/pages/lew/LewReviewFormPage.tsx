@@ -37,6 +37,7 @@ import type {
 import { CofStepApplicationSummary } from './sections/CofStepApplicationSummary';
 import { CofStepInputs } from './sections/CofStepInputs';
 import { CofStepReviewFinalize } from './sections/CofStepReviewFinalize';
+import { AdminApplicationInfo } from '../admin/sections/AdminApplicationInfo';
 
 /**
  * LEW 통합 리뷰 페이지 (Phase 6).
@@ -106,6 +107,11 @@ export default function LewReviewFormPage() {
   const [confirmed, setConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+
+  // 옵션 B — 신청 정보 시야 토글.
+  // - 데스크톱: 우측 콜랩서블 사이드바 (기본 접힘). localStorage 영속화 안 함 — 페이지 재진입 시 항상 접힘.
+  // - 모바일: 우하단 FAB → 풀스크린 드로어. 같은 state로 제어.
+  const [appInfoOpen, setAppInfoOpen] = useState(false);
 
   const applicationId = id ? Number(id) : NaN;
   const idValid = Number.isFinite(applicationId) && applicationId > 0;
@@ -279,7 +285,8 @@ export default function LewReviewFormPage() {
       await lewReviewApi.finalizeCof(applicationId);
       // PR3 옵션 R: finalize는 결제 후 단계 — status 전이 없음. 메시지에서 "moved to payment stage" 제거.
       toast.success('Certificate of Fitness finalized.');
-      navigate('/lew/applications');
+      // 옵션 B: 리뷰 종료 후 신청 상세로 복귀 (목록이 아닌 같은 신청 컨텍스트 유지)
+      navigate(`/lew/applications/${applicationId}`);
     } catch (err) {
       const { code, message } = extractError(err);
       if (code === 'COF_ALREADY_FINALIZED') {
@@ -290,6 +297,7 @@ export default function LewReviewFormPage() {
         await loadData();
       } else if (code === 'APPLICATION_NOT_ASSIGNED') {
         toast.error('You are not assigned to this application.');
+        // 권한 없는 신청은 상세도 못 보므로 목록으로 유지 (옵션 B 예외 — 무한 redirect 방지)
         navigate('/lew/applications');
       } else if (code === 'APPLICATION_NOT_PAID') {
         // PR3: CoF는 결제(PAID/IN_PROGRESS) 이후에만 finalize 가능. SS 638 §13 준수.
@@ -380,6 +388,7 @@ export default function LewReviewFormPage() {
       <ErrorPanel
         code={loadError?.code ?? 'UNKNOWN'}
         message={loadError?.message ?? 'Failed to load application'}
+        // application/lew 응답 자체를 받지 못한 상태 → 상세 페이지도 동일 에러 가능성 → 목록 유지 (옵션 B 예외)
         onBack={() => navigate('/lew/applications')}
       />
     );
@@ -428,8 +437,36 @@ export default function LewReviewFormPage() {
       : adminApp.userEmail;
   const applicationCode = `APP-${String(adminApp.applicationSeq).padStart(6, '0')}`;
 
+  // 옵션 B sticky 요약 — kVA는 확정값 우선, 없으면 신청값 + (pending confirmation) 표기
+  const kvaPending = adminApp.kvaStatus !== 'CONFIRMED';
+  const kvaSummary = `${adminApp.selectedKva ?? '?'} kVA${kvaPending ? ' (pending confirmation)' : ''}`;
+
   return (
     <div className="space-y-6">
+      {/* 옵션 B: Sticky 상단 요약 헤더 — 리뷰 중에도 신청 메타가 항상 보이도록.
+          Layout 헤더가 top-0 z-10 (h-16=64px) 이므로 그 아래에 붙도록 top-16 + z-30. */}
+      <div className="sticky top-16 z-30 -mx-4 lg:-mx-6 px-4 lg:px-6 py-2 bg-white border-b border-gray-200">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <span className="font-semibold text-gray-800 truncate max-w-[18ch]" title={applicantDisplayName}>
+            {applicantDisplayName}
+          </span>
+          <span className="text-gray-500 truncate max-w-[40ch]" title={app.address}>
+            {app.address}
+          </span>
+          <span className={kvaPending ? 'text-warning-700' : 'text-gray-700'}>
+            {kvaSummary}
+          </span>
+          <StatusBadge status={app.status} />
+          <button
+            type="button"
+            onClick={() => navigate(id ? `/lew/applications/${id}` : '/lew/applications')}
+            className="ml-auto text-primary-600 hover:text-primary-700 hover:underline text-sm whitespace-nowrap"
+          >
+            View full application →
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
@@ -583,6 +620,107 @@ export default function LewReviewFormPage() {
         onConfirm={handleSldConfirm}
         onClose={() => setShowSldConfirm(false)}
       />
+
+      {/* ───────────────────────────────────────────────────────────────────
+          옵션 B 사이드바 형태 ② — 데스크톱 (>=1024px) 콜랩서블 사이드바
+          접힘: 우측 폭 ~40px 토글 바 / 펼침: 폭 ~360px 카드 (AdminApplicationInfo 재사용).
+          z-index 40 → sticky 헤더(z-30)보다 위. localStorage 영속화 안 함.
+         ────────────────────────────────────────────────────────────────── */}
+      <div className="hidden lg:block">
+        {!appInfoOpen && (
+          <button
+            type="button"
+            onClick={() => setAppInfoOpen(true)}
+            className="fixed right-0 top-1/2 -translate-y-1/2 z-40 bg-white border border-r-0 border-gray-300 rounded-l-lg shadow hover:bg-gray-50 px-2 py-4 flex flex-col items-center gap-2"
+            aria-label="Show application info"
+            aria-expanded="false"
+          >
+            <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            <span
+              className="text-xs font-medium text-gray-700 tracking-wide"
+              style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)' }}
+            >
+              Application info
+            </span>
+          </button>
+        )}
+        {appInfoOpen && (
+          <aside
+            className="fixed right-0 top-16 bottom-0 z-40 w-[360px] bg-white border-l border-gray-200 shadow-xl flex flex-col"
+            aria-label="Application info"
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-800">Application info</h3>
+              <button
+                type="button"
+                onClick={() => setAppInfoOpen(false)}
+                className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                aria-label="Close application info"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <AdminApplicationInfo
+                application={adminApp}
+                onNavigateToOriginal={(seq) => navigate(`/lew/applications/${seq}`)}
+              />
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {/* ───────────────────────────────────────────────────────────────────
+          옵션 B 모바일 ⓐ — <1024px 우하단 FAB + 풀스크린 드로어
+         ────────────────────────────────────────────────────────────────── */}
+      <div className="lg:hidden">
+        {!appInfoOpen && (
+          <button
+            type="button"
+            onClick={() => setAppInfoOpen(true)}
+            className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-primary text-white shadow-lg hover:opacity-90 flex items-center justify-center text-lg font-bold"
+            aria-label="Show application info"
+          >
+            i
+          </button>
+        )}
+        {appInfoOpen && (
+          <div className="fixed inset-0 z-50 flex flex-col">
+            {/* dim backdrop */}
+            <button
+              type="button"
+              className="absolute inset-0 bg-black/50"
+              onClick={() => setAppInfoOpen(false)}
+              aria-label="Close application info"
+            />
+            <div className="relative ml-auto w-full max-w-md h-full bg-white shadow-xl flex flex-col animate-in">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <h3 className="text-base font-semibold text-gray-800">Application info</h3>
+                <button
+                  type="button"
+                  onClick={() => setAppInfoOpen(false)}
+                  className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <AdminApplicationInfo
+                  application={adminApp}
+                  onNavigateToOriginal={(seq) => navigate(`/lew/applications/${seq}`)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
