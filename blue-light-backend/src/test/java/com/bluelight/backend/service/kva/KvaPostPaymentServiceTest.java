@@ -4,6 +4,10 @@ import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideRequest;
 import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideResponse;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.invoice.InvoiceGenerationService;
+import com.bluelight.backend.api.lew.LewKvaAdjustmentRequestedEvent;
+import com.bluelight.backend.api.lew.LewKvaRequestResolvedByOverrideEvent;
+import com.bluelight.backend.api.lew.dto.LewKvaAdjustmentRequest;
+import com.bluelight.backend.api.lew.dto.LewKvaAdjustmentResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -27,12 +31,15 @@ import com.bluelight.backend.domain.price.MasterPriceRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.api.admin.KvaOverrideAppliedEvent;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -107,6 +114,11 @@ class KvaPostPaymentServiceTest {
                     org.springframework.test.util.ReflectionTestUtils.setField(r, "adjustmentSeq", 42L);
                     return r;
                 });
+
+        // PR-3: 기본적으로 PENDING LEW 요청 없음 — 개별 테스트가 필요시 override.
+        when(kvaAdjustmentRepository.findByApplicationSeqAndStatusForUpdate(
+                any(), eq(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW)))
+                .thenReturn(Collections.emptyList());
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────
@@ -455,5 +467,254 @@ class KvaPostPaymentServiceTest {
                 .isInstanceOf(BusinessException.class);
 
         verify(eventPublisher, never()).publishEvent(any(KvaOverrideAppliedEvent.class));
+    }
+
+    // ── PR-3: requestAdjustmentByLew ─────────────────────────────────
+
+    private LewKvaAdjustmentRequest lewReq(Integer proposedKva, String reason) {
+        LewKvaAdjustmentRequest r = new LewKvaAdjustmentRequest();
+        r.setProposedKva(proposedKva);
+        r.setReason(reason);
+        return r;
+    }
+
+    @Test
+    void AC_L1_LEW_요청_정상_PENDING_ADMIN_REVIEW_row_생성() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450.00"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650.00"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        // resolveLewDisplayName lookup
+        User lew = mock(User.class);
+        when(lew.getFirstName()).thenReturn("Long");
+        when(lew.getLastName()).thenReturn("Eric");
+        when(lew.getEmail()).thenReturn("lew@licensekaki.sg");
+        when(userRepository.findById(50L)).thenReturn(Optional.of(lew));
+
+        LewKvaAdjustmentResponse resp =
+                service.requestAdjustmentByLew(APP_ID, 50L, lewReq(200, "Site survey reason"));
+
+        // 저장된 row 검증
+        ArgumentCaptor<KvaAdjustmentRecord> cap =
+                ArgumentCaptor.forClass(KvaAdjustmentRecord.class);
+        verify(kvaAdjustmentRepository).save(cap.capture());
+        KvaAdjustmentRecord saved = cap.getValue();
+        assertThat(saved.getStatus()).isEqualTo(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW);
+        assertThat(saved.getChangedByRole()).isEqualTo(ChangedByRole.LEW);
+        assertThat(saved.getChangedByUserSeq()).isEqualTo(50L);
+        assertThat(saved.getProposedKva()).isEqualTo(200);
+        assertThat(saved.getNewKva()).isNull();
+        assertThat(saved.getPreviousKva()).isEqualTo(100);
+        assertThat(saved.getReason()).isEqualTo("Site survey reason");
+        assertThat(saved.getLewRequestSeq()).isNull();
+        // amountDifference / newQuoteAmount 는 LEW 요청 단계에선 null
+        assertThat(saved.getAmountDifference()).isNull();
+        assertThat(saved.getNewQuoteAmount()).isNull();
+
+        // Application 상태 변경 없음 (LEW 요청은 단순 제안)
+        verify(app, never()).overrideKvaPostPayment(any(), any(), any());
+
+        // 이벤트 publish 검증
+        ArgumentCaptor<LewKvaAdjustmentRequestedEvent> evCap =
+                ArgumentCaptor.forClass(LewKvaAdjustmentRequestedEvent.class);
+        verify(eventPublisher).publishEvent(evCap.capture());
+        LewKvaAdjustmentRequestedEvent ev = evCap.getValue();
+        assertThat(ev.getApplicationSeq()).isEqualTo(APP_ID);
+        assertThat(ev.getAdjustmentSeq()).isEqualTo(42L);
+        assertThat(ev.getLewUserSeq()).isEqualTo(50L);
+        assertThat(ev.getProposedKva()).isEqualTo(200);
+        assertThat(ev.getCurrentKva()).isEqualTo(100);
+        assertThat(ev.getReason()).isEqualTo("Site survey reason");
+        assertThat(ev.getLewName()).isEqualTo("Long Eric");
+
+        // 응답 DTO
+        assertThat(resp.getAdjustmentSeq()).isEqualTo(42L);
+        assertThat(resp.getStatus()).isEqualTo(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW);
+        assertThat(resp.getProposedKva()).isEqualTo(200);
+        assertThat(resp.getCurrentKva()).isEqualTo(100);
+    }
+
+    @Test
+    void AC_L3_LEW_요청_PRE_PAYMENT_거부_409_KVA_NOT_POSTPAYMENT() {
+        Application app = mockApp(ApplicationStatus.PENDING_PAYMENT, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.requestAdjustmentByLew(APP_ID, 50L, lewReq(200, "x reason")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_NOT_POSTPAYMENT"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void AC_L3_LEW_요청_EXPIRED_거부() {
+        Application app = mockApp(ApplicationStatus.EXPIRED, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.requestAdjustmentByLew(APP_ID, 50L, lewReq(200, "late")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+    }
+
+    @Test
+    void AC_L1_LEW_요청_동일_proposedKva_거부_KVA_NO_CHANGE() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.requestAdjustmentByLew(APP_ID, 50L, lewReq(100, "noop")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_NO_CHANGE"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+        verify(masterPriceRepository, never()).findByKva(any());
+    }
+
+    @Test
+    void AC_L1_LEW_요청_master_prices_미존재_400_INVALID_KVA_TIER() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        when(masterPriceRepository.findByKva(999)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.requestAdjustmentByLew(APP_ID, 50L, lewReq(999, "weird tier")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("INVALID_KVA_TIER"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+    }
+
+    @Test
+    void AC_L5_중복_PENDING_요청_거부_409_KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+
+        // 이미 PENDING 요청 row 가 락 조회 결과에 존재
+        KvaAdjustmentRecord existing = mock(KvaAdjustmentRecord.class);
+        when(existing.getAdjustmentSeq()).thenReturn(7L);
+        when(kvaAdjustmentRepository.findByApplicationSeqAndStatusForUpdate(
+                eq(APP_ID), eq(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW)))
+                .thenReturn(List.of(existing));
+
+        assertThatThrownBy(() -> service.requestAdjustmentByLew(APP_ID, 50L, lewReq(200, "again duplicate")))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
+                        .isEqualTo("KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING"));
+
+        verify(kvaAdjustmentRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(LewKvaAdjustmentRequestedEvent.class));
+    }
+
+    // ── PR-3 AC-L4: ADMIN 직접 변경 시 PENDING LEW 요청 자동 RESOLVED 마킹 ──────────
+
+    @Test
+    void AC_L4_ADMIN_override_시_PENDING_LEW_요청이_RESOLVED_BY_ADMIN_OVERRIDE_마킹() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(150)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+        stubActiveInvoice();
+
+        // 동일 application 의 PENDING LEW 요청 row 1건이 존재 — markResolvedByAdminOverride 가 호출되어야.
+        KvaAdjustmentRecord pending = makePendingLewRow(7L, 50L, 200);
+        when(kvaAdjustmentRepository.findByApplicationSeqAndStatusForUpdate(
+                eq(APP_ID), eq(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW)))
+                .thenReturn(List.of(pending));
+
+        service.overrideKva(APP_ID, req(150, "ADMIN decided 150"), ADMIN_SEQ);
+
+        // PENDING row 의 status 가 RESOLVED 로 전이되었는지 검증.
+        Assertions.assertThat(pending.getStatus())
+                .isEqualTo(KvaAdjustmentStatus.RESOLVED_BY_ADMIN_OVERRIDE);
+
+        // ADMIN 의 새 row 가 생성되며 lewRequestSeq=7 로 self-FK 연결.
+        ArgumentCaptor<KvaAdjustmentRecord> cap =
+                ArgumentCaptor.forClass(KvaAdjustmentRecord.class);
+        verify(kvaAdjustmentRepository).save(cap.capture());
+        KvaAdjustmentRecord adminRow = cap.getValue();
+        Assertions.assertThat(adminRow.getLewRequestSeq()).isEqualTo(7L);
+
+        // 해소 알림 이벤트 발행 (요청 LEW 에게)
+        ArgumentCaptor<LewKvaRequestResolvedByOverrideEvent> resolvedCap =
+                ArgumentCaptor.forClass(LewKvaRequestResolvedByOverrideEvent.class);
+        verify(eventPublisher).publishEvent(resolvedCap.capture());
+        LewKvaRequestResolvedByOverrideEvent ev = resolvedCap.getValue();
+        Assertions.assertThat(ev.getApplicationSeq()).isEqualTo(APP_ID);
+        Assertions.assertThat(ev.getRequestingLewUserSeq()).isEqualTo(50L);
+        Assertions.assertThat(ev.getLewRequestAdjustmentSeq()).isEqualTo(7L);
+        Assertions.assertThat(ev.getProposedKva()).isEqualTo(200);
+        Assertions.assertThat(ev.getAppliedKva()).isEqualTo(150);
+
+        // 감사 로그에 KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE 포함
+        ArgumentCaptor<AuditAction> actionCap = ArgumentCaptor.forClass(AuditAction.class);
+        verify(auditLogService, org.mockito.Mockito.atLeast(1)).logAsync(
+                any(), actionCap.capture(), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), any(), anyString(), any());
+        Assertions.assertThat(actionCap.getAllValues())
+                .contains(AuditAction.KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE);
+    }
+
+    @Test
+    void AC_L4_PENDING_LEW_요청_없을_때_resolved_event_미발행() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+        stubActiveInvoice();
+
+        service.overrideKva(APP_ID, req(200, "no LEW request to resolve"), ADMIN_SEQ);
+
+        // ADMIN row 의 lewRequestSeq=null
+        ArgumentCaptor<KvaAdjustmentRecord> cap =
+                ArgumentCaptor.forClass(KvaAdjustmentRecord.class);
+        verify(kvaAdjustmentRepository).save(cap.capture());
+        Assertions.assertThat(cap.getValue().getLewRequestSeq()).isNull();
+        // 해소 이벤트 미발행
+        verify(eventPublisher, never()).publishEvent(any(LewKvaRequestResolvedByOverrideEvent.class));
+    }
+
+    /**
+     * 실제 KvaAdjustmentRecord 인스턴스를 builder 로 생성하고 status 전이 / FK 연결 검증을 위해 사용.
+     * 단순 mock 으로는 markResolvedByAdminOverride 의 도메인 로직을 검증할 수 없다.
+     */
+    private KvaAdjustmentRecord makePendingLewRow(Long adjustmentSeq, Long lewSeq, Integer proposedKva) {
+        KvaAdjustmentRecord row = KvaAdjustmentRecord.builder()
+                .application(null) // 테스트에서는 사용 안 함
+                .lewRequestSeq(null)
+                .previousKva(100)
+                .newKva(null)
+                .proposedKva(proposedKva)
+                .reason("LEW reason")
+                .status(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW)
+                .changedByRole(ChangedByRole.LEW)
+                .changedByUserSeq(lewSeq)
+                .previousQuoteAmount(new BigDecimal("450.00"))
+                .newQuoteAmount(null)
+                .amountDifference(null)
+                .masterPriceSeqUsed(null)
+                .adminMemo(null)
+                .adminPaymentAdjustment(null)
+                .settledAmount(null)
+                .receiptReferenceNumber(null)
+                .settlementMemo(null)
+                .adminAdjustmentAt(null)
+                .cofReissueTriggered(false)
+                .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(row, "adjustmentSeq", adjustmentSeq);
+        return row;
     }
 }

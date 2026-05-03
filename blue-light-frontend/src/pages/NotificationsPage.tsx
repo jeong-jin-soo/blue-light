@@ -26,6 +26,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   KVA_CONFIRMED: '💡',
   // PR-2 (kva-postpayment) — ADMIN의 결제 후 kVA 변경 → 배정 LEW 알림 (전구⚡ 변경 의미)
   KVA_ADJUSTED_BY_ADMIN_LEW: '⚡',
+  // PR-3 (kva-postpayment) — LEW의 kVA 변경 요청 → ADMIN 알림 (전구⚡ 요청)
+  KVA_ADJUSTMENT_REQUESTED_ADMIN: '⚡',
 };
 
 export default function NotificationsPage() {
@@ -80,6 +82,9 @@ export default function NotificationsPage() {
       //  type이 곧 라우트를 의미하도록 명시적으로 처리.)
       if (n.type === 'PAYMENT_CONFIRMED_LEW' || n.type === 'KVA_ADJUSTED_BY_ADMIN_LEW') {
         navigate(`/lew/applications/${n.referenceId}`);
+      } else if (n.type === 'KVA_ADJUSTMENT_REQUESTED_ADMIN') {
+        // PR-3: 수신자가 ADMIN — admin 워크스페이스의 신청 상세로 이동.
+        navigate(`/admin/applications/${n.referenceId}`);
       } else {
         navigate(`${basePath}/applications/${n.referenceId}`);
       }

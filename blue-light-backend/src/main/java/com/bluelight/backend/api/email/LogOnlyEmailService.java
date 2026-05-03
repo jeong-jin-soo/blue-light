@@ -146,6 +146,21 @@ public class LogOnlyEmailService implements EmailService {
         log.info("==================================================");
     }
 
+    @Override
+    public void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
+                                                        Integer proposedKva, Integer currentKva, String reason) {
+        log.info("==================================================");
+        log.info("[DEV] kVA Adjustment Requested by LEW (to ADMIN) Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Admin Name: {}", adminName);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Current kVA: {}", currentKva);
+        log.info("  Proposed kVA: {}", proposedKva);
+        log.info("  Reason: {}", reason);
+        log.info("==================================================");
+    }
+
     // ── Phase 3 PR#4 · Document Request Workflow ──
 
     @Override

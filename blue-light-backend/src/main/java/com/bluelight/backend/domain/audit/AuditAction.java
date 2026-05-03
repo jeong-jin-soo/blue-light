@@ -81,6 +81,11 @@ public enum AuditAction {
     KVA_OVERRIDE_POSTPAYMENT,
     COF_UNFINALIZED_BY_KVA_ADJUSTMENT,
 
+    // 결제 후 kVA 사후 변경 — LEW 요청 흐름 (kva-postpayment-adjustment-spec.md §4.2 / PR-3)
+    KVA_ADJUSTMENT_REQUESTED_BY_LEW,
+    // ADMIN 의 직접 변경에 의해 PENDING LEW 요청이 자동으로 해소(RESOLVED_BY_ADMIN_OVERRIDE) 됨 (AC-L4)
+    KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE,
+
     // Data breach
     DATA_BREACH_REPORTED,
     DATA_BREACH_PDPC_NOTIFIED,

@@ -1359,7 +1359,9 @@ export type NotificationType =
   // Phase 5 — LEW kVA 확정 알림
   | 'KVA_CONFIRMED'
   // PR-2 (kva-postpayment-adjustment) — 결제 후 ADMIN의 kVA 변경 → 배정 LEW 통지
-  | 'KVA_ADJUSTED_BY_ADMIN_LEW';
+  | 'KVA_ADJUSTED_BY_ADMIN_LEW'
+  // PR-3 (kva-postpayment-adjustment) — LEW 의 kVA 변경 요청 → ADMIN 통지
+  | 'KVA_ADJUSTMENT_REQUESTED_ADMIN';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

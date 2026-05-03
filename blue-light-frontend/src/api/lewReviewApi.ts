@@ -77,11 +77,53 @@ export async function requestPayment(id: number): Promise<Application> {
   return response.data;
 }
 
+// ── PR-3: 결제 후 kVA 변경 요청 (LEW → ADMIN) ─────────────────────────────
+// 스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §4.2
+
+/** PR-3 요청 payload — proposedKva 는 master_prices 에 등록된 활성 tier 만 허용. */
+export interface LewKvaAdjustmentPayload {
+  proposedKva: number;
+  reason: string;
+}
+
+/** PR-3 응답 — KvaAdjustmentRecord 의 PENDING_ADMIN_REVIEW row. */
+export interface LewKvaAdjustmentResponse {
+  adjustmentSeq: number;
+  status: 'PENDING_ADMIN_REVIEW' | 'APPLIED' | 'RESOLVED_BY_ADMIN_OVERRIDE' | 'REJECTED' | 'CANCELLED';
+  proposedKva: number;
+  currentKva: number;
+  reason: string;
+  createdAt: string;
+}
+
+/**
+ * §4.2 PR-3 — LEW 가 결제 후 kVA 변경을 ADMIN 에게 요청.
+ *
+ * 가드 위반 코드:
+ * - 403 APPLICATION_NOT_ASSIGNED — 배정 LEW 가 아님
+ * - 409 KVA_NOT_POSTPAYMENT — PRE-PAYMENT 상태
+ * - 409 KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED — EXPIRED 상태
+ * - 409 KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING — 동일 application 에 PENDING 요청 존재
+ * - 400 KVA_NO_CHANGE — 동일 proposedKva
+ * - 400 INVALID_KVA_TIER — master_prices 미존재
+ */
+export async function requestKvaAdjustment(
+  id: number,
+  payload: LewKvaAdjustmentPayload,
+): Promise<LewKvaAdjustmentResponse> {
+  const response = await axiosClient.post<LewKvaAdjustmentResponse>(
+    `/lew/applications/${id}/kva-adjustment-request`,
+    payload,
+  );
+  return response.data;
+}
+
 const lewReviewApi = {
   getAssignedApplication,
   saveDraftCof,
   finalizeCof,
   requestPayment,
+  requestKvaAdjustment,
 };
 
 export default lewReviewApi;

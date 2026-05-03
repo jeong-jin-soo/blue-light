@@ -270,6 +270,27 @@ public class SmtpEmailService implements EmailService {
         }
     }
 
+    @Override
+    @Async
+    public void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
+                                                        Integer proposedKva, Integer currentKva, String reason) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA 최소화 — Subject 에 kVA 수치/금액 노출 금지. applicationSeq 만 reference 로 노출.
+            helper.setSubject("[LicenseKaki] kVA adjustment requested · Application #" + appSeq);
+            helper.setText(buildKvaAdjustmentRequestedToAdminHtml(adminName, lewName, appSeq,
+                    proposedKva, currentKva, reason), true);
+            mailSender.send(message);
+            log.info("kVA adjustment requested (ADMIN) email sent to: {}, appSeq={}, lewName={}, proposed={}kVA",
+                    to, appSeq, lewName, proposedKva);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send kVA adjustment requested (ADMIN) email to: {}", to, e);
+        }
+    }
+
     // ── HTML 템플릿 빌더 ──────────────────────
 
     private String buildPasswordResetHtml(String userName, String resetLink) {
@@ -786,6 +807,83 @@ public class SmtpEmailService implements EmailService {
                         newKva != null ? newKva.toString() : "—",
                         previousQuoteText, newQuoteText, amountDifferenceText,
                         cofBox,
+                        esc(reasonText),
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    /**
+     * PR-3: LEW 의 kVA 변경 요청을 ADMIN 이 수신할 때의 HTML 본문.
+     *
+     * <p>스펙: kva-postpayment-adjustment-spec.md §4.2. 톤은 LEW 알림(L) 의 ADMIN 변환:
+     * 격식체 + 단일 CTA(/admin/applications/{id}) + PDPA/반피싱 푸터.</p>
+     */
+    private String buildKvaAdjustmentRequestedToAdminHtml(String adminName, String lewName, Long appSeq,
+                                                          Integer proposedKva, Integer currentKva,
+                                                          String reason) {
+        String deepLink = appBaseUrl + "/admin/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
+        String reasonText = (reason != null && !reason.isBlank()) ? reason : "(no reason provided)";
+        String greetingName = (adminName != null && !adminName.isBlank()) ? adminName : "Admin";
+        String lewDisplay = (lewName != null && !lewName.isBlank()) ? lewName : "the assigned LEW";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">kVA adjustment requested</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        LEW <strong>%s</strong> has requested a kVA adjustment on Application
+                        <strong>#%d</strong>. Please review and decide whether to apply, modify,
+                        or reject the proposal.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Current kVA</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Proposed kVA</td>
+                            <td style="padding: 6px 0;"><strong>%s</strong></td>
+                          </tr>
+                        </table>
+                      </div>
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 6px;"><strong>Reason from LEW:</strong></p>
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 16px; padding: 12px; background-color: #f8fafc; border-left: 3px solid #1a3a5c; font-style: italic;">
+                        %s
+                      </p>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        This is an automated notification from LicenseKaki. We never ask for your
+                        password or payment details by email — sign in directly from licensekaki.sg
+                        if anything looks suspicious.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                        esc(greetingName),
+                        esc(lewDisplay),
+                        appSeq,
+                        currentKva != null ? currentKva.toString() : "—",
+                        proposedKva != null ? proposedKva.toString() : "—",
                         esc(reasonText),
                         escapedDeepLink, escapedDeepLink, escapedDeepLink);
     }
