@@ -111,6 +111,31 @@ public interface EmailService {
      */
     void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount);
 
+    /**
+     * PR-2: 결제 후 ADMIN 이 kVA 를 변경한 직후, 배정된 LEW 에게 발송하는 알림 이메일.
+     *
+     * <p>스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.1 AC-A1,
+     * §8 PR-2. 톤: notification-copy-templates.en.md 의 LEW 섹션 — 격식체 + 단일 CTA + 반피싱 푸터.</p>
+     *
+     * <p>Subject 는 {@code applicationSeq} 만 노출 (PDPA 최소화 — kVA 수치/금액은 본문에만).</p>
+     *
+     * @param to                    LEW 이메일
+     * @param lewName               LEW 이름 (인사말)
+     * @param appSeq                신청서 번호 (CTA URL/제목)
+     * @param previousKva           변경 전 kVA
+     * @param newKva                변경 후 kVA
+     * @param previousQuoteAmount   변경 전 견적가 (nullable — 알 수 없으면 표시 생략)
+     * @param newQuoteAmount        변경 후 견적가 (nullable)
+     * @param amountDifference      차액 (signed, nullable)
+     * @param cofReissueTriggered   CoF re-issue 동반 여부 (true 면 추가 안내 라인)
+     * @param reason                ADMIN 이 입력한 사유 (HTML escape 후 본문 표시)
+     */
+    void sendKvaAdjustedToLewEmail(String to, String lewName, Long appSeq,
+                                    Integer previousKva, Integer newKva,
+                                    BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
+                                    BigDecimal amountDifference,
+                                    boolean cofReissueTriggered, String reason);
+
     // ── Phase 3 PR#4 · LEW Document Request Workflow ──────────────────────
 
     /**

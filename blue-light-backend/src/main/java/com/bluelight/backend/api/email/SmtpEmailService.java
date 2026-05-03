@@ -244,6 +244,32 @@ public class SmtpEmailService implements EmailService {
         }
     }
 
+    @Override
+    @Async
+    public void sendKvaAdjustedToLewEmail(String to, String lewName, Long appSeq,
+                                          Integer previousKva, Integer newKva,
+                                          BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
+                                          BigDecimal amountDifference,
+                                          boolean cofReissueTriggered, String reason) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PR-2: PDPA 최소화 — Subject 에 kVA 수치/금액 노출 금지. publicCode 가 아직 도메인에
+            // 자리잡지 않아 applicationSeq 를 reference 로 사용 (PR4 PaymentConfirmed 와 동일 패턴).
+            helper.setSubject("[LicenseKaki] kVA adjusted by Admin · Application #" + appSeq);
+            helper.setText(buildKvaAdjustedToLewHtml(lewName, appSeq, previousKva, newKva,
+                    previousQuoteAmount, newQuoteAmount, amountDifference,
+                    cofReissueTriggered, reason), true);
+            mailSender.send(message);
+            log.info("kVA adjusted (LEW) email sent to: {}, appSeq={}, prev={}kVA, new={}kVA, cofReissue={}",
+                    to, appSeq, previousKva, newKva, cofReissueTriggered);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send kVA adjusted (LEW) email to: {}", to, e);
+        }
+    }
+
     // ── HTML 템플릿 빌더 ──────────────────────
 
     private String buildPasswordResetHtml(String userName, String resetLink) {
@@ -639,6 +665,128 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(
                         esc(lewName), amount, appSeq,
                         appSeq, esc(address), amount,
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    /**
+     * PR-2: 결제 후 ADMIN 의 kVA 변경 → 배정 LEW 이메일 본문.
+     *
+     * <p>스펙: {@code kva-postpayment-adjustment-spec.md} §8 PR-2 + notification-copy-templates.en.md
+     * 의 LEW 톤(격식체, 1 CTA, 반피싱 푸터). CoF re-issue 동반 시 별도 박스로 추가 안내.</p>
+     */
+    private String buildKvaAdjustedToLewHtml(String lewName, Long appSeq,
+                                             Integer previousKva, Integer newKva,
+                                             BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
+                                             BigDecimal amountDifference,
+                                             boolean cofReissueTriggered, String reason) {
+        String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
+
+        // 변경 박스: nullable 처리 — 이전/이후 견적가는 알 수 없으면 표시 생략 (placeholder 남기지 않음).
+        String previousQuoteText = previousQuoteAmount != null
+                ? "$" + previousQuoteAmount.toPlainString()
+                : "—";
+        String newQuoteText = newQuoteAmount != null
+                ? "$" + newQuoteAmount.toPlainString()
+                : "—";
+        String amountDifferenceText;
+        if (amountDifference == null) {
+            amountDifferenceText = "—";
+        } else if (amountDifference.signum() > 0) {
+            amountDifferenceText = "+$" + amountDifference.toPlainString();
+        } else if (amountDifference.signum() < 0) {
+            amountDifferenceText = "−$" + amountDifference.abs().toPlainString();
+        } else {
+            amountDifferenceText = "$0.00";
+        }
+
+        // CoF re-issue 박스: 트리거된 경우에만 노출.
+        String cofBox = cofReissueTriggered
+                ? """
+                <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                  <p style="color: #9a3412; line-height: 1.6; margin: 0; font-size: 14px;">
+                    <strong>Action required — CoF re-signature.</strong> Because the kVA changed,
+                    the previously finalized Certificate of Fitness has been reopened. Please
+                    review the application and sign the CoF again.
+                  </p>
+                </div>
+                """
+                : "";
+
+        // 사유 박스: ADMIN 입력 사유. 항상 표시 (필수 입력 — 빈 값이어도 placeholder).
+        String reasonText = reason != null && !reason.isBlank() ? reason : "(no reason provided)";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">kVA adjusted by Admin</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        The kVA tier on Application <strong>#%d</strong> has been adjusted by an
+                        administrator. Details below.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Previous kVA</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">New kVA</td>
+                            <td style="padding: 6px 0;"><strong>%s</strong></td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Previous quote</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">New quote</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Difference</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                        </table>
+                      </div>
+                      %s
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 6px;"><strong>Reason from Admin:</strong></p>
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 16px; padding: 12px; background-color: #f8fafc; border-left: 3px solid #1a3a5c; font-style: italic;">
+                        %s
+                      </p>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        This is an automated notification from LicenseKaki. We never ask for your
+                        password or payment details by email — sign in directly from licensekaki.sg
+                        if anything looks suspicious.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                        esc(lewName), appSeq,
+                        previousKva != null ? previousKva.toString() : "—",
+                        newKva != null ? newKva.toString() : "—",
+                        previousQuoteText, newQuoteText, amountDifferenceText,
+                        cofBox,
+                        esc(reasonText),
                         escapedDeepLink, escapedDeepLink, escapedDeepLink);
     }
 

@@ -27,6 +27,10 @@ public enum NotificationType {
     CERTIFICATE_OF_FITNESS_FINALIZED,   // 신청자: CoF 서명 완료 → 결제 단계 진입 안내
     COF_REISSUED_BY_KVA_OVERRIDE,       // LEW/신청자: kVA override로 CoF 재서명 필요
 
+    // PR-2 (kva-postpayment-adjustment-spec §5.4) — 결제 후 ADMIN 의 kVA 변경 → 배정 LEW 통지.
+    // CoF re-issue 가 동반되더라도 본 알림 한 건에 통합 메시지 포함 (사용자 인지 부담 최소화).
+    KVA_ADJUSTED_BY_ADMIN_LEW,
+
     // Phase 1 — Kaki Concierge Service (v1.5)
     CONCIERGE_REQUEST_SUBMITTED,              // N1/N2: 신청 접수 시 신청자/관리자
     CONCIERGE_REQUEST_ASSIGNED,               // N3: 담당자 배정 시 담당자

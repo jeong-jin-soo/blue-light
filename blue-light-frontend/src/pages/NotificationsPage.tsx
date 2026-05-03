@@ -24,6 +24,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   DOCUMENT_REQUEST_REJECTED: '⚠️',
   // Phase 5 — LEW kVA 확정 알림
   KVA_CONFIRMED: '💡',
+  // PR-2 (kva-postpayment) — ADMIN의 결제 후 kVA 변경 → 배정 LEW 알림 (전구⚡ 변경 의미)
+  KVA_ADJUSTED_BY_ADMIN_LEW: '⚡',
 };
 
 export default function NotificationsPage() {
@@ -73,9 +75,10 @@ export default function NotificationsPage() {
     //         싣지 않는 한 현재는 일반 APPLICATION 라우팅 fallback만 수행.
     if (n.referenceType === 'APPLICATION' && n.referenceId) {
       // PR4: PAYMENT_CONFIRMED_LEW 는 항상 LEW 워크스페이스로 deeplink.
+      // PR-2 (kva-postpayment): KVA_ADJUSTED_BY_ADMIN_LEW 도 LEW 워크스페이스로 동일 패턴.
       // (수신자가 LEW 인 알림이므로 user.role 기준 basePath 와도 일치하지만,
       //  type이 곧 라우트를 의미하도록 명시적으로 처리.)
-      if (n.type === 'PAYMENT_CONFIRMED_LEW') {
+      if (n.type === 'PAYMENT_CONFIRMED_LEW' || n.type === 'KVA_ADJUSTED_BY_ADMIN_LEW') {
         navigate(`/lew/applications/${n.referenceId}`);
       } else {
         navigate(`${basePath}/applications/${n.referenceId}`);

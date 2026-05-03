@@ -125,6 +125,27 @@ public class LogOnlyEmailService implements EmailService {
         log.info("==================================================");
     }
 
+    @Override
+    public void sendKvaAdjustedToLewEmail(String to, String lewName, Long appSeq,
+                                          Integer previousKva, Integer newKva,
+                                          BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
+                                          BigDecimal amountDifference,
+                                          boolean cofReissueTriggered, String reason) {
+        log.info("==================================================");
+        log.info("[DEV] kVA Adjusted by Admin to LEW Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Previous kVA: {}", previousKva);
+        log.info("  New kVA: {}", newKva);
+        log.info("  Previous Quote: ${}", previousQuoteAmount);
+        log.info("  New Quote: ${}", newQuoteAmount);
+        log.info("  Difference: ${}", amountDifference);
+        log.info("  CoF Reissue Triggered: {}", cofReissueTriggered);
+        log.info("  Reason: {}", reason);
+        log.info("==================================================");
+    }
+
     // ── Phase 3 PR#4 · Document Request Workflow ──
 
     @Override
