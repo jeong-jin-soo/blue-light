@@ -435,14 +435,14 @@ export default function LewReviewFormPage() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => navigate('/lew/applications')}
+            onClick={() => navigate(id ? `/lew/applications/${id}` : '/lew/applications')}
             className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to assigned applications"
+            aria-label="Back to application"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            <span>Back</span>
+            <span>Back to application</span>
           </button>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
