@@ -717,4 +717,204 @@ class KvaPostPaymentServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(row, "adjustmentSeq", adjustmentSeq);
         return row;
     }
+
+    // ──────────────────────────────────────────────────────────
+    // PR-4: 이력 조회 + Settlement 마킹 테스트
+    // 스펙: kva-postpayment-adjustment-spec.md §4.3 / PR-4
+    // ──────────────────────────────────────────────────────────
+
+    private KvaAdjustmentRecord adminRecord(Long seq, KvaAdjustmentStatus status,
+                                              AdminPaymentAdjustment paymentAdj) {
+        KvaAdjustmentRecord r = KvaAdjustmentRecord.builder()
+                .application(mock(Application.class))
+                .lewRequestSeq(null)
+                .previousKva(100).newKva(200)
+                .reason("Admin reason")
+                .status(status)
+                .changedByRole(ChangedByRole.ADMIN)
+                .changedByUserSeq(ADMIN_SEQ)
+                .previousQuoteAmount(new BigDecimal("450.00"))
+                .newQuoteAmount(new BigDecimal("650.00"))
+                .amountDifference(new BigDecimal("200.00"))
+                .masterPriceSeqUsed(5L)
+                .adminMemo(null)
+                .adminPaymentAdjustment(paymentAdj)
+                .settledAmount(null)
+                .receiptReferenceNumber(null)
+                .settlementMemo(null)
+                .adminAdjustmentAt(java.time.LocalDateTime.now())
+                .cofReissueTriggered(false)
+                .build();
+        org.springframework.test.util.ReflectionTestUtils.setField(r, "adjustmentSeq", seq);
+        return r;
+    }
+
+    @Test
+    void PR4_이력_조회_application_없으면_404() {
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getAdjustmentHistory(APP_ID))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", "APPLICATION_NOT_FOUND");
+    }
+
+    @Test
+    void PR4_이력_조회_정상_changedByUserName_채워짐() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450.00"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        KvaAdjustmentRecord r1 = adminRecord(11L, KvaAdjustmentStatus.APPLIED, AdminPaymentAdjustment.PENDING);
+        // application 필드를 적절히 mock — entity.getApplication().getApplicationSeq() 호출 안 됨.
+        when(kvaAdjustmentRepository.findByApplication_ApplicationSeqOrderByCreatedAtDescAdjustmentSeqDesc(APP_ID))
+                .thenReturn(List.of(r1));
+
+        User admin = mock(User.class);
+        when(admin.getUserSeq()).thenReturn(ADMIN_SEQ);
+        when(admin.getFirstName()).thenReturn("Admin");
+        when(admin.getLastName()).thenReturn("User");
+        when(userRepository.findAllById(any())).thenReturn(List.of(admin));
+
+        var items = service.getAdjustmentHistory(APP_ID);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).getAdjustmentSeq()).isEqualTo(11L);
+        assertThat(items.get(0).getChangedByUserName()).isEqualTo("Admin User");
+        assertThat(items.get(0).getStatus()).isEqualTo(KvaAdjustmentStatus.APPLIED);
+    }
+
+    @Test
+    void PR4_settlement_정상_PAID_DIFFERENCE_마킹() {
+        Application app = mockApp(ApplicationStatus.PAID, 200, new BigDecimal("650.00"));
+        when(app.getApplicationSeq()).thenReturn(APP_ID);
+        KvaAdjustmentRecord row = adminRecord(42L, KvaAdjustmentStatus.APPLIED, AdminPaymentAdjustment.PENDING);
+        org.springframework.test.util.ReflectionTestUtils.setField(row, "application", app);
+        when(kvaAdjustmentRepository.findById(42L)).thenReturn(Optional.of(row));
+
+        com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest req =
+                new com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest();
+        req.setPaymentAdjustment(AdminPaymentAdjustment.PAID_DIFFERENCE);
+        req.setSettledAmount(new BigDecimal("200.00"));
+        req.setReceiptReferenceNumber("PAYNOW-ABC-123");
+        req.setSettlementMemo("Manual transfer");
+        req.setNotifyLew(true);
+
+        var result = service.markSettlement(APP_ID, 42L, req, ADMIN_SEQ);
+
+        assertThat(result.getPaymentAdjustment()).isEqualTo(AdminPaymentAdjustment.PAID_DIFFERENCE);
+        assertThat(result.getSettledAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
+        verify(eventPublisher, times(1)).publishEvent(
+                any(com.bluelight.backend.api.admin.KvaSettlementMarkedEvent.class));
+        verify(auditLogService, times(1)).logAsync(
+                eq(ADMIN_SEQ), eq(AuditAction.KVA_SETTLEMENT_MARKED), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), anyString(), anyString(), eq(200));
+    }
+
+    @Test
+    void PR4_settlement_D6_거부_이미_finalize() {
+        Application app = mockApp(ApplicationStatus.PAID, 200, new BigDecimal("650.00"));
+        when(app.getApplicationSeq()).thenReturn(APP_ID);
+        // 이미 PAID_DIFFERENCE 로 finalize 된 row.
+        KvaAdjustmentRecord row = adminRecord(42L, KvaAdjustmentStatus.APPLIED,
+                AdminPaymentAdjustment.PAID_DIFFERENCE);
+        org.springframework.test.util.ReflectionTestUtils.setField(row, "application", app);
+        when(kvaAdjustmentRepository.findById(42L)).thenReturn(Optional.of(row));
+
+        com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest req =
+                new com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest();
+        req.setPaymentAdjustment(AdminPaymentAdjustment.REFUNDED);
+        req.setNotifyLew(true);
+
+        assertThatThrownBy(() -> service.markSettlement(APP_ID, 42L, req, ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", "KVA_SETTLEMENT_ALREADY_FINALIZED");
+
+        // 이벤트 발행 안 됨.
+        verify(eventPublisher, never()).publishEvent(
+                any(com.bluelight.backend.api.admin.KvaSettlementMarkedEvent.class));
+        // 거부 audit 기록.
+        verify(auditLogService, times(1)).logAsync(
+                eq(ADMIN_SEQ), eq(AuditAction.KVA_SETTLEMENT_DENIED), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), anyString(), anyString(), eq(409));
+    }
+
+    @Test
+    void PR4_settlement_status_거부_LEW_PENDING_row() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450.00"));
+        when(app.getApplicationSeq()).thenReturn(APP_ID);
+        // LEW PENDING_ADMIN_REVIEW row — settlement 호출 자체가 부적절.
+        KvaAdjustmentRecord row = makePendingLewRow(33L, 60L, 200);
+        org.springframework.test.util.ReflectionTestUtils.setField(row, "application", app);
+        when(kvaAdjustmentRepository.findById(33L)).thenReturn(Optional.of(row));
+
+        com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest req =
+                new com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest();
+        req.setPaymentAdjustment(AdminPaymentAdjustment.WAIVED);
+        req.setNotifyLew(true);
+
+        assertThatThrownBy(() -> service.markSettlement(APP_ID, 33L, req, ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", "KVA_SETTLEMENT_NOT_APPLICABLE");
+
+        verify(eventPublisher, never()).publishEvent(
+                any(com.bluelight.backend.api.admin.KvaSettlementMarkedEvent.class));
+    }
+
+    @Test
+    void PR4_settlement_row_없음_404() {
+        when(kvaAdjustmentRepository.findById(99L)).thenReturn(Optional.empty());
+
+        com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest req =
+                new com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest();
+        req.setPaymentAdjustment(AdminPaymentAdjustment.PAID_DIFFERENCE);
+        req.setNotifyLew(true);
+
+        assertThatThrownBy(() -> service.markSettlement(APP_ID, 99L, req, ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", "KVA_ADJUSTMENT_NOT_FOUND");
+    }
+
+    @Test
+    void PR4_settlement_다른_application_row_404() {
+        Application appOfRow = mock(Application.class);
+        when(appOfRow.getApplicationSeq()).thenReturn(999L);
+        KvaAdjustmentRecord row = adminRecord(42L, KvaAdjustmentStatus.APPLIED, AdminPaymentAdjustment.PENDING);
+        org.springframework.test.util.ReflectionTestUtils.setField(row, "application", appOfRow);
+        when(kvaAdjustmentRepository.findById(42L)).thenReturn(Optional.of(row));
+
+        com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest req =
+                new com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest();
+        req.setPaymentAdjustment(AdminPaymentAdjustment.PAID_DIFFERENCE);
+        req.setNotifyLew(true);
+
+        // path APP_ID(=1) 와 row.application.applicationSeq(=999) 가 다름 — 404 정보 노출 방지.
+        assertThatThrownBy(() -> service.markSettlement(APP_ID, 42L, req, ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("code", "KVA_ADJUSTMENT_NOT_FOUND");
+    }
+
+    @Test
+    void PR4_settlement_notifyLew_false_이벤트_발행_안함() {
+        Application app = mockApp(ApplicationStatus.PAID, 200, new BigDecimal("650.00"));
+        when(app.getApplicationSeq()).thenReturn(APP_ID);
+        KvaAdjustmentRecord row = adminRecord(42L, KvaAdjustmentStatus.APPLIED, AdminPaymentAdjustment.PENDING);
+        org.springframework.test.util.ReflectionTestUtils.setField(row, "application", app);
+        when(kvaAdjustmentRepository.findById(42L)).thenReturn(Optional.of(row));
+
+        com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest req =
+                new com.bluelight.backend.api.admin.dto.KvaSettlementUpdateRequest();
+        req.setPaymentAdjustment(AdminPaymentAdjustment.WAIVED);
+        req.setNotifyLew(false); // 명시적 false
+
+        service.markSettlement(APP_ID, 42L, req, ADMIN_SEQ);
+
+        // 마킹은 정상 — 이벤트 발행만 스킵.
+        verify(eventPublisher, never()).publishEvent(
+                any(com.bluelight.backend.api.admin.KvaSettlementMarkedEvent.class));
+        verify(auditLogService, times(1)).logAsync(
+                eq(ADMIN_SEQ), eq(AuditAction.KVA_SETTLEMENT_MARKED), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), anyString(), anyString(), eq(200));
+    }
 }

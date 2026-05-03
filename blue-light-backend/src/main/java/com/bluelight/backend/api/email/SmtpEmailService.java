@@ -272,6 +272,29 @@ public class SmtpEmailService implements EmailService {
 
     @Override
     @Async
+    public void sendKvaSettlementMarkedToLewEmail(String to, String lewName, Long appSeq,
+                                                   String paymentAdjustment,
+                                                   BigDecimal settledAmount,
+                                                   String receiptReferenceNumber) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PR-4: PDPA 최소화 — Subject 에 금액·영수증 번호 노출 금지. applicationSeq 만 reference.
+            helper.setSubject("[LicenseKaki] kVA settlement marked · #" + appSeq);
+            helper.setText(buildKvaSettlementMarkedToLewHtml(lewName, appSeq,
+                    paymentAdjustment, settledAmount, receiptReferenceNumber), true);
+            mailSender.send(message);
+            log.info("kVA settlement marked (LEW) email sent to: {}, appSeq={}, paymentAdjustment={}",
+                    to, appSeq, paymentAdjustment);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send kVA settlement marked (LEW) email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
     public void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
                                                         Integer proposedKva, Integer currentKva, String reason) {
         try {
@@ -885,6 +908,95 @@ public class SmtpEmailService implements EmailService {
                         currentKva != null ? currentKva.toString() : "—",
                         proposedKva != null ? proposedKva.toString() : "—",
                         esc(reasonText),
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    /**
+     * PR-4: ADMIN 이 settlement 를 마킹한 직후 LEW 가 수신할 HTML 본문.
+     *
+     * <p>스펙: kva-postpayment-adjustment-spec.md §4.3 / PR-4. 톤은 LEW 알림(L) — 격식체 +
+     * 단일 CTA(/lew/applications/{id}) + 반피싱 푸터. 본문은 정산 결과 + (있을 때) 금액 + 영수증 번호.</p>
+     */
+    private String buildKvaSettlementMarkedToLewHtml(String lewName, Long appSeq,
+                                                       String paymentAdjustment,
+                                                       BigDecimal settledAmount,
+                                                       String receiptReferenceNumber) {
+        String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
+        String greetingName = (lewName != null && !lewName.isBlank()) ? lewName : "LEW";
+        String adjustmentLabel = (paymentAdjustment != null && !paymentAdjustment.isBlank())
+                ? paymentAdjustment : "—";
+
+        // 금액·영수증은 nullable — 있을 때만 row 노출.
+        String amountRow = (settledAmount != null)
+                ? """
+                  <tr>
+                    <td style="padding: 6px 0; font-weight: bold;">Settled amount</td>
+                    <td style="padding: 6px 0;"><strong>$%s</strong></td>
+                  </tr>
+                  """.formatted(settledAmount.toPlainString())
+                : "";
+        String receiptRow = (receiptReferenceNumber != null && !receiptReferenceNumber.isBlank())
+                ? """
+                  <tr>
+                    <td style="padding: 6px 0; font-weight: bold;">Receipt ref.</td>
+                    <td style="padding: 6px 0;">%s</td>
+                  </tr>
+                  """.formatted(esc(receiptReferenceNumber))
+                : "";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">kVA settlement marked</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        The administrator has marked the settlement for the recent kVA adjustment on
+                        Application <strong>#%d</strong>. No further action is required from you for
+                        this settlement record — this email is for your records.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Settlement</td>
+                            <td style="padding: 6px 0;"><strong>%s</strong></td>
+                          </tr>
+                          %s
+                          %s
+                        </table>
+                      </div>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        This is an automated notification from LicenseKaki. We never ask for your
+                        password or payment details by email — sign in directly from licensekaki.sg
+                        if anything looks suspicious.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                        esc(greetingName),
+                        appSeq,
+                        esc(adjustmentLabel),
+                        amountRow,
+                        receiptRow,
                         escapedDeepLink, escapedDeepLink, escapedDeepLink);
     }
 

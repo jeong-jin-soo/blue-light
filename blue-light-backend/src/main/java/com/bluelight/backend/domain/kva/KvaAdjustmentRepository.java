@@ -23,6 +23,16 @@ public interface KvaAdjustmentRepository extends JpaRepository<KvaAdjustmentReco
     List<KvaAdjustmentRecord> findByApplication_ApplicationSeqOrderByAdjustmentSeqAsc(Long applicationSeq);
 
     /**
+     * PR-4: 특정 신청의 변경 이력을 최신순(createdAt DESC, 동률 시 adjustmentSeq DESC) 으로 조회.
+     *
+     * <p>이력 카드 컴포넌트({@code AdminKvaAdjustmentSection})가 최근 변경부터 timeline 으로
+     * 표시한다. {@code lewRequestSeq} 로 LEW 요청 row 와 ADMIN 변경 row 를 그룹화하므로,
+     * 클라이언트는 이 응답을 보면 즉시 묶을 수 있다.</p>
+     */
+    List<KvaAdjustmentRecord> findByApplication_ApplicationSeqOrderByCreatedAtDescAdjustmentSeqDesc(
+            Long applicationSeq);
+
+    /**
      * 특정 신청의 특정 status row 를 비관적 락(PESSIMISTIC_WRITE)으로 조회.
      *
      * <p>PR-3 / 스펙 §10 D4: LEW 의 중복 PENDING 요청을 차단하기 위해

@@ -147,6 +147,22 @@ public class LogOnlyEmailService implements EmailService {
     }
 
     @Override
+    public void sendKvaSettlementMarkedToLewEmail(String to, String lewName, Long appSeq,
+                                                   String paymentAdjustment,
+                                                   BigDecimal settledAmount,
+                                                   String receiptReferenceNumber) {
+        log.info("==================================================");
+        log.info("[DEV] kVA Settlement Marked to LEW Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Payment Adjustment: {}", paymentAdjustment);
+        log.info("  Settled Amount: {}", settledAmount == null ? "(none)" : "$" + settledAmount);
+        log.info("  Receipt Ref: {}", receiptReferenceNumber == null ? "(none)" : receiptReferenceNumber);
+        log.info("==================================================");
+    }
+
+    @Override
     public void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
                                                         Integer proposedKva, Integer currentKva, String reason) {
         log.info("==================================================");

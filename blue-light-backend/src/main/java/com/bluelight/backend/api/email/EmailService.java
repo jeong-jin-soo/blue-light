@@ -155,6 +155,26 @@ public interface EmailService {
     void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
                                                  Integer proposedKva, Integer currentKva, String reason);
 
+    /**
+     * PR-4: ADMIN 이 settlement 를 마킹한 직후, 배정된 LEW 에게 발송하는 알림 이메일.
+     *
+     * <p>스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.3 / PR-4. 톤은
+     * notification-copy-templates.en.md 의 LEW 섹션 — 격식체 + 단일 CTA + 반피싱 푸터.</p>
+     *
+     * <p>Subject 는 {@code applicationSeq} 만 노출 (PDPA 최소화 — 금액·영수증 번호 미노출).</p>
+     *
+     * @param to                       LEW 이메일
+     * @param lewName                  LEW 이름 (인사말)
+     * @param appSeq                   신청서 번호 (CTA URL/제목)
+     * @param paymentAdjustment        정산 상태 라벨 ("PAID_DIFFERENCE" / "REFUNDED" / "WAIVED")
+     * @param settledAmount            실제 송금/환불 금액 (nullable — 알 수 없으면 표시 생략)
+     * @param receiptReferenceNumber   외부 채널 참조번호 (nullable)
+     */
+    void sendKvaSettlementMarkedToLewEmail(String to, String lewName, Long appSeq,
+                                            String paymentAdjustment,
+                                            java.math.BigDecimal settledAmount,
+                                            String receiptReferenceNumber);
+
     // ── Phase 3 PR#4 · LEW Document Request Workflow ──────────────────────
 
     /**

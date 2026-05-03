@@ -28,6 +28,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   KVA_ADJUSTED_BY_ADMIN_LEW: '⚡',
   // PR-3 (kva-postpayment) — LEW의 kVA 변경 요청 → ADMIN 알림 (전구⚡ 요청)
   KVA_ADJUSTMENT_REQUESTED_ADMIN: '⚡',
+  // PR-4 (kva-postpayment) — ADMIN의 settlement 마킹 → 배정 LEW 알림 (정산 영수증 🧾)
+  KVA_ADJUSTMENT_SETTLED_LEW: '🧾',
 };
 
 export default function NotificationsPage() {
@@ -80,7 +82,12 @@ export default function NotificationsPage() {
       // PR-2 (kva-postpayment): KVA_ADJUSTED_BY_ADMIN_LEW 도 LEW 워크스페이스로 동일 패턴.
       // (수신자가 LEW 인 알림이므로 user.role 기준 basePath 와도 일치하지만,
       //  type이 곧 라우트를 의미하도록 명시적으로 처리.)
-      if (n.type === 'PAYMENT_CONFIRMED_LEW' || n.type === 'KVA_ADJUSTED_BY_ADMIN_LEW') {
+      if (
+        n.type === 'PAYMENT_CONFIRMED_LEW' ||
+        n.type === 'KVA_ADJUSTED_BY_ADMIN_LEW' ||
+        // PR-4: settlement 마킹 알림 — 수신자가 LEW 이므로 LEW 워크스페이스로.
+        n.type === 'KVA_ADJUSTMENT_SETTLED_LEW'
+      ) {
         navigate(`/lew/applications/${n.referenceId}`);
       } else if (n.type === 'KVA_ADJUSTMENT_REQUESTED_ADMIN') {
         // PR-3: 수신자가 ADMIN — admin 워크스페이스의 신청 상세로 이동.

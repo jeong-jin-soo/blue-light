@@ -86,6 +86,11 @@ public enum AuditAction {
     // ADMIN 의 직접 변경에 의해 PENDING LEW 요청이 자동으로 해소(RESOLVED_BY_ADMIN_OVERRIDE) 됨 (AC-L4)
     KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE,
 
+    // 결제 후 kVA 사후 변경 — Settlement 마킹 (kva-postpayment-adjustment-spec.md §4.3 / PR-4)
+    KVA_SETTLEMENT_MARKED,
+    // D6 거부 / 잘못된 status row 등 settlement 마킹 거부도 동일 액션에 metadata 로 기록
+    KVA_SETTLEMENT_DENIED,
+
     // Data breach
     DATA_BREACH_REPORTED,
     DATA_BREACH_PDPC_NOTIFIED,
