@@ -182,4 +182,30 @@ public class KvaAdjustmentRecord extends BaseEntity {
     public void markCofReissueTriggered() {
         this.cofReissueTriggered = true;
     }
+
+    /**
+     * PR-3 / AC-L4: ADMIN 의 직접 변경에 의해 본 LEW 요청 row 가 자동 해소됨.
+     *
+     * <p>전제: {@code status == PENDING_ADMIN_REVIEW} 이고 {@code changedByRole == LEW} 인 row 만 호출 가능.
+     * 그 외 상태에서 호출 시 {@link IllegalStateException}.</p>
+     */
+    public void markResolvedByAdminOverride() {
+        if (this.status != KvaAdjustmentStatus.PENDING_ADMIN_REVIEW) {
+            throw new IllegalStateException(
+                    "Only PENDING_ADMIN_REVIEW rows can be auto-resolved (current: " + this.status + ")");
+        }
+        if (this.changedByRole != ChangedByRole.LEW) {
+            throw new IllegalStateException(
+                    "Only LEW request rows can be auto-resolved (current role: " + this.changedByRole + ")");
+        }
+        this.status = KvaAdjustmentStatus.RESOLVED_BY_ADMIN_OVERRIDE;
+    }
+
+    /**
+     * PR-3 / AC-L4: ADMIN 의 새 변경 row 를 작성한 직후, 해소된 LEW 요청 row 를 가리키도록 self-FK 를 설정.
+     * builder 시 채울 수도 있으나, ADMIN row 저장 → PENDING 락/마킹 → 연결 순서로 단일 트랜잭션 내 명시 단계가 필요해서 별도 setter 도메인 메서드.
+     */
+    public void linkLewRequest(Long lewRequestSeq) {
+        this.lewRequestSeq = lewRequestSeq;
+    }
 }

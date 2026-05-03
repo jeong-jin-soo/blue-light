@@ -20,6 +20,7 @@ import {
 } from '../../utils/lewActionUtils';
 
 import { AdminApplicationInfo } from '../admin/sections/AdminApplicationInfo';
+import LewKvaAdjustmentRequestModal from '../../components/lew/LewKvaAdjustmentRequestModal';
 
 import type { AdminApplication, DocumentRequest, SldRequest } from '../../types';
 
@@ -50,6 +51,9 @@ export default function LewApplicationDetailPage() {
   // PR3: "Request payment" CTA 흐름 — confirm dialog + 호출 진행 상태
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
   const [requestingPayment, setRequestingPayment] = useState(false);
+
+  // PR-3 (kva-postpayment): LEW kVA 조정 요청 모달 오픈 상태
+  const [showKvaAdjustmentModal, setShowKvaAdjustmentModal] = useState(false);
 
   const applicationId = Number(id);
 
@@ -400,6 +404,27 @@ export default function LewApplicationDetailPage() {
               </div>
             </div>
           </Card>
+
+          {/* PR-3 (kva-postpayment): LEW kVA 조정 요청 — PAID/IN_PROGRESS/COMPLETED 상태에서만 노출.
+              스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §4.2.
+              요청은 단순 제안 — 시스템은 Application.selectedKva 를 변경하지 않고 ADMIN 검토 대기 row 만 작성. */}
+          {(application.status === 'PAID'
+            || application.status === 'IN_PROGRESS'
+            || application.status === 'COMPLETED') && (
+            <Card>
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">kVA adjustment</h3>
+              <p className="text-xs text-gray-600 mb-3">
+                If site survey shows the licensed kVA is unsuitable, request the admin to adjust it.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowKvaAdjustmentModal(true)}
+              >
+                Request kVA adjustment
+              </Button>
+            </Card>
+          )}
         </div>
       </div>
 
@@ -413,6 +438,14 @@ export default function LewApplicationDetailPage() {
         confirmLabel="Request payment"
         onConfirm={handleRequestPayment}
         onClose={() => setShowRequestPaymentConfirm(false)}
+      />
+
+      {/* PR-3 (kva-postpayment): LEW kVA 조정 요청 모달 */}
+      <LewKvaAdjustmentRequestModal
+        isOpen={showKvaAdjustmentModal}
+        application={application}
+        onClose={() => setShowKvaAdjustmentModal(false)}
+        onSuccess={fetchData}
       />
     </div>
   );

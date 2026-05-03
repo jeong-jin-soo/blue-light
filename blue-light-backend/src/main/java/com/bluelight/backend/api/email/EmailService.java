@@ -136,6 +136,25 @@ public interface EmailService {
                                     BigDecimal amountDifference,
                                     boolean cofReissueTriggered, String reason);
 
+    /**
+     * PR-3: LEW 가 결제 후 kVA 변경을 요청한 직후, ADMIN/SYSTEM_ADMIN 사용자에게 발송하는 알림 이메일.
+     *
+     * <p>스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.2 / PR-3.
+     * 톤: notification-copy-templates.en.md ADMIN 섹션 — 격식체 + 단일 CTA + 반피싱 푸터.</p>
+     *
+     * <p>Subject 는 {@code applicationSeq} 만 노출 (PDPA 최소화 — kVA 수치/금액 미노출).</p>
+     *
+     * @param to              수신자 ADMIN 이메일
+     * @param adminName       수신자 ADMIN 이름 (인사말, escape 후 사용)
+     * @param lewName         요청자 LEW 이름 (본문 표기)
+     * @param appSeq          신청서 번호 (Subject + CTA URL)
+     * @param proposedKva     LEW 가 제안한 kVA
+     * @param currentKva      현재 application.selectedKva (참조 표시용)
+     * @param reason          LEW 가 입력한 사유 (HTML escape 후 본문 표시)
+     */
+    void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
+                                                 Integer proposedKva, Integer currentKva, String reason);
+
     // ── Phase 3 PR#4 · LEW Document Request Workflow ──────────────────────
 
     /**

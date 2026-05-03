@@ -4,6 +4,10 @@ import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideRequest;
 import com.bluelight.backend.api.admin.dto.KvaPostPaymentOverrideResponse;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.invoice.InvoiceGenerationService;
+import com.bluelight.backend.api.lew.LewKvaAdjustmentRequestedEvent;
+import com.bluelight.backend.api.lew.LewKvaRequestResolvedByOverrideEvent;
+import com.bluelight.backend.api.lew.dto.LewKvaAdjustmentRequest;
+import com.bluelight.backend.api.lew.dto.LewKvaAdjustmentResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -37,7 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -183,6 +189,54 @@ public class KvaPostPaymentService {
                 .build();
         record = kvaAdjustmentRepository.save(record);
 
+        // ── PR-3 AC-L4: PENDING LEW 요청 자동 RESOLVED 마킹 + ADMIN row 와 self-FK 연결 ──
+        // 같은 application 의 모든 PENDING_ADMIN_REVIEW 요청을 비관적 락으로 가져와 해소.
+        // 가장 오래된 1건의 seq 를 ADMIN row 의 lewRequestSeq 에 기록 (대표 1건만 연결).
+        List<KvaAdjustmentRecord> pendingLewRequests =
+                kvaAdjustmentRepository.findByApplicationSeqAndStatusForUpdate(
+                        applicationSeq, KvaAdjustmentStatus.PENDING_ADMIN_REVIEW);
+        List<Long> resolvedLewRequestSeqs = new ArrayList<>();
+        Long primaryResolvedSeq = null;
+        Long primaryRequestingLewUserSeq = null;
+        Integer primaryProposedKva = null;
+        for (KvaAdjustmentRecord pending : pendingLewRequests) {
+            // 방어: changedByRole=LEW 인 PENDING 만 해소 (ADMIN row 가 PENDING 인 경우는 도메인상 없으나 안전).
+            if (pending.getChangedByRole() != ChangedByRole.LEW) {
+                continue;
+            }
+            pending.markResolvedByAdminOverride();
+            resolvedLewRequestSeqs.add(pending.getAdjustmentSeq());
+            if (primaryResolvedSeq == null) {
+                primaryResolvedSeq = pending.getAdjustmentSeq();
+                primaryRequestingLewUserSeq = pending.getChangedByUserSeq();
+                primaryProposedKva = pending.getProposedKva();
+            }
+        }
+        if (primaryResolvedSeq != null) {
+            // ADMIN row 의 lewRequestSeq 를 가장 오래된 PENDING 요청과 연결.
+            record.linkLewRequest(primaryResolvedSeq);
+
+            // 감사 로그 — 해소된 각 LEW 요청 row 별로 1건 (REQUIRES_NEW)
+            for (KvaAdjustmentRecord resolved : pendingLewRequests) {
+                if (resolved.getChangedByRole() != ChangedByRole.LEW) continue;
+                Map<String, Object> resolveMeta = new LinkedHashMap<>();
+                resolveMeta.put("resolvedAdjustmentSeq", resolved.getAdjustmentSeq());
+                resolveMeta.put("byAdminAdjustmentSeq", record.getAdjustmentSeq());
+                resolveMeta.put("requestingLewUserSeq", resolved.getChangedByUserSeq());
+                resolveMeta.put("proposedKva", resolved.getProposedKva());
+                resolveMeta.put("appliedKva", request.getNewKva());
+                resolveMeta.put("applicationSeq", applicationSeq);
+                auditLogService.logAsync(
+                        adminUserSeq, AuditAction.KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE,
+                        AuditCategory.ADMIN,
+                        "KvaAdjustmentRecord", String.valueOf(resolved.getAdjustmentSeq()),
+                        "LEW kVA adjustment request resolved by admin override",
+                        null, resolveMeta,
+                        null, null, "POST",
+                        "/api/admin/applications/" + applicationSeq + "/kva-override-postpayment", 200);
+            }
+        }
+
         // ── Invoice invalidate + 재발행 (D3) ─────────────
         invalidateAndRegenerateInvoice(application, record.getAdjustmentSeq());
 
@@ -245,7 +299,163 @@ public class KvaPostPaymentService {
                 adminUserSeq,
                 "ADMIN"));
 
+        // ── PR-3 AC-L4: 해소된 각 LEW 요청 row 별로 요청자(LEW) 알림 이벤트 발행 ──
+        // 요청자가 배정 LEW 와 동일하면 PR-2 알림과 중복될 수 있으나, listener 는 멱등성 가드로 스킵 처리.
+        for (KvaAdjustmentRecord resolved : pendingLewRequests) {
+            if (resolved.getChangedByRole() != ChangedByRole.LEW) continue;
+            Long requestingLewSeq = resolved.getChangedByUserSeq();
+            if (requestingLewSeq == null) continue;
+            eventPublisher.publishEvent(new LewKvaRequestResolvedByOverrideEvent(
+                    applicationSeq,
+                    requestingLewSeq,
+                    resolved.getAdjustmentSeq(),
+                    record.getAdjustmentSeq(),
+                    resolved.getProposedKva(),
+                    request.getNewKva()));
+        }
+
         return KvaPostPaymentOverrideResponse.from(record);
+    }
+
+    /**
+     * §4.2 PR-3: LEW 의 결제 후 kVA 변경 요청 — {@code KvaAdjustmentRecord} (status=PENDING_ADMIN_REVIEW) row 작성 + ADMIN 알림 이벤트 발행.
+     *
+     * <h3>가드</h3>
+     * <ul>
+     *   <li>EXPIRED → 409 {@code KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED}.</li>
+     *   <li>PRE-PAYMENT 상태 → 409 {@code KVA_NOT_POSTPAYMENT}.</li>
+     *   <li>동일 {@code proposedKva} → 400 {@code KVA_NO_CHANGE}.</li>
+     *   <li>master_prices 미존재 → 400 {@code INVALID_KVA_TIER}.</li>
+     *   <li>이미 PENDING 요청 존재 → 409 {@code KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING} (D4 비관적 락).</li>
+     * </ul>
+     *
+     * <h3>트랜잭션 경계</h3>
+     * 단일 {@code @Transactional} 내에서 락 + 검증 + row 저장 + audit + 이벤트 publish.
+     * 알림 발송은 AFTER_COMMIT 으로 분리({@code LewKvaAdjustmentRequestNotificationListener}).
+     */
+    @Transactional
+    public LewKvaAdjustmentResponse requestAdjustmentByLew(Long applicationSeq,
+                                                            Long lewUserSeq,
+                                                            LewKvaAdjustmentRequest request) {
+        Application application = applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found",
+                        HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+        // ── 가드 0: 상태 ─────────────────────────────────
+        ApplicationStatus current = application.getStatus();
+        if (current == ApplicationStatus.EXPIRED) {
+            logLewDenied(lewUserSeq, application, request,
+                    "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED",
+                    "Application is EXPIRED, cannot request kVA adjustment");
+            throw new BusinessException(
+                    "EXPIRED applications cannot be adjusted",
+                    HttpStatus.CONFLICT, "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED");
+        }
+        if (!application.isPostPaymentStatus()) {
+            logLewDenied(lewUserSeq, application, request,
+                    "KVA_NOT_POSTPAYMENT",
+                    "Application status " + current + " is pre-payment");
+            throw new BusinessException(
+                    "Use Phase 1 kVA confirmation flow for pre-payment changes",
+                    HttpStatus.CONFLICT, "KVA_NOT_POSTPAYMENT");
+        }
+
+        // ── 가드 1: no-op ────────────────────────────────
+        Integer currentKva = application.getSelectedKva();
+        if (currentKva != null && currentKva.equals(request.getProposedKva())) {
+            logLewDenied(lewUserSeq, application, request,
+                    "KVA_NO_CHANGE",
+                    "proposedKva is identical to current selectedKva=" + currentKva);
+            throw new BusinessException(
+                    "Proposed kVA is identical to current value",
+                    HttpStatus.BAD_REQUEST, "KVA_NO_CHANGE");
+        }
+
+        // ── 가드 2: master_prices 정합성 ─────────────────
+        masterPriceRepository.findByKva(request.getProposedKva())
+                .orElseThrow(() -> {
+                    logLewDenied(lewUserSeq, application, request,
+                            "INVALID_KVA_TIER",
+                            "Unknown kVA tier: " + request.getProposedKva());
+                    return new BusinessException(
+                            "Invalid kVA tier: " + request.getProposedKva(),
+                            HttpStatus.BAD_REQUEST, "INVALID_KVA_TIER");
+                });
+
+        // ── 가드 3 (D4): 동일 application 의 PENDING LEW 요청 비관적 락 + 중복 차단 ──
+        // SELECT ... FOR UPDATE 로 직렬화. 존재하는 PENDING 이 본인 또는 타 LEW 의 것이든 모두 차단.
+        List<KvaAdjustmentRecord> existingPending =
+                kvaAdjustmentRepository.findByApplicationSeqAndStatusForUpdate(
+                        applicationSeq, KvaAdjustmentStatus.PENDING_ADMIN_REVIEW);
+        if (!existingPending.isEmpty()) {
+            logLewDenied(lewUserSeq, application, request,
+                    "KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING",
+                    "An existing LEW request is pending admin review (adjustmentSeq="
+                            + existingPending.get(0).getAdjustmentSeq() + ")");
+            throw new BusinessException(
+                    "A kVA adjustment request is already pending admin review for this application",
+                    HttpStatus.CONFLICT, "KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING");
+        }
+
+        // ── KvaAdjustmentRecord LEW 요청 row 작성 ────────
+        // 자기 자신이 LEW 요청 row 이므로 lewRequestSeq=null (self-ref 불필요).
+        // newKva=null (ADMIN 이 적용하기 전), proposedKva=request 의 값, previousKva=현재 selectedKva.
+        KvaAdjustmentRecord record = KvaAdjustmentRecord.builder()
+                .application(application)
+                .lewRequestSeq(null)
+                .previousKva(currentKva)
+                .newKva(null)
+                .proposedKva(request.getProposedKva())
+                .reason(request.getReason())
+                .status(KvaAdjustmentStatus.PENDING_ADMIN_REVIEW)
+                .changedByRole(ChangedByRole.LEW)
+                .changedByUserSeq(lewUserSeq)
+                .previousQuoteAmount(application.getQuoteAmount())
+                .newQuoteAmount(null)
+                .amountDifference(null)
+                .masterPriceSeqUsed(null)
+                .adminMemo(null)
+                .adminPaymentAdjustment(null)
+                .settledAmount(null)
+                .receiptReferenceNumber(null)
+                .settlementMemo(null)
+                .adminAdjustmentAt(null)
+                .cofReissueTriggered(false)
+                .build();
+        record = kvaAdjustmentRepository.save(record);
+
+        // ── Audit log (REQUIRES_NEW) ─────────────────────
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("adjustmentSeq", record.getAdjustmentSeq());
+        meta.put("currentKva", currentKva);
+        meta.put("proposedKva", request.getProposedKva());
+        meta.put("reason", request.getReason());
+        meta.put("applicationStatus", current.name());
+        auditLogService.logAsync(
+                lewUserSeq, AuditAction.KVA_ADJUSTMENT_REQUESTED_BY_LEW, AuditCategory.APPLICATION,
+                "Application", String.valueOf(applicationSeq),
+                "kVA adjustment requested by LEW",
+                null, meta,
+                null, null, "POST",
+                "/api/lew/applications/" + applicationSeq + "/kva-adjustment-request", 200);
+
+        log.info("LEW kVA adjustment requested: applicationSeq={}, lewSeq={}, proposed={}kVA, current={}kVA, adjustmentSeq={}",
+                applicationSeq, lewUserSeq, request.getProposedKva(), currentKva, record.getAdjustmentSeq());
+
+        // ── ADMIN 알림 이벤트 발행 (AFTER_COMMIT) ────────
+        // LEW 이름은 listener 가 user 조회로 보강 — 본 트랜잭션에서는 lewName 만 best-effort 로 채운다.
+        String lewName = resolveLewDisplayName(lewUserSeq);
+        eventPublisher.publishEvent(new LewKvaAdjustmentRequestedEvent(
+                applicationSeq,
+                record.getAdjustmentSeq(),
+                lewUserSeq,
+                lewName,
+                request.getProposedKva(),
+                currentKva,
+                request.getReason()));
+
+        return LewKvaAdjustmentResponse.from(record);
     }
 
     // ── Helpers ──────────────────────────────────────────────
@@ -395,9 +605,52 @@ public class KvaPostPaymentService {
         return switch (code) {
             case "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED" -> 409;
             case "KVA_NOT_POSTPAYMENT" -> 409;
+            case "KVA_ADJUSTMENT_REQUEST_ALREADY_PENDING" -> 409;
             case "KVA_NO_CHANGE" -> 400;
             case "INVALID_KVA_TIER" -> 400;
             default -> 400;
         };
+    }
+
+    /** PR-3: LEW 요청 거부 케이스 audit 로그. ADMIN 거부와 코드 매핑은 별 표기되지만 양 흐름의 거부 코드를 공유. */
+    private void logLewDenied(Long lewUserSeq, Application application,
+                               LewKvaAdjustmentRequest req,
+                               String errorCode, String reason) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("errorCode", errorCode);
+        m.put("reason", reason);
+        m.put("proposedKva", req != null ? req.getProposedKva() : null);
+        m.put("currentKva", application.getSelectedKva());
+        m.put("currentStatus",
+                application.getStatus() != null ? application.getStatus().name() : null);
+        auditLogService.logAsync(
+                lewUserSeq, AuditAction.KVA_ADJUSTMENT_REQUESTED_BY_LEW, AuditCategory.APPLICATION,
+                "Application", String.valueOf(application.getApplicationSeq()),
+                "kVA adjustment request denied: " + errorCode,
+                null, m,
+                null, null, "POST",
+                "/api/lew/applications/" + application.getApplicationSeq()
+                        + "/kva-adjustment-request",
+                statusFromCode(errorCode));
+    }
+
+    /**
+     * LEW userSeq → 표시용 이름 (firstName + lastName, 없으면 email 또는 "LEW").
+     * 이벤트 payload 의 best-effort 값으로만 사용 — listener 는 필요 시 user 재조회로 보강한다.
+     */
+    private String resolveLewDisplayName(Long lewUserSeq) {
+        try {
+            return userRepository.findById(lewUserSeq)
+                    .map(u -> {
+                        String first = u.getFirstName() != null ? u.getFirstName() : "";
+                        String last = u.getLastName() != null ? u.getLastName() : "";
+                        String full = (first + " " + last).trim();
+                        if (!full.isEmpty()) return full;
+                        return u.getEmail() != null ? u.getEmail() : "LEW";
+                    })
+                    .orElse("LEW");
+        } catch (RuntimeException ex) {
+            return "LEW";
+        }
     }
 }
