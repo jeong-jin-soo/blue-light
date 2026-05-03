@@ -26,9 +26,11 @@ import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import com.bluelight.backend.api.admin.KvaOverrideAppliedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -72,6 +74,7 @@ class KvaPostPaymentServiceTest {
     private PaymentRepository paymentRepository;
     private InvoiceGenerationService invoiceGenerationService;
     private AuditLogService auditLogService;
+    private ApplicationEventPublisher eventPublisher;
     private KvaPostPaymentService service;
 
     private static final Long APP_ID = 1L;
@@ -88,15 +91,22 @@ class KvaPostPaymentServiceTest {
         paymentRepository = mock(PaymentRepository.class);
         invoiceGenerationService = mock(InvoiceGenerationService.class);
         auditLogService = mock(AuditLogService.class);
+        eventPublisher = mock(ApplicationEventPublisher.class);
 
         service = new KvaPostPaymentService(
                 applicationRepository, masterPriceRepository, userRepository,
                 kvaAdjustmentRepository, cofRepository, invoiceRepository,
-                paymentRepository, invoiceGenerationService, auditLogService);
+                paymentRepository, invoiceGenerationService, auditLogService,
+                eventPublisher);
 
-        // 저장 시 동일 객체 반환 (id 미세팅이라도 record 가 setter 없으니 반환만 흉내)
+        // 저장 시 동일 객체 반환 + adjustmentSeq 를 ReflectionTestUtils 로 채워 PR-2 이벤트의
+        // adjustmentSeq 가 null 이 아니도록 보장 (Application.@GeneratedValue 동작 흉내).
         when(kvaAdjustmentRepository.save(any(KvaAdjustmentRecord.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
+                .thenAnswer(inv -> {
+                    KvaAdjustmentRecord r = inv.getArgument(0);
+                    org.springframework.test.util.ReflectionTestUtils.setField(r, "adjustmentSeq", 42L);
+                    return r;
+                });
     }
 
     // ── 헬퍼 ────────────────────────────────────────────────
@@ -354,5 +364,96 @@ class KvaPostPaymentServiceTest {
         verify(activeInv).invalidate(anyString());
         // 신규 Invoice 자동 발행 호출
         verify(invoiceGenerationService).generateFromPayment(eq(payment), eq(app));
+    }
+
+    // ── PR-2: AFTER_COMMIT 알림 이벤트 발행 검증 ─────────────────────
+
+    @Test
+    void PR2_정상_변경_시_KvaOverrideAppliedEvent_가_발행된다_payload_검증() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450.00"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650.00"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+        // assignedLew 가 있는 케이스: payload 의 assignedLewUserSeq 가 채워져야 한다.
+        User assignedLew = mock(User.class);
+        when(assignedLew.getUserSeq()).thenReturn(77L);
+        when(app.getAssignedLew()).thenReturn(assignedLew);
+        stubActiveInvoice();
+
+        service.overrideKva(APP_ID, req(200, "Site survey: 200 kVA"), ADMIN_SEQ);
+
+        // 이벤트 publish 검증 + payload 검증
+        ArgumentCaptor<KvaOverrideAppliedEvent> evCap =
+                ArgumentCaptor.forClass(KvaOverrideAppliedEvent.class);
+        verify(eventPublisher).publishEvent(evCap.capture());
+        KvaOverrideAppliedEvent ev = evCap.getValue();
+        assertThat(ev.getApplicationSeq()).isEqualTo(APP_ID);
+        assertThat(ev.getAdjustmentSeq()).isEqualTo(42L);
+        assertThat(ev.getAssignedLewUserSeq()).isEqualTo(77L);
+        assertThat(ev.getPreviousKva()).isEqualTo(100);
+        assertThat(ev.getNewKva()).isEqualTo(200);
+        assertThat(ev.getPreviousQuoteAmount()).isEqualByComparingTo("450.00");
+        assertThat(ev.getNewQuoteAmount()).isEqualByComparingTo("650.00");
+        assertThat(ev.getAmountDifference()).isEqualByComparingTo("200.00");
+        assertThat(ev.isCofReissueTriggered()).isFalse();
+        assertThat(ev.getReason()).isEqualTo("Site survey: 200 kVA");
+        assertThat(ev.getTriggeredByUserSeq()).isEqualTo(ADMIN_SEQ);
+        assertThat(ev.getTriggeredByRole()).isEqualTo("ADMIN");
+    }
+
+    @Test
+    void PR2_assignedLew_없을_때_event_의_assignedLewUserSeq_는_null() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450.00"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650.00"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.empty());
+        when(app.getAssignedLew()).thenReturn(null); // 명시
+        stubActiveInvoice();
+
+        service.overrideKva(APP_ID, req(200, "no LEW"), ADMIN_SEQ);
+
+        ArgumentCaptor<KvaOverrideAppliedEvent> evCap =
+                ArgumentCaptor.forClass(KvaOverrideAppliedEvent.class);
+        verify(eventPublisher).publishEvent(evCap.capture());
+        assertThat(evCap.getValue().getAssignedLewUserSeq()).isNull();
+    }
+
+    @Test
+    void PR2_CoF_finalized면_이벤트의_cofReissueTriggered_는_true() {
+        Application app = mockApp(ApplicationStatus.IN_PROGRESS, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+        MasterPrice mp = mockPrice(5L, new BigDecimal("650"));
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp));
+        User admin = mock(User.class);
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        stubActiveInvoice();
+
+        CertificateOfFitness cof = mock(CertificateOfFitness.class);
+        when(cof.isFinalized()).thenReturn(true);
+        when(cofRepository.findByApplication_ApplicationSeq(APP_ID)).thenReturn(Optional.of(cof));
+
+        service.overrideKva(APP_ID, req(200, "field"), ADMIN_SEQ);
+
+        ArgumentCaptor<KvaOverrideAppliedEvent> evCap =
+                ArgumentCaptor.forClass(KvaOverrideAppliedEvent.class);
+        verify(eventPublisher).publishEvent(evCap.capture());
+        assertThat(evCap.getValue().isCofReissueTriggered()).isTrue();
+    }
+
+    @Test
+    void PR2_거부_케이스_KVA_NO_CHANGE_에선_이벤트_미발행() {
+        Application app = mockApp(ApplicationStatus.PAID, 100, new BigDecimal("450"));
+        when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
+
+        assertThatThrownBy(() -> service.overrideKva(APP_ID, req(100, "noop"), ADMIN_SEQ))
+                .isInstanceOf(BusinessException.class);
+
+        verify(eventPublisher, never()).publishEvent(any(KvaOverrideAppliedEvent.class));
     }
 }

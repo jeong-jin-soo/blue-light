@@ -1357,7 +1357,9 @@ export type NotificationType =
   | 'DOCUMENT_REQUEST_APPROVED'
   | 'DOCUMENT_REQUEST_REJECTED'
   // Phase 5 — LEW kVA 확정 알림
-  | 'KVA_CONFIRMED';
+  | 'KVA_CONFIRMED'
+  // PR-2 (kva-postpayment-adjustment) — 결제 후 ADMIN의 kVA 변경 → 배정 LEW 통지
+  | 'KVA_ADJUSTED_BY_ADMIN_LEW';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

@@ -27,8 +27,10 @@ import com.bluelight.backend.domain.price.MasterPrice;
 import com.bluelight.backend.domain.price.MasterPriceRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import com.bluelight.backend.api.admin.KvaOverrideAppliedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +82,7 @@ public class KvaPostPaymentService {
     private final PaymentRepository paymentRepository;
     private final InvoiceGenerationService invoiceGenerationService;
     private final AuditLogService auditLogService;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * ADMIN 직접 변경 — 결제 후 kVA 변경 적용 + ledger row 생성 + Invoice 재발행 + (필요 시) CoF unfinalize.
@@ -222,7 +225,25 @@ public class KvaPostPaymentService {
                 request.getNewKva(), newQuote, record.getAdjustmentSeq(),
                 cofReissueTriggered, adminUserSeq);
 
-        // 알림은 PR-2 에서 추가. PR-1 은 ApplicationEventPublisher 호출 없음.
+        // ── PR-2: 배정 LEW 알림 이벤트 발행 ──────────────
+        // 본 트랜잭션 커밋 후 KvaOverrideNotificationListener (AFTER_COMMIT) 가 인앱+이메일 발송.
+        // assignedLew 가 null 이면 listener 가 스킵하므로 여기서는 무조건 publish.
+        Long assignedLewUserSeq = (application.getAssignedLew() != null)
+                ? application.getAssignedLew().getUserSeq()
+                : null;
+        eventPublisher.publishEvent(new KvaOverrideAppliedEvent(
+                applicationSeq,
+                record.getAdjustmentSeq(),
+                assignedLewUserSeq,
+                previousKva,
+                request.getNewKva(),
+                previousQuote,
+                newQuote,
+                amountDifference,
+                cofReissueTriggered,
+                request.getReason(),
+                adminUserSeq,
+                "ADMIN"));
 
         return KvaPostPaymentOverrideResponse.from(record);
     }
