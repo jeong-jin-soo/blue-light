@@ -1,8 +1,10 @@
 package com.bluelight.backend.api.admin.manualemail;
 
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.domain.manualemail.ManualEmailDispatch;
 import com.bluelight.backend.domain.manualemail.ManualEmailDispatchRepository;
+import com.bluelight.backend.domain.notification.NotificationType;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +61,18 @@ public class ManualEmailDispatchSendListener {
     /** failedReason 컬럼은 TEXT 이지만 너무 긴 누적 메시지 회피. 멀티라인 누적 cap. */
     static final int FAILED_REASON_AGGREGATE_MAX = 4000;
 
+    /**
+     * PR-4 인앱 알림 본문 미리보기 길이 — 신청자/LEW 가 알림 목록에서 보는 짧은 문구.
+     * Notification.message 컬럼은 length 1000 이지만, UX 일관성을 위해 더 짧게 자른다.
+     */
+    static final int IN_APP_PREVIEW_MAX = 200;
+
+    /** 인앱 알림 referenceType — relatedApplicationSeq 가 있는 경우 (NotificationsPage 라우팅 키). */
+    static final String REFERENCE_TYPE_APPLICATION = "APPLICATION";
+
+    /** 인앱 알림 referenceType — relatedApplicationSeq 가 없는 경우 (단순 dismiss). */
+    static final String REFERENCE_TYPE_MANUAL_EMAIL = "MANUAL_EMAIL";
+
     private final ManualEmailDispatchRepository dispatchRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
@@ -66,6 +80,8 @@ public class ManualEmailDispatchSendListener {
      * row mutation 은 별도 빈에 위임 — Spring AOP 의 self-invocation 제약 회피.
      */
     private final ManualEmailDispatchStatusUpdater statusUpdater;
+    /** PR-4 인앱 알림 동반 생성 (D4=B). REQUIRES_NEW 트랜잭션은 NotificationService 측에서 보장. */
+    private final NotificationService notificationService;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onDispatchRequested(ManualEmailDispatchRequestedEvent event) {
@@ -102,6 +118,16 @@ public class ManualEmailDispatchSendListener {
                     outcome.failedReasonJoined());
             log.info("Manual email batch finished: dispatchSeq={}, sent={}, failed={}, total={}",
                     dispatchSeq, outcome.sentCount, outcome.failedCount, recipients.size());
+
+            // 6) PR-4 인앱 알림 동반 (D4=B) — 시스템 사용자 수신자에게만, EXTERNAL 은 자동 스킵.
+            //    SMTP 결과와 무관하게 인앱 알림은 항상 시도 — SMTP 실패 시 사용자가 인앱으로
+            //    "메일이 발송됐을 수도 있다" 를 인지할 수 있는 단일 채널을 보장하기 위함.
+            //    실패는 try/catch 로 격리 — 인앱 실패가 row 마킹을 되돌리지 않는다.
+            if (row.isAlsoCreateInAppNotification()) {
+                createInAppNotificationsSafely(row);
+            } else {
+                log.debug("Manual email in-app notification skipped (option off): dispatchSeq={}", dispatchSeq);
+            }
 
         } catch (RuntimeException ex) {
             // 트랜잭션이 이미 커밋되어 결과를 바꿀 수 없으므로 단순 ERROR 로깅.
@@ -181,6 +207,79 @@ public class ManualEmailDispatchSendListener {
             log.warn("Admin email lookup failed: senderSeq={}, err={}", senderUserSeq, ex.getMessage());
             return "";
         }
+    }
+
+    /**
+     * PR-4 (D4=B): 시스템 사용자 수신자에게 인앱 알림 동반 생성. EXTERNAL 만 있는 발송은
+     * recipientUserSeqsJson 이 null/empty 라 loop 가 스킵되므로 추가 가드 불필요.
+     *
+     * <p>실패 격리: 각 사용자별로 try/catch — 한 사용자 실패가 다른 사용자 알림을 막지 않는다.
+     * SMTP 결과와 무관하게 인앱은 항상 발송 시도 (사용자가 두 채널 중 하나는 받음 보장).</p>
+     *
+     * <h3>라우팅 키</h3>
+     * <ul>
+     *   <li>relatedApplicationSeq 가 있으면 referenceType=APPLICATION, referenceId=appSeq —
+     *       NotificationsPage 가 신청 상세로 deeplink.</li>
+     *   <li>없으면 referenceType=MANUAL_EMAIL, referenceId=dispatchSeq — dismiss-only (현재
+     *       라우팅 미정, 향후 manual-email 상세 페이지가 생기면 deeplink 활성화).</li>
+     * </ul>
+     */
+    private void createInAppNotificationsSafely(ManualEmailDispatch row) {
+        List<Long> userSeqs = row.getRecipientUserSeqsJson();
+        // 단일 시스템 사용자 발송(APPLICANT/LEW) 의 경우 _Json 은 null 이고 recipientUserSeq 단일 필드에 있음.
+        if ((userSeqs == null || userSeqs.isEmpty()) && row.getRecipientUserSeq() != null) {
+            userSeqs = List.of(row.getRecipientUserSeq());
+        }
+        if (userSeqs == null || userSeqs.isEmpty()) {
+            // EXTERNAL 단일/MULTI 외부만 — 시스템 사용자 없음. 정상 스킵.
+            log.debug("Manual email in-app skipped (no system users): dispatchSeq={}", row.getDispatchSeq());
+            return;
+        }
+
+        String title = truncate(row.getSubject(), 200);
+        String message = buildInAppMessage(row);
+        String referenceType = row.getRelatedApplicationSeq() != null
+                ? REFERENCE_TYPE_APPLICATION : REFERENCE_TYPE_MANUAL_EMAIL;
+        Long referenceId = row.getRelatedApplicationSeq() != null
+                ? row.getRelatedApplicationSeq() : row.getDispatchSeq();
+
+        int created = 0;
+        for (Long userSeq : userSeqs) {
+            if (userSeq == null) continue;
+            try {
+                notificationService.createNotification(
+                        userSeq,
+                        NotificationType.ADMIN_MANUAL_EMAIL_NOTICE,
+                        title,
+                        message,
+                        referenceType,
+                        referenceId);
+                created++;
+            } catch (RuntimeException ex) {
+                log.warn("Manual email in-app notification failed: dispatchSeq={}, userSeq={}, err={}",
+                        row.getDispatchSeq(), userSeq, ex.getMessage());
+            }
+        }
+        log.info("Manual email in-app notifications created: dispatchSeq={}, count={}/{}, refType={}",
+                row.getDispatchSeq(), created, userSeqs.size(), referenceType);
+    }
+
+    /**
+     * 인앱 알림 본문 — categoryTag 가 있으면 prefix, 없으면 본문 100자 미리보기.
+     * NotificationsPage 의 짧은 카드 UI 에 적합한 길이.
+     */
+    private String buildInAppMessage(ManualEmailDispatch row) {
+        String preview = truncate(row.getBodyText(), IN_APP_PREVIEW_MAX);
+        if (row.getCategoryTag() != null && !row.getCategoryTag().isBlank()) {
+            return "[" + row.getCategoryTag() + "] " + preview;
+        }
+        return preview;
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        if (s.length() <= max) return s;
+        return s.substring(0, max - 1) + "…";
     }
 
     /** loop 결과를 누적하기 위한 mutable 컨테이너 (private 사용). */

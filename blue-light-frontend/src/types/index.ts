@@ -1363,7 +1363,10 @@ export type NotificationType =
   // PR-3 (kva-postpayment-adjustment) — LEW 의 kVA 변경 요청 → ADMIN 통지
   | 'KVA_ADJUSTMENT_REQUESTED_ADMIN'
   // PR-4 (kva-postpayment-adjustment) — ADMIN 의 settlement 마킹 → 배정 LEW 통지
-  | 'KVA_ADJUSTMENT_SETTLED_LEW';
+  | 'KVA_ADJUSTMENT_SETTLED_LEW'
+  // PR-4 (admin-manual-email-spec D4=B) — ADMIN 수동 이메일 발송 동반 인앱 알림.
+  // 시스템 사용자 수신자(APPLICANT/LEW)에게만, 옵션 ON 시(기본) 생성.
+  | 'ADMIN_MANUAL_EMAIL_NOTICE';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

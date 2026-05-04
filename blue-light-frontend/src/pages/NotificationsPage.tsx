@@ -30,6 +30,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   KVA_ADJUSTMENT_REQUESTED_ADMIN: '⚡',
   // PR-4 (kva-postpayment) — ADMIN의 settlement 마킹 → 배정 LEW 알림 (정산 영수증 🧾)
   KVA_ADJUSTMENT_SETTLED_LEW: '🧾',
+  // PR-4 (admin-manual-email D4=B) — ADMIN 수동 이메일 동반 인앱 알림 (📧 봉투)
+  ADMIN_MANUAL_EMAIL_NOTICE: '📧',
 };
 
 export default function NotificationsPage() {
@@ -93,8 +95,13 @@ export default function NotificationsPage() {
         // PR-3: 수신자가 ADMIN — admin 워크스페이스의 신청 상세로 이동.
         navigate(`/admin/applications/${n.referenceId}`);
       } else {
+        // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE) 도 여기 fallback — 수신자 role 의 워크스페이스
+        // (APPLICANT → /applicant/applications, LEW → /lew/applications) 로 이동.
         navigate(`${basePath}/applications/${n.referenceId}`);
       }
+    } else if (n.referenceType === 'MANUAL_EMAIL') {
+      // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE) 의 relatedApplication 미지정 케이스 — 단순 dismiss.
+      // 향후 manual-email 상세 페이지가 생기면 deeplink 활성화 가능. 현재는 마킹만.
     } else if (n.referenceType === 'DOCUMENT_REQUEST' && n.referenceId) {
       // PR#4에서 referenceType=APPLICATION + metadata로 정규화 예정.
       // 임시: 알림 message에서 applicationSeq 파싱 불가 → 알림 목록 유지.

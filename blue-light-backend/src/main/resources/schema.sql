@@ -1187,6 +1187,9 @@ CREATE TABLE IF NOT EXISTS manual_email_dispatches (
     failed_reason            TEXT           NULL,
     -- 실제 SMTP 시도 시각 (AFTER_COMMIT 단계). PENDING 상태에서는 NULL.
     dispatched_at            DATETIME(6)    NULL,
+    -- PR-4 (D4=B): 시스템 사용자 수신자 인앱 알림 동반 생성 여부. 기본 ON.
+    -- EXTERNAL 만 있는 발송에는 무관 (시스템 계정이 없으므로 listener 가 자동 스킵).
+    also_create_in_app_notification TINYINT(1) NOT NULL DEFAULT 1,
     -- BaseEntity audit (deleted_at 은 보존만, soft delete 미적용)
     created_at               DATETIME(6),
     updated_at               DATETIME(6),

@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin.manualemail;
 
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.domain.manualemail.BodyFormat;
 import com.bluelight.backend.domain.manualemail.ManualEmailDispatch;
 import com.bluelight.backend.domain.manualemail.ManualEmailDispatchRepository;
@@ -44,6 +45,7 @@ class ManualEmailDispatchSendListenerMultiTest {
     private UserRepository userRepository;
     private EmailService emailService;
     private ManualEmailDispatchStatusUpdater statusUpdater;
+    private NotificationService notificationService;
     private ManualEmailDispatchSendListener listener;
 
     @BeforeEach
@@ -52,8 +54,9 @@ class ManualEmailDispatchSendListenerMultiTest {
         userRepository = mock(UserRepository.class);
         emailService = mock(EmailService.class);
         statusUpdater = mock(ManualEmailDispatchStatusUpdater.class);
+        notificationService = mock(NotificationService.class);
         listener = new ManualEmailDispatchSendListener(
-                dispatchRepository, userRepository, emailService, statusUpdater);
+                dispatchRepository, userRepository, emailService, statusUpdater, notificationService);
 
         // Mockito nested-when 트랩 회피 — User mock 을 변수로 만든 후 stub 에 주입.
         User admin = mock(User.class);

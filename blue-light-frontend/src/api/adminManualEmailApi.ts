@@ -1,10 +1,12 @@
 import axiosClient from './axiosClient';
 import type { Page } from '../types';
 import type {
+  ManualEmailCategorySuggestionsResponse,
   ManualEmailDispatchHistoryItem,
   ManualEmailDispatchResponse,
   ManualEmailHistoryFilter,
   ManualEmailPreviewResponse,
+  ManualEmailQuotaSnapshot,
   SendManualEmailRequest,
 } from '../types/manualEmail';
 
@@ -89,11 +91,35 @@ export const getManualEmailDetail = async (
   return response.data;
 };
 
+/**
+ * PR-4 잔여 발송 한도 — GET /api/admin/manual-emails/quota.
+ * Compose UI 우상단 "Today: X / Y sent" 표시용.
+ */
+export const getManualEmailQuota = async (): Promise<ManualEmailQuotaSnapshot> => {
+  const response = await axiosClient.get<ManualEmailQuotaSnapshot>(
+    '/admin/manual-emails/quota'
+  );
+  return response.data;
+};
+
+/**
+ * PR-4 카테고리 추천 — GET /api/admin/manual-emails/category-suggestions.
+ * system_settings 에서 CSV 로 로드. 자유 입력은 항상 허용.
+ */
+export const getManualEmailCategorySuggestions = async (): Promise<string[]> => {
+  const response = await axiosClient.get<ManualEmailCategorySuggestionsResponse>(
+    '/admin/manual-emails/category-suggestions'
+  );
+  return response.data.suggestions ?? [];
+};
+
 const adminManualEmailApi = {
   sendManualEmail,
   previewManualEmail,
   getManualEmailHistory,
   getManualEmailDetail,
+  getManualEmailQuota,
+  getManualEmailCategorySuggestions,
 };
 
 export default adminManualEmailApi;

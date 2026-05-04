@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { fullName } from '../../../utils/formatName';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
@@ -121,6 +122,19 @@ export function AdminSidebar({
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-center">
               <p className="text-xs text-gray-500">No actions available for expired applications.</p>
             </div>
+          )}
+
+          {/* PR-4 (admin-manual-email-spec §7.3): 신청 컨텍스트 prefill 진입점.
+              ADMIN 전용 — 신청자에게 ad-hoc 이메일 발송 시 신청자 + 신청번호가 자동 prefill 된다. */}
+          {isAdmin && (
+            <Link
+              to={`/admin/manual-emails?related=${application.applicationSeq}&recipientType=APPLICANT&recipientUserSeq=${application.userSeq}`}
+              className="block"
+            >
+              <Button variant="ghost" fullWidth size="sm">
+                📧 Send manual email
+              </Button>
+            </Link>
           )}
         </div>
       </Card>

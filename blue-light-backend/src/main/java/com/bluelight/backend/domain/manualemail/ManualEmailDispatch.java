@@ -169,6 +169,18 @@ public class ManualEmailDispatch extends BaseEntity {
     @Column(name = "dispatched_at")
     private LocalDateTime dispatchedAt;
 
+    /**
+     * PR-4 (admin-manual-email-spec.md §8.5, D4=B): 시스템 사용자 수신자에게 인앱 알림
+     * 동반 생성 여부 (기본 true). EXTERNAL 수신자에게는 어차피 시스템 계정이 없어 무관 —
+     * 본 플래그는 APPLICANT/LEW/MULTI 발송에서만 의미를 갖는다.
+     *
+     * <p>row 컬럼으로 영속화하는 이유: ① 운영자가 History 에서 "이 발송에 인앱이 동반됐는가"
+     * 를 확인 가능 ② AFTER_COMMIT 리스너가 이벤트 페이로드에 의존하지 않고 row 단일 정본을
+     * 본다 (이벤트 페이로드 비대화 방지, PR-2 동일 정책).</p>
+     */
+    @Column(name = "also_create_in_app_notification", nullable = false)
+    private boolean alsoCreateInAppNotification;
+
     @Builder
     private ManualEmailDispatch(Long senderUserSeq,
                                 RecipientType recipientType,
@@ -181,7 +193,8 @@ public class ManualEmailDispatch extends BaseEntity {
                                 String subject,
                                 String bodyText,
                                 BodyFormat bodyFormat,
-                                String categoryTag) {
+                                String categoryTag,
+                                Boolean alsoCreateInAppNotification) {
         this.senderUserSeq = senderUserSeq;
         this.recipientType = recipientType;
         this.recipientUserSeq = recipientUserSeq;
@@ -194,6 +207,9 @@ public class ManualEmailDispatch extends BaseEntity {
         this.bodyText = bodyText;
         this.bodyFormat = bodyFormat != null ? bodyFormat : BodyFormat.PLAIN_TEXT;
         this.categoryTag = categoryTag;
+        // PR-4: 명시 안 되면 true (기본 ON, D4=B).
+        this.alsoCreateInAppNotification = alsoCreateInAppNotification == null
+                ? true : alsoCreateInAppNotification;
         // 신규 row 는 항상 PENDING 으로 시작 — AFTER_COMMIT 리스너가 SMTP 결과에 따라 갱신.
         this.dispatchStatus = DispatchStatus.PENDING;
         this.sentCount = 0;

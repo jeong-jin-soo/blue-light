@@ -308,4 +308,79 @@ class AdminManualEmailControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
+
+    // ── PR-4 Quota / Category suggestions ────────────────────────
+
+    @Test
+    @DisplayName("PR-4 GET /quota — { dailyCap, usedToday, remaining }")
+    void GET_quota_정상() throws Exception {
+        when(dispatcher.getQuotaSnapshot(eq(ADMIN_SEQ)))
+                .thenReturn(new ManualEmailDispatcher.QuotaSnapshot(100, 32, 68));
+
+        mockMvc.perform(get("/api/admin/manual-emails/quota")
+                        .principal(adminAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dailyCap").value(100))
+                .andExpect(jsonPath("$.usedToday").value(32))
+                .andExpect(jsonPath("$.remaining").value(68));
+    }
+
+    @Test
+    @DisplayName("PR-4 GET /category-suggestions — { suggestions: [...] }")
+    void GET_categorySuggestions_정상() throws Exception {
+        when(dispatcher.getCategorySuggestions())
+                .thenReturn(List.of("PAYMENT_NOTICE", "MAINTENANCE", "INFO", "MISC"));
+
+        mockMvc.perform(get("/api/admin/manual-emails/category-suggestions")
+                        .principal(adminAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.suggestions").isArray())
+                .andExpect(jsonPath("$.suggestions.length()").value(4))
+                .andExpect(jsonPath("$.suggestions[0]").value("PAYMENT_NOTICE"));
+    }
+
+    @Test
+    @DisplayName("PR-4 POST 발송 — alsoCreateInAppNotification 필드가 디스패처에 그대로 전달")
+    void POST_alsoCreateInAppNotification_passthrough() throws Exception {
+        when(dispatcher.dispatch(any(SendManualEmailRequest.class), eq(ADMIN_SEQ)))
+                .thenReturn(ManualEmailDispatchResponse.builder()
+                        .dispatchSeq(456L)
+                        .dispatchStatus(DispatchStatus.PENDING)
+                        .sentCount(0)
+                        .failedCount(0)
+                        .build());
+
+        SendManualEmailRequest req = applicantReq();
+        req.setAlsoCreateInAppNotification(false);
+
+        mockMvc.perform(post("/api/admin/manual-emails")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .principal(adminAuth())
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        // dispatcher 가 받은 DTO 의 alsoCreateInAppNotification 필드 검증.
+        org.mockito.ArgumentCaptor<SendManualEmailRequest> captor =
+                org.mockito.ArgumentCaptor.forClass(SendManualEmailRequest.class);
+        org.mockito.Mockito.verify(dispatcher).dispatch(captor.capture(), eq(ADMIN_SEQ));
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getAlsoCreateInAppNotification())
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("PR-4 POST 발송 — daily cap 초과 시 429 MANUAL_EMAIL_DAILY_CAP_EXCEEDED 매핑")
+    void POST_dailyCapExceeded_429() throws Exception {
+        when(dispatcher.dispatch(any(SendManualEmailRequest.class), eq(ADMIN_SEQ)))
+                .thenThrow(new BusinessException(
+                        "Daily limit of 100 manual email recipients reached",
+                        HttpStatus.TOO_MANY_REQUESTS,
+                        "MANUAL_EMAIL_DAILY_CAP_EXCEEDED"));
+
+        mockMvc.perform(post("/api/admin/manual-emails")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .principal(adminAuth())
+                        .content(objectMapper.writeValueAsString(applicantReq())))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("MANUAL_EMAIL_DAILY_CAP_EXCEEDED"));
+    }
 }

@@ -51,6 +51,7 @@ class ManualEmailDispatcherMultiTest {
     private AuditLogService auditLogService;
     private ApplicationEventPublisher eventPublisher;
     private com.bluelight.backend.api.email.EmailService emailService;
+    private ManualEmailSettings manualEmailSettings;
     private ManualEmailDispatcher dispatcher;
 
     @BeforeEach
@@ -61,9 +62,15 @@ class ManualEmailDispatcherMultiTest {
         auditLogService = mock(AuditLogService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         emailService = mock(com.bluelight.backend.api.email.EmailService.class);
+        manualEmailSettings = mock(ManualEmailSettings.class);
         dispatcher = new ManualEmailDispatcher(
                 dispatchRepository, userRepository, applicationRepository,
-                auditLogService, eventPublisher, emailService);
+                auditLogService, eventPublisher, emailService, manualEmailSettings);
+
+        // PR-4: cap 가드 무력화 (별도 cap 시나리오는 ManualEmailDailyCapTest 에서 검증).
+        when(manualEmailSettings.loadDailyCap()).thenReturn(100);
+        when(dispatchRepository.sumDailyRecipientCountByCreatedBy(anyLong(), any(), any()))
+                .thenReturn(0L);
 
         when(dispatchRepository.save(any(ManualEmailDispatch.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
