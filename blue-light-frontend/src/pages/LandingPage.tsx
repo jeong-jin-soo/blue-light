@@ -325,7 +325,7 @@ export default function LandingPage() {
               <Link to="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
             </div>
             <span className="text-xs text-gray-400">
-              &copy; {new Date().getFullYear()} LicenseKaki. All rights reserved.
+              &copy; {new Date().getFullYear()} LicenseKaki by HanVision. All rights reserved.
             </span>
           </div>
         </div>

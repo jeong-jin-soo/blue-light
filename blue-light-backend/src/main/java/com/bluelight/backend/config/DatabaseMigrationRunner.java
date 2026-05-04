@@ -101,6 +101,8 @@ public class DatabaseMigrationRunner {
             // kva_adjustment_record 테이블에 settled_at 컬럼 추가 (settlement 마킹 시각)
             migrateKvaAdjustmentRecordSettledAt(conn);
             seedSystemSettings(conn);
+            // ── invoice_footer_note 브랜딩 추가 — 운영 DB row 1회 갱신 ──
+            updateInvoiceFooterNoteBranding(conn);
             // ── Document Number Generator (공통 문서번호 채번) P1.1 + P1.3 ──
             createDocumentNumberTables(conn);
             seedDocumentNumberTypes(conn);
@@ -1029,7 +1031,7 @@ public class DatabaseMigrationRunner {
             {"invoice_number_prefix", "IN", "[DEPRECATED 2026-04] Replaced by DocumentNumberService — see document-number-generator-spec.md"},
             {"invoice_currency", "SGD", "E-Invoice default currency"},
             {"invoice_footer_note",
-             "No electronic signature is necessary, as this document serves as an official E-Invoice.",
+             "LicenseKaki by HanVision · No electronic signature is necessary, as this document serves as an official E-Invoice.",
              "E-Invoice footer note"},
         };
 
@@ -1055,6 +1057,26 @@ public class DatabaseMigrationRunner {
             log.info("Migration [seed-system-settings]: seeded {} new settings", seeded);
         } else {
             log.debug("Migration [seed-system-settings]: all settings exist, skipping");
+        }
+    }
+
+    /**
+     * 운영 DB의 invoice_footer_note row에 "LicenseKaki by HanVision · " 브랜딩 prefix를 1회 추가.
+     * seedSystemSettings()는 INSERT IGNORE 패턴이라 기존 row 갱신을 못 한다 — 별도 idempotent UPDATE.
+     * 이미 "LicenseKaki by HanVision"이 포함된 row는 건드리지 않으므로 여러 번 실행해도 안전.
+     */
+    private void updateInvoiceFooterNoteBranding(Connection conn) throws SQLException {
+        final String oldValue = "No electronic signature is necessary, as this document serves as an official E-Invoice.";
+        final String newValue = "LicenseKaki by HanVision · " + oldValue;
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE system_settings SET setting_value = ? "
+                        + "WHERE setting_key = 'invoice_footer_note' AND setting_value = ?")) {
+            ps.setString(1, newValue);
+            ps.setString(2, oldValue);
+            int updated = ps.executeUpdate();
+            if (updated > 0) {
+                log.info("Migration [invoice-footer-branding]: updated invoice_footer_note ({} row).", updated);
+            }
         }
     }
 
