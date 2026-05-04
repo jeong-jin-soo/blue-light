@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin.manualemail;
 
 import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailDispatchHistoryItem;
 import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailDispatchResponse;
+import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailPreviewResponse;
 import com.bluelight.backend.api.admin.manualemail.dto.SendManualEmailRequest;
 import com.bluelight.backend.domain.manualemail.DispatchStatus;
 import jakarta.validation.Valid;
@@ -105,6 +106,30 @@ public class AdminManualEmailController {
             @PathVariable Long dispatchSeq) {
         log.debug("GET /api/admin/manual-emails/{}", dispatchSeq);
         return ResponseEntity.ok(dispatcher.getDispatchDetail(dispatchSeq));
+    }
+
+    /**
+     * PR-3: 발송 전 미리보기 — 실제 SMTP 발송·DB 저장 없이 본문 HTML 만 렌더한다.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §5.4. 트랜잭션 영향 0,
+     * dispatchSeq 미생성, 카운팅·멱등성·audit 모두 미반영. 권한은 컨트롤러 클래스 레벨
+     * {@code @PreAuthorize("hasAnyRole('ADMIN', 'SYSTEM_ADMIN')")} 으로 통제된다.</p>
+     *
+     * <p>요청 DTO 는 발송과 동일 ({@link SendManualEmailRequest}) — Compose 폼 상태를 그대로 보낼 수
+     * 있게 한다. 단, 본 엔드포인트는 {@code subject}/{@code bodyText} 만 사용하며 수신자 유효성은
+     * 검사하지 않는다.</p>
+     */
+    @PostMapping("/preview")
+    public ResponseEntity<ManualEmailPreviewResponse> preview(
+            Authentication authentication,
+            @Valid @RequestBody SendManualEmailRequest request) {
+        Long adminSeq = (Long) authentication.getPrincipal();
+        log.debug("POST /api/admin/manual-emails/preview: adminSeq={}, subjectLen={}, bodyLen={}",
+                adminSeq,
+                request.getSubject() == null ? 0 : request.getSubject().length(),
+                request.getBodyText() == null ? 0 : request.getBodyText().length());
+        ManualEmailPreviewResponse response = dispatcher.preview(request, adminSeq);
+        return ResponseEntity.ok(response);
     }
 
     private int clampPageSize(int requested) {

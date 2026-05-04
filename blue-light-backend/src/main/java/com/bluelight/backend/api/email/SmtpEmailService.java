@@ -31,6 +31,11 @@ import java.util.List;
 public class SmtpEmailService implements EmailService {
 
     private final JavaMailSender mailSender;
+    /**
+     * PR-3: ADMIN 수동 이메일 본문 렌더링은 미리보기와 동일해야 하므로 별도 컴포넌트로 분리. SMTP/Preview/LogOnly
+     * 모두 동일 인스턴스를 사용 (Spring DI 가 싱글톤으로 보장).
+     */
+    private final ManualEmailHtmlRenderer manualEmailHtmlRenderer;
 
     @Value("${spring.mail.sender.from:noreply@licensekaki.com}")
     private String fromAddress;
@@ -351,52 +356,25 @@ public class SmtpEmailService implements EmailService {
     }
 
     /**
-     * 수동 이메일 본문 HTML — ADMIN 입력 PLAIN_TEXT 본문을 안전하게 렌더 (XSS 차단) 후
-     * 자동 헤더("This is a manual notice from a LicenseKaki administrator.") + 자동 푸터
-     * (Sent by {adminEmail} + 표준 반피싱 푸터) 를 부착.
+     * PR-3: 미리보기 — 동일한 빌더를 호출해 SMTP 발송 없이 HTML 문자열만 반환한다.
+     *
+     * <p>{@code renderManualPlainTextHtml(subject, body, admin)} 시그니처는 EmailService 인터페이스
+     * 표준 — subject 는 현재 HTML 본문에 직접 렌더되지는 않지만, 발송 시 메일 헤더에 그대로 사용되므로
+     * 서명에 포함해 두어 향후 미리보기에 헤더/제목 줄을 넣을 때 추가 변경 없이 활용 가능하다.</p>
+     */
+    @Override
+    public String renderManualPlainTextHtml(String subject, String bodyText, String adminEmailForFooter) {
+        return buildManualPlainTextHtml(bodyText, adminEmailForFooter);
+    }
+
+    /**
+     * 수동 이메일 본문 HTML — PR-3 부터 {@link ManualEmailHtmlRenderer} 로 추출되어 미리보기와 SMTP
+     * 발송이 동일한 결과를 보장한다. 시그니처는 PR-1/PR-2 동작 보존을 위해 그대로 둔다.
      *
      * <p>스펙: admin-manual-email-spec.md §9.1, AC-A13.</p>
      */
     private String buildManualPlainTextHtml(String bodyText, String adminEmailForFooter) {
-        // 본문은 escape 후 줄바꿈을 <br> 로만 변환. 추가 HTML 마크업은 일절 허용하지 않는다.
-        String safeBody = esc(bodyText == null ? "" : bodyText)
-                .replace("\r\n", "\n")
-                .replace("\r", "\n")
-                .replace("\n", "<br>");
-        String safeAdminEmail = esc(adminEmailForFooter == null ? "" : adminEmailForFooter);
-        return """
-                <!DOCTYPE html>
-                <html>
-                <head><meta charset="UTF-8"></head>
-                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
-                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
-                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
-                    </div>
-                    <div style="padding: 32px 24px;">
-                      <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;">
-                        <p style="color: #1e3a8a; font-size: 13px; line-height: 1.5; margin: 0;">
-                          This is a manual notice from a LicenseKaki administrator.
-                        </p>
-                      </div>
-                      <div style="color: #333333; line-height: 1.6; font-size: 15px;">
-                        %s
-                      </div>
-                      <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0 16px;">
-                      <p style="color: #6b7280; font-size: 12px; line-height: 1.5; margin: 0 0 6px;">
-                        Sent by: <strong>%s</strong>
-                      </p>
-                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5; margin: 0;">
-                        This message was sent manually from LicenseKaki. Our only sender domain is
-                        <strong>@licensekaki.sg</strong>. We will never ask for your password, OTP, or PIN by
-                        email. If anything looks suspicious, sign in directly from licensekaki.sg or contact
-                        support@licensekaki.sg.
-                      </p>
-                    </div>
-                  </div>
-                </body>
-                </html>
-                """.formatted(safeBody, safeAdminEmail);
+        return manualEmailHtmlRenderer.render(bodyText, adminEmailForFooter);
     }
 
     // ── HTML 템플릿 빌더 ──────────────────────
