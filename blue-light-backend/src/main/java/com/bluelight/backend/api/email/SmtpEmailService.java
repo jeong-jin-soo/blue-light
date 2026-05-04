@@ -314,6 +314,91 @@ public class SmtpEmailService implements EmailService {
         }
     }
 
+    // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md §8.2) ──────
+
+    /**
+     * ADMIN 수동 이메일 발송. 다른 자동 알림 메서드와 달리:
+     * <ul>
+     *   <li>{@code @Async} 미적용 — 호출자({@code ManualEmailDispatchSendListener}) 가 발송 결과를
+     *       동기적으로 인지하여 {@code ManualEmailDispatch.dispatchStatus} 를 SENT/FAILED 로
+     *       갱신해야 한다. 이미 호출자 자체가 AFTER_COMMIT 비동기 단계라 추가 비동기는 불필요.</li>
+     *   <li>예외를 swallow 하지 않고 {@link RuntimeException} 으로 전파 — 호출자가 try/catch 로
+     *       감싸 status 를 갱신한다.</li>
+     * </ul>
+     */
+    @Override
+    public void sendManualPlainTextEmail(String to, String subject, String bodyText, String adminEmailForFooter) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // ADMIN 입력 subject 는 그대로 메일 헤더에 사용 — RFC 2047 인코딩은 JavaMail 이 처리.
+            // 자동 prefix 는 일관성을 위해 부착 (스펙 §8.2 + AC-A13 footer 와 함께).
+            helper.setSubject(subject == null ? "[LicenseKaki] Notice" : subject);
+            helper.setText(buildManualPlainTextHtml(bodyText, adminEmailForFooter), true);
+            mailSender.send(message);
+            log.info("Manual email sent: to={}, admin={}, subjectLen={}, bodyLen={}",
+                    to, adminEmailForFooter,
+                    subject == null ? 0 : subject.length(),
+                    bodyText == null ? 0 : bodyText.length());
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send manual email to: {} (admin={})", to, adminEmailForFooter, e);
+            // 호출자({@code ManualEmailDispatchSendListener})가 row.status=FAILED 로 마킹하기 위해
+            // 예외 전파 — 다른 알림 메서드(swallow)와 의도적으로 다른 정책.
+            throw new RuntimeException("Manual email dispatch failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 수동 이메일 본문 HTML — ADMIN 입력 PLAIN_TEXT 본문을 안전하게 렌더 (XSS 차단) 후
+     * 자동 헤더("This is a manual notice from a LicenseKaki administrator.") + 자동 푸터
+     * (Sent by {adminEmail} + 표준 반피싱 푸터) 를 부착.
+     *
+     * <p>스펙: admin-manual-email-spec.md §9.1, AC-A13.</p>
+     */
+    private String buildManualPlainTextHtml(String bodyText, String adminEmailForFooter) {
+        // 본문은 escape 후 줄바꿈을 <br> 로만 변환. 추가 HTML 마크업은 일절 허용하지 않는다.
+        String safeBody = esc(bodyText == null ? "" : bodyText)
+                .replace("\r\n", "\n")
+                .replace("\r", "\n")
+                .replace("\n", "<br>");
+        String safeAdminEmail = esc(adminEmailForFooter == null ? "" : adminEmailForFooter);
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px 16px; margin-bottom: 20px;">
+                        <p style="color: #1e3a8a; font-size: 13px; line-height: 1.5; margin: 0;">
+                          This is a manual notice from a LicenseKaki administrator.
+                        </p>
+                      </div>
+                      <div style="color: #333333; line-height: 1.6; font-size: 15px;">
+                        %s
+                      </div>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 28px 0 16px;">
+                      <p style="color: #6b7280; font-size: 12px; line-height: 1.5; margin: 0 0 6px;">
+                        Sent by: <strong>%s</strong>
+                      </p>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5; margin: 0;">
+                        This message was sent manually from LicenseKaki. Our only sender domain is
+                        <strong>@licensekaki.sg</strong>. We will never ask for your password, OTP, or PIN by
+                        email. If anything looks suspicious, sign in directly from licensekaki.sg or contact
+                        support@licensekaki.sg.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(safeBody, safeAdminEmail);
+    }
+
     // ── HTML 템플릿 빌더 ──────────────────────
 
     private String buildPasswordResetHtml(String userName, String resetLink) {

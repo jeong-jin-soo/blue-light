@@ -292,4 +292,26 @@ public interface EmailService {
                                     BigDecimal quotedAmount, java.time.LocalDateTime callScheduledAt,
                                     String managerNote, String verificationPhrase,
                                     String paynowUen, String paynowAccountName);
+
+    // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md §8.2, §14) ──────
+
+    /**
+     * ADMIN 이 신청자/LEW/외부 수신자에게 발송하는 ad-hoc 수동 이메일.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §8.2, AC-A13.
+     * 본문은 PLAIN_TEXT 만 허용하며, 자동 헤더("This is a manual notice from a LicenseKaki administrator.")
+     * + 자동 푸터("Sent by: {adminEmail}" + 표준 반피싱 푸터) 가 시스템에 의해 부착된다.
+     * ADMIN 본문은 HTML escape 후 줄바꿈을 {@code <br>} 으로 변환하여 렌더 — XSS 차단.</p>
+     *
+     * <p><b>예외 정책</b>: SMTP 발송 실패 시 {@link RuntimeException} 을 던진다 (다른 알림 메서드처럼
+     * swallow 하지 않음). 호출자({@code ManualEmailDispatchSendListener}) 가 try/catch 로 감싸 row 의
+     * {@code dispatchStatus=FAILED} + {@code failedReason} 을 기록할 수 있어야 하기 때문.</p>
+     *
+     * @param to                  수신자 이메일 주소 (이미 검증/정규화된 값)
+     * @param subject             ADMIN 입력 subject (escape 전 원문 — 메일 헤더에 그대로 사용)
+     * @param bodyText            ADMIN 입력 PLAIN_TEXT 본문 (escape 전 원문 — 메서드 내부에서 escape)
+     * @param adminEmailForFooter 발송 ADMIN 의 이메일 주소 — 자동 푸터의 신원 노출 라인에 표시.
+     *                            ADMIN 사칭 위험 완화 (스펙 §9.1 AC-A13).
+     */
+    void sendManualPlainTextEmail(String to, String subject, String bodyText, String adminEmailForFooter);
 }

@@ -143,5 +143,10 @@ public enum AuditAction {
     // PR 3 — 체크인/아웃 + 재방문 요청
     LEW_SERVICE_CHECKED_IN,
     LEW_SERVICE_CHECKED_OUT,
-    LEW_SERVICE_REVISIT_REQUESTED
+    LEW_SERVICE_REVISIT_REQUESTED,
+
+    // ADMIN Manual Email Dispatch (admin-manual-email-spec.md §6 AC-A1, §13.2)
+    // ADMIN/SYSTEM_ADMIN 이 신청자/LEW/외부 수신자에게 ad-hoc 이메일 발송 시 1건 기록.
+    // metadata: dispatchSeq, recipientType, recipientEmail, relatedApplicationSeq, subject(원문), bodyText 길이 등.
+    MANUAL_EMAIL_DISPATCHED
 }

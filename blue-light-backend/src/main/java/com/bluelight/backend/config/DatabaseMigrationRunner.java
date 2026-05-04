@@ -100,6 +100,10 @@ public class DatabaseMigrationRunner {
             // ── 결제 후 kVA 사후 변경 (PR-4) ──
             // kva_adjustment_record 테이블에 settled_at 컬럼 추가 (settlement 마킹 시각)
             migrateKvaAdjustmentRecordSettledAt(conn);
+            // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md PR-1) ──
+            // syncCreateTablesFromSchemaSql 가 IF NOT EXISTS 로 테이블을 만들지만,
+            // 본 메서드는 명시적 멱등 가드를 두어 신규 테이블의 의도가 코드 리뷰에서 보이도록 한다.
+            migrateManualEmailDispatchesTable(conn);
             seedSystemSettings(conn);
             // ── invoice_footer_note 브랜딩 추가 — 운영 DB row 1회 갱신 ──
             updateInvoiceFooterNoteBranding(conn);
@@ -1703,6 +1707,61 @@ public class DatabaseMigrationRunner {
                 + "ADD COLUMN settled_at DATETIME(6) NULL AFTER admin_adjustment_at"
             );
             log.info("Migration [kva-adj-settled-at]: added settled_at column");
+        }
+    }
+
+    /**
+     * ADMIN Manual Email Dispatch 테이블 idempotent 생성.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §13.1.</p>
+     *
+     * <p>{@code syncCreateTablesFromSchemaSql} 가 schema.sql 의 모든 CREATE TABLE IF NOT EXISTS 를
+     * 자동 실행하므로, 본 메서드는 사실상 중복이지만 다음 두 이유로 명시한다:
+     * <ol>
+     *   <li>코드 리뷰에서 신규 테이블 도입의 의도가 분명히 드러난다 (kVA PR-1 패턴 동일).</li>
+     *   <li>schema.sql 파싱이 어떤 이유로 실패했을 때(예: 주석 형태 변경)의 fallback.</li>
+     * </ol></p>
+     */
+    private void migrateManualEmailDispatchesTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "manual_email_dispatches")) {
+            log.debug("Migration [manual-email-dispatches]: table exists, skipping");
+            return;
+        }
+        log.info("Migration [manual-email-dispatches]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE IF NOT EXISTS manual_email_dispatches (" +
+                "  dispatch_seq             BIGINT         NOT NULL AUTO_INCREMENT," +
+                "  sender_user_seq          BIGINT         NOT NULL," +
+                "  recipient_type           VARCHAR(20)    NOT NULL," +
+                "  recipient_user_seq       BIGINT         NULL," +
+                "  recipient_email          VARCHAR(254)   NOT NULL," +
+                "  related_application_seq  BIGINT         NULL," +
+                "  subject                  VARCHAR(200)   NOT NULL," +
+                "  body_text                TEXT           NOT NULL," +
+                "  body_format              VARCHAR(20)    NOT NULL DEFAULT 'PLAIN_TEXT'," +
+                "  category_tag             VARCHAR(50)    NULL," +
+                "  dispatch_status          VARCHAR(20)    NOT NULL," +
+                "  sent_count               INT            NOT NULL DEFAULT 0," +
+                "  failed_count             INT            NOT NULL DEFAULT 0," +
+                "  failed_reason            TEXT           NULL," +
+                "  dispatched_at            DATETIME(6)    NULL," +
+                "  created_at               DATETIME(6)," +
+                "  updated_at               DATETIME(6)," +
+                "  created_by               BIGINT," +
+                "  updated_by               BIGINT," +
+                "  deleted_at               DATETIME(6)," +
+                "  PRIMARY KEY (dispatch_seq)," +
+                "  KEY idx_manual_email_sender (sender_user_seq, dispatched_at DESC)," +
+                "  KEY idx_manual_email_dispatched (dispatched_at DESC)," +
+                "  KEY idx_manual_email_status (dispatch_status, dispatched_at DESC)," +
+                "  KEY idx_manual_email_application (related_application_seq)," +
+                "  CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq)," +
+                "  CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq)," +
+                "  CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [manual-email-dispatches]: table created");
         }
     }
 
