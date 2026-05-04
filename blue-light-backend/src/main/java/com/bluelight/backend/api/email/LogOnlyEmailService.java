@@ -287,6 +287,23 @@ public class LogOnlyEmailService implements EmailService {
     }
 
     @Override
+    public void sendManualPlainTextEmail(String to, String subject, String bodyText, String adminEmailForFooter) {
+        // 개발 환경 — 실제 발송 없이 콘솔에만 표시. 본문은 100자 이상이면 truncate.
+        // SmtpEmailService 와 달리 RuntimeException 을 던지지 않으며, 항상 성공으로 간주된다.
+        String preview = bodyText == null ? "" : bodyText;
+        if (preview.length() > 200) {
+            preview = preview.substring(0, 200) + "…(truncated)";
+        }
+        log.info("==================================================");
+        log.info("[DEV] Manual Email (admin → recipient) (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  From admin: {}", adminEmailForFooter);
+        log.info("  Subject: {}", subject);
+        log.info("  Body preview: {}", preview);
+        log.info("==================================================");
+    }
+
+    @Override
     public String sendConciergeQuoteEmail(String to, String applicantName, String publicCode,
                                            java.math.BigDecimal quotedAmount,
                                            java.time.LocalDateTime callScheduledAt,

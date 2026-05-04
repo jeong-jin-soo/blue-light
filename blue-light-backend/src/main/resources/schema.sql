@@ -1150,3 +1150,47 @@ CREATE TABLE IF NOT EXISTS kva_adjustment_record (
     CONSTRAINT fk_kva_adj_lew_request FOREIGN KEY (lew_request_seq) REFERENCES kva_adjustment_record (adjustment_seq),
     CONSTRAINT fk_kva_adj_master_price FOREIGN KEY (master_price_seq_used) REFERENCES master_prices (master_price_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- ADMIN Manual Email Dispatch (admin-manual-email-spec.md §4 + §13.1) — PR-1
+-- 정책: 감사 무결성 — soft delete 미적용 (deleted_at 컬럼은 BaseEntity 호환을 위해 보존만, 사용 금지)
+-- PR-1 단일 수신자 전용 — recipient_user_seq 또는 recipient_email 중 하나가 채워진다.
+--   PR-2 에서 recipient_user_seqs_json / recipient_emails_json 컬럼이 추가될 예정.
+-- ============================================
+CREATE TABLE IF NOT EXISTS manual_email_dispatches (
+    dispatch_seq             BIGINT         NOT NULL AUTO_INCREMENT,
+    sender_user_seq          BIGINT         NOT NULL,
+    -- RecipientType: APPLICANT | LEW | EXTERNAL | MULTI (MULTI 는 PR-2 에서 활성화)
+    recipient_type           VARCHAR(20)    NOT NULL,
+    -- 시스템 사용자 단일 수신 시 user_seq. EXTERNAL 일 때는 NULL.
+    recipient_user_seq       BIGINT         NULL,
+    -- 발송 시점의 이메일 스냅샷 (사용자 이메일 변경/삭제와 무관하게 이력 정본 보존).
+    recipient_email          VARCHAR(254)   NOT NULL,
+    related_application_seq  BIGINT         NULL,
+    subject                  VARCHAR(200)   NOT NULL,
+    body_text                TEXT           NOT NULL,
+    -- BodyFormat: PLAIN_TEXT | HTML (PR-1 은 PLAIN_TEXT 만 허용)
+    body_format              VARCHAR(20)    NOT NULL DEFAULT 'PLAIN_TEXT',
+    category_tag             VARCHAR(50)    NULL,
+    -- DispatchStatus: PENDING | SENT | PARTIAL_FAILED | FAILED
+    dispatch_status          VARCHAR(20)    NOT NULL,
+    sent_count               INT            NOT NULL DEFAULT 0,
+    failed_count             INT            NOT NULL DEFAULT 0,
+    failed_reason            TEXT           NULL,
+    -- 실제 SMTP 시도 시각 (AFTER_COMMIT 단계). PENDING 상태에서는 NULL.
+    dispatched_at            DATETIME(6)    NULL,
+    -- BaseEntity audit (deleted_at 은 보존만, soft delete 미적용)
+    created_at               DATETIME(6),
+    updated_at               DATETIME(6),
+    created_by               BIGINT,
+    updated_by               BIGINT,
+    deleted_at               DATETIME(6),
+    PRIMARY KEY (dispatch_seq),
+    KEY idx_manual_email_sender (sender_user_seq, dispatched_at DESC),
+    KEY idx_manual_email_dispatched (dispatched_at DESC),
+    KEY idx_manual_email_status (dispatch_status, dispatched_at DESC),
+    KEY idx_manual_email_application (related_application_seq),
+    CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq),
+    CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
