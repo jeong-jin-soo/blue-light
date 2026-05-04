@@ -15,7 +15,10 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * JWT 인증 필터
@@ -44,18 +47,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String role = jwtTokenProvider.getRole(token);
             Boolean approved = jwtTokenProvider.getApproved(token);
 
-            // 미승인 LEW는 ROLE_LEW_PENDING 권한 부여 → /api/admin/** 접근 차단
-            String authority;
-            if ("LEW".equals(role) && (approved == null || !approved)) {
-                authority = "ROLE_LEW_PENDING";
-            } else {
-                authority = "ROLE_" + role;
+            // ★ Concierge 강화 + 별도 수금 PR-1 (D1=B): 다중 역할 authority 매핑.
+            // roles claim 이 있으면 모든 역할을 ROLE_* 권한으로 부여. 없으면 legacy 단일 role 사용.
+            List<String> roleNames = jwtTokenProvider.getRoles(token);
+            Set<SimpleGrantedAuthority> authoritySet = new LinkedHashSet<>();
+
+            // 미승인 LEW 가드: primary role 이 LEW 이고 approved=false 면 모든 LEW authority 를
+            // ROLE_LEW_PENDING 으로 강등 — 다른 secondary role(예: SLD_MANAGER)은 그대로 살리되
+            // /api/admin/** 등 LEW 가 가야 할 경로는 차단된다.
+            boolean lewPending = "LEW".equals(role) && (approved == null || !approved);
+
+            for (String r : roleNames) {
+                if (r == null || r.isBlank()) continue;
+                if ("LEW".equals(r) && lewPending) {
+                    authoritySet.add(new SimpleGrantedAuthority("ROLE_LEW_PENDING"));
+                } else {
+                    authoritySet.add(new SimpleGrantedAuthority("ROLE_" + r));
+                }
+            }
+            // 안전망: roles 가 비어있고 legacy role 만 있으면 그것으로 fallback (LEW_PENDING 가드 동일 적용).
+            if (authoritySet.isEmpty() && role != null && !role.isBlank()) {
+                if (lewPending) {
+                    authoritySet.add(new SimpleGrantedAuthority("ROLE_LEW_PENDING"));
+                } else {
+                    authoritySet.add(new SimpleGrantedAuthority("ROLE_" + role));
+                }
             }
 
-            // 권한 설정
-            List<SimpleGrantedAuthority> authorities = List.of(
-                    new SimpleGrantedAuthority(authority)
-            );
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>(authoritySet);
 
             // 인증 객체 생성 및 SecurityContext에 설정
             UsernamePasswordAuthenticationToken authentication =
@@ -63,7 +82,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            log.debug("Security Context에 인증 정보 설정 완료: userSeq={}, role={}, authority={}", userSeq, role, authority);
+            log.debug("Security Context에 인증 정보 설정 완료: userSeq={}, primaryRole={}, authorities={}",
+                    userSeq, role, authorities);
         }
 
         filterChain.doFilter(request, response);

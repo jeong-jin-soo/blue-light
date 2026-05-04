@@ -442,14 +442,24 @@ public class AuthService {
 
     /**
      * TokenResponse 생성
+     * <p>
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D1=B): 다중 역할 사용자에게 effective roles 모두를
+     * {@code roles} claim 으로 발급한다. legacy 클라이언트는 기존 {@code role} 단일 claim 도
+     * 그대로 사용 가능 — primary role 만 거기 들어간다.
      */
     private TokenResponse createTokenResponse(User user) {
         boolean approved = user.isApproved();
         boolean emailVerified = user.isEmailVerified();
+
+        List<String> effectiveRoleNames = user.effectiveRoles().stream()
+                .map(Enum::name)
+                .toList();
+
         String accessToken = jwtTokenProvider.createToken(
                 user.getUserSeq(),
                 user.getEmail(),
                 user.getRole().name(),
+                effectiveRoleNames,
                 approved,
                 emailVerified
         );

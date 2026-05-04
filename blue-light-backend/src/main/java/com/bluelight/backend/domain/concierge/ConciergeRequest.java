@@ -41,7 +41,9 @@ import java.time.LocalDateTime;
     @Index(name = "idx_concierge_assigned", columnList = "assigned_manager_seq, status"),
     @Index(name = "idx_concierge_submitter_email", columnList = "submitter_email"),
     @Index(name = "idx_concierge_created", columnList = "created_at"),
-    @Index(name = "idx_concierge_applicant_user", columnList = "applicant_user_seq")
+    @Index(name = "idx_concierge_applicant_user", columnList = "applicant_user_seq"),
+    // ★ Concierge 강화 + 별도 수금 PR-1 (D6=A 셀프 할당) — LEW 가 자기 작업 목록을 빠르게 조회.
+    @Index(name = "idx_concierge_assigned_lew", columnList = "assigned_lew_seq")
 })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -108,6 +110,24 @@ public class ConciergeRequest extends BaseEntity {
      */
     @Column(name = "payment_seq")
     private Long paymentSeq;
+
+    /**
+     * 배정된 LEW 의 user_seq (★ Concierge 강화 + 별도 수금 PR-1, D6=A 셀프 할당).
+     * <p>
+     * 컨시어지 매니저({@link #assignedManager}) 와는 분리된 트랙 — LEW 는 면허 발급에 필요한
+     * SLD/CoF 등의 실무를 담당하며, 매니저는 고객 응대를 담당한다.
+     * 셀프 할당이 가능하므로 재할당 충돌 가능성이 있어 도메인 메서드 {@link #assignLew} 가
+     * 단일 진입점이 된다 (실제 트랜잭션 수준 동시성 제어는 PR-3 의 서비스 레이어 + 옵티미스틱 락 책임).
+     * 순환 의존 회피를 위해 User 엔티티 ManyToOne 대신 Long 만 보관.
+     */
+    @Column(name = "assigned_lew_seq")
+    private Long assignedLewSeq;
+
+    /**
+     * LEW 배정 시점 (재할당 시 최신 시각으로 갱신).
+     */
+    @Column(name = "lew_assigned_at")
+    private LocalDateTime lewAssignedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 40)
@@ -340,6 +360,34 @@ public class ConciergeRequest extends BaseEntity {
      */
     public void linkPayment(Long paymentSeq) {
         this.paymentSeq = paymentSeq;
+    }
+
+    // ============================================================
+    // ★ LEW 배정 (★ Concierge 강화 + 별도 수금 PR-1, D6=A 셀프 할당)
+    // ============================================================
+
+    /**
+     * LEW 배정 또는 재배정. 이전 LEW 가 있으면 덮어쓰며, 시점은 최신 시각으로 갱신된다.
+     * <p>
+     * 본 PR-1 은 도메인 진입점만 도입하고, 실제 셀프 할당 엔드포인트 + 알림은 PR-3 에서 wiring.
+     * 상태 전이({@code LEW_ASSIGNED}) 는 PR-3 가 책임진다 — 본 메서드는 status 를 건드리지 않는다.
+     *
+     * @param lewUserSeq 배정할 LEW 의 user_seq (필수)
+     * @param now        배정 시각 (보통 LocalDateTime.now())
+     */
+    public void assignLew(Long lewUserSeq, LocalDateTime now) {
+        if (lewUserSeq == null) {
+            throw new IllegalArgumentException("lewUserSeq must not be null");
+        }
+        this.assignedLewSeq = lewUserSeq;
+        this.lewAssignedAt = now != null ? now : LocalDateTime.now();
+    }
+
+    /**
+     * LEW 가 배정되었는지 여부 ({@code assignedLewSeq != null}).
+     */
+    public boolean isLewAssigned() {
+        return this.assignedLewSeq != null;
     }
 
     /**

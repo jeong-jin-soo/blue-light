@@ -148,5 +148,13 @@ public enum AuditAction {
     // ADMIN Manual Email Dispatch (admin-manual-email-spec.md §6 AC-A1, §13.2)
     // ADMIN/SYSTEM_ADMIN 이 신청자/LEW/외부 수신자에게 ad-hoc 이메일 발송 시 1건 기록.
     // metadata: dispatchSeq, recipientType, recipientEmail, relatedApplicationSeq, subject(원문), bodyText 길이 등.
-    MANUAL_EMAIL_DISPATCHED
+    MANUAL_EMAIL_DISPATCHED,
+
+    // ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 — PR-1 인프라, PR-2/3 에서 호출.
+    // ADMIN 이 별도 수금(은행 송금/현금 등)을 수동으로 기록한 시점 (PR-2 metadata: paymentSeq, method, amount, reference).
+    MANUAL_PAYMENT_RECORDED,
+    // LEW 셀프 할당 또는 ADMIN 의 LEW 배정 (PR-3, D6=A). metadata: conciergeRequestSeq, lewUserSeq, previousLewUserSeq.
+    CONCIERGE_LEW_ASSIGNED,
+    // 별도 수금 기록 직후 자동 발행된 영수증 (PR-2). metadata: invoiceSeq, paymentSeq, paymentMethod.
+    INVOICE_AUTO_GENERATED_FROM_MANUAL_PAYMENT
 }

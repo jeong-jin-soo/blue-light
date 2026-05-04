@@ -53,5 +53,13 @@ public enum NotificationType {
     CONCIERGE_LICENCE_PAYMENT_REQUIRED,       // N6b: 라이선스 결제 요청 (신청자)
     CONCIERGE_COMPLETED,                      // N7: 컨시어지 프로세스 완료
     CONCIERGE_CANCELLED,                      // N8: 취소 통보
-    CONCIERGE_SLA_BREACH_WARNING              // N9: 24h SLA 위반 경고 (Admin)
+    CONCIERGE_SLA_BREACH_WARNING,             // N9: 24h SLA 위반 경고 (Admin)
+
+    // ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 — PR-1 placeholder, PR-2/3 에서 발화.
+    // (PR-2) ADMIN 이 별도 수금(offline)을 수동 기록한 직후 신청자에게 결제 확인 인앱 알림.
+    MANUAL_PAYMENT_CONFIRMED_APPLICANT,
+    // (PR-2) 별도 수금 기록 직후 자동 발행된 영수증을 신청자에게 안내.
+    INVOICE_ISSUED_APPLICANT,
+    // (PR-3) LEW 가 ConciergeRequest 에 셀프/타인 배정될 때 해당 LEW 에게 발송.
+    CONCIERGE_LEW_ASSIGNED_LEW
 }

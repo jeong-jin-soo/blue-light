@@ -4,12 +4,16 @@ import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicantType;
+import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationType;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
+import com.bluelight.backend.domain.concierge.ConciergeRequest;
+import com.bluelight.backend.domain.concierge.ConciergeRequestRepository;
 import com.bluelight.backend.domain.invoice.Invoice;
 import com.bluelight.backend.domain.invoice.InvoiceRepository;
 import com.bluelight.backend.domain.payment.Payment;
+import com.bluelight.backend.domain.payment.PaymentReferenceType;
 import com.bluelight.backend.domain.setting.SystemSetting;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.User;
@@ -43,6 +47,10 @@ public class InvoiceGenerationService {
     private final InvoicePdfRenderer invoicePdfRenderer;
     private final SystemSettingRepository systemSettingRepository;
     private final AuditLogService auditLogService;
+    // ★ Concierge 강화 + 별도 수금 PR-1: referenceType 분기 dispatcher 가 사용.
+    // PR-1 은 분기만 도입하고, CONCIERGE_REQUEST 경로의 실제 스냅샷 구성은 PR-2 에서 구현.
+    private final ApplicationRepository applicationRepository;
+    private final ConciergeRequestRepository conciergeRequestRepository;
 
     /**
      * 결제 확인 직후 자동 발행.
@@ -100,6 +108,113 @@ public class InvoiceGenerationService {
                 saved.getInvoiceSeq(), saved.getInvoiceNumber(), payment.getPaymentSeq());
 
         return saved;
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 — 다형 referenceType 진입점.
+     * <p>
+     * 결제 1건만 받아 referenceType 에 따라 적절한 스냅샷 빌더로 라우팅한다.
+     * 본 PR-1 은 dispatcher 골격만 도입하고, CONCIERGE_REQUEST 경로의 실제 스냅샷은 PR-2 에서 구현.
+     * 기존 호출처({@link com.bluelight.backend.api.admin.AdminPaymentService},
+     * {@link com.bluelight.backend.service.kva.KvaPostPaymentService})는
+     * {@link #generateFromPayment(Payment, Application)} 두 인자 형태를 그대로 사용 — 회귀 영향 없음.
+     *
+     * @param payment 영수증 발행 대상 결제 (referenceType/referenceSeq 필수)
+     * @return 발행된 Invoice
+     * @throws BusinessException APPLICATION 인데 referenceSeq 가 무효한 경우 또는
+     *                           CONCIERGE_REQUEST 경로가 PR-2 이전 호출된 경우
+     *                           (UnsupportedOperationException 대신 INVALID_ARGUMENT 비즈니스 예외).
+     */
+    public Invoice generateFromPayment(Payment payment) {
+        if (payment == null) {
+            throw new BusinessException("Payment is required",
+                    HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
+        }
+        PaymentReferenceType refType = payment.getReferenceType();
+        if (refType == null) {
+            // 매우 오래된 데이터(PR#7 마이그레이션 이전) — APPLICATION 으로 가정.
+            refType = PaymentReferenceType.APPLICATION;
+        }
+        return switch (refType) {
+            case APPLICATION -> {
+                Long appSeq = payment.getReferenceSeq() != null
+                        ? payment.getReferenceSeq()
+                        : (payment.getApplication() != null ? payment.getApplication().getApplicationSeq() : null);
+                if (appSeq == null) {
+                    throw new BusinessException(
+                            "APPLICATION payment has no reference seq",
+                            HttpStatus.BAD_REQUEST,
+                            "INVALID_ARGUMENT");
+                }
+                Application application = payment.getApplication() != null
+                        ? payment.getApplication()
+                        : applicationRepository.findById(appSeq)
+                            .orElseThrow(() -> new BusinessException(
+                                    "Application not found: " + appSeq,
+                                    HttpStatus.NOT_FOUND,
+                                    "APPLICATION_NOT_FOUND"));
+                yield generateFromPayment(payment, application);
+            }
+            case CONCIERGE_REQUEST -> {
+                ConciergeRequest cr = conciergeRequestRepository.findById(payment.getReferenceSeq())
+                        .orElseThrow(() -> new BusinessException(
+                                "ConciergeRequest not found: " + payment.getReferenceSeq(),
+                                HttpStatus.NOT_FOUND,
+                                "CONCIERGE_REQUEST_NOT_FOUND"));
+                // PR-1: placeholder — PR-2 에서 buildSnapshotForConciergeRequest 채움.
+                yield buildSnapshotForConciergeRequest(payment, cr);
+            }
+            case SLD_ORDER -> {
+                // SLD_ORDER 결제는 현재 별도 SldOrderPayment 엔티티가 처리 — 본 진입점에 도달할 일이
+                // 없지만 안전 가드로 기록만 남기고 동일한 NOT_IMPLEMENTED 패턴 적용.
+                throw new BusinessException(
+                        "SLD_ORDER invoice generation via Payment is not supported in PR-1 — "
+                                + "use SldOrderPayment flow instead",
+                        HttpStatus.NOT_IMPLEMENTED,
+                        "INVOICE_PATH_NOT_SUPPORTED");
+            }
+        };
+    }
+
+    /**
+     * APPLICATION 결제의 스냅샷 빌더 (extracted for clarity).
+     * 기존 {@link #generateFromPayment(Payment, Application)} 와 동일 동작이며, 향후 dispatcher 가
+     * APPLICATION 분기에서 호출한다 (현재는 dispatcher 가 두 인자 메서드를 위임 호출).
+     *
+     * <p>※ PR-1 에서는 스펙대로 분리만 해두고, 본 메서드는 현 시점 직접 호출되지 않는다 — 기존
+     * 두 인자 메서드 시그니처와 호출처를 보존하기 위해 그대로 둔다.</p>
+     */
+    Invoice buildSnapshotForApplication(Payment payment, Application application) {
+        return generateFromPayment(payment, application);
+    }
+
+    /**
+     * ★ PR-1 placeholder — CONCIERGE_REQUEST 결제 영수증 스냅샷 빌더.
+     * <p>
+     * PR-2 에서 다음을 구현:
+     * <ul>
+     *   <li>billingRecipient 는 ConciergeRequest.applicantUser 또는 submitter snapshot 우선</li>
+     *   <li>installation 주소는 신청자 주소 또는 ConciergeRequest.memo 기반 (PR-2 결정)</li>
+     *   <li>description 은 "Concierge Service Fee — &lt;publicCode&gt;" 형태</li>
+     *   <li>회계 흐름은 application 결제와 동일 (currency / paynow / footer 모두 system_settings)</li>
+     * </ul>
+     * PR-1 은 NOT_IMPLEMENTED 비즈니스 예외로 호출 자체를 차단해, 잘못된 PR 차순에서 호출이 발생하면
+     * 즉시 트랜잭션이 롤백되도록 한다.
+     */
+    Invoice buildSnapshotForConciergeRequest(Payment payment, ConciergeRequest conciergeRequest) {
+        // 인자 검증을 명시적으로 — PR-2 가 본 메서드를 채울 때 sanity check 가 사라지지 않도록.
+        if (payment == null || payment.getPaymentSeq() == null) {
+            throw new BusinessException("Payment must be persisted",
+                    HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
+        }
+        if (conciergeRequest == null || conciergeRequest.getConciergeRequestSeq() == null) {
+            throw new BusinessException("ConciergeRequest must be persisted",
+                    HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
+        }
+        throw new BusinessException(
+                "CONCIERGE_REQUEST invoice generation is implemented in PR-2",
+                HttpStatus.NOT_IMPLEMENTED,
+                "NOT_IMPLEMENTED_IN_PR1");
     }
 
     /**
