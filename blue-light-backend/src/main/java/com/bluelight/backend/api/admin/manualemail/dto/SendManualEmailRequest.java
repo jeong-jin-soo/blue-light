@@ -9,17 +9,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 /**
  * ADMIN 수동 이메일 발송 요청 DTO.
  *
  * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §5.1.</p>
  *
- * <h3>PR-1 단일 수신자 검증 규칙</h3>
+ * <h3>수신자 검증 규칙</h3>
  * <ul>
  *   <li>{@code recipientType=APPLICANT} → {@code recipientUserSeq} 필수, 사용자 role 매칭 검증.</li>
  *   <li>{@code recipientType=LEW} → {@code recipientUserSeq} 필수, 사용자 role 매칭 검증.</li>
  *   <li>{@code recipientType=EXTERNAL} → {@code recipientEmail} 필수, 이메일 형식 검증.</li>
- *   <li>{@code recipientType=MULTI} → 컨트롤러에서 400 {@code MULTI_NOT_SUPPORTED_IN_PR1} 거부 (PR-2 활성화).</li>
+ *   <li>{@code recipientType=MULTI} (PR-2) → {@code recipientUserSeqs} + {@code recipientEmails}
+ *       의 합이 2건 이상 필수. 시스템 사용자 role 매칭 검증 + 외부 이메일 형식 검증.</li>
  * </ul>
  *
  * <p>{@code subject}/{@code bodyText} 길이 제약은 Bean Validation 으로 강제 (스펙 AC-A6).</p>
@@ -32,13 +35,32 @@ public class SendManualEmailRequest {
     @NotNull(message = "Recipient type is required")
     private RecipientType recipientType;
 
-    /** APPLICANT/LEW 수신 시 user_seq. EXTERNAL 일 때는 무시된다. */
+    /** APPLICANT/LEW 수신 시 user_seq. EXTERNAL/MULTI 일 때는 무시된다. */
     private Long recipientUserSeq;
 
-    /** EXTERNAL 수신 시 이메일 주소. APPLICANT/LEW 일 때는 무시된다. */
+    /** EXTERNAL 수신 시 이메일 주소. APPLICANT/LEW/MULTI 일 때는 무시된다. */
     @Email(message = "Recipient email format is invalid")
     @Size(max = 254, message = "Recipient email must be at most 254 characters")
     private String recipientEmail;
+
+    /**
+     * MULTI 발송 시 시스템 사용자 user_seq 목록 (APPLICANT/LEW 혼합 가능).
+     *
+     * <p>스펙: PR-2 §5.1 / AC-A4. 단일 발송에서는 무시된다. {@link #recipientEmails} 와 합쳐서 2건 이상.
+     * 각 user_seq 는 시스템 사용자 lookup 으로 이메일을 추출하며 role 은 APPLICANT 또는 LEW 만 허용.</p>
+     */
+    @Size(max = 100, message = "Recipient user seqs must be at most 100")
+    private List<Long> recipientUserSeqs;
+
+    /**
+     * MULTI 발송 시 외부 이메일 목록 (시스템 미등록 EXTERNAL).
+     *
+     * <p>스펙: PR-2 §5.1. 단일 발송에서는 무시된다. {@link #recipientUserSeqs} 와 합쳐서 2건 이상.
+     * 각 항목은 RFC 5322 형식 + 254자 이하. 서비스 레이어에서 정규화(소문자 + 트림) 후 중복 제거.</p>
+     */
+    @Size(max = 100, message = "Recipient emails must be at most 100")
+    private List<@Email(message = "Recipient email format is invalid")
+                  @Size(max = 254, message = "Each recipient email must be at most 254 characters") String> recipientEmails;
 
     /** 신청 컨텍스트 (옵션). null 가능. */
     private Long relatedApplicationSeq;

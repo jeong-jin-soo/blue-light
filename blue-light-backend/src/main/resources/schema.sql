@@ -1152,20 +1152,28 @@ CREATE TABLE IF NOT EXISTS kva_adjustment_record (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- ADMIN Manual Email Dispatch (admin-manual-email-spec.md §4 + §13.1) — PR-1
+-- ADMIN Manual Email Dispatch (admin-manual-email-spec.md §4 + §13.1) — PR-1 + PR-2
 -- 정책: 감사 무결성 — soft delete 미적용 (deleted_at 컬럼은 BaseEntity 호환을 위해 보존만, 사용 금지)
 -- PR-1 단일 수신자 전용 — recipient_user_seq 또는 recipient_email 중 하나가 채워진다.
---   PR-2 에서 recipient_user_seqs_json / recipient_emails_json 컬럼이 추가될 예정.
+-- PR-2 MULTI 활성화 — recipient_user_seqs_json / recipient_emails_json / recipient_hash 컬럼 추가.
 -- ============================================
 CREATE TABLE IF NOT EXISTS manual_email_dispatches (
     dispatch_seq             BIGINT         NOT NULL AUTO_INCREMENT,
     sender_user_seq          BIGINT         NOT NULL,
-    -- RecipientType: APPLICANT | LEW | EXTERNAL | MULTI (MULTI 는 PR-2 에서 활성화)
+    -- RecipientType: APPLICANT | LEW | EXTERNAL | MULTI
     recipient_type           VARCHAR(20)    NOT NULL,
-    -- 시스템 사용자 단일 수신 시 user_seq. EXTERNAL 일 때는 NULL.
+    -- 시스템 사용자 단일 수신 시 user_seq. EXTERNAL/MULTI 일 때는 NULL.
     recipient_user_seq       BIGINT         NULL,
     -- 발송 시점의 이메일 스냅샷 (사용자 이메일 변경/삭제와 무관하게 이력 정본 보존).
+    -- MULTI 시: 첫 번째(대표) 이메일을 저장 — 단일 수신자 코드 호환성. 전체 목록은 _json 컬럼에.
     recipient_email          VARCHAR(254)   NOT NULL,
+    -- PR-2 MULTI: 시스템 사용자 user_seq 목록 (JSON 배열). 단일 발송 시 NULL.
+    recipient_user_seqs_json TEXT           NULL,
+    -- PR-2 MULTI: 전체 발송 대상 이메일 목록 (JSON 배열, 정렬+중복제거). 단일 발송 시 NULL.
+    recipient_emails_json    TEXT           NULL,
+    -- PR-2 멱등성: 정렬된 수신자 + subject + body 의 SHA-256 hex (64자).
+    -- 단일/다수 통합 멱등성 비교 키.
+    recipient_hash           VARCHAR(64)    NULL,
     related_application_seq  BIGINT         NULL,
     subject                  VARCHAR(200)   NOT NULL,
     body_text                TEXT           NOT NULL,
@@ -1190,6 +1198,7 @@ CREATE TABLE IF NOT EXISTS manual_email_dispatches (
     KEY idx_manual_email_dispatched (dispatched_at DESC),
     KEY idx_manual_email_status (dispatch_status, dispatched_at DESC),
     KEY idx_manual_email_application (related_application_seq),
+    KEY idx_manual_email_recipient_hash (sender_user_seq, recipient_hash, created_at DESC),
     CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)
