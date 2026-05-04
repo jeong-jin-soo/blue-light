@@ -61,6 +61,9 @@ import DataBreachPage from '../pages/admin/DataBreachPage';
 // LEW pages
 import LewReviewFormPage from '../pages/lew/LewReviewFormPage';
 import LewApplicationDetailPage from '../pages/lew/LewApplicationDetailPage';
+// ★ Concierge 강화 PR-4 — LEW 컨시어지 페이지
+import LewConciergeRequestListPage from '../pages/lew/LewConciergeRequestListPage';
+import LewConciergeRequestDetailPage from '../pages/lew/LewConciergeRequestDetailPage';
 
 // SLD Manager pages
 import SldManagerDashboardPage from '../pages/sld-manager/SldManagerDashboardPage';
@@ -251,6 +254,9 @@ const router = createBrowserRouter([
           { path: '/lew/applications/:id', element: <LewApplicationDetailPage /> },
           // LEW Review Form (P2.B) — CoF 3-step
           { path: '/lew/applications/:id/review', element: <LewReviewFormPage /> },
+          // ★ Concierge 강화 PR-4 — LEW 컨시어지 워크스페이스
+          { path: '/lew/concierge-requests', element: <LewConciergeRequestListPage /> },
+          { path: '/lew/concierge-requests/:id', element: <LewConciergeRequestDetailPage /> },
           { path: '/lew/notifications', element: <NotificationsPage /> },
         ],
       },

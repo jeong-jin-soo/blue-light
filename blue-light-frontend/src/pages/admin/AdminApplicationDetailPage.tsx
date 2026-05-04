@@ -23,6 +23,11 @@ import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
 import { AdminPaymentSection } from './sections/AdminPaymentSection';
 import { AdminSidebar } from './sections/AdminSidebar';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
+// ★ Concierge 강화 + 별도 수금 PR-4 — Manual Payment 모달 + 영수증 이력 카드.
+import { ManualPaymentModal } from '../../components/admin/ManualPaymentModal';
+import { InvoiceHistoryCard } from '../../components/admin/InvoiceHistoryCard';
+import { recordManualPayment as recordManualPaymentApi } from '../../api/adminApplicationApi';
+import type { ManualPaymentPayload } from '../../types/manualPayment';
 
 // Modal components
 import {
@@ -70,6 +75,12 @@ export default function AdminApplicationDetailPage() {
   const [availableLews, setAvailableLews] = useState<LewSummary[]>([]);
   const [selectedLewSeq, setSelectedLewSeq] = useState<number | null>(null);
   const [lewsLoading, setLewsLoading] = useState(false);
+
+  // ★ Concierge 강화 PR-4 — Manual Payment (offline) state
+  const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
+  const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
+  // 영수증 이력 카드 강제 새로고침 키 — manual-payment 후 invalidate.
+  const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
 
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN';
@@ -252,6 +263,29 @@ export default function AdminApplicationDetailPage() {
       fetchData();
     } catch { toast.error('Failed to unassign LEW'); }
     finally { setActionLoading(false); }
+  };
+
+  // ★ Concierge 강화 PR-4 — Manual Payment (offline) handler.
+  // 스펙: doc/Project Analysis/concierge-flow-and-offline-payment-spec.md §7.3, AC-A1~A7.
+  // finally 블록에서 로딩 해제 — 에러는 모달이 자체 errMsg 로 표시하도록 자연 propagate.
+  const handleRecordManualPayment = async (payload: ManualPaymentPayload) => {
+    setManualPaymentLoading(true);
+    try {
+      const response = await recordManualPaymentApi(applicationId, payload);
+      const issuedNote = payload.receiptIssue !== false
+        ? response.invoiceNumber
+          ? ` Receipt ${response.invoiceNumber} issued.`
+          : ' Receipt will be issued shortly.'
+        : '';
+      toast.success(`Payment of SGD ${Number(payload.amount).toFixed(2)} recorded.${issuedNote}`);
+      setShowManualPaymentModal(false);
+      // 신청 상태/payments 갱신.
+      await fetchData();
+      // InvoiceHistoryCard 가 새 invoice 를 다시 조회하도록 트리거.
+      setInvoiceRefreshKey((k) => k + 1);
+    } finally {
+      setManualPaymentLoading(false);
+    }
   };
 
   // LOA
@@ -468,6 +502,16 @@ export default function AdminApplicationDetailPage() {
           />
 
           <AdminPaymentSection payments={payments} files={files} applicationStatus={application.status} />
+
+          {/* ★ Concierge 강화 PR-4 — 영수증 이력 카드 (ADMIN/SYSTEM_ADMIN 전용 표시).
+              LEW 는 영수증 카드를 노출하지 않는다(스펙 §11 — invoice 는 신청자에 귀속). */}
+          {isAdmin && (
+            <InvoiceHistoryCard
+              applicationSeq={applicationId}
+              mode="admin"
+              refreshKey={invoiceRefreshKey}
+            />
+          )}
         </div>
 
         {/* Sidebar */}
@@ -484,6 +528,7 @@ export default function AdminApplicationDetailPage() {
           onCompleteClick={() => setShowCompleteModal(true)}
           onAssignLewClick={openAssignLewModal}
           onUnassignLewClick={() => setShowUnassignConfirm(true)}
+          onManualPaymentClick={() => setShowManualPaymentModal(true)}
         />
       </div>
 
@@ -526,6 +571,22 @@ export default function AdminApplicationDetailPage() {
       <SldConfirmDialog
         isOpen={showSldConfirm} onClose={() => setShowSldConfirm(false)}
         onConfirm={handleSldConfirm} loading={actionLoading}
+      />
+
+      {/* ★ Concierge 강화 PR-4 — Manual Payment 모달.
+          ADMIN/SYSTEM_ADMIN 만 진입 가능하도록 사이드바에서 isAdmin 가드 — 본 모달은 단지 마운트. */}
+      <ManualPaymentModal
+        isOpen={showManualPaymentModal}
+        onClose={() => setShowManualPaymentModal(false)}
+        onSubmit={handleRecordManualPayment}
+        contextLabel={`Application #${application.applicationSeq}`}
+        recipientName={
+          application.userFirstName || application.userLastName
+            ? `${application.userFirstName ?? ''} ${application.userLastName ?? ''}`.trim()
+            : application.userEmail
+        }
+        expectedAmount={application.quoteAmount}
+        loading={manualPaymentLoading}
       />
     </div>
   );

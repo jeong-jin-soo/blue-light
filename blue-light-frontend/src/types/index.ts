@@ -1366,7 +1366,14 @@ export type NotificationType =
   | 'KVA_ADJUSTMENT_SETTLED_LEW'
   // PR-4 (admin-manual-email-spec D4=B) — ADMIN 수동 이메일 발송 동반 인앱 알림.
   // 시스템 사용자 수신자(APPLICANT/LEW)에게만, 옵션 ON 시(기본) 생성.
-  | 'ADMIN_MANUAL_EMAIL_NOTICE';
+  | 'ADMIN_MANUAL_EMAIL_NOTICE'
+  // ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2/PR-3 — frontend mirror.
+  // (PR-2) 신청자에게 별도 수금 확인 알림. referenceType=APPLICATION 또는 CONCIERGE_REQUEST.
+  | 'MANUAL_PAYMENT_CONFIRMED_APPLICANT'
+  // (PR-2) 신청자에게 자동 발행 영수증 발급 안내. referenceType=APPLICATION 또는 CONCIERGE_REQUEST.
+  | 'INVOICE_ISSUED_APPLICANT'
+  // (PR-3) LEW 가 ConciergeRequest 에 배정될 때 해당 LEW 에게 발송. referenceType=CONCIERGE_REQUEST.
+  | 'CONCIERGE_LEW_ASSIGNED_LEW';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

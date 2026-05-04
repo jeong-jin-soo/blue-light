@@ -73,6 +73,11 @@ function actionsFor(status: ConciergeStatus): ActionDef[] {
       ];
     case 'IN_PROGRESS':
       return [{ label: 'Mark completed', kind: 'transition', nextStatus: 'COMPLETED' }];
+    // ★ PR-3 (D6=A): LEW 가 배정된 상태. 매니저/배정 LEW 가 신청서 대행 작성 또는 직접 후속 흐름 진입 가능.
+    case 'LEW_ASSIGNED':
+      return [
+        { label: 'Create application on behalf', kind: 'createApplication' },
+      ];
     case 'COMPLETED':
     case 'CANCELLED':
       return [];

@@ -15,6 +15,10 @@ import type {
   SldRequest,
   UpdateStatusRequest,
 } from '../types';
+import type {
+  ManualPaymentPayload,
+  ManualPaymentResponse,
+} from '../types/manualPayment';
 
 // Phase 5 PR#3 — kVA 확정 API
 export interface ConfirmKvaPayload {
@@ -273,6 +277,34 @@ export const confirmPayment = async (
 export const getPayments = async (applicationId: number): Promise<Payment[]> => {
   const response = await axiosClient.get<Payment[]>(
     `/admin/applications/${applicationId}/payments`
+  );
+  return response.data;
+};
+
+// ── Manual Payment (★ Concierge 강화 + 별도 수금 PR-2/PR-4) ──────────────────────
+// 스펙: doc/Project Analysis/concierge-flow-and-offline-payment-spec.md §7.3, AC-A1~A7
+
+/**
+ * ADMIN/SYSTEM_ADMIN 별도 수금 기록 (Application 결제).
+ *
+ * <p>D3=C: ADMIN 은 PENDING_REVIEW 부터 모든 상태에서 호출 가능 (단 PAID/IN_PROGRESS/COMPLETED 는
+ * 백엔드에서 409 ALREADY_PAID 또는 INVALID_STATUS 차단).</p>
+ *
+ * <p>에러 코드:</p>
+ * <ul>
+ *   <li>400 INVALID_AMOUNT — amount 0 이하</li>
+ *   <li>400 INVALID_PAYMENT_METHOD — PAYNOW_ONLINE 입력 시 (offline 4종만 허용)</li>
+ *   <li>409 ALREADY_PAID — 이미 결제 완료</li>
+ *   <li>409 INVALID_STATUS — 호출 불가 상태 (예: EXPIRED)</li>
+ * </ul>
+ */
+export const recordManualPayment = async (
+  applicationSeq: number,
+  payload: ManualPaymentPayload,
+): Promise<ManualPaymentResponse> => {
+  const response = await axiosClient.post<ManualPaymentResponse>(
+    `/admin/applications/${applicationSeq}/manual-payment`,
+    payload,
   );
   return response.data;
 };

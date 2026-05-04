@@ -32,6 +32,12 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   KVA_ADJUSTMENT_SETTLED_LEW: '🧾',
   // PR-4 (admin-manual-email D4=B) — ADMIN 수동 이메일 동반 인앱 알림 (📧 봉투)
   ADMIN_MANUAL_EMAIL_NOTICE: '📧',
+  // ★ Concierge 강화 + 별도 수금 PR-2 — 별도 수금 확인 (💰 돈주머니)
+  MANUAL_PAYMENT_CONFIRMED_APPLICANT: '💰',
+  // ★ PR-2 — 영수증 자동 발행 안내 (🧾 영수증)
+  INVOICE_ISSUED_APPLICANT: '🧾',
+  // ★ PR-3 — 컨시어지 LEW 배정 알림 (🤝 컨시어지)
+  CONCIERGE_LEW_ASSIGNED_LEW: '🤝',
 };
 
 export default function NotificationsPage() {
@@ -95,10 +101,28 @@ export default function NotificationsPage() {
         // PR-3: 수신자가 ADMIN — admin 워크스페이스의 신청 상세로 이동.
         navigate(`/admin/applications/${n.referenceId}`);
       } else {
-        // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE) 도 여기 fallback — 수신자 role 의 워크스페이스
-        // (APPLICANT → /applicant/applications, LEW → /lew/applications) 로 이동.
-        navigate(`${basePath}/applications/${n.referenceId}`);
+        // ★ Concierge 강화 PR-2 (MANUAL_PAYMENT_CONFIRMED_APPLICANT, INVOICE_ISSUED_APPLICANT)
+        //   — 수신자가 APPLICANT 이므로 basePath('/applicant/applications' or '/dashboard'-aware)
+        //   기준 라우팅. 영수증 알림은 #receipts 해시로 영수증 카드까지 자동 스크롤(있을 때).
+        if (n.type === 'INVOICE_ISSUED_APPLICANT') {
+          navigate(`${basePath}/applications/${n.referenceId}#receipts`);
+        } else {
+          // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE), PR-2 (MANUAL_PAYMENT_CONFIRMED_APPLICANT) 등
+          // 수신자 role 의 워크스페이스 (APPLICANT → /applications, LEW → /lew/applications) 로 이동.
+          navigate(`${basePath}/applications/${n.referenceId}`);
+        }
       }
+    } else if (n.referenceType === 'CONCIERGE_REQUEST' && n.referenceId) {
+      // ★ Concierge 강화 PR-2/PR-3 — referenceType=CONCIERGE_REQUEST.
+      // - CONCIERGE_LEW_ASSIGNED_LEW (수신자=LEW) → LEW 컨시어지 페이지
+      // - MANUAL_PAYMENT_CONFIRMED_APPLICANT / INVOICE_ISSUED_APPLICANT (수신자=APPLICANT)
+      //   → 컨시어지 신청자에게 본인 컨시어지 상세 페이지가 별도 없으므로(향후 별도 PR)
+      //     안전한 fallback: notifications 페이지에 머무르고 message 만 갱신 (단순 dismiss).
+      //     향후 applicant 용 컨시어지 상세 페이지가 생기면 활성화.
+      if (n.type === 'CONCIERGE_LEW_ASSIGNED_LEW') {
+        navigate(`/lew/concierge-requests/${n.referenceId}`);
+      }
+      // 그 외 알림 타입은 단순 마킹만 — 향후 PR 에서 라우팅 활성화.
     } else if (n.referenceType === 'MANUAL_EMAIL') {
       // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE) 의 relatedApplication 미지정 케이스 — 단순 dismiss.
       // 향후 manual-email 상세 페이지가 생기면 deeplink 활성화 가능. 현재는 마킹만.
