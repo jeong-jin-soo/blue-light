@@ -51,6 +51,16 @@ public class ConciergeRequestDetail {
     /** 피싱 방지 검증 문구 — 통화 · 이메일에서 신청자와 상호 확인용 (매니저 UI에만 노출) */
     private String verificationPhrase;
 
+    // ── ★ PR-3: LEW 배정 (D6=A 셀프 할당 포함) ──
+    /** 배정된 LEW user_seq (null = 미배정) */
+    private Long assignedLewSeq;
+    /** 배정된 LEW 표시 이름 (firstName + lastName) */
+    private String assignedLewName;
+    /** 배정된 LEW 이메일 — 매니저 UI 에서 연락 정보 노출용 */
+    private String assignedLewEmail;
+    /** LEW 배정 시점 (재할당 시 최신 값) */
+    private LocalDateTime lewAssignedAt;
+
     /** 노트 타임라인 (최신순) */
     private List<NoteResponse> notes;
 

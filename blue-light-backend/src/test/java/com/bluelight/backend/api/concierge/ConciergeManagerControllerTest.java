@@ -1,5 +1,7 @@
 package com.bluelight.backend.api.concierge;
 
+import com.bluelight.backend.api.concierge.dto.AssignLewRequest;
+import com.bluelight.backend.api.concierge.dto.AssignLewResponse;
 import com.bluelight.backend.api.concierge.dto.CancelRequest;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestDetail;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
@@ -343,5 +345,70 @@ class ConciergeManagerControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}"))
             .andExpect(status().isBadRequest());
+    }
+
+    // ============================================================
+    // ★ PR-3 — POST /api/concierge-manager/requests/{id}/assign-lew
+    // ============================================================
+
+    @Test
+    @DisplayName("PR-3 assign-lew - 200 + AssignLewResponse")
+    void assignLew_200() throws Exception {
+        AssignLewResponse response = AssignLewResponse.builder()
+            .conciergeRequestSeq(100L)
+            .assignedLewSeq(50L)
+            .assignedLewName("L ew50")
+            .lewAssignedAt(LocalDateTime.now())
+            .previousLewSeq(null)
+            .selfAssigned(false)
+            .status("LEW_ASSIGNED")
+            .build();
+        when(managerService.assignLew(eq(100L), any(AssignLewRequest.class), eq(ACTOR_SEQ), any()))
+            .thenReturn(response);
+
+        AssignLewRequest body = new AssignLewRequest();
+        body.setLewUserSeq(50L);
+
+        mockMvc.perform(auth(post("/api/concierge-manager/requests/100/assign-lew"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.assignedLewSeq").value(50))
+            .andExpect(jsonPath("$.status").value("LEW_ASSIGNED"))
+            .andExpect(jsonPath("$.selfAssigned").value(false));
+    }
+
+    @Test
+    @DisplayName("PR-3 assign-lew - lewUserSeq 누락 → 400")
+    void assignLew_missingLewUserSeq_400() throws Exception {
+        mockMvc.perform(auth(post("/api/concierge-manager/requests/100/assign-lew"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("PR-3 assign-lew - 셀프 할당 → selfAssigned=true 응답")
+    void assignLew_selfAssign_200() throws Exception {
+        AssignLewResponse response = AssignLewResponse.builder()
+            .conciergeRequestSeq(100L)
+            .assignedLewSeq(ACTOR_SEQ)
+            .assignedLewName("M anager")
+            .lewAssignedAt(LocalDateTime.now())
+            .previousLewSeq(null)
+            .selfAssigned(true)
+            .status("LEW_ASSIGNED")
+            .build();
+        when(managerService.assignLew(eq(100L), any(AssignLewRequest.class), eq(ACTOR_SEQ), any()))
+            .thenReturn(response);
+
+        AssignLewRequest body = new AssignLewRequest();
+        body.setLewUserSeq(ACTOR_SEQ);
+
+        mockMvc.perform(auth(post("/api/concierge-manager/requests/100/assign-lew"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(body)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.selfAssigned").value(true));
     }
 }

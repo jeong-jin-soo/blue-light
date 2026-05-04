@@ -6,6 +6,8 @@ import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.auth.AccountSetupTokenService;
 import com.bluelight.backend.api.concierge.dto.ApplicantStatusInfo;
+import com.bluelight.backend.api.concierge.dto.AssignLewRequest;
+import com.bluelight.backend.api.concierge.dto.AssignLewResponse;
 import com.bluelight.backend.api.concierge.dto.CancelRequest;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestDetail;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
@@ -27,6 +29,7 @@ import com.bluelight.backend.domain.concierge.ConciergeRequestStatus;
 import com.bluelight.backend.domain.user.AccountSetupToken;
 import com.bluelight.backend.domain.user.AccountSetupTokenRepository;
 import com.bluelight.backend.domain.user.AccountSetupTokenSource;
+import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
@@ -35,6 +38,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -45,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -71,6 +76,8 @@ public class ConciergeManagerService {
     private final EmailService emailService;
     private final AuditLogService auditLogService;
     private final ConciergeNotifier notifier;
+    /** ★ PR-3: ConciergeLewAssignedEvent 발행 — AFTER_COMMIT 알림 listener 가 구독. */
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${concierge.account-setup.base-url}")
     private String setupBaseUrl;
@@ -87,7 +94,6 @@ public class ConciergeManagerService {
     public Page<ConciergeRequestSummary> listForActor(Long actorSeq, String statusStr,
                                                        String q, int page, int size) {
         User actor = loadActor(actorSeq);
-        Long filterManagerSeq = ConciergeOwnershipValidator.resolveListFilterManagerSeq(actor);
         ConciergeRequestStatus status = parseStatusOrNull(statusStr);
 
         int validPage = Math.max(0, page);
@@ -95,6 +101,19 @@ public class ConciergeManagerService {
         Pageable pageable = PageRequest.of(validPage, validSize,
             Sort.by(Sort.Direction.DESC, "createdAt"));
 
+        // ★ PR-3 (D7=B): LEW 만 가진 사용자(매니저/ADMIN 권한 없음)는 본인 배정 LEW row 만 조회.
+        boolean isManagerOrAdmin = actor.hasRole(UserRole.ADMIN)
+            || actor.hasRole(UserRole.SYSTEM_ADMIN)
+            || actor.hasRole(UserRole.CONCIERGE_MANAGER);
+        if (!isManagerOrAdmin && actor.hasRole(UserRole.LEW)) {
+            // LEW 단독 사용자 — assignedLewSeq 필터.
+            // 검색 q 와 status 필터는 본 PR 범위 외(LEW UI 가 단순). 추후 PR-4 에서 확장 가능.
+            Page<ConciergeRequest> results = conciergeRepository
+                .findByAssignedLewSeqOrderByCreatedAtDesc(actor.getUserSeq(), pageable);
+            return results.map(this::toSummary);
+        }
+
+        Long filterManagerSeq = ConciergeOwnershipValidator.resolveListFilterManagerSeq(actor);
         String normalizedQ = (q == null || q.isBlank()) ? null : q.trim();
         Page<ConciergeRequest> results = conciergeRepository.searchForDashboard(
             filterManagerSeq, status, normalizedQ, pageable);
@@ -109,7 +128,9 @@ public class ConciergeManagerService {
     public ConciergeRequestDetail getDetail(Long id, Long actorSeq) {
         User actor = loadActor(actorSeq);
         ConciergeRequest request = loadRequest(id);
-        ConciergeOwnershipValidator.assertManagerCanAccess(request, actor);
+        // ★ PR-3 (D7=B): LEW 가 본인 assigned ConciergeRequest 상세를 조회할 수 있도록
+        // assertAccessible 로 통합 (ADMIN/매니저 + 배정 LEW 모두 통과).
+        ConciergeOwnershipValidator.assertAccessible(request, actor);
 
         List<ConciergeNote> notes = noteRepository
             .findAllByConciergeRequest_ConciergeRequestSeqOrderByCreatedAtDesc(id);
@@ -413,15 +434,19 @@ public class ConciergeManagerService {
             Long managerSeq, HttpServletRequest httpRequest) {
         User actor = loadActor(managerSeq);
         ConciergeRequest cr = loadRequest(conciergeRequestId);
-        ConciergeOwnershipValidator.assertManagerCanAccess(cr, actor);
+        // ★ PR-3 (D7=B): assigned LEW 도 호출 가능 — assertAccessible 로 통합.
+        // ADMIN/매니저는 기존 동작 보존 (AC-D3), LEW 는 본인 assignedLewSeq 일 때만 통과 (AC-D1/D2/D4).
+        ConciergeOwnershipValidator.assertAccessible(cr, actor);
 
-        // CONTACTING 또는 QUOTE_SENT 상태에서 대리 생성 허용
-        // (PRD §5.2: CONTACTING → APPLICATION_CREATED, Phase 1.5: QUOTE_SENT → APPLICATION_CREATED)
-        if (cr.getStatus() != ConciergeRequestStatus.CONTACTING
-                && cr.getStatus() != ConciergeRequestStatus.QUOTE_SENT) {
+        // ★ PR-3: LEW_ASSIGNED 상태에서도 대리 생성 허용 (LEW 가 신청서를 만드는 정상 동선).
+        // CONTACTING/QUOTE_SENT 는 매니저가 LEW 할당 전에도 만들 수 있도록 기존 동작 유지.
+        ConciergeRequestStatus current = cr.getStatus();
+        if (current != ConciergeRequestStatus.CONTACTING
+                && current != ConciergeRequestStatus.QUOTE_SENT
+                && current != ConciergeRequestStatus.LEW_ASSIGNED) {
             throw new BusinessException(
                 "Application can only be created after first contact or quote is recorded "
-                    + "(requires status=CONTACTING or QUOTE_SENT; current status=" + cr.getStatus() + ")",
+                    + "(requires status=CONTACTING, QUOTE_SENT, or LEW_ASSIGNED; current status=" + current + ")",
                 HttpStatus.CONFLICT, "INVALID_STATE_FOR_APPLICATION");
         }
 
@@ -454,6 +479,131 @@ public class ConciergeManagerService {
             .applicationSeq(created.getApplicationSeq())
             .conciergeRequestSeq(cr.getConciergeRequestSeq())
             .conciergeStatus(cr.getStatus().name())
+            .build();
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // ★ PR-3 — LEW 배정 (셀프 할당 포함, D6=A)
+    // ────────────────────────────────────────────────────────────
+
+    /**
+     * LEW 배정/재배정 엔드포인트의 비즈니스 로직.
+     *
+     * <p>스펙: §5 / §10 AC-L1~L4, §14 PR-3.</p>
+     *
+     * <h3>흐름</h3>
+     * <ol>
+     *   <li>actor 로드 + ConciergeRequest 로드 + ownership 검증 (매니저: 본인 배정 / ADMIN: 우회)</li>
+     *   <li>LEW 후보 검증: hasRole(LEW), status ACTIVE, approvedStatus APPROVED</li>
+     *   <li>도메인 메서드 {@link ConciergeRequest#assignLewWithTransition} 호출 — 상태 전이 + 시각 갱신 + 이전 LEW 반환</li>
+     *   <li>AuditLog 기록 (selfAssign 플래그 metadata 포함)</li>
+     *   <li>ConciergeLewAssignedEvent 발행 — listener 가 AFTER_COMMIT 으로 알림 처리</li>
+     * </ol>
+     *
+     * <h3>D6=A 셀프 할당</h3>
+     * lewUserSeq == actor.userSeq 이고 actor 가 LEW role 보유 시 정상 처리. 음소거는 listener 책임.
+     */
+    @Transactional
+    public AssignLewResponse assignLew(Long conciergeRequestId,
+                                         AssignLewRequest request,
+                                         Long actorSeq,
+                                         HttpServletRequest httpRequest) {
+        // ── 1) 입력 ──
+        if (request == null || request.getLewUserSeq() == null) {
+            throw new BusinessException("lewUserSeq is required",
+                HttpStatus.BAD_REQUEST, "INVALID_REQUEST");
+        }
+        Long lewUserSeq = request.getLewUserSeq();
+
+        User actor = loadActor(actorSeq);
+        ConciergeRequest cr = loadRequest(conciergeRequestId);
+
+        // ── 2) ownership: 매니저 본인 배정 또는 ADMIN ──
+        // 본 엔드포인트는 LEW 호출자를 받지 않는다 — 매니저/ADMIN 만 assign-lew 가능.
+        ConciergeOwnershipValidator.assertManagerCanAccess(cr, actor);
+
+        // ── 3) LEW 후보 검증 ──
+        User targetLew = userRepository.findById(lewUserSeq)
+            .orElseThrow(() -> new BusinessException(
+                "Target LEW user not found", HttpStatus.BAD_REQUEST, "USER_NOT_FOUND"));
+
+        // role: hasRole(LEW) — primary 또는 secondary 어디든 보유하면 통과 (D1=B 다중 역할).
+        if (!targetLew.hasRole(UserRole.LEW)) {
+            throw new BusinessException(
+                "Target user does not have the LEW role",
+                HttpStatus.BAD_REQUEST, "USER_NOT_LEW");
+        }
+
+        // status 활성 + 승인 검증
+        if (targetLew.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException(
+                "Target LEW is not active (status=" + targetLew.getStatus() + ")",
+                HttpStatus.BAD_REQUEST, "USER_INACTIVE");
+        }
+        // primary 가 LEW 인 경우에만 approvedStatus 가 의미 있음 (다중 역할 매니저+LEW 의 경우 primary=CONCIERGE_MANAGER 이면 approvedStatus null).
+        // 안전망: primary 또는 secondary 로 LEW 를 보유하지만 LEW 활동을 위한 승인 정보가 있으면 검증, 없으면 통과.
+        if (targetLew.getRole() == UserRole.LEW
+                && targetLew.getApprovedStatus() != ApprovalStatus.APPROVED) {
+            throw new BusinessException(
+                "Target LEW is not approved",
+                HttpStatus.BAD_REQUEST, "LEW_NOT_APPROVED");
+        }
+
+        // ── 4) 셀프 할당 판정 (D6=A) ──
+        boolean selfAssigned = lewUserSeq.equals(actor.getUserSeq()) && actor.hasRole(UserRole.LEW);
+
+        // ── 5) 도메인 메서드 호출 ──
+        Long previousLewSeq;
+        try {
+            previousLewSeq = cr.assignLewWithTransition(lewUserSeq, LocalDateTime.now());
+        } catch (IllegalStateException e) {
+            // 예: COMPLETED/CANCELLED 등 진입 불가 상태
+            throw new BusinessException(
+                "Cannot assign LEW from current status: " + cr.getStatus(),
+                HttpStatus.CONFLICT, "INVALID_TRANSITION");
+        }
+
+        // ── 6) Audit ──
+        StringBuilder description = new StringBuilder();
+        description.append("Concierge LEW assigned: lewUserSeq=").append(lewUserSeq)
+                   .append(", lewName=").append(targetLew.getFullName())
+                   .append(", publicCode=").append(cr.getPublicCode())
+                   .append(", selfAssign=").append(selfAssigned);
+        if (previousLewSeq != null) {
+            description.append(", previousLewSeq=").append(previousLewSeq);
+        }
+        auditLogService.log(
+            actor.getUserSeq(), actor.getEmail(), actor.getRole().name(),
+            AuditAction.CONCIERGE_LEW_ASSIGNED, AuditCategory.APPLICATION,
+            "concierge_request", String.valueOf(cr.getConciergeRequestSeq()),
+            description.toString(), null, null,
+            extractIp(httpRequest), userAgent(httpRequest),
+            "POST", "/api/concierge-manager/requests/" + cr.getConciergeRequestSeq() + "/assign-lew", 200);
+
+        // ── 7) AFTER_COMMIT 이벤트 발행 ──
+        eventPublisher.publishEvent(new ConciergeLewAssignedEvent(
+            cr.getConciergeRequestSeq(),
+            cr.getPublicCode(),
+            lewUserSeq,
+            previousLewSeq,
+            actor.getUserSeq(),
+            selfAssigned,
+            cr.getSubmitterName(),
+            cr.getSubmitterEmail(),
+            cr.getSubmitterPhone(),
+            cr.getMemo()));
+
+        log.info("Concierge LEW assigned: conciergeRequestSeq={}, lewSeq={}, previousLewSeq={}, selfAssign={}, by actorSeq={}",
+            cr.getConciergeRequestSeq(), lewUserSeq, previousLewSeq, selfAssigned, actor.getUserSeq());
+
+        return AssignLewResponse.builder()
+            .conciergeRequestSeq(cr.getConciergeRequestSeq())
+            .assignedLewSeq(lewUserSeq)
+            .assignedLewName(targetLew.getFullName())
+            .lewAssignedAt(cr.getLewAssignedAt())
+            .previousLewSeq(previousLewSeq)
+            .selfAssigned(selfAssigned)
+            .status(cr.getStatus().name())
             .build();
     }
 
@@ -530,6 +680,9 @@ public class ConciergeManagerService {
             .applicantUserStatus(applicant != null ? applicant.getStatus().name() : null)
             .createdAt(cr.getCreatedAt())
             .firstContactAt(cr.getFirstContactAt())
+            // ★ PR-3
+            .assignedLewSeq(cr.getAssignedLewSeq())
+            .lewAssignedAt(cr.getLewAssignedAt())
             .build();
     }
 
@@ -566,6 +719,18 @@ public class ConciergeManagerService {
 
         boolean marketing = Boolean.TRUE.equals(cr.getMarketingOptIn());
 
+        // ★ PR-3: 배정 LEW 정보 채우기.
+        Long assignedLewSeq = cr.getAssignedLewSeq();
+        String lewName = null;
+        String lewEmail = null;
+        if (assignedLewSeq != null) {
+            User lew = userRepository.findById(assignedLewSeq).orElse(null);
+            if (lew != null) {
+                lewName = lew.getFullName();
+                lewEmail = lew.getEmail();
+            }
+        }
+
         return ConciergeRequestDetail.builder()
             .conciergeRequestSeq(cr.getConciergeRequestSeq())
             .publicCode(cr.getPublicCode())
@@ -593,6 +758,11 @@ public class ConciergeManagerService {
             .quotedAmount(cr.getQuotedAmount())
             .quoteSentAt(cr.getQuoteSentAt())
             .verificationPhrase(cr.getVerificationPhrase())
+            // ★ PR-3 필드
+            .assignedLewSeq(assignedLewSeq)
+            .assignedLewName(lewName)
+            .assignedLewEmail(lewEmail)
+            .lewAssignedAt(cr.getLewAssignedAt())
             .notes(noteResponses)
             .applicantStatus(applicantInfo)
             .build();

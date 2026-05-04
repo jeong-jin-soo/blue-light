@@ -342,6 +342,47 @@ public interface EmailService {
                                  byte[] attachmentBytes, String attachmentFilename);
 
     /**
+     * ★ Concierge 강화 + 별도 수금 PR-3 — LEW 가 ConciergeRequest 에 배정되었음을 알리는 이메일.
+     *
+     * <p>스펙: {@code doc/Project Analysis/concierge-flow-and-offline-payment-spec.md} §3 S3, §14 PR-3.</p>
+     *
+     * <p><b>Subject 정책 (PDPA 최소화)</b>: publicCode 만 노출 (예:
+     * {@code [LicenseKaki] You have been assigned to a Concierge request · #C-2026-0042}).
+     * 신청자 이름/이메일/전화는 본문에만 — 메일 헤더 캐싱·검색 노출 차단.</p>
+     *
+     * <p><b>본문 구성</b>: 신청자 연락 정보(이름/이메일/전화) + 메모 + 컨시어지 상세 페이지 링크 +
+     * 행동 안내("연락 후 신청서 대행 작성 가능") + 표준 반피싱 푸터.</p>
+     *
+     * <p><b>실패 정책</b>: 다른 알림 메서드와 동일하게 swallow — 본 메서드는 항상 정상 종료해야 하며,
+     * 호출자({@code ConciergeLewAssignmentNotificationListener}) 가 별도 try/catch 로 감싸 로그만 남긴다.</p>
+     *
+     * @param to              LEW 이메일
+     * @param lewName         LEW 이름 (인사말, escape 후 사용)
+     * @param publicCode      ConciergeRequest 공개 코드 (Subject + CTA URL reference)
+     * @param applicantName   신청자 이름 (본문 표기)
+     * @param applicantEmail  신청자 이메일 (본문 표기)
+     * @param applicantPhone  신청자 전화 (본문 표기)
+     * @param memo            컨시어지 폼 메모 (nullable — null/blank 면 섹션 생략)
+     * @param reassigned      재할당 케이스 여부 (true 면 안내 문구 추가)
+     */
+    void sendConciergeLewAssignedEmail(String to, String lewName, String publicCode,
+                                         String applicantName, String applicantEmail,
+                                         String applicantPhone, String memo,
+                                         boolean reassigned);
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-3 — 이전에 배정되어 있던 LEW 에게 unassign 통보 이메일.
+     *
+     * <p>스펙: §10 AC-L4 — 재할당 발생 시 이전 LEW 에게 알림. 본문은 간결히 — 사유는 노출하지 않고,
+     * 추가 작업이 불필요함만 안내 (PDPA 최소화 + 사칭 방지). 자세한 컨텍스트는 매니저 측 채널로.</p>
+     *
+     * @param to               이전 LEW 이메일
+     * @param lewName          이전 LEW 이름
+     * @param publicCode       ConciergeRequest 공개 코드
+     */
+    void sendConciergeLewUnassignedEmail(String to, String lewName, String publicCode);
+
+    /**
      * PR-3: ADMIN 수동 이메일 미리보기용 HTML 렌더러.
      *
      * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §5.4. 실제 SMTP 발송 없이

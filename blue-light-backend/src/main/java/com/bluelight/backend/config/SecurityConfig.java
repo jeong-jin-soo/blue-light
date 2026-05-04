@@ -102,7 +102,10 @@ public class SecurityConfig {
                         // LEW Service Manager 경로 (SLD_MANAGER 역할 공유)
                         .requestMatchers("/api/lew-service-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
                         // Concierge Manager 경로 (★ Kaki Concierge v1.5 Phase 1 PR#4)
-                        .requestMatchers("/api/concierge-manager/**").hasAnyRole("CONCIERGE_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // ★ PR-3 (D7=B): LEW 도 본인 배정 ConciergeRequest 조회 + 신청서 대행 가능 → URL 레벨 허용.
+                        // 메서드별 fine-grained 가드는 컨트롤러 @PreAuthorize + 서비스 ConciergeOwnershipValidator.assertAccessible 가 책임.
+                        .requestMatchers("/api/concierge-manager/**")
+                            .hasAnyRole("CONCIERGE_MANAGER", "LEW", "ADMIN", "SYSTEM_ADMIN")
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
