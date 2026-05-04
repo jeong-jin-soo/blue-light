@@ -70,6 +70,8 @@ export default function Layout() {
   const lewMenu = [
     { path: '/lew/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/lew/applications', label: 'Applications', icon: '📋' },
+    // ★ Concierge 강화 PR-4 — LEW 본인에 배정된 컨시어지 요청 목록.
+    { path: '/lew/concierge-requests', label: 'My Concierge', icon: '🤝' },
   ];
 
   const sldManagerMenu = [

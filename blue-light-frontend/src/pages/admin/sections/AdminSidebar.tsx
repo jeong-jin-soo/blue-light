@@ -22,6 +22,8 @@ interface Props {
   onCompleteClick: () => void;
   onAssignLewClick: () => void;
   onUnassignLewClick: () => void;
+  /** ★ Concierge 강화 PR-4 — Manual Payment 모달 트리거 (ADMIN/SYSTEM_ADMIN 전용). */
+  onManualPaymentClick?: () => void;
 }
 
 /**
@@ -41,6 +43,7 @@ export function AdminSidebar({
   onCompleteClick,
   onAssignLewClick,
   onUnassignLewClick,
+  onManualPaymentClick,
 }: Props) {
   return (
     <div className="space-y-6 lg:sticky lg:top-6 lg:self-start">
@@ -135,6 +138,24 @@ export function AdminSidebar({
                 📧 Send manual email
               </Button>
             </Link>
+          )}
+
+          {/* ★ Concierge 강화 + 별도 수금 PR-4 — Manual Payment 진입점.
+              스펙 D3=C: ADMIN/SYSTEM_ADMIN 은 PENDING_REVIEW 부터 결제 가능 상태에서 호출 가능.
+              PAID/IN_PROGRESS/COMPLETED/EXPIRED 는 백엔드 409 차단 — UI 도 노출하지 않는다. */}
+          {isAdmin && onManualPaymentClick
+            && (application.status === 'PENDING_REVIEW'
+              || application.status === 'REVISION_REQUESTED'
+              || application.status === 'PENDING_PAYMENT') && (
+            <Button
+              variant="ghost"
+              fullWidth
+              size="sm"
+              onClick={onManualPaymentClick}
+              loading={actionLoading}
+            >
+              💰 Record manual payment
+            </Button>
           )}
         </div>
       </Card>

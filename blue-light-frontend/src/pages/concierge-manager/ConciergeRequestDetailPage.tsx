@@ -22,6 +22,12 @@ import conciergeManagerApi, {
   type ConciergeStatus,
   type NoteChannel,
 } from '../../api/conciergeManagerApi';
+// ★ Concierge 강화 PR-4 — Manual payment + LEW 배정 모달 + 영수증 이력 카드.
+import { ConciergeManualPaymentModal } from '../../components/concierge-manager/ConciergeManualPaymentModal';
+import { AssignLewModal } from '../../components/concierge-manager/AssignLewModal';
+import { useToastStore } from '../../stores/toastStore';
+import type { ManualPaymentPayload } from '../../types/manualPayment';
+import type { AssignLewRequestPayload } from '../../types/concierge';
 
 function errMsg(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'message' in err) {
@@ -33,11 +39,17 @@ function errMsg(err: unknown, fallback: string): string {
 export default function ConciergeRequestDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const toast = useToastStore();
   const [detail, setDetail] = useState<ConciergeRequestDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // ★ PR#5 Stage B: Create Application 모달 상태
   const [createAppOpen, setCreateAppOpen] = useState(false);
+  // ★ Concierge 강화 PR-4 — LEW 배정 + 별도 수금 모달 상태.
+  const [assignLewOpen, setAssignLewOpen] = useState(false);
+  const [assignLewLoading, setAssignLewLoading] = useState(false);
+  const [manualPaymentOpen, setManualPaymentOpen] = useState(false);
+  const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
 
   const reload = useCallback(async () => {
     if (!id) return;
@@ -102,6 +114,52 @@ export default function ConciergeRequestDetailPage() {
       payload,
     );
     setDetail(updated);
+  };
+
+  // ★ Concierge 강화 PR-4 — LEW 배정/재배정 핸들러.
+  // 스펙 §5.3, AC-L1~L4. selfAssigned=true 면 toast 메시지를 다르게 표시.
+  const handleAssignLew = async (payload: AssignLewRequestPayload) => {
+    if (!detail) return;
+    setAssignLewLoading(true);
+    // finally 블록에서 로딩 해제 — 에러는 모달이 자체 errMsg 로 표시하도록 자연 propagate.
+    try {
+      const response = await conciergeManagerApi.assignLew(detail.conciergeRequestSeq, payload);
+      if (response.selfAssigned) {
+        toast.success('You assigned this request to yourself.');
+      } else if (response.previousLewSeq) {
+        toast.success(`Request reassigned to ${response.assignedLewName}.`);
+      } else {
+        toast.success(`Assigned to ${response.assignedLewName}. LEW notified.`);
+      }
+      setAssignLewOpen(false);
+      await reload();
+    } finally {
+      setAssignLewLoading(false);
+    }
+  };
+
+  // ★ Concierge 강화 PR-4 — 별도 수금 핸들러.
+  // 스펙 §7.3, AC-A4. AFTER_COMMIT 으로 영수증 발행 + 이메일.
+  const handleRecordManualPayment = async (payload: ManualPaymentPayload) => {
+    if (!detail) return;
+    setManualPaymentLoading(true);
+    // finally 블록에서 로딩 해제 — 에러는 모달이 자체 errMsg 로 표시하도록 자연 propagate.
+    try {
+      const response = await conciergeManagerApi.recordManualPayment(
+        detail.conciergeRequestSeq,
+        payload,
+      );
+      const issuedNote = payload.receiptIssue !== false
+        ? response.invoiceNumber
+          ? ` Receipt ${response.invoiceNumber} issued.`
+          : ' Receipt will be issued shortly.'
+        : '';
+      toast.success(`Payment of SGD ${Number(payload.amount).toFixed(2)} recorded.${issuedNote}`);
+      setManualPaymentOpen(false);
+      await reload();
+    } finally {
+      setManualPaymentLoading(false);
+    }
   };
 
   if (!id) {
@@ -222,6 +280,63 @@ export default function ConciergeRequestDetailPage() {
             </Card>
           )}
 
+          {/* ★ Concierge 강화 PR-3/PR-4 — LEW 배정 패널 (CONTACTING/QUOTE_SENT/APPLICATION_CREATED/LEW_ASSIGNED 에서 노출).
+              스펙 §5.3, AC-L1~L4. ADMIN/매니저 전용 — 본 페이지는 매니저 워크스페이스이므로 항상 표시 가능. */}
+          {(detail.status === 'CONTACTING'
+            || detail.status === 'QUOTE_SENT'
+            || detail.status === 'APPLICATION_CREATED'
+            || detail.status === 'LEW_ASSIGNED') && (
+            <Card padding="md">
+              <h2 className="text-sm font-semibold text-gray-800 mb-2">
+                LEW assignment
+              </h2>
+              {detail.assignedLewSeq ? (
+                <div className="space-y-2 text-sm">
+                  <div className="rounded-md bg-primary-50 border border-primary-100 p-2">
+                    <p className="font-medium text-primary-800">
+                      {detail.assignedLewName ?? `LEW #${detail.assignedLewSeq}`}
+                    </p>
+                    {detail.assignedLewEmail && (
+                      <p className="text-xs text-primary-700 break-all">{detail.assignedLewEmail}</p>
+                    )}
+                    {detail.lewAssignedAt && (
+                      <p className="text-xs text-primary-600 mt-1">
+                        Assigned {new Date(detail.lewAssignedAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" fullWidth onClick={() => setAssignLewOpen(true)}>
+                    Reassign LEW
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">No LEW assigned yet.</p>
+                  <Button variant="outline" size="sm" fullWidth onClick={() => setAssignLewOpen(true)}>
+                    Assign LEW
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* ★ Concierge 강화 PR-4 — 별도 수금 패널 (CANCELLED 외 모든 상태).
+              스펙 §7.3, AC-A4. CANCELLED 와 COMPLETED 는 백엔드 거부 — UI 도 노출 안함. */}
+          {detail.status !== 'CANCELLED' && detail.status !== 'COMPLETED' && (
+            <Card padding="md">
+              <h2 className="text-sm font-semibold text-gray-800 mb-2">
+                Offline payment
+              </h2>
+              <p className="text-xs text-gray-500 mb-2">
+                Record bank transfer / PayNow QR / cash payments received outside the platform.
+                A receipt PDF is auto-generated and emailed to the applicant.
+              </p>
+              <Button variant="outline" size="sm" fullWidth onClick={() => setManualPaymentOpen(true)}>
+                💰 Record manual payment
+              </Button>
+            </Card>
+          )}
+
           {/* ★ PR#6 Stage B: LOA 서명 수집 패널 */}
           <ConciergeLoaCollectionPanel
             applicationSeq={detail.applicationSeq}
@@ -262,6 +377,27 @@ export default function ConciergeRequestDetailPage() {
           // 상태/타임라인/applicationSeq 등 업데이트 반영
           void reload();
         }}
+      />
+
+      {/* ★ Concierge 강화 PR-4 — LEW 배정 모달 */}
+      <AssignLewModal
+        isOpen={assignLewOpen}
+        onClose={() => setAssignLewOpen(false)}
+        onSubmit={handleAssignLew}
+        currentAssigneeName={detail.assignedLewName}
+        currentAssigneeSeq={detail.assignedLewSeq}
+        loading={assignLewLoading}
+      />
+
+      {/* ★ Concierge 강화 PR-4 — Manual Payment 모달 */}
+      <ConciergeManualPaymentModal
+        isOpen={manualPaymentOpen}
+        onClose={() => setManualPaymentOpen(false)}
+        onSubmit={handleRecordManualPayment}
+        publicCode={detail.publicCode}
+        submitterName={detail.submitterName}
+        quotedAmount={detail.quotedAmount}
+        loading={manualPaymentLoading}
       />
     </div>
   );

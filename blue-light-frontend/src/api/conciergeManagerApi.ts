@@ -6,9 +6,20 @@
  */
 
 import axiosClient from './axiosClient';
+import type {
+  ManualPaymentPayload,
+  ManualPaymentResponse,
+} from '../types/manualPayment';
+import type {
+  AssignLewRequestPayload,
+  AssignLewResponseDto,
+} from '../types/concierge';
 
 // ── Types (Backend DTO와 일치) ──
 
+/**
+ * ★ PR-3 (D6=A): LEW_ASSIGNED 상태 추가 — LEW 배정/재배정 후 진입.
+ */
 export type ConciergeStatus =
   | 'SUBMITTED'
   | 'ASSIGNED'
@@ -18,6 +29,7 @@ export type ConciergeStatus =
   | 'AWAITING_APPLICANT_LOA_SIGN'
   | 'AWAITING_LICENCE_PAYMENT'
   | 'IN_PROGRESS'
+  | 'LEW_ASSIGNED'
   | 'COMPLETED'
   | 'CANCELLED';
 
@@ -79,6 +91,11 @@ export interface ConciergeRequestDetail extends ConciergeRequestSummary {
   quotedAmount: number | null;
   quoteSentAt: string | null;
   verificationPhrase: string | null;
+  // ★ PR-3: LEW 배정 (D6=A 셀프 할당 포함)
+  assignedLewSeq: number | null;
+  assignedLewName: string | null;
+  assignedLewEmail: string | null;
+  lewAssignedAt: string | null;
   notes: NoteResponse[];
   applicantStatus: ApplicantStatusInfo | null;
 }
@@ -226,8 +243,8 @@ export const sendConciergeQuote = async (
 };
 
 /**
- * 대리 Application 생성 (★ PR#5 Stage B).
- * - CONTACTING 상태에서만 성공. 성공 시 ConciergeRequest는 APPLICATION_CREATED로 자동 전이.
+ * 대리 Application 생성 (★ PR#5 Stage B / PR-3 권한 확장 — assigned LEW 도 호출 가능).
+ * - CONTACTING / QUOTE_SENT / LEW_ASSIGNED 상태에서 성공. 성공 시 APPLICATION_CREATED 자동 전이.
  * - 에러 코드: INVALID_STATE_FOR_APPLICATION (409), CONCIERGE_NOT_ASSIGNED (403), 기타 400/500.
  */
 export const createApplicationOnBehalf = async (
@@ -241,6 +258,55 @@ export const createApplicationOnBehalf = async (
   return response.data;
 };
 
+// ── PR-3 (LEW 배정) / PR-4 (frontend) ──────────────────────────────
+// 스펙: doc/Project Analysis/concierge-flow-and-offline-payment-spec.md §5.3, §10 AC-L1~L4
+
+/**
+ * LEW 배정/재배정.
+ *
+ * <p>D6=A 셀프 할당: lewUserSeq=actor.userSeq + actor.hasRole(LEW) 시 백엔드가 selfAssigned=true 마킹.
+ * 프론트는 응답 selfAssigned 플래그로 toast 메시지를 분기한다.</p>
+ *
+ * <p>에러 코드:</p>
+ * <ul>
+ *   <li>400 USER_NOT_FOUND — lewUserSeq 의 user 미존재</li>
+ *   <li>400 USER_NOT_LEW — 대상이 LEW role 미보유 (primary 또는 secondary)</li>
+ *   <li>400 USER_INACTIVE — 대상 user.status != ACTIVE</li>
+ *   <li>400 LEW_NOT_APPROVED — primary 가 LEW 인데 approvedStatus != APPROVED</li>
+ *   <li>409 INVALID_TRANSITION — 현재 상태(COMPLETED/CANCELLED)에서 진입 불가</li>
+ *   <li>403 FORBIDDEN — 매니저 본인 배정 아님</li>
+ * </ul>
+ */
+export const assignLewToConcierge = async (
+  id: number,
+  payload: AssignLewRequestPayload,
+): Promise<AssignLewResponseDto> => {
+  const response = await axiosClient.post<AssignLewResponseDto>(
+    `${base}/${id}/assign-lew`,
+    payload,
+  );
+  return response.data;
+};
+
+/**
+ * 컨시어지 별도 수금 기록 (CONCIERGE_MANAGER + ADMIN/SYSTEM_ADMIN).
+ *
+ * <p>스펙 §7.3, AC-A4. CANCELLED 상태가 아닌 모든 컨시어지 요청에서 호출 가능.</p>
+ *
+ * <p>에러 코드: ManualPaymentRequest 와 동일 (400 INVALID_AMOUNT / INVALID_PAYMENT_METHOD,
+ * 409 ALREADY_PAID / INVALID_STATUS).</p>
+ */
+export const recordConciergeManualPayment = async (
+  id: number,
+  payload: ManualPaymentPayload,
+): Promise<ManualPaymentResponse> => {
+  const response = await axiosClient.post<ManualPaymentResponse>(
+    `${base}/${id}/manual-payment`,
+    payload,
+  );
+  return response.data;
+};
+
 export const conciergeManagerApi = {
   list: listConciergeRequests,
   getDetail: getConciergeRequestDetail,
@@ -250,6 +316,9 @@ export const conciergeManagerApi = {
   cancel: cancelConciergeRequest,
   createApplicationOnBehalf,
   sendQuote: sendConciergeQuote,
+  // PR-3 / PR-4
+  assignLew: assignLewToConcierge,
+  recordManualPayment: recordConciergeManualPayment,
 };
 
 export default conciergeManagerApi;

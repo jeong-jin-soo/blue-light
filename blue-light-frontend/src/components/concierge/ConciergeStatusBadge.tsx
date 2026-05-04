@@ -17,6 +17,8 @@ export type ConciergeStatus =
   | 'AWAITING_APPLICANT_LOA_SIGN'
   | 'AWAITING_LICENCE_PAYMENT'
   | 'IN_PROGRESS'
+  // ★ Concierge 강화 PR-3 (D6=A) — LEW 배정/재배정 후 진입 상태.
+  | 'LEW_ASSIGNED'
   | 'COMPLETED'
   | 'CANCELLED';
 
@@ -36,6 +38,8 @@ const STATUS_MAP: Record<ConciergeStatus, StatusConfig> = {
   AWAITING_APPLICANT_LOA_SIGN: { label: 'Awaiting LOA',      variant: 'warning', pulse: true },
   AWAITING_LICENCE_PAYMENT:    { label: 'Awaiting payment',  variant: 'warning', pulse: true },
   IN_PROGRESS:                 { label: 'In progress',       variant: 'info' },
+  // ★ PR-3 (D6=A) — LEW 가 배정된 상태. 매니저/LEW 가 신청서 대행 작성 가능.
+  LEW_ASSIGNED:                { label: 'LEW assigned',      variant: 'info' },
   COMPLETED:                   { label: 'Completed',         variant: 'success' },
   CANCELLED:                   { label: 'Cancelled',         variant: 'gray' },
 };

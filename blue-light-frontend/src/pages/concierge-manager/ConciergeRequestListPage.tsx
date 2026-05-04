@@ -24,6 +24,9 @@ const STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: 'SUBMITTED', label: 'Submitted' },
   { value: 'ASSIGNED', label: 'Assigned' },
   { value: 'CONTACTING', label: 'Contacting' },
+  { value: 'QUOTE_SENT', label: 'Quote sent' },
+  // ★ Concierge 강화 PR-3 (D6=A) — LEW 배정 상태.
+  { value: 'LEW_ASSIGNED', label: 'LEW assigned' },
   { value: 'APPLICATION_CREATED', label: 'Application ready' },
   { value: 'AWAITING_APPLICANT_LOA_SIGN', label: 'Awaiting LOA' },
   { value: 'AWAITING_LICENCE_PAYMENT', label: 'Awaiting payment' },
