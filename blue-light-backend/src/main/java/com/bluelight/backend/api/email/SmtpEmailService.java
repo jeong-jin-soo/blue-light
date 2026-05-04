@@ -368,6 +368,98 @@ public class SmtpEmailService implements EmailService {
     }
 
     /**
+     * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — 영수증 PDF 첨부 이메일.
+     *
+     * <p>스펙: concierge-flow-and-offline-payment-spec.md §8.3, AC-R1. Subject 에는 invoice
+     * number 만 노출 — 금액/이름은 본문에만. 첨부 실패는 RuntimeException 으로 던져 호출자
+     * (ManualPaymentInvoiceListener) 가 audit 에 FAILED 마킹할 수 있게 한다.</p>
+     *
+     * <p>{@code @Async} 미적용 — 호출자가 발송 결과(예외)를 즉시 catch 하여 audit 처리해야 함.</p>
+     */
+    @Override
+    public void sendInvoiceIssuedEmail(String to, String recipientName, String invoiceNumber,
+                                        BigDecimal amount, String currency,
+                                        byte[] attachmentBytes, String attachmentFilename) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA 최소화: invoice number 만 노출.
+            helper.setSubject("[LicenseKaki] Receipt issued · #" + nullSafeStr(invoiceNumber));
+
+            String htmlContent = buildInvoiceIssuedHtml(recipientName, invoiceNumber, amount, currency);
+            helper.setText(htmlContent, true);
+
+            if (attachmentBytes != null && attachmentBytes.length > 0) {
+                String filename = (attachmentFilename != null && !attachmentFilename.isBlank())
+                        ? attachmentFilename
+                        : ("INVOICE_" + nullSafeStr(invoiceNumber) + ".pdf");
+                helper.addAttachment(filename,
+                        new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+            }
+
+            mailSender.send(message);
+            log.info("Invoice issued email sent to: {} (invoiceNumber={}, attachmentBytes={})",
+                    to, invoiceNumber, attachmentBytes != null ? attachmentBytes.length : 0);
+        } catch (jakarta.mail.MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send invoice issued email to: {} (invoiceNumber={})",
+                    to, invoiceNumber, e);
+            // 영수증 이메일 발송 실패는 호출자가 audit 처리해야 하므로 RuntimeException 으로 전파.
+            throw new RuntimeException("Failed to send invoice issued email: " + e.getMessage(), e);
+        }
+    }
+
+    private static String nullSafeStr(String s) {
+        return s == null ? "" : s;
+    }
+
+    /**
+     * 영수증 이메일 HTML 본문 빌더 — PDPA 최소화 + 반(反)피싱 푸터.
+     */
+    private String buildInvoiceIssuedHtml(String recipientName, String invoiceNumber,
+                                           BigDecimal amount, String currency) {
+        String safeName = esc(recipientName != null ? recipientName : "");
+        String safeNumber = esc(invoiceNumber != null ? invoiceNumber : "");
+        String currencyCode = (currency == null || currency.isBlank()) ? "SGD" : currency;
+        String amountText = amount != null ? amount.toPlainString() : "—";
+
+        return """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <title>Receipt issued</title>
+            </head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 16px;">
+              <h2 style="color: #1f2937; margin-top: 0;">Receipt issued</h2>
+              <p>Dear %s,</p>
+              <p>A receipt has been issued for your recent payment to LicenseKaki. Please find the details below — the PDF copy is attached for your records.</p>
+              <table style="border-collapse: collapse; margin: 16px 0;">
+                <tr>
+                  <td style="padding: 6px 12px; color: #6b7280;">Receipt number</td>
+                  <td style="padding: 6px 12px; font-weight: 600;">%s</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 12px; color: #6b7280;">Total amount</td>
+                  <td style="padding: 6px 12px; font-weight: 600;">%s %s</td>
+                </tr>
+              </table>
+              <p>If you have any questions about this receipt, please reply to this email or contact us via the dashboard.</p>
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+              <p style="color: #6b7280; font-size: 12px;">
+                <strong>Anti-phishing notice.</strong> LicenseKaki will never ask for your password, OTP,
+                or full payment card details by email. This email is sent in connection with your existing
+                LicenseKaki account; if you did not expect this message, please ignore it and notify us via the dashboard.
+              </p>
+              <p style="color: #9ca3af; font-size: 11px;">© LicenseKaki — Singapore electrical installation licence platform.</p>
+            </body>
+            </html>
+            """.formatted(safeName, safeNumber, currencyCode, esc(amountText));
+    }
+
+    /**
      * 수동 이메일 본문 HTML — PR-3 부터 {@link ManualEmailHtmlRenderer} 로 추출되어 미리보기와 SMTP
      * 발송이 동일한 결과를 보장한다. 시그니처는 PR-1/PR-2 동작 보존을 위해 그대로 둔다.
      *

@@ -322,4 +322,69 @@ class InvoiceGenerationServiceTest {
         assertThat(result.getDescriptionSnapshot()).isEqualTo(snapshotDescBefore);
         assertThat(result.getInvoiceNumber()).isEqualTo("IN20260422001");
     }
+
+    // ── Concierge 강화 + 별도 수금 PR-2 — CONCIERGE_REQUEST 영수증 발행 ──
+
+    @Test
+    @DisplayName("PR-2: CONCIERGE_REQUEST 결제 → Concierge 스냅샷 빌더로 Invoice 자동 발행")
+    void shouldGenerateInvoiceForConciergePayment() {
+        // Given: CONCIERGE_REQUEST referenceType 결제 + ConciergeRequest entity
+        Payment payment = mock(Payment.class);
+        Long crSeq = 300L;
+        when(payment.getPaymentSeq()).thenReturn(PAYMENT_SEQ);
+        when(payment.getReferenceType()).thenReturn(PaymentReferenceType.CONCIERGE_REQUEST);
+        when(payment.getReferenceSeq()).thenReturn(crSeq);
+        when(payment.getAmount()).thenReturn(new BigDecimal("500.00"));
+
+        com.bluelight.backend.domain.concierge.ConciergeRequest cr =
+                mock(com.bluelight.backend.domain.concierge.ConciergeRequest.class);
+        when(cr.getConciergeRequestSeq()).thenReturn(crSeq);
+        when(cr.getPublicCode()).thenReturn("C-2026-0300");
+        when(cr.getSubmitterName()).thenReturn("Tan Wei Ming");
+        User applicant = mock(User.class);
+        when(applicant.getUserSeq()).thenReturn(77L);
+        when(applicant.getFullName()).thenReturn("Tan Wei Ming");
+        when(cr.getApplicantUser()).thenReturn(applicant);
+        when(conciergeRequestRepository.findById(crSeq)).thenReturn(Optional.of(cr));
+
+        // When: 단일 인자 dispatcher 호출
+        ArgumentCaptor<Invoice> captor = ArgumentCaptor.forClass(Invoice.class);
+        Invoice saved = service.generateFromPayment(payment);
+
+        // Then: Concierge 스냅샷이 저장됨
+        verify(invoiceRepository).save(captor.capture());
+        Invoice persisted = captor.getValue();
+        assertThat(persisted.getReferenceType()).isEqualTo("CONCIERGE_REQUEST");
+        assertThat(persisted.getReferenceSeq()).isEqualTo(crSeq);
+        assertThat(persisted.getApplicationSeq()).isNull(); // Concierge 결제는 application FK 없음
+        assertThat(persisted.getDescriptionSnapshot()).contains("Concierge service fee").contains("C-2026-0300");
+        assertThat(persisted.getBillingRecipientNameSnapshot()).isEqualTo("Tan Wei Ming");
+    }
+
+    @Test
+    @DisplayName("PR-2: CONCIERGE_REQUEST + 동일 payment 의 ACTIVE invoice 이미 존재 → 409")
+    void shouldRejectDuplicateConciergeInvoiceWhenActiveExists() {
+        Payment payment = mock(Payment.class);
+        when(payment.getPaymentSeq()).thenReturn(PAYMENT_SEQ);
+        when(payment.getReferenceType()).thenReturn(PaymentReferenceType.CONCIERGE_REQUEST);
+        when(payment.getReferenceSeq()).thenReturn(300L);
+        when(payment.getAmount()).thenReturn(new BigDecimal("500.00"));
+
+        com.bluelight.backend.domain.concierge.ConciergeRequest cr =
+                mock(com.bluelight.backend.domain.concierge.ConciergeRequest.class);
+        when(cr.getConciergeRequestSeq()).thenReturn(300L);
+        when(cr.getPublicCode()).thenReturn("C-2026-0300");
+        User applicant = mock(User.class);
+        when(applicant.getUserSeq()).thenReturn(77L);
+        when(applicant.getFullName()).thenReturn("Tan");
+        when(cr.getApplicantUser()).thenReturn(applicant);
+        when(conciergeRequestRepository.findById(300L)).thenReturn(Optional.of(cr));
+
+        when(invoiceRepository.existsByPaymentSeqAndStatus(PAYMENT_SEQ, "ACTIVE")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.generateFromPayment(payment))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex -> assertThat(((BusinessException) ex).getStatus().value()).isEqualTo(409));
+        verify(invoiceRepository, never()).save(any());
+    }
 }

@@ -329,6 +329,22 @@ public class LogOnlyEmailService implements EmailService {
     }
 
     @Override
+    public void sendInvoiceIssuedEmail(String to, String recipientName, String invoiceNumber,
+                                        BigDecimal amount, String currency,
+                                        byte[] attachmentBytes, String attachmentFilename) {
+        log.info("==================================================");
+        log.info("[DEV] Invoice Issued Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Recipient: {}", recipientName);
+        log.info("  Invoice Number: {}", invoiceNumber);
+        log.info("  Amount: {} {}", currency, amount);
+        log.info("  Attachment: {} ({} bytes)",
+                attachmentFilename,
+                attachmentBytes != null ? attachmentBytes.length : 0);
+        log.info("==================================================");
+    }
+
+    @Override
     public String renderManualPlainTextHtml(String subject, String bodyText, String adminEmailForFooter) {
         // 개발 환경 — SMTP 와 동일한 HTML 을 반환해야 미리보기가 환경 따라 달라지지 않는다.
         // 별도 로그는 남기지 않는다 (preview 호출은 빈번할 수 있어 노이즈 방지).

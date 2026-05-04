@@ -45,6 +45,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class ConciergeManagerController {
 
     private final ConciergeManagerService managerService;
+    /** ★ Concierge 강화 + 별도 수금 PR-2 — ConciergeRequest 별도 수금. */
+    private final com.bluelight.backend.api.payment.ConciergeManualPaymentService conciergeManualPaymentService;
 
     /**
      * 목록 조회 (페이지네이션 + 상태 필터 + 검색)
@@ -159,6 +161,26 @@ public class ConciergeManagerController {
             id, request.getQuotedAmount(), userSeq);
         return ResponseEntity.ok(
             managerService.sendQuote(id, request, userSeq, httpRequest));
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — ConciergeRequest 별도 수금 기록.
+     * <p>
+     * 스펙: {@code doc/Project Analysis/concierge-flow-and-offline-payment-spec.md} §7.3, AC-A4.
+     * 권한: CONCIERGE_MANAGER (본인 배정 건만), ADMIN, SYSTEM_ADMIN. CANCELLED 거부, 그 외 모든 상태 허용.
+     * AFTER_COMMIT 훅에서 영수증 PDF 자동 발행 + 영수증 이메일 발송.
+     */
+    @PostMapping("/{id}/manual-payment")
+    public ResponseEntity<com.bluelight.backend.api.admin.dto.ManualPaymentResponse> recordManualPayment(
+        Authentication authentication,
+        @PathVariable Long id,
+        @Valid @RequestBody com.bluelight.backend.api.concierge.dto.ConciergeManualPaymentRequest request) {
+        Long actorUserSeq = (Long) authentication.getPrincipal();
+        log.info("Concierge manual payment: conciergeRequestSeq={}, method={}, amount={}, by actorSeq={}",
+            id, request.getPaymentMethod(), request.getAmount(), actorUserSeq);
+        com.bluelight.backend.api.admin.dto.ManualPaymentResponse response =
+            conciergeManualPaymentService.recordOfflinePayment(id, request, actorUserSeq);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**

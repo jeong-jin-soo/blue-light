@@ -189,20 +189,20 @@ public class InvoiceGenerationService {
     }
 
     /**
-     * ★ PR-1 placeholder — CONCIERGE_REQUEST 결제 영수증 스냅샷 빌더.
+     * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — CONCIERGE_REQUEST 결제 영수증 스냅샷 빌더.
      * <p>
-     * PR-2 에서 다음을 구현:
+     * APPLICATION 결제와 동일한 발행자(회사) 스냅샷 + PayNow + footer 를 사용하지만, 빌링·설치 주소·
+     * description 은 ConciergeRequest 도메인에서 추출한다.
      * <ul>
-     *   <li>billingRecipient 는 ConciergeRequest.applicantUser 또는 submitter snapshot 우선</li>
-     *   <li>installation 주소는 신청자 주소 또는 ConciergeRequest.memo 기반 (PR-2 결정)</li>
-     *   <li>description 은 "Concierge Service Fee — &lt;publicCode&gt;" 형태</li>
-     *   <li>회계 흐름은 application 결제와 동일 (currency / paynow / footer 모두 system_settings)</li>
+     *   <li>billingRecipient: {@code ConciergeRequest.applicantUser.fullName} 우선,
+     *       fallback {@code submitterName} (스냅샷)</li>
+     *   <li>billingAddress: ConciergeRequest 폼에는 주소 컬럼이 없어 비워둠 (R6 위험 — 후속 PR 에서 보완 예정).</li>
+     *   <li>installation: 비워둠 (Concierge 서비스 자체 — 물리 설치 주소 없음)</li>
+     *   <li>description: {@code "Concierge service fee — request <publicCode>"}</li>
      * </ul>
-     * PR-1 은 NOT_IMPLEMENTED 비즈니스 예외로 호출 자체를 차단해, 잘못된 PR 차순에서 호출이 발생하면
-     * 즉시 트랜잭션이 롤백되도록 한다.
+     * ACTIVE 영수증 중복 차단(스펙 §10 D3 — kVA invalidation 케이스 대비)은 동일하게 적용.
      */
     Invoice buildSnapshotForConciergeRequest(Payment payment, ConciergeRequest conciergeRequest) {
-        // 인자 검증을 명시적으로 — PR-2 가 본 메서드를 채울 때 sanity check 가 사라지지 않도록.
         if (payment == null || payment.getPaymentSeq() == null) {
             throw new BusinessException("Payment must be persisted",
                     HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
@@ -211,10 +211,112 @@ public class InvoiceGenerationService {
             throw new BusinessException("ConciergeRequest must be persisted",
                     HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
         }
-        throw new BusinessException(
-                "CONCIERGE_REQUEST invoice generation is implemented in PR-2",
-                HttpStatus.NOT_IMPLEMENTED,
-                "NOT_IMPLEMENTED_IN_PR1");
+        // 활성(ACTIVE) 영수증만 중복 발행 차단 — APPLICATION 분기와 동일 정책.
+        if (invoiceRepository.existsByPaymentSeqAndStatus(payment.getPaymentSeq(), "ACTIVE")) {
+            throw new BusinessException(
+                    "Active invoice already exists for payment " + payment.getPaymentSeq(),
+                    HttpStatus.CONFLICT,
+                    "INVOICE_ALREADY_EXISTS");
+        }
+
+        User recipient = conciergeRequest.getApplicantUser();
+        if (recipient == null) {
+            throw new BusinessException("ConciergeRequest applicant user is missing",
+                    HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT");
+        }
+
+        String invoiceNumber = invoiceNumberGenerator.next(LocalDate.now());
+
+        // ── 1) 스냅샷 1차 구성 (pdfFileSeq=null) ──
+        Invoice draft = buildConciergeInvoiceSnapshot(invoiceNumber, payment, conciergeRequest, recipient);
+
+        // ── 2) PDF 렌더 → fileSeq 확정 ──
+        Long pdfFileSeq = invoicePdfRenderer.render(draft);
+
+        // ── 3) 최종 Invoice 빌드 & save ──
+        Invoice persistable = rebuildWithPdfFile(draft, pdfFileSeq);
+        Invoice saved = invoiceRepository.save(persistable);
+
+        // ── 4) AuditLog ──
+        auditLogService.log(
+                null, null, null,
+                AuditAction.INVOICE_GENERATED,
+                AuditCategory.APPLICATION,
+                "Invoice",
+                String.valueOf(saved.getInvoiceSeq()),
+                "Invoice auto-generated for concierge payment " + payment.getPaymentSeq()
+                        + " (number=" + saved.getInvoiceNumber() + ", publicCode=" + conciergeRequest.getPublicCode() + ")",
+                null, null, null, null, null, null, null);
+
+        log.info("Concierge invoice generated: invoiceSeq={}, number={}, paymentSeq={}, conciergeRequestSeq={}",
+                saved.getInvoiceSeq(), saved.getInvoiceNumber(), payment.getPaymentSeq(),
+                conciergeRequest.getConciergeRequestSeq());
+
+        return saved;
+    }
+
+    /**
+     * Concierge 결제용 Invoice 스냅샷 (pdfFileSeq=null 인 draft).
+     * 발행자/통화/PayNow 는 Application 분기와 동일하게 system_settings 에서 로드.
+     */
+    private Invoice buildConciergeInvoiceSnapshot(String invoiceNumber, Payment payment,
+                                                   ConciergeRequest cr, User recipient) {
+        BigDecimal totalAmount = payment.getAmount();
+        BigDecimal rateAmount = totalAmount;
+
+        // 빌링: applicantUser.fullName 우선, fallback submitterName 스냅샷.
+        String billingName = firstNonBlank(recipient.getFullName(), cr.getSubmitterName());
+        if (billingName == null || billingName.isBlank()) {
+            billingName = "Concierge Customer"; // 절대 null 방지 (NOT NULL 컬럼).
+        }
+
+        String description = "Concierge service fee — request " + cr.getPublicCode();
+
+        Long paynowQrFileSeq = resolveSettingLong("invoice_paynow_qr_file_seq");
+        String paynowUen = firstNonBlank(
+                resolveSetting("invoice_paynow_uen"),
+                resolveSetting("invoice_company_uen"));
+
+        String currency = firstNonBlank(resolveSetting("invoice_currency"), "SGD");
+
+        return Invoice.builder()
+                .invoiceNumber(invoiceNumber)
+                .paymentSeq(payment.getPaymentSeq())
+                .referenceType(PaymentReferenceType.CONCIERGE_REQUEST.name())
+                .referenceSeq(cr.getConciergeRequestSeq())
+                .applicationSeq(null) // Concierge 결제는 application FK 없음
+                .recipientUserSeq(recipient.getUserSeq())
+                .issuedByUserSeq(null) // 자동 발행
+                .issuedAt(LocalDateTime.now())
+                .totalAmount(totalAmount)
+                .qtySnapshot(1)
+                .rateAmountSnapshot(rateAmount)
+                .currencySnapshot(currency)
+                .companyNameSnapshot(resolveSetting("invoice_company_name"))
+                .companyAliasSnapshot(resolveSetting("invoice_company_alias"))
+                .companyUenSnapshot(resolveSetting("invoice_company_uen"))
+                .companyAddressLine1Snapshot(resolveSetting("invoice_company_address_line1"))
+                .companyAddressLine2Snapshot(resolveSetting("invoice_company_address_line2"))
+                .companyAddressLine3Snapshot(resolveSetting("invoice_company_address_line3"))
+                .companyEmailSnapshot(resolveSetting("invoice_company_email"))
+                .companyWebsiteSnapshot(resolveSetting("invoice_company_website"))
+                .billingRecipientNameSnapshot(billingName)
+                .billingRecipientCompanySnapshot(null) // Concierge 폼은 회사 정보 미수집
+                .billingAddressLine1Snapshot(null) // R6: 주소 컬럼 부재 — 후속 PR 에서 추가 검토
+                .billingAddressLine2Snapshot(null)
+                .billingAddressLine3Snapshot(null)
+                .billingAddressLine4Snapshot(null)
+                .installationNameSnapshot(null) // 컨시어지 서비스 자체엔 설치 위치 없음
+                .installationAddressLine1Snapshot(null)
+                .installationAddressLine2Snapshot(null)
+                .installationAddressLine3Snapshot(null)
+                .installationAddressLine4Snapshot(null)
+                .descriptionSnapshot(description)
+                .paynowUenSnapshot(paynowUen)
+                .paynowQrFileSeqSnapshot(paynowQrFileSeq)
+                .footerNoteSnapshot(resolveSetting("invoice_footer_note"))
+                .pdfFileSeq(null) // 렌더러에서 확정 후 rebuild
+                .build();
     }
 
     /**

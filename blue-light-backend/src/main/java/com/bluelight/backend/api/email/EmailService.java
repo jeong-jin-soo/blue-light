@@ -316,6 +316,32 @@ public interface EmailService {
     void sendManualPlainTextEmail(String to, String subject, String bodyText, String adminEmailForFooter);
 
     /**
+     * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — 영수증 PDF 첨부 이메일 발송.
+     *
+     * <p>스펙: {@code doc/Project Analysis/concierge-flow-and-offline-payment-spec.md} §8.3, AC-R1.
+     * ADMIN/MANAGER 가 별도 수금을 기록한 직후 자동 발행된 Invoice PDF 를 첨부하여 신청자에게
+     * 발송한다.</p>
+     *
+     * <p><b>Subject 정책 (PDPA 최소화)</b>: invoice number 만 노출 (예: {@code [LicenseKaki] Receipt issued · #LK-RCP-20260501-0001}).
+     * 금액·이름·주소는 본문에만 — 메일 헤더 캐싱·검색 노출 차단.</p>
+     *
+     * <p><b>예외 정책</b>: SMTP/IO 실패 시 {@link RuntimeException} 을 던진다 — 호출자
+     * ({@code ManualPaymentInvoiceListener}) 가 try/catch 로 감싸 audit 에 INVOICE_AUTO_GENERATED_FROM_MANUAL_PAYMENT
+     * 의 실패 status 를 기록하기 위함 (D5=B).</p>
+     *
+     * @param to                   신청자 이메일
+     * @param recipientName        신청자 이름 (escape 후 본문 표시)
+     * @param invoiceNumber        영수증 번호 (Subject + 본문)
+     * @param amount               결제 금액 (본문 — Subject 미노출)
+     * @param currency             통화 코드 (예: SGD)
+     * @param attachmentBytes      Invoice PDF 바이트 (null 이면 첨부 생략)
+     * @param attachmentFilename   첨부 파일명 (예: {@code INVOICE_LK-RCP-20260501-0001.pdf})
+     */
+    void sendInvoiceIssuedEmail(String to, String recipientName, String invoiceNumber,
+                                 BigDecimal amount, String currency,
+                                 byte[] attachmentBytes, String attachmentFilename);
+
+    /**
      * PR-3: ADMIN 수동 이메일 미리보기용 HTML 렌더러.
      *
      * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §5.4. 실제 SMTP 발송 없이
