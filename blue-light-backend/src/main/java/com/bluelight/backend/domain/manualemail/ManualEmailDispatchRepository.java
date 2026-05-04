@@ -70,6 +70,51 @@ public interface ManualEmailDispatchRepository extends JpaRepository<ManualEmail
             Pageable limit);
 
     /**
+     * PR-4 Daily cap 카운트 (스펙 §8.4 / AC-A12, D5=B).
+     *
+     * <p>발송 ADMIN 의 오늘(SGT 자정 기준 since~until) 발송된 수신자 수 합계를 단일 쿼리로 반환.
+     * FAILED 상태 row 는 cap 에서 제외 — SMTP 실패는 ADMIN 의도적 행위 결과가 아니므로 한도를
+     * 소진시키지 않는다. PENDING/SENT/PARTIAL_FAILED 는 모두 합산 (PENDING 도 ADMIN 의 발송
+     * 의도 건수이므로 cap 에 포함, 동시 다발 spam 방지).</p>
+     *
+     * <p>합계 산정 기준: 본 PR 은 row 단위가 아니라 row 의 {@code recipientCount}(=
+     * {@code sent_count + failed_count} 또는 PENDING 시 {@code recipientCount}) 합계를
+     * cap 과 비교한다. 그러나 PENDING row 는 sent_count/failed_count 가 0 이라 그대로 합산
+     * 하면 cap 우회가 가능 — 따라서 PENDING 은 row 1건당 인접 send list 길이를 cap 에 반영
+     * 하기 위해 별도 산식이 필요하다. 본 메서드는 단순/안전한 정책으로 row 1건당 최대
+     * 수신자 수를 (sent + failed) 또는 row 1 (PENDING fallback) 으로 계산한다.</p>
+     *
+     * <p>SQL: {@code SUM(GREATEST(sent_count + failed_count, CASE status WHEN 'PENDING' THEN 1 ELSE 0 END))}.
+     * — 단, JPQL 은 GREATEST 미지원 → MySQL 함수 대신 CASE 식으로 표현.</p>
+     *
+     * <p>FAILED 상태(전체 실패)는 사용자 의도와 무관한 SMTP 다운이므로 cap 에서 빼는 정책 —
+     * 운영 단순화를 위해 PENDING/SENT/PARTIAL_FAILED 만 합산한다.</p>
+     */
+    @Query("""
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN m.dispatchStatus = com.bluelight.backend.domain.manualemail.DispatchStatus.PENDING
+                        THEN CASE WHEN (m.sentCount + m.failedCount) > 0
+                                  THEN (m.sentCount + m.failedCount)
+                                  ELSE 1 END
+                    WHEN m.dispatchStatus = com.bluelight.backend.domain.manualemail.DispatchStatus.SENT
+                        THEN m.sentCount
+                    WHEN m.dispatchStatus = com.bluelight.backend.domain.manualemail.DispatchStatus.PARTIAL_FAILED
+                        THEN (m.sentCount + m.failedCount)
+                    ELSE 0
+                END
+            ), 0)
+            FROM ManualEmailDispatch m
+            WHERE m.senderUserSeq = :senderSeq
+              AND m.createdAt >= :sinceMidnight
+              AND m.createdAt < :untilNextMidnight
+            """)
+    long sumDailyRecipientCountByCreatedBy(
+            @Param("senderSeq") Long senderSeq,
+            @Param("sinceMidnight") LocalDateTime sinceMidnight,
+            @Param("untilNextMidnight") LocalDateTime untilNextMidnight);
+
+    /**
      * 전체 이력 페이지네이션 — 필터 4종(sender/dateRange/status/relatedApplication)을
      * 옵션 파라미터로 받아 단일 쿼리로 처리. null 인 파라미터는 해당 조건을 무시한다.
      */

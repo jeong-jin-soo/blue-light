@@ -28,7 +28,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -76,6 +78,9 @@ public class ManualEmailDispatcher {
     /** MULTI 발송 최대 수신자 수 — UI/SMTP 보호. system_settings 외부화는 PR-4 에서. */
     static final int MULTI_MAX_RECIPIENTS = 100;
 
+    /** PR-4 Daily cap 산정 시각대 — 싱가포르 자정 기준 (스펙 AC-A12 "Resets at 00:00 SGT"). */
+    static final ZoneId SG_ZONE = ZoneId.of("Asia/Singapore");
+
     private final ManualEmailDispatchRepository dispatchRepository;
     private final UserRepository userRepository;
     private final ApplicationRepository applicationRepository;
@@ -83,6 +88,8 @@ public class ManualEmailDispatcher {
     private final ApplicationEventPublisher eventPublisher;
     /** PR-3: Preview 엔드포인트는 SMTP 발송 없이 본문 HTML 만 렌더한다. */
     private final EmailService emailService;
+    /** PR-4: system_settings 에서 daily cap / category suggestions 로드 (설정 우선 원칙). */
+    private final ManualEmailSettings manualEmailSettings;
 
     // ── 1) 발송 ─────────────────────────────────────────────────
 
@@ -99,6 +106,10 @@ public class ManualEmailDispatcher {
                     HttpStatus.BAD_REQUEST,
                     "APPLICATION_NOT_FOUND");
         }
+
+        // PR-4 Daily cap 가드 (스펙 §8.4 / AC-A12, D5=B). 멱등성 가드보다 먼저 — 한도 초과면
+        // 멱등성 비교 자체가 무의미하다. SYSTEM_ADMIN 도 동일 cap 적용 (감사·운영 일관성).
+        guardDailyCap(adminUserSeq, resolved.allEmails().size());
 
         // 멱등성 가드 (D3=B) — 단일/다수 통합 recipientHash 비교.
         String recipientHash = ManualEmailRecipientHasher.hashOf(
@@ -121,6 +132,11 @@ public class ManualEmailDispatcher {
             }
         }
 
+        // PR-4 (D4=B): 인앱 동반 옵션 — null 이면 true 기본값. EXTERNAL 단일 발송도 컬럼은
+        // 채워두되 listener 가 시스템 user_seq 가 없는 row 는 자동 스킵하므로 안전 (행위 동일).
+        boolean alsoInApp = request.getAlsoCreateInAppNotification() == null
+                ? true : request.getAlsoCreateInAppNotification();
+
         // row 저장 (PENDING). bodyFormat 은 PLAIN_TEXT 로 강제.
         // MULTI 도 row 1건 — 수신자 리스트는 JSON 컬럼에 저장.
         ManualEmailDispatch saved = dispatchRepository.save(
@@ -137,6 +153,7 @@ public class ManualEmailDispatcher {
                         .bodyText(request.getBodyText())
                         .bodyFormat(BodyFormat.PLAIN_TEXT)
                         .categoryTag(blankToNull(request.getCategoryTag()))
+                        .alsoCreateInAppNotification(alsoInApp)
                         .build());
 
         // audit 로그 — PENDING 시점에서 즉시 기록 (스펙 AC-A1 / §13.2). SMTP 결과와 무관하게
@@ -402,9 +419,75 @@ public class ManualEmailDispatcher {
         m.put("bodyLength", saved.getBodyText() == null ? 0 : saved.getBodyText().length());
         m.put("categoryTag", saved.getCategoryTag());
         m.put("forceDuplicate", forceDuplicate);
+        // PR-4: 인앱 동반 여부도 audit metadata 에 명시 — 운영 추적 + 사후 재현용.
+        m.put("alsoCreateInAppNotification", saved.isAlsoCreateInAppNotification());
         m.put("status", DispatchStatus.PENDING.name());
         return m;
     }
+
+    // ── 4) Daily cap (PR-4) ────────────────────────────────────
+
+    /**
+     * Daily cap 가드 — 본 발송 직전에 호출. 한도 초과 시 429 (스펙 AC-A12).
+     *
+     * <p>산정 기준: 오늘 SGT 자정~다음 자정 윈도우 내 본 ADMIN 의 row 의 수신자 수 합계 +
+     * 본 발송 추가 수신자 수 가 cap 을 초과하면 거부. FAILED row 는 사용자 의도와 무관한
+     * SMTP 다운이므로 합계에서 제외 (Repository SQL 에서 처리).</p>
+     *
+     * <p>예외 메시지에 잔여 한도를 포함 — 사용자가 발송 가능량을 즉시 인지.</p>
+     */
+    private void guardDailyCap(Long adminUserSeq, int recipientCountThisDispatch) {
+        int dailyCap = manualEmailSettings.loadDailyCap();
+        DailyUsage usage = computeDailyUsage(adminUserSeq, dailyCap);
+        if (usage.usedToday + recipientCountThisDispatch > dailyCap) {
+            int remaining = Math.max(0, dailyCap - usage.usedToday);
+            log.warn("Manual email daily cap exceeded: adminSeq={}, usedToday={}, attempt={}, cap={}, remaining={}",
+                    adminUserSeq, usage.usedToday, recipientCountThisDispatch, dailyCap, remaining);
+            throw new BusinessException(
+                    "Daily limit of " + dailyCap + " manual email recipients reached "
+                            + "(used " + usage.usedToday + ", remaining " + remaining
+                            + "). Resets at 00:00 SGT.",
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "MANUAL_EMAIL_DAILY_CAP_EXCEEDED");
+        }
+    }
+
+    /**
+     * Quota 스냅샷 — Compose UI 가 발송 전에 잔여 한도를 표시할 때 사용 (스펙 §7.2.1 PR-4).
+     */
+    @Transactional(readOnly = true)
+    public QuotaSnapshot getQuotaSnapshot(Long adminUserSeq) {
+        int dailyCap = manualEmailSettings.loadDailyCap();
+        DailyUsage usage = computeDailyUsage(adminUserSeq, dailyCap);
+        int remaining = Math.max(0, dailyCap - usage.usedToday);
+        return new QuotaSnapshot(dailyCap, usage.usedToday, remaining);
+    }
+
+    /**
+     * Category suggestions 로드 — Compose UI 의 추천 드롭다운 옵션 (스펙 §13.3 PR-4).
+     */
+    @Transactional(readOnly = true)
+    public List<String> getCategorySuggestions() {
+        return manualEmailSettings.loadCategorySuggestions();
+    }
+
+    private DailyUsage computeDailyUsage(Long adminUserSeq, int dailyCap) {
+        // SGT 자정 윈도우. 시스템 zone 과 SGT 가 다를 수 있으므로 명시적 변환.
+        LocalDate todaySg = LocalDate.now(SG_ZONE);
+        LocalDateTime since = todaySg.atStartOfDay();
+        LocalDateTime until = todaySg.plusDays(1).atStartOfDay();
+        long sum = dispatchRepository.sumDailyRecipientCountByCreatedBy(adminUserSeq, since, until);
+        // long → int 클램프 (cap 비교만 수행하므로 cap*N 이상이면 cap 으로 잘라도 의미 동일).
+        int usedToday = (int) Math.min(sum, (long) dailyCap * 10L);
+        return new DailyUsage(usedToday);
+    }
+
+    private record DailyUsage(int usedToday) {}
+
+    /**
+     * Daily cap 잔여 한도 스냅샷 (스펙 §7.2.1 PR-4 — Compose UI 우상단 "Today: X / Y sent").
+     */
+    public record QuotaSnapshot(int dailyCap, int usedToday, int remaining) {}
 
     private static String blankToNull(String s) {
         return (s == null || s.isBlank()) ? null : s.trim();

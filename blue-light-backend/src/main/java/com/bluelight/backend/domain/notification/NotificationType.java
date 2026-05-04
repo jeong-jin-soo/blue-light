@@ -38,6 +38,12 @@ public enum NotificationType {
     // 클릭 시 /lew/applications/{seq} 로 라우팅 — Subject 는 PDPA 최소화를 위해 금액 미포함.
     KVA_ADJUSTMENT_SETTLED_LEW,
 
+    // PR-4 (admin-manual-email-spec.md §8.5 / D4=B) — ADMIN 이 수동 이메일을 발송할 때
+    // 시스템 사용자 수신자(APPLICANT/LEW)에게 동반 생성되는 인앱 알림. 옵션 체크박스 기본 ON,
+    // EXTERNAL 수신자에게는 발송되지 않는다 (시스템 계정이 없음). referenceType=APPLICATION
+    // (relatedApplicationSeq 가 있을 때) 또는 MANUAL_EMAIL (없을 때) 로 라우팅 키를 분기한다.
+    ADMIN_MANUAL_EMAIL_NOTICE,
+
     // Phase 1 — Kaki Concierge Service (v1.5)
     CONCIERGE_REQUEST_SUBMITTED,              // N1/N2: 신청 접수 시 신청자/관리자
     CONCIERGE_REQUEST_ASSIGNED,               // N3: 담당자 배정 시 담당자

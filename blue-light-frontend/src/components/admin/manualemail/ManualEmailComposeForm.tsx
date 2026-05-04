@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Textarea } from '../../ui/Textarea';
@@ -6,7 +7,11 @@ import { Select } from '../../ui/Select';
 import { ConfirmDialog } from '../../ui/ConfirmDialog';
 import { useToastStore } from '../../../stores/toastStore';
 import { useAuthStore } from '../../../stores/authStore';
-import { sendManualEmail } from '../../../api/adminManualEmailApi';
+import {
+  getManualEmailCategorySuggestions,
+  sendManualEmail,
+} from '../../../api/adminManualEmailApi';
+import adminApi from '../../../api/adminApi';
 import { SystemUserPicker } from './RecipientPicker';
 import { ApplicationPicker } from './ApplicationPicker';
 import { ManualEmailPreviewModal } from './ManualEmailPreviewModal';
@@ -34,6 +39,7 @@ import type { AdminApplication, User } from '../../../types';
  */
 
 interface ManualEmailComposeFormProps {
+  /** 발송 성공 시 — 부모(History 탭 자동 이동 + quota 갱신). */
   onSent: () => void;
 }
 
@@ -42,10 +48,14 @@ const BODY_MAX = 50_000;
 const MULTI_MIN = 2;
 const MULTI_MAX = 100;
 
-// 카테고리 추천값 — MVP 는 frontend 상수.
-// 설정 우선 원칙 예외: PR-4 에서 system_settings.admin_manual_email_category_suggestions 로 이관 예정 (스펙 §13.3).
-//   사유: PR-3 백엔드는 system_settings 키 시드/조회 API 미포함. 자유 입력은 항상 허용되므로 운영 자유도는 손상 없음.
-const CATEGORY_SUGGESTIONS = ['PAYMENT_NOTICE', 'MAINTENANCE', 'INFO', 'MISC'];
+/**
+ * 카테고리 추천값 폴백 — PR-4 부터 system_settings 에서 로드.
+ *
+ * 설정 우선 원칙 예외: API 실패/네트워크 단절 시 UI 가 fallback 으로 사용.
+ *   사유: 백엔드 미응답 시에도 ADMIN 이 발송 자체는 가능해야 함 (자유 입력 허용 + 추천만 폴백).
+ *   백엔드 ManualEmailSettings.DEFAULT_CATEGORY_SUGGESTIONS 와 동일 4개로 양쪽 일치.
+ */
+const CATEGORY_SUGGESTIONS_FALLBACK = ['PAYMENT_NOTICE', 'MAINTENANCE', 'INFO', 'MISC'];
 
 interface MultiUserChip {
   userSeq: number;
@@ -63,6 +73,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) {
   const toast = useToastStore();
   const { user } = useAuthStore();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [recipientType, setRecipientType] = useState<RecipientType>('APPLICANT');
   // 단일 시스템 사용자 (APPLICANT/LEW)
@@ -79,6 +90,13 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
   const [subject, setSubject] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [categoryTag, setCategoryTag] = useState('');
+  // PR-4 (D4=B): 시스템 사용자 수신자에게 인앱 알림 동반 — 기본 ON.
+  const [alsoCreateInApp, setAlsoCreateInApp] = useState<boolean>(true);
+
+  // PR-4 (§13.3): system_settings 에서 추천 카테고리 로드.
+  const [categorySuggestions, setCategorySuggestions] = useState<string[]>(
+    CATEGORY_SUGGESTIONS_FALLBACK
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -86,6 +104,102 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
   const [duplicateConfirmOpen, setDuplicateConfirmOpen] = useState(false);
   const [duplicateMessage, setDuplicateMessage] = useState<string>('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  // ── PR-4: 마운트 시 카테고리 추천 로드 (system_settings) + URL prefill ───
+  useEffect(() => {
+    let cancelled = false;
+    getManualEmailCategorySuggestions()
+      .then((list) => {
+        if (cancelled) return;
+        if (list.length > 0) setCategorySuggestions(list);
+      })
+      .catch(() => {
+        // API 실패 — fallback 유지. 자유 입력은 항상 허용되므로 발송 자체에 영향 없음.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── PR-4: URL query 기반 prefill — 신청 상세 "Send manual email" 진입점에서 활용 ───
+  // 지원 파라미터:
+  //   ?related={applicationSeq} — 신청 컨텍스트 자동 채움
+  //   &recipientType=APPLICANT|LEW|EXTERNAL|MULTI — recipient type
+  //   &recipientUserSeq={userSeq} — APPLICANT/LEW 단일 수신자 (시스템 사용자 lookup)
+  // 한 번 prefill 한 후 query 는 제거 — 재마운트/뒤로가기 시 중복 적용 방지.
+  useEffect(() => {
+    const related = searchParams.get('related');
+    const rtParam = searchParams.get('recipientType');
+    const userSeqParam = searchParams.get('recipientUserSeq');
+    if (!related && !rtParam && !userSeqParam) return;
+
+    let cancelled = false;
+    const run = async () => {
+      try {
+        // 1) related application — 신청 정보로 컨텍스트 + 신청자 정본 확보.
+        let appLoaded: AdminApplication | null = null;
+        if (related && /^\d+$/.test(related)) {
+          try {
+            appLoaded = await adminApi.getApplication(Number(related));
+            if (!cancelled && appLoaded) setRelatedApplication(appLoaded);
+          } catch {
+            // 신청 조회 실패 — 무시 (사용자가 직접 선택 가능).
+          }
+        }
+
+        // 2) recipientType prefill.
+        let nextType: RecipientType = 'APPLICANT';
+        if (rtParam === 'APPLICANT' || rtParam === 'LEW' || rtParam === 'EXTERNAL' || rtParam === 'MULTI') {
+          nextType = rtParam;
+        }
+        if (!cancelled) setRecipientType(nextType);
+
+        // 3) recipientUserSeq — APPLICANT/LEW 단일 prefill. 신청 상세에서 진입한 케이스
+        //    (recipientUserSeq=appLoaded.userSeq) 면 application 의 user 정보를 그대로 쓴다.
+        if (
+          (nextType === 'APPLICANT' || nextType === 'LEW') &&
+          userSeqParam &&
+          /^\d+$/.test(userSeqParam)
+        ) {
+          const seq = Number(userSeqParam);
+          if (appLoaded && appLoaded.userSeq === seq) {
+            // 신청자 prefill — application 응답의 user* 필드로 User 객체 합성.
+            const synthesized: User = {
+              userSeq: appLoaded.userSeq,
+              email: appLoaded.userEmail,
+              firstName: appLoaded.userFirstName,
+              lastName: appLoaded.userLastName,
+              role: nextType,
+            } as User;
+            if (!cancelled) setSingleUser(synthesized);
+          } else {
+            // application 컨텍스트 없는 직접 user_seq 진입 — myProfile 등 다른 lookup 도구가 없어
+            // SystemUserPicker 의 결과를 기다리지 않고 user 정본 합성이 어렵다. PR-4 범위:
+            // 신청 상세 진입을 1차 유스케이스로 두고, 외부 user_seq 직접 진입은 미지원.
+            // (사용자가 직접 검색 박스에 이메일을 다시 검색하면 됨.)
+            // → 별도 lookup 호출 회피로 단순성 유지.
+            if (!cancelled) {
+              toast.info('Search and select the recipient — pre-fill is supported only from application context.');
+            }
+          }
+        }
+      } finally {
+        // prefill 1회 후 query 제거 — replace=true 로 history 미오염.
+        if (!cancelled) {
+          const next = new URLSearchParams(searchParams);
+          next.delete('related');
+          next.delete('recipientType');
+          next.delete('recipientUserSeq');
+          setSearchParams(next, { replace: true });
+        }
+      }
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Validation ────────────────────────────────────────────
   const recipientCount = useMemo(() => {
@@ -125,6 +239,9 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
       bodyText,
       ...(relatedApplication ? { relatedApplicationSeq: relatedApplication.applicationSeq } : {}),
       ...(categoryTag.trim() ? { categoryTag: categoryTag.trim() } : {}),
+      // PR-4 (D4=B): EXTERNAL 단일 발송에는 인앱 동반이 무의미하지만, 백엔드가 자동 스킵하므로
+      // 일관된 payload 형태로 전송. UI 에서는 EXTERNAL 시 체크박스 disabled.
+      alsoCreateInAppNotification: alsoCreateInApp,
     };
     if (recipientType === 'APPLICANT' || recipientType === 'LEW') {
       return { ...base, recipientUserSeq: singleUser?.userSeq ?? null };
@@ -139,6 +256,9 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
       recipientEmails: multiExternals.map((e) => e.email),
     };
   };
+
+  // EXTERNAL 단일 발송에는 시스템 사용자가 없어 인앱 동반이 적용되지 않는다 — 체크박스 disabled.
+  const inAppCheckboxDisabled = recipientType === 'EXTERNAL';
 
   // ── Recipient handlers ────────────────────────────────────
   const handleSingleSelect = (u: User) => {
@@ -216,6 +336,7 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
     setSubject('');
     setBodyText('');
     setCategoryTag('');
+    setAlsoCreateInApp(true);  // PR-4: 기본 ON 으로 복원.
     setFieldErrors({});
   };
 
@@ -250,6 +371,11 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
             'Same email was sent within the past 30 seconds. Send anyway?'
         );
         setDuplicateConfirmOpen(true);
+      } else if (e.code === 'MANUAL_EMAIL_DAILY_CAP_EXCEEDED') {
+        // PR-4 (D5=B): cap 초과 — toast + onSent 콜백으로 부모가 quota 갱신.
+        toast.error(e.message || 'Daily manual email cap reached. Try again after midnight SGT.');
+        // 부모가 quota 를 새로 가져와 한도 표시를 갱신할 수 있도록 onSent 알림 (실제 발송은 안 됨).
+        onSent();
       } else if (e.code === 'MULTI_REQUIRES_AT_LEAST_TWO_RECIPIENTS') {
         setFieldErrors({ recipient: `Please add at least ${MULTI_MIN} recipients` });
       } else if (e.code === 'MULTI_EXCEEDS_MAX_RECIPIENTS') {
@@ -462,11 +588,11 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
         <div className="flex gap-2">
           <div className="w-44">
             <Select
-              value={CATEGORY_SUGGESTIONS.includes(categoryTag) ? categoryTag : ''}
+              value={categorySuggestions.includes(categoryTag) ? categoryTag : ''}
               onChange={(e) => setCategoryTag(e.target.value)}
               options={[
                 { value: '', label: '(none)' },
-                ...CATEGORY_SUGGESTIONS.map((c) => ({ value: c, label: c })),
+                ...categorySuggestions.map((c) => ({ value: c, label: c })),
               ]}
             />
           </div>
@@ -513,6 +639,31 @@ export function ManualEmailComposeForm({ onSent }: ManualEmailComposeFormProps) 
         <div className={`mt-1 text-xs text-right ${bodyText.length === BODY_MAX ? 'text-error-600' : 'text-gray-400'}`}>
           {bodyText.length} / {BODY_MAX}
         </div>
+      </div>
+
+      {/* PR-4 (D4=B): 인앱 알림 동반 옵션 — 시스템 사용자 수신자에게만 적용. */}
+      <div className="pt-1">
+        <label
+          className={`inline-flex items-start gap-2 text-sm cursor-pointer ${
+            inAppCheckboxDisabled ? 'cursor-not-allowed opacity-60' : ''
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={alsoCreateInApp}
+            onChange={(e) => setAlsoCreateInApp(e.target.checked)}
+            disabled={inAppCheckboxDisabled}
+            className="mt-0.5 text-primary"
+          />
+          <span>
+            <span className="text-gray-800">Also create in-app notification for system users</span>
+            <span className="block text-xs text-gray-500 mt-0.5">
+              {inAppCheckboxDisabled
+                ? 'In-app notification is only sent to system users (APPLICANT/LEW). EXTERNAL recipients receive email only.'
+                : 'Recommended — recipients see the email subject as a card on their dashboard.'}
+            </span>
+          </span>
+        </label>
       </div>
 
       {/* Actions */}

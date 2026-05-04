@@ -60,6 +60,7 @@ class ManualEmailDispatcherTest {
     private AuditLogService auditLogService;
     private ApplicationEventPublisher eventPublisher;
     private com.bluelight.backend.api.email.EmailService emailService;
+    private ManualEmailSettings manualEmailSettings;
     private ManualEmailDispatcher dispatcher;
 
     @BeforeEach
@@ -70,9 +71,16 @@ class ManualEmailDispatcherTest {
         auditLogService = mock(AuditLogService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         emailService = mock(com.bluelight.backend.api.email.EmailService.class);
+        manualEmailSettings = mock(ManualEmailSettings.class);
         dispatcher = new ManualEmailDispatcher(
                 dispatchRepository, userRepository, applicationRepository,
-                auditLogService, eventPublisher, emailService);
+                auditLogService, eventPublisher, emailService, manualEmailSettings);
+
+        // PR-4: daily cap 기본 100 — 단위 테스트는 cap 미접근 시나리오만.
+        when(manualEmailSettings.loadDailyCap()).thenReturn(100);
+        // sumDailyRecipientCountByCreatedBy 는 0 (오늘 발송 없음) 으로 stub — cap 가드 무력화.
+        when(dispatchRepository.sumDailyRecipientCountByCreatedBy(anyLong(), any(), any()))
+                .thenReturn(0L);
 
         // dispatchRepository.save() 가 dispatchSeq 가 채워진 entity 를 반환하도록 stub.
         when(dispatchRepository.save(any(ManualEmailDispatch.class))).thenAnswer(inv -> {

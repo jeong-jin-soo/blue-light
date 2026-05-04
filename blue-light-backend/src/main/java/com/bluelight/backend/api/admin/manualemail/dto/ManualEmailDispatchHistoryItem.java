@@ -45,6 +45,8 @@ public class ManualEmailDispatchHistoryItem {
     private final String failedReason;
     private final LocalDateTime dispatchedAt;
     private final LocalDateTime createdAt;
+    /** PR-4 (D4=B): 시스템 사용자 수신자 인앱 알림 동반 생성 여부. */
+    private final boolean alsoCreateInAppNotification;
 
     public static ManualEmailDispatchHistoryItem from(ManualEmailDispatch entity) {
         // PR-2: recipientCount 는 single/multi 통합 — entity.resolveAllRecipientEmails() 의 size.
@@ -69,6 +71,7 @@ public class ManualEmailDispatchHistoryItem {
                 .failedReason(entity.getFailedReason())
                 .dispatchedAt(entity.getDispatchedAt())
                 .createdAt(entity.getCreatedAt())
+                .alsoCreateInAppNotification(entity.isAlsoCreateInAppNotification())
                 .build();
     }
 }

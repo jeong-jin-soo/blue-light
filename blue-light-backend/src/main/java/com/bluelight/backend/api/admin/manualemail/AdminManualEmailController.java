@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 /**
  * ADMIN 수동 이메일 발송 컨트롤러 (PR-1).
@@ -130,6 +132,36 @@ public class AdminManualEmailController {
                 request.getBodyText() == null ? 0 : request.getBodyText().length());
         ManualEmailPreviewResponse response = dispatcher.preview(request, adminSeq);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * PR-4: 잔여 발송 한도(daily cap) 조회 — Compose UI 우상단 표시용 (스펙 §7.2.1).
+     *
+     * <p>응답: {@code { dailyCap, usedToday, remaining }}. usedToday 는 본 ADMIN 이 오늘
+     * SGT 자정 이후 발송한 row 의 recipientCount 합계 (FAILED 제외). cap 은 system_settings
+     * {@code admin_manual_email_daily_cap} 에서 로드 (D5=B, 기본 100).</p>
+     */
+    @GetMapping("/quota")
+    public ResponseEntity<ManualEmailDispatcher.QuotaSnapshot> getQuota(Authentication authentication) {
+        Long adminSeq = (Long) authentication.getPrincipal();
+        ManualEmailDispatcher.QuotaSnapshot quota = dispatcher.getQuotaSnapshot(adminSeq);
+        log.debug("GET /api/admin/manual-emails/quota: adminSeq={}, used={}, cap={}",
+                adminSeq, quota.usedToday(), quota.dailyCap());
+        return ResponseEntity.ok(quota);
+    }
+
+    /**
+     * PR-4: Category tag 추천 목록 — Compose UI 드롭다운 옵션 (스펙 §13.3).
+     *
+     * <p>응답: {@code { suggestions: ["PAYMENT_NOTICE", "MAINTENANCE", ...] }}. 값은
+     * system_settings {@code admin_manual_email_category_suggestions} 에서 CSV 로 로드.
+     * row 미존재/빈 값 시 기본 4개 폴백.</p>
+     */
+    @GetMapping("/category-suggestions")
+    public ResponseEntity<Map<String, List<String>>> getCategorySuggestions() {
+        List<String> suggestions = dispatcher.getCategorySuggestions();
+        log.debug("GET /api/admin/manual-emails/category-suggestions: {} options", suggestions.size());
+        return ResponseEntity.ok(Map.of("suggestions", suggestions));
     }
 
     private int clampPageSize(int requested) {

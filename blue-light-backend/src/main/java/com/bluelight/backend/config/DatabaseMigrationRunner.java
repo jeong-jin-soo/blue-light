@@ -107,6 +107,9 @@ public class DatabaseMigrationRunner {
             // ── ADMIN Manual Email Dispatch (PR-2): MULTI 컬럼 + 멱등성 해시 보강 ──
             // PR-1 운영 DB 에 _json + recipient_hash 컬럼이 누락되어 있을 수 있으므로 idempotent ALTER.
             migrateManualEmailRecipientLists(conn);
+            // ── ADMIN Manual Email Dispatch (PR-4): 인앱 동반 옵션 컬럼 추가 (D4=B) ──
+            // 기존 row 는 default true 로 backfill — PR-1/2/3 동작 변경 없이 인앱 옵션이 뒤늦게 켜진 형태.
+            migrateManualEmailInAppOptionColumn(conn);
             seedSystemSettings(conn);
             // ── invoice_footer_note 브랜딩 추가 — 운영 DB row 1회 갱신 ──
             updateInvoiceFooterNoteBranding(conn);
@@ -1040,6 +1043,14 @@ public class DatabaseMigrationRunner {
             {"invoice_footer_note",
              "LicenseKaki by HanVision · No electronic signature is necessary, as this document serves as an official E-Invoice.",
              "E-Invoice footer note"},
+
+            // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md §13.3) — PR-4 ──
+            // D5=B: ADMIN 1인당 일 발송 한도. SGT 자정 기준 윈도우. SYSTEM_ADMIN 도 동일 cap (감사·운영 일관성).
+            {"admin_manual_email_daily_cap", "100",
+             "Daily manual email recipient cap per ADMIN (resets at 00:00 SGT)"},
+            // D4=B (스펙 §13.3): Compose UI 카테고리 추천 드롭다운 옵션 (CSV). 자유 입력은 항상 허용.
+            {"admin_manual_email_category_suggestions", "PAYMENT_NOTICE,MAINTENANCE,INFO,MISC",
+             "Comma-separated category tag suggestions for manual email Compose UI"},
         };
 
         int seeded = 0;
@@ -1753,6 +1764,8 @@ public class DatabaseMigrationRunner {
                 "  failed_count             INT            NOT NULL DEFAULT 0," +
                 "  failed_reason            TEXT           NULL," +
                 "  dispatched_at            DATETIME(6)    NULL," +
+                // PR-4: 인앱 알림 동반 옵션 (D4=B). 기본 ON.
+                "  also_create_in_app_notification TINYINT(1) NOT NULL DEFAULT 1," +
                 "  created_at               DATETIME(6)," +
                 "  updated_at               DATETIME(6)," +
                 "  created_by               BIGINT," +
@@ -1859,6 +1872,41 @@ public class DatabaseMigrationRunner {
                 log.info("Migration [manual-email-pr2]: backfilled recipient_hash for {} rows", updated);
             }
         }
+    }
+
+    /**
+     * 마이그레이션: ADMIN Manual Email Dispatch — PR-4 인앱 동반 옵션 컬럼 추가.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §8.5 / D4=B.</p>
+     *
+     * <ul>
+     *   <li>{@code also_create_in_app_notification} TINYINT(1) NOT NULL DEFAULT 1 —
+     *       시스템 사용자 수신자에게 인앱 알림 동반 생성 여부. 기존 row 는 default 1
+     *       (true) 로 backfill — PR-1/2/3 동작 변경 없이 인앱 옵션이 뒤늦게 ON 된 형태.</li>
+     * </ul>
+     *
+     * <p>idempotent — 컬럼 존재 시 스킵. 기존 PR-1/2/3 row 의 값은 default 1 이 그대로 들어가며,
+     * AFTER_COMMIT 리스너는 row 가 보관된 후 새로 처리되는 발송에만 알림을 보낸다 (이미 처리된
+     * 과거 row 는 listener 가 다시 발화하지 않음 — DB row 단순 backfill 만 영향).</p>
+     */
+    private void migrateManualEmailInAppOptionColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "manual_email_dispatches")) {
+            log.debug("Migration [manual-email-pr4]: table missing, skipping (will be created in schema.sql)");
+            return;
+        }
+        if (columnExists(conn, "manual_email_dispatches", "also_create_in_app_notification")) {
+            log.debug("Migration [manual-email-pr4]: also_create_in_app_notification column exists, skipping");
+            return;
+        }
+        log.info("Migration [manual-email-pr4]: adding also_create_in_app_notification column...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE manual_email_dispatches "
+                + "ADD COLUMN also_create_in_app_notification TINYINT(1) NOT NULL DEFAULT 1 "
+                + "AFTER dispatched_at"
+            );
+        }
+        log.info("Migration [manual-email-pr4]: column added (default 1 backfilled)");
     }
 
     /**

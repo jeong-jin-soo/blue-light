@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin.manualemail;
 
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.notification.NotificationService;
 import com.bluelight.backend.domain.manualemail.BodyFormat;
 import com.bluelight.backend.domain.manualemail.ManualEmailDispatch;
 import com.bluelight.backend.domain.manualemail.ManualEmailDispatchRepository;
@@ -45,6 +46,7 @@ class ManualEmailDispatchSendListenerTest {
     private UserRepository userRepository;
     private EmailService emailService;
     private ManualEmailDispatchStatusUpdater statusUpdater;
+    private NotificationService notificationService;
     private ManualEmailDispatchSendListener listener;
 
     @BeforeEach
@@ -53,8 +55,9 @@ class ManualEmailDispatchSendListenerTest {
         userRepository = mock(UserRepository.class);
         emailService = mock(EmailService.class);
         statusUpdater = mock(ManualEmailDispatchStatusUpdater.class);
+        notificationService = mock(NotificationService.class);
         listener = new ManualEmailDispatchSendListener(
-                dispatchRepository, userRepository, emailService, statusUpdater);
+                dispatchRepository, userRepository, emailService, statusUpdater, notificationService);
     }
 
     private ManualEmailDispatch row() {

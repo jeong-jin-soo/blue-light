@@ -83,4 +83,14 @@ public class SendManualEmailRequest {
      * 재발송임을 명시할 때 {@code true} 로 보내 우회.
      */
     private Boolean forceDuplicate;
+
+    /**
+     * PR-4 (admin-manual-email-spec.md §8.5 / AC-A11 / D4=B): 시스템 사용자 수신자에게 인앱
+     * 알림을 동반 생성할지 여부. 기본값(필드 미지정/null) 은 {@code true} — Compose UI 의
+     * 기본 체크 ON 과 일치한다.
+     *
+     * <p>EXTERNAL 수신자는 시스템 계정이 없어 본 플래그와 무관하게 인앱 알림이 발생하지
+     * 않는다 (값을 false 로 보내도 동작 변경 없음). MULTI 시 시스템 사용자 부분에만 적용.</p>
+     */
+    private Boolean alsoCreateInAppNotification;
 }
