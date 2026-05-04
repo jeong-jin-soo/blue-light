@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -75,7 +76,7 @@ class ManualEmailDispatchSendListenerTest {
     }
 
     @Test
-    @DisplayName("정상 발송 — emailService 호출 + statusUpdater.markSent")
+    @DisplayName("정상 발송 — emailService 호출 + statusUpdater.markBatchResult(sent=1, failed=0)")
     void onDispatchRequested_정상() {
         ManualEmailDispatch entity = row();
         User admin = adminUser("admin@licensekaki.sg");
@@ -89,13 +90,12 @@ class ManualEmailDispatchSendListenerTest {
                 eq("Maintenance notice"),
                 eq("We will undergo maintenance."),
                 eq("admin@licensekaki.sg"));
-        // statusUpdater 빈에 위임 — markSent 가 dispatchSeq 와 함께 호출되어야 한다.
-        verify(statusUpdater).markSent(eq(DISPATCH_SEQ));
-        verify(statusUpdater, never()).markFailed(anyLong(), anyString());
+        // PR-2: markBatchResult 로 통합 — 단일 수신자도 sent=1/failed=0/reason=null.
+        verify(statusUpdater).markBatchResult(eq(DISPATCH_SEQ), eq(1), eq(0), eq(null));
     }
 
     @Test
-    @DisplayName("AC-A8 SMTP 실패 — statusUpdater.markFailed + 예외 swallow (리스너에서 빠져나가지 않음)")
+    @DisplayName("AC-A8 SMTP 실패 — markBatchResult(sent=0, failed=1) + 예외 swallow")
     void onDispatchRequested_SMTP실패() {
         ManualEmailDispatch entity = row();
         User admin = adminUser("admin@licensekaki.sg");
@@ -108,8 +108,8 @@ class ManualEmailDispatchSendListenerTest {
         // 예외가 빠져나오면 안 됨.
         listener.onDispatchRequested(new ManualEmailDispatchRequestedEvent(DISPATCH_SEQ));
 
-        verify(statusUpdater).markFailed(eq(DISPATCH_SEQ), contains("SMTP server unavailable"));
-        verify(statusUpdater, never()).markSent(anyLong());
+        verify(statusUpdater).markBatchResult(eq(DISPATCH_SEQ), eq(0), eq(1),
+                contains("SMTP server unavailable"));
     }
 
     @Test
@@ -143,6 +143,6 @@ class ManualEmailDispatchSendListenerTest {
                 adminEmailCap.capture());
         // 빈 문자열로 fallback — 자동 푸터에 "Sent by:" 빈값이 표시되지만 발송 자체는 진행.
         assertThat(adminEmailCap.getValue()).isEmpty();
-        verify(statusUpdater).markSent(eq(DISPATCH_SEQ));
+        verify(statusUpdater).markBatchResult(eq(DISPATCH_SEQ), eq(1), eq(0), eq(null));
     }
 }

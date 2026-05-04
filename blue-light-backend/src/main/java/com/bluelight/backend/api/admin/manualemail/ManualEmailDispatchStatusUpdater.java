@@ -41,4 +41,27 @@ public class ManualEmailDispatchStatusUpdater {
         dispatchRepository.findById(dispatchSeq)
                 .ifPresent(r -> r.markFailed(LocalDateTime.now(), truncated));
     }
+
+    /**
+     * PR-2 MULTI 발송 결과 일괄 마킹.
+     *
+     * <p>스펙: AC-A4 부분 실패. listener 가 모든 수신자 처리 후 한 번만 호출 — status 결정 규칙은
+     * {@code ManualEmailDispatch#markBatchResult} 에 위임.</p>
+     *
+     * @param dispatchSeq    row PK
+     * @param sentCount      성공 수
+     * @param failedCount    실패 수
+     * @param failedReason   실패 사유 멀티라인 (모두 성공이면 null)
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markBatchResult(Long dispatchSeq, int sentCount, int failedCount, String failedReason) {
+        // failed_reason 컬럼 cap — listener 에서도 cap 하지만 안전망으로 한 번 더 잘라낸다.
+        String safeReason = failedReason;
+        if (safeReason != null && safeReason.length() > FAILED_REASON_MAX) {
+            safeReason = safeReason.substring(0, FAILED_REASON_MAX) + "…(truncated)";
+        }
+        final String finalReason = safeReason;
+        dispatchRepository.findById(dispatchSeq)
+                .ifPresent(r -> r.markBatchResult(LocalDateTime.now(), sentCount, failedCount, finalReason));
+    }
 }

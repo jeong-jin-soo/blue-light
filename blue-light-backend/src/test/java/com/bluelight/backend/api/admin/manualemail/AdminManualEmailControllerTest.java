@@ -163,21 +163,21 @@ class AdminManualEmailControllerTest {
     }
 
     @Test
-    @DisplayName("MULTI — PR-1 거부 → 400 MULTI_NOT_SUPPORTED_IN_PR1")
-    void POST_MULTI_거부() throws Exception {
+    @DisplayName("PR-2: MULTI 1건 이하 → 400 MULTI_REQUIRES_AT_LEAST_TWO_RECIPIENTS")
+    void POST_MULTI_1건_거부() throws Exception {
         SendManualEmailRequest req = applicantReq();
         req.setRecipientType(RecipientType.MULTI);
         when(dispatcher.dispatch(any(SendManualEmailRequest.class), eq(ADMIN_SEQ)))
                 .thenThrow(new BusinessException(
-                        "Multi-recipient dispatch is not supported in PR-1.",
-                        HttpStatus.BAD_REQUEST, "MULTI_NOT_SUPPORTED_IN_PR1"));
+                        "MULTI dispatch requires at least 2 recipients",
+                        HttpStatus.BAD_REQUEST, "MULTI_REQUIRES_AT_LEAST_TWO_RECIPIENTS"));
 
         mockMvc.perform(post("/api/admin/manual-emails")
                         .contentType(MediaType.APPLICATION_JSON)
                         .principal(adminAuth())
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("MULTI_NOT_SUPPORTED_IN_PR1"));
+                .andExpect(jsonPath("$.code").value("MULTI_REQUIRES_AT_LEAST_TWO_RECIPIENTS"));
     }
 
     @Test

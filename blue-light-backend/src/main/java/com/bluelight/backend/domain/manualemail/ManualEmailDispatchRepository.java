@@ -28,7 +28,9 @@ public interface ManualEmailDispatchRepository extends JpaRepository<ManualEmail
      * MySQL VARCHAR/TEXT 동등 비교가 인덱스가 없어도 30초 윈도우 내라면 스캔 비용이 무시할 수준.
      *
      * <p>PR-1 은 단일 수신자만 처리하므로 recipientEmail 단일 필드만 검사. PR-2 에서 다수 수신자
-     * 활성화 시 정렬된 수신자 리스트 해시 비교로 확장 예정.</p>
+     * 활성화 시 정렬된 수신자 리스트 해시 비교({@link #findRecentDuplicateByHash})로 확장된다.
+     * 본 메서드는 PR-1 기존 테스트 호환을 위해 유지하되 실제 호출 경로에서는 더 이상 사용되지
+     * 않는다.</p>
      */
     @Query("""
             SELECT m FROM ManualEmailDispatch m
@@ -44,6 +46,26 @@ public interface ManualEmailDispatchRepository extends JpaRepository<ManualEmail
             @Param("recipientEmail") String recipientEmail,
             @Param("subject") String subject,
             @Param("bodyText") String bodyText,
+            @Param("since") LocalDateTime since,
+            Pageable limit);
+
+    /**
+     * PR-2 멱등성 가드 (D3=B 확장) — 정렬된 수신자 리스트 + subject + bodyText 의 SHA-256 해시를
+     * 단일 컬럼({@code recipient_hash}) 비교로 검사한다. 단일/다수 수신자 양쪽에서 동일한 코드 경로.
+     *
+     * <p>인덱스: {@code idx_manual_email_recipient_hash (sender_user_seq, recipient_hash, created_at DESC)}
+     * — 본 lookup 의 카디널리티를 만족.</p>
+     */
+    @Query("""
+            SELECT m FROM ManualEmailDispatch m
+            WHERE m.senderUserSeq = :senderSeq
+              AND m.recipientHash = :recipientHash
+              AND m.createdAt >= :since
+            ORDER BY m.createdAt DESC
+            """)
+    List<ManualEmailDispatch> findRecentDuplicateByHash(
+            @Param("senderSeq") Long senderSeq,
+            @Param("recipientHash") String recipientHash,
             @Param("since") LocalDateTime since,
             Pageable limit);
 

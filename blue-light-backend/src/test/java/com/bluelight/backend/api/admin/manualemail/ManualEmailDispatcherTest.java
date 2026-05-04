@@ -79,8 +79,8 @@ class ManualEmailDispatcherTest {
             // ID 필드는 null 이지만 본 테스트는 ID 가 응답에 그대로 매핑되는지만 확인하므로 OK.
             return e;
         });
-        // 멱등성 가드 — 기본은 빈 리스트(중복 없음).
-        when(dispatchRepository.findRecentDuplicate(anyLong(), anyString(), anyString(), anyString(), any(), any()))
+        // 멱등성 가드 — PR-2 부터는 hash 기반. 기본은 빈 리스트(중복 없음).
+        when(dispatchRepository.findRecentDuplicateByHash(anyLong(), anyString(), any(), any()))
                 .thenReturn(List.of());
     }
 
@@ -185,15 +185,18 @@ class ManualEmailDispatcherTest {
     }
 
     @Test
-    @DisplayName("AC-A7-PR1 MULTI 거부 — 400 MULTI_NOT_SUPPORTED_IN_PR1")
-    void dispatch_MULTI_거부() {
-        SendManualEmailRequest req = applicantRequest();
+    @DisplayName("PR-2: MULTI 1건 이하 — 400 MULTI_REQUIRES_AT_LEAST_TWO_RECIPIENTS")
+    void dispatch_MULTI_1건_거부() {
+        SendManualEmailRequest req = new SendManualEmailRequest();
         req.setRecipientType(RecipientType.MULTI);
+        // recipientUserSeqs/recipientEmails 모두 비어 있음 → 0건.
+        req.setSubject("S");
+        req.setBodyText("B");
 
         assertThatThrownBy(() -> dispatcher.dispatch(req, ADMIN_SEQ))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Multi-recipient")
-                .matches(t -> ((BusinessException) t).getCode().equals("MULTI_NOT_SUPPORTED_IN_PR1"));
+                .matches(t -> ((BusinessException) t).getCode()
+                        .equals("MULTI_REQUIRES_AT_LEAST_TWO_RECIPIENTS"));
         verify(dispatchRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());
     }
@@ -261,7 +264,7 @@ class ManualEmailDispatcherTest {
     }
 
     @Test
-    @DisplayName("AC-A9 멱등성 — 30초 내 동일 (sender+recipient+subject+body) 발견 시 409")
+    @DisplayName("AC-A9 멱등성 — 30초 내 동일 (sender+recipient hash) 발견 시 409 (PR-2: hash 기반)")
     void dispatch_멱등성_충돌() {
         SendManualEmailRequest req = applicantRequest();
         User user = systemUser(APPLICANT_SEQ, UserRole.APPLICANT, "alice@example.com");
@@ -275,8 +278,9 @@ class ManualEmailDispatcherTest {
                 .bodyText(req.getBodyText())
                 .bodyFormat(BodyFormat.PLAIN_TEXT)
                 .build();
-        when(dispatchRepository.findRecentDuplicate(eq(ADMIN_SEQ), eq("alice@example.com"),
-                eq(req.getSubject()), eq(req.getBodyText()), any(), any()))
+        // PR-2: 어떤 hash 가 입력되어도 동일 row 가 반환되도록 stub — dispatcher 가 정확한 hash 를
+        // 계산하는지는 별도 테스트(ManualEmailRecipientHasherTest)에서 검증.
+        when(dispatchRepository.findRecentDuplicateByHash(eq(ADMIN_SEQ), anyString(), any(), any()))
                 .thenReturn(List.of(recent));
 
         assertThatThrownBy(() -> dispatcher.dispatch(req, ADMIN_SEQ))
@@ -300,8 +304,9 @@ class ManualEmailDispatcherTest {
         assertThat(response.getDispatchStatus()).isEqualTo(DispatchStatus.PENDING);
         verify(dispatchRepository).save(any());
         verify(eventPublisher).publishEvent(any(ManualEmailDispatchRequestedEvent.class));
-        // force=true 면 멱등 검사 자체를 우회 — repository 호출 없음.
-        verify(dispatchRepository, never()).findRecentDuplicate(anyLong(), anyString(), anyString(), anyString(), any(), any());
+        // force=true 면 멱등 검사 자체를 우회 — PR-2 의 hash lookup 도 호출되지 않음.
+        verify(dispatchRepository, never())
+                .findRecentDuplicateByHash(anyLong(), anyString(), any(), any());
     }
 
     @Test

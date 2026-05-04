@@ -104,6 +104,9 @@ public class DatabaseMigrationRunner {
             // syncCreateTablesFromSchemaSql 가 IF NOT EXISTS 로 테이블을 만들지만,
             // 본 메서드는 명시적 멱등 가드를 두어 신규 테이블의 의도가 코드 리뷰에서 보이도록 한다.
             migrateManualEmailDispatchesTable(conn);
+            // ── ADMIN Manual Email Dispatch (PR-2): MULTI 컬럼 + 멱등성 해시 보강 ──
+            // PR-1 운영 DB 에 _json + recipient_hash 컬럼이 누락되어 있을 수 있으므로 idempotent ALTER.
+            migrateManualEmailRecipientLists(conn);
             seedSystemSettings(conn);
             // ── invoice_footer_note 브랜딩 추가 — 운영 DB row 1회 갱신 ──
             updateInvoiceFooterNoteBranding(conn);
@@ -1736,6 +1739,10 @@ public class DatabaseMigrationRunner {
                 "  recipient_type           VARCHAR(20)    NOT NULL," +
                 "  recipient_user_seq       BIGINT         NULL," +
                 "  recipient_email          VARCHAR(254)   NOT NULL," +
+                // PR-2: MULTI 컬럼 + 멱등성 해시 — 새 DB 도 즉시 보유하도록 본 CREATE 에 포함.
+                "  recipient_user_seqs_json TEXT           NULL," +
+                "  recipient_emails_json    TEXT           NULL," +
+                "  recipient_hash           VARCHAR(64)    NULL," +
                 "  related_application_seq  BIGINT         NULL," +
                 "  subject                  VARCHAR(200)   NOT NULL," +
                 "  body_text                TEXT           NOT NULL," +
@@ -1756,12 +1763,101 @@ public class DatabaseMigrationRunner {
                 "  KEY idx_manual_email_dispatched (dispatched_at DESC)," +
                 "  KEY idx_manual_email_status (dispatch_status, dispatched_at DESC)," +
                 "  KEY idx_manual_email_application (related_application_seq)," +
+                "  KEY idx_manual_email_recipient_hash (sender_user_seq, recipient_hash, created_at DESC)," +
                 "  CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq)," +
                 "  CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq)," +
                 "  CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)" +
                 ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
             );
             log.info("Migration [manual-email-dispatches]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: ADMIN Manual Email Dispatch — PR-2 MULTI 컬럼 + 멱등성 해시.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §4 / PR-2.</p>
+     *
+     * <ul>
+     *   <li>{@code recipient_user_seqs_json} TEXT NULL — MULTI 시 시스템 사용자 user_seq 목록 (JSON).</li>
+     *   <li>{@code recipient_emails_json} TEXT NULL — MULTI 시 이메일 목록 (JSON).</li>
+     *   <li>{@code recipient_hash} VARCHAR(64) NULL — 정렬된 수신자 + subject + body 의 SHA-256 hex.</li>
+     *   <li>{@code idx_manual_email_recipient_hash} 인덱스 — 멱등성 lookup 가속.</li>
+     * </ul>
+     *
+     * <p>PR-1 운영 DB 에 본 컬럼들이 누락되어 있을 수 있으므로 idempotent ALTER. 기존 PR-1 row 들은
+     * 단일 수신자 기반 backfill 로 {@code recipient_hash} 를 채워둔다 — MySQL SHA2 함수 + 정규화된
+     * 입력으로 Java 측 {@link com.bluelight.backend.api.admin.manualemail.ManualEmailRecipientHasher}
+     * 와 동일한 해시를 산출. (동일성 보장: 단일 수신자라 정렬 불필요, 소문자 + trim 만 일치하면 OK.)</p>
+     */
+    private void migrateManualEmailRecipientLists(Connection conn) throws SQLException {
+        if (!tableExists(conn, "manual_email_dispatches")) {
+            log.debug("Migration [manual-email-pr2]: table missing, skipping (will be created in schema.sql)");
+            return;
+        }
+
+        boolean userSeqsJsonExists = columnExists(conn, "manual_email_dispatches", "recipient_user_seqs_json");
+        boolean emailsJsonExists = columnExists(conn, "manual_email_dispatches", "recipient_emails_json");
+        boolean hashExists = columnExists(conn, "manual_email_dispatches", "recipient_hash");
+
+        if (!userSeqsJsonExists) {
+            log.info("Migration [manual-email-pr2]: adding recipient_user_seqs_json column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD COLUMN recipient_user_seqs_json TEXT NULL AFTER recipient_email"
+                );
+            }
+        }
+        if (!emailsJsonExists) {
+            log.info("Migration [manual-email-pr2]: adding recipient_emails_json column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD COLUMN recipient_emails_json TEXT NULL AFTER recipient_user_seqs_json"
+                );
+            }
+        }
+        if (!hashExists) {
+            log.info("Migration [manual-email-pr2]: adding recipient_hash column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD COLUMN recipient_hash VARCHAR(64) NULL AFTER recipient_emails_json"
+                );
+            }
+        }
+
+        // 멱등성 lookup 인덱스 — 컬럼 추가 후에 별도 가드.
+        if (!indexExists(conn, "manual_email_dispatches", "idx_manual_email_recipient_hash")) {
+            log.info("Migration [manual-email-pr2]: adding idx_manual_email_recipient_hash...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD INDEX idx_manual_email_recipient_hash (sender_user_seq, recipient_hash, created_at DESC)"
+                );
+            }
+        }
+
+        // PR-1 row backfill — recipient_hash 가 NULL 인 row 만 단일 수신자 기반으로 채운다.
+        // Java 의 ManualEmailRecipientHasher 와 동일한 입력 정규화를 SQL 로 재현:
+        //   - 단일 수신자: LOWER(TRIM(recipient_email))
+        //   - "" (Unit Separator) 구분자: CONCAT(recipients, CHAR(31), subject, CHAR(31), body_text)
+        //   - SHA2(..., 256) → 64자 hex (소문자)
+        // 단일 수신자라 정렬 불필요 (해시 입력에 단일 항목만 등장).
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE manual_email_dispatches "
+                + "SET recipient_hash = LOWER(SHA2("
+                + "  CONCAT(LOWER(TRIM(recipient_email)), CHAR(31), "
+                + "         IFNULL(subject, ''), CHAR(31), "
+                + "         IFNULL(body_text, ''))"
+                + ", 256)) "
+                + "WHERE recipient_hash IS NULL"
+            );
+            if (updated > 0) {
+                log.info("Migration [manual-email-pr2]: backfilled recipient_hash for {} rows", updated);
+            }
         }
     }
 
