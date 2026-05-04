@@ -26,4 +26,8 @@ public class ConciergeRequestSummary {
     private String applicantUserStatus;
     private LocalDateTime createdAt;
     private LocalDateTime firstContactAt;
+
+    // ★ PR-3: LEW 배정 (목록에서 빠르게 식별하기 위함)
+    private Long assignedLewSeq;
+    private LocalDateTime lewAssignedAt;
 }

@@ -59,6 +59,7 @@ class ConciergeManagerServiceTest {
     private AuditLogService auditLogService;
     private ConciergeNotifier notifier;
     private com.bluelight.backend.api.application.ApplicationService applicationService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private ConciergeManagerService service;
 
     @BeforeEach
@@ -72,11 +73,13 @@ class ConciergeManagerServiceTest {
         auditLogService = mock(AuditLogService.class);
         notifier = mock(ConciergeNotifier.class);
         applicationService = mock(com.bluelight.backend.api.application.ApplicationService.class);
+        eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
 
         service = new ConciergeManagerService(
             applicationService,
             conciergeRepository, noteRepository, userRepository,
-            tokenRepository, tokenService, emailService, auditLogService, notifier);
+            tokenRepository, tokenService, emailService, auditLogService, notifier,
+            eventPublisher);
         ReflectionTestUtils.setField(service, "setupBaseUrl", "http://localhost:5174");
 
         when(noteRepository.save(any(ConciergeNote.class))).thenAnswer(inv -> {

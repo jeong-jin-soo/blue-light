@@ -1784,4 +1784,153 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(pCode, aName, amountStr, scheduleBlock, noteBlock,
                     uen, acctName, amountStr, pCode, pCode, phrase, supportMail, pCode);
     }
+
+    // ────────────────────────────────────────────────────────────
+    // ★ Concierge 강화 + 별도 수금 PR-3 — LEW 배정 알림
+    // ────────────────────────────────────────────────────────────
+
+    @Override
+    @Async
+    public void sendConciergeLewAssignedEmail(String to, String lewName, String publicCode,
+                                                String applicantName, String applicantEmail,
+                                                String applicantPhone, String memo,
+                                                boolean reassigned) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA 최소화 — 신청자 식별 정보는 본문에만, 제목은 publicCode 만 노출.
+            helper.setSubject("[LicenseKaki] You have been assigned to a Concierge request · #" + publicCode);
+            helper.setText(buildConciergeLewAssignedHtml(lewName, publicCode,
+                    applicantName, applicantEmail, applicantPhone, memo, reassigned), true);
+            mailSender.send(message);
+            log.info("Concierge LEW assigned email sent: to={}, publicCode={}, reassigned={}",
+                    to, publicCode, reassigned);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            // 다른 알림 메서드와 동일 — swallow. 호출자는 격리 try/catch 로 audit 만 처리.
+            log.warn("Failed to send Concierge LEW assigned email to: {}, publicCode={}, err={}",
+                    to, publicCode, e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendConciergeLewUnassignedEmail(String to, String lewName, String publicCode) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] You have been unassigned from a Concierge request · #" + publicCode);
+            helper.setText(buildConciergeLewUnassignedHtml(lewName, publicCode), true);
+            mailSender.send(message);
+            log.info("Concierge LEW unassigned email sent: to={}, publicCode={}", to, publicCode);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.warn("Failed to send Concierge LEW unassigned email to: {}, publicCode={}, err={}",
+                    to, publicCode, e.getMessage());
+        }
+    }
+
+    /**
+     * LEW 배정 본문 — 신청자 컨텍스트 + CTA + 표준 푸터.
+     */
+    private String buildConciergeLewAssignedHtml(String lewName, String publicCode,
+                                                   String applicantName, String applicantEmail,
+                                                   String applicantPhone, String memo,
+                                                   boolean reassigned) {
+        String name = esc(lewName);
+        String code = esc(publicCode);
+        String aName = esc(applicantName);
+        String aEmail = esc(applicantEmail == null ? "" : applicantEmail);
+        String aPhone = esc(applicantPhone == null ? "" : applicantPhone);
+        String memoBlock = (memo != null && !memo.isBlank())
+            ? ("<p style=\"margin:12px 0 0 0;padding:10px 12px;background:#f3f4f6;border-left:3px solid #1a3a5c;color:#374151;font-size:13px;\">"
+                + "<strong>Applicant memo:</strong> " + esc(memo) + "</p>")
+            : "";
+        String reassignedBlock = reassigned
+            ? "<p style=\"margin:8px 0;color:#92400e;background:#fffbeb;padding:10px;border-radius:4px;font-size:13px;\">"
+              + "This is a re-assignment. The previous LEW has been unassigned."
+              + "</p>"
+            : "";
+        String ctaUrl = HtmlUtils.htmlEscape(appBaseUrl + "/lew/concierge-requests");
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">You have been assigned to a Concierge request</h2>
+                      <p style="margin:6px 0 0 0;color:#c7d2e3;font-size:13px;">Reference: %s</p>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>A Concierge Manager has assigned you to assist the following applicant. Please contact them and proceed with the application on their behalf.</p>
+                      %s
+
+                      <table style="width:100%%;border-collapse:collapse;margin:16px 0;">
+                        <tr><td style="padding:6px 0;color:#666;width:140px;">Applicant</td>
+                            <td style="padding:6px 0;font-weight:600;color:#111;">%s</td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Email</td>
+                            <td style="padding:6px 0;color:#111;">%s</td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Phone</td>
+                            <td style="padding:6px 0;color:#111;">%s</td></tr>
+                      </table>
+                      %s
+
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Open Concierge requests</a>
+                      </p>
+
+                      <p style="font-size:12px;color:#6b7280;margin-top:20px;">
+                        LicenseKaki will only email you from <strong>@licensekaki.com</strong>.
+                        If you receive a suspicious message claiming to be from LicenseKaki, please email
+                        <a href="%s" style="color:#1a3a5c;">support@licensekaki.sg</a> with the reference %s.
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected and processed under Singapore PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(code, name, reassignedBlock, aName, aEmail, aPhone, memoBlock,
+                    ctaUrl, supportMail, code);
+    }
+
+    /**
+     * LEW unassign 본문 — 간결한 통보 + 추가 작업 불필요 안내.
+     */
+    private String buildConciergeLewUnassignedHtml(String lewName, String publicCode) {
+        String name = esc(lewName);
+        String code = esc(publicCode);
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Concierge request reassigned</h2>
+                      <p style="margin:6px 0 0 0;color:#c7d2e3;font-size:13px;">Reference: %s</p>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>The Concierge request <strong>%s</strong> has been reassigned to a different LEW.
+                         No further action is required from you.</p>
+                      <p>If you believe this is a mistake, please contact your Concierge Manager directly,
+                         or email <a href="%s" style="color:#1a3a5c;">support@licensekaki.sg</a>.</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected and processed under Singapore PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(code, name, code, supportMail);
+    }
 }

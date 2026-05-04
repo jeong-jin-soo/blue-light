@@ -1,6 +1,8 @@
 package com.bluelight.backend.api.concierge;
 
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
+import com.bluelight.backend.api.concierge.dto.AssignLewRequest;
+import com.bluelight.backend.api.concierge.dto.AssignLewResponse;
 import com.bluelight.backend.api.concierge.dto.CancelRequest;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestDetail;
 import com.bluelight.backend.api.concierge.dto.ConciergeRequestSummary;
@@ -41,7 +43,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/concierge-manager/requests")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
+// ★ PR-3 (D7=B): 클래스 레벨에 LEW 추가. LEW 가 호출 가능한 엔드포인트는 본 컨트롤러 안에서
+// (1) GET 목록/상세, (2) POST applications (신청서 대행 작성) 뿐이며, 그 외 매니저-only 엔드포인트는
+// 메서드 레벨 @PreAuthorize 로 LEW 를 명시 차단한다.
+@PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'LEW', 'ADMIN', 'SYSTEM_ADMIN')")
 public class ConciergeManagerController {
 
     private final ConciergeManagerService managerService;
@@ -84,6 +89,7 @@ public class ConciergeManagerController {
      * body: { "nextStatus": "ASSIGNED", "assignedManagerSeq": null }
      */
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
     public ResponseEntity<ConciergeRequestDetail> transitionStatus(
         Authentication authentication,
         @PathVariable Long id,
@@ -101,6 +107,7 @@ public class ConciergeManagerController {
      * POST /api/concierge-manager/requests/{id}/notes
      */
     @PostMapping("/{id}/notes")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
     public ResponseEntity<NoteResponse> addNote(
         Authentication authentication,
         @PathVariable Long id,
@@ -116,6 +123,7 @@ public class ConciergeManagerController {
      * POST /api/concierge-manager/requests/{id}/resend-setup-email
      */
     @PostMapping("/{id}/resend-setup-email")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
     public ResponseEntity<Void> resendSetupEmail(
         Authentication authentication,
         @PathVariable Long id,
@@ -151,6 +159,7 @@ public class ConciergeManagerController {
      * body: { quotedAmount, callScheduledAt?, note? }
      */
     @PostMapping("/{id}/quote")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
     public ResponseEntity<ConciergeRequestDetail> sendQuote(
         Authentication authentication,
         @PathVariable Long id,
@@ -164,6 +173,33 @@ public class ConciergeManagerController {
     }
 
     /**
+     * ★ Concierge 강화 + 별도 수금 PR-3 — LEW 배정/재배정 (D6=A 셀프 할당 포함).
+     *
+     * <p>스펙: §5 / §10 AC-L1~L4 / §14 PR-3.</p>
+     *
+     * <p>권한: CONCIERGE_MANAGER (본인 배정 ConciergeRequest 한정), ADMIN, SYSTEM_ADMIN.
+     * LEW 자체는 호출 불가 — assign-lew 는 매니저/ADMIN 의 결정 행위.</p>
+     *
+     * <p>D6=A 셀프 할당: 매니저 본인이 동시에 LEW role 을 보유한 경우 본인을 LEW 로 할당 가능.
+     * lewUserSeq == actor.userSeq + actor.hasRole(LEW) 일 때 selfAssigned=true 로 audit 마킹.</p>
+     *
+     * @return AssignLewResponse — 새 LEW 정보 + previousLewSeq + selfAssigned
+     */
+    @PostMapping("/{id}/assign-lew")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
+    public ResponseEntity<AssignLewResponse> assignLew(
+        Authentication authentication,
+        @PathVariable Long id,
+        @Valid @RequestBody AssignLewRequest request,
+        HttpServletRequest httpRequest) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        log.info("Concierge assign-lew: conciergeRequestSeq={}, lewUserSeq={}, by actorSeq={}",
+            id, request.getLewUserSeq(), userSeq);
+        AssignLewResponse response = managerService.assignLew(id, request, userSeq, httpRequest);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — ConciergeRequest 별도 수금 기록.
      * <p>
      * 스펙: {@code doc/Project Analysis/concierge-flow-and-offline-payment-spec.md} §7.3, AC-A4.
@@ -171,6 +207,7 @@ public class ConciergeManagerController {
      * AFTER_COMMIT 훅에서 영수증 PDF 자동 발행 + 영수증 이메일 발송.
      */
     @PostMapping("/{id}/manual-payment")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
     public ResponseEntity<com.bluelight.backend.api.admin.dto.ManualPaymentResponse> recordManualPayment(
         Authentication authentication,
         @PathVariable Long id,
@@ -189,6 +226,7 @@ public class ConciergeManagerController {
      * body: { "reason": "..." }
      */
     @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('CONCIERGE_MANAGER', 'ADMIN', 'SYSTEM_ADMIN')")
     public ResponseEntity<ConciergeRequestDetail> cancel(
         Authentication authentication,
         @PathVariable Long id,

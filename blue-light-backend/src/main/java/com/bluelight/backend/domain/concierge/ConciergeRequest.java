@@ -363,24 +363,53 @@ public class ConciergeRequest extends BaseEntity {
     }
 
     // ============================================================
-    // ★ LEW 배정 (★ Concierge 강화 + 별도 수금 PR-1, D6=A 셀프 할당)
+    // ★ LEW 배정 (★ Concierge 강화 + 별도 수금 PR-1/PR-3, D6=A 셀프 할당)
     // ============================================================
 
     /**
      * LEW 배정 또는 재배정. 이전 LEW 가 있으면 덮어쓰며, 시점은 최신 시각으로 갱신된다.
      * <p>
-     * 본 PR-1 은 도메인 진입점만 도입하고, 실제 셀프 할당 엔드포인트 + 알림은 PR-3 에서 wiring.
-     * 상태 전이({@code LEW_ASSIGNED}) 는 PR-3 가 책임진다 — 본 메서드는 status 를 건드리지 않는다.
+     * 본 메서드는 {@code assignedLewSeq} + {@code lewAssignedAt} 만 갱신한다.
+     * 상태 전이는 {@link #assignLewWithTransition(Long, LocalDateTime)} 에서 별도로 처리.
      *
      * @param lewUserSeq 배정할 LEW 의 user_seq (필수)
      * @param now        배정 시각 (보통 LocalDateTime.now())
+     * @return 재할당 직전의 이전 LEW user_seq (최초 배정이면 {@code null})
      */
-    public void assignLew(Long lewUserSeq, LocalDateTime now) {
+    public Long assignLew(Long lewUserSeq, LocalDateTime now) {
         if (lewUserSeq == null) {
             throw new IllegalArgumentException("lewUserSeq must not be null");
         }
+        Long previous = this.assignedLewSeq;
         this.assignedLewSeq = lewUserSeq;
         this.lewAssignedAt = now != null ? now : LocalDateTime.now();
+        return previous;
+    }
+
+    /**
+     * ★ PR-3: LEW 배정 + 상태 전이 통합 진입점.
+     * <p>
+     * 가능 진입 상태: CONTACTING / QUOTE_SENT / APPLICATION_CREATED / LEW_ASSIGNED(재할당).
+     * 그 외 상태에서는 {@link IllegalStateException} 으로 거부한다 (canTransitionTo 가드).
+     * <p>
+     * - 멱등 재할당(같은 LEW 로 재호출): 같은-state 전이는 enum {@code canTransitionTo} 가 허용하므로 통과.
+     * - 다른 LEW 로 재할당: 상태는 LEW_ASSIGNED 유지, assignedLewSeq 만 갱신.
+     *
+     * @param lewUserSeq 신규 배정 LEW user_seq (필수)
+     * @param now        배정 시각
+     * @return 직전 LEW user_seq (최초면 null)
+     * @throws IllegalStateException 진입 불가 상태에서 호출 시
+     */
+    public Long assignLewWithTransition(Long lewUserSeq, LocalDateTime now) {
+        if (lewUserSeq == null) {
+            throw new IllegalArgumentException("lewUserSeq must not be null");
+        }
+        // 상태 가드 — canTransitionTo(LEW_ASSIGNED) 통과 시에만 진입.
+        transitionTo(ConciergeRequestStatus.LEW_ASSIGNED);
+        Long previous = this.assignedLewSeq;
+        this.assignedLewSeq = lewUserSeq;
+        this.lewAssignedAt = now != null ? now : LocalDateTime.now();
+        return previous;
     }
 
     /**

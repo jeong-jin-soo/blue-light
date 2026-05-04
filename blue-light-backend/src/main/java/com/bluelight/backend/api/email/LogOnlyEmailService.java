@@ -350,4 +350,30 @@ public class LogOnlyEmailService implements EmailService {
         // 별도 로그는 남기지 않는다 (preview 호출은 빈번할 수 있어 노이즈 방지).
         return manualEmailHtmlRenderer.render(bodyText, adminEmailForFooter);
     }
+
+    @Override
+    public void sendConciergeLewAssignedEmail(String to, String lewName, String publicCode,
+                                                String applicantName, String applicantEmail,
+                                                String applicantPhone, String memo,
+                                                boolean reassigned) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge LEW Assigned Email (PR-3) (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  PublicCode: {}", publicCode);
+        log.info("  Applicant: {} <{}> {}", applicantName, applicantEmail, applicantPhone);
+        log.info("  Memo: {}", memo == null || memo.isBlank() ? "(none)" : memo);
+        log.info("  Reassigned: {}", reassigned);
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendConciergeLewUnassignedEmail(String to, String lewName, String publicCode) {
+        log.info("==================================================");
+        log.info("[DEV] Concierge LEW Unassigned Email (PR-3) (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  PublicCode: {}", publicCode);
+        log.info("==================================================");
+    }
 }
