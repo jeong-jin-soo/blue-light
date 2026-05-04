@@ -159,13 +159,20 @@ CREATE TABLE IF NOT EXISTS payments (
     application_seq BIGINT,
     transaction_id VARCHAR(100),
     amount         DECIMAL(10,2) NOT NULL,
-    payment_method VARCHAR(20)   DEFAULT 'CARD',
+    -- ★ Concierge 강화 + 별도 수금 PR-1 (D2=B): VARCHAR(20) → VARCHAR(40),
+    -- 기본값 'CARD' → 'PAYNOW_ONLINE'. PaymentMethod enum 키 그대로 저장.
+    -- 백필: 마이그레이션이 기존 'CARD' row 를 'PAYNOW_ONLINE' 으로 갱신한다.
+    payment_method VARCHAR(40)   NOT NULL DEFAULT 'PAYNOW_ONLINE',
     status         VARCHAR(20)   NOT NULL DEFAULT 'SUCCESS',
     -- ★ PR#7: 다형 참조 (APPLICATION / CONCIERGE_REQUEST / SLD_ORDER)
     reference_type VARCHAR(30)   NOT NULL DEFAULT 'APPLICATION',
     reference_seq  BIGINT        NOT NULL,
     paid_at        DATETIME(6),
     updated_at     DATETIME(6),
+    -- ★ Concierge 강화 + 별도 수금 PR-1: offline 결제(별도 수금) 기록자 + 시점.
+    -- 온라인(PAYNOW_ONLINE) 결제는 NULL. PR-2 의 별도 수금 엔드포인트가 채운다.
+    recorded_by_user_seq BIGINT,
+    recorded_at          DATETIME(6),
     created_by     BIGINT,
     updated_by     BIGINT,
     deleted_at     DATETIME(6),
@@ -993,6 +1000,10 @@ CREATE TABLE IF NOT EXISTS concierge_requests (
     quoted_amount            DECIMAL(10,2),
     quote_sent_at            DATETIME(6),
     verification_phrase      VARCHAR(60),
+    -- ★ Concierge 강화 + 별도 수금 PR-1 (D6=A 셀프 할당) — LEW 배정 트랙.
+    -- assigned_manager_seq 와 분리된 트랙 (매니저=고객 응대, LEW=실무).
+    assigned_lew_seq         BIGINT,
+    lew_assigned_at          DATETIME(6),
     version                  BIGINT        NOT NULL DEFAULT 0,
     created_at               DATETIME(6),
     updated_at               DATETIME(6),
@@ -1007,7 +1018,8 @@ CREATE TABLE IF NOT EXISTS concierge_requests (
     INDEX idx_concierge_assigned (assigned_manager_seq, status),
     INDEX idx_concierge_submitter_email (submitter_email),
     INDEX idx_concierge_created (created_at),
-    INDEX idx_concierge_applicant_user (applicant_user_seq)
+    INDEX idx_concierge_applicant_user (applicant_user_seq),
+    INDEX idx_concierge_assigned_lew (assigned_lew_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 18. 컨시어지 연락 기록 (담당자 노트)
@@ -1205,4 +1217,18 @@ CREATE TABLE IF NOT EXISTS manual_email_dispatches (
     CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-1 (D1=B 다중 역할 정규화 1:N)
+-- ============================================
+-- user_roles — User 와 1:N. primary role 은 users.role 컬럼에 그대로 두고,
+-- 본 테이블은 추가 역할(보조 역할)을 포함한 모든 effective role 을 보관한다.
+-- 마이그레이션이 기존 users.role row 를 INSERT IGNORE 로 백필한다 (멱등).
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_seq BIGINT       NOT NULL,
+    role     VARCHAR(40)  NOT NULL,
+    PRIMARY KEY (user_seq, role),
+    KEY idx_user_roles_user (user_seq),
+    CONSTRAINT fk_user_roles_user FOREIGN KEY (user_seq) REFERENCES users (user_seq) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

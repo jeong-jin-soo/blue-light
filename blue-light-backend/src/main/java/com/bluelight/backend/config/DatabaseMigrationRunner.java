@@ -110,6 +110,13 @@ public class DatabaseMigrationRunner {
             // ── ADMIN Manual Email Dispatch (PR-4): 인앱 동반 옵션 컬럼 추가 (D4=B) ──
             // 기존 row 는 default true 로 backfill — PR-1/2/3 동작 변경 없이 인앱 옵션이 뒤늦게 켜진 형태.
             migrateManualEmailInAppOptionColumn(conn);
+            // ── ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-1 ──
+            // D1=B 다중 역할 정규화: user_roles 테이블 + 기존 users.role 백필.
+            migrateUserRolesTable(conn);
+            // D2=B PaymentMethod enum + offline 기록: payments.payment_method 정정 + 신규 컬럼.
+            migratePaymentsMethodColumns(conn);
+            // D6=A LEW 셀프 할당: concierge_requests.assigned_lew_seq + lew_assigned_at + 인덱스.
+            migrateConciergeRequestsLewAssignment(conn);
             seedSystemSettings(conn);
             // ── invoice_footer_note 브랜딩 추가 — 운영 DB row 1회 갱신 ──
             updateInvoiceFooterNoteBranding(conn);
@@ -1907,6 +1914,155 @@ public class DatabaseMigrationRunner {
             );
         }
         log.info("Migration [manual-email-pr4]: column added (default 1 backfilled)");
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D1=B 다중 역할 정규화).
+     * <p>
+     * {@code user_roles} 테이블 생성 + 기존 {@code users.role} 백필.
+     * <ul>
+     *   <li>테이블이 없으면 CREATE (schema.sql 의 CREATE TABLE IF NOT EXISTS 와 동일).</li>
+     *   <li>users 테이블의 모든 active row(role 컬럼)에 대해 user_roles 에 INSERT IGNORE
+     *       — 동일 row 가 이미 있으면 무시 (PK 가 (user_seq, role) 이므로 충돌 없음).</li>
+     *   <li>soft-deleted 사용자도 백필 대상 — soft delete 는 조회 필터일 뿐 실제 row 는 보존.
+     *       따라서 그들의 primary role 도 user_roles 에 들어간다.</li>
+     * </ul>
+     * idempotent: 여러 번 실행해도 INSERT IGNORE 가 중복을 무시한다.
+     */
+    private void migrateUserRolesTable(Connection conn) throws SQLException {
+        // 1) 테이블 생성 (멱등). syncCreateTablesFromSchemaSql 가 이미 처리하지만
+        //    명시적으로 한 번 더 — 코드 리뷰 시 의도 가시성 + schema.sql 파싱 fallback.
+        if (!tableExists(conn, "user_roles")) {
+            log.info("Migration [user-roles]: creating table...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS user_roles (" +
+                    "  user_seq BIGINT       NOT NULL," +
+                    "  role     VARCHAR(40)  NOT NULL," +
+                    "  PRIMARY KEY (user_seq, role)," +
+                    "  KEY idx_user_roles_user (user_seq)," +
+                    "  CONSTRAINT fk_user_roles_user FOREIGN KEY (user_seq) " +
+                    "    REFERENCES users (user_seq) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+                );
+            }
+            log.info("Migration [user-roles]: table created");
+        }
+
+        // 2) 백필: 기존 users.role row 를 user_roles 에 1건씩 복제.
+        //    INSERT IGNORE 로 PK 충돌 무시 (재실행 시 중복 추가 방지).
+        try (Statement stmt = conn.createStatement()) {
+            int inserted = stmt.executeUpdate(
+                "INSERT IGNORE INTO user_roles (user_seq, role) " +
+                "SELECT user_seq, role FROM users WHERE role IS NOT NULL"
+            );
+            if (inserted > 0) {
+                log.info("Migration [user-roles]: backfilled {} primary role rows", inserted);
+            } else {
+                log.debug("Migration [user-roles]: no rows to backfill (already in sync)");
+            }
+        }
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D2=B PaymentMethod enum + offline 기록 컬럼).
+     * <p>
+     * 변경 요약:
+     * <ul>
+     *   <li>{@code payment_method} VARCHAR(20) → VARCHAR(40), 기본값 'CARD' → 'PAYNOW_ONLINE',
+     *       NOT NULL 강화. 기존 'CARD' row 는 'PAYNOW_ONLINE' 으로 갱신.</li>
+     *   <li>{@code recorded_by_user_seq} BIGINT NULL — offline 기록자 user_seq.</li>
+     *   <li>{@code recorded_at} DATETIME(6) NULL — 기록 시점.</li>
+     * </ul>
+     * idempotent: 컬럼 폭/기본값/NOT NULL 모두 멱등 ALTER. 백필 UPDATE 는 'CARD' row 만 영향.
+     */
+    private void migratePaymentsMethodColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "payments")) {
+            log.debug("Migration [payments-method]: payments table missing, skipping");
+            return;
+        }
+
+        // 1) payment_method 컬럼 폭/기본값/NOT NULL 정정. 컬럼 자체는 PR#7 이전부터 존재.
+        //    MySQL 은 같은 정의로 MODIFY 호출해도 안전 (no-op). 따라서 무조건 1회 적용해도 멱등.
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE payments " +
+                "MODIFY COLUMN payment_method VARCHAR(40) NOT NULL DEFAULT 'PAYNOW_ONLINE'"
+            );
+            log.info("Migration [payments-method]: payment_method column normalized to VARCHAR(40) NOT NULL DEFAULT 'PAYNOW_ONLINE'");
+        }
+
+        // 2) 백필: 'CARD' / NULL row 를 PAYNOW_ONLINE 으로 갱신.
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE payments SET payment_method = 'PAYNOW_ONLINE' " +
+                "WHERE payment_method IS NULL OR payment_method = 'CARD'"
+            );
+            if (updated > 0) {
+                log.info("Migration [payments-method]: backfilled {} legacy rows ('CARD'/NULL → 'PAYNOW_ONLINE')", updated);
+            }
+        }
+
+        // 3) recorded_by_user_seq, recorded_at 컬럼 추가 (멱등).
+        if (!columnExists(conn, "payments", "recorded_by_user_seq")) {
+            log.info("Migration [payments-method]: adding recorded_by_user_seq column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE payments ADD COLUMN recorded_by_user_seq BIGINT NULL AFTER paid_at"
+                );
+            }
+        }
+        if (!columnExists(conn, "payments", "recorded_at")) {
+            log.info("Migration [payments-method]: adding recorded_at column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE payments ADD COLUMN recorded_at DATETIME(6) NULL AFTER recorded_by_user_seq"
+                );
+            }
+        }
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D6=A 셀프 할당) — concierge_requests LEW 배정 컬럼.
+     * <p>
+     * 추가 컬럼:
+     * <ul>
+     *   <li>{@code assigned_lew_seq} BIGINT NULL — 배정된 LEW user_seq.</li>
+     *   <li>{@code lew_assigned_at} DATETIME(6) NULL — 배정 시점.</li>
+     * </ul>
+     * 인덱스: {@code idx_concierge_assigned_lew (assigned_lew_seq)}.
+     */
+    private void migrateConciergeRequestsLewAssignment(Connection conn) throws SQLException {
+        if (!tableExists(conn, "concierge_requests")) {
+            log.debug("Migration [concierge-lew-assignment]: concierge_requests table missing, skipping");
+            return;
+        }
+
+        if (!columnExists(conn, "concierge_requests", "assigned_lew_seq")) {
+            log.info("Migration [concierge-lew-assignment]: adding assigned_lew_seq column...");
+            try (Statement stmt = conn.createStatement()) {
+                // verification_phrase 다음에 배치 — 기존 PR#1.5 컬럼들과 시간순 인접.
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN assigned_lew_seq BIGINT NULL AFTER verification_phrase"
+                );
+            }
+        }
+        if (!columnExists(conn, "concierge_requests", "lew_assigned_at")) {
+            log.info("Migration [concierge-lew-assignment]: adding lew_assigned_at column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN lew_assigned_at DATETIME(6) NULL AFTER assigned_lew_seq"
+                );
+            }
+        }
+        if (!indexExists(conn, "concierge_requests", "idx_concierge_assigned_lew")) {
+            log.info("Migration [concierge-lew-assignment]: adding idx_concierge_assigned_lew index...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD INDEX idx_concierge_assigned_lew (assigned_lew_seq)"
+                );
+            }
+        }
     }
 
     /**

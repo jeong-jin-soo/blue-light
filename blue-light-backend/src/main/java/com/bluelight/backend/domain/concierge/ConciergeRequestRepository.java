@@ -71,4 +71,14 @@ public interface ConciergeRequestRepository extends JpaRepository<ConciergeReque
      * KPI 카운트 — 전체 상태 집계 (Admin)
      */
     long countByStatus(ConciergeRequestStatus status);
+
+    // ────────────────────────────────────────────────────────────
+    // ★ Concierge 강화 + 별도 수금 PR-1 — LEW 셀프 할당 (D6=A) 조회
+    // ────────────────────────────────────────────────────────────
+
+    /**
+     * LEW 가 자신에게 배정된 컨시어지 요청 목록을 조회 (PR-3 에서 사용).
+     * created_at DESC 정렬로 최신순 노출.
+     */
+    Page<ConciergeRequest> findByAssignedLewSeqOrderByCreatedAtDesc(Long lewUserSeq, Pageable pageable);
 }

@@ -32,6 +32,15 @@ public enum ConciergeRequestStatus {
     AWAITING_APPLICANT_LOA_SIGN,
     AWAITING_LICENCE_PAYMENT,
     IN_PROGRESS,
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D6=A): LEW 가 셀프 할당된 상태.
+     * <p>
+     * 본 PR-1 은 enum 값만 도입하며, 상태 전이 로직(어느 상태에서 LEW_ASSIGNED 로 진입하고
+     * 어디로 빠져나가는지)은 PR-3 에서 정의된다. 그 사이의 보수적 동작은
+     * {@link #canTransitionTo} 의 신규 switch arm 이 보증한다 — 본 PR 에서는 LEW_ASSIGNED 로의
+     * 진입/이탈 모두 차단(self/CANCELLED 만 허용).
+     */
+    LEW_ASSIGNED,
     COMPLETED,
     CANCELLED;
 
@@ -54,6 +63,8 @@ public enum ConciergeRequestStatus {
             case AWAITING_APPLICANT_LOA_SIGN -> next == AWAITING_LICENCE_PAYMENT || next == CANCELLED;
             case AWAITING_LICENCE_PAYMENT -> next == IN_PROGRESS || next == CANCELLED;
             case IN_PROGRESS -> next == COMPLETED || next == CANCELLED;
+            // ★ PR-1: 신규 enum 값 — PR-3 에서 정식 전이 wiring. 그 전까지는 CANCELLED 만 허용.
+            case LEW_ASSIGNED -> next == CANCELLED;
             case COMPLETED, CANCELLED -> false; // terminal
         };
     }

@@ -10,6 +10,10 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * 사용자 정보 Entity
@@ -59,11 +63,36 @@ public class User extends BaseEntity {
     private String phone;
 
     /**
-     * 역할 구분 (APPLICANT, LEW, ADMIN)
+     * 역할 구분 (APPLICANT, LEW, ADMIN) — primary role.
+     * <p>
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D1=B): 다중 역할은 {@link #roles} 1:N 정규화 테이블에서 관리한다.
+     * primary {@code role} 컬럼은 호환성을 위해 유지된다 (기존 코드/조회/UI 가 의존).
+     * 추가 역할은 {@link #addRole}/{@link #removeRole} 로 관리되며, primary role 은 항상 {@link #roles}
+     * 에 포함된다 ({@link #ensurePrimaryInRoles} 가 보증).
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
     private UserRole role = UserRole.APPLICANT;
+
+    /**
+     * 다중 역할 (★ D1=B 정규화 1:N).
+     * <p>
+     * {@code user_roles} 테이블에 (user_seq, role) 1:N 으로 저장. primary {@link #role} 은 항상
+     * 본 집합에 포함되도록 도메인 메서드가 보증한다.
+     * <p>
+     * EAGER 로드는 Spring Security 의 {@code GrantedAuthority} 매핑이 lazy 트랜잭션 밖에서도
+     * 안전하게 수행되도록 하기 위함이다 (LazyInitializationException 회피).
+     * 단, 한 사용자당 row 가 보통 1~3개 수준이라 EAGER 로드 비용이 무시 가능하다.
+     */
+    @ElementCollection(targetClass = UserRole.class, fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_seq", nullable = false),
+        foreignKey = @ForeignKey(name = "fk_user_roles_user")
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 40)
+    private Set<UserRole> roles = new HashSet<>();
 
     /**
      * LEW 승인 상태 (LEW만 사용, APPLICANT/ADMIN은 null)
@@ -217,6 +246,9 @@ public class User extends BaseEntity {
         this.lastName = lastName;
         this.phone = phone;
         this.role = role != null ? role : UserRole.APPLICANT;
+        // primary role 은 항상 roles 집합에 포함되도록 빌더에서 즉시 동기화.
+        this.roles = new HashSet<>();
+        this.roles.add(this.role);
         this.approvedStatus = approvedStatus;
         this.lewLicenceNo = lewLicenceNo;
         this.lewGrade = lewGrade;
@@ -332,16 +364,88 @@ public class User extends BaseEntity {
     }
 
     /**
-     * 역할 변경 (approvedStatus, lewGrade 연동)
+     * Primary 역할 변경 (approvedStatus, lewGrade 연동).
+     * <p>
+     * primary {@link #role} 만 교체하며, 기존 secondary 역할({@link #roles})은 그대로 유지된다.
+     * 신규 primary 는 즉시 {@link #roles} 집합에도 포함된다.
+     * <p>
+     * 본 메서드 호출만으로는 이전 primary role 이 secondary 로 강등되지 않는다 — secondary 로 남길지
+     * 여부는 호출자(Admin 화면)가 명시적으로 {@link #removeRole}/{@link #addRole} 로 결정.
      */
     public void changeRole(UserRole role) {
+        if (role == null) {
+            throw new IllegalArgumentException("primary role must not be null");
+        }
         this.role = role;
+        if (this.roles == null) this.roles = new HashSet<>();
+        this.roles.add(role);
         if (role == UserRole.LEW) {
             this.approvedStatus = ApprovalStatus.PENDING;
         } else {
             this.approvedStatus = null;
             this.lewGrade = null;
         }
+    }
+
+    // ============================================================
+    // ★ 다중 역할 (D1=B 정규화) — Concierge 강화 + 별도 수금 PR-1
+    // ============================================================
+
+    /**
+     * 사용자가 특정 역할을 보유하고 있는지 확인한다 (primary 또는 secondary).
+     * <p>
+     * Spring Security {@code @PreAuthorize("hasRole(...)")} 와 직접 동치는 아니지만,
+     * 도메인 권한 체크에서 일관된 진입점 역할을 한다. JWT/Authorities 매핑은 별도로
+     * {@link #effectiveRoles()} 를 사용한다.
+     */
+    public boolean hasRole(UserRole role) {
+        if (role == null) return false;
+        if (this.role == role) return true;
+        return this.roles != null && this.roles.contains(role);
+    }
+
+    /**
+     * 보조 역할 추가 (멱등). primary role 과 동일해도 안전하게 무시된다.
+     * <p>
+     * 본 메서드는 {@link #role}(primary) 을 변경하지 않는다. primary 변경은
+     * {@link #changeRole(UserRole)} 사용.
+     */
+    public void addRole(UserRole role) {
+        if (role == null) {
+            throw new IllegalArgumentException("role must not be null");
+        }
+        if (this.roles == null) this.roles = new HashSet<>();
+        this.roles.add(role);
+    }
+
+    /**
+     * 보조 역할 제거. primary role 제거는 거부한다 — primary 를 바꾸려면
+     * {@link #changeRole(UserRole)} 을 사용해야 한다.
+     *
+     * @throws IllegalStateException primary role 제거 시도 시
+     */
+    public void removeRole(UserRole role) {
+        if (role == null) return;
+        if (role == this.role) {
+            throw new IllegalStateException(
+                "Cannot remove primary role: " + role + ". Use changeRole() to switch primary first.");
+        }
+        if (this.roles != null) {
+            this.roles.remove(role);
+        }
+    }
+
+    /**
+     * 사용자가 보유한 모든 역할의 합집합 (primary + secondary, 불변 EnumSet).
+     * <p>
+     * Spring Security {@code GrantedAuthority} 매핑 + JWT {@code roles} claim 발급에 사용된다.
+     * 반환값은 호출자가 변경할 수 없도록 unmodifiable 로 감싸 노출한다.
+     */
+    public Set<UserRole> effectiveRoles() {
+        EnumSet<UserRole> out = EnumSet.noneOf(UserRole.class);
+        if (this.role != null) out.add(this.role);
+        if (this.roles != null) out.addAll(this.roles);
+        return Collections.unmodifiableSet(out);
     }
 
     /**

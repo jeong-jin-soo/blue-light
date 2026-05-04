@@ -62,7 +62,11 @@ class AuthServiceLoginTest {
             mock(EmailService.class),
             auditLogService);
 
+        // ★ Concierge 강화 + 별도 수금 PR-1 (D1=B): AuthService 가 다중 역할 토큰 발급으로 전환되어
+        // 6-arg 오버로드를 호출한다. 5-arg 오버로드 stub 도 함께 둬서 legacy 호출이 있는 경우에도 안전.
         when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))
+            .thenReturn("jwt-xyz");
+        when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyList(), anyBoolean(), anyBoolean()))
             .thenReturn("jwt-xyz");
         when(jwtTokenProvider.getExpirationInSeconds()).thenReturn(86400L);
     }

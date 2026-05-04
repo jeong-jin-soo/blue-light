@@ -4,7 +4,9 @@ import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.ApplicantType;
 import com.bluelight.backend.domain.application.Application;
+import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationType;
+import com.bluelight.backend.domain.concierge.ConciergeRequestRepository;
 import com.bluelight.backend.domain.invoice.Invoice;
 import com.bluelight.backend.domain.invoice.InvoiceRepository;
 import com.bluelight.backend.domain.payment.Payment;
@@ -40,6 +42,8 @@ class InvoiceGenerationServiceTest {
     private InvoicePdfRenderer invoicePdfRenderer;
     private SystemSettingRepository systemSettingRepository;
     private AuditLogService auditLogService;
+    private ApplicationRepository applicationRepository;
+    private ConciergeRequestRepository conciergeRequestRepository;
     private InvoiceGenerationService service;
 
     private static final Long PAYMENT_SEQ = 101L;
@@ -55,10 +59,13 @@ class InvoiceGenerationServiceTest {
         invoicePdfRenderer = mock(InvoicePdfRenderer.class);
         systemSettingRepository = mock(SystemSettingRepository.class);
         auditLogService = mock(AuditLogService.class);
+        applicationRepository = mock(ApplicationRepository.class);
+        conciergeRequestRepository = mock(ConciergeRequestRepository.class);
 
         service = new InvoiceGenerationService(
                 invoiceRepository, invoiceNumberGenerator, invoicePdfRenderer,
-                systemSettingRepository, auditLogService);
+                systemSettingRepository, auditLogService,
+                applicationRepository, conciergeRequestRepository);
 
         // 기본 stub: 중복 없음, 번호 생성, PDF 렌더 성공
         // ★ kva-postpayment-adjustment-spec.md §10 D3 — 활성(ACTIVE) 영수증만 중복 차단.
