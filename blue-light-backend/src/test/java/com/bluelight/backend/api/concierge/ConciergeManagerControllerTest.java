@@ -98,8 +98,11 @@ class ConciergeManagerControllerTest {
         managerService = mock(ConciergeManagerService.class);
         objectMapper = JsonMapper.builder().findAndAddModules().build();
 
+        // ★ Concierge 강화 + 별도 수금 PR-2 — 별도 수금 서비스도 controller 의존성으로 추가됨.
+        com.bluelight.backend.api.payment.ConciergeManualPaymentService conciergeManualPaymentService =
+                mock(com.bluelight.backend.api.payment.ConciergeManualPaymentService.class);
         mockMvc = MockMvcBuilders
-            .standaloneSetup(new ConciergeManagerController(managerService))
+            .standaloneSetup(new ConciergeManagerController(managerService, conciergeManualPaymentService))
             .setHandlerExceptionResolvers(globalResolver())
             .build();
 

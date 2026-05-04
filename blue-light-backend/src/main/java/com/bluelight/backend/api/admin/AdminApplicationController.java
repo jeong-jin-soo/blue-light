@@ -34,6 +34,8 @@ public class AdminApplicationController {
 
     private final AdminApplicationService adminApplicationService;
     private final AdminPaymentService adminPaymentService;
+    /** ★ Concierge 강화 + 별도 수금 PR-2 — Application 별도 수금. */
+    private final com.bluelight.backend.api.payment.ManualPaymentService manualPaymentService;
     private final GenericRateLimiter rateLimiter;
 
     /** 결제 확인: 신청서당 5분 내 최대 3회 */
@@ -121,6 +123,28 @@ public class AdminApplicationController {
         rateLimiter.checkAndRecord(RATE_TYPE_PAYMENT, "app:" + id, PAYMENT_MAX, PAYMENT_WINDOW_MIN);
         log.info("Admin confirm payment: applicationSeq={}", id);
         PaymentResponse response = adminPaymentService.confirmPayment(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — ADMIN 별도 수금 기록 (Application 결제).
+     * <p>
+     * 스펙: {@code doc/Project Analysis/concierge-flow-and-offline-payment-spec.md} §7.3, §10 AC-A1~A7.
+     * D3=C: ADMIN/SYSTEM_ADMIN 만, PENDING_REVIEW/REVISION_REQUESTED/PENDING_PAYMENT 모든 상태에서 호출 가능.
+     * 결제 트랜잭션 커밋 후 AFTER_COMMIT 훅에서 영수증 PDF 자동 발행 + 영수증 이메일 발송.
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'SYSTEM_ADMIN')")
+    @PostMapping("/applications/{id}/manual-payment")
+    public ResponseEntity<com.bluelight.backend.api.admin.dto.ManualPaymentResponse> recordManualPayment(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody com.bluelight.backend.api.admin.dto.ManualPaymentRequest request) {
+        Long adminUserSeq = (Long) authentication.getPrincipal();
+        rateLimiter.checkAndRecord(RATE_TYPE_PAYMENT, "manual-app:" + id, PAYMENT_MAX, PAYMENT_WINDOW_MIN);
+        log.info("Admin manual payment: applicationSeq={}, method={}, amount={}, by adminSeq={}",
+                id, request.getPaymentMethod(), request.getAmount(), adminUserSeq);
+        com.bluelight.backend.api.admin.dto.ManualPaymentResponse response =
+                manualPaymentService.recordOfflinePayment(id, request, adminUserSeq);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

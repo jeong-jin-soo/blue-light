@@ -53,7 +53,14 @@ public class InvoicePdfRenderer {
     public Long render(Invoice invoice) {
         String filename = "INVOICE_" + invoice.getInvoiceNumber() + "_"
                 + UUID.randomUUID().toString().substring(0, 8) + ".pdf";
-        String subDirectory = "invoices/" + invoice.getApplicationSeq();
+        // ★ Concierge 강화 + 별도 수금 PR-2 — applicationSeq 가 null 인 CONCIERGE_REQUEST 결제는
+        //   referenceSeq 로 분류 디렉토리를 만든다 (예: "invoices/concierge/123").
+        //   APPLICATION 결제는 기존 경로 ("invoices/100") 호환.
+        String subDirectory = invoice.getApplicationSeq() != null
+                ? "invoices/" + invoice.getApplicationSeq()
+                : "invoices/" + (invoice.getReferenceType() != null
+                        ? invoice.getReferenceType().toLowerCase()
+                        : "misc") + "/" + invoice.getReferenceSeq();
 
         try {
             byte[] pdfBytes = buildPdf(invoice);
