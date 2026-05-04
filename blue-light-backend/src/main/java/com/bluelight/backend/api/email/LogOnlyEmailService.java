@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.email;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -14,7 +15,11 @@ import java.util.List;
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class LogOnlyEmailService implements EmailService {
+
+    /** PR-3: 미리보기 HTML 빌더 — SMTP 발송 본문과 동일한 결과를 위해 단일 컴포넌트 사용. */
+    private final ManualEmailHtmlRenderer manualEmailHtmlRenderer;
 
     @Override
     public void sendPasswordResetEmail(String to, String userName, String resetLink) {
@@ -321,5 +326,12 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  PayNow UEN: {} / Name: {}", paynowUen, paynowAccountName);
         log.info("==================================================");
         return "dev-msg-" + publicCode;
+    }
+
+    @Override
+    public String renderManualPlainTextHtml(String subject, String bodyText, String adminEmailForFooter) {
+        // 개발 환경 — SMTP 와 동일한 HTML 을 반환해야 미리보기가 환경 따라 달라지지 않는다.
+        // 별도 로그는 남기지 않는다 (preview 호출은 빈번할 수 있어 노이즈 방지).
+        return manualEmailHtmlRenderer.render(bodyText, adminEmailForFooter);
     }
 }

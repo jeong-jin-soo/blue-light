@@ -50,6 +50,7 @@ class ManualEmailDispatcherMultiTest {
     private ApplicationRepository applicationRepository;
     private AuditLogService auditLogService;
     private ApplicationEventPublisher eventPublisher;
+    private com.bluelight.backend.api.email.EmailService emailService;
     private ManualEmailDispatcher dispatcher;
 
     @BeforeEach
@@ -59,9 +60,10 @@ class ManualEmailDispatcherMultiTest {
         applicationRepository = mock(ApplicationRepository.class);
         auditLogService = mock(AuditLogService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
+        emailService = mock(com.bluelight.backend.api.email.EmailService.class);
         dispatcher = new ManualEmailDispatcher(
                 dispatchRepository, userRepository, applicationRepository,
-                auditLogService, eventPublisher);
+                auditLogService, eventPublisher, emailService);
 
         when(dispatchRepository.save(any(ManualEmailDispatch.class)))
                 .thenAnswer(inv -> inv.getArgument(0));

@@ -59,6 +59,7 @@ class ManualEmailDispatcherTest {
     private ApplicationRepository applicationRepository;
     private AuditLogService auditLogService;
     private ApplicationEventPublisher eventPublisher;
+    private com.bluelight.backend.api.email.EmailService emailService;
     private ManualEmailDispatcher dispatcher;
 
     @BeforeEach
@@ -68,9 +69,10 @@ class ManualEmailDispatcherTest {
         applicationRepository = mock(ApplicationRepository.class);
         auditLogService = mock(AuditLogService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
+        emailService = mock(com.bluelight.backend.api.email.EmailService.class);
         dispatcher = new ManualEmailDispatcher(
                 dispatchRepository, userRepository, applicationRepository,
-                auditLogService, eventPublisher);
+                auditLogService, eventPublisher, emailService);
 
         // dispatchRepository.save() 가 dispatchSeq 가 채워진 entity 를 반환하도록 stub.
         when(dispatchRepository.save(any(ManualEmailDispatch.class))).thenAnswer(inv -> {
@@ -334,6 +336,50 @@ class ManualEmailDispatcherTest {
         assertThatThrownBy(() -> dispatcher.getDispatchDetail(123L))
                 .isInstanceOf(BusinessException.class)
                 .matches(t -> ((BusinessException) t).getCode().equals("MANUAL_EMAIL_DISPATCH_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("PR-3 preview — emailService.renderManualPlainTextHtml 호출 + DB 저장 없음")
+    void preview_DB저장없이_HTML반환() {
+        // ADMIN 이메일 lookup
+        User admin = systemUser(ADMIN_SEQ, UserRole.ADMIN, "admin@licensekaki.sg");
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.of(admin));
+        when(emailService.renderManualPlainTextHtml("Hi", "<b>X</b>", "admin@licensekaki.sg"))
+                .thenReturn("<html>SAFE</html>");
+
+        SendManualEmailRequest req = new SendManualEmailRequest();
+        req.setRecipientType(RecipientType.APPLICANT);
+        req.setSubject("Hi");
+        req.setBodyText("<b>X</b>");
+
+        var resp = dispatcher.preview(req, ADMIN_SEQ);
+
+        assertThat(resp.getRenderedSubject()).isEqualTo("Hi");
+        assertThat(resp.getRenderedHtmlPreview()).isEqualTo("<html>SAFE</html>");
+
+        // DB 영향 0 — save / findRecentDuplicate / save audit 모두 미호출.
+        verify(dispatchRepository, never()).save(any());
+        verify(dispatchRepository, never())
+                .findRecentDuplicateByHash(anyLong(), anyString(), any(), any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("PR-3 preview — ADMIN 이메일 미존재 시 빈 footer 로 안전하게 렌더")
+    void preview_ADMIN이메일없음_빈문자열() {
+        when(userRepository.findById(ADMIN_SEQ)).thenReturn(Optional.empty());
+        when(emailService.renderManualPlainTextHtml("S", "B", ""))
+                .thenReturn("<html>NOFOOTER</html>");
+
+        SendManualEmailRequest req = new SendManualEmailRequest();
+        req.setRecipientType(RecipientType.APPLICANT);
+        req.setSubject("S");
+        req.setBodyText("B");
+
+        var resp = dispatcher.preview(req, ADMIN_SEQ);
+
+        assertThat(resp.getRenderedHtmlPreview()).isEqualTo("<html>NOFOOTER</html>");
+        verify(emailService, times(1)).renderManualPlainTextHtml("S", "B", "");
     }
 
     @Test

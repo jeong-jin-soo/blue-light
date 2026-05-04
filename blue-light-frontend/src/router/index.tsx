@@ -50,6 +50,7 @@ import AdminApplicationListPage from '../pages/admin/AdminApplicationListPage';
 import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPage';
 import AdminUserListPage from '../pages/admin/AdminUserListPage';
 import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
+import AdminManualEmailPage from '../pages/admin/AdminManualEmailPage';
 
 // System Admin pages
 import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
@@ -201,6 +202,21 @@ const router = createBrowserRouter([
           { path: '/admin/users', element: <AdminUserListPage /> },
           { path: '/admin/prices', element: <AdminPriceManagementPage /> },
           { path: '/admin/notifications', element: <NotificationsPage /> },
+        ],
+      },
+    ],
+  },
+
+  // ADMIN + SYSTEM_ADMIN shared routes
+  // - Manual Email Dispatch: 메뉴 노출은 ADMIN 만 (Layout 에서 처리), 직접 URL 진입은 SYSTEM_ADMIN 도 허용
+  //   (admin-manual-email-spec.md §2.1, §7.1 / PR-3)
+  {
+    element: <ProtectedRoute allowedRoles={['ADMIN', 'SYSTEM_ADMIN']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/admin/manual-emails', element: <AdminManualEmailPage /> },
         ],
       },
     ],

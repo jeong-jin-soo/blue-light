@@ -2,8 +2,10 @@ package com.bluelight.backend.api.admin.manualemail;
 
 import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailDispatchHistoryItem;
 import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailDispatchResponse;
+import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailPreviewResponse;
 import com.bluelight.backend.api.admin.manualemail.dto.SendManualEmailRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
+import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.audit.AuditAction;
@@ -79,6 +81,8 @@ public class ManualEmailDispatcher {
     private final ApplicationRepository applicationRepository;
     private final AuditLogService auditLogService;
     private final ApplicationEventPublisher eventPublisher;
+    /** PR-3: Preview 엔드포인트는 SMTP 발송 없이 본문 HTML 만 렌더한다. */
+    private final EmailService emailService;
 
     // ── 1) 발송 ─────────────────────────────────────────────────
 
@@ -171,6 +175,46 @@ public class ManualEmailDispatcher {
                 filter.to(),
                 pageable);
         return page.map(ManualEmailDispatchHistoryItem::from);
+    }
+
+    // ── 3) 미리보기 (PR-3) ────────────────────────────────────────
+
+    /**
+     * ADMIN 수동 이메일 미리보기 — 실제 발송 없이 본문 HTML 만 렌더한다 (스펙 §5.4).
+     *
+     * <p>트랜잭션·DB 영향 0. 멱등성/카운터/audit 모두 미발생 — 순수 HTML 빌더 호출. ADMIN 이 발송 전
+     * 받게 될 메일 모양을 모달로 확인하기 위함.</p>
+     *
+     * <p>수신자 lookup·검증은 미수행 — Preview 는 본문/제목 자체에만 관심이 있으며, 수신자 오류는 실제
+     * 발송({@link #dispatch}) 시점에서 동일하게 검증된다. ADMIN 푸터에 노출될 발송자 이메일은 인증
+     * principal({@code adminUserSeq}) 으로 lookup 한다.</p>
+     */
+    @Transactional(readOnly = true)
+    public ManualEmailPreviewResponse preview(SendManualEmailRequest request, Long adminUserSeq) {
+        String adminEmail = lookupAdminEmail(adminUserSeq);
+        String html = emailService.renderManualPlainTextHtml(
+                request.getSubject(),
+                request.getBodyText(),
+                adminEmail);
+        // renderedSubject 는 발송 시 메일 헤더에 그대로 들어가는 문자열 — 현재는 ADMIN 입력 그대로.
+        // 향후 카테고리 prefix 등이 추가되면 여기서 빌드.
+        return ManualEmailPreviewResponse.of(
+                request.getSubject() == null ? "" : request.getSubject(),
+                html);
+    }
+
+    private String lookupAdminEmail(Long adminUserSeq) {
+        if (adminUserSeq == null) return "";
+        try {
+            return userRepository.findById(adminUserSeq)
+                    .map(User::getEmail)
+                    .filter(s -> s != null && !s.isBlank())
+                    .orElse("");
+        } catch (RuntimeException ex) {
+            log.warn("Admin email lookup failed for preview: adminSeq={}, err={}",
+                    adminUserSeq, ex.getMessage());
+            return "";
+        }
     }
 
     @Transactional(readOnly = true)

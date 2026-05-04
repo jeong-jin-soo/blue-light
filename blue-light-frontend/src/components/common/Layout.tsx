@@ -53,6 +53,8 @@ export default function Layout() {
   const adminMenu = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/admin/applications', label: 'Applications', icon: '📋' },
+    // admin-manual-email-spec.md §7.1: ADMIN 사이드바 노출, SYSTEM_ADMIN 은 미노출(직접 URL 진입만 가능)
+    { path: '/admin/manual-emails', label: 'Manual Email', icon: '✉️' },
     { path: '/admin/prices', label: 'Settings', icon: '⚙️' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];

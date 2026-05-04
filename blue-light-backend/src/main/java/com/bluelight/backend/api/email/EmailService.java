@@ -314,4 +314,23 @@ public interface EmailService {
      *                            ADMIN 사칭 위험 완화 (스펙 §9.1 AC-A13).
      */
     void sendManualPlainTextEmail(String to, String subject, String bodyText, String adminEmailForFooter);
+
+    /**
+     * PR-3: ADMIN 수동 이메일 미리보기용 HTML 렌더러.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §5.4. 실제 SMTP 발송 없이
+     * {@link #sendManualPlainTextEmail} 과 동일한 자동 헤더("This is a manual notice...") + ADMIN
+     * 신원 푸터("Sent by: ...") + 표준 반피싱 푸터를 부착해 ADMIN 이 발송 전 모양을 모달로 확인할 수
+     * 있게 한다. DB 영향 0, 트랜잭션 없음.</p>
+     *
+     * <p>본문은 {@code HtmlUtils.htmlEscape} 로 XSS 차단 → 줄바꿈만 {@code <br>} 로 변환. 모든 구현체
+     * (SMTP/LogOnly) 는 동일 결과를 반환해야 한다 — 미리보기는 환경에 따라 다르면 안 된다.</p>
+     *
+     * @param subject             ADMIN 입력 subject (현재는 본문 HTML 에 직접 노출되지는 않으나,
+     *                            향후 헤더 라인 등에 사용할 수 있도록 시그니처에 포함).
+     * @param bodyText            ADMIN 입력 PLAIN_TEXT 본문 (escape 전 원문)
+     * @param adminEmailForFooter 발송 ADMIN 의 이메일 주소 — 푸터 신원 표시
+     * @return 안전하게 렌더된 HTML 문자열 (iframe sandbox 또는 dangerouslySetInnerHTML 로 주입 가능)
+     */
+    String renderManualPlainTextHtml(String subject, String bodyText, String adminEmailForFooter);
 }

@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin.manualemail;
 
 import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailDispatchHistoryItem;
 import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailDispatchResponse;
+import com.bluelight.backend.api.admin.manualemail.dto.ManualEmailPreviewResponse;
 import com.bluelight.backend.api.admin.manualemail.dto.SendManualEmailRequest;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.exception.GlobalExceptionHandler;
@@ -275,5 +276,36 @@ class AdminManualEmailControllerTest {
                         .principal(adminAuth()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("MANUAL_EMAIL_DISPATCH_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("PR-3 POST /preview 정상 — 200 OK + renderedSubject + renderedHtmlPreview")
+    void POST_preview_정상() throws Exception {
+        when(dispatcher.preview(any(SendManualEmailRequest.class), eq(ADMIN_SEQ)))
+                .thenReturn(ManualEmailPreviewResponse.of("Hi", "<html>OK</html>"));
+
+        SendManualEmailRequest req = applicantReq();
+
+        mockMvc.perform(post("/api/admin/manual-emails/preview")
+                        .principal(adminAuth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.renderedSubject").value("Hi"))
+                .andExpect(jsonPath("$.renderedHtmlPreview").value("<html>OK</html>"));
+    }
+
+    @Test
+    @DisplayName("PR-3 POST /preview validation 실패 — subject 누락 400 VALIDATION_ERROR")
+    void POST_preview_subject누락_400() throws Exception {
+        SendManualEmailRequest req = applicantReq();
+        req.setSubject("");
+
+        mockMvc.perform(post("/api/admin/manual-emails/preview")
+                        .principal(adminAuth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 }

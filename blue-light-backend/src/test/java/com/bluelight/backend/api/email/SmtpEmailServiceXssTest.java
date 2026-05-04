@@ -36,7 +36,7 @@ class SmtpEmailServiceXssTest {
         message = new MimeMessage(session);
         when(mailSender.createMimeMessage()).thenReturn(message);
 
-        service = new SmtpEmailService(mailSender);
+        service = new SmtpEmailService(mailSender, new ManualEmailHtmlRenderer());
         ReflectionTestUtils.setField(service, "fromAddress", "noreply@licensekaki.com");
         ReflectionTestUtils.setField(service, "fromName", "LicenseKaki");
         ReflectionTestUtils.setField(service, "appBaseUrl", "http://localhost:5174");
