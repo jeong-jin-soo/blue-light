@@ -64,11 +64,20 @@ export function maxLength(value: string, max: number): boolean {
  */
 export interface ApplicationFormData {
   applicationType: string;
+  applicantType: 'INDIVIDUAL' | 'CORPORATE';
   spAccountNo: string;
   address: string;
   postalCode: string;
+  /** P2.B — EMA ELISE 5-part Installation Address. 신규 폼에서 필수. */
+  installationBlock?: string;
+  installationUnit?: string;
+  installationStreet?: string;
+  installationBuilding?: string;
+  installationPostalCode?: string;
   buildingType: string;
   selectedKva: number | null;
+  /** Phase 5: "I don't know" 선택 시 true. true면 selectedKva 필수 검증 면제. */
+  kvaUnknown?: boolean;
   originalApplicationSeq: number | null;
   existingLicenceNo: string;
   existingExpiryDate: string;
@@ -82,6 +91,11 @@ export function validateApplicationStep0(formData: ApplicationFormData): Record<
 
   if (!formData.renewalPeriodMonths) {
     errors.renewalPeriodMonths = 'Please select a licence period';
+  }
+
+  // AC-A3: applicantType 필수. 기본값 INDIVIDUAL이므로 실제로는 null이 될 수 없지만 방어적 검증.
+  if (formData.applicantType !== 'INDIVIDUAL' && formData.applicantType !== 'CORPORATE') {
+    errors.applicantType = 'Please select an applicant type';
   }
 
   if (formData.applicationType === 'RENEWAL') {
@@ -106,22 +120,26 @@ export function validateApplicationStep0(formData: ApplicationFormData): Record<
 export function validateApplicationStep1(formData: ApplicationFormData): Record<string, string> {
   const errors: Record<string, string> = {};
 
-  if (!isRequired(formData.address)) {
-    errors.address = 'Address is required';
-  } else if (!minLength(formData.address, 5)) {
-    errors.address = 'Address must be at least 5 characters';
+  // P2.B — EMA ELISE 5-part Installation Address 필수 검증.
+  // Block / Street / PostalCode 는 EMA 양식상 필수 3필드. Unit/Building 은 선택.
+  // (Backend 는 아직 legacy address/postalCode 만 NotBlank 로 받지만, 프론트는 5-part 를 기준으로 잡는다.)
+  if (!isRequired(formData.installationBlock || '')) {
+    errors.installationBlock = 'Block / House No is required';
+  }
+  if (!isRequired(formData.installationStreet || '')) {
+    errors.installationStreet = 'Street name is required';
+  } else if (!minLength(formData.installationStreet || '', 3)) {
+    errors.installationStreet = 'Street must be at least 3 characters';
   }
 
-  if (!isRequired(formData.postalCode)) {
-    errors.postalCode = 'Postal code is required';
-  } else if (!isValidPostalCode(formData.postalCode)) {
-    errors.postalCode = 'Postal code must be 6 digits (Singapore format)';
+  if (!isRequired(formData.installationPostalCode || '')) {
+    errors.installationPostalCode = 'Postal code is required';
+  } else if (!isValidPostalCode(formData.installationPostalCode || '')) {
+    errors.installationPostalCode = 'Postal code must be 6 digits (Singapore format)';
   }
 
-  // SP Account No: optional but if provided, validate format
-  if (formData.spAccountNo.trim() && !minLength(formData.spAccountNo, 3)) {
-    errors.spAccountNo = 'SP Account number seems too short';
-  }
+  // P2.A: spAccountNo (legacy)는 msslHint로 통합되었고, hint 검증은 서버 warning-only이므로
+  // 클라이언트 차단 없음. 어떤 hint 필드도 유효성 검증으로 신청을 막지 않는다(스펙 §5.1).
 
   return errors;
 }
@@ -129,9 +147,24 @@ export function validateApplicationStep1(formData: ApplicationFormData): Record<
 export function validateApplicationStep2(formData: ApplicationFormData): Record<string, string> {
   const errors: Record<string, string> = {};
 
-  if (!formData.selectedKva) {
-    errors.selectedKva = 'Please select a kVA capacity';
+  // Phase 5: "I don't know" 선택 시 selectedKva 필수 면제 — 서버가 45 강제
+  if (!formData.kvaUnknown && !formData.selectedKva) {
+    errors.selectedKva = 'Please select a kVA capacity, or choose "I don\'t know"';
   }
 
   return errors;
+}
+
+/**
+ * Phase 2 PR#3: 싱가포르 UEN 형식 검증
+ * - 9자리 숫자 + 1 알파벳 (예: 201812345A)
+ * - 또는 8자리 숫자 + 1 알파벳 (Business 등록)
+ * - 또는 T/S/R 프리픽스 10자리 (사업체)
+ *
+ * 백엔드 CompanyInfoRequest.uen 정규식과 동일하게 유지해야 함.
+ */
+export function isValidSingaporeUen(uen: string): boolean {
+  if (!uen) return false;
+  const re = /^(\d{8}[A-Z]|\d{9}[A-Z]|[TSR]\d{2}[A-Z]{2}\d{4}[A-Z])$/;
+  return re.test(uen.trim());
 }

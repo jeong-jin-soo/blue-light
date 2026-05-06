@@ -15,11 +15,19 @@ import { getBasePath } from '../../utils/routeUtils';
 
 // Section components
 import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
+import { KvaSection } from '../../components/admin/KvaSection';
+import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
 import { AdminLoaSection } from './sections/AdminLoaSection';
 import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
 import { AdminPaymentSection } from './sections/AdminPaymentSection';
 import { AdminSidebar } from './sections/AdminSidebar';
+import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
+// ★ Concierge 강화 + 별도 수금 PR-4 — Manual Payment 모달 + 영수증 이력 카드.
+import { ManualPaymentModal } from '../../components/admin/ManualPaymentModal';
+import { InvoiceHistoryCard } from '../../components/admin/InvoiceHistoryCard';
+import { recordManualPayment as recordManualPaymentApi } from '../../api/adminApplicationApi';
+import type { ManualPaymentPayload } from '../../types/manualPayment';
 
 // Modal components
 import {
@@ -68,23 +76,36 @@ export default function AdminApplicationDetailPage() {
   const [selectedLewSeq, setSelectedLewSeq] = useState<number | null>(null);
   const [lewsLoading, setLewsLoading] = useState(false);
 
+  // ★ Concierge 강화 PR-4 — Manual Payment (offline) state
+  const [showManualPaymentModal, setShowManualPaymentModal] = useState(false);
+  const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
+  // 영수증 이력 카드 강제 새로고침 키 — manual-payment 후 invalidate.
+  const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
+
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN';
   const basePath = getBasePath(currentUser?.role);
   const applicationId = Number(id);
 
+  // 서류 요청 모달 권한 가드 — ADMIN/SYSTEM_ADMIN 전용.
+  // LEW는 별도 LEW 페이지(/lew/applications/:id, /lew/applications/:id/review)에서 처리.
+  const canRequestDocuments = isAdmin;
+
   // ── Data Fetching ──────────────────────────────────
 
   const fetchData = useCallback(async () => {
     try {
-      const [appData, filesData, paymentsData] = await Promise.all([
-        adminApi.getApplication(applicationId),
+      // Application 상세는 필수. files/payments는 역할에 따라 권한이 제한적이므로
+      // allSettled로 부분 실패 허용(LEW는 files/payments 열람 권한이 없을 수 있음).
+      const appData = await adminApi.getApplication(applicationId);
+      setApplication(appData);
+
+      const [filesResult, paymentsResult] = await Promise.allSettled([
         fileApi.getFilesByApplication(applicationId),
         adminApi.getPayments(applicationId),
       ]);
-      setApplication(appData);
-      setFiles(filesData);
-      setPayments(paymentsData);
+      setFiles(filesResult.status === 'fulfilled' ? filesResult.value : []);
+      setPayments(paymentsResult.status === 'fulfilled' ? paymentsResult.value : []);
 
       // LOA status
       try {
@@ -244,6 +265,29 @@ export default function AdminApplicationDetailPage() {
     finally { setActionLoading(false); }
   };
 
+  // ★ Concierge 강화 PR-4 — Manual Payment (offline) handler.
+  // 스펙: doc/Project Analysis/concierge-flow-and-offline-payment-spec.md §7.3, AC-A1~A7.
+  // finally 블록에서 로딩 해제 — 에러는 모달이 자체 errMsg 로 표시하도록 자연 propagate.
+  const handleRecordManualPayment = async (payload: ManualPaymentPayload) => {
+    setManualPaymentLoading(true);
+    try {
+      const response = await recordManualPaymentApi(applicationId, payload);
+      const issuedNote = payload.receiptIssue !== false
+        ? response.invoiceNumber
+          ? ` Receipt ${response.invoiceNumber} issued.`
+          : ' Receipt will be issued shortly.'
+        : '';
+      toast.success(`Payment of SGD ${Number(payload.amount).toFixed(2)} recorded.${issuedNote}`);
+      setShowManualPaymentModal(false);
+      // 신청 상태/payments 갱신.
+      await fetchData();
+      // InvoiceHistoryCard 가 새 invoice 를 다시 조회하도록 트리거.
+      setInvoiceRefreshKey((k) => k + 1);
+    } finally {
+      setManualPaymentLoading(false);
+    }
+  };
+
   // LOA
   const handleGenerateLoa = async () => {
     setLoaGenerating(true);
@@ -400,6 +444,15 @@ export default function AdminApplicationDetailPage() {
             onNavigateToOriginal={(seq) => navigate(`${basePath}/applications/${seq}`)}
           />
 
+          {/* Phase 5 PR#3 — kVA 확정 섹션 (ADMIN/LEW) */}
+          <KvaSection application={application} onUpdated={fetchData} />
+
+          {/* PR-4 — 결제 후 kVA 사후 변경 이력 섹션 (PAID/IN_PROGRESS/COMPLETED 에서만 노출) */}
+          <AdminKvaAdjustmentSection
+            applicationSeq={applicationId}
+            applicationStatus={application.status}
+          />
+
           <AdminLoaSection
             application={application}
             loaStatus={loaStatus}
@@ -436,7 +489,29 @@ export default function AdminApplicationDetailPage() {
             onFileDelete={handleFileDelete}
           />
 
+          {/* Phase 3 PR#2 — LEW/ADMIN 서류 요청 섹션 */}
+          <LewDocumentReviewSection
+            applicationSeq={applicationId}
+            canRequest={canRequestDocuments}
+            applicantDisplayName={
+              application.userFirstName || application.userLastName
+                ? `${application.userFirstName ?? ''} ${application.userLastName ?? ''}`.trim()
+                : application.userEmail
+            }
+            applicationCode={`APP-${String(application.applicationSeq).padStart(6, '0')}`}
+          />
+
           <AdminPaymentSection payments={payments} files={files} applicationStatus={application.status} />
+
+          {/* ★ Concierge 강화 PR-4 — 영수증 이력 카드 (ADMIN/SYSTEM_ADMIN 전용 표시).
+              LEW 는 영수증 카드를 노출하지 않는다(스펙 §11 — invoice 는 신청자에 귀속). */}
+          {isAdmin && (
+            <InvoiceHistoryCard
+              applicationSeq={applicationId}
+              mode="admin"
+              refreshKey={invoiceRefreshKey}
+            />
+          )}
         </div>
 
         {/* Sidebar */}
@@ -453,6 +528,7 @@ export default function AdminApplicationDetailPage() {
           onCompleteClick={() => setShowCompleteModal(true)}
           onAssignLewClick={openAssignLewModal}
           onUnassignLewClick={() => setShowUnassignConfirm(true)}
+          onManualPaymentClick={() => setShowManualPaymentModal(true)}
         />
       </div>
 
@@ -461,6 +537,7 @@ export default function AdminApplicationDetailPage() {
         isOpen={showPaymentModal} onClose={() => setShowPaymentModal(false)}
         onConfirm={handleConfirmPayment} quoteAmount={application.quoteAmount}
         paymentForm={paymentForm} setPaymentForm={setPaymentForm} loading={actionLoading}
+        assignedLewSeq={application.assignedLewSeq ?? null}
       />
       <CompleteModal
         isOpen={showCompleteModal} onClose={() => setShowCompleteModal(false)}
@@ -494,6 +571,22 @@ export default function AdminApplicationDetailPage() {
       <SldConfirmDialog
         isOpen={showSldConfirm} onClose={() => setShowSldConfirm(false)}
         onConfirm={handleSldConfirm} loading={actionLoading}
+      />
+
+      {/* ★ Concierge 강화 PR-4 — Manual Payment 모달.
+          ADMIN/SYSTEM_ADMIN 만 진입 가능하도록 사이드바에서 isAdmin 가드 — 본 모달은 단지 마운트. */}
+      <ManualPaymentModal
+        isOpen={showManualPaymentModal}
+        onClose={() => setShowManualPaymentModal(false)}
+        onSubmit={handleRecordManualPayment}
+        contextLabel={`Application #${application.applicationSeq}`}
+        recipientName={
+          application.userFirstName || application.userLastName
+            ? `${application.userFirstName ?? ''} ${application.userLastName ?? ''}`.trim()
+            : application.userEmail
+        }
+        expectedAmount={application.quoteAmount}
+        loading={manualPaymentLoading}
       />
     </div>
   );

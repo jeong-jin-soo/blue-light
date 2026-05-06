@@ -98,7 +98,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isAuthenticated: false,
             isLoading: false,
-            error: error.message || '로그인에 실패했습니다',
+            error: error.message || 'Login failed',
           });
           throw err;
         }
@@ -131,7 +131,7 @@ export const useAuthStore = create<AuthState>()(
             user: null,
             isAuthenticated: false,
             isLoading: false,
-            error: error.message || '회원가입에 실패했습니다',
+            error: error.message || 'Signup failed',
           });
           throw err;
         }

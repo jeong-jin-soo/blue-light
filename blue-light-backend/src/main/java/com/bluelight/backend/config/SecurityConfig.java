@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -79,10 +80,32 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         // Error 페이지 (SSE 비동기 완료 시 SecurityContext 없이 디스패치됨)
                         .requestMatchers("/error").permitAll()
+                        // ★ Kaki Concierge v1.5 Phase 1 PR#6 — LOA 경로 A (Manager 대리 업로드)
+                        // URL은 /api/admin/**이지만 CONCIERGE_MANAGER가 대리 서명 업로드를 수행해야 하므로
+                        // 더 구체적인 매처를 /api/admin/** 앞에 먼저 배치.
+                        // AC-15b: LEW는 이 경로에서 제외되며, 메서드 @PreAuthorize로 이중 방어.
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/admin/applications/*/loa/upload-signature")
+                        .hasAnyRole("CONCIERGE_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // ── LEW Review Form (P1.B, lew-review-form-spec.md §7) ──
+                        // /api/lew/** 는 LEW 전용 경로. /api/admin/** 의 LEW 공유 이슈(H-4)와 별개로
+                        // URL 단에서 역할 필터링하고, 배정 여부 검증은 메서드 @PreAuthorize("@appSec.isAssignedLew(...)")로.
+                        .requestMatchers("/api/lew/**").hasRole("LEW")
                         // Admin/LEW/SystemAdmin 경로 (URL-level defense-in-depth)
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
                         // SLD Manager 경로
                         .requestMatchers("/api/sld-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // Lighting Manager 경로 (SLD_MANAGER 역할 공유)
+                        .requestMatchers("/api/lighting-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // Power Socket Manager 경로 (SLD_MANAGER 역할 공유)
+                        .requestMatchers("/api/power-socket-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // LEW Service Manager 경로 (SLD_MANAGER 역할 공유)
+                        .requestMatchers("/api/lew-service-manager/**").hasAnyRole("SLD_MANAGER", "ADMIN", "SYSTEM_ADMIN")
+                        // Concierge Manager 경로 (★ Kaki Concierge v1.5 Phase 1 PR#4)
+                        // ★ PR-3 (D7=B): LEW 도 본인 배정 ConciergeRequest 조회 + 신청서 대행 가능 → URL 레벨 허용.
+                        // 메서드별 fine-grained 가드는 컨트롤러 @PreAuthorize + 서비스 ConciergeOwnershipValidator.assertAccessible 가 책임.
+                        .requestMatchers("/api/concierge-manager/**")
+                            .hasAnyRole("CONCIERGE_MANAGER", "LEW", "ADMIN", "SYSTEM_ADMIN")
                         // 그 외 모든 요청은 인증 필요
                         .anyRequest().authenticated()
                 )

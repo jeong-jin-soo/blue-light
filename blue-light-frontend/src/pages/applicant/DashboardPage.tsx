@@ -9,7 +9,21 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useAuthStore } from '../../stores/authStore';
 import { useToastStore } from '../../stores/toastStore';
 import applicationApi from '../../api/applicationApi';
+import { usePendingDocumentCounts } from '../../hooks/usePendingDocumentCounts';
+import { KvaPendingBadge } from '../../components/applicant/KvaPendingBadge';
 import type { Application, ApplicationSummary } from '../../types';
+
+function PendingDocsBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-warning-800 bg-warning-50 border border-warning-500/40 rounded-full"
+      title="Awaiting requested documents"
+    >
+      🟡 {count} awaiting
+    </span>
+  );
+}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -18,6 +32,12 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState<ApplicationSummary | null>(null);
   const [recentApps, setRecentApps] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Phase 3 PR#3 — LEW 요청 대기 서류 건수 (AC-AU3)
+  const pendingDocCounts = usePendingDocumentCounts(
+    recentApps.map((a) => a.applicationSeq),
+    user?.role === 'APPLICANT',
+  );
 
   useEffect(() => {
     const fetchData = async () => {
@@ -130,12 +150,18 @@ export default function DashboardPage() {
                       <p className="font-medium text-gray-800 truncate">{app.address}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
                     </div>
-                    <StatusBadge status={app.status} />
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {app.kvaStatus === 'UNKNOWN' && <KvaPendingBadge />}
+                      <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
+                      <StatusBadge status={app.status} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-3 text-gray-500">
-                      <span>{app.selectedKva} kVA</span>
-                      <span className="font-medium text-gray-800">${app.quoteAmount.toLocaleString()}</span>
+                      <span>{app.kvaStatus === 'UNKNOWN' ? '— kVA' : `${app.selectedKva} kVA`}</span>
+                      <span className="font-medium text-gray-800">
+                        {app.kvaStatus === 'UNKNOWN' ? `From $${app.quoteAmount.toLocaleString()}` : `$${app.quoteAmount.toLocaleString()}`}
+                      </span>
                     </div>
                     <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
                   </div>
@@ -170,12 +196,23 @@ export default function DashboardPage() {
                         </div>
                         <div className="text-xs text-gray-400">{app.postalCode}</div>
                       </td>
-                      <td className="py-3 px-2 text-gray-600">{app.selectedKva} kVA</td>
+                      <td className="py-3 px-2 text-gray-600">
+                        {app.kvaStatus === 'UNKNOWN' ? (
+                          <KvaPendingBadge />
+                        ) : (
+                          <>{app.selectedKva} kVA</>
+                        )}
+                      </td>
                       <td className="py-3 px-2 text-right font-medium text-gray-800">
-                        ${app.quoteAmount.toLocaleString()}
+                        {app.kvaStatus === 'UNKNOWN'
+                          ? <span className="text-gray-500">From ${app.quoteAmount.toLocaleString()}</span>
+                          : `$${app.quoteAmount.toLocaleString()}`}
                       </td>
                       <td className="py-3 px-2">
-                        <StatusBadge status={app.status} />
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={app.status} />
+                          <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
+                        </div>
                       </td>
                       <td className="py-3 px-2 text-gray-500">
                         {new Date(app.createdAt).toLocaleDateString()}

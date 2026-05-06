@@ -101,6 +101,33 @@ export const resendVerificationEmail = async (): Promise<MessageResponse> => {
   return response.data;
 };
 
+// ── Kaki Concierge v1.5 Phase 1 PR#2 Stage C (옵션 B) ──
+
+/** POST /api/auth/login/request-activation 요청 본문 */
+export interface ActivationLinkRequest {
+  email: string;
+}
+
+/** POST /api/auth/login/request-activation 응답 (고정 문구) */
+export interface ActivationLinkResponse {
+  message: string;
+}
+
+/**
+ * 활성화 링크 재발송 요청 (옵션 B).
+ * - 5케이스(PENDING/ACTIVE/SUSPENDED/DELETED/미존재) 모두 동일 200 + 고정 메시지.
+ * - 429: Rate limit 초과
+ */
+export const requestActivationLink = async (
+  data: ActivationLinkRequest
+): Promise<ActivationLinkResponse> => {
+  const response = await axiosClient.post<ActivationLinkResponse>(
+    '/auth/login/request-activation',
+    data
+  );
+  return response.data;
+};
+
 export const authApi = {
   signup,
   login,
@@ -111,6 +138,7 @@ export const authApi = {
   resetPassword,
   verifyEmail,
   resendVerificationEmail,
+  requestActivationLink,
 };
 
 export default authApi;

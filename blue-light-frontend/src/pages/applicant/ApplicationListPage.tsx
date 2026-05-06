@@ -7,8 +7,36 @@ import { Select } from '../../components/ui/Select';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { useToastStore } from '../../stores/toastStore';
+import { useAuthStore } from '../../stores/authStore';
 import applicationApi from '../../api/applicationApi';
+import { usePendingDocumentCounts } from '../../hooks/usePendingDocumentCounts';
+import { KvaPendingBadge } from '../../components/applicant/KvaPendingBadge';
 import type { Application } from '../../types';
+
+/** Phase 3 PR#3 — LEW 요청 대기 배지 (AC-AU3) */
+function PendingDocsBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-warning-800 bg-warning-50 border border-warning-500/40 rounded-full"
+      title="Awaiting requested documents"
+    >
+      🟡 {count} awaiting
+    </span>
+  );
+}
+
+/** P2.C — CoF 발급 배지 (목록 행용, 작은 크기). */
+function CofIssuedBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-success-700 bg-success-50 border border-success-500/40 rounded-full"
+      title="Your LEW issued the Certificate of Fitness."
+    >
+      ✓ CoF
+    </span>
+  );
+}
 
 const STATUS_FILTER_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -28,6 +56,7 @@ export default function ApplicationListPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchKeyword, setSearchKeyword] = useState('');
+  const user = useAuthStore((s) => s.user);
 
   useEffect(() => {
     applicationApi
@@ -63,6 +92,12 @@ export default function ApplicationListPage() {
 
     return result;
   }, [applications, statusFilter, searchKeyword]);
+
+  // Phase 3 PR#3 — pending 배지용 (AC-AU3)
+  const pendingDocCounts = usePendingDocumentCounts(
+    filteredApplications.map((a) => a.applicationSeq),
+    user?.role === 'APPLICANT',
+  );
 
   const columns: Column<Application>[] = [
     {
@@ -103,7 +138,9 @@ export default function ApplicationListPage() {
       align: 'right',
       className: 'hidden sm:table-cell',
       render: (app) => (
-        <span className="font-medium text-gray-700">{app.selectedKva} kVA</span>
+        app.kvaStatus === 'UNKNOWN'
+          ? <KvaPendingBadge />
+          : <span className="font-medium text-gray-700">{app.selectedKva} kVA</span>
       ),
     },
     {
@@ -112,15 +149,21 @@ export default function ApplicationListPage() {
       sortable: true,
       align: 'right',
       render: (app) => (
-        <span className="font-medium text-gray-800">
-          SGD ${app.quoteAmount.toLocaleString()}
+        <span className={`font-medium ${app.kvaStatus === 'UNKNOWN' ? 'text-gray-500' : 'text-gray-800'}`}>
+          {app.kvaStatus === 'UNKNOWN' ? 'From ' : ''}SGD ${app.quoteAmount.toLocaleString()}
         </span>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      render: (app) => <StatusBadge status={app.status} />,
+      render: (app) => (
+        <div className="flex items-center gap-2 flex-wrap">
+          <StatusBadge status={app.status} />
+          {app.cofFinalized && <CofIssuedBadge />}
+          <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
+        </div>
+      ),
     },
     {
       key: 'createdAt',
@@ -214,12 +257,19 @@ export default function ApplicationListPage() {
                 <p className="font-medium text-gray-800 truncate">{app.address}</p>
                 <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
               </div>
-              <StatusBadge status={app.status} />
+              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+                {app.kvaStatus === 'UNKNOWN' && <KvaPendingBadge />}
+                {app.cofFinalized && <CofIssuedBadge />}
+                <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
+                <StatusBadge status={app.status} />
+              </div>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-3 text-gray-500">
-                <span>{app.selectedKva} kVA</span>
-                <span className="font-medium text-gray-800">SGD ${app.quoteAmount.toLocaleString()}</span>
+                <span>{app.kvaStatus === 'UNKNOWN' ? '— kVA' : `${app.selectedKva} kVA`}</span>
+                <span className={`font-medium ${app.kvaStatus === 'UNKNOWN' ? 'text-gray-500' : 'text-gray-800'}`}>
+                  {app.kvaStatus === 'UNKNOWN' ? 'From ' : ''}SGD ${app.quoteAmount.toLocaleString()}
+                </span>
               </div>
               <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
             </div>

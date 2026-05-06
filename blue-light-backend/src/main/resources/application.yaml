@@ -34,7 +34,9 @@ spring:
     open-in-view: false
     defer-datasource-initialization: true
 
-  # 이메일 설정 (AWS SES SMTP or 기타 SMTP)
+  # 이메일 설정 — 운영은 Resend SMTP (smtp.resend.com:465)
+  # AWS SES production access 거부로 인해 Resend로 전환 (2026-04-29)
+  # Local: MAIL_SMTP_ENABLED=false 시 LogOnlyEmailService로 폴백
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}
@@ -45,10 +47,12 @@ spring:
       name: ${MAIL_FROM_NAME:LicenseKaki}
 
   # 파일 업로드 설정
+  # B-3 §10: document_type_catalog 최대값(SLD_FILE=20MB) + 헤더/메타 마진 = 25MB.
+  #          서비스 계층은 카탈로그 max_size_mb로 별도 검증한다.
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 25MB
+      max-request-size: 30MB
 
 # 로깅 설정 (개발 시 환경변수로 오버라이드: LOG_LEVEL_APP=DEBUG 등)
 logging:
@@ -74,17 +78,29 @@ cors:
 file:
   upload-dir: ${FILE_UPLOAD_DIR:./uploads}
   storage-type: ${FILE_STORAGE_TYPE:local}           # "local" (로컬 디스크) 또는 "s3" (AWS S3)
-  encryption-key: ${FILE_ENCRYPTION_KEY:}           # Base64 인코딩 AES-256 키 (비어있으면 암호화 비활성화, local 전용)
+  encryption-key: ${FILE_ENCRYPTION_KEY:}           # Base64 인코딩 AES-256 키 (로컬·S3 공용 클라이언트측 암호화, 비어있으면 비활성화)
   encryption-migrate: ${FILE_ENCRYPTION_MIGRATE:false}  # true로 설정 시 기동 시 기존 평문 파일 일괄 암호화
   s3:
     bucket: ${AWS_S3_BUCKET:}
     region: ${AWS_S3_REGION:ap-southeast-1}
     endpoint: ${AWS_S3_ENDPOINT:}                   # 로컬 테스트용 (LocalStack 등, 비어있으면 AWS 기본)
 
+# 필드(컬럼) 단위 암호화 키 — 파일 키와 분리 운영 (키 스코프 누출 방지)
+# Base64 인코딩 AES-256 키. 비어있으면 평문 passthrough (로컬/테스트 편의).
+field:
+  encryption:
+    key: ${FIELD_ENCRYPTION_KEY:}
+
 # 비밀번호 재설정 설정
 password-reset:
   token-expiry-minutes: ${PASSWORD_RESET_TOKEN_EXPIRY:60}
   base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:5174}
+
+# Kaki Concierge 설정 (Phase 1 PR#2)
+# 계정 활성화 링크 base URL — Stage B의 ConciergeNotifier가 이메일 발송 시 사용
+concierge:
+  account-setup:
+    base-url: ${CONCIERGE_SETUP_BASE_URL:http://localhost:5174}
 
 # 면허 만료 스케줄러 설정
 license-expiry:
@@ -114,6 +130,11 @@ sld:
 mail:
   smtp:
     enabled: ${MAIL_SMTP_ENABLED:false}
+  # AWS SES Configuration Set — SES 백엔드 사용 시에만 설정 (헤더로 부착됨).
+  # 현재 운영은 Resend SMTP를 사용하므로 빈 값(헤더 미부착) 유지.
+  # Resend는 자체 트래킹·suppression·webhook을 제공하므로 SES Configuration Set 불필요.
+  ses:
+    configuration-set: ${SES_CONFIGURATION_SET:}
 
 # 감사 로그 설정
 audit:

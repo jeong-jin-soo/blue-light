@@ -24,9 +24,10 @@ export interface ApiError {
 // ============================================
 
 /**
- * 사용자 역할
+ * 사용자 역할 — 단일 정의원은 `constants/roles.ts`
  */
-export type UserRole = 'APPLICANT' | 'LEW' | 'ADMIN' | 'SYSTEM_ADMIN' | 'SLD_MANAGER';
+import type { UserRole } from '../constants/roles';
+export type { UserRole };
 
 /**
  * LEW 승인 상태
@@ -85,9 +86,33 @@ export type ApplicationStatus =
 export type ApplicationType = 'NEW' | 'RENEWAL';
 
 /**
- * SLD 제출 방식
+ * 신청자 유형 (Phase 1)
  */
-export type SldOption = 'SELF_UPLOAD' | 'REQUEST_LEW';
+export type ApplicantType = 'INDIVIDUAL' | 'CORPORATE';
+
+/**
+ * SLD 제출 방식
+ * - SELF_UPLOAD: 신청자가 지금 업로드
+ * - SUBMIT_WITHIN_3_MONTHS: 3개월 내 제출 약속 (JIT — 신청 시점에 SLD 준비 불필요)
+ * - REQUEST_LEW: LEW에게 작성 의뢰
+ */
+export type SldOption = 'SELF_UPLOAD' | 'SUBMIT_WITHIN_3_MONTHS' | 'REQUEST_LEW';
+
+/**
+ * EMA ELISE Premises Type (시설 용도)
+ */
+export type PremisesType =
+  | 'COMMERCIAL'
+  | 'FACTORIES'
+  | 'FARM'
+  | 'RESIDENTIAL'
+  | 'INDUSTRIAL'
+  | 'HOTEL'
+  | 'HEALTHCARE'
+  | 'EDUCATION'
+  | 'GOVERNMENT'
+  | 'MIXED_USE'
+  | 'OTHER';
 
 /**
  * SLD 요청 상태
@@ -110,6 +135,18 @@ export interface SldRequest {
 }
 
 /**
+ * Phase 5 — kVA 확정 상태
+ * - UNKNOWN: 신청자가 "I don't know" 선택, LEW 확정 대기
+ * - CONFIRMED: 신청자 직접 입력(USER_INPUT) 또는 LEW 확정(LEW_VERIFIED)
+ */
+export type KvaStatus = 'UNKNOWN' | 'CONFIRMED';
+
+/**
+ * Phase 5 — kVA 출처
+ */
+export type KvaSource = 'USER_INPUT' | 'LEW_VERIFIED';
+
+/**
  * 라이선스 신청 내역
  */
 export interface Application {
@@ -126,12 +163,19 @@ export interface Application {
   licenseExpiryDate?: string;
   createdAt: string;
   updatedAt: string;
+  // Phase 5: kVA 확정 상태
+  kvaStatus?: KvaStatus;
+  kvaSource?: KvaSource;
+  kvaConfirmedAt?: string;
+  kvaConfirmedBy?: number;
   // Phase 19: Assigned LEW info
   assignedLewFirstName?: string;
   assignedLewLastName?: string;
   assignedLewLicenceNo?: string;
   // SP Group 계정 번호
   spAccountNo?: string;
+  // Phase 1: 신청자 유형
+  applicantType: ApplicantType;
   // 갱신 + 견적
   applicationType: ApplicationType;
   sldFee?: number;
@@ -146,7 +190,54 @@ export interface Application {
   // LOA 서명 정보
   loaSignatureUrl?: string;
   loaSignedAt?: string;
+  // ── P1.2: EMA ELISE 필드 (신청자 수집 / 일부는 LEW 추가 예정) ──
+  installationName?: string;
+  premisesType?: PremisesType;
+  isRentalPremises?: boolean;
+  /** Landlord EI Licence 는 서버 응답에서 앞 5자 마스킹 처리됨 (LEW 전용 응답에서만 원본). */
+  landlordEiLicenceMasked?: string;
+  renewalCompanyNameChanged?: boolean;
+  renewalAddressChanged?: boolean;
+  installationAddressBlock?: string;
+  installationAddressUnit?: string;
+  installationAddressStreet?: string;
+  installationAddressBuilding?: string;
+  installationAddressPostalCode?: string;
+  correspondenceAddressBlock?: string;
+  correspondenceAddressUnit?: string;
+  correspondenceAddressStreet?: string;
+  correspondenceAddressBuilding?: string;
+  correspondenceAddressPostalCode?: string;
+  // ── P2.A: LEW Review Form hint 응답 필드 (스펙 §5.5) ──
+  /** MSSL hint — last4만 노출(평문·enc는 LEW 전용 응답에서만). */
+  msslHintLast4?: string;
+  supplyVoltageHint?: number;
+  consumerTypeHint?: string;
+  retailerHint?: string;
+  hasGeneratorHint?: boolean;
+  generatorCapacityHint?: number;
+  /** CoF finalize 여부 — 상세 화면 "CoF 발급됨" 배지용 (P2.C에서 사용). */
+  cofFinalized?: boolean;
+  cofCertifiedAt?: string;
+  /** 경고 수준 검증 결과. 200 OK 차단하지 않음. */
+  warnings?: ApplicantHintWarning[];
 }
+
+/**
+ * 신청자 hint 필드에 대한 경고 수준 검증 결과.
+ * 백엔드 {@code ApplicantHintWarning} DTO와 1:1 매핑.
+ */
+export interface ApplicantHintWarning {
+  field: string;
+  code: string;
+  reason: string;
+}
+
+/** Declaration consent types — Submit 시 3건 append-only 로그에 기록. */
+export type DeclarationConsentType =
+  | 'APPLICATION_DECLARATION_V1_GROUP1'
+  | 'APPLICATION_DECLARATION_V1_GROUP2'
+  | 'APPLICATION_DECLARATION_V1_GROUP3';
 
 // ============================================
 // File Types
@@ -210,6 +301,34 @@ export interface Inspection {
 }
 
 // ============================================
+// Invoice Types (E-Invoice)
+// ============================================
+
+/**
+ * E-Invoice 메타데이터.
+ * PDF 바이너리는 {@code pdfFileSeq} 를 기존 {@code /api/files/{id}/download} 로 조합해 받는다.
+ */
+export interface Invoice {
+  invoiceSeq: number;
+  invoiceNumber: string;
+  paymentSeq: number;
+  referenceType: string;
+  referenceSeq: number;
+  applicationSeq?: number;
+  issuedAt: string;
+  totalAmount: number;
+  currency: string;
+  pdfFileSeq: number;
+  billingRecipientName: string;
+  billingRecipientCompany?: string;
+}
+
+/** Admin 재발행 요청 — 스냅샷은 불변, PDF만 재생성. 사유 필수. */
+export interface RegenerateInvoiceRequest {
+  reason: string;
+}
+
+// ============================================
 // Price Types
 // ============================================
 
@@ -269,13 +388,9 @@ export interface SignupRequest {
   password: string;
   firstName: string;
   lastName: string;
-  phone?: string;
   role?: string;
   lewLicenceNo?: string;
   lewGrade?: string;
-  companyName?: string;
-  uen?: string;
-  designation?: string;
   pdpaConsent: boolean;
 }
 
@@ -300,6 +415,17 @@ export interface TokenResponse {
 // ============================================
 
 /**
+ * Phase 2 PR#3: 법인 JIT 모달에서 수집하는 회사 정보
+ */
+export interface CompanyInfo {
+  companyName: string;
+  uen: string;
+  designation: string;
+  /** true(기본) = User 프로필에 저장 / false = 이 신청에만 사용 */
+  persistToProfile: boolean;
+}
+
+/**
  * 신청서 작성 요청
  */
 export interface CreateApplicationRequest {
@@ -307,6 +433,7 @@ export interface CreateApplicationRequest {
   postalCode: string;
   buildingType?: string;
   selectedKva: number;
+  applicantType: ApplicantType;
   spAccountNo?: string;
   // Phase 18: 갱신 관련
   applicationType?: string;
@@ -317,6 +444,42 @@ export interface CreateApplicationRequest {
   renewalReferenceNo?: string;
   // SLD 제출 방식
   sldOption?: string;
+  // Phase 2 PR#3: 법인 JIT
+  companyInfo?: CompanyInfo;
+  // Phase 5: kVA UNKNOWN 플래그 — true면 서버가 selectedKva=45 강제
+  kvaUnknown?: boolean;
+  // ── P1.2: EMA ELISE 확장 필드 (전부 선택, JIT) ──
+  installationName?: string;
+  premisesType?: PremisesType;
+  isRentalPremises?: boolean;
+  landlordEiLicenceNo?: string;
+  renewalCompanyNameChanged?: boolean;
+  renewalAddressChanged?: boolean;
+  installationAddressBlock?: string;
+  installationAddressUnit?: string;
+  installationAddressStreet?: string;
+  installationAddressBuilding?: string;
+  installationAddressPostalCode?: string;
+  correspondenceAddressBlock?: string;
+  correspondenceAddressUnit?: string;
+  correspondenceAddressStreet?: string;
+  correspondenceAddressBuilding?: string;
+  correspondenceAddressPostalCode?: string;
+  /** 제출 시점 폼 스냅샷 해시 (Declaration 감사 로그용). 미제공 시 서버가 재계산. */
+  formSnapshotHash?: string;
+  // ── P2.A: LEW Review Form hint 필드 (모두 optional, warning-only 검증) ──
+  /** MSSL Account No 평문 힌트 (예: "123-45-6789-0"). */
+  msslHint?: string;
+  /** 공급 전압 힌트(V): 230 / 400 / 6600 / 22000. */
+  supplyVoltageHint?: number;
+  /** Consumer Type 힌트. */
+  consumerTypeHint?: 'NON_CONTESTABLE' | 'CONTESTABLE';
+  /** Retailer 힌트: RetailerCode enum 문자열. */
+  retailerHint?: string;
+  /** 발전기 보유 여부 힌트. */
+  hasGeneratorHint?: boolean;
+  /** 발전기 용량 힌트(kVA). */
+  generatorCapacityHint?: number;
 }
 
 /**
@@ -329,6 +492,24 @@ export interface UpdateApplicationRequest {
   selectedKva: number;
   spAccountNo?: string;
   renewalPeriodMonths?: number;
+  // ── P2.A: LEW Review Form hint 필드 ──
+  msslHint?: string;
+  supplyVoltageHint?: number;
+  consumerTypeHint?: 'NON_CONTESTABLE' | 'CONTESTABLE';
+  retailerHint?: string;
+  hasGeneratorHint?: boolean;
+  generatorCapacityHint?: number;
+  // ── EMA ELISE 5-part 주소 (재제출 시 갱신) ──
+  installationAddressBlock?: string;
+  installationAddressUnit?: string;
+  installationAddressStreet?: string;
+  installationAddressBuilding?: string;
+  installationAddressPostalCode?: string;
+  correspondenceAddressBlock?: string;
+  correspondenceAddressUnit?: string;
+  correspondenceAddressStreet?: string;
+  correspondenceAddressBuilding?: string;
+  correspondenceAddressPostalCode?: string;
 }
 
 /**
@@ -665,6 +846,7 @@ export interface SldOrder {
   postalCode?: string;
   buildingType?: string;
   selectedKva?: number;
+  ampere?: string;
   applicantNote?: string;
   sketchFileSeq?: number;
   status: SldOrderStatus;
@@ -688,6 +870,7 @@ export interface CreateSldOrderRequest {
   postalCode?: string;
   buildingType?: string;
   selectedKva?: number;
+  ampere?: string;
   applicantNote?: string;
 }
 
@@ -735,6 +918,337 @@ export interface SldChatMessage {
   createdAt: string;
 }
 
+// ── Lighting Layout / Power Socket / LEW Service 주문 (SldOrder와 동일 구조) ──
+// 프로세스는 SLD와 동일하며, 관리 항목은 차후 기능별로 분화될 수 있음.
+
+export type LightingOrderStatus = SldOrderStatus;
+
+export interface LightingOrder {
+  lightingOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: LightingOrderStatus;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  uploadedFileSeq?: number;
+  revisionComment?: string;
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateLightingOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+/**
+ * Lighting Manager 대시보드 (백엔드 LightingOrderDashboardResponse)
+ */
+export interface LightingOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  inProgress: number;
+  deliverableUploaded: number;
+  completed: number;
+}
+
+export interface LightingOrderPayment {
+  lightingOrderPaymentSeq: number;
+  lightingOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
+export type PowerSocketOrderStatus = SldOrderStatus;
+
+export interface PowerSocketOrder {
+  powerSocketOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: PowerSocketOrderStatus;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  uploadedFileSeq?: number;
+  revisionComment?: string;
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePowerSocketOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+/**
+ * PowerSocket Manager 대시보드 (백엔드 PowerSocketOrderDashboardResponse)
+ */
+export interface PowerSocketOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  inProgress: number;
+  deliverableUploaded: number;
+  completed: number;
+}
+
+export interface PowerSocketOrderPayment {
+  powerSocketOrderPaymentSeq: number;
+  powerSocketOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
+/**
+ * LEW Service 주문 상태 (방문형 서비스 기준 — PR 3 rename).
+ * <p>SldOrderStatus 와 공유하지 않는다(Backend 에서 enum 분리).
+ */
+export type LewServiceOrderStatus =
+  | 'PENDING_QUOTE'
+  | 'QUOTE_PROPOSED'
+  | 'QUOTE_REJECTED'
+  | 'PENDING_PAYMENT'
+  | 'PAID'
+  | 'VISIT_SCHEDULED'
+  | 'VISIT_COMPLETED'
+  | 'REVISIT_REQUESTED'
+  | 'COMPLETED';
+
+/**
+ * LEW Service 방문 사진 (PR 3).
+ */
+export interface VisitPhoto {
+  photoSeq: number;
+  fileSeq: number;
+  caption?: string;
+  uploadedAt: string;
+}
+
+export interface LewServiceOrder {
+  lewServiceOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  sketchFileSeq?: number;
+  status: LewServiceOrderStatus;
+  /**
+   * 파생 상태: status=VISIT_SCHEDULED && checkInAt 있음.
+   * 백엔드에서 계산되어 내려옴.
+   */
+  onSite?: boolean;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  /** PR 3 — 방문 보고서 (기존 uploadedFileSeq 와 같은 값, alias) */
+  visitReportFileSeq?: number;
+  /** @deprecated PR 3 — visitReportFileSeq 사용 권장 */
+  uploadedFileSeq?: number;
+  /** PR 3 — 재방문 요청 사유 */
+  revisitComment?: string;
+  /** @deprecated PR 3 — revisitComment 사용 권장 */
+  revisionComment?: string;
+  // LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약
+  visitScheduledAt?: string;
+  visitScheduleNote?: string;
+  // PR 3 — 체크인/아웃 + 방문 사진
+  checkInAt?: string;
+  checkOutAt?: string;
+  visitPhotos?: VisitPhoto[];
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * LEW Service check-out 요청 (Manager 측, PR 3).
+ * POST /api/lew-service-manager/orders/{id}/check-out
+ */
+export interface CheckOutRequest {
+  visitReportFileSeq: number;
+  managerNote?: string;
+}
+
+/**
+ * LEW Service 방문 일정 예약 요청 (Manager 측)
+ * POST /api/lew-service-manager/orders/{id}/schedule-visit
+ */
+export interface ScheduleVisitRequest {
+  /** ISO-8601 LocalDateTime (예: "2026-04-23T14:00:00") */
+  visitScheduledAt: string;
+  visitScheduleNote?: string;
+}
+
+export interface CreateLewServiceOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+/**
+ * LewService Manager 대시보드 (백엔드 LewServiceOrderDashboardResponse).
+ * <p>PR 3 — 신규 visit* 필드 + 하위호환 alias.
+ */
+export interface LewServiceOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  /** PR 3 — VISIT_SCHEDULED 건수 */
+  visitScheduled: number;
+  /** PR 3 — VISIT_COMPLETED 건수 */
+  visitCompleted: number;
+  /** PR 3 — REVISIT_REQUESTED 건수 */
+  revisitRequested: number;
+  completed: number;
+  /** @deprecated PR 3 — visitScheduled 사용 권장 */
+  inProgress?: number;
+  /** @deprecated PR 3 — visitCompleted 사용 권장 */
+  deliverableUploaded?: number;
+}
+
+export interface LewServiceOrderPayment {
+  lewServiceOrderPaymentSeq: number;
+  lewServiceOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
+// ────────────────────────────────────────────────────────────
+//  Expired License Order (LEW Service 와 동일 생애주기, 다중 참고 문서 업로드)
+// ────────────────────────────────────────────────────────────
+
+export type ExpiredLicenseOrderStatus = LewServiceOrderStatus;
+
+export interface ExpiredLicenseVisitPhoto {
+  photoSeq: number;
+  fileSeq: number;
+  caption?: string;
+  uploadedAt: string;
+}
+
+export interface ExpiredLicenseSupportingDocument {
+  fileSeq: number;
+  fileType: string;
+  originalFilename?: string;
+  fileSize?: number;
+  uploadedAt: string;
+}
+
+export interface ExpiredLicenseOrder {
+  expiredLicenseOrderSeq: number;
+  userSeq: number;
+  userFirstName: string;
+  userLastName: string;
+  userEmail: string;
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+  status: ExpiredLicenseOrderStatus;
+  onSite?: boolean;
+  quoteAmount?: number;
+  quoteNote?: string;
+  managerNote?: string;
+  visitReportFileSeq?: number;
+  revisitComment?: string;
+  visitScheduledAt?: string;
+  visitScheduleNote?: string;
+  checkInAt?: string;
+  checkOutAt?: string;
+  visitPhotos?: ExpiredLicenseVisitPhoto[];
+  supportingDocuments?: ExpiredLicenseSupportingDocument[];
+  assignedManagerSeq?: number;
+  assignedManagerFirstName?: string;
+  assignedManagerLastName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateExpiredLicenseOrderRequest {
+  address?: string;
+  postalCode?: string;
+  buildingType?: string;
+  selectedKva?: number;
+  applicantNote?: string;
+}
+
+export interface ExpiredLicenseOrderDashboard {
+  total: number;
+  pendingQuote: number;
+  quoteProposed: number;
+  pendingPayment: number;
+  paid: number;
+  visitScheduled: number;
+  visitCompleted: number;
+  revisitRequested: number;
+  completed: number;
+}
+
+export interface ExpiredLicenseOrderPayment {
+  expiredLicenseOrderPaymentSeq: number;
+  expiredLicenseOrderSeq: number;
+  amount: number;
+  paymentMethod: string;
+  status: string;
+  paidAt: string;
+  transactionId?: string;
+}
+
 /**
  * SLD SSE 이벤트 타입
  */
@@ -744,6 +1258,8 @@ export type SldSseEventType =
   | 'tool_result'
   | 'sld_preview'
   | 'file_generated'
+  | 'applied_defaults'
+  | 'layout_warnings'
   | 'done'
   | 'error'
   | 'status'
@@ -784,6 +1300,8 @@ export interface SldSseEvent {
   stage?: SldProgressStage;
   message?: string;
   elapsed?: number;
+  // applied_defaults / layout_warnings 이벤트 필드
+  items?: string[];
 }
 
 // ============================================
@@ -829,7 +1347,42 @@ export interface AuditLog {
 
 // ── Notification ──────────────────────────────
 
-export type NotificationType = 'PAYMENT_CONFIRMED';
+export type NotificationType =
+  | 'PAYMENT_CONFIRMED'
+  // PR4 — ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 알림
+  | 'PAYMENT_CONFIRMED_LEW'
+  // Phase 3 — LEW 서류 요청 워크플로
+  | 'DOCUMENT_REQUEST_CREATED'
+  | 'DOCUMENT_REQUEST_FULFILLED'
+  | 'DOCUMENT_REQUEST_APPROVED'
+  | 'DOCUMENT_REQUEST_REJECTED'
+  // Phase 5 — LEW kVA 확정 알림
+  | 'KVA_CONFIRMED'
+  // PR-2 (kva-postpayment-adjustment) — 결제 후 ADMIN의 kVA 변경 → 배정 LEW 통지
+  | 'KVA_ADJUSTED_BY_ADMIN_LEW'
+  // PR-3 (kva-postpayment-adjustment) — LEW 의 kVA 변경 요청 → ADMIN 통지
+  | 'KVA_ADJUSTMENT_REQUESTED_ADMIN'
+  // PR-4 (kva-postpayment-adjustment) — ADMIN 의 settlement 마킹 → 배정 LEW 통지
+  | 'KVA_ADJUSTMENT_SETTLED_LEW'
+  // PR-4 (admin-manual-email-spec D4=B) — ADMIN 수동 이메일 발송 동반 인앱 알림.
+  // 시스템 사용자 수신자(APPLICANT/LEW)에게만, 옵션 ON 시(기본) 생성.
+  | 'ADMIN_MANUAL_EMAIL_NOTICE'
+  // ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2/PR-3 — frontend mirror.
+  // (PR-2) 신청자에게 별도 수금 확인 알림. referenceType=APPLICATION 또는 CONCIERGE_REQUEST.
+  | 'MANUAL_PAYMENT_CONFIRMED_APPLICANT'
+  // (PR-2) 신청자에게 자동 발행 영수증 발급 안내. referenceType=APPLICATION 또는 CONCIERGE_REQUEST.
+  | 'INVOICE_ISSUED_APPLICANT'
+  // (PR-3) LEW 가 ConciergeRequest 에 배정될 때 해당 LEW 에게 발송. referenceType=CONCIERGE_REQUEST.
+  | 'CONCIERGE_LEW_ASSIGNED_LEW';
+
+// ── Phase 2 Document Management (re-export) ───
+export type {
+  DocumentRequestStatus,
+  DocumentType,
+  DocumentRequest,
+  VoluntaryUploadResponse,
+  VoluntaryUploadPayload,
+} from './document';
 
 export interface AppNotification {
   notificationSeq: number;

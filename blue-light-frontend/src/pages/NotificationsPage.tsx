@@ -9,7 +9,36 @@ import { useNotificationStore } from '../stores/notificationStore';
 import { useAuthStore } from '../stores/authStore';
 import { getBasePath } from '../utils/routeUtils';
 import notificationApi from '../api/notificationApi';
-import type { AppNotification } from '../types';
+import type { AppNotification, NotificationType } from '../types';
+
+/**
+ * Phase 3 PR#3 — 알림 타입별 아이콘 (AC-N1~N3)
+ */
+const NOTIFICATION_ICON: Record<NotificationType, string> = {
+  PAYMENT_CONFIRMED: '💳',
+  // PR4 — ADMIN의 결제 확인 후 배정된 LEW에게 전달되는 Phase 2 시작 알림
+  PAYMENT_CONFIRMED_LEW: '💳',
+  DOCUMENT_REQUEST_CREATED: '🔔',
+  DOCUMENT_REQUEST_FULFILLED: '📤',
+  DOCUMENT_REQUEST_APPROVED: '✅',
+  DOCUMENT_REQUEST_REJECTED: '⚠️',
+  // Phase 5 — LEW kVA 확정 알림
+  KVA_CONFIRMED: '💡',
+  // PR-2 (kva-postpayment) — ADMIN의 결제 후 kVA 변경 → 배정 LEW 알림 (전구⚡ 변경 의미)
+  KVA_ADJUSTED_BY_ADMIN_LEW: '⚡',
+  // PR-3 (kva-postpayment) — LEW의 kVA 변경 요청 → ADMIN 알림 (전구⚡ 요청)
+  KVA_ADJUSTMENT_REQUESTED_ADMIN: '⚡',
+  // PR-4 (kva-postpayment) — ADMIN의 settlement 마킹 → 배정 LEW 알림 (정산 영수증 🧾)
+  KVA_ADJUSTMENT_SETTLED_LEW: '🧾',
+  // PR-4 (admin-manual-email D4=B) — ADMIN 수동 이메일 동반 인앱 알림 (📧 봉투)
+  ADMIN_MANUAL_EMAIL_NOTICE: '📧',
+  // ★ Concierge 강화 + 별도 수금 PR-2 — 별도 수금 확인 (💰 돈주머니)
+  MANUAL_PAYMENT_CONFIRMED_APPLICANT: '💰',
+  // ★ PR-2 — 영수증 자동 발행 안내 (🧾 영수증)
+  INVOICE_ISSUED_APPLICANT: '🧾',
+  // ★ PR-3 — 컨시어지 LEW 배정 알림 (🤝 컨시어지)
+  CONCIERGE_LEW_ASSIGNED_LEW: '🤝',
+};
 
 export default function NotificationsPage() {
   const navigate = useNavigate();
@@ -53,8 +82,54 @@ export default function NotificationsPage() {
     }
 
     // Navigate to referenced entity
+    // Phase 3: DOCUMENT_REQUEST notifications reference_type='DOCUMENT_REQUEST',
+    //         reference_id=document_request_id. 백엔드가 metadata.applicationSeq를 같이
+    //         싣지 않는 한 현재는 일반 APPLICATION 라우팅 fallback만 수행.
     if (n.referenceType === 'APPLICATION' && n.referenceId) {
-      navigate(`${basePath}/applications/${n.referenceId}`);
+      // PR4: PAYMENT_CONFIRMED_LEW 는 항상 LEW 워크스페이스로 deeplink.
+      // PR-2 (kva-postpayment): KVA_ADJUSTED_BY_ADMIN_LEW 도 LEW 워크스페이스로 동일 패턴.
+      // (수신자가 LEW 인 알림이므로 user.role 기준 basePath 와도 일치하지만,
+      //  type이 곧 라우트를 의미하도록 명시적으로 처리.)
+      if (
+        n.type === 'PAYMENT_CONFIRMED_LEW' ||
+        n.type === 'KVA_ADJUSTED_BY_ADMIN_LEW' ||
+        // PR-4: settlement 마킹 알림 — 수신자가 LEW 이므로 LEW 워크스페이스로.
+        n.type === 'KVA_ADJUSTMENT_SETTLED_LEW'
+      ) {
+        navigate(`/lew/applications/${n.referenceId}`);
+      } else if (n.type === 'KVA_ADJUSTMENT_REQUESTED_ADMIN') {
+        // PR-3: 수신자가 ADMIN — admin 워크스페이스의 신청 상세로 이동.
+        navigate(`/admin/applications/${n.referenceId}`);
+      } else {
+        // ★ Concierge 강화 PR-2 (MANUAL_PAYMENT_CONFIRMED_APPLICANT, INVOICE_ISSUED_APPLICANT)
+        //   — 수신자가 APPLICANT 이므로 basePath('/applicant/applications' or '/dashboard'-aware)
+        //   기준 라우팅. 영수증 알림은 #receipts 해시로 영수증 카드까지 자동 스크롤(있을 때).
+        if (n.type === 'INVOICE_ISSUED_APPLICANT') {
+          navigate(`${basePath}/applications/${n.referenceId}#receipts`);
+        } else {
+          // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE), PR-2 (MANUAL_PAYMENT_CONFIRMED_APPLICANT) 등
+          // 수신자 role 의 워크스페이스 (APPLICANT → /applications, LEW → /lew/applications) 로 이동.
+          navigate(`${basePath}/applications/${n.referenceId}`);
+        }
+      }
+    } else if (n.referenceType === 'CONCIERGE_REQUEST' && n.referenceId) {
+      // ★ Concierge 강화 PR-2/PR-3 — referenceType=CONCIERGE_REQUEST.
+      // - CONCIERGE_LEW_ASSIGNED_LEW (수신자=LEW) → LEW 컨시어지 페이지
+      // - MANUAL_PAYMENT_CONFIRMED_APPLICANT / INVOICE_ISSUED_APPLICANT (수신자=APPLICANT)
+      //   → 컨시어지 신청자에게 본인 컨시어지 상세 페이지가 별도 없으므로(향후 별도 PR)
+      //     안전한 fallback: notifications 페이지에 머무르고 message 만 갱신 (단순 dismiss).
+      //     향후 applicant 용 컨시어지 상세 페이지가 생기면 활성화.
+      if (n.type === 'CONCIERGE_LEW_ASSIGNED_LEW') {
+        navigate(`/lew/concierge-requests/${n.referenceId}`);
+      }
+      // 그 외 알림 타입은 단순 마킹만 — 향후 PR 에서 라우팅 활성화.
+    } else if (n.referenceType === 'MANUAL_EMAIL') {
+      // PR-4 (ADMIN_MANUAL_EMAIL_NOTICE) 의 relatedApplication 미지정 케이스 — 단순 dismiss.
+      // 향후 manual-email 상세 페이지가 생기면 deeplink 활성화 가능. 현재는 마킹만.
+    } else if (n.referenceType === 'DOCUMENT_REQUEST' && n.referenceId) {
+      // PR#4에서 referenceType=APPLICATION + metadata로 정규화 예정.
+      // 임시: 알림 message에서 applicationSeq 파싱 불가 → 알림 목록 유지.
+      // (스펙상 deep link는 `/applications/:appId#doc-req-:id`)
     }
   };
 
@@ -129,6 +204,9 @@ export default function NotificationsPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${isUnread ? 'bg-blue-500' : 'bg-transparent'}`} />
+                  <span className="text-lg flex-shrink-0 leading-none mt-0.5" aria-hidden>
+                    {NOTIFICATION_ICON[n.type] ?? '🔔'}
+                  </span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className={`text-sm ${isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>

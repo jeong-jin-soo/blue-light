@@ -11,10 +11,12 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 /**
  * SMTP 기반 이메일 발송 서비스
@@ -29,6 +31,11 @@ import java.time.format.DateTimeFormatter;
 public class SmtpEmailService implements EmailService {
 
     private final JavaMailSender mailSender;
+    /**
+     * PR-3: ADMIN 수동 이메일 본문 렌더링은 미리보기와 동일해야 하므로 별도 컴포넌트로 분리. SMTP/Preview/LogOnly
+     * 모두 동일 인스턴스를 사용 (Spring DI 가 싱글톤으로 보장).
+     */
+    private final ManualEmailHtmlRenderer manualEmailHtmlRenderer;
 
     @Value("${spring.mail.sender.from:noreply@licensekaki.com}")
     private String fromAddress;
@@ -36,11 +43,47 @@ public class SmtpEmailService implements EmailService {
     @Value("${spring.mail.sender.name:LicenseKaki}")
     private String fromName;
 
+    /**
+     * 프론트엔드 base URL — CTA 링크 및 로고 이미지 참조에 사용.
+     * {@code password-reset.base-url} 를 재사용하여 별도 설정 부담을 줄인다.
+     */
+    @Value("${password-reset.base-url:http://localhost:5174}")
+    private String appBaseUrl;
+
+    /**
+     * AWS SES Configuration Set 이름.
+     * 설정 시 {@code X-SES-CONFIGURATION-SET} 헤더를 모든 발송 메시지에 부착하여
+     * SES가 해당 Configuration Set으로 이벤트(SEND/BOUNCE/COMPLAINT/DELIVERY 등)를
+     * 처리하도록 한다. 비어있으면(다른 SMTP 서버) 헤더 미부착.
+     */
+    @Value("${mail.ses.configuration-set:}")
+    private String sesConfigurationSet;
+
+    // ── B-2 · HTML 이스케이프 유틸 ─────────────────────────
+    // 모든 사용자 입력 주입 지점(userName, comment, rejectionReason, customLabel 등)에 적용.
+    // 기존 템플릿도 회귀 방지 차원에서 동일 유틸을 통과시킨다.
+    private static String esc(String s) {
+        return s == null ? "" : HtmlUtils.htmlEscape(s);
+    }
+
+    /**
+     * MimeMessage 생성 시 SES Configuration Set 헤더를 자동 부착하는 팩토리.
+     * Spring의 JavaMailSender가 그대로 전송하므로 SMTP 레벨에서 헤더가 유지된다.
+     * {@code mail.ses.configuration-set} 설정이 비어있으면 일반 createMimeMessage()와 동일.
+     */
+    private MimeMessage createMessageWithConfigSet() throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        if (sesConfigurationSet != null && !sesConfigurationSet.isBlank()) {
+            message.setHeader("X-SES-CONFIGURATION-SET", sesConfigurationSet);
+        }
+        return message;
+    }
+
     @Override
     @Async
     public void sendPasswordResetEmail(String to, String userName, String resetLink) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -62,7 +105,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendEmailVerificationEmail(String to, String userName, String verificationLink) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -85,7 +128,7 @@ public class SmtpEmailService implements EmailService {
                                                String licenseNumber, String address,
                                                LocalDate expiryDate, int daysRemaining) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromAddress, fromName);
@@ -106,7 +149,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendRevisionRequestEmail(String to, String userName, Long appSeq, String address, String comment) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -123,7 +166,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendPaymentRequestEmail(String to, String userName, Long appSeq, String address, BigDecimal amount) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -140,7 +183,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendPaymentConfirmEmail(String to, String userName, Long appSeq, String address, BigDecimal amount) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -158,7 +201,7 @@ public class SmtpEmailService implements EmailService {
     public void sendLicenseIssuedEmail(String to, String userName, Long appSeq,
                                         String address, String licenseNo, LocalDate expiryDate) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -175,7 +218,7 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendLewAssignedEmail(String to, String lewName, Long appSeq, String address, String applicantName) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
@@ -192,17 +235,238 @@ public class SmtpEmailService implements EmailService {
     @Async
     public void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount) {
         try {
-            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Payment Confirmed for Application #" + appSeq + " - LicenseKaki");
+            // PR4: LEW가 메일 제목만 보고도 Phase 2 시작 시점임을 인지하도록 명시.
+            helper.setSubject("[LicenseKaki] Payment confirmed — Application #" + appSeq + " ready for certification");
             helper.setText(buildPaymentConfirmedToLewHtml(lewName, appSeq, address, amount), true);
             mailSender.send(message);
             log.info("Payment confirmed (LEW) email sent to: {}, appSeq={}", to, appSeq);
         } catch (MessagingException | java.io.UnsupportedEncodingException e) {
             log.error("Failed to send payment confirmed (LEW) email to: {}", to, e);
         }
+    }
+
+    @Override
+    @Async
+    public void sendKvaAdjustedToLewEmail(String to, String lewName, Long appSeq,
+                                          Integer previousKva, Integer newKva,
+                                          BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
+                                          BigDecimal amountDifference,
+                                          boolean cofReissueTriggered, String reason) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PR-2: PDPA 최소화 — Subject 에 kVA 수치/금액 노출 금지. publicCode 가 아직 도메인에
+            // 자리잡지 않아 applicationSeq 를 reference 로 사용 (PR4 PaymentConfirmed 와 동일 패턴).
+            helper.setSubject("[LicenseKaki] kVA adjusted by Admin · Application #" + appSeq);
+            helper.setText(buildKvaAdjustedToLewHtml(lewName, appSeq, previousKva, newKva,
+                    previousQuoteAmount, newQuoteAmount, amountDifference,
+                    cofReissueTriggered, reason), true);
+            mailSender.send(message);
+            log.info("kVA adjusted (LEW) email sent to: {}, appSeq={}, prev={}kVA, new={}kVA, cofReissue={}",
+                    to, appSeq, previousKva, newKva, cofReissueTriggered);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send kVA adjusted (LEW) email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendKvaSettlementMarkedToLewEmail(String to, String lewName, Long appSeq,
+                                                   String paymentAdjustment,
+                                                   BigDecimal settledAmount,
+                                                   String receiptReferenceNumber) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PR-4: PDPA 최소화 — Subject 에 금액·영수증 번호 노출 금지. applicationSeq 만 reference.
+            helper.setSubject("[LicenseKaki] kVA settlement marked · #" + appSeq);
+            helper.setText(buildKvaSettlementMarkedToLewHtml(lewName, appSeq,
+                    paymentAdjustment, settledAmount, receiptReferenceNumber), true);
+            mailSender.send(message);
+            log.info("kVA settlement marked (LEW) email sent to: {}, appSeq={}, paymentAdjustment={}",
+                    to, appSeq, paymentAdjustment);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send kVA settlement marked (LEW) email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendKvaAdjustmentRequestedToAdminEmail(String to, String adminName, String lewName, Long appSeq,
+                                                        Integer proposedKva, Integer currentKva, String reason) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA 최소화 — Subject 에 kVA 수치/금액 노출 금지. applicationSeq 만 reference 로 노출.
+            helper.setSubject("[LicenseKaki] kVA adjustment requested · Application #" + appSeq);
+            helper.setText(buildKvaAdjustmentRequestedToAdminHtml(adminName, lewName, appSeq,
+                    proposedKva, currentKva, reason), true);
+            mailSender.send(message);
+            log.info("kVA adjustment requested (ADMIN) email sent to: {}, appSeq={}, lewName={}, proposed={}kVA",
+                    to, appSeq, lewName, proposedKva);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send kVA adjustment requested (ADMIN) email to: {}", to, e);
+        }
+    }
+
+    // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md §8.2) ──────
+
+    /**
+     * ADMIN 수동 이메일 발송. 다른 자동 알림 메서드와 달리:
+     * <ul>
+     *   <li>{@code @Async} 미적용 — 호출자({@code ManualEmailDispatchSendListener}) 가 발송 결과를
+     *       동기적으로 인지하여 {@code ManualEmailDispatch.dispatchStatus} 를 SENT/FAILED 로
+     *       갱신해야 한다. 이미 호출자 자체가 AFTER_COMMIT 비동기 단계라 추가 비동기는 불필요.</li>
+     *   <li>예외를 swallow 하지 않고 {@link RuntimeException} 으로 전파 — 호출자가 try/catch 로
+     *       감싸 status 를 갱신한다.</li>
+     * </ul>
+     */
+    @Override
+    public void sendManualPlainTextEmail(String to, String subject, String bodyText, String adminEmailForFooter) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // ADMIN 입력 subject 는 그대로 메일 헤더에 사용 — RFC 2047 인코딩은 JavaMail 이 처리.
+            // 자동 prefix 는 일관성을 위해 부착 (스펙 §8.2 + AC-A13 footer 와 함께).
+            helper.setSubject(subject == null ? "[LicenseKaki] Notice" : subject);
+            helper.setText(buildManualPlainTextHtml(bodyText, adminEmailForFooter), true);
+            mailSender.send(message);
+            log.info("Manual email sent: to={}, admin={}, subjectLen={}, bodyLen={}",
+                    to, adminEmailForFooter,
+                    subject == null ? 0 : subject.length(),
+                    bodyText == null ? 0 : bodyText.length());
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send manual email to: {} (admin={})", to, adminEmailForFooter, e);
+            // 호출자({@code ManualEmailDispatchSendListener})가 row.status=FAILED 로 마킹하기 위해
+            // 예외 전파 — 다른 알림 메서드(swallow)와 의도적으로 다른 정책.
+            throw new RuntimeException("Manual email dispatch failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * PR-3: 미리보기 — 동일한 빌더를 호출해 SMTP 발송 없이 HTML 문자열만 반환한다.
+     *
+     * <p>{@code renderManualPlainTextHtml(subject, body, admin)} 시그니처는 EmailService 인터페이스
+     * 표준 — subject 는 현재 HTML 본문에 직접 렌더되지는 않지만, 발송 시 메일 헤더에 그대로 사용되므로
+     * 서명에 포함해 두어 향후 미리보기에 헤더/제목 줄을 넣을 때 추가 변경 없이 활용 가능하다.</p>
+     */
+    @Override
+    public String renderManualPlainTextHtml(String subject, String bodyText, String adminEmailForFooter) {
+        return buildManualPlainTextHtml(bodyText, adminEmailForFooter);
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-2 — 영수증 PDF 첨부 이메일.
+     *
+     * <p>스펙: concierge-flow-and-offline-payment-spec.md §8.3, AC-R1. Subject 에는 invoice
+     * number 만 노출 — 금액/이름은 본문에만. 첨부 실패는 RuntimeException 으로 던져 호출자
+     * (ManualPaymentInvoiceListener) 가 audit 에 FAILED 마킹할 수 있게 한다.</p>
+     *
+     * <p>{@code @Async} 미적용 — 호출자가 발송 결과(예외)를 즉시 catch 하여 audit 처리해야 함.</p>
+     */
+    @Override
+    public void sendInvoiceIssuedEmail(String to, String recipientName, String invoiceNumber,
+                                        BigDecimal amount, String currency,
+                                        byte[] attachmentBytes, String attachmentFilename) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA 최소화: invoice number 만 노출.
+            helper.setSubject("[LicenseKaki] Receipt issued · #" + nullSafeStr(invoiceNumber));
+
+            String htmlContent = buildInvoiceIssuedHtml(recipientName, invoiceNumber, amount, currency);
+            helper.setText(htmlContent, true);
+
+            if (attachmentBytes != null && attachmentBytes.length > 0) {
+                String filename = (attachmentFilename != null && !attachmentFilename.isBlank())
+                        ? attachmentFilename
+                        : ("INVOICE_" + nullSafeStr(invoiceNumber) + ".pdf");
+                helper.addAttachment(filename,
+                        new org.springframework.core.io.ByteArrayResource(attachmentBytes));
+            }
+
+            mailSender.send(message);
+            log.info("Invoice issued email sent to: {} (invoiceNumber={}, attachmentBytes={})",
+                    to, invoiceNumber, attachmentBytes != null ? attachmentBytes.length : 0);
+        } catch (jakarta.mail.MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send invoice issued email to: {} (invoiceNumber={})",
+                    to, invoiceNumber, e);
+            // 영수증 이메일 발송 실패는 호출자가 audit 처리해야 하므로 RuntimeException 으로 전파.
+            throw new RuntimeException("Failed to send invoice issued email: " + e.getMessage(), e);
+        }
+    }
+
+    private static String nullSafeStr(String s) {
+        return s == null ? "" : s;
+    }
+
+    /**
+     * 영수증 이메일 HTML 본문 빌더 — PDPA 최소화 + 반(反)피싱 푸터.
+     */
+    private String buildInvoiceIssuedHtml(String recipientName, String invoiceNumber,
+                                           BigDecimal amount, String currency) {
+        String safeName = esc(recipientName != null ? recipientName : "");
+        String safeNumber = esc(invoiceNumber != null ? invoiceNumber : "");
+        String currencyCode = (currency == null || currency.isBlank()) ? "SGD" : currency;
+        String amountText = amount != null ? amount.toPlainString() : "—";
+
+        return """
+            <!DOCTYPE html>
+            <html lang="en">
+            <head>
+              <meta charset="UTF-8">
+              <title>Receipt issued</title>
+            </head>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #1a1a1a; max-width: 600px; margin: 0 auto; padding: 16px;">
+              <h2 style="color: #1f2937; margin-top: 0;">Receipt issued</h2>
+              <p>Dear %s,</p>
+              <p>A receipt has been issued for your recent payment to LicenseKaki. Please find the details below — the PDF copy is attached for your records.</p>
+              <table style="border-collapse: collapse; margin: 16px 0;">
+                <tr>
+                  <td style="padding: 6px 12px; color: #6b7280;">Receipt number</td>
+                  <td style="padding: 6px 12px; font-weight: 600;">%s</td>
+                </tr>
+                <tr>
+                  <td style="padding: 6px 12px; color: #6b7280;">Total amount</td>
+                  <td style="padding: 6px 12px; font-weight: 600;">%s %s</td>
+                </tr>
+              </table>
+              <p>If you have any questions about this receipt, please reply to this email or contact us via the dashboard.</p>
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+              <p style="color: #6b7280; font-size: 12px;">
+                <strong>Anti-phishing notice.</strong> LicenseKaki will never ask for your password, OTP,
+                or full payment card details by email. This email is sent in connection with your existing
+                LicenseKaki account; if you did not expect this message, please ignore it and notify us via the dashboard.
+              </p>
+              <p style="color: #9ca3af; font-size: 11px;">© LicenseKaki — Singapore electrical installation licence platform.</p>
+            </body>
+            </html>
+            """.formatted(safeName, safeNumber, currencyCode, esc(amountText));
+    }
+
+    /**
+     * 수동 이메일 본문 HTML — PR-3 부터 {@link ManualEmailHtmlRenderer} 로 추출되어 미리보기와 SMTP
+     * 발송이 동일한 결과를 보장한다. 시그니처는 PR-1/PR-2 동작 보존을 위해 그대로 둔다.
+     *
+     * <p>스펙: admin-manual-email-spec.md §9.1, AC-A13.</p>
+     */
+    private String buildManualPlainTextHtml(String bodyText, String adminEmailForFooter) {
+        return manualEmailHtmlRenderer.render(bodyText, adminEmailForFooter);
     }
 
     // ── HTML 템플릿 빌더 ──────────────────────
@@ -242,7 +506,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, resetLink, resetLink, resetLink);
+                """.formatted(esc(userName), esc(resetLink), esc(resetLink), esc(resetLink));
     }
 
     private String buildLicenseExpiryHtml(String userName, String licenseNumber,
@@ -296,7 +560,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, urgencyColor, daysText, licenseNumber, address, urgencyColor, formattedDate);
+                """.formatted(esc(userName), urgencyColor, daysText, esc(licenseNumber), esc(address), urgencyColor, formattedDate);
     }
 
     private String buildEmailVerificationHtml(String userName, String verificationLink) {
@@ -332,7 +596,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, verificationLink, verificationLink, verificationLink);
+                """.formatted(esc(userName), esc(verificationLink), esc(verificationLink), esc(verificationLink));
     }
 
     private String buildRevisionRequestHtml(String userName, Long appSeq, String address, String comment) {
@@ -366,7 +630,11 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, appSeq, address, comment != null ? comment : "Please review and update your application.");
+                """.formatted(
+                        esc(userName),
+                        appSeq,
+                        esc(address),
+                        esc(comment != null ? comment : "Please review and update your application."));
     }
 
     private String buildPaymentRequestHtml(String userName, Long appSeq, String address, BigDecimal amount) {
@@ -401,7 +669,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, appSeq, address, amount);
+                """.formatted(esc(userName), appSeq, esc(address), amount);
     }
 
     private String buildPaymentConfirmHtml(String userName, Long appSeq, String address, BigDecimal amount) {
@@ -435,7 +703,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, amount, appSeq, address);
+                """.formatted(esc(userName), amount, appSeq, esc(address));
     }
 
     private String buildLicenseIssuedHtml(String userName, Long appSeq, String address,
@@ -484,7 +752,7 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(userName, appSeq, licenseNo, address, formattedDate);
+                """.formatted(esc(userName), appSeq, esc(licenseNo), esc(address), formattedDate);
     }
 
     private String buildLewAssignedHtml(String lewName, Long appSeq, String address, String applicantName) {
@@ -530,10 +798,14 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(lewName, appSeq, address, applicantName);
+                """.formatted(esc(lewName), appSeq, esc(address), esc(applicantName));
     }
 
     private String buildPaymentConfirmedToLewHtml(String lewName, Long appSeq, String address, BigDecimal amount) {
+        // PR4: Phase 2 (SLD/LOA/CoF) 작업 시작점을 명시적으로 안내 + LEW 워크스페이스 deeplink 제공.
+        // appBaseUrl 은 password-reset.base-url 을 재사용 (기존 패턴, 별도 설정 부담 회피).
+        String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
         return """
                 <!DOCTYPE html>
                 <html>
@@ -544,10 +816,11 @@ public class SmtpEmailService implements EmailService {
                       <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
                     </div>
                     <div style="padding: 32px 24px;">
-                      <h2 style="color: #333333; margin-top: 0;">Payment Confirmed</h2>
-                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <h2 style="color: #333333; margin-top: 0;">Payment confirmed — ready for certification</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hi %s,</p>
                       <p style="color: #555555; line-height: 1.6;">
-                        Payment of <strong>$%s</strong> has been confirmed for an application assigned to you.
+                        Payment of <strong>$%s</strong> for Application <strong>#%d</strong> has been confirmed.
+                        You can now proceed with the post-payment certification work.
                       </p>
                       <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
                         <table style="width: 100%%; font-size: 14px; color: #555555;">
@@ -565,8 +838,20 @@ public class SmtpEmailService implements EmailService {
                           </tr>
                         </table>
                       </div>
-                      <p style="color: #555555; line-height: 1.6;">
-                        You can now proceed with processing this application. Please log in to your LicenseKaki account to continue.
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 8px;">Next steps for Phase 2:</p>
+                      <ul style="color: #555555; line-height: 1.6; margin: 0 0 16px 20px; padding: 0;">
+                        <li>Prepare or review the SLD (if applicable)</li>
+                        <li>Finalize the Letter of Authority signing</li>
+                        <li>Complete the Certificate of Fitness</li>
+                      </ul>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
                       </p>
                       <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
                       <p style="color: #aaaaaa; font-size: 12px;">
@@ -576,6 +861,1076 @@ public class SmtpEmailService implements EmailService {
                   </div>
                 </body>
                 </html>
-                """.formatted(lewName, amount, appSeq, address, amount);
+                """.formatted(
+                        esc(lewName), amount, appSeq,
+                        appSeq, esc(address), amount,
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    /**
+     * PR-2: 결제 후 ADMIN 의 kVA 변경 → 배정 LEW 이메일 본문.
+     *
+     * <p>스펙: {@code kva-postpayment-adjustment-spec.md} §8 PR-2 + notification-copy-templates.en.md
+     * 의 LEW 톤(격식체, 1 CTA, 반피싱 푸터). CoF re-issue 동반 시 별도 박스로 추가 안내.</p>
+     */
+    private String buildKvaAdjustedToLewHtml(String lewName, Long appSeq,
+                                             Integer previousKva, Integer newKva,
+                                             BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
+                                             BigDecimal amountDifference,
+                                             boolean cofReissueTriggered, String reason) {
+        String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
+
+        // 변경 박스: nullable 처리 — 이전/이후 견적가는 알 수 없으면 표시 생략 (placeholder 남기지 않음).
+        String previousQuoteText = previousQuoteAmount != null
+                ? "$" + previousQuoteAmount.toPlainString()
+                : "—";
+        String newQuoteText = newQuoteAmount != null
+                ? "$" + newQuoteAmount.toPlainString()
+                : "—";
+        String amountDifferenceText;
+        if (amountDifference == null) {
+            amountDifferenceText = "—";
+        } else if (amountDifference.signum() > 0) {
+            amountDifferenceText = "+$" + amountDifference.toPlainString();
+        } else if (amountDifference.signum() < 0) {
+            amountDifferenceText = "−$" + amountDifference.abs().toPlainString();
+        } else {
+            amountDifferenceText = "$0.00";
+        }
+
+        // CoF re-issue 박스: 트리거된 경우에만 노출.
+        String cofBox = cofReissueTriggered
+                ? """
+                <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 16px 0;">
+                  <p style="color: #9a3412; line-height: 1.6; margin: 0; font-size: 14px;">
+                    <strong>Action required — CoF re-signature.</strong> Because the kVA changed,
+                    the previously finalized Certificate of Fitness has been reopened. Please
+                    review the application and sign the CoF again.
+                  </p>
+                </div>
+                """
+                : "";
+
+        // 사유 박스: ADMIN 입력 사유. 항상 표시 (필수 입력 — 빈 값이어도 placeholder).
+        String reasonText = reason != null && !reason.isBlank() ? reason : "(no reason provided)";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">kVA adjusted by Admin</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        The kVA tier on Application <strong>#%d</strong> has been adjusted by an
+                        administrator. Details below.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Previous kVA</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">New kVA</td>
+                            <td style="padding: 6px 0;"><strong>%s</strong></td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Previous quote</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">New quote</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Difference</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                        </table>
+                      </div>
+                      %s
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 6px;"><strong>Reason from Admin:</strong></p>
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 16px; padding: 12px; background-color: #f8fafc; border-left: 3px solid #1a3a5c; font-style: italic;">
+                        %s
+                      </p>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        This is an automated notification from LicenseKaki. We never ask for your
+                        password or payment details by email — sign in directly from licensekaki.sg
+                        if anything looks suspicious.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                        esc(lewName), appSeq,
+                        previousKva != null ? previousKva.toString() : "—",
+                        newKva != null ? newKva.toString() : "—",
+                        previousQuoteText, newQuoteText, amountDifferenceText,
+                        cofBox,
+                        esc(reasonText),
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    /**
+     * PR-3: LEW 의 kVA 변경 요청을 ADMIN 이 수신할 때의 HTML 본문.
+     *
+     * <p>스펙: kva-postpayment-adjustment-spec.md §4.2. 톤은 LEW 알림(L) 의 ADMIN 변환:
+     * 격식체 + 단일 CTA(/admin/applications/{id}) + PDPA/반피싱 푸터.</p>
+     */
+    private String buildKvaAdjustmentRequestedToAdminHtml(String adminName, String lewName, Long appSeq,
+                                                          Integer proposedKva, Integer currentKva,
+                                                          String reason) {
+        String deepLink = appBaseUrl + "/admin/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
+        String reasonText = (reason != null && !reason.isBlank()) ? reason : "(no reason provided)";
+        String greetingName = (adminName != null && !adminName.isBlank()) ? adminName : "Admin";
+        String lewDisplay = (lewName != null && !lewName.isBlank()) ? lewName : "the assigned LEW";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">kVA adjustment requested</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        LEW <strong>%s</strong> has requested a kVA adjustment on Application
+                        <strong>#%d</strong>. Please review and decide whether to apply, modify,
+                        or reject the proposal.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Current kVA</td>
+                            <td style="padding: 6px 0;">%s</td>
+                          </tr>
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Proposed kVA</td>
+                            <td style="padding: 6px 0;"><strong>%s</strong></td>
+                          </tr>
+                        </table>
+                      </div>
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 6px;"><strong>Reason from LEW:</strong></p>
+                      <p style="color: #555555; line-height: 1.6; margin: 0 0 16px; padding: 12px; background-color: #f8fafc; border-left: 3px solid #1a3a5c; font-style: italic;">
+                        %s
+                      </p>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        This is an automated notification from LicenseKaki. We never ask for your
+                        password or payment details by email — sign in directly from licensekaki.sg
+                        if anything looks suspicious.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                        esc(greetingName),
+                        esc(lewDisplay),
+                        appSeq,
+                        currentKva != null ? currentKva.toString() : "—",
+                        proposedKva != null ? proposedKva.toString() : "—",
+                        esc(reasonText),
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    /**
+     * PR-4: ADMIN 이 settlement 를 마킹한 직후 LEW 가 수신할 HTML 본문.
+     *
+     * <p>스펙: kva-postpayment-adjustment-spec.md §4.3 / PR-4. 톤은 LEW 알림(L) — 격식체 +
+     * 단일 CTA(/lew/applications/{id}) + 반피싱 푸터. 본문은 정산 결과 + (있을 때) 금액 + 영수증 번호.</p>
+     */
+    private String buildKvaSettlementMarkedToLewHtml(String lewName, Long appSeq,
+                                                       String paymentAdjustment,
+                                                       BigDecimal settledAmount,
+                                                       String receiptReferenceNumber) {
+        String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
+        String escapedDeepLink = esc(deepLink);
+        String greetingName = (lewName != null && !lewName.isBlank()) ? lewName : "LEW";
+        String adjustmentLabel = (paymentAdjustment != null && !paymentAdjustment.isBlank())
+                ? paymentAdjustment : "—";
+
+        // 금액·영수증은 nullable — 있을 때만 row 노출.
+        String amountRow = (settledAmount != null)
+                ? """
+                  <tr>
+                    <td style="padding: 6px 0; font-weight: bold;">Settled amount</td>
+                    <td style="padding: 6px 0;"><strong>$%s</strong></td>
+                  </tr>
+                  """.formatted(settledAmount.toPlainString())
+                : "";
+        String receiptRow = (receiptReferenceNumber != null && !receiptReferenceNumber.isBlank())
+                ? """
+                  <tr>
+                    <td style="padding: 6px 0; font-weight: bold;">Receipt ref.</td>
+                    <td style="padding: 6px 0;">%s</td>
+                  </tr>
+                  """.formatted(esc(receiptReferenceNumber))
+                : "";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">kVA settlement marked</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        The administrator has marked the settlement for the recent kVA adjustment on
+                        Application <strong>#%d</strong>. No further action is required from you for
+                        this settlement record — this email is for your records.
+                      </p>
+                      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                        <table style="width: 100%%; font-size: 14px; color: #555555;">
+                          <tr>
+                            <td style="padding: 6px 0; font-weight: bold;">Settlement</td>
+                            <td style="padding: 6px 0;"><strong>%s</strong></td>
+                          </tr>
+                          %s
+                          %s
+                        </table>
+                      </div>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%s" style="display: inline-block; background-color: #1a3a5c; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px;">
+                          Open application
+                        </a>
+                      </div>
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        If the button doesn't work, copy this link into your browser:<br>
+                        <a href="%s" style="color: #1a3a5c;">%s</a>
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px; line-height: 1.5;">
+                        This is an automated notification from LicenseKaki. We never ask for your
+                        password or payment details by email — sign in directly from licensekaki.sg
+                        if anything looks suspicious.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                        esc(greetingName),
+                        appSeq,
+                        esc(adjustmentLabel),
+                        amountRow,
+                        receiptRow,
+                        escapedDeepLink, escapedDeepLink, escapedDeepLink);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    // Phase 3 PR#4 · LEW Document Request Workflow — 4종 이메일
+    // ──────────────────────────────────────────────────────────────────
+
+    @Override
+    @Async
+    public void sendDocumentRequestCreatedEmail(String to, String userName, Long appSeq,
+                                                 int requestedCount, List<String> documentLabels) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Your LEW requested " + requestedCount + " document(s)");
+            helper.setText(buildDocumentRequestCreatedHtml(userName, appSeq, requestedCount, documentLabels), true);
+            mailSender.send(message);
+            log.info("Document request created email sent to: {}, appSeq={}, count={}", to, appSeq, requestedCount);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request created email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendDocumentRequestFulfilledEmail(String to, String lewName, Long appSeq, String documentLabel) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA: 신청자 이름은 제외하고 appSeq/라벨만 노출 (B-2 §3.1 권고)
+            helper.setSubject("[LicenseKaki] Application #" + appSeq
+                    + " — applicant uploaded " + documentLabel + ", please review");
+            helper.setText(buildDocumentRequestFulfilledHtml(lewName, appSeq, documentLabel), true);
+            mailSender.send(message);
+            log.info("Document request fulfilled email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request fulfilled email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendDocumentRequestApprovedEmail(String to, String userName, Long appSeq, String documentLabel) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] " + documentLabel + " approved");
+            helper.setText(buildDocumentRequestApprovedHtml(userName, appSeq, documentLabel), true);
+            mailSender.send(message);
+            log.info("Document request approved email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request approved email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendDocumentRequestRejectedEmail(String to, String userName, Long appSeq,
+                                                  String documentLabel, String rejectionReason) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] " + documentLabel + " needs re-upload");
+            helper.setText(buildDocumentRequestRejectedHtml(userName, appSeq, documentLabel, rejectionReason), true);
+            mailSender.send(message);
+            log.info("Document request rejected email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send document request rejected email to: {}", to, e);
+        }
+    }
+
+    // ── Phase 3 템플릿 빌더 (영/한 병기, primary #1a3a5c 헤더, PDPA 푸터) ──
+
+    /**
+     * Phase 3 공통 레이아웃. {@code coreEn}/{@code coreKo} 타이틀, 상세 블록, CTA, PDPA 푸터를 렌더.
+     * 동적 값은 모두 호출부에서 {@link #esc} 를 거친 뒤 주입한다.
+     */
+    private String buildDocumentEmailLayout(String coreEn, String coreKo, String detailsHtml,
+                                             String deepLinkPath, String role) {
+        // coreKo 파라미터는 호환을 위해 유지하되 영어화 이후 사용하지 않는다.
+        String deepLink = appBaseUrl + deepLinkPath;
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 24px 0;">
+                  <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;">
+                    <tr><td align="center">
+                      <table width="600" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                        <tr><td style="background:#1a3a5c;padding:20px 32px;">
+                          <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:600;">LicenseKaki</h1>
+                        </td></tr>
+                        <tr><td style="padding:32px;color:#1f2937;">
+                          <h2 style="font-size:18px;margin:0 0 20px;color:#111827;">%s</h2>
+                          <table width="100%%" style="background:#f9fafb;border-radius:8px;margin-bottom:24px;">
+                            <tr><td style="padding:16px;font-size:13px;color:#374151;line-height:1.8;">
+                              %s
+                            </td></tr>
+                          </table>
+                          <a href="%s" style="display:inline-block;background:#1a3a5c;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">Open in LicenseKaki &rarr;</a>
+                        </td></tr>
+                        <tr><td style="background:#f9fafb;padding:16px 32px;font-size:11px;color:#9ca3af;line-height:1.6;">
+                          You are receiving this because you are the %s on this application.<br/>
+                          LicenseKaki complies with Singapore PDPA. For privacy inquiries: privacy@licensekaki.sg
+                        </td></tr>
+                      </table>
+                    </td></tr>
+                  </table>
+                </body>
+                </html>
+                """.formatted(esc(coreEn), detailsHtml, esc(deepLink), esc(role));
+    }
+
+    private String buildDocumentRequestCreatedHtml(String userName, Long appSeq,
+                                                    int requestedCount, List<String> documentLabels) {
+        StringBuilder labelList = new StringBuilder();
+        if (documentLabels != null && !documentLabels.isEmpty()) {
+            labelList.append("<strong>Documents requested:</strong><ul style=\"margin:4px 0 0 18px;padding:0;\">");
+            for (String label : documentLabels) {
+                labelList.append("<li>").append(esc(label)).append("</li>");
+            }
+            labelList.append("</ul>");
+        }
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Hello,</strong> %s<br/>
+                Your LEW has requested <strong>%d</strong> document(s) to proceed with your licence application. Please log in to upload them.<br/>
+                %s
+                """.formatted(appSeq, esc(userName), requestedCount, labelList.toString());
+        return buildDocumentEmailLayout(
+                "Your LEW has requested documents",
+                "",
+                details,
+                "/applications/" + appSeq,
+                "applicant");
+    }
+
+    private String buildDocumentRequestFulfilledHtml(String lewName, Long appSeq, String documentLabel) {
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Hello,</strong> %s<br/>
+                The applicant has uploaded <strong>%s</strong>. Please review it in LicenseKaki.
+                """.formatted(appSeq, esc(lewName), esc(documentLabel));
+        return buildDocumentEmailLayout(
+                "Applicant uploaded a requested document",
+                "",
+                details,
+                "/admin/applications/" + appSeq,
+                "assigned LEW");
+    }
+
+    private String buildDocumentRequestApprovedHtml(String userName, Long appSeq, String documentLabel) {
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Document:</strong> %s<br/>
+                <strong>Hello,</strong> %s<br/>
+                Your document has been <span style="color:#16a34a;font-weight:600;">approved</span>. No further action is required for this item.
+                """.formatted(appSeq, esc(documentLabel), esc(userName));
+        return buildDocumentEmailLayout(
+                documentLabel + " approved",
+                "",
+                details,
+                "/applications/" + appSeq,
+                "applicant");
+    }
+
+    private String buildDocumentRequestRejectedHtml(String userName, Long appSeq,
+                                                     String documentLabel, String rejectionReason) {
+        String details = """
+                <strong>Application:</strong> #%d<br/>
+                <strong>Document:</strong> %s<br/>
+                <strong>Hello,</strong> %s<br/>
+                Your document needs to be <span style="color:#dc2626;font-weight:600;">re-uploaded</span>. Please review the reviewer's reason below and upload a corrected file.
+                <div style="background:#fef3c7;border-left:3px solid #f59e0b;padding:12px;margin-top:12px;border-radius:4px;">
+                  <strong style="color:#92400e;">Reason:</strong>
+                  <p style="color:#78350f;margin:4px 0 0 0;line-height:1.5;">%s</p>
+                </div>
+                """.formatted(appSeq, esc(documentLabel), esc(userName), esc(rejectionReason));
+        return buildDocumentEmailLayout(
+                documentLabel + " needs re-upload",
+                "",
+                details,
+                "/applications/" + appSeq,
+                "applicant");
+    }
+
+    // ── Kaki Concierge Phase 1 PR#2 ──────────────────────
+
+    @Override
+    @Async
+    public void sendAccountSetupLinkEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Activate your account");
+
+            String htmlContent = buildAccountSetupLinkHtml(fullName, setupUrl, expiresAtDisplay);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Account setup link email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send account setup link email to: {}", to, e);
+            // 실패해도 예외를 던지지 않음 (보안: 이메일 존재 여부 노출 방지, 기존 패턴 준수)
+        }
+    }
+
+    /**
+     * Concierge 계정 활성화 링크 이메일 본문.
+     * 기존 템플릿 스타일(600px max-width, #1a3a5c 헤더, PDPA footer) 준수.
+     * 사용자 입력(name)은 esc(), URL은 htmlEscape로 XSS 방어.
+     */
+    private String buildAccountSetupLinkHtml(String fullName, String setupUrl, String expiresAtDisplay) {
+        String name = esc(fullName);
+        String url = HtmlUtils.htmlEscape(setupUrl == null ? "" : setupUrl);
+        String exp = esc(expiresAtDisplay);
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Activate your LicenseKaki account</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Your LicenseKaki account has been created via the Kaki Concierge Service.
+                         Your account is currently <strong>inactive</strong>. To activate it and set
+                         your password, please use the link below.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Activate account</a>
+                      </p>
+                      <p style="color:#555;font-size:13px;">This link expires at <strong>%s</strong> (48 hours after issue).</p>
+                      <p style="color:#555;font-size:13px;">If you did not request this, you may safely ignore this email.</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, url, exp);
+    }
+
+    // ── N1 / N1-Alt / N2: Concierge 신청 접수 이메일 ──
+
+    @Override
+    @Async
+    public void sendConciergeRequestReceivedEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Your Kaki Concierge request is received");
+
+            String htmlContent = buildConciergeReceivedHtml(fullName, setupUrl, expiresAtDisplay);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N1 email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N1 email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendConciergeRequestReceivedExistingUserEmail(String to, String fullName) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] Your Kaki Concierge request is received");
+
+            String htmlContent = buildConciergeReceivedExistingHtml(fullName);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N1-Alt email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N1-Alt email to: {}", to, e);
+        }
+    }
+
+    @Override
+    @Async
+    public void sendConciergeStaffNewRequestEmail(String to, String staffName, String publicCode,
+                                                   String applicantName, String applicantEmail) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // 제목에 사용자 입력이 섞이지 않도록 publicCode는 서버 생성값(C-YYYY-NNNN)으로 제한적
+            helper.setSubject("[LicenseKaki] New concierge request: " + publicCode);
+
+            String htmlContent = buildConciergeStaffNewRequestHtml(staffName, publicCode, applicantName, applicantEmail);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N2 email sent to: {}, publicCode={}", to, publicCode);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N2 email to: {}", to, e);
+        }
+    }
+
+    /**
+     * N1 본문 — 신청 접수 + 활성화 링크 안내 (C1/C3).
+     */
+    private String buildConciergeReceivedHtml(String fullName, String setupUrl, String expiresAtDisplay) {
+        String name = esc(fullName);
+        String url = HtmlUtils.htmlEscape(setupUrl == null ? "" : setupUrl);
+        String exp = esc(expiresAtDisplay);
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Your Kaki Concierge request is received</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Thank you for requesting the Kaki Concierge Service. A dedicated manager
+                         will contact you within <strong>24 hours</strong>.</p>
+                      <p>A LicenseKaki account has been created for you. Your account is currently
+                         <strong>inactive</strong>. Please activate it by setting your password
+                         using the link below.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Activate account</a>
+                      </p>
+                      <p style="color:#555;font-size:13px;">This link expires at <strong>%s</strong> (48 hours after issue).</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, url, exp);
+    }
+
+    /**
+     * N1-Alt 본문 — 기존 활성 계정 연결 안내 (C2).
+     */
+    private String buildConciergeReceivedExistingHtml(String fullName) {
+        String name = esc(fullName);
+        String loginUrl = HtmlUtils.htmlEscape(appBaseUrl + "/login");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Your Kaki Concierge request is received</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Thank you for requesting the Kaki Concierge Service. A dedicated manager
+                         will contact you within <strong>24 hours</strong>.</p>
+                      <p>We linked this request to your existing LicenseKaki account. You can track
+                         progress anytime after logging in.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Log in</a>
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, loginUrl);
+    }
+
+    /**
+     * N2 본문 — Admin/Manager에게 신규 신청 접수 알림.
+     */
+    private String buildConciergeStaffNewRequestHtml(String staffName, String publicCode,
+                                                      String applicantName, String applicantEmail) {
+        String name = esc(staffName);
+        String code = esc(publicCode);
+        String aName = esc(applicantName);
+        String aEmail = esc(applicantEmail);
+        String dashboardUrl = HtmlUtils.htmlEscape(appBaseUrl + "/admin/concierge");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">New Kaki Concierge request</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>A new concierge request has been submitted:</p>
+                      <table style="width:100%%;border-collapse:collapse;margin:16px 0;">
+                        <tr><td style="padding:6px 0;color:#666;width:140px;">Request code</td><td><strong>%s</strong></td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Applicant</td><td>%s</td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Email</td><td>%s</td></tr>
+                      </table>
+                      <p>SLA reminder: first contact must be made within <strong>24 hours</strong>.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Open Concierge Dashboard</a>
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Internal notification.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, code, aName, aEmail, dashboardUrl);
+    }
+
+    // ── N5-UploadConfirm: Manager 대리 서명 업로드 확인 이메일 (PR#6 Stage A) ──
+
+    @Override
+    @Async
+    public void sendConciergeLoaUploadConfirmEmail(String to, String applicantName,
+                                                    String managerName, Long applicationSeq,
+                                                    String memo) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject(
+                "[LicenseKaki] Confirmation: Your LOA signature was uploaded by your Concierge Manager");
+
+            String htmlContent = buildConciergeLoaUploadConfirmHtml(
+                applicantName, managerName, applicationSeq, memo);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("Concierge N5-UploadConfirm email sent to: {} (applicationSeq={})",
+                to, applicationSeq);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge N5-UploadConfirm email to: {}", to, e);
+        }
+    }
+
+    /**
+     * N5-UploadConfirm 본문 — 신청자에게 Manager 업로드 사실 통보 + 7일 이의 제기 창구.
+     * 모든 사용자/매니저 입력은 esc()로 XSS 방어.
+     */
+    private String buildConciergeLoaUploadConfirmHtml(String applicantName, String managerName,
+                                                       Long applicationSeq, String memo) {
+        String aName = esc(applicantName);
+        String mName = esc(managerName);
+        String appLink = HtmlUtils.htmlEscape(appBaseUrl + "/applications/" + applicationSeq);
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+        String memoBlock = (memo != null && !memo.isBlank())
+            ? ("<p style=\"margin:12px 0 0 0;padding:10px 12px;background:#f3f4f6;border-left:3px solid #1a3a5c;color:#374151;font-size:13px;\">"
+                + "<strong>Manager note:</strong> " + esc(memo) + "</p>")
+            : "";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">LOA signature uploaded</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Your Concierge Manager <strong>%s</strong> has uploaded your LOA
+                         signature file to application <strong>#%d</strong> on your behalf.
+                         This confirms that we registered the signature you provided during your
+                         consultation.</p>
+                      %s
+                      <p style="margin-top:20px;padding:12px 14px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:4px;color:#92400e;font-size:14px;">
+                        <strong>Please verify within 7 days.</strong> If this signature is not
+                        the one you provided, please notify us immediately at
+                        <a href="%s" style="color:#92400e;text-decoration:underline;">support@licensekaki.sg</a>.
+                        If we don't hear from you within 7 days, we will treat the uploaded
+                        signature as your confirmed signature.
+                      </p>
+                      <p style="text-align:center;margin:28px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Review application</a>
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(aName, mName, applicationSeq, memoBlock, supportMail, appLink);
+    }
+
+    // ── Concierge Quote Email (Phase 1.5) ──
+
+    private static final DateTimeFormatter SCHEDULE_FMT =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'SGT'");
+
+    @Override
+    @Async
+    public String sendConciergeQuoteEmail(String to, String applicantName, String publicCode,
+                                           BigDecimal quotedAmount, java.time.LocalDateTime callScheduledAt,
+                                           String managerNote, String verificationPhrase,
+                                           String paynowUen, String paynowAccountName) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA: 제목에 금액·주소·이름 제외, publicCode 만 포함
+            helper.setSubject("[LicenseKaki] Payment details for your concierge request " + publicCode);
+
+            String htmlContent = buildConciergeQuoteHtml(
+                applicantName, publicCode, quotedAmount, callScheduledAt,
+                managerNote, verificationPhrase, paynowUen, paynowAccountName);
+            helper.setText(htmlContent, true);
+
+            // Message-ID 확보를 위해 saveChanges() 후 발송
+            message.saveChanges();
+            String messageId = message.getMessageID();
+            mailSender.send(message);
+            log.info("Concierge quote email sent: to={}, publicCode={}, messageId={}",
+                to, publicCode, messageId);
+            return messageId;
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send Concierge quote email to: {}, publicCode={}", to, publicCode, e);
+            return null;
+        }
+    }
+
+    private String buildConciergeQuoteHtml(String applicantName, String publicCode,
+                                             BigDecimal quotedAmount,
+                                             java.time.LocalDateTime callScheduledAt,
+                                             String managerNote, String verificationPhrase,
+                                             String paynowUen, String paynowAccountName) {
+        String aName = esc(applicantName);
+        String pCode = esc(publicCode);
+        String amountStr = quotedAmount == null ? "-" : "S$" + quotedAmount.toPlainString();
+        String scheduleBlock = (callScheduledAt != null)
+            ? ("<tr><td style=\"padding:6px 0;color:#666;\">Scheduled</td>"
+                + "<td style=\"padding:6px 0;font-weight:600;color:#111;\">"
+                + esc(callScheduledAt.format(SCHEDULE_FMT)) + "</td></tr>")
+            : "";
+        String noteBlock = (managerNote != null && !managerNote.isBlank())
+            ? ("<p style=\"margin:12px 0 0 0;padding:10px 12px;background:#f3f4f6;border-left:3px solid #1a3a5c;color:#374151;font-size:13px;\">"
+                + "<strong>From your manager:</strong> " + esc(managerNote) + "</p>")
+            : "";
+        String phrase = esc(verificationPhrase == null ? "" : verificationPhrase);
+        String uen = esc(paynowUen == null ? "" : paynowUen);
+        String acctName = esc(paynowAccountName == null ? "" : paynowAccountName);
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Your Kaki Concierge quote</h2>
+                      <p style="margin:6px 0 0 0;color:#c7d2e3;font-size:13px;">Reference: %s</p>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>Thank you for speaking with us. Here are the agreed details from our call.</p>
+
+                      <table style="width:100%%;border-collapse:collapse;margin:16px 0;">
+                        <tr><td style="padding:6px 0;color:#666;width:140px;">Service fee</td>
+                            <td style="padding:6px 0;font-weight:600;color:#111;">%s</td></tr>
+                        %s
+                      </table>
+                      %s
+
+                      <div style="margin:24px 0;padding:16px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;">
+                        <div style="font-weight:600;color:#111;margin-bottom:8px;">PayNow payment instructions</div>
+                        <table style="width:100%%;border-collapse:collapse;font-size:14px;">
+                          <tr><td style="padding:4px 0;color:#666;width:140px;">UEN</td>
+                              <td style="padding:4px 0;color:#111;font-family:monospace;">%s</td></tr>
+                          <tr><td style="padding:4px 0;color:#666;">Payee name</td>
+                              <td style="padding:4px 0;color:#111;">%s</td></tr>
+                          <tr><td style="padding:4px 0;color:#666;">Amount</td>
+                              <td style="padding:4px 0;color:#111;font-weight:600;">%s</td></tr>
+                          <tr><td style="padding:4px 0;color:#c53030;">Reference (required)</td>
+                              <td style="padding:4px 0;color:#c53030;font-weight:600;font-family:monospace;">%s</td></tr>
+                        </table>
+                        <p style="margin:12px 0 0 0;font-size:13px;color:#374151;">
+                          Please enter <strong style="font-family:monospace;">%s</strong> as the PayNow reference so we can match your payment to this request.
+                        </p>
+                      </div>
+
+                      <div style="margin:20px 0;padding:14px;border:2px solid #fbbf24;border-radius:6px;background:#fffbeb;">
+                        <div style="font-weight:700;color:#92400e;font-size:14px;">Verification phrase</div>
+                        <div style="margin-top:6px;font-family:monospace;font-size:16px;color:#111;letter-spacing:0.5px;">%s</div>
+                        <p style="margin:8px 0 0 0;font-size:12px;color:#92400e;">
+                          Your manager mentioned this phrase on the call. If it does not match, this email may be fraudulent — do NOT pay. Contact support immediately.
+                        </p>
+                      </div>
+
+                      <p style="font-size:12px;color:#6b7280;margin-top:20px;">
+                        LicenseKaki will only email you from <strong>@licensekaki.com</strong>. We will never ask you to send money to a different UEN or account name.
+                        If you have any doubt, email <a href="%s" style="color:#1a3a5c;">support@licensekaki.sg</a> and reference your code %s.
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected and processed under Singapore PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(pCode, aName, amountStr, scheduleBlock, noteBlock,
+                    uen, acctName, amountStr, pCode, pCode, phrase, supportMail, pCode);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // ★ Concierge 강화 + 별도 수금 PR-3 — LEW 배정 알림
+    // ────────────────────────────────────────────────────────────
+
+    @Override
+    @Async
+    public void sendConciergeLewAssignedEmail(String to, String lewName, String publicCode,
+                                                String applicantName, String applicantEmail,
+                                                String applicantPhone, String memo,
+                                                boolean reassigned) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            // PDPA 최소화 — 신청자 식별 정보는 본문에만, 제목은 publicCode 만 노출.
+            helper.setSubject("[LicenseKaki] You have been assigned to a Concierge request · #" + publicCode);
+            helper.setText(buildConciergeLewAssignedHtml(lewName, publicCode,
+                    applicantName, applicantEmail, applicantPhone, memo, reassigned), true);
+            mailSender.send(message);
+            log.info("Concierge LEW assigned email sent: to={}, publicCode={}, reassigned={}",
+                    to, publicCode, reassigned);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            // 다른 알림 메서드와 동일 — swallow. 호출자는 격리 try/catch 로 audit 만 처리.
+            log.warn("Failed to send Concierge LEW assigned email to: {}, publicCode={}, err={}",
+                    to, publicCode, e.getMessage());
+        }
+    }
+
+    @Override
+    @Async
+    public void sendConciergeLewUnassignedEmail(String to, String lewName, String publicCode) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject("[LicenseKaki] You have been unassigned from a Concierge request · #" + publicCode);
+            helper.setText(buildConciergeLewUnassignedHtml(lewName, publicCode), true);
+            mailSender.send(message);
+            log.info("Concierge LEW unassigned email sent: to={}, publicCode={}", to, publicCode);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.warn("Failed to send Concierge LEW unassigned email to: {}, publicCode={}, err={}",
+                    to, publicCode, e.getMessage());
+        }
+    }
+
+    /**
+     * LEW 배정 본문 — 신청자 컨텍스트 + CTA + 표준 푸터.
+     */
+    private String buildConciergeLewAssignedHtml(String lewName, String publicCode,
+                                                   String applicantName, String applicantEmail,
+                                                   String applicantPhone, String memo,
+                                                   boolean reassigned) {
+        String name = esc(lewName);
+        String code = esc(publicCode);
+        String aName = esc(applicantName);
+        String aEmail = esc(applicantEmail == null ? "" : applicantEmail);
+        String aPhone = esc(applicantPhone == null ? "" : applicantPhone);
+        String memoBlock = (memo != null && !memo.isBlank())
+            ? ("<p style=\"margin:12px 0 0 0;padding:10px 12px;background:#f3f4f6;border-left:3px solid #1a3a5c;color:#374151;font-size:13px;\">"
+                + "<strong>Applicant memo:</strong> " + esc(memo) + "</p>")
+            : "";
+        String reassignedBlock = reassigned
+            ? "<p style=\"margin:8px 0;color:#92400e;background:#fffbeb;padding:10px;border-radius:4px;font-size:13px;\">"
+              + "This is a re-assignment. The previous LEW has been unassigned."
+              + "</p>"
+            : "";
+        String ctaUrl = HtmlUtils.htmlEscape(appBaseUrl + "/lew/concierge-requests");
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">You have been assigned to a Concierge request</h2>
+                      <p style="margin:6px 0 0 0;color:#c7d2e3;font-size:13px;">Reference: %s</p>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>A Concierge Manager has assigned you to assist the following applicant. Please contact them and proceed with the application on their behalf.</p>
+                      %s
+
+                      <table style="width:100%%;border-collapse:collapse;margin:16px 0;">
+                        <tr><td style="padding:6px 0;color:#666;width:140px;">Applicant</td>
+                            <td style="padding:6px 0;font-weight:600;color:#111;">%s</td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Email</td>
+                            <td style="padding:6px 0;color:#111;">%s</td></tr>
+                        <tr><td style="padding:6px 0;color:#666;">Phone</td>
+                            <td style="padding:6px 0;color:#111;">%s</td></tr>
+                      </table>
+                      %s
+
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Open Concierge requests</a>
+                      </p>
+
+                      <p style="font-size:12px;color:#6b7280;margin-top:20px;">
+                        LicenseKaki will only email you from <strong>@licensekaki.com</strong>.
+                        If you receive a suspicious message claiming to be from LicenseKaki, please email
+                        <a href="%s" style="color:#1a3a5c;">support@licensekaki.sg</a> with the reference %s.
+                      </p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected and processed under Singapore PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(code, name, reassignedBlock, aName, aEmail, aPhone, memoBlock,
+                    ctaUrl, supportMail, code);
+    }
+
+    /**
+     * LEW unassign 본문 — 간결한 통보 + 추가 작업 불필요 안내.
+     */
+    private String buildConciergeLewUnassignedHtml(String lewName, String publicCode) {
+        String name = esc(lewName);
+        String code = esc(publicCode);
+        String supportMail = HtmlUtils.htmlEscape("mailto:support@licensekaki.sg");
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">Concierge request reassigned</h2>
+                      <p style="margin:6px 0 0 0;color:#c7d2e3;font-size:13px;">Reference: %s</p>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>The Concierge request <strong>%s</strong> has been reassigned to a different LEW.
+                         No further action is required from you.</p>
+                      <p>If you believe this is a mistake, please contact your Concierge Manager directly,
+                         or email <a href="%s" style="color:#1a3a5c;">support@licensekaki.sg</a>.</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected and processed under Singapore PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(code, name, code, supportMail);
     }
 }

@@ -14,18 +14,27 @@ import applicationApi from '../../api/applicationApi';
 import fileApi from '../../api/fileApi';
 import priceApi from '../../api/priceApi';
 import loaApi from '../../api/loaApi';
+import invoiceApi from '../../api/invoiceApi';
 import sampleFileApi from '../../api/sampleFileApi';
+import type { Invoice } from '../../types';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import { ApplicationInfo } from './sections/ApplicationInfo';
+import {
+  joinAddressParts,
+  type AddressInputValues,
+} from '../../components/domain/AddressInputGroup';
 import { ApplicationPayment } from './sections/ApplicationPayment';
 import { ApplicationLoaSection } from './sections/ApplicationLoaSection';
 import { ApplicationDocuments } from './sections/ApplicationDocuments';
+import { DocumentUploadSection } from '../../components/document/DocumentUploadSection';
+import { useAuthStore } from '../../stores/authStore';
 import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest, LoaStatus, SampleFileInfo } from '../../types';
 
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToastStore();
+  const authUser = useAuthStore((s) => s.user);
 
   const [application, setApplication] = useState<Application | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -37,6 +46,8 @@ export default function ApplicationDetailPage() {
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
   const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
+  // E-Invoice 메타 (PAID/IN_PROGRESS/COMPLETED 일 때만 조회)
+  const [invoice, setInvoice] = useState<Invoice | null>(null);
 
   // Edit mode state
   const [editMode, setEditMode] = useState(false);
@@ -45,6 +56,14 @@ export default function ApplicationDetailPage() {
   const [editBuildingType, setEditBuildingType] = useState('');
   const [editKva, setEditKva] = useState<number>(0);
   const [editPrice, setEditPrice] = useState<number | null>(null);
+  // P2.B — EMA ELISE 5-part 수정용 상태
+  const [editInstallation, setEditInstallation] = useState<AddressInputValues>({
+    block: '',
+    unit: '',
+    street: '',
+    building: '',
+    postalCode: '',
+  });
   const [prices, setPrices] = useState<MasterPrice[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
@@ -68,6 +87,17 @@ export default function ApplicationDetailPage() {
         const loaData = await loaApi.getLoaStatus(applicationId);
         setLoaStatus(loaData);
       } catch { /* LOA status might not be available */ }
+
+      // Invoice 메타 — 결제 확정 이후에만 존재. 404는 정상 케이스(아직 발행 안 됨)이므로 무시.
+      const paid = ['PAID', 'IN_PROGRESS', 'COMPLETED'].includes(appData.status);
+      if (paid) {
+        try {
+          const invoiceData = await invoiceApi.getMyInvoice(applicationId);
+          setInvoice(invoiceData);
+        } catch { /* Invoice may not be ready yet; non-critical */ }
+      } else {
+        setInvoice(null);
+      }
 
       // Sample files (non-critical)
       try {
@@ -116,6 +146,17 @@ export default function ApplicationDetailPage() {
       setEditBuildingType(application.buildingType || '');
       setEditKva(application.selectedKva);
       setEditPrice(application.quoteAmount);
+      // P2.B — 저장된 5-part 가 있으면 그대로 사용, 없으면 legacy 단일 address 를 street 에 임시 배치 +
+      // postalCode 는 그대로 매핑. (사용자에게 나머지 필드를 직접 정정 기회 제공.)
+      setEditInstallation({
+        block: application.installationAddressBlock ?? '',
+        unit: application.installationAddressUnit ?? '',
+        street:
+          application.installationAddressStreet ??
+          (application.installationAddressBlock ? '' : (application.address ?? '')),
+        building: application.installationAddressBuilding ?? '',
+        postalCode: application.installationAddressPostalCode ?? (application.postalCode ?? ''),
+      });
       setEditMode(true);
     } catch {
       toast.error('Failed to load price information');
@@ -134,12 +175,23 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  const handleEditStateChange = (field: string, value: string | number) => {
+  const handleEditStateChange = (
+    field: string,
+    value: string | number | AddressInputValues,
+  ) => {
     switch (field) {
       case 'address': setEditAddress(value as string); break;
       case 'postalCode': setEditPostalCode(value as string); break;
       case 'buildingType': setEditBuildingType(value as string); break;
       case 'kva': setEditKva(value as number); break;
+      case 'installation': {
+        const next = value as AddressInputValues;
+        setEditInstallation(next);
+        // legacy mirror — auto-concat for resubmit payload
+        setEditAddress(joinAddressParts(next));
+        setEditPostalCode(next.postalCode);
+        break;
+      }
     }
   };
 
@@ -147,11 +199,32 @@ export default function ApplicationDetailPage() {
     if (!application) return;
     setSubmitting(true);
     try {
+      // P2.B — 5-part 는 개별 컬럼 + legacy address(auto-concat) 양쪽 모두 송신.
+      // 5-part 가 하나라도 있으면 백엔드가 5개 컬럼을 덮어쓰고, 없으면 legacy 만 갱신.
+      const concat = joinAddressParts(editInstallation);
+      const hasAny5Part = !!(
+        editInstallation.block.trim() ||
+        editInstallation.unit.trim() ||
+        editInstallation.street.trim() ||
+        editInstallation.building.trim() ||
+        editInstallation.postalCode.trim()
+      );
+      const addressForPayload = concat || editAddress;
+      const postalForPayload = editInstallation.postalCode.trim() || editPostalCode;
       const updated = await applicationApi.updateApplication(applicationId, {
-        address: editAddress,
-        postalCode: editPostalCode,
+        address: addressForPayload,
+        postalCode: postalForPayload,
         buildingType: editBuildingType || undefined,
         selectedKva: editKva,
+        ...(hasAny5Part
+          ? {
+              installationAddressBlock: editInstallation.block.trim() || undefined,
+              installationAddressUnit: editInstallation.unit.trim() || undefined,
+              installationAddressStreet: editInstallation.street.trim() || undefined,
+              installationAddressBuilding: editInstallation.building.trim() || undefined,
+              installationAddressPostalCode: editInstallation.postalCode.trim() || undefined,
+            }
+          : {}),
       });
       setApplication(updated);
       setEditMode(false);
@@ -292,7 +365,24 @@ export default function ApplicationDetailPage() {
             </p>
           </div>
         </div>
-        <StatusBadge status={application.status} />
+        <div className="flex items-center gap-2">
+          {/* P2.C — CoF 발급 배지. cofFinalized=true일 때 status와 나란히 표시.
+              툴팁: LEW가 CoF를 발급해 결제 단계로 이행됐음을 안내. */}
+          {application.cofFinalized && (
+            <span
+              title="Your LEW issued the Certificate of Fitness. The application is ready for payment."
+              className="inline-flex"
+            >
+              <Badge variant="success">
+                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                CoF issued
+              </Badge>
+            </span>
+          )}
+          <StatusBadge status={application.status} />
+        </div>
       </div>
 
       {/* PENDING_REVIEW Banner */}
@@ -362,6 +452,12 @@ export default function ApplicationDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Phase 2 — 서류 섹션 (자발적 업로드). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
+          <DocumentUploadSection
+            applicationSeq={applicationId}
+            canUpload={authUser?.role === 'APPLICANT'}
+          />
+
           <ApplicationInfo
             application={application}
             editMode={editMode}
@@ -371,6 +467,7 @@ export default function ApplicationDetailPage() {
               buildingType: editBuildingType,
               kva: editKva,
               price: editPrice,
+              installation: editInstallation,
             }}
             prices={prices}
             submitting={submitting}
@@ -388,6 +485,35 @@ export default function ApplicationDetailPage() {
             onPaymentAdviceUpload={handlePaymentAdviceUpload}
             onPaymentAdviceDelete={handlePaymentAdviceDelete}
           />
+
+          {/* E-Invoice 다운로드 — PAID 이후에만 노출 */}
+          {invoice && (
+            <Card>
+              <h2 className="text-lg font-semibold text-gray-800 mb-3">E-Invoice</h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-gray-500">
+                      {invoice.invoiceNumber}
+                    </span>
+                    <Badge variant="success">Issued</Badge>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {new Date(invoice.issuedAt).toLocaleString()} · {invoice.currency} ${Number(invoice.totalAmount).toLocaleString()}
+                  </p>
+                </div>
+                <a
+                  href={invoiceApi.buildInvoicePdfDownloadUrl(invoice.pdfFileSeq)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                >
+                  <span aria-hidden>📄</span>
+                  <span>Download Invoice</span>
+                </a>
+              </div>
+            </Card>
+          )}
 
           <ApplicationLoaSection
             application={application}

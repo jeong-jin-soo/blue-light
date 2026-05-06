@@ -443,6 +443,11 @@ def generate_sld(
         else:
             logger.info("No cached template for app_seq=%d, using requirements as-is", app_seq)
 
+    # ── LEW 자주 누락 항목 자동 보완 ─────────────────
+    # 사용자가 명시한 값은 건드리지 않고 빈 자리만 채운다.
+    from app.sld.lew_defaults import apply_lew_defaults
+    requirements, _lew_applied = apply_lew_defaults(requirements)
+
     # 입력 검증: 필수 필드 확인
     required_fields = ["supply_type", "kva", "main_breaker", "busbar_rating", "sub_circuits"]
     missing = [f for f in required_fields if f not in requirements or not requirements[f]]
@@ -612,6 +617,10 @@ def generate_sld(
                        "The user can review it there. Do NOT include or describe any SVG code in your response.",
         }
 
+        # LEW 자동 보완값을 사용자가 인지할 수 있도록 응답에 포함
+        if _lew_applied:
+            response["applied_defaults"] = _lew_applied
+
         # Add layout warnings and overflow metrics from pipeline result
         if sld_result:
             if sld_result.layout_warnings:
@@ -652,10 +661,8 @@ def generate_sld(
 
     except Exception as e:
         logger.error(f"SLD generation failed: {e}", exc_info=True)
-        return json.dumps({
-            "success": False,
-            "error": f"Generation failed: {str(e)}",
-        })
+        from app.agent.error_classifier import classify_error, to_tool_response
+        return json.dumps(to_tool_response(classify_error(e)), ensure_ascii=False)
 
 
 # ── Tool 4b: Vision AI Validation ────────────────────
@@ -725,10 +732,8 @@ def validate_sld_vision(file_id: str, api_key: str | None = None) -> str:
 
     except Exception as e:
         logger.error(f"Vision validation failed: {e}", exc_info=True)
-        return json.dumps({
-            "success": False,
-            "error": f"Vision validation failed: {str(e)}",
-        })
+        from app.agent.error_classifier import classify_error, to_tool_response
+        return json.dumps(to_tool_response(classify_error(e)), ensure_ascii=False)
 
 
 # ── Tool 5: Generate Preview ────────────────────────
@@ -883,6 +888,7 @@ def find_matching_templates(
     application_seq: int = 0,
     circuit_count: int = 0,
     main_breaker_type: str = "",
+    main_breaker_rating: float = 0,
     metering_type: str = "",
 ) -> str:
     """
@@ -900,6 +906,8 @@ def find_matching_templates(
         application_seq: Application ID for template caching (required for auto-merge)
         circuit_count: Number of sub-circuits (0 = unknown, optional)
         main_breaker_type: "MCB", "MCCB", or "ACB" (optional)
+        main_breaker_rating: Main breaker rating in Amps (0 = unknown, optional).
+            Strongly improves match quality — 100A vs 500A는 도면이 완전히 다르다.
         metering_type: "sp_meter" or "ct_meter" (optional)
     """
     from app.sld.template_matcher import (
@@ -913,6 +921,7 @@ def find_matching_templates(
         "kva": kva,
         "circuit_count": circuit_count,
         "main_breaker_type": main_breaker_type,
+        "main_breaker_rating": main_breaker_rating,
         "metering_type": metering_type,
     }
 

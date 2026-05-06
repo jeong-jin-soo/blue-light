@@ -1,18 +1,27 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
+import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Admin 신청 관리 핵심 서비스
@@ -27,6 +36,8 @@ public class AdminApplicationService {
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Get admin dashboard summary (역할별 범위 분리)
@@ -94,17 +105,64 @@ public class AdminApplicationService {
      * LEW는 자신에게 배정된 신청서만, Admin/SystemAdmin은 전체
      */
     public Page<AdminApplicationResponse> getAllApplications(
-            ApplicationStatus status, String search, Pageable pageable, Long userSeq, String role) {
+            ApplicationStatus status, KvaStatus kvaStatus, String search, Pageable pageable,
+            Long userSeq, String role) {
         Page<Application> page;
         boolean hasSearch = search != null && !search.trim().isEmpty();
         boolean isLew = "ROLE_LEW".equals(role);
 
-        if (isLew) {
+        // Phase 5 PR#3 — kvaStatus 필터가 들어오면 Specification 경로로 통합
+        // (기존 필터 조합과 직교). kvaStatus 미지정 시에는 기존 전용 쿼리 경로 유지.
+        if (kvaStatus != null) {
+            Long lewSeqFilter = isLew ? userSeq : null;
+            Pageable sorted = pageable.getSort().isSorted()
+                    ? pageable
+                    : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                            Sort.by(Sort.Direction.DESC, "createdAt"));
+            page = applicationRepository.findAll(
+                    buildSpec(status, kvaStatus, hasSearch ? search.trim() : null, lewSeqFilter),
+                    sorted);
+        } else if (isLew) {
             page = getLewApplications(status, search, hasSearch, userSeq, pageable);
         } else {
             page = getAdminApplications(status, search, hasSearch, pageable);
         }
         return page.map(AdminApplicationResponse::from);
+    }
+
+    /**
+     * Phase 5 PR#3 — AC-P3: kvaStatus 필터를 포함한 복합 Specification.
+     * status / kvaStatus / keyword / assignedLew (LEW 역할) 를 AND 로 조합한다.
+     */
+    private Specification<Application> buildSpec(
+            ApplicationStatus status, KvaStatus kvaStatus, String keyword, Long lewSeqFilter) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (status != null) {
+                predicates.add(cb.equal(root.get("status"), status));
+            }
+            if (kvaStatus != null) {
+                predicates.add(cb.equal(root.get("kvaStatus"), kvaStatus));
+            }
+            if (lewSeqFilter != null) {
+                predicates.add(cb.equal(root.get("assignedLew").get("userSeq"), lewSeqFilter));
+            }
+            if (keyword != null && !keyword.isEmpty()) {
+                String like = "%" + keyword.toLowerCase() + "%";
+                var userJoin = root.join("user");
+                Predicate byAddress = cb.like(cb.lower(root.get("address")), like);
+                Predicate byName = cb.like(
+                        cb.lower(cb.concat(cb.concat(userJoin.get("firstName"), " "),
+                                userJoin.get("lastName"))),
+                        like);
+                Predicate byEmail = cb.like(cb.lower(userJoin.get("email")), like);
+                Predicate byId = cb.like(
+                        root.get("applicationSeq").as(String.class),
+                        "%" + keyword + "%");
+                predicates.add(cb.or(byAddress, byName, byEmail, byId));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
     }
 
     /**
@@ -168,9 +226,17 @@ public class AdminApplicationService {
         // Validate status transition
         validateStatusTransition(application.getStatus(), request.getStatus());
 
+        ApplicationStatus previousStatus = application.getStatus();
         application.changeStatus(request.getStatus());
         log.info("Application status updated: applicationSeq={}, oldStatus={}, newStatus={}",
-                applicationSeq, application.getStatus(), request.getStatus());
+                applicationSeq, previousStatus, request.getStatus());
+
+        // ★ Phase 1 PR#7: ConciergeRequest 자동 동기화 트리거
+        eventPublisher.publishEvent(new ApplicationStatusChangedEvent(
+            applicationSeq,
+            application.getViaConciergeRequestSeq(),
+            previousStatus,
+            application.getStatus()));
 
         return AdminApplicationResponse.from(application);
     }
@@ -190,10 +256,18 @@ public class AdminApplicationService {
             );
         }
 
+        ApplicationStatus previousStatus = application.getStatus();
         application.issueLicense(request.getLicenseNumber(), request.getLicenseExpiryDate());
 
         log.info("Application completed: applicationSeq={}, licenseNumber={}, expiryDate={}",
                 applicationSeq, request.getLicenseNumber(), request.getLicenseExpiryDate());
+
+        // ★ Phase 1 PR#7: ConciergeRequest 자동 동기화 트리거 (IN_PROGRESS → COMPLETED)
+        eventPublisher.publishEvent(new ApplicationStatusChangedEvent(
+            applicationSeq,
+            application.getViaConciergeRequestSeq(),
+            previousStatus,
+            application.getStatus()));
 
         // 신청자에게 면허 발급 완료 이메일 발송
         User applicant = application.getUser();
@@ -247,6 +321,14 @@ public class AdminApplicationService {
             throw new BusinessException(
                     "Only applications in PENDING_REVIEW status can be approved for payment",
                     HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_APPROVAL");
+        }
+
+        // Phase 5 B-1: kVA 가 UNKNOWN 인 신청은 결제 단계 진입 차단.
+        // security-review §1.2 — 실제 코드 경로는 `/approve` 이며, 여기에 가드 배치.
+        if (application.getKvaStatus() == KvaStatus.UNKNOWN) {
+            throw new BusinessException(
+                    "Payment will be enabled after LEW confirms the kVA",
+                    HttpStatus.BAD_REQUEST, "KVA_NOT_CONFIRMED");
         }
 
         application.approveForPayment();

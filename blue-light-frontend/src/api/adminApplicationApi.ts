@@ -6,6 +6,8 @@ import type {
   CompleteApplicationRequest,
   FileInfo,
   FileType,
+  KvaStatus,
+  KvaSource,
   Page,
   Payment,
   PaymentConfirmRequest,
@@ -13,6 +15,26 @@ import type {
   SldRequest,
   UpdateStatusRequest,
 } from '../types';
+import type {
+  ManualPaymentPayload,
+  ManualPaymentResponse,
+} from '../types/manualPayment';
+
+// Phase 5 PR#3 — kVA 확정 API
+export interface ConfirmKvaPayload {
+  selectedKva: number;
+  note?: string;
+}
+
+export interface ConfirmKvaResponse {
+  applicationId: number;
+  kvaStatus: KvaStatus;
+  kvaSource: KvaSource;
+  selectedKva: number;
+  quoteAmount: number;
+  kvaConfirmedBy: number | null;
+  kvaConfirmedAt: string | null;
+}
 
 // ── Dashboard ──────────────────────────────
 
@@ -27,10 +49,17 @@ export const getApplications = async (
   page = 0,
   size = 20,
   status?: ApplicationStatus,
-  search?: string
+  search?: string,
+  kvaStatus?: KvaStatus
 ): Promise<Page<AdminApplication>> => {
   const response = await axiosClient.get<Page<AdminApplication>>('/admin/applications', {
-    params: { page, size, ...(status && { status }), ...(search && { search }) },
+    params: {
+      page,
+      size,
+      ...(status && { status }),
+      ...(search && { search }),
+      ...(kvaStatus && { kvaStatus }),
+    },
   });
   return response.data;
 };
@@ -69,6 +98,158 @@ export const approveForPayment = async (id: number): Promise<AdminApplication> =
   return response.data;
 };
 
+/**
+ * Phase 5 PR#3 — LEW/ADMIN kVA 확정 (AC-A1).
+ * force=true 는 ADMIN 전용 override.
+ */
+export const confirmKva = async (
+  id: number,
+  data: ConfirmKvaPayload,
+  force = false
+): Promise<ConfirmKvaResponse> => {
+  const response = await axiosClient.patch<ConfirmKvaResponse>(
+    `/admin/applications/${id}/kva`,
+    data,
+    { params: force ? { force: true } : {} }
+  );
+  return response.data;
+};
+
+// ── 결제 후 kVA 사후 변경 (PR-1) ──────────────────────────────
+// 스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §4.1
+
+export interface KvaPostPaymentOverridePayload {
+  newKva: number;
+  reason: string;
+  adminMemo?: string;
+  paymentAdjustment?: string; // PENDING | PAID_DIFFERENCE | REFUNDED | WAIVED
+  settledAmount?: number;
+  receiptReferenceNumber?: string;
+}
+
+export interface KvaPostPaymentOverrideResponse {
+  adjustmentSeq: number;
+  previousKva: number;
+  newKva: number;
+  previousQuoteAmount: number;
+  newQuoteAmount: number;
+  amountDifference: number;
+  cofReissueTriggered: boolean;
+}
+
+/**
+ * 결제 후 kVA 사후 변경 (ADMIN 전용).
+ * 결제 전 신청은 {@link confirmKva} 의 force=true 를 사용해야 한다.
+ */
+export const overrideKvaPostPayment = async (
+  applicationSeq: number,
+  data: KvaPostPaymentOverridePayload
+): Promise<KvaPostPaymentOverrideResponse> => {
+  const response = await axiosClient.post<KvaPostPaymentOverrideResponse>(
+    `/admin/applications/${applicationSeq}/kva-override-postpayment`,
+    data
+  );
+  return response.data;
+};
+
+// ── 결제 후 kVA 사후 변경 — 이력 + Settlement (PR-4) ──────────────────────
+// 스펙: doc/Project Analysis/kva-postpayment-adjustment-spec.md §4.3 / §8 PR-4
+
+/** PR-4: KvaAdjustmentRecord 의 status enum (백엔드 mirror). */
+export type KvaAdjustmentStatus =
+  | 'PENDING_ADMIN_REVIEW'
+  | 'APPLIED'
+  | 'RESOLVED_BY_ADMIN_OVERRIDE'
+  | 'REJECTED'
+  | 'CANCELLED';
+
+/** PR-4: 변경 주체 역할 (ADMIN | LEW). */
+export type KvaAdjustmentChangedByRole = 'ADMIN' | 'LEW';
+
+/** PR-4: 정산 상태 enum (PENDING | PAID_DIFFERENCE | REFUNDED | WAIVED). */
+export type KvaPaymentAdjustment =
+  | 'PENDING'
+  | 'PAID_DIFFERENCE'
+  | 'REFUNDED'
+  | 'WAIVED';
+
+/**
+ * PR-4: 이력 카드 row.
+ *
+ * <p>{@code lewRequestSeq} 가 있으면 ADMIN 변경 row 가 어떤 LEW 요청 row 에 응답한 것인지 self-FK
+ * 로 가리킨다. 프론트는 이를 기준으로 timeline 에 그룹 표시.</p>
+ */
+export interface KvaAdjustmentHistoryItem {
+  adjustmentSeq: number;
+  status: KvaAdjustmentStatus;
+  changedByRole: KvaAdjustmentChangedByRole;
+  changedByUserName?: string;
+  previousKva: number;
+  newKva?: number;
+  proposedKva?: number;
+  previousQuoteAmount?: number;
+  newQuoteAmount?: number;
+  amountDifference?: number;
+  reason: string;
+  adminMemo?: string;
+  paymentAdjustment?: KvaPaymentAdjustment;
+  settledAmount?: number;
+  receiptReferenceNumber?: string;
+  settlementMemo?: string;
+  settledAt?: string;
+  cofReissueTriggered: boolean;
+  lewRequestSeq?: number;
+  createdAt: string;
+  adminAdjustmentAt?: string;
+}
+
+/** PR-4: settlement 마킹 요청 payload. */
+export interface KvaSettlementUpdatePayload {
+  /** PAID_DIFFERENCE / REFUNDED / WAIVED. PENDING 은 백엔드에서 거부됨. */
+  paymentAdjustment: 'PAID_DIFFERENCE' | 'REFUNDED' | 'WAIVED';
+  settledAmount?: number;
+  receiptReferenceNumber?: string;
+  settlementMemo?: string;
+  /** LEW 알림 발송 여부. 기본 true. */
+  notifyLew?: boolean;
+}
+
+/**
+ * PR-4: 결제 후 kVA 변경 이력 조회.
+ *
+ * <p>응답은 시간 내림차순. 빈 배열도 정상.</p>
+ * <p>권한: ADMIN/SYSTEM_ADMIN 또는 신청에 배정된 LEW.</p>
+ */
+export const getKvaAdjustments = async (
+  applicationSeq: number
+): Promise<KvaAdjustmentHistoryItem[]> => {
+  const response = await axiosClient.get<KvaAdjustmentHistoryItem[]>(
+    `/admin/applications/${applicationSeq}/kva-adjustments`
+  );
+  return response.data;
+};
+
+/**
+ * PR-4: settlement 마킹.
+ *
+ * 가드 위반 코드:
+ * - 404 KVA_ADJUSTMENT_NOT_FOUND — row 미존재 또는 다른 application 의 row
+ * - 409 KVA_SETTLEMENT_NOT_APPLICABLE — row.status 가 APPLIED/RESOLVED_BY_ADMIN_OVERRIDE 가 아님
+ * - 409 KVA_SETTLEMENT_ALREADY_FINALIZED — D6 거부 (이미 PAID_DIFFERENCE/REFUNDED/WAIVED)
+ * - 400 KVA_SETTLEMENT_INVALID_VALUE — paymentAdjustment 누락 또는 PENDING
+ */
+export const markKvaSettlement = async (
+  applicationSeq: number,
+  adjustmentSeq: number,
+  payload: KvaSettlementUpdatePayload
+): Promise<KvaAdjustmentHistoryItem> => {
+  const response = await axiosClient.patch<KvaAdjustmentHistoryItem>(
+    `/admin/applications/${applicationSeq}/kva-adjustments/${adjustmentSeq}/settlement`,
+    payload
+  );
+  return response.data;
+};
+
 export const completeApplication = async (
   id: number,
   data: CompleteApplicationRequest
@@ -96,6 +277,34 @@ export const confirmPayment = async (
 export const getPayments = async (applicationId: number): Promise<Payment[]> => {
   const response = await axiosClient.get<Payment[]>(
     `/admin/applications/${applicationId}/payments`
+  );
+  return response.data;
+};
+
+// ── Manual Payment (★ Concierge 강화 + 별도 수금 PR-2/PR-4) ──────────────────────
+// 스펙: doc/Project Analysis/concierge-flow-and-offline-payment-spec.md §7.3, AC-A1~A7
+
+/**
+ * ADMIN/SYSTEM_ADMIN 별도 수금 기록 (Application 결제).
+ *
+ * <p>D3=C: ADMIN 은 PENDING_REVIEW 부터 모든 상태에서 호출 가능 (단 PAID/IN_PROGRESS/COMPLETED 는
+ * 백엔드에서 409 ALREADY_PAID 또는 INVALID_STATUS 차단).</p>
+ *
+ * <p>에러 코드:</p>
+ * <ul>
+ *   <li>400 INVALID_AMOUNT — amount 0 이하</li>
+ *   <li>400 INVALID_PAYMENT_METHOD — PAYNOW_ONLINE 입력 시 (offline 4종만 허용)</li>
+ *   <li>409 ALREADY_PAID — 이미 결제 완료</li>
+ *   <li>409 INVALID_STATUS — 호출 불가 상태 (예: EXPIRED)</li>
+ * </ul>
+ */
+export const recordManualPayment = async (
+  applicationSeq: number,
+  payload: ManualPaymentPayload,
+): Promise<ManualPaymentResponse> => {
+  const response = await axiosClient.post<ManualPaymentResponse>(
+    `/admin/applications/${applicationSeq}/manual-payment`,
+    payload,
   );
   return response.data;
 };

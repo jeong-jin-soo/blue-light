@@ -1,6 +1,10 @@
 import { Card } from '../../../components/ui/Card';
 import { InfoField } from '../../../components/common/InfoField';
 import { fullName } from '../../../utils/formatName';
+import {
+  hasAnyAddressPart,
+  type AddressInputValues,
+} from '../../../components/domain/AddressInputGroup';
 import type { AdminApplication } from '../../../types';
 
 interface Props {
@@ -13,6 +17,18 @@ interface Props {
  * - 신청자 정보, 물건 정보, 면허 기간, 갱신 정보, 가격 정보
  */
 export function AdminApplicationInfo({ application, onNavigateToOriginal }: Props) {
+  // CORPORATE 신청자만 Company/UEN/Designation 필요.
+  // INDIVIDUAL은 EMA 양식상 본인 이름으로 자동 대체되므로 경고 대상 아님.
+  // Correspondence Address는 LOA 렌더 시 Installation address로 fallback되므로 경고 제외.
+  const missingCorporateFields: string[] =
+    application.applicantType === 'CORPORATE'
+      ? [
+          !application.userCompanyName && 'Company Name',
+          !application.userUen && 'UEN',
+          !application.userDesignation && 'Designation',
+        ].filter((v): v is string => !!v)
+      : [];
+
   return (
     <>
       {/* Applicant Info */}
@@ -31,10 +47,16 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
             Business Details
             <span className="text-xs text-gray-400 ml-1.5">(Required for Letter of Appointment)</span>
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <InfoField label="Company Name" value={application.userCompanyName || '—'} />
-            <InfoField label="UEN" value={application.userUen || '—'} />
-          </div>
+          {application.applicantType === 'INDIVIDUAL' ? (
+            <div className="text-sm text-gray-500 italic py-2">
+              Individual applicant — no business registration.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <InfoField label="Company Name" value={application.userCompanyName || '—'} />
+              <InfoField label="UEN" value={application.userUen || '—'} />
+            </div>
+          )}
         </div>
 
         {/* Correspondence Address */}
@@ -49,22 +71,16 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
           </div>
         </div>
 
-        {/* Missing info warning */}
-        {(!application.userCompanyName || !application.userUen || !application.userDesignation || !application.userCorrespondenceAddress) && (
+        {/* Missing info warning — CORPORATE 전용 */}
+        {missingCorporateFields.length > 0 && (
           <div className="mt-4 bg-warning-50 border border-warning-200 rounded-lg p-3">
             <div className="flex items-start gap-2">
               <span className="text-sm">⚠️</span>
               <div>
-                <p className="text-xs font-medium text-warning-800">Incomplete Applicant Profile</p>
+                <p className="text-xs font-medium text-warning-800">Corporate Applicant Profile Incomplete</p>
                 <p className="text-xs text-warning-700 mt-0.5">
-                  The following are required for Letter of Appointment:{' '}
-                  {[
-                    !application.userCompanyName && 'Company Name',
-                    !application.userUen && 'UEN',
-                    !application.userDesignation && 'Designation',
-                    !application.userCorrespondenceAddress && 'Correspondence Address',
-                  ].filter(Boolean).join(', ')}.
-                  Please ask the applicant to update their profile.
+                  Missing: {missingCorporateFields.join(', ')}.
+                  Ask the applicant to update their profile before generating LOA.
                 </p>
               </div>
             </div>
@@ -75,15 +91,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
       {/* Property Details */}
       <Card>
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Property Details</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <InfoField label="Installation Address" value={application.address} />
-          <InfoField label="Postal Code" value={application.postalCode} />
-          <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-          <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
-          {application.spAccountNo && (
-            <InfoField label="SP Account No." value={application.spAccountNo} />
-          )}
-        </div>
+        <AdminInstallationDetails application={application} />
       </Card>
 
       {/* Licence Period */}
@@ -172,5 +180,55 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
         </div>
       </Card>
     </>
+  );
+}
+
+/**
+ * Admin/System Admin Property Details 블록 — 5-part 있으면 EMA ELISE 양식 순서로,
+ * 없으면 legacy 단일 address 로 폴백.
+ */
+function AdminInstallationDetails({ application }: { application: AdminApplication }) {
+  const fiveParts: AddressInputValues = {
+    block: application.installationAddressBlock ?? '',
+    unit: application.installationAddressUnit ?? '',
+    street: application.installationAddressStreet ?? '',
+    building: application.installationAddressBuilding ?? '',
+    postalCode: application.installationAddressPostalCode ?? '',
+  };
+  const hasFiveParts = hasAnyAddressPart(fiveParts);
+
+  if (!hasFiveParts) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoField label="Installation Address" value={application.address} />
+        <InfoField label="Postal Code" value={application.postalCode} />
+        <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+        <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
+        {application.spAccountNo && (
+          <InfoField label="SP Account No." value={application.spAccountNo} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <InfoField label="Block / House No" value={fiveParts.block || '—'} />
+        <InfoField label="Unit #" value={fiveParts.unit || '—'} />
+        <div className="sm:col-span-2">
+          <InfoField label="Street" value={fiveParts.street || '—'} />
+        </div>
+        <InfoField label="Building" value={fiveParts.building || '—'} />
+        <InfoField label="Postal Code" value={fiveParts.postalCode || application.postalCode || '—'} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+        <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
+        <InfoField label="Electric Box (kVA)" value={`${application.selectedKva} kVA`} />
+        {application.spAccountNo && (
+          <InfoField label="SP Account No." value={application.spAccountNo} />
+        )}
+      </div>
+    </div>
   );
 }

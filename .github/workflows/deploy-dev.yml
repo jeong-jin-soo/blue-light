@@ -177,7 +177,10 @@ jobs:
             MAIL_PORT=${{ secrets.MAIL_PORT }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            MAIL_FROM=${{ secrets.MAIL_FROM }}
+            MAIL_FROM_NAME=${{ secrets.MAIL_FROM_NAME }}
             MAIL_SMTP_ENABLED=true
+            SES_CONFIGURATION_SET=
             PASSWORD_RESET_BASE_URL=${{ secrets.PASSWORD_RESET_BASE_URL }}
             SQL_INIT_MODE=never
             ENVEOF
@@ -191,9 +194,18 @@ jobs:
             echo "MYSQL_PORT=$MYSQL_PORT" >> .env
             echo "MYSQL_DATABASE=$MYSQL_DATABASE" >> .env
 
+            # 배포 전 디스크 여유 확보 — 과거 layer 축적으로 99%까지 찬 사례 있음.
+            # 24시간 이전의 unused 이미지는 안전하게 회수.
+            docker image prune -a -f --filter "until=24h" || true
+            df -h / | tail -1
+
             # 배포 (개발: DB는 외부 RDS)
+            # -e: pull 실패 시 즉시 실패로 보고 (이전엔 silent skip → stale 컨테이너 유지)
+            # --force-recreate: IMAGE_TAG는 바뀌었지만 compose가 config hash
+            # 동일하다고 오판해 기존 컨테이너를 유지하는 사례 방지.
+            set -e
             docker compose -f docker-compose.yml pull
-            docker compose -f docker-compose.yml up -d --remove-orphans
+            docker compose -f docker-compose.yml up -d --remove-orphans --force-recreate
 
             # 이전 이미지 정리
             docker image prune -f

@@ -1,6 +1,8 @@
 package com.bluelight.backend.api.auth;
 
 import com.bluelight.backend.api.audit.AuditLogService;
+import com.bluelight.backend.api.auth.dto.ActivationLinkRequest;
+import com.bluelight.backend.api.auth.dto.ActivationLinkResponse;
 import com.bluelight.backend.api.auth.dto.ForgotPasswordRequest;
 import com.bluelight.backend.api.auth.dto.LoginRequest;
 import com.bluelight.backend.api.auth.dto.ResetPasswordRequest;
@@ -36,9 +38,16 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final LoginActivationService loginActivationService;
     private final LoginRateLimiter loginRateLimiter;
     private final AuditLogService auditLogService;
     private final JwtTokenProvider jwtTokenProvider;
+
+    /**
+     * 활성화 링크 요청 시 5케이스 공통 고정 메시지 (★ v1.5 §4.4 이메일 유출 방지).
+     */
+    private static final String ACTIVATION_FIXED_MESSAGE =
+        "If this email is registered and eligible for activation, we've sent an activation link.";
 
     /**
      * 가입 가능한 역할 목록 조회 (Public)
@@ -75,7 +84,12 @@ public class AuthController {
     }
 
     /**
-     * 로그인 (Rate Limiting 적용: IP당 15분 내 최대 5회)
+     * 로그인 (Rate Limiting 적용: IP당 15분 내 최대 5회).
+     * <p>
+     * ★ Kaki Concierge v1.5 H-1: 감사 로그(LOGIN_SUCCESS/LOGIN_FAILED_*)는
+     * 서비스 레이어({@link AuthService#login})에서 상황별로 세분화하여 기록한다.
+     * Controller는 Rate limit과 JWT 쿠키 세팅만 담당.
+     *
      * POST /api/auth/login
      */
     @PostMapping("/login")
@@ -98,30 +112,52 @@ public class AuthController {
         log.info("로그인 요청: email={}", request.getEmail());
 
         try {
-            TokenResponse response = authService.login(request);
+            TokenResponse response = authService.login(request, httpRequest);
             loginRateLimiter.clearAttempts(clientIp);
             addJwtCookie(httpResponse, response.getAccessToken());
-            auditLogService.log(
-                    response.getUserSeq(), request.getEmail(), response.getRole(),
-                    AuditAction.LOGIN_SUCCESS, AuditCategory.AUTH,
-                    "User", String.valueOf(response.getUserSeq()),
-                    "로그인 성공: " + request.getEmail(),
-                    null, null,
-                    clientIp, httpRequest.getHeader("User-Agent"),
-                    "POST", "/api/auth/login", 200);
             return ResponseEntity.ok(response);
         } catch (BusinessException e) {
             loginRateLimiter.recordFailedAttempt(clientIp);
-            auditLogService.log(
-                    null, request.getEmail(), null,
-                    AuditAction.LOGIN_FAILURE, AuditCategory.AUTH,
-                    null, null,
-                    "로그인 실패: " + request.getEmail(),
-                    null, null,
-                    clientIp, httpRequest.getHeader("User-Agent"),
-                    "POST", "/api/auth/login", 401);
+            // 감사 로그는 서비스 레이어에서 세분화 기록함 (LOGIN_FAILED_UNKNOWN_EMAIL / BAD_PASSWORD / DELETED)
             throw e;
         }
+    }
+
+    /**
+     * 활성화 링크 재발송 요청 (★ Kaki Concierge v1.5 §4.4 옵션 B).
+     * <p>
+     * PENDING_ACTIVATION 계정의 AccountSetupToken을 재발급하여 이메일로 발송한다.
+     * 이메일 존재 여부를 노출하지 않기 위해 <b>모든 케이스에서 동일한 200 + 고정 메시지</b>.
+     * Rate limit은 IP 기반(LoginRateLimiter 재사용) — 동일 IP에서 과도한 요청 차단.
+     *
+     * POST /api/auth/login/request-activation
+     */
+    @PostMapping("/login/request-activation")
+    public ResponseEntity<ActivationLinkResponse> requestActivation(
+            @Valid @RequestBody ActivationLinkRequest request,
+            HttpServletRequest httpRequest) {
+
+        String clientIp = httpRequest.getRemoteAddr();
+
+        // Rate limit — LoginRateLimiter 재사용 (로그인/활성화 공통 IP 카운트)
+        if (loginRateLimiter.isBlocked(clientIp)) {
+            log.warn("Activation link rate limit exceeded for IP: {}", clientIp);
+            throw new BusinessException(
+                    "Too many activation requests. Please try again later.",
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "RATE_LIMIT_EXCEEDED"
+            );
+        }
+
+        // 응답은 항상 고정 메시지 — 내부 분기는 서비스가 처리
+        loginActivationService.requestActivation(request.getEmail(), httpRequest);
+
+        // 과도한 스캐닝 차단용 — 성공/미매칭 관계없이 IP 카운트 증가
+        loginRateLimiter.recordFailedAttempt(clientIp);
+
+        return ResponseEntity.ok(ActivationLinkResponse.builder()
+                .message(ACTIVATION_FIXED_MESSAGE)
+                .build());
     }
 
     /**

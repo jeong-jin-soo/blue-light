@@ -6,20 +6,22 @@ import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { authApi } from '../../api/authApi';
+import { parseReturnTo } from '../../utils/safeReturnTo';
 
+/**
+ * Phase 1 (2026-04-17): 회원가입 간소화.
+ * phone / companyName / uen / designation 4필드 제거.
+ * 회사 정보는 ProfilePage에서 선택적으로 입력한다 (Just-in-Time Disclosure, AC-S1~S4).
+ */
 interface SignupForm {
   email: string;
   password: string;
   confirmPassword: string;
   firstName: string;
   lastName: string;
-  phone: string;
   role: string;
   lewLicenceNo: string;
   lewGrade: string;
-  companyName: string;
-  uen: string;
-  designation: string;
   pdpaConsent: boolean;
 }
 
@@ -29,13 +31,9 @@ const INITIAL_FORM: SignupForm = {
   confirmPassword: '',
   firstName: '',
   lastName: '',
-  phone: '',
   role: 'APPLICANT',
   lewLicenceNo: '',
   lewGrade: '',
-  companyName: '',
-  uen: '',
-  designation: '',
   pdpaConsent: false,
 };
 
@@ -44,44 +42,38 @@ export default function SignupPage() {
   const [searchParams] = useSearchParams();
   const { signup, isLoading, error, clearError, isAuthenticated, user } = useAuthStore();
 
-  // URL query parameter로 역할이 지정된 경우 (랜딩페이지에서 진입)
+  // Account type은 랜딩 페이지 링크의 ?role= 파라미터로 확정 (LEW | APPLICANT). 없으면 APPLICANT.
   const presetRole = searchParams.get('role');
-  const isRolePreset = presetRole === 'APPLICANT' || presetRole === 'LEW';
+  const initialRole = presetRole === 'LEW' ? 'LEW' : 'APPLICANT';
 
   const [form, setForm] = useState<SignupForm>({
     ...INITIAL_FORM,
-    role: isRolePreset ? presetRole : INITIAL_FORM.role,
+    role: initialRole,
   });
   const [localError, setLocalError] = useState('');
 
-  // 가입 가능한 역할 목록 (동적 로드)
-  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [optionsLoading, setOptionsLoading] = useState(true);
 
   const updateField = useCallback(<K extends keyof SignupForm>(field: K, value: SignupForm[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   }, []);
 
-  // 가입 옵션 로드
+  // LEW 가입 가능 여부 확인 — 불가능하면 APPLICANT로 폴백
   useEffect(() => {
     authApi.getSignupOptions()
       .then((options) => {
-        setAvailableRoles(options.availableRoles);
-        // URL에서 LEW로 지정했는데 백엔드에서 LEW 가입이 불가능한 경우
-        if (isRolePreset && presetRole === 'LEW' && !options.availableRoles.includes('LEW')) {
+        if (presetRole === 'LEW' && !options.availableRoles.includes('LEW')) {
           updateField('role', 'APPLICANT');
-        }
-        // 역할이 1개뿐이고 URL 지정이 없으면 자동 선택
-        if (!isRolePreset && options.availableRoles.length === 1) {
-          updateField('role', options.availableRoles[0]);
         }
       })
       .catch(() => {
-        // 실패 시 기본값 (APPLICANT만)
-        setAvailableRoles(['APPLICANT']);
+        // 실패 시 기본값(APPLICANT) 유지
       })
       .finally(() => setOptionsLoading(false));
-  }, [updateField]);
+  }, [presetRole, updateField]);
+
+  // 가입 후 원래 요청 페이지로 돌려보낼 returnTo URL (Applicant 전용)
+  const returnTo = parseReturnTo(searchParams.get('returnTo'));
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -90,10 +82,15 @@ export default function SignupPage() {
         navigate('/lew-pending', { replace: true });
         return;
       }
+      // Applicant이고 returnTo가 있으면 해당 페이지로 리다이렉트
+      if (user.role === 'APPLICANT' && returnTo) {
+        navigate(returnTo, { replace: true });
+        return;
+      }
       const dest = user.role === 'SYSTEM_ADMIN' ? '/admin/system' : user.role === 'ADMIN' ? '/admin/dashboard' : user.role === 'LEW' ? '/lew/dashboard' : '/dashboard';
       navigate(dest, { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, returnTo]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,13 +128,9 @@ export default function SignupPage() {
         password: form.password,
         firstName: form.firstName,
         lastName: form.lastName,
-        phone: form.phone || undefined,
         role: form.role,
         lewLicenceNo: form.role === 'LEW' ? form.lewLicenceNo.trim() : undefined,
         lewGrade: form.role === 'LEW' ? form.lewGrade : undefined,
-        companyName: form.role === 'APPLICANT' && form.companyName.trim() ? form.companyName.trim() : undefined,
-        uen: form.role === 'APPLICANT' && form.uen.trim() ? form.uen.trim() : undefined,
-        designation: form.role === 'APPLICANT' && form.designation.trim() ? form.designation.trim() : undefined,
         pdpaConsent: form.pdpaConsent,
       });
     } catch {
@@ -159,9 +152,10 @@ export default function SignupPage() {
 
   return (
     <AuthLayout>
-      <h2 className="text-xl font-semibold text-gray-800 mb-6">
-        {isRolePreset && form.role === 'LEW' ? 'Register as LEW' : 'Create your account'}
+      <h2 className="text-xl font-semibold text-gray-800 mb-1">
+        {form.role === 'LEW' ? 'Register as LEW' : 'Create your account'}
       </h2>
+      <p className="text-sm text-gray-500 mb-6">Get started in 30 seconds</p>
 
       {displayError && (
         <div className="mb-4 p-3 bg-error-50 border border-error-200 rounded-lg text-sm text-error-600">
@@ -200,108 +194,17 @@ export default function SignupPage() {
           placeholder="you@example.com"
         />
 
-        <Input
-          label="Phone"
-          type="tel"
-          maxLength={20}
-          value={form.phone}
-          onChange={(e) => updateField('phone', e.target.value)}
-          placeholder="+65-XXXX-XXXX"
-          hint="Optional"
-        />
-
-        {/* Business Information — APPLICANT 회원가입 시 (선택적) */}
-        {form.role === 'APPLICANT' && (
-          <div className="space-y-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs font-medium text-gray-600">
-              Business Information <span className="text-gray-400">(Optional — can be added later in Profile)</span>
-            </p>
-            <Input
-              label="Company Name"
-              maxLength={100}
-              value={form.companyName}
-              onChange={(e) => updateField('companyName', e.target.value)}
-              placeholder="e.g., LICENSEKAKI PTE LTD"
-              hint="Will be printed on your installation licence"
-            />
-            <div className="grid grid-cols-2 gap-3">
-              <Input
-                label="UEN"
-                maxLength={20}
-                value={form.uen}
-                onChange={(e) => updateField('uen', e.target.value)}
-                placeholder="e.g., 202407291M"
-                hint="Business registration number"
-              />
-              <Input
-                label="Designation"
-                maxLength={50}
-                value={form.designation}
-                onChange={(e) => updateField('designation', e.target.value)}
-                placeholder="e.g., Director"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Role indicator — 랜딩에서 역할이 지정된 경우 */}
-        {isRolePreset && (
+        {/* Role indicator — LEW 전용. 일반 Applicant는 기본값이므로 노출 생략 */}
+        {form.role === 'LEW' && (
           <div className="flex items-center gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg">
-            <span className="text-lg">{form.role === 'LEW' ? '⚡' : '🏢'}</span>
+            <span className="text-lg">⚡</span>
             <div className="flex-1">
               <div className="text-sm font-medium text-primary">
-                {form.role === 'LEW' ? 'LEW (Licensed Electrical Worker)' : 'Building Owner'}
+                LEW (Licensed Electrical Worker)
               </div>
               <div className="text-xs text-gray-500">
-                {form.role === 'LEW'
-                  ? 'Signing up as a Licensed Electrical Worker'
-                  : 'Signing up as a building / business / shop owner'}
+                Signing up as a Licensed Electrical Worker
               </div>
-            </div>
-            <Link
-              to="/signup"
-              className="text-xs text-primary hover:underline whitespace-nowrap"
-            >
-              Change
-            </Link>
-          </div>
-        )}
-
-        {/* Role selection — 역할이 미지정이고 2개 이상일 때만 표시 */}
-        {!isRolePreset && availableRoles.length > 1 && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Account Type<span className="text-error-500 ml-0.5">*</span>
-            </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => updateField('role', 'APPLICANT')}
-                className={`p-3 border-2 rounded-lg text-center transition-all ${
-                  form.role === 'APPLICANT'
-                    ? 'border-primary bg-primary/5 text-primary'
-                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                }`}
-              >
-                <div className="text-lg mb-1">🏢</div>
-                <div className="text-sm font-medium">Building Owner</div>
-                <div className="text-xs text-gray-500 mt-0.5">Applicant</div>
-              </button>
-              {availableRoles.includes('LEW') && (
-                <button
-                  type="button"
-                  onClick={() => updateField('role', 'LEW')}
-                  className={`p-3 border-2 rounded-lg text-center transition-all ${
-                    form.role === 'LEW'
-                      ? 'border-primary bg-primary/5 text-primary'
-                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="text-lg mb-1">⚡</div>
-                  <div className="text-sm font-medium">LEW</div>
-                  <div className="text-xs text-gray-500 mt-0.5">Licensed Electrical Worker</div>
-                </button>
-              )}
             </div>
           </div>
         )}
@@ -360,6 +263,7 @@ export default function SignupPage() {
           value={form.password}
           onChange={(e) => updateField('password', e.target.value)}
           placeholder="8-20 characters"
+          hint="Min 8 chars, 1 uppercase, 1 number"
         />
 
         <Input
@@ -389,7 +293,7 @@ export default function SignupPage() {
             <a href="/disclaimer" target="_blank" className="text-primary font-medium hover:underline">
               Disclaimer
             </a>
-            . I consent to the collection and use of my personal data as described.
+            . I consent to the collection and use of my personal data under Singapore PDPA.
             <span className="text-error-500"> *</span>
           </label>
         </div>
@@ -399,9 +303,16 @@ export default function SignupPage() {
         </Button>
       </form>
 
-      <div className="mt-6 text-center text-sm text-gray-500">
+      <p className="text-xs text-gray-500 mt-6 text-center">
+        You can add phone and company details later from your profile — they're optional.
+      </p>
+
+      <div className="mt-4 text-center text-sm text-gray-500">
         Already have an account?{' '}
-        <Link to="/login" className="text-primary font-medium hover:underline">
+        <Link
+          to={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login'}
+          className="text-primary font-medium hover:underline"
+        >
           Sign in
         </Link>
       </div>

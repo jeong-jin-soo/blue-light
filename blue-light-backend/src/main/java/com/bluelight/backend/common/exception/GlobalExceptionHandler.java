@@ -1,13 +1,18 @@
 package com.bluelight.backend.common.exception;
 
+import jakarta.persistence.OptimisticLockException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -80,6 +85,50 @@ public class GlobalExceptionHandler {
                 .build();
 
         return ResponseEntity.badRequest().body(response);
+    }
+
+    /**
+     * 낙관적 락 충돌 — 동시 수정 시 409 STALE_STATE.
+     * B-1 블로커 해결: {@code DocumentRequest.@Version} 충돌을 사용자에게 재시도 유도.
+     */
+    @ExceptionHandler({
+            OptimisticLockException.class,
+            ObjectOptimisticLockingFailureException.class,
+            OptimisticLockingFailureException.class
+    })
+    public ResponseEntity<ErrorResponse> handleOptimisticLock(Exception e) {
+        log.warn("Optimistic lock conflict: {}", e.getMessage());
+
+        // LEW Review Form P1.C — CoF 경로(`/api/lew/applications/.../cof`)는 스펙 §9-12에 따라
+        // `COF_VERSION_CONFLICT` 로 세분화한다. 그 외는 기존 공통 `STALE_STATE` 유지.
+        String code = isCofLockConflict() ? "COF_VERSION_CONFLICT" : "STALE_STATE";
+        String message = "COF_VERSION_CONFLICT".equals(code)
+                ? "Certificate of Fitness was updated concurrently — refresh and try again."
+                : "This resource was updated by someone else. Please refresh and try again.";
+
+        ErrorResponse response = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(HttpStatus.CONFLICT.value())
+                .error(HttpStatus.CONFLICT.getReasonPhrase())
+                .code(code)
+                .message(message)
+                .build();
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+    }
+
+    /** 현재 요청 URI가 CoF 편집 경로(/api/lew/applications/{id}/cof ...)인지 판정. */
+    private boolean isCofLockConflict() {
+        try {
+            var attrs = RequestContextHolder.getRequestAttributes();
+            if (attrs instanceof ServletRequestAttributes sra) {
+                String uri = sra.getRequest().getRequestURI();
+                if (uri == null) return false;
+                return uri.startsWith("/api/lew/applications/") && uri.contains("/cof");
+            }
+        } catch (Exception ignored) {
+            // 요청 컨텍스트 없음 (백그라운드 스레드 등)
+        }
+        return false;
     }
 
     /**

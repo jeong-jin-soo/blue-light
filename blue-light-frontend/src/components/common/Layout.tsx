@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useShallow } from 'zustand/react/shallow';
 import { useAuthStore } from '../../stores/authStore';
+import { useRoleStore, selectRoleLabels } from '../../stores/roleStore';
+import licensekakiLogo from '../../assets/licensekaki-logo.png';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
 import Footer from './Footer';
@@ -13,11 +16,21 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const loadRoles = useRoleStore((s) => s.loadRoles);
+  // useShallow: selectRoleLabels가 매 호출마다 새 객체({...})를 반환하므로
+  // 얕은 비교로 래핑하지 않으면 Layout이 무한 리렌더 → React error #185.
+  const roleLabels = useRoleStore(useShallow(selectRoleLabels));
+
+  // 인증된 사용자가 Layout 에 진입하는 순간 1회 역할 메타데이터 로드
+  useEffect(() => {
+    loadRoles();
+  }, [loadRoles]);
 
   const isAdmin = user?.role === 'ADMIN';
   const isSystemAdmin = user?.role === 'SYSTEM_ADMIN';
   const isLew = user?.role === 'LEW' && user?.approved;
   const isSldManager = user?.role === 'SLD_MANAGER';
+  const isConciergeManager = user?.role === 'CONCIERGE_MANAGER';
 
   const handleLogout = () => {
     logout();
@@ -30,13 +43,18 @@ export default function Layout() {
     { path: '/applications', label: 'My Applications', icon: '📋' },
     { path: '/applications/new', label: 'New Application', icon: '➕' },
     { path: '/sld-orders', label: 'SLD Orders', icon: '📐' },
-    { path: '/sld-orders/new', label: 'New SLD Order', icon: '➕' },
+    { path: '/lighting-orders', label: 'Lighting Layout', icon: '💡' },
+    { path: '/power-socket-orders', label: 'Power Socket', icon: '🔌' },
+    { path: '/lew-service-orders', label: 'LEW Service', icon: '⚡' },
+    { path: '/expired-license-orders', label: 'Expired License', icon: '🔄' },
     { path: '/profile', label: 'My Profile', icon: '👤' },
   ];
 
   const adminMenu = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/admin/applications', label: 'Applications', icon: '📋' },
+    // admin-manual-email-spec.md §7.1: ADMIN 사이드바 노출, SYSTEM_ADMIN 은 미노출(직접 URL 진입만 가능)
+    { path: '/admin/manual-emails', label: 'Manual Email', icon: '✉️' },
     { path: '/admin/prices', label: 'Settings', icon: '⚙️' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
@@ -44,6 +62,7 @@ export default function Layout() {
   // SYSTEM_ADMIN: 시스템 설정 전용
   const systemAdminMenu = [
     { path: '/admin/system', label: 'System', icon: '🔧' },
+    { path: '/admin/roles', label: 'Roles', icon: '🗝️' },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: '📋' },
     { path: '/admin/data-breaches', label: 'Data Breach', icon: '🛡️' },
   ];
@@ -51,31 +70,51 @@ export default function Layout() {
   const lewMenu = [
     { path: '/lew/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/lew/applications', label: 'Applications', icon: '📋' },
+    // ★ Concierge 강화 PR-4 — LEW 본인에 배정된 컨시어지 요청 목록.
+    { path: '/lew/concierge-requests', label: 'My Concierge', icon: '🤝' },
   ];
 
   const sldManagerMenu = [
-    { path: '/sld-manager/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/sld-manager/orders', label: 'Orders', icon: '📐' },
+    { path: '/sld-manager/dashboard', label: 'SLD Dashboard', icon: '📊' },
+    { path: '/sld-manager/orders', label: 'SLD Orders', icon: '📐' },
+    { path: '/lighting-manager/dashboard', label: 'Lighting Dashboard', icon: '📊' },
+    { path: '/lighting-manager/orders', label: 'Lighting Orders', icon: '💡' },
+    { path: '/power-socket-manager/dashboard', label: 'Power Socket Dashboard', icon: '📊' },
+    { path: '/power-socket-manager/orders', label: 'Power Socket Orders', icon: '🔌' },
+    { path: '/lew-service-manager/dashboard', label: 'LEW Service Dashboard', icon: '📊' },
+    { path: '/lew-service-manager/orders', label: 'LEW Service Orders', icon: '⚡' },
+    { path: '/expired-license-manager/dashboard', label: 'Expired License Dashboard', icon: '📊' },
+    { path: '/expired-license-manager/orders', label: 'Expired License Orders', icon: '🔄' },
+  ];
+
+  // ★ Kaki Concierge v1.5 Phase 1 PR#4 Stage B
+  const conciergeManagerMenu = [
+    { path: '/concierge-manager/dashboard', label: 'Dashboard', icon: '📊' },
+    { path: '/concierge-manager/requests', label: 'Requests', icon: '🤝' },
   ];
 
   const menuItems = isSystemAdmin ? systemAdminMenu
     : isAdmin ? adminMenu
     : isLew ? lewMenu
     : isSldManager ? sldManagerMenu
+    : isConciergeManager ? conciergeManagerMenu
     : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
 
-  const roleLabel = isSystemAdmin ? 'System Admin'
-    : isAdmin ? 'Administrator'
-    : isLew ? 'LEW'
-    : isSldManager ? 'SLD Manager'
-    : 'Applicant';
+  // 승인 대기 LEW는 Applicant UI로 노출하는 기존 동작을 유지 (isLew는 approved일 때만 true)
+  const roleLabel = isSystemAdmin ? roleLabels.SYSTEM_ADMIN
+    : isAdmin ? roleLabels.ADMIN
+    : isLew ? roleLabels.LEW
+    : isSldManager ? roleLabels.SLD_MANAGER
+    : isConciergeManager ? roleLabels.CONCIERGE_MANAGER
+    : roleLabels.APPLICANT;
 
   const homePath = isSystemAdmin ? '/admin/system'
     : isAdmin ? '/admin/dashboard'
     : isLew ? '/lew/dashboard'
     : isSldManager ? '/sld-manager/dashboard'
+    : isConciergeManager ? '/concierge-manager/dashboard'
     : '/dashboard';
 
   return (
@@ -99,9 +138,8 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-white/10">
-          <Link to={homePath} className="flex items-center gap-2">
-            <span className="text-xl">💡</span>
-            <span className="text-lg font-bold tracking-tight">LicenseKaki</span>
+          <Link to={homePath} className="flex items-center">
+            <img src={licensekakiLogo} alt="LicenseKaki" className="h-6 brightness-0 invert" />
           </Link>
         </div>
 

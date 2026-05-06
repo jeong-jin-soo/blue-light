@@ -23,12 +23,17 @@ export function AdminLoaSection({
 }: Props) {
   const isRenewal = application.applicationType === 'RENEWAL';
   const lewAssigned = !!application.assignedLewSeq;
-  const profileComplete = !!(
-    application.userCompanyName &&
-    application.userUen &&
-    application.userDesignation &&
-    application.userCorrespondenceAddress
-  );
+  const isCorporate = application.applicantType === 'CORPORATE';
+  // CORPORATE만 Company/UEN/Designation 필요. INDIVIDUAL은 무조건 완비된 것으로 간주.
+  // Correspondence Address는 Installation address fallback 가능하므로 경고 제외 (V-1).
+  const missingCorporateFields: string[] = isCorporate
+    ? [
+        !application.userCompanyName && 'Company Name',
+        !application.userUen && 'UEN',
+        !application.userDesignation && 'Designation',
+      ].filter((v): v is string => !!v)
+    : [];
+  const profileComplete = missingCorporateFields.length === 0;
   const canGenerate = lewAssigned && profileComplete;
 
   // LOA 업로드용 파일 상태 (RENEWAL)
@@ -87,21 +92,16 @@ export function AdminLoaSection({
             </div>
           )}
 
-          {/* 프로필 미완성 경고 */}
+          {/* 프로필 미완성 경고 — CORPORATE 전용 */}
           {lewAssigned && !profileComplete && (
             <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
               <div className="flex items-start gap-2">
                 <span className="text-sm">⚠️</span>
                 <div>
-                  <p className="text-sm font-medium text-warning-800">Incomplete Applicant Profile</p>
+                  <p className="text-sm font-medium text-warning-800">Corporate Applicant Profile Incomplete</p>
                   <p className="text-xs text-warning-700 mt-0.5">
-                    The following are required for LOA:{' '}
-                    {[
-                      !application.userCompanyName && 'Company Name',
-                      !application.userUen && 'UEN',
-                      !application.userDesignation && 'Designation',
-                      !application.userCorrespondenceAddress && 'Correspondence Address',
-                    ].filter(Boolean).join(', ')}.
+                    Missing: {missingCorporateFields.join(', ')}.
+                    Ask the applicant to update their profile before generating LOA.
                   </p>
                 </div>
               </div>

@@ -71,7 +71,7 @@ export default function SldOrderListPage() {
             title="No SLD orders yet"
             description="Request your first SLD drawing to get started."
             action={
-              <Button variant="outline" size="sm" onClick={() => navigate('/sld-orders/new')}>
+              <Button onClick={() => navigate('/sld-orders/new')}>
                 Create SLD Order
               </Button>
             }

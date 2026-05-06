@@ -25,6 +25,20 @@ public enum AuditAction {
     FILE_UPLOADED,
     FILE_DELETED,
 
+    // Document Request (Phase 2)
+    DOCUMENT_UPLOADED_VOLUNTARY,
+    DOCUMENT_DELETED_VOLUNTARY,
+
+    // Document Request — LEW 워크플로 (Phase 3 PR#1)
+    DOCUMENT_REQUEST_CREATED,
+    DOCUMENT_REQUEST_FULFILLED,
+    DOCUMENT_REQUEST_APPROVED,
+    DOCUMENT_REQUEST_REJECTED,
+    DOCUMENT_REQUEST_CANCELLED,
+
+    // LOA snapshot (Phase 2 PR#4)
+    LOA_SNAPSHOT_CREATED,
+
     // Admin user management
     LEW_APPROVED,
     LEW_REJECTED,
@@ -46,15 +60,101 @@ public enum AuditAction {
     SLD_AI_GENERATION_TOGGLED,
     PRICE_UPDATED,
     SETTINGS_UPDATED,
+    ROLE_METADATA_UPDATED,
 
     // PDPA data rights
     DATA_EXPORTED,
     ACCOUNT_DELETED,
     PDPA_CONSENT_WITHDRAWN,
+    PROFILE_COMPANY_INFO_UPDATED,
+    CORPORATE_INFO_CAPTURED_VIA_JIT,
+
+    // Phase 5: kVA 확정 (security-review §4 — 3종 분리)
+    KVA_CONFIRMED_BY_LEW,
+    KVA_OVERRIDDEN_BY_ADMIN,
+    KVA_CONFIRMATION_DENIED,
+
+    // Phase 6: 통합 LEW 리뷰 — finalize된 CoF가 kVA override로 재발급 요구
+    COF_REISSUED_BY_KVA_OVERRIDE,
+
+    // 결제 후 kVA 사후 변경 (kva-postpayment-adjustment-spec.md PR-1)
+    KVA_OVERRIDE_POSTPAYMENT,
+    COF_UNFINALIZED_BY_KVA_ADJUSTMENT,
+
+    // 결제 후 kVA 사후 변경 — LEW 요청 흐름 (kva-postpayment-adjustment-spec.md §4.2 / PR-3)
+    KVA_ADJUSTMENT_REQUESTED_BY_LEW,
+    // ADMIN 의 직접 변경에 의해 PENDING LEW 요청이 자동으로 해소(RESOLVED_BY_ADMIN_OVERRIDE) 됨 (AC-L4)
+    KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE,
+
+    // 결제 후 kVA 사후 변경 — Settlement 마킹 (kva-postpayment-adjustment-spec.md §4.3 / PR-4)
+    KVA_SETTLEMENT_MARKED,
+    // D6 거부 / 잘못된 status row 등 settlement 마킹 거부도 동일 액션에 metadata 로 기록
+    KVA_SETTLEMENT_DENIED,
 
     // Data breach
     DATA_BREACH_REPORTED,
     DATA_BREACH_PDPC_NOTIFIED,
     DATA_BREACH_USERS_NOTIFIED,
-    DATA_BREACH_RESOLVED
+    DATA_BREACH_RESOLVED,
+
+    // Phase 1 — Kaki Concierge Service (v1.5)
+    CONCIERGE_REQUEST_SUBMITTED,
+    CONCIERGE_ACCOUNT_AUTO_CREATED,
+    CONCIERGE_EXISTING_USER_LINKED,
+    CONCIERGE_MANAGER_ASSIGNED,
+    CONCIERGE_STATUS_TRANSITION,
+    CONCIERGE_NOTE_ADDED,
+    CONCIERGE_CANCELLED,
+    CONCIERGE_QUOTE_EMAIL_SENT,
+    USER_CONSENT_RECORDED,
+    ACCOUNT_SETUP_TOKEN_ISSUED,
+    ACCOUNT_SETUP_TOKEN_FAILED_ATTEMPT,    // H-3
+    ACCOUNT_SETUP_TOKEN_LOCKED,            // H-3
+    ACCOUNT_ACTIVATED,
+    ACCOUNT_ACTIVATION_REQUEST_SENT,       // H-1, §4.4 옵션 B
+    ACCOUNT_ACTIVATION_REQUEST_NO_MATCH,   // H-1, 이메일 미존재도 동일 응답 (감사 내부 기록)
+    APPLICATION_CREATED_ON_BEHALF,
+    LOA_SIGNATURE_UPLOADED_BY_MANAGER,
+    LOA_SIGNATURE_IMPLICIT_CONSENT_LAPSED, // O-15, 7일 이의 제기 창구 만료
+    LOGIN_FAILED_UNKNOWN_EMAIL,            // v1.5 AC-29 관련
+    LOGIN_FAILED_BAD_PASSWORD,             // v1.5 AC-29 관련
+    LOGIN_FAILED_DELETED,                  // v1.5 AC-29 관련
+
+    // LEW Review Form — Certificate of Fitness (P1.A)
+    // lew-review-form-spec.md §7 감사 로그
+    APPLICATION_VIEWED_BY_LEW,
+    CERTIFICATE_OF_FITNESS_CREATED,
+    CERTIFICATE_OF_FITNESS_UPDATED,
+    CERTIFICATE_OF_FITNESS_FINALIZED,
+    MSSL_UNMASKED_VIEW,
+
+    // PR3: LEW가 명시적으로 결제 요청을 트리거 (옵션 R — Phase 1 종료 후)
+    // CoF finalize 와 분리되어 status PENDING_REVIEW/REVISION_REQUESTED → PENDING_PAYMENT 전이를 일으킨다.
+    APPLICATION_PAYMENT_REQUESTED_BY_LEW,
+
+    // E-Invoice (invoice-spec.md §9 감사 로그)
+    INVOICE_GENERATED,
+    INVOICE_DOWNLOADED,
+    INVOICE_REGENERATED,
+    INVOICE_GENERATION_FAILED,
+
+    // LEW Service 방문형 리스키닝 (lew-service-visit-redesign-spec.md PR 2+)
+    LEW_SERVICE_VISIT_SCHEDULED,
+    // PR 3 — 체크인/아웃 + 재방문 요청
+    LEW_SERVICE_CHECKED_IN,
+    LEW_SERVICE_CHECKED_OUT,
+    LEW_SERVICE_REVISIT_REQUESTED,
+
+    // ADMIN Manual Email Dispatch (admin-manual-email-spec.md §6 AC-A1, §13.2)
+    // ADMIN/SYSTEM_ADMIN 이 신청자/LEW/외부 수신자에게 ad-hoc 이메일 발송 시 1건 기록.
+    // metadata: dispatchSeq, recipientType, recipientEmail, relatedApplicationSeq, subject(원문), bodyText 길이 등.
+    MANUAL_EMAIL_DISPATCHED,
+
+    // ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 — PR-1 인프라, PR-2/3 에서 호출.
+    // ADMIN 이 별도 수금(은행 송금/현금 등)을 수동으로 기록한 시점 (PR-2 metadata: paymentSeq, method, amount, reference).
+    MANUAL_PAYMENT_RECORDED,
+    // LEW 셀프 할당 또는 ADMIN 의 LEW 배정 (PR-3, D6=A). metadata: conciergeRequestSeq, lewUserSeq, previousLewUserSeq.
+    CONCIERGE_LEW_ASSIGNED,
+    // 별도 수금 기록 직후 자동 발행된 영수증 (PR-2). metadata: invoiceSeq, paymentSeq, paymentMethod.
+    INVOICE_AUTO_GENERATED_FROM_MANUAL_PAYMENT
 }

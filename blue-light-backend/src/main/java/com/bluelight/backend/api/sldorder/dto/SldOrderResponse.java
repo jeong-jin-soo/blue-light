@@ -19,6 +19,7 @@ public class SldOrderResponse {
     private String postalCode;
     private String buildingType;
     private Integer selectedKva;
+    private String ampere;
     private String applicantNote;
     private Long sketchFileSeq;
     private String status;
@@ -46,6 +47,7 @@ public class SldOrderResponse {
                 .postalCode(order.getPostalCode())
                 .buildingType(order.getBuildingType())
                 .selectedKva(order.getSelectedKva())
+                .ampere(order.getAmpere())
                 .applicantNote(order.getApplicantNote())
                 .sketchFileSeq(order.getSketchFileSeq())
                 .status(order.getStatus().name())

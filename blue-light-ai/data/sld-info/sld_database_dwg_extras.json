@@ -1,0 +1,5484 @@
+[
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 20,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {},
+    "busbar": {
+      "rating_a": 20
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "Boyutei.dwg",
+    "file_path": "sld-dwg-old/converted_dxf/Boyutei.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/Boyutei.dwg",
+    "dxf_path": "sld-dwg-old/converted_dxf/Boyutei.dxf",
+    "circuit_count": 19
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 32,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {},
+    "busbar": {
+      "rating_a": 32
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "Electrical Layout Plan N SLD 2021-10-12.dwg",
+    "file_path": "sld-dwg-old/Electrical Layout Plan N SLD 2021-10-12.dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/Electrical Layout Plan N SLD 2021-10-12.dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P\nRCCB (30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (WATER DISPENSOR)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 2x13A S/S/O (MASTER BEDROOM)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 1x13A WEATHERPROOF S/S/O (CAR PORCH)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (DISH WASHER)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2x13A S/S/O (MASTER BEDROOM)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2x13A S/S/O (LIVING)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 1x13A S/S/O (HOB AND HOOD)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2x13A S/S/O (JUNIOR MASTER BEDROOM)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2x13A S/S/O (LIVING)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (FRIDGE)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 1x13A, 2 Nos 2x13A S/S/O (JUNIOR MASTER BEDROOM)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2x13A S/S/O (DINING)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (FRIDGE)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A WP S/S/O, 2 Nos 2x13A S/S/O (COVERED TERRACE)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (WASHER)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4 Nos 2x13A S/S/O (BEDROOM 2)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2x13A S/S/O (DRY KITCHEN)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (DRYER)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 2x13A S/S/O (BEDROOM 1)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A TPN\nMCB 10kA\nTYPE C",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (INDUCTION HOB)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 1x13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2x13A S/S/O (WET KITCHEN)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (OVEN STEAM)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2x13A S/S/O (LAUNDRY)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1x13A S/S/O (OVEN)",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "SLD-2021-03-29_6 Lor Marican.dwg",
+    "file_path": "sld-dwg-old/SLD-2021-03-29_6 Lor Marican.dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/SLD-2021-03-29_6 Lor Marican.dwg",
+    "dxf_path": "",
+    "circuit_count": 39
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 32,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {},
+    "busbar": {
+      "rating_a": 32
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "ULidoor.dwg",
+    "file_path": "sld-dwg-old/ULidoor.dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/ULidoor.dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 40,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {},
+    "busbar": {
+      "rating_a": 40
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-CJS-E-SL1_2022 08 12 (Whitegrass).dwg",
+    "file_path": "sld-dwg-old/i2R-CJS-E-SL1_2022 08 12 (Whitegrass).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-CJS-E-SL1_2022 08 12 (Whitegrass).dwg",
+    "dxf_path": "",
+    "circuit_count": 15
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 40,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 40,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 40
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 20A DP ISOLATOR",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SL01_2022-01-17 (Pasir Ris ST21 B208 02-344).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SL01_2022-01-17 (Pasir Ris ST21 B208 02-344).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SL01_2022-01-17 (Pasir Ris ST21 B208 02-344).dwg",
+    "dxf_path": "",
+    "circuit_count": 1
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 63,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 63,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 63
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P \nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A TPN\nMCB 10kA\nTYPE C",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P \nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A TPN\nMCB 10kA\nTYPE C",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SL01_2022-02-18 (Anglican PSL).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SL01_2022-02-18 (Anglican PSL).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SL01_2022-02-18 (Anglican PSL).dwg",
+    "dxf_path": "",
+    "circuit_count": 40
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 80,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 80,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 80
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD-01_2021-01-25 (Aspire FnB).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD-01_2021-01-25 (Aspire FnB).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD-01_2021-01-25 (Aspire FnB).dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "100A COMB BUSBAR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "B16A\nDP\nMCB\n6kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "B16A\nDP\nMCB\n6kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A TPN MCB \n10kA TYPE C",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2020-10-05 (Yalor).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2020-10-05 (Yalor).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2020-10-05 (Yalor).dwg",
+    "dxf_path": "",
+    "circuit_count": 24
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 63,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 63,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 63
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2021-03-08 (Soon Huat).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2021-03-08 (Soon Huat).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2021-03-08 (Soon Huat).dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 63,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 63,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 63
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A 4P \nRCCB (30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P \nRCCB (30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A 4P \nRCCB (100mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2021-06-11 (Pezzo).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2021-06-11 (Pezzo).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2021-06-11 (Pezzo).dwg",
+    "dxf_path": "",
+    "circuit_count": 18
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "B16A\nDP\nMCB\n6kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A DP\nISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "16A 3-PIN 1ɸ Cee-Form\nINDUSTRIAL SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 2 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 2 x 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 1 x 15A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "B16A\nDP\nMCB\n6kA",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2021-06-23 (NEX Crave).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2021-06-23 (NEX Crave).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2021-06-23 (NEX Crave).dwg",
+    "dxf_path": "",
+    "circuit_count": 27
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {},
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2021-12-21 (OG BOX 5N&5E).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2021-12-21 (OG BOX 5N&5E).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2021-12-21 (OG BOX 5N&5E).dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2022 02 15 (TED Concept).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2022 02 15 (TED Concept).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2022 02 15 (TED Concept).dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4 NOS 2x13A S/S/O + 1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "5 NOS 2x13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A DP \nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "5 NOS 2x13A S/S/O + 1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 NOS 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4 NOS 2x13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A SPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A SPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A SPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A TPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A TPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A \nTPN \nMCB \n10kA\nTYPE C",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2024 07 22 (100A MSB) ELVO PL.dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2024 07 22 (100A MSB) ELVO PL.dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2024 07 22 (100A MSB) ELVO PL.dwg",
+    "dxf_path": "",
+    "circuit_count": 34
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4 NOS 2x13A S/S/O + 1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "5 NOS 2x13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A DP \nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "5 NOS 2x13A S/S/O + 1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 NOS 13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4 NOS 2x13A S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A SPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A SPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A SPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A TPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 NO. 20A TPN ISOLATOR FOR AIRCON",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A \nTPN \nMCB \n10kA\nTYPE C",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2024 07 22 (100A MSB).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2024 07 22 (100A MSB).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2024 07 22 (100A MSB).dwg",
+    "dxf_path": "",
+    "circuit_count": 34
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 63,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 63,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 63
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2024-08-29 (Citrine Islander Pte).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2024-08-29 (Citrine Islander Pte).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2024-08-29 (Citrine Islander Pte).dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "i2R-E-SLD1_2024-10-25 (Crossborder LLC).dwg",
+    "file_path": "sld-dwg-old/i2R-E-SLD1_2024-10-25 (Crossborder LLC).dwg",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/i2R-E-SLD1_2024-10-25 (Crossborder LLC).dwg",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "100A Single Phase DB 1 DWG.dxf",
+    "file_path": "sld-dwg-old/100A Single Phase DB 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/100A Single Phase DB 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A DOUBLE S/S/O       - OFFICE & CHANGING ROOM",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 15A POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A DOUBLE S/S/O       - PACKING ROOM",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 15A POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 15A POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "8 Nos 13A SINGLE S/S/O        - CAMERA HIGH LEVEL",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A SINGLE S/S/O        - CAMERA HIGH LEVEL",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A 4P \nRCCB (30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A WATER PROOF POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A WATER PROOF POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A WATER PROOF POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A WATER PROOF POWER SOCKET",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A TPN ISOLATOR",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "100A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/100A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/100A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 36
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 125,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "ELCB",
+      "rating_a": 125,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 125
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A SINGLE S/S/O    - COFFEE ROASTING ROOM",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A SINGLE S/S/O    - COFFEE CANNING ROOM",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 15A SINGLE S/S/O    - COFFEE CANNING ROOM",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "125A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/125A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/125A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 24
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 150,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 150,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 150
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6 Nos 13A TWIN S/S/O     (POWDER SHOWER ROOM)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "C20A\nSPN\nMCB\n10kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 20A DP ISOLATOR (OVEN) WET KITCHEN",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 20A DP ISOLATOR (DISH WASHER) WET KITCHEN",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "150A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/150A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/150A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 40
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 150,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 150,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 150
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A 4P\nRCCB 30mA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6A",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "100A BUSBAR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 X 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "150A TPN SLD 3 DWG.dxf",
+    "file_path": "sld-dwg-old/150A TPN SLD 3 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/150A TPN SLD 3 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 27
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 200,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 200,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 200
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 2 x 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A TWIN SSO + 1 No. 13A SINGLE SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  No. 2 x 13A SSO HIGH LEVEL",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 1 x 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4  Nos 1 x 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  No. 2 x 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 2 x 13A SSO",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "200A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/200A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/200A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 16
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 200,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 200,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 200
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A 4P\nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "200A TPN SLD 3 DWG.dxf",
+    "file_path": "sld-dwg-old/200A TPN SLD 3 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/200A TPN SLD 3 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 33
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 300,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 300,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 300
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "10A \nSPN\nMCB\n10kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "10A \nSPN\nMCB\n10kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "10A \nSPN\nMCB\n10kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "100A BUSBAR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P\nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P\nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P\nRCCB \n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "20A \nSPN\nMCB\n10kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "20A \nSPN\nMCB\n10kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A DP ISOLATOR     - VENTICELL OVEN",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 20A DP ISOLATOR     - VENTICELL OVEN",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "300A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/300A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/300A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 27
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "32A Single Phase DB 1 DWG.dxf",
+    "file_path": "sld-dwg-old/32A Single Phase DB 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/32A Single Phase DB 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "32A Single Phase DB 3 DWG.dxf",
+    "file_path": "sld-dwg-old/32A Single Phase DB 3 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/32A Single Phase DB 3 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN RCD S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN RCD S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN RCD S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "32A 4P\nISOLATOR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN RCD S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "32A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/32A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/32A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 10
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 400,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 400,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 400
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "400A MSB (MAIN SWITCHBOARD)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "0-400A",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 No. 63A",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "L2AC11",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "L3AC15",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "400A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/400A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/400A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 36
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 80,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 80,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 80
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "40A Single Phase DB 1 DWG.dxf",
+    "file_path": "sld-dwg-old/40A Single Phase DB 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/40A Single Phase DB 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 113,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 113,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 113
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "40A Single Phase DB 3 DWG.dxf",
+    "file_path": "sld-dwg-old/40A Single Phase DB 3 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/40A Single Phase DB 3 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "C40A 4P\n     MCB 10KA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "40A 4P RCCB\n(30mA)",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "40A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/40A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/40A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 9
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "80A 4P\nMCB 10kA\nTYPE C",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "40A TPN SLD 3 DWG.dxf",
+    "file_path": "sld-dwg-old/40A TPN SLD 3 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/40A TPN SLD 3 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 7
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 500,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 500,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 500
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "30A TPN \nMCCB 25kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "30A TPN \nMCCB 25kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "E/F (DTL)  : 80A 0.5sec\nO/C (IDMTL): PS 70%\n     500A 0.3 sec",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "0-500A",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "100A TPN \nMCCB 25kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "160A TPN \nMCCB 25kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "125A TPN \nMCCB 25kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "160A TPN \nMCCB 25kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "500A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/500A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/500A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 42
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "63A Single Phase DB 3 DWG.dxf",
+    "file_path": "sld-dwg-old/63A Single Phase DB 3 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/63A Single Phase DB 3 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "single_phase",
+    "kva": 0,
+    "voltage": 230,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 80,
+      "poles": "DP",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 80,
+      "sensitivity_ma": 30,
+      "poles": 2
+    },
+    "busbar": {
+      "rating_a": 80
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "63A Single Phase DB 6 DWG.dxf",
+    "file_path": "sld-dwg-old/63A Single Phase DB 6 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/63A Single Phase DB 6 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "5  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "3  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2  Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "63A TPN SLD 1 DWG.dxf",
+    "file_path": "sld-dwg-old/63A TPN SLD 1 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/63A TPN SLD 1 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 15
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "ELCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "4 Nos 13A TWIN S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A TWIN S/S/O",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "63A TPN SLD 14.dxf",
+    "file_path": "sld-dwg-old/63A TPN SLD 14.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/63A TPN SLD 14.dxf",
+    "dxf_path": "",
+    "circuit_count": 20
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "100A COMB BUSBAR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "100A COMB BUSBAR",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "63A 4P\nMCB 10kA\nTYPE B",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "63A TPN SLD 16 DWG.dxf",
+    "file_path": "sld-dwg-old/63A TPN SLD 16 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/63A TPN SLD 16 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 24
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "6 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A SINGLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "8 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "7 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "63A TPN SLD 8 DWG.dxf",
+    "file_path": "sld-dwg-old/63A TPN SLD 8 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/63A TPN SLD 8 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 21
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "80A 4P \nMCB 10kA \nTYPE B",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2A",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "80A TPN SLD 2 DWG.dxf",
+    "file_path": "sld-dwg-old/80A TPN SLD 2 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/80A TPN SLD 2 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 17
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 40,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 40,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 40
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": 0,
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "Cable Extension SLD 4 DWG.dxf",
+    "file_path": "sld-dwg-old/Cable Extension SLD 4 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/Cable Extension SLD 4 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 15
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 40,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 40,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 40
+    },
+    "sub_circuits": [],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "Cable Extension SLD 5 DWG.dxf",
+    "file_path": "sld-dwg-old/Cable Extension SLD 5 DWG.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/Cable Extension SLD 5 DWG.dxf",
+    "dxf_path": "",
+    "circuit_count": 0
+  },
+  {
+    "supply_type": "three_phase",
+    "kva": 0,
+    "voltage": 400,
+    "main_breaker": {
+      "type": "MCCB",
+      "rating_a": 100,
+      "poles": "TPN",
+      "ka_rating": 10
+    },
+    "elcb": {
+      "type": "RCCB",
+      "rating_a": 100,
+      "sensitivity_ma": 30,
+      "poles": 4
+    },
+    "busbar": {
+      "rating_a": 100
+    },
+    "sub_circuits": [
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "20A \nSPN\nMCB\n6kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "20A \nSPN\nMCB\n6kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "20A \nSPN\nMCB\n6kA",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "2 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      },
+      {
+        "name": "",
+        "breaker_type": "MCB",
+        "breaker_rating": "1 Nos 13A DOUBLE S/S/O",
+        "cable": ""
+      }
+    ],
+    "metering": {
+      "type": "sp_meter"
+    },
+    "filename": "I2R-ETR-NLB-SLD-1.dxf",
+    "file_path": "sld-dwg-old/I2R-ETR-NLB-SLD-1.dxf",
+    "source": "lew_dwg_archive",
+    "dwg_path": "sld-dwg-old/I2R-ETR-NLB-SLD-1.dxf",
+    "dxf_path": "",
+    "circuit_count": 18
+  }
+]

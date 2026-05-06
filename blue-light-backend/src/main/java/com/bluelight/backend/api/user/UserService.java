@@ -64,6 +64,11 @@ public class UserService {
         // LEW 등급 파싱
         LewGrade lewGrade = EnumParser.parseNullable(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
 
+        // Phase 1 (B-2 PDPA): 회사 정보 변경 감지 — LOA/EMA 인쇄 목적의 선택 수집 항목이므로
+        // 변경 발생 시 감사 로그 기록. 변경 없으면 noise 방지 위해 기록 생략.
+        Map<String, String> beforeCompany = snapshotCompanyInfo(user);
+        Map<String, String> afterCompany = snapshotRequestCompanyInfo(request);
+
         user.updateProfile(
                 request.getFirstName(),
                 request.getLastName(),
@@ -76,8 +81,44 @@ public class UserService {
                 request.getCorrespondenceAddress(),
                 request.getCorrespondencePostalCode()
         );
+
+        if (!beforeCompany.equals(afterCompany)) {
+            auditLogService.logAsync(
+                    userSeq, AuditAction.PROFILE_COMPANY_INFO_UPDATED, AuditCategory.DATA_PROTECTION,
+                    "User", String.valueOf(userSeq),
+                    "Company information updated for LOA / EMA licence printing",
+                    beforeCompany, afterCompany,
+                    null, null, "PATCH", "/api/users/me", 200
+            );
+        }
+
         log.info("Profile updated: userSeq={}", userSeq);
         return UserResponse.from(user);
+    }
+
+    /**
+     * Phase 1 B-2: 회사 정보 3필드 스냅샷 (audit log diff 용)
+     */
+    private Map<String, String> snapshotCompanyInfo(User user) {
+        Map<String, String> snap = new LinkedHashMap<>();
+        snap.put("companyName", user.getCompanyName());
+        snap.put("uen", user.getUen());
+        snap.put("designation", user.getDesignation());
+        return snap;
+    }
+
+    private Map<String, String> snapshotRequestCompanyInfo(UpdateProfileRequest request) {
+        Map<String, String> snap = new LinkedHashMap<>();
+        snap.put("companyName", normalizeBlank(request.getCompanyName()));
+        snap.put("uen", normalizeBlank(request.getUen()));
+        snap.put("designation", normalizeBlank(request.getDesignation()));
+        return snap;
+    }
+
+    private static String normalizeBlank(String s) {
+        if (s == null) return null;
+        String trimmed = s.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.file;
 
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.FileEncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,12 +19,25 @@ import java.io.IOException;
 import java.util.UUID;
 
 /**
- * AWS S3 파일 저장 구현체
+ * AWS S3 파일 저장 구현체.
  *
- * file.storage-type=s3 일 때 활성화.
- * - 암호화: S3 SSE-S3 (서버 사이드 암호화) — 앱 레벨 AES-256-GCM 불필요
- * - 인증: IAM Role(EC2/ECS) 또는 AWS CLI 프로파일/환경변수
- * - S3 키 구조: {subDirectory}/{UUID}.{ext} (기존 로컬 경로 패턴 동일)
+ * <p>{@code file.storage-type=s3} 일 때 활성화.</p>
+ *
+ * <h2>암호화 설계 — 이중 방어(defense in depth)</h2>
+ * <ol>
+ *   <li><b>클라이언트 측 AES-256-GCM</b>: {@link FileEncryptionUtil}이 로컬 구현체와
+ *       동일하게 동작. {@code FILE_ENCRYPTION_KEY} 환경변수 하나로 로컬·S3 파일을
+ *       같은 키 체계로 관리한다. 로컬 → S3 마이그레이션 시 재암호화 불필요.</li>
+ *   <li><b>S3 서버 측 SSE-S3</b>: AWS 관리 키로 추가 암호화. 버킷 misconfig로
+ *       공개 노출되는 사고에도 평문이 나가지 않도록 하는 최후 방어선.</li>
+ * </ol>
+ *
+ * <h2>인증</h2>
+ * IAM Role(EC2/ECS) 또는 AWS CLI 프로파일/환경변수 (DefaultCredentialsProvider).
+ *
+ * <h2>S3 키 구조</h2>
+ * {@code {subDirectory}/{UUID}.{ext}} — 로컬 경로 패턴 동일. 마이그레이션 시
+ * {@code file_url} 컬럼 값을 그대로 재사용 가능.
  */
 @Slf4j
 @Service
@@ -32,6 +46,7 @@ import java.util.UUID;
 public class S3FileStorageService implements FileStorageService {
 
     private final S3Client s3Client;
+    private final FileEncryptionUtil fileEncryptionUtil;
 
     @Value("${file.s3.bucket}")
     private String bucket;
@@ -48,16 +63,23 @@ public class S3FileStorageService implements FileStorageService {
             String storedFilename = UUID.randomUUID() + extension;
             String s3Key = subDirectory + "/" + storedFilename;
 
+            byte[] payload = file.getBytes();
+            boolean encrypted = fileEncryptionUtil.isEnabled();
+            if (encrypted) {
+                payload = fileEncryptionUtil.encrypt(payload);
+            }
+
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucket)
                     .key(s3Key)
-                    .serverSideEncryption(ServerSideEncryption.AES256)  // SSE-S3
+                    .serverSideEncryption(ServerSideEncryption.AES256)  // SSE-S3 (defense in depth)
                     .contentType(file.getContentType())
                     .build();
 
-            s3Client.putObject(putRequest, RequestBody.fromBytes(file.getBytes()));
+            s3Client.putObject(putRequest, RequestBody.fromBytes(payload));
 
-            log.info("File stored to S3: {} -> s3://{}/{}", originalFilename, bucket, s3Key);
+            log.info("File stored to S3 ({}): {} -> s3://{}/{}",
+                    encrypted ? "encrypted" : "plaintext", originalFilename, bucket, s3Key);
             return s3Key;
 
         } catch (IOException e) {
@@ -79,15 +101,22 @@ public class S3FileStorageService implements FileStorageService {
             String storedFilename = UUID.randomUUID() + extension;
             String s3Key = subDirectory + "/" + storedFilename;
 
+            byte[] payload = data;
+            boolean encrypted = fileEncryptionUtil.isEnabled();
+            if (encrypted) {
+                payload = fileEncryptionUtil.encrypt(payload);
+            }
+
             PutObjectRequest putRequest = PutObjectRequest.builder()
                     .bucket(bucket)
                     .key(s3Key)
                     .serverSideEncryption(ServerSideEncryption.AES256)
                     .build();
 
-            s3Client.putObject(putRequest, RequestBody.fromBytes(data));
+            s3Client.putObject(putRequest, RequestBody.fromBytes(payload));
 
-            log.info("Bytes stored to S3: {} -> s3://{}/{}", filename, bucket, s3Key);
+            log.info("Bytes stored to S3 ({}): {} -> s3://{}/{}",
+                    encrypted ? "encrypted" : "plaintext", filename, bucket, s3Key);
             return s3Key;
 
         } catch (S3Exception e) {
@@ -105,6 +134,12 @@ public class S3FileStorageService implements FileStorageService {
                     .build();
 
             byte[] data = s3Client.getObjectAsBytes(getRequest).asByteArray();
+
+            // 로컬 구현체와 동일하게, 키가 설정돼 있으면 저장시 암호화된 것으로 간주하고 복호화.
+            if (fileEncryptionUtil.isEnabled()) {
+                data = fileEncryptionUtil.decrypt(data);
+            }
+
             return new ByteArrayResource(data);
 
         } catch (NoSuchKeyException e) {

@@ -3,8 +3,12 @@ package com.bluelight.backend.api.application;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.application.dto.ApplicationSummaryResponse;
+import com.bluelight.backend.api.application.dto.CompanyInfoRequest;
 import com.bluelight.backend.api.application.dto.CreateApplicationRequest;
 import com.bluelight.backend.api.application.dto.UpdateApplicationRequest;
+import com.bluelight.backend.api.audit.AuditLogService;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.api.application.dto.CreateSldRequestDto;
@@ -12,6 +16,11 @@ import com.bluelight.backend.api.application.dto.SldRequestResponse;
 import com.bluelight.backend.api.application.dto.UpdateSldRequestDto;
 import com.bluelight.backend.domain.application.*;
 import com.bluelight.backend.domain.file.FileEntity;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
 import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
 import com.bluelight.backend.domain.payment.PaymentRepository;
@@ -21,6 +30,9 @@ import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
+import com.bluelight.backend.service.application.ApplicantHintValidationResult;
+import com.bluelight.backend.service.application.ApplicantHintValidator;
+import com.bluelight.backend.service.application.NormalizedHints;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,7 +41,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Application service for applicants
@@ -47,15 +61,53 @@ public class ApplicationService {
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
     private final FileRepository fileRepository;
+    private final AuditLogService auditLogService;
+    private final ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
+    /** P1.B — LEW Review Form 신청자 hint 경고 수준 검증. */
+    private final ApplicantHintValidator applicantHintValidator;
+
+    /** Declaration 문서 버전 상수 — 문구가 바뀌면 증가시켜 법적 증거 체인을 분리한다. */
+    private static final String DECLARATION_DOCUMENT_VERSION = "2026-04-declaration-v1";
+
+    /** JIT 스펙에 정의된 Declaration 3개 그룹 consent_type. */
+    private static final String[] DECLARATION_CONSENT_TYPES = {
+            "APPLICATION_DECLARATION_V1_GROUP1",
+            "APPLICATION_DECLARATION_V1_GROUP2",
+            "APPLICATION_DECLARATION_V1_GROUP3"
+    };
 
     /**
-     * Create a new licence application (NEW or RENEWAL)
+     * Create a new licence application (NEW or RENEWAL).
+     * <p>기존 호출부 호환을 위해 래퍼 시그니처(IP/UA 없음)를 함께 제공한다.
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ApplicationResponse createApplication(Long userSeq, CreateApplicationRequest request) {
+        return createApplication(userSeq, request, null, null);
+    }
+
+    /**
+     * Create a new licence application (NEW or RENEWAL).
+     * Declaration 로그를 append하기 위해 IP/UA를 함께 기록한다.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ApplicationResponse createApplication(Long userSeq, CreateApplicationRequest request,
+                                                 String clientIp, String userAgent) {
         // Find user
         User user = userRepository.findById(userSeq)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+
+        // Phase 2 PR#3 — 법인 JIT 회사 정보 처리 (AC-J1~J6)
+        // 같은 @Transactional 안에서 User 업데이트 + Application insert가 함께 커밋된다.
+        applyCorporateJitCompanyInfo(user, request);
+
+        // Phase 5 — "I don't know" 분기.
+        // security-review §6: kvaStatus=UNKNOWN 이면 악의적 selectedKva 값을 무시하고 최저 tier 로 강제.
+        // 현재 master_prices 최저 tier 는 55 kVA (45는 tier 존재하지 않음 — Phase 5 배포 후 버그 발견).
+        // 이 강제 덮어쓰기는 가격 계산(findByKva) 진입 전에 수행해야 안전.
+        boolean kvaUnknown = Boolean.TRUE.equals(request.getKvaUnknown());
+        if (kvaUnknown) {
+            request.setSelectedKva(55);
+        }
 
         // Calculate price from kVA
         MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
@@ -65,11 +117,9 @@ public class ApplicationService {
                         "PRICE_TIER_NOT_FOUND"
                 ));
 
-        // Parse SLD option early (needed for fee calculation)
-        SldOption sldOption = SldOption.SELF_UPLOAD;
-        if ("REQUEST_LEW".equals(request.getSldOption())) {
-            sldOption = SldOption.REQUEST_LEW;
-        }
+        // Parse SLD option early (needed for fee calculation).
+        // P1.4: SUBMIT_WITHIN_3_MONTHS 지원 — 미지정/오타는 SELF_UPLOAD 기본.
+        SldOption sldOption = parseSldOption(request.getSldOption());
 
         // SLD fee: only when REQUEST_LEW
         BigDecimal sldFee = (sldOption == SldOption.REQUEST_LEW)
@@ -147,6 +197,32 @@ public class ApplicationService {
                 // Auto-fill from original
                 existingLicenceNo = originalApp.getLicenseNumber();
                 existingExpiryDate = originalApp.getLicenseExpiryDate();
+
+                // ── P1.4: Renewal 변경 체크박스 서버 검증 (tester [MEDIUM]) ──
+                // 플래그가 false인데 실제 값이 변경되면 악의적 조작 의심 → 400.
+                Boolean companyChangedFlag = request.getRenewalCompanyNameChanged();
+                if (Boolean.FALSE.equals(companyChangedFlag) || companyChangedFlag == null) {
+                    String prevCompany = originalApp.getUser() != null ? originalApp.getUser().getCompanyName() : null;
+                    String curCompany = user.getCompanyName();
+                    if (prevCompany != null && curCompany != null
+                            && !java.util.Objects.equals(prevCompany, curCompany)) {
+                        throw new BusinessException(
+                                "Company name has changed since the previous application. "
+                                + "Please check 'Company name has changed' in the renewal section.",
+                                HttpStatus.BAD_REQUEST, "RENEWAL_COMPANY_CHANGE_UNFLAGGED");
+                    }
+                }
+                Boolean addressChangedFlag = request.getRenewalAddressChanged();
+                if (Boolean.FALSE.equals(addressChangedFlag) || addressChangedFlag == null) {
+                    String prevAddr = originalApp.getAddress();
+                    String curAddr = request.getAddress();
+                    if (prevAddr != null && curAddr != null && !prevAddr.equals(curAddr)) {
+                        throw new BusinessException(
+                                "Installation address has changed since the previous application. "
+                                + "Please check 'Installation address has changed' in the renewal section.",
+                                HttpStatus.BAD_REQUEST, "RENEWAL_ADDRESS_CHANGE_UNFLAGGED");
+                    }
+                }
             } else {
                 // Manual entry
                 existingLicenceNo = request.getExistingLicenceNo();
@@ -168,26 +244,84 @@ public class ApplicationService {
                 .spAccountNo(request.getSpAccountNo())
                 .sldOption(sldOption)
                 .applicationType(appType)
+                .applicantType(request.getApplicantType())
                 .originalApplication(originalApp)
                 .existingLicenceNo(existingLicenceNo)
                 .renewalReferenceNo(renewalReferenceNo)
                 .existingExpiryDate(existingExpiryDate)
                 .renewalPeriodMonths(renewalPeriodMonths)
                 .emaFee(emaFee)
+                // Phase 5: kVA 상태 (UNKNOWN 이면 kvaSource=NULL, 아니면 USER_INPUT)
+                .kvaStatus(kvaUnknown
+                        ? com.bluelight.backend.domain.application.KvaStatus.UNKNOWN
+                        : com.bluelight.backend.domain.application.KvaStatus.CONFIRMED)
+                .kvaSource(kvaUnknown
+                        ? null
+                        : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)
+                // ── P1.2: EMA ELISE 필드 전파 (nullable, JIT) ──
+                .installationName(request.getInstallationName())
+                .premisesType(request.getPremisesType())
+                .isRentalPremises(request.getIsRentalPremises())
+                .landlordEiLicenceNo(
+                        Boolean.TRUE.equals(request.getIsRentalPremises())
+                                ? request.getLandlordEiLicenceNo()
+                                : null)
+                .renewalCompanyNameChanged(request.getRenewalCompanyNameChanged())
+                .renewalAddressChanged(request.getRenewalAddressChanged())
+                .installationAddressBlock(request.getInstallationAddressBlock())
+                .installationAddressUnit(request.getInstallationAddressUnit())
+                .installationAddressStreet(request.getInstallationAddressStreet())
+                .installationAddressBuilding(request.getInstallationAddressBuilding())
+                .installationAddressPostalCode(request.getInstallationAddressPostalCode())
+                .correspondenceAddressBlock(request.getCorrespondenceAddressBlock())
+                .correspondenceAddressUnit(request.getCorrespondenceAddressUnit())
+                .correspondenceAddressStreet(request.getCorrespondenceAddressStreet())
+                .correspondenceAddressBuilding(request.getCorrespondenceAddressBuilding())
+                .correspondenceAddressPostalCode(request.getCorrespondenceAddressPostalCode())
                 .build();
 
-        // 승인된 LEW가 1명이면 자동 할당
-        List<User> approvedLews = userRepository.findByRoleAndApprovedStatus(
-                UserRole.LEW, ApprovalStatus.APPROVED);
-        if (approvedLews.size() == 1) {
-            application.assignLew(approvedLews.get(0));
-            log.info("LEW auto-assigned: lewSeq={}", approvedLews.get(0).getUserSeq());
+        // 승인된 LEW 중 이 신청의 kVA 를 처리 가능한(lewGrade 세팅된) LEW 가 1명이면 자동 할당.
+        // 주의: lewGrade==null 인 LEW 는 admin 의 수동 지정 드롭다운(/api/admin/lews)에서도 제외되므로
+        //       auto-assign 에서도 동일하게 제외해야 두 경로의 "배정 가능한 LEW" 정의가 일치한다.
+        Integer kva = request.getSelectedKva();
+        List<User> eligibleLews = userRepository.findByRoleAndApprovedStatus(
+                UserRole.LEW, ApprovalStatus.APPROVED).stream()
+                .filter(lew -> kva != null && lew.canHandleKva(kva))
+                .toList();
+        if (eligibleLews.size() == 1) {
+            application.assignLew(eligibleLews.get(0));
+            log.info("LEW auto-assigned: lewSeq={}", eligibleLews.get(0).getUserSeq());
         }
+
+        // ── P1.B: 신청자 hint 경고 수준 검증 + 엔티티 반영 ──
+        // Application.builder에 hint를 넣지 않고 save 전에 updateApplicantHints() 호출.
+        // 빌더 파라미터 폭발 억제 + hint 재계산이 변경 시 재사용 가능.
+        ApplicantHintValidationResult hintResult = applicantHintValidator.validateAndNormalize(
+                request.getMsslHint(),
+                request.getSupplyVoltageHint(),
+                request.getConsumerTypeHint(),
+                request.getRetailerHint(),
+                request.getHasGeneratorHint(),
+                request.getGeneratorCapacityHint());
+        NormalizedHints nh = hintResult.getNormalized();
+        application.updateApplicantHints(
+                nh.getMsslEnc(), nh.getMsslHmac(), nh.getMsslLast4(),
+                nh.getSupplyVoltage(), nh.getConsumerType(), nh.getRetailer(),
+                nh.getHasGenerator(), nh.getGeneratorCapacity());
 
         Application saved = applicationRepository.save(application);
         log.info("Application created: seq={}, type={}, userSeq={}, kva={}, amount={}, sldFee={}, sldOption={}",
                 saved.getApplicationSeq(), appType, userSeq,
                 request.getSelectedKva(), quoteAmount, sldFee, sldOption);
+        if (hintResult.hasWarnings()) {
+            log.info("Applicant hint warnings on create: applicationSeq={}, count={}",
+                    saved.getApplicationSeq(), hintResult.getWarnings().size());
+        }
+
+        // C.1: Snapshot-at-submit — Application을 "신청 당시 정본"으로 격상
+        // JIT 결과(applyCorporateJitCompanyInfo)가 User에 반영됐든 persistToProfile=false로 반영 안 됐든
+        // 동일하게 request.companyInfo 우선 → User fallback 순으로 스냅샷 저장.
+        recordApplicationSubmitSnapshot(saved, user, request);
 
         // SLD 요청 시 자동으로 SldRequest 생성
         if (sldOption == SldOption.REQUEST_LEW) {
@@ -199,7 +333,353 @@ public class ApplicationService {
             log.info("SLD request auto-created: applicationSeq={}", saved.getApplicationSeq());
         }
 
-        return ApplicationResponse.from(saved);
+        // ── P1.2: Declaration 3개 그룹을 append-only 로그에 기록 ──
+        // 신청서 제출은 법적 선언에 해당하므로 3개 그룹 각각 한 행씩 불변 기록.
+        recordApplicationDeclarations(saved, user, request, clientIp, userAgent);
+
+        return ApplicationResponse.from(saved).withWarnings(hintResult.getWarnings());
+    }
+
+    /**
+     * C.1 — 신청 Submit 시점에 Application을 "신청 당시 정본"으로 스냅샷.
+     * <p>
+     * 처리 규칙 (감사 리포트 §8 수정 권고 + §9 아키텍처 재정의):
+     * <ul>
+     *   <li>INDIVIDUAL: companyName = 신청자 성명, uen = null, designation = "Owner" 기본값.</li>
+     *   <li>CORPORATE: {@code request.companyInfo}가 있으면 그 값을 우선 사용
+     *       ({@code persistToProfile=false}라서 User에 저장되지 않은 경우도 스냅샷은 기록).
+     *       없으면 User.companyName/uen/designation fallback.</li>
+     *   <li>phone/email은 항상 User에서 읽는다.</li>
+     * </ul>
+     * {@code @Column(updatable=false)}로 인해 두 번째 호출은 no-op.
+     */
+    private void recordApplicationSubmitSnapshot(Application app, User user, CreateApplicationRequest request) {
+        String applicantName = user.getFullName();
+
+        boolean isIndividual = request.getApplicantType() == ApplicantType.INDIVIDUAL;
+
+        String companyName;
+        String uen;
+        String designation;
+
+        if (isIndividual) {
+            // INDIVIDUAL 자동 대체값 (EMA ELISE 양식: 개인은 본인 이름/Owner)
+            companyName = applicantName;
+            uen = null;
+            designation = "Owner";
+        } else {
+            // CORPORATE — request.companyInfo(persistToProfile 무관) > user profile
+            CompanyInfoRequest info = request.getCompanyInfo();
+            if (info != null) {
+                companyName = trimOrNull(info.getCompanyName());
+                uen = trimOrNull(info.getUen());
+                designation = trimOrNull(info.getDesignation());
+            } else {
+                companyName = user.getCompanyName();
+                uen = user.getUen();
+                designation = user.getDesignation();
+            }
+        }
+
+        String phone = user.getPhone();
+        String email = user.getEmail();
+
+        app.recordLoaSnapshot(applicantName, companyName, uen, designation, phone, email);
+    }
+
+    private String trimOrNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    /**
+     * 신청 Submit 시 Declaration 3개 그룹(UX 스펙의 축약 버전)을 application_declaration_logs에 append.
+     * 실패해도 신청 자체는 롤백하지 않고 경고만 남긴다 (법적 추적성과 사용자 경험 사이의 절충).
+     */
+    private void recordApplicationDeclarations(Application saved, User user,
+                                               CreateApplicationRequest request,
+                                               String clientIp, String userAgent) {
+        String formHash = resolveFormHash(request);
+        LocalDateTime now = LocalDateTime.now();
+        for (String consentType : DECLARATION_CONSENT_TYPES) {
+            try {
+                ApplicationDeclarationLog logEntry = ApplicationDeclarationLog.builder()
+                        .application(saved)
+                        .user(user)
+                        .consentType(consentType)
+                        .documentVersion(DECLARATION_DOCUMENT_VERSION)
+                        .formSnapshotHash(formHash)
+                        .ipAddress(truncate(clientIp, 45))
+                        .userAgent(truncate(userAgent, 500))
+                        .declaredAt(now)
+                        .build();
+                applicationDeclarationLogRepository.save(logEntry);
+            } catch (Exception e) {
+                log.warn("Declaration log append failed: applicationSeq={}, consentType={}, err={}",
+                        saved.getApplicationSeq(), consentType, e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * formSnapshotHash 결정. 클라이언트가 전송한 값이 있으면 그대로 쓰고,
+     * 없으면 핵심 필드들을 직렬화해 SHA-256 계산. 둘 다 실패 시 빈 문자열.
+     */
+    private String resolveFormHash(CreateApplicationRequest request) {
+        if (request.getFormSnapshotHash() != null && !request.getFormSnapshotHash().isBlank()) {
+            return request.getFormSnapshotHash();
+        }
+        String serialized = String.join("|",
+                String.valueOf(request.getApplicantType()),
+                String.valueOf(request.getApplicationType()),
+                String.valueOf(request.getSelectedKva()),
+                String.valueOf(request.getSldOption()),
+                String.valueOf(request.getPostalCode()),
+                String.valueOf(request.getAddress()),
+                String.valueOf(request.getInstallationName()),
+                String.valueOf(request.getPremisesType()),
+                String.valueOf(request.getIsRentalPremises()),
+                String.valueOf(request.getRenewalCompanyNameChanged()),
+                String.valueOf(request.getRenewalAddressChanged())
+        );
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            return HexFormat.of().formatHex(md.digest(serialized.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            return "";
+        }
+    }
+
+    private String truncate(String value, int max) {
+        if (value == null) return null;
+        return value.length() <= max ? value : value.substring(0, max);
+    }
+
+    /**
+     * SLD 옵션 파싱 — 3-way enum. 미지정/오타는 SELF_UPLOAD 기본.
+     * Tester 리포트 HIGH 버그 수정: 기존에는 REQUEST_LEW만 인식하고
+     * SUBMIT_WITHIN_3_MONTHS 전송 시 SELF_UPLOAD로 잘못 저장됐다.
+     */
+    private SldOption parseSldOption(String raw) {
+        if (raw == null) return SldOption.SELF_UPLOAD;
+        try {
+            return SldOption.valueOf(raw);
+        } catch (IllegalArgumentException e) {
+            return SldOption.SELF_UPLOAD;
+        }
+    }
+
+    /**
+     * Concierge Manager가 대리 생성하는 Application (★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A).
+     * <p>
+     * Owner = targetApplicant (Application.user). Actor(created_by)는 SecurityContext의
+     * AuditorAware에 의해 Manager로 자동 세팅된다. {@code viaConciergeRequestSeq}는
+     * {@code @Column(updatable=false)}라 INSERT 시점에 Builder로만 주입 가능.
+     * <p>
+     * 검증 로직은 {@link #createApplication}과 동일(JIT 회사 정보, kVA UNKNOWN 강제,
+     * MasterPrice 조회, RENEWAL 전용 검증 등). JIT 회사 정보는 Manager의 것이 아닌
+     * <b>target applicant</b>의 User 레코드에 적용된다.
+     * <p>
+     * ownership 검증(OwnershipValidator)은 {@code originalApplicationSeq}가 있을 때만 수행 —
+     * 이때 "원본 Application 소유자"가 target applicant와 일치해야 함.
+     *
+     * @param targetApplicantSeq     대리 생성 대상 신청자 seq (Application.user가 될 대상)
+     * @param conciergeRequestSeq    연결할 ConciergeRequest seq (via_concierge_request_seq에 기록)
+     * @param request                신청서 본문 (기존 CreateApplicationRequest 재사용)
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ApplicationResponse createOnBehalfOf(Long targetApplicantSeq,
+                                                 Long conciergeRequestSeq,
+                                                 CreateApplicationRequest request) {
+        // Target applicant 조회 (Manager가 대리 소유자로 지정하는 대상)
+        User user = userRepository.findById(targetApplicantSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Target applicant not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+
+        // 법인 JIT (target applicant 기준)
+        applyCorporateJitCompanyInfo(user, request);
+
+        // kVA UNKNOWN 분기 (applicant 경로와 동일)
+        boolean kvaUnknown = Boolean.TRUE.equals(request.getKvaUnknown());
+        if (kvaUnknown) {
+            request.setSelectedKva(55);
+        }
+
+        MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())
+                .orElseThrow(() -> new BusinessException(
+                        "No price tier found for " + request.getSelectedKva() + " kVA",
+                        HttpStatus.BAD_REQUEST, "PRICE_TIER_NOT_FOUND"));
+
+        SldOption sldOption = parseSldOption(request.getSldOption());
+
+        BigDecimal sldFee = (sldOption == SldOption.REQUEST_LEW)
+                ? masterPrice.getSldPrice() : null;
+
+        ApplicationType appType = ApplicationType.NEW;
+        if ("RENEWAL".equals(request.getApplicationType())) {
+            appType = ApplicationType.RENEWAL;
+        }
+
+        Application originalApp = null;
+        String existingLicenceNo = null;
+        String renewalReferenceNo = request.getRenewalReferenceNo();
+        LocalDate existingExpiryDate = null;
+        Integer renewalPeriodMonths = null;
+        BigDecimal emaFee = null;
+
+        if (request.getRenewalPeriodMonths() != null) {
+            renewalPeriodMonths = request.getRenewalPeriodMonths();
+            if (renewalPeriodMonths != 3 && renewalPeriodMonths != 12) {
+                throw new BusinessException(
+                        "Licence period must be 3 or 12 months",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            emaFee = calculateEmaFee(appType, renewalPeriodMonths);
+        }
+
+        BigDecimal tierPrice = (appType == ApplicationType.RENEWAL)
+                ? masterPrice.getRenewalPrice()
+                : masterPrice.getPrice();
+        BigDecimal quoteAmount = tierPrice;
+        if (sldFee != null) {
+            quoteAmount = quoteAmount.add(sldFee);
+        }
+        if (emaFee != null) {
+            quoteAmount = quoteAmount.add(emaFee);
+        }
+
+        if (appType == ApplicationType.RENEWAL) {
+            if (renewalPeriodMonths == null) {
+                throw new BusinessException(
+                        "Licence period is required for renewal",
+                        HttpStatus.BAD_REQUEST, "INVALID_RENEWAL_PERIOD");
+            }
+            if (renewalReferenceNo == null || renewalReferenceNo.isBlank()) {
+                throw new BusinessException(
+                        "Renewal reference number is required",
+                        HttpStatus.BAD_REQUEST, "RENEWAL_REF_REQUIRED");
+            }
+
+            if (request.getOriginalApplicationSeq() != null) {
+                originalApp = applicationRepository.findById(request.getOriginalApplicationSeq())
+                        .orElseThrow(() -> new BusinessException(
+                                "Original application not found",
+                                HttpStatus.NOT_FOUND, "ORIGINAL_APP_NOT_FOUND"));
+
+                // 원본 소유자 == target applicant 여야 함 (Manager가 타인 원본을 끌어쓸 수 없음)
+                OwnershipValidator.validateOwner(
+                    originalApp.getUser().getUserSeq(), targetApplicantSeq);
+
+                if (originalApp.getStatus() != ApplicationStatus.COMPLETED
+                        && originalApp.getStatus() != ApplicationStatus.EXPIRED) {
+                    throw new BusinessException(
+                            "Original application must be completed or expired for renewal",
+                            HttpStatus.BAD_REQUEST, "ORIGINAL_APP_NOT_ELIGIBLE");
+                }
+
+                existingLicenceNo = originalApp.getLicenseNumber();
+                existingExpiryDate = originalApp.getLicenseExpiryDate();
+            } else {
+                existingLicenceNo = request.getExistingLicenceNo();
+                if (request.getExistingExpiryDate() != null && !request.getExistingExpiryDate().isBlank()) {
+                    existingExpiryDate = LocalDate.parse(request.getExistingExpiryDate());
+                }
+            }
+        }
+
+        // Application 빌드 — ★ PR#5 Stage A: viaConciergeRequestSeq 주입
+        Application application = Application.builder()
+                .user(user)
+                .address(request.getAddress())
+                .postalCode(request.getPostalCode())
+                .buildingType(request.getBuildingType())
+                .selectedKva(request.getSelectedKva())
+                .quoteAmount(quoteAmount)
+                .sldFee(sldFee)
+                .spAccountNo(request.getSpAccountNo())
+                .sldOption(sldOption)
+                .applicationType(appType)
+                .applicantType(request.getApplicantType())
+                .originalApplication(originalApp)
+                .existingLicenceNo(existingLicenceNo)
+                .renewalReferenceNo(renewalReferenceNo)
+                .existingExpiryDate(existingExpiryDate)
+                .renewalPeriodMonths(renewalPeriodMonths)
+                .emaFee(emaFee)
+                .kvaStatus(kvaUnknown
+                        ? com.bluelight.backend.domain.application.KvaStatus.UNKNOWN
+                        : com.bluelight.backend.domain.application.KvaStatus.CONFIRMED)
+                .kvaSource(kvaUnknown
+                        ? null
+                        : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)
+                .viaConciergeRequestSeq(conciergeRequestSeq)
+                // ── P1.4: Concierge 대리 생성 경로도 EMA 필드 전파 (tester [HIGH] 수정) ──
+                .installationName(request.getInstallationName())
+                .premisesType(request.getPremisesType())
+                .isRentalPremises(request.getIsRentalPremises())
+                .landlordEiLicenceNo(
+                        Boolean.TRUE.equals(request.getIsRentalPremises())
+                                ? request.getLandlordEiLicenceNo()
+                                : null)
+                .renewalCompanyNameChanged(request.getRenewalCompanyNameChanged())
+                .renewalAddressChanged(request.getRenewalAddressChanged())
+                .installationAddressBlock(request.getInstallationAddressBlock())
+                .installationAddressUnit(request.getInstallationAddressUnit())
+                .installationAddressStreet(request.getInstallationAddressStreet())
+                .installationAddressBuilding(request.getInstallationAddressBuilding())
+                .installationAddressPostalCode(request.getInstallationAddressPostalCode())
+                .correspondenceAddressBlock(request.getCorrespondenceAddressBlock())
+                .correspondenceAddressUnit(request.getCorrespondenceAddressUnit())
+                .correspondenceAddressStreet(request.getCorrespondenceAddressStreet())
+                .correspondenceAddressBuilding(request.getCorrespondenceAddressBuilding())
+                .correspondenceAddressPostalCode(request.getCorrespondenceAddressPostalCode())
+                .build();
+
+        // 승인된 LEW 자동 할당 (applicant 경로와 동일 — kVA 처리 가능한 LEW 만 카운트)
+        Integer kvaForOnBehalf = request.getSelectedKva();
+        List<User> eligibleLewsOnBehalf = userRepository.findByRoleAndApprovedStatus(
+                UserRole.LEW, ApprovalStatus.APPROVED).stream()
+                .filter(lew -> kvaForOnBehalf != null && lew.canHandleKva(kvaForOnBehalf))
+                .toList();
+        if (eligibleLewsOnBehalf.size() == 1) {
+            application.assignLew(eligibleLewsOnBehalf.get(0));
+            log.info("LEW auto-assigned on-behalf: lewSeq={}", eligibleLewsOnBehalf.get(0).getUserSeq());
+        }
+
+        // ── P1.B: Concierge 대리 생성 경로도 동일 hint 검증 + 반영 ──
+        ApplicantHintValidationResult hintResultObo = applicantHintValidator.validateAndNormalize(
+                request.getMsslHint(),
+                request.getSupplyVoltageHint(),
+                request.getConsumerTypeHint(),
+                request.getRetailerHint(),
+                request.getHasGeneratorHint(),
+                request.getGeneratorCapacityHint());
+        NormalizedHints nhObo = hintResultObo.getNormalized();
+        application.updateApplicantHints(
+                nhObo.getMsslEnc(), nhObo.getMsslHmac(), nhObo.getMsslLast4(),
+                nhObo.getSupplyVoltage(), nhObo.getConsumerType(), nhObo.getRetailer(),
+                nhObo.getHasGenerator(), nhObo.getGeneratorCapacity());
+
+        Application saved = applicationRepository.save(application);
+        log.info("Application created ON-BEHALF: seq={}, targetApplicantSeq={}, conciergeRequestSeq={}, type={}, kva={}, amount={}",
+                saved.getApplicationSeq(), targetApplicantSeq, conciergeRequestSeq, appType,
+                request.getSelectedKva(), quoteAmount);
+
+        // C.1: Snapshot-at-submit (Concierge 대리 생성 경로도 동일 로직 적용)
+        recordApplicationSubmitSnapshot(saved, user, request);
+
+        // SLD 요청 자동 생성 (applicant 경로와 동일)
+        if (sldOption == SldOption.REQUEST_LEW) {
+            SldRequest sldRequest = SldRequest.builder()
+                    .application(saved)
+                    .applicantNote(null)
+                    .build();
+            sldRequestRepository.save(sldRequest);
+            log.info("SLD request auto-created on-behalf: applicationSeq={}", saved.getApplicationSeq());
+        }
+
+        return ApplicationResponse.from(saved).withWarnings(hintResultObo.getWarnings());
     }
 
     /**
@@ -265,18 +745,55 @@ public class ApplicationService {
                 quoteAmount, sldFee
         );
 
+        // ── EMA ELISE 5-part 주소 동기화 (재제출 경로) ──
+        // 클라이언트가 5-part 를 송신하면 각 컬럼 덮어쓰기. 송신 안 했으면 기존 값 유지.
+        if (anyInstallationAddressPartPresent(request)) {
+            application.updateInstallationAddressParts(
+                    request.getInstallationAddressBlock(),
+                    request.getInstallationAddressUnit(),
+                    request.getInstallationAddressStreet(),
+                    request.getInstallationAddressBuilding(),
+                    request.getInstallationAddressPostalCode());
+        }
+        if (anyCorrespondenceAddressPartPresent(request)) {
+            application.updateCorrespondenceAddressParts(
+                    request.getCorrespondenceAddressBlock(),
+                    request.getCorrespondenceAddressUnit(),
+                    request.getCorrespondenceAddressStreet(),
+                    request.getCorrespondenceAddressBuilding(),
+                    request.getCorrespondenceAddressPostalCode());
+        }
+
         // SP Account No 수정
         if (request.getSpAccountNo() != null) {
             application.updateSpAccountNo(request.getSpAccountNo());
         }
+
+        // ── P1.B: 재제출 시에도 신청자 hint를 갱신할 수 있다 (스펙 §5·§5.5) ──
+        ApplicantHintValidationResult hintResult = applicantHintValidator.validateAndNormalize(
+                request.getMsslHint(),
+                request.getSupplyVoltageHint(),
+                request.getConsumerTypeHint(),
+                request.getRetailerHint(),
+                request.getHasGeneratorHint(),
+                request.getGeneratorCapacityHint());
+        NormalizedHints nh = hintResult.getNormalized();
+        application.updateApplicantHints(
+                nh.getMsslEnc(), nh.getMsslHmac(), nh.getMsslLast4(),
+                nh.getSupplyVoltage(), nh.getConsumerType(), nh.getRetailer(),
+                nh.getHasGenerator(), nh.getGeneratorCapacity());
 
         // Auto-transition status back to PENDING_REVIEW
         application.resubmit();
 
         log.info("Application updated and resubmitted: applicationSeq={}, userSeq={}",
                 applicationSeq, userSeq);
+        if (hintResult.hasWarnings()) {
+            log.info("Applicant hint warnings on update: applicationSeq={}, count={}",
+                    applicationSeq, hintResult.getWarnings().size());
+        }
 
-        return ApplicationResponse.from(application);
+        return ApplicationResponse.from(application).withWarnings(hintResult.getWarnings());
     }
 
     /**
@@ -464,6 +981,83 @@ public class ApplicationService {
     }
 
     /**
+     * Phase 2 PR#3 — 법인 JIT 회사 정보 적용.
+     *
+     * 규칙:
+     * - applicantType != CORPORATE 이면 no-op (INDIVIDUAL일 때 companyInfo 전송되어도 무시).
+     * - CORPORATE이고 User에 companyName이 이미 있으면 companyInfo 없이도 통과 (모달 없이 제출 케이스).
+     * - CORPORATE이고 User.companyName이 없는데 companyInfo도 누락이면 400 COMPANY_INFO_REQUIRED.
+     * - companyInfo가 주어졌을 때 persistToProfile=true(default)면 User에 저장 + 감사 로그 2건
+     *   (PROFILE_COMPANY_INFO_UPDATED + CORPORATE_INFO_CAPTURED_VIA_JIT).
+     * - persistToProfile=false이면 User는 변경하지 않고 감사 로그 1건만 기록
+     *   (CORPORATE_INFO_CAPTURED_VIA_JIT, metadata.persistToProfile=false).
+     */
+    private void applyCorporateJitCompanyInfo(User user, CreateApplicationRequest request) {
+        if (request.getApplicantType() != ApplicantType.CORPORATE) {
+            return;
+        }
+
+        CompanyInfoRequest info = request.getCompanyInfo();
+        boolean userHasCompany = user.getCompanyName() != null && !user.getCompanyName().isBlank();
+
+        if (info == null) {
+            if (!userHasCompany) {
+                throw new BusinessException(
+                        "Company info is required for corporate applications",
+                        HttpStatus.BAD_REQUEST, "COMPANY_INFO_REQUIRED");
+            }
+            // User에 이미 회사정보가 있음 → JIT 불필요, no-op
+            return;
+        }
+
+        String companyName = info.getCompanyName() == null ? null : info.getCompanyName().trim();
+        String uen = info.getUen() == null ? null : info.getUen().trim();
+        String designation = info.getDesignation() == null ? null : info.getDesignation().trim();
+        boolean persist = info.shouldPersistToProfile();
+
+        Map<String, String> before = new LinkedHashMap<>();
+        before.put("companyName", user.getCompanyName());
+        before.put("uen", user.getUen());
+        before.put("designation", user.getDesignation());
+
+        Map<String, String> after = new LinkedHashMap<>();
+        after.put("companyName", companyName);
+        after.put("uen", uen);
+        after.put("designation", designation);
+
+        if (persist && !before.equals(after)) {
+            user.updateCompanyInfo(companyName, uen, designation);
+            // 기존 프로필 수정 경로와 동일한 감사 이벤트 (Phase 1 B-2와 일관)
+            auditLogService.logAsync(
+                    user.getUserSeq(),
+                    AuditAction.PROFILE_COMPANY_INFO_UPDATED,
+                    AuditCategory.DATA_PROTECTION,
+                    "User", String.valueOf(user.getUserSeq()),
+                    "Company information captured via JIT modal during application submission",
+                    before, after,
+                    null, null, "POST", "/api/applications", 201
+            );
+        }
+
+        // JIT 경로 표식 감사 이벤트 (Security B-2: persistToProfile flag 반드시 기록)
+        Map<String, Object> jitMetadata = new LinkedHashMap<>();
+        jitMetadata.put("persistToProfile", persist);
+        jitMetadata.put("companyName", companyName);
+        jitMetadata.put("uen", uen);
+        jitMetadata.put("designation", designation);
+
+        auditLogService.logAsync(
+                user.getUserSeq(),
+                AuditAction.CORPORATE_INFO_CAPTURED_VIA_JIT,
+                AuditCategory.APPLICATION,
+                "User", String.valueOf(user.getUserSeq()),
+                "Corporate company info captured via JIT modal",
+                null, jitMetadata,
+                null, null, "POST", "/api/applications", 201
+        );
+    }
+
+    /**
      * EMA 수수료 계산
      * - 3개월=$50, 12개월=$100
      */
@@ -472,5 +1066,25 @@ public class ApplicationService {
             return new BigDecimal("50.00");
         }
         return new BigDecimal("100.00");
+    }
+
+    // ── EMA ELISE 5-part 주소 갱신 감지 헬퍼 ──
+    // 하나라도 값이 넘어왔으면 "사용자가 5-part 를 편집함" 으로 간주하고 일괄 덮어쓴다.
+    // 모든 서브필드가 null이면 기존 값을 건드리지 않는다 (legacy 단일 address 만 편집한 케이스).
+
+    private boolean anyInstallationAddressPartPresent(UpdateApplicationRequest request) {
+        return request.getInstallationAddressBlock() != null
+                || request.getInstallationAddressUnit() != null
+                || request.getInstallationAddressStreet() != null
+                || request.getInstallationAddressBuilding() != null
+                || request.getInstallationAddressPostalCode() != null;
+    }
+
+    private boolean anyCorrespondenceAddressPartPresent(UpdateApplicationRequest request) {
+        return request.getCorrespondenceAddressBlock() != null
+                || request.getCorrespondenceAddressUnit() != null
+                || request.getCorrespondenceAddressStreet() != null
+                || request.getCorrespondenceAddressBuilding() != null
+                || request.getCorrespondenceAddressPostalCode() != null;
     }
 }

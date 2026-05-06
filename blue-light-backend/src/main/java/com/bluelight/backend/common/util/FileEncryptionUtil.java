@@ -32,14 +32,27 @@ public class FileEncryptionUtil {
     @Value("${file.encryption-key:}")
     private String encryptionKeyBase64;
 
+    /**
+     * 활성 Spring 프로필. 운영(prod)에서 키 누락 시 기동 실패시키기 위해 사용.
+     * (Phase 2 Security Review B-4)
+     */
+    @Value("${spring.profiles.active:default}")
+    private String activeProfile;
+
     private SecretKeySpec secretKey;
     private boolean enabled;
 
     @PostConstruct
     public void init() {
         if (encryptionKeyBase64 == null || encryptionKeyBase64.isBlank()) {
+            // B-4: prod 프로필에서는 평문 저장 절대 금지 → 기동 실패시킨다.
+            if (isProdProfile(activeProfile)) {
+                throw new IllegalStateException(
+                        "FILE_ENCRYPTION_KEY is required in prod profile. " +
+                        "Set the env var (Base64 AES-256 key) or remove 'prod' from spring.profiles.active.");
+            }
             enabled = false;
-            log.warn("파일 암호화 비활성화: FILE_ENCRYPTION_KEY 미설정");
+            log.warn("파일 암호화 비활성화: FILE_ENCRYPTION_KEY 미설정 (profile={})", activeProfile);
             return;
         }
 
@@ -62,6 +75,18 @@ public class FileEncryptionUtil {
      */
     public boolean isEnabled() {
         return enabled;
+    }
+
+    /**
+     * spring.profiles.active 문자열 안에 "prod"가 포함되어 있는지 검사.
+     * 콤마로 여러 프로필이 지정될 수 있어 split 후 trim 비교한다.
+     */
+    static boolean isProdProfile(String profilesProperty) {
+        if (profilesProperty == null || profilesProperty.isBlank()) return false;
+        for (String token : profilesProperty.split(",")) {
+            if ("prod".equalsIgnoreCase(token.trim())) return true;
+        }
+        return false;
     }
 
     /**

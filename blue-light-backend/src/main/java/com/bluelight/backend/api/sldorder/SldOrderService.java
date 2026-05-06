@@ -48,6 +48,7 @@ public class SldOrderService {
                 .postalCode(request.getPostalCode())
                 .buildingType(request.getBuildingType())
                 .selectedKva(request.getSelectedKva())
+                .ampere(request.getAmpere())
                 .applicantNote(request.getApplicantNote())
                 .build();
 

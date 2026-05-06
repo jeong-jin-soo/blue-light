@@ -1,14 +1,23 @@
 package com.bluelight.backend.config;
 
+import com.bluelight.backend.domain.user.UserRole;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * DB 스키마 마이그레이션 러너
@@ -31,18 +40,156 @@ public class DatabaseMigrationRunner {
 
     private void migrateAll() {
         try (Connection conn = dataSource.getConnection()) {
+            // ★ 새 CREATE TABLE이 schema.sql에 추가되어도 기존 DB에 자동 반영되도록,
+            //   schema.sql의 모든 `CREATE TABLE IF NOT EXISTS` 문을 idempotent 하게 실행.
+            //   ALTER는 기존 migrate*Columns() 메서드들이 계속 담당.
+            syncCreateTablesFromSchemaSql(conn);
             migrateUserNameSplit(conn);
             migrateApplicationsLoaColumns(conn);
+            // sld_option VARCHAR(20) → VARCHAR(40)
+            // SldOption enum에 SUBMIT_WITHIN_3_MONTHS(22자)가 추가되어 기존 컬럼 폭을 초과.
+            // 레거시 DB(dev RDS)가 VARCHAR(20)인 채로 있어 INSERT 시 Data truncation 발생.
+            migrateApplicationsSldOptionWidth(conn);
             migrateSldTemplatesTable(conn);
             migrateSampleFilesTable(conn);
             migrateSampleFilesMultiFile(conn);
             migrateMasterPricesRenewalPrice(conn);
             migrateNotificationsTable(conn);
+            // ★ Kaki Concierge Phase 1 PR#1
+            migrateUsersAccountStatusColumns(conn);
+            migrateAccountSetupTokensTable(conn);
+            // ★ Kaki Concierge Phase 1 PR#1 Stage 2
+            migrateConciergeRequestsTable(conn);
+            migrateConciergeNotesTable(conn);
+            migrateUserConsentLogsTable(conn);
+            // ★ Kaki Concierge Phase 1 PR#1 Stage 3
+            migrateApplicationsLoaSignatureSource(conn);
+            // ★ Kaki Concierge Phase 1 PR#5 Stage A
+            migrateApplicationsViaConciergeColumn(conn);
+            // ★ Kaki Concierge Phase 1 PR#7
+            migratePaymentsReferenceColumns(conn);
+            // files 테이블에 3개 신규 서비스 주문 FK 컬럼 추가
+            migrateFilesServiceOrderColumns(conn);
+            // ★ Expired License Order — files.expired_license_order_seq FK + file_type VARCHAR(40)
+            migrateFilesExpiredLicenseColumn(conn);
+            migrateFilesFileTypeWidth(conn);
+            // ★ Kaki Concierge Phase 1.5 — Quote workflow (통화 후 견적 이메일)
+            migrateConciergeRequestsQuoteColumns(conn);
+            // sld_orders.ampere — 신청자가 주문 시 입력하는 ampere 정보
+            migrateSldOrdersAmpereColumn(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 2 — 방문 일정 예약 컬럼
+            migrateLewServiceOrdersVisitScheduleColumns(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — 체크인/아웃 + 보고서 컬럼
+            migrateLewServiceOrdersVisitColumns(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — revision_comment → revisit_comment rename
+            migrateLewServiceOrdersRevisitRename(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — 상태 enum rename
+            migrateLewServiceOrdersStatusRename(conn);
+            // ★ LEW Service 방문형 리스키닝 PR 3 — visit_photos 테이블
+            createLewServiceVisitPhotosTable(conn);
+            // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
+            migrateApplicationsEmaFields(conn);
+            migrateApplicationDeclarationLogsTable(conn);
+            // ── C.1: Snapshot-at-submit — applications.loa_phone_snapshot, loa_email_snapshot ──
+            migrateApplicationsLoaPhoneEmailSnapshots(conn);
+            // ── LEW Review Form P1.B: applications 테이블에 신청자 hint 8 컬럼 ──
+            migrateApplicationsApplicantHintColumns(conn);
+            // ── 결제 후 kVA 사후 변경 (PR-1) ──
+            // invoices 테이블 status/invalidated_reason/invalidated_at 컬럼 + uk_invoices_payment 제거
+            migrateInvoicesStatusColumns(conn);
+            // ── 결제 후 kVA 사후 변경 (PR-4) ──
+            // kva_adjustment_record 테이블에 settled_at 컬럼 추가 (settlement 마킹 시각)
+            migrateKvaAdjustmentRecordSettledAt(conn);
+            // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md PR-1) ──
+            // syncCreateTablesFromSchemaSql 가 IF NOT EXISTS 로 테이블을 만들지만,
+            // 본 메서드는 명시적 멱등 가드를 두어 신규 테이블의 의도가 코드 리뷰에서 보이도록 한다.
+            migrateManualEmailDispatchesTable(conn);
+            // ── ADMIN Manual Email Dispatch (PR-2): MULTI 컬럼 + 멱등성 해시 보강 ──
+            // PR-1 운영 DB 에 _json + recipient_hash 컬럼이 누락되어 있을 수 있으므로 idempotent ALTER.
+            migrateManualEmailRecipientLists(conn);
+            // ── ADMIN Manual Email Dispatch (PR-4): 인앱 동반 옵션 컬럼 추가 (D4=B) ──
+            // 기존 row 는 default true 로 backfill — PR-1/2/3 동작 변경 없이 인앱 옵션이 뒤늦게 켜진 형태.
+            migrateManualEmailInAppOptionColumn(conn);
+            // ── ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-1 ──
+            // D1=B 다중 역할 정규화: user_roles 테이블 + 기존 users.role 백필.
+            migrateUserRolesTable(conn);
+            // D2=B PaymentMethod enum + offline 기록: payments.payment_method 정정 + 신규 컬럼.
+            migratePaymentsMethodColumns(conn);
+            // D6=A LEW 셀프 할당: concierge_requests.assigned_lew_seq + lew_assigned_at + 인덱스.
+            migrateConciergeRequestsLewAssignment(conn);
             seedSystemSettings(conn);
+            // ── invoice_footer_note 브랜딩 추가 — 운영 DB row 1회 갱신 ──
+            updateInvoiceFooterNoteBranding(conn);
+            // ── Document Number Generator (공통 문서번호 채번) P1.1 + P1.3 ──
+            createDocumentNumberTables(conn);
+            seedDocumentNumberTypes(conn);
+            // ★ Kaki Concierge Phase 1 PR#4 Stage A
+            seedConciergeManager(conn);
+            // role_metadata 싱크 — UserRole enum 값을 테이블에 upsert하고 enum에 없는 row는 삭제
+            syncRoleMetadata(conn);
+            // ★ Soft-deleted 계정 이메일 익명화 백필 (PDPA + uk_users_email 충돌 회피)
+            // User.anonymize() 패치 이전에 삭제된 row는 원본 이메일을 점유하고 있어
+            // 동일 이메일 재가입 시 INSERT가 unique 제약으로 실패한다.
+            backfillDeletedUserEmails(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
             throw new RuntimeException("Database migration failed", e);
+        }
+    }
+
+    /**
+     * schema.sql의 모든 `CREATE TABLE IF NOT EXISTS ...` 문을 idempotent 하게 실행한다.
+     * <p>
+     * 배경: schema.sql에 신규 테이블을 추가할 때마다 DatabaseMigrationRunner에
+     * 별도 {@code migrate*Table()} 메서드를 추가하는 방식은 누락 사고가 반복됨
+     * (예: lew_service_orders, lighting_orders, power_socket_orders, role_metadata).
+     * 이 메서드는 schema.sql 전체를 파싱하여 CREATE TABLE만 재실행하므로
+     * IF NOT EXISTS 덕분에 기존 테이블은 영향 받지 않고 신규 테이블만 자동 생성된다.
+     * <p>
+     * ALTER/프로시저/트리거는 이 메서드가 건드리지 않는다 — 기존 migrate*Columns()
+     * 메서드들이 계속 담당한다.
+     */
+    private void syncCreateTablesFromSchemaSql(Connection conn) {
+        String sql;
+        try (InputStream is = new ClassPathResource("schema.sql").getInputStream()) {
+            sql = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.warn("syncCreateTablesFromSchemaSql: schema.sql read failed — skipping: {}", e.getMessage());
+            return;
+        }
+
+        // 주석(--) 제거 후 ';' 기준으로 문장 분리. 프로시저/트리거가 없으므로 이 단순 분리로 충분.
+        StringBuilder cleaned = new StringBuilder();
+        for (String line : sql.split("\\R")) {
+            String trimmed = line.replaceAll("--.*$", "").trim();
+            if (!trimmed.isEmpty()) cleaned.append(trimmed).append('\n');
+        }
+        String[] statements = cleaned.toString().split(";");
+
+        int created = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String raw : statements) {
+                String s = raw.trim();
+                if (s.isEmpty()) continue;
+                // CREATE TABLE IF NOT EXISTS만 실행 (대소문자 무시, 공백 관대)
+                if (!s.toUpperCase().matches("(?s)^CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+.*")) continue;
+                try {
+                    stmt.executeUpdate(s);
+                    created++;
+                } catch (SQLException e) {
+                    // 이미 다른 스키마/버전이면 warn만 (다음 migration에서 해결)
+                    log.warn("syncCreateTables statement warn: {} — err: {}",
+                        s.substring(0, Math.min(80, s.length())), e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("syncCreateTables statement execution aborted: {}", e.getMessage());
+        }
+        if (created > 0) {
+            log.info("Migration [sync-create-tables]: processed {} CREATE TABLE IF NOT EXISTS statements", created);
+        } else {
+            log.debug("Migration [sync-create-tables]: no statements processed");
         }
     }
 
@@ -110,6 +257,53 @@ public class DatabaseMigrationRunner {
                 "ALTER TABLE applications ADD COLUMN loa_signed_at DATETIME(6) AFTER loa_signature_url"
             );
             log.info("Migration [applications-loa-columns]: added loa_signature_url, loa_signed_at columns");
+        }
+    }
+
+    /**
+     * 마이그레이션: applications.sld_option VARCHAR(20) → VARCHAR(40)
+     * <p>
+     * 배경: SldOption enum에 {@code SUBMIT_WITHIN_3_MONTHS}(22자)가 추가되면서
+     * 기존 컬럼 폭(20)을 초과하여 INSERT 시 MySQL이 Data truncation 에러를 발생.
+     * schema.sql은 신규 DB에 대해 이미 VARCHAR(40)으로 수정되었으나,
+     * 레거시 DB(dev RDS 등)는 ALTER로 확장해야 함.
+     * <p>
+     * 멱등성: information_schema에서 현재 크기를 조회하여 40 미만일 때만 실행.
+     */
+    private void migrateApplicationsSldOptionWidth(Connection conn) throws SQLException {
+        Integer currentSize = getColumnCharLength(conn, "applications", "sld_option");
+        if (currentSize == null) {
+            log.debug("Migration [applications-sld-option-width]: column not found, skipping");
+            return;
+        }
+        if (currentSize >= 40) {
+            log.debug("Migration [applications-sld-option-width]: already {} chars, skipping", currentSize);
+            return;
+        }
+        log.info("Migration [applications-sld-option-width]: widening sld_option {} → 40", currentSize);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications MODIFY COLUMN sld_option VARCHAR(40) DEFAULT 'SELF_UPLOAD'"
+            );
+            log.info("Migration [applications-sld-option-width]: done");
+        }
+    }
+
+    /**
+     * information_schema에서 VARCHAR 컬럼의 문자 길이를 조회한다.
+     * 컬럼이 없으면 null.
+     */
+    private Integer getColumnCharLength(Connection conn, String table, String column) throws SQLException {
+        String sql = "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS " +
+                     "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, table);
+            ps.setString(2, column);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                long len = rs.getLong(1);
+                return rs.wasNull() ? null : (int) len;
+            }
         }
     }
 
@@ -282,6 +476,553 @@ public class DatabaseMigrationRunner {
     }
 
     /**
+     * 마이그레이션: users 테이블에 계정 상태 + 가입 경로 + 동의 스냅샷 컬럼 8종 추가
+     * (★ Kaki Concierge v1.4/v1.5, Phase 1 PR#1)
+     * - status 컬럼 존재 시 스킵 (멱등성)
+     * - 기존 유저는 status=ACTIVE로 backfill, activated_at=created_at 보강
+     */
+    private void migrateUsersAccountStatusColumns(Connection conn) throws SQLException {
+        if (columnExists(conn, "users", "status")) {
+            log.debug("Migration [users-account-status]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [users-account-status]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            // 1. 컬럼 8종 추가 — signature_url 뒤에 순서대로 배치
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' AFTER signature_url"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN activated_at DATETIME(6) AFTER status"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN first_logged_in_at DATETIME(6) AFTER activated_at"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN signup_source VARCHAR(30) NOT NULL DEFAULT 'DIRECT_SIGNUP' AFTER first_logged_in_at"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN signup_consent_at DATETIME(6) AFTER signup_source"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN terms_version VARCHAR(30) AFTER signup_consent_at"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN marketing_opt_in BOOLEAN NOT NULL DEFAULT FALSE AFTER terms_version"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD COLUMN marketing_opt_in_at DATETIME(6) AFTER marketing_opt_in"
+            );
+            log.info("Migration [users-account-status]: added 8 columns");
+
+            // 2. 상태 인덱스 (대시보드 필터링용) — 이미 존재하면 무시
+            try {
+                stmt.executeUpdate("CREATE INDEX idx_users_status ON users (status)");
+                log.info("Migration [users-account-status]: created idx_users_status");
+            } catch (SQLException e) {
+                log.debug("Migration [users-account-status]: idx_users_status already exists, skipping");
+            }
+
+            // 3. Backfill: 기존 유저는 status=ACTIVE (DEFAULT로 이미 설정됐으나 명시적 보강),
+            //    activated_at은 created_at 사용 (기존 유저의 "활성화 시점" 근사값)
+            int updated = stmt.executeUpdate(
+                "UPDATE users SET activated_at = created_at " +
+                "WHERE activated_at IS NULL AND status = 'ACTIVE' AND deleted_at IS NULL"
+            );
+            log.info("Migration [users-account-status]: backfilled activated_at for {} users", updated);
+        }
+    }
+
+    /**
+     * 마이그레이션: account_setup_tokens 테이블 생성
+     * (★ Kaki Concierge v1.5, Phase 1 PR#1)
+     */
+    private void migrateAccountSetupTokensTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "account_setup_tokens")) {
+            log.debug("Migration [account-setup-tokens-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [account-setup-tokens-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE account_setup_tokens (" +
+                "  token_seq             BIGINT       NOT NULL AUTO_INCREMENT," +
+                "  token_uuid            VARCHAR(36)  NOT NULL," +
+                "  user_seq              BIGINT       NOT NULL," +
+                "  source                VARCHAR(40)  NOT NULL," +
+                "  expires_at            DATETIME(6)  NOT NULL," +
+                "  used_at               DATETIME(6)," +
+                "  revoked_at            DATETIME(6)," +
+                "  failed_attempts       INT          NOT NULL DEFAULT 0," +
+                "  locked_at             DATETIME(6)," +
+                "  requesting_ip         VARCHAR(45)," +
+                "  requesting_user_agent VARCHAR(500)," +
+                "  created_at            DATETIME(6)," +
+                "  updated_at            DATETIME(6)," +
+                "  created_by            BIGINT," +
+                "  updated_by            BIGINT," +
+                "  deleted_at            DATETIME(6)," +
+                "  PRIMARY KEY (token_seq)," +
+                "  UNIQUE KEY uk_account_setup_tokens_uuid (token_uuid)," +
+                "  CONSTRAINT fk_account_setup_tokens_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)," +
+                "  INDEX idx_account_setup_tokens_user_active (user_seq, used_at, revoked_at, locked_at, expires_at)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [account-setup-tokens-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: concierge_requests 테이블 생성
+     * (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 2)
+     * 화이트글러브 대행 서비스 신청 + 상태 머신 + 동의 4종 타임스탬프 포함
+     */
+    private void migrateConciergeRequestsTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "concierge_requests")) {
+            log.debug("Migration [concierge-requests-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [concierge-requests-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE concierge_requests (" +
+                "  concierge_request_seq    BIGINT        NOT NULL AUTO_INCREMENT," +
+                "  public_code              VARCHAR(20)   NOT NULL," +
+                "  submitter_name           VARCHAR(100)  NOT NULL," +
+                "  submitter_email          VARCHAR(100)  NOT NULL," +
+                "  submitter_phone          VARCHAR(20)   NOT NULL," +
+                "  memo                     VARCHAR(2000)," +
+                "  applicant_user_seq       BIGINT        NOT NULL," +
+                "  assigned_manager_seq     BIGINT," +
+                "  application_seq          BIGINT," +
+                "  payment_seq              BIGINT," +
+                "  status                   VARCHAR(40)   NOT NULL DEFAULT 'SUBMITTED'," +
+                "  pdpa_consent_at          DATETIME(6)   NOT NULL," +
+                "  terms_consent_at         DATETIME(6)   NOT NULL," +
+                "  signup_consent_at        DATETIME(6)   NOT NULL," +
+                "  delegation_consent_at    DATETIME(6)   NOT NULL," +
+                "  marketing_opt_in         BOOLEAN       NOT NULL DEFAULT FALSE," +
+                "  assigned_at              DATETIME(6)," +
+                "  first_contact_at         DATETIME(6)," +
+                "  application_created_at   DATETIME(6)," +
+                "  loa_requested_at         DATETIME(6)," +
+                "  loa_signed_at            DATETIME(6)," +
+                "  licence_paid_at          DATETIME(6)," +
+                "  completed_at             DATETIME(6)," +
+                "  cancelled_at             DATETIME(6)," +
+                "  cancellation_reason      VARCHAR(500)," +
+                "  version                  BIGINT        NOT NULL DEFAULT 0," +
+                "  created_at               DATETIME(6)," +
+                "  updated_at               DATETIME(6)," +
+                "  created_by               BIGINT," +
+                "  updated_by               BIGINT," +
+                "  deleted_at               DATETIME(6)," +
+                "  PRIMARY KEY (concierge_request_seq)," +
+                "  UNIQUE KEY uk_concierge_public_code (public_code)," +
+                "  CONSTRAINT fk_concierge_applicant FOREIGN KEY (applicant_user_seq) REFERENCES users (user_seq)," +
+                "  CONSTRAINT fk_concierge_manager FOREIGN KEY (assigned_manager_seq) REFERENCES users (user_seq)," +
+                "  INDEX idx_concierge_status (status)," +
+                "  INDEX idx_concierge_assigned (assigned_manager_seq, status)," +
+                "  INDEX idx_concierge_submitter_email (submitter_email)," +
+                "  INDEX idx_concierge_created (created_at)," +
+                "  INDEX idx_concierge_applicant_user (applicant_user_seq)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [concierge-requests-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: concierge_notes 테이블 생성
+     * (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 2)
+     */
+    private void migrateConciergeNotesTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "concierge_notes")) {
+            log.debug("Migration [concierge-notes-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [concierge-notes-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE concierge_notes (" +
+                "  concierge_note_seq       BIGINT        NOT NULL AUTO_INCREMENT," +
+                "  concierge_request_seq    BIGINT        NOT NULL," +
+                "  author_user_seq          BIGINT        NOT NULL," +
+                "  channel                  VARCHAR(20)   NOT NULL," +
+                "  content                  VARCHAR(2000) NOT NULL," +
+                "  created_at               DATETIME(6)," +
+                "  updated_at               DATETIME(6)," +
+                "  created_by               BIGINT," +
+                "  updated_by               BIGINT," +
+                "  deleted_at               DATETIME(6)," +
+                "  PRIMARY KEY (concierge_note_seq)," +
+                "  CONSTRAINT fk_concierge_note_request FOREIGN KEY (concierge_request_seq) REFERENCES concierge_requests (concierge_request_seq)," +
+                "  CONSTRAINT fk_concierge_note_author FOREIGN KEY (author_user_seq) REFERENCES users (user_seq)," +
+                "  INDEX idx_concierge_note_request (concierge_request_seq, created_at)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [concierge-notes-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: user_consent_logs 테이블 생성
+     * (★ Kaki Concierge v1.3, Phase 1 PR#1 Stage 2)
+     * PDPA 7년 보존 요건 — soft delete 미적용, 모든 필드 불변
+     */
+    private void migrateUserConsentLogsTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "user_consent_logs")) {
+            log.debug("Migration [user-consent-logs-table]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [user-consent-logs-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE user_consent_logs (" +
+                "  consent_log_seq          BIGINT        NOT NULL AUTO_INCREMENT," +
+                "  user_seq                 BIGINT        NOT NULL," +
+                "  consent_type             VARCHAR(40)   NOT NULL," +
+                "  action                   VARCHAR(20)   NOT NULL," +
+                "  document_version         VARCHAR(30)," +
+                "  source_context           VARCHAR(40)   NOT NULL," +
+                "  ip_address               VARCHAR(45)," +
+                "  user_agent               VARCHAR(500)," +
+                "  created_at               DATETIME(6)   NOT NULL," +
+                "  PRIMARY KEY (consent_log_seq)," +
+                "  CONSTRAINT fk_consent_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)," +
+                "  INDEX idx_consent_log_user_type (user_seq, consent_type, created_at)," +
+                "  INDEX idx_consent_log_created (created_at)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [user-consent-logs-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: applications 테이블에 LOA 서명 출처 컬럼 4종 추가
+     * (★ Kaki Concierge v1.5, Phase 1 PR#1 Stage 3)
+     * <p>
+     * PRD §3.4a / §7.2.1-LOA 3-경로 모델 (APPLICANT_DIRECT / MANAGER_UPLOAD / REMOTE_LINK).
+     * - loa_signature_source 컬럼 존재 시 스킵 (멱등성)
+     * - 4개 ALTER TABLE + FK 제약 1개 (이미 존재 시 try-catch)
+     */
+    private void migrateApplicationsLoaSignatureSource(Connection conn) throws SQLException {
+        if (columnExists(conn, "applications", "loa_signature_source")) {
+            log.debug("Migration [applications-loa-signature-source]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [applications-loa-signature-source]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN loa_signature_source VARCHAR(30) AFTER loa_signed_at"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN loa_signature_uploaded_by BIGINT AFTER loa_signature_source"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN loa_signature_uploaded_at DATETIME(6) AFTER loa_signature_uploaded_by"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN loa_signature_source_memo VARCHAR(500) AFTER loa_signature_uploaded_at"
+            );
+            log.info("Migration [applications-loa-signature-source]: added 4 columns");
+
+            // FK 제약 — 이미 존재 시 무시
+            try {
+                stmt.executeUpdate(
+                    "ALTER TABLE applications ADD CONSTRAINT fk_applications_loa_uploader " +
+                    "FOREIGN KEY (loa_signature_uploaded_by) REFERENCES users (user_seq)"
+                );
+                log.info("Migration [applications-loa-signature-source]: added FK fk_applications_loa_uploader");
+            } catch (SQLException e) {
+                log.debug("Migration [applications-loa-signature-source]: FK fk_applications_loa_uploader already exists, skipping");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: applications 테이블에 Concierge 대리 생성 연결 컬럼 추가
+     * (★ Kaki Concierge v1.5, Phase 1 PR#5 Stage A)
+     * <p>
+     * Manager가 대리 생성한 Application은 {@code via_concierge_request_seq}에 해당
+     * ConciergeRequest.seq를 기록. APPLICANT 직접 신청은 null. FK는 걸지 않음
+     * (concierge_requests soft-delete와 상호작용 회피, 인덱스만).
+     */
+    /**
+     * 마이그레이션: files 테이블에 lighting_order_seq / power_socket_order_seq /
+     * lew_service_order_seq 컬럼 + 인덱스 추가.
+     * 3개 신규 서비스 주문(Lighting / Power Socket / LEW Service)의 스케치 업로드
+     * 기능이 sld_order_seq와 동일한 방식으로 FileEntity를 참조하게 한다.
+     */
+    private void migrateFilesServiceOrderColumns(Connection conn) throws SQLException {
+        String[][] cols = {
+            {"lighting_order_seq",     "sld_order_seq",          "idx_files_lighting_order_seq"},
+            {"power_socket_order_seq", "lighting_order_seq",     "idx_files_power_socket_order_seq"},
+            {"lew_service_order_seq",  "power_socket_order_seq", "idx_files_lew_service_order_seq"},
+        };
+        for (String[] col : cols) {
+            String columnName = col[0];
+            String afterColumn = col[1];
+            String indexName = col[2];
+            if (columnExists(conn, "files", columnName)) {
+                continue;
+            }
+            log.info("Migration [files-service-order]: adding {}", columnName);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE files ADD COLUMN " + columnName + " BIGINT AFTER " + afterColumn
+                );
+                try {
+                    stmt.executeUpdate("CREATE INDEX " + indexName + " ON files (" + columnName + ")");
+                } catch (SQLException ignore) {
+                    log.debug("Migration [files-service-order]: {} already exists", indexName);
+                }
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: files 테이블에 expired_license_order_seq 컬럼 + 인덱스 추가.
+     */
+    private void migrateFilesExpiredLicenseColumn(Connection conn) throws SQLException {
+        if (columnExists(conn, "files", "expired_license_order_seq")) {
+            log.debug("Migration [files-expired-license]: already applied, skipping");
+            return;
+        }
+        log.info("Migration [files-expired-license]: adding expired_license_order_seq");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE files ADD COLUMN expired_license_order_seq BIGINT AFTER lew_service_order_seq"
+            );
+            try {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_files_expired_license_order_seq ON files (expired_license_order_seq)"
+                );
+            } catch (SQLException ignore) {
+                log.debug("Migration [files-expired-license]: index already exists");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: files.file_type VARCHAR(30) → VARCHAR(40)
+     * <p>Expired License 관련 enum 값이 30자에 근접 (EXPIRED_LICENSE_SUPPORTING_DOC = 30자) 하여
+     * 향후 확장성 확보를 위해 40으로 확대. 멱등성 보장.
+     */
+    private void migrateFilesFileTypeWidth(Connection conn) throws SQLException {
+        Integer currentSize = getColumnCharLength(conn, "files", "file_type");
+        if (currentSize == null) {
+            log.debug("Migration [files-file-type-width]: column not found, skipping");
+            return;
+        }
+        if (currentSize >= 40) {
+            log.debug("Migration [files-file-type-width]: already {} chars, skipping", currentSize);
+            return;
+        }
+        log.info("Migration [files-file-type-width]: widening file_type {} → 40", currentSize);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE files MODIFY COLUMN file_type VARCHAR(40) NOT NULL"
+            );
+            log.info("Migration [files-file-type-width]: done");
+        }
+    }
+
+    private void migrateApplicationsViaConciergeColumn(Connection conn) throws SQLException {
+        if (columnExists(conn, "applications", "via_concierge_request_seq")) {
+            log.debug("Migration [applications-via-concierge]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [applications-via-concierge]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN via_concierge_request_seq BIGINT " +
+                "AFTER loa_signature_source_memo"
+            );
+            log.info("Migration [applications-via-concierge]: added via_concierge_request_seq column");
+
+            try {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_applications_concierge ON applications (via_concierge_request_seq)"
+                );
+                log.info("Migration [applications-via-concierge]: created idx_applications_concierge");
+            } catch (SQLException e) {
+                log.debug("Migration [applications-via-concierge]: idx_applications_concierge already exists, skipping");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: payments 테이블에 reference_type/reference_seq 컬럼 추가 + application_seq nullable 전환
+     * (★ Kaki Concierge v1.5, Phase 1 PR#7)
+     * <p>
+     * 전환 순서 (안전성 우선):
+     * <ol>
+     *   <li>reference_type, reference_seq 컬럼 추가 (nullable)</li>
+     *   <li>기존 데이터 backfill: reference_type='APPLICATION', reference_seq=application_seq</li>
+     *   <li>NOT NULL 제약 전환</li>
+     *   <li>application_seq를 nullable로 완화 (Phase 2에서 CONCIERGE_REQUEST 결제는 NULL)</li>
+     *   <li>복합 인덱스 idx_payment_reference 생성</li>
+     * </ol>
+     */
+    private void migratePaymentsReferenceColumns(Connection conn) throws SQLException {
+        if (columnExists(conn, "payments", "reference_type")) {
+            log.debug("Migration [payments-reference]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [payments-reference]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            // 1. 컬럼 2종 추가 (우선 nullable)
+            stmt.executeUpdate(
+                "ALTER TABLE payments ADD COLUMN reference_type VARCHAR(30) " +
+                "DEFAULT 'APPLICATION' AFTER application_seq"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE payments ADD COLUMN reference_seq BIGINT AFTER reference_type"
+            );
+            log.info("Migration [payments-reference]: added reference_type, reference_seq columns");
+
+            // 2. Backfill: 기존 Payment는 모두 APPLICATION 결제
+            int updated = stmt.executeUpdate(
+                "UPDATE payments " +
+                "SET reference_type = 'APPLICATION', reference_seq = application_seq " +
+                "WHERE reference_seq IS NULL AND application_seq IS NOT NULL"
+            );
+            log.info("Migration [payments-reference]: backfilled {} existing payment rows", updated);
+
+            // 3. NOT NULL 제약 강화
+            stmt.executeUpdate(
+                "ALTER TABLE payments MODIFY COLUMN reference_type VARCHAR(30) NOT NULL"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE payments MODIFY COLUMN reference_seq BIGINT NOT NULL"
+            );
+
+            // 4. application_seq nullable 전환 (Phase 2 CONCIERGE_REQUEST 결제 대비)
+            stmt.executeUpdate(
+                "ALTER TABLE payments MODIFY COLUMN application_seq BIGINT"
+            );
+            log.info("Migration [payments-reference]: relaxed application_seq to nullable");
+
+            // 5. 복합 인덱스 (이미 존재 시 무시)
+            try {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_payment_reference ON payments (reference_type, reference_seq)"
+                );
+                log.info("Migration [payments-reference]: created idx_payment_reference");
+            } catch (SQLException e) {
+                log.debug("Migration [payments-reference]: idx_payment_reference already exists, skipping");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: concierge_requests 에 견적 워크플로 컬럼 추가
+     * (★ Kaki Concierge Phase 1.5 — 통화 후 이메일 견적 발송)
+     * <p>
+     * 추가 컬럼:
+     * - call_scheduled_at: 통화에서 합의한 미팅/후속 약속 일정
+     * - quoted_amount: 컨시어지 서비스 수수료 (매니저가 통화 후 확정)
+     * - quote_sent_at: 견적 이메일 발송 타임스탬프
+     * - verification_phrase: 피싱 방지용 4단어 토큰 (생성 시 세팅, 이메일·통화에 노출)
+     */
+    private void migrateConciergeRequestsQuoteColumns(Connection conn) throws SQLException {
+        if (columnExists(conn, "concierge_requests", "quoted_amount")) {
+            log.debug("Migration [concierge-requests-quote]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [concierge-requests-quote]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            if (!columnExists(conn, "concierge_requests", "call_scheduled_at")) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN call_scheduled_at DATETIME(6) AFTER cancellation_reason"
+                );
+            }
+            stmt.executeUpdate(
+                "ALTER TABLE concierge_requests ADD COLUMN quoted_amount DECIMAL(10,2) AFTER call_scheduled_at"
+            );
+            stmt.executeUpdate(
+                "ALTER TABLE concierge_requests ADD COLUMN quote_sent_at DATETIME(6) AFTER quoted_amount"
+            );
+            if (!columnExists(conn, "concierge_requests", "verification_phrase")) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN verification_phrase VARCHAR(60) AFTER quote_sent_at"
+                );
+            }
+            log.info("Migration [concierge-requests-quote]: added 4 columns");
+        }
+    }
+
+    /**
+     * sld_orders.ampere — 신청자가 주문 시 선택적으로 입력하는 암페어 값 (VARCHAR, 단위 자유입력).
+     */
+    private void migrateSldOrdersAmpereColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "sld_orders")) {
+            log.debug("Migration [sld-orders-ampere]: sld_orders table not found, skipping");
+            return;
+        }
+        if (columnExists(conn, "sld_orders", "ampere")) {
+            log.debug("Migration [sld-orders-ampere]: already applied, skipping");
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE sld_orders ADD COLUMN ampere VARCHAR(30) AFTER selected_kva"
+            );
+            log.info("Migration [sld-orders-ampere]: added ampere column");
+        }
+    }
+
+    /**
+     * 마이그레이션: lew_service_orders 에 방문 일정 예약 컬럼 2종 추가
+     * (★ LEW Service 방문형 리스키닝 PR 2)
+     * <p>
+     * 추가 컬럼:
+     * - visit_scheduled_at: 합의된 방문 예정 일시
+     * - visit_schedule_note: 방문 일정 관련 메모 (도어벨 고장 등)
+     * <p>
+     * 상태 전이는 변경하지 않음 — 기존 row 는 NULL 로 두고 무해하게 동작.
+     */
+    private void migrateLewServiceOrdersVisitScheduleColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) {
+            log.debug("Migration [lew-service-visit-schedule]: lew_service_orders table not found, skipping");
+            return;
+        }
+        boolean hasScheduledAt = columnExists(conn, "lew_service_orders", "visit_scheduled_at");
+        boolean hasScheduleNote = columnExists(conn, "lew_service_orders", "visit_schedule_note");
+        if (hasScheduledAt && hasScheduleNote) {
+            log.debug("Migration [lew-service-visit-schedule]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [lew-service-visit-schedule]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            if (!hasScheduledAt) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN visit_scheduled_at DATETIME(6) NULL AFTER revision_comment"
+                );
+                log.info("Migration [lew-service-visit-schedule]: added visit_scheduled_at column");
+            }
+            if (!hasScheduleNote) {
+                String after = hasScheduledAt ? "revision_comment" : "visit_scheduled_at";
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN visit_schedule_note TEXT NULL AFTER " + after
+                );
+                log.info("Migration [lew-service-visit-schedule]: added visit_schedule_note column");
+            }
+        }
+    }
+
+    /**
      * 시드 데이터: SQL_INIT_MODE=never 환경에서 data.sql이 실행되지 않으므로
      * 필수 system_settings 초기값을 여기서 INSERT (이미 존재하면 스킵)
      */
@@ -291,6 +1032,32 @@ public class DatabaseMigrationRunner {
             {"sld_ai_generation_enabled", "true", "Enable AI-powered SLD generation"},
             {"chat_system_prompt", "", "AI Chatbot system prompt"},
             {"sld_system_prompt", "", "AI SLD generation system prompt"},
+
+            // ── E-Invoice 회사/결제 정보 (invoice-spec.md §3) ──
+            {"invoice_company_name", "HanVision holdings Private Ltd.", "E-Invoice company name"},
+            {"invoice_company_alias", "Licensekaki", "E-Invoice company brand alias"},
+            {"invoice_company_uen", "202627777H", "E-Invoice company UEN"},
+            {"invoice_company_address_line1", "12 WOODLANDS SQUARE", "E-Invoice company address line 1"},
+            {"invoice_company_address_line2", "#13-79 WOODS SQUARE TOWER ONE,", "E-Invoice company address line 2"},
+            {"invoice_company_address_line3", "SINGAPORE 737715", "E-Invoice company address line 3"},
+            {"invoice_company_email", "Admin@licensekaki.com", "E-Invoice company email"},
+            {"invoice_company_website", "Licensekaki.com", "E-Invoice company website"},
+            {"invoice_paynow_uen", "202627777H", "E-Invoice PayNow UEN"},
+            {"invoice_paynow_qr_file_seq", "", "E-Invoice PayNow QR FileEntity seq (empty = not configured)"},
+            // @Deprecated 2026-04: DocumentNumberService로 대체됨. Phase 2에서 row 제거 예정.
+            {"invoice_number_prefix", "IN", "[DEPRECATED 2026-04] Replaced by DocumentNumberService — see document-number-generator-spec.md"},
+            {"invoice_currency", "SGD", "E-Invoice default currency"},
+            {"invoice_footer_note",
+             "LicenseKaki by HanVision · No electronic signature is necessary, as this document serves as an official E-Invoice.",
+             "E-Invoice footer note"},
+
+            // ── ADMIN Manual Email Dispatch (admin-manual-email-spec.md §13.3) — PR-4 ──
+            // D5=B: ADMIN 1인당 일 발송 한도. SGT 자정 기준 윈도우. SYSTEM_ADMIN 도 동일 cap (감사·운영 일관성).
+            {"admin_manual_email_daily_cap", "100",
+             "Daily manual email recipient cap per ADMIN (resets at 00:00 SGT)"},
+            // D4=B (스펙 §13.3): Compose UI 카테고리 추천 드롭다운 옵션 (CSV). 자유 입력은 항상 허용.
+            {"admin_manual_email_category_suggestions", "PAYMENT_NOTICE,MAINTENANCE,INFO,MISC",
+             "Comma-separated category tag suggestions for manual email Compose UI"},
         };
 
         int seeded = 0;
@@ -319,12 +1086,997 @@ public class DatabaseMigrationRunner {
     }
 
     /**
+     * 운영 DB의 invoice_footer_note row에 "LicenseKaki by HanVision · " 브랜딩 prefix를 1회 추가.
+     * seedSystemSettings()는 INSERT IGNORE 패턴이라 기존 row 갱신을 못 한다 — 별도 idempotent UPDATE.
+     * 이미 "LicenseKaki by HanVision"이 포함된 row는 건드리지 않으므로 여러 번 실행해도 안전.
+     */
+    private void updateInvoiceFooterNoteBranding(Connection conn) throws SQLException {
+        final String oldValue = "No electronic signature is necessary, as this document serves as an official E-Invoice.";
+        final String newValue = "LicenseKaki by HanVision · " + oldValue;
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE system_settings SET setting_value = ? "
+                        + "WHERE setting_key = 'invoice_footer_note' AND setting_value = ?")) {
+            ps.setString(1, newValue);
+            ps.setString(2, oldValue);
+            int updated = ps.executeUpdate();
+            if (updated > 0) {
+                log.info("Migration [invoice-footer-branding]: updated invoice_footer_note ({} row).", updated);
+            }
+        }
+    }
+
+    // ===================================================================
+    // Document Number Generator (공통 문서번호 채번 엔진)
+    // 스펙: doc/Project Analysis/document-number-generator-spec.md
+    // ===================================================================
+
+    /**
+     * 문서번호 관련 테이블 생성 (멱등). schema.sql 시드와 동일한 DDL을 런타임에도 실행하여,
+     * SQL_INIT_MODE=never 환경(운영 DB) 대응.
+     */
+    private void createDocumentNumberTables(Connection conn) throws SQLException {
+        final String createTypes = """
+                CREATE TABLE IF NOT EXISTS document_number_types (
+                    code            VARCHAR(40)   NOT NULL,
+                    prefix          VARCHAR(10)   NOT NULL,
+                    label_ko        VARCHAR(120)  NOT NULL,
+                    label_en        VARCHAR(120)  NOT NULL,
+                    description     VARCHAR(500),
+                    active          BOOLEAN       NOT NULL DEFAULT TRUE,
+                    display_order   INT           NOT NULL DEFAULT 0,
+                    created_at      DATETIME(6),
+                    updated_at      DATETIME(6),
+                    created_by      BIGINT,
+                    updated_by      BIGINT,
+                    deleted_at      DATETIME(6),
+                    PRIMARY KEY (code),
+                    UNIQUE KEY uk_document_number_types_prefix (prefix),
+                    CONSTRAINT ck_docnumtypes_prefix_fmt CHECK (prefix REGEXP '^[A-Z]{2,5}$'),
+                    CONSTRAINT ck_docnumtypes_code_fmt   CHECK (code REGEXP '^[A-Z_]{3,40}$')
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """;
+
+        final String createSequence = """
+                CREATE TABLE IF NOT EXISTS document_number_sequence (
+                    doc_type_code    VARCHAR(40)   NOT NULL,
+                    issue_date       DATE          NOT NULL,
+                    next_value       INT           NOT NULL DEFAULT 1,
+                    last_issued_at   DATETIME(6),
+                    last_issued_by   BIGINT,
+                    created_at       DATETIME(6),
+                    updated_at       DATETIME(6),
+                    PRIMARY KEY (doc_type_code, issue_date),
+                    CONSTRAINT fk_docnumseq_type FOREIGN KEY (doc_type_code)
+                        REFERENCES document_number_types (code)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+                """;
+
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(createTypes);
+            stmt.executeUpdate(createSequence);
+            log.debug("Migration [document-number-tables]: verified (idempotent)");
+        }
+    }
+
+    /**
+     * 문서 타입 카탈로그 시드 — P1에서는 RECEIPT 하나만. Phase 2에서 Admin UI를 통해 확장.
+     * 멱등성: 이미 존재하면 스킵.
+     */
+    private void seedDocumentNumberTypes(Connection conn) throws SQLException {
+        // {code, prefix, label_ko, label_en, description, display_order}
+        final String[][] types = {
+            {"RECEIPT", "RCP", "영수증", "Receipt",
+             "결제 영수증 (E-Invoice) — 기존 Invoice 엔티티의 번호 생성에 사용", "10"},
+        };
+
+        int seeded = 0;
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM document_number_types WHERE code = ?");
+             PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO document_number_types "
+              + "(code, prefix, label_ko, label_en, description, active, display_order, created_at, updated_at) "
+              + "VALUES (?, ?, ?, ?, ?, TRUE, ?, NOW(), NOW())")) {
+
+            for (String[] t : types) {
+                check.setString(1, t[0]);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) continue;
+                }
+                insert.setString(1, t[0]);
+                insert.setString(2, t[1]);
+                insert.setString(3, t[2]);
+                insert.setString(4, t[3]);
+                insert.setString(5, t[4]);
+                insert.setInt(6, Integer.parseInt(t[5]));
+                insert.executeUpdate();
+                seeded++;
+            }
+        }
+        if (seeded > 0) {
+            log.info("Migration [seed-document-number-types]: seeded {} new types", seeded);
+        } else {
+            log.debug("Migration [seed-document-number-types]: all types exist, skipping");
+        }
+    }
+
+    /**
+     * 시드 데이터: CONCIERGE_MANAGER 계정 (★ Kaki Concierge Phase 1 PR#4 Stage A).
+     * SQL_INIT_MODE=never 환경 대응 — data.sql이 실행되지 않을 때 여기서 INSERT.
+     * 이미 존재하면 스킵 (멱등성).
+     * <p>
+     * 이메일: conciergemanager@licensekaki.sg / Password: admin1234 (BCrypt)
+     */
+    private void seedConciergeManager(Connection conn) throws SQLException {
+        final String email = "conciergemanager@licensekaki.sg";
+        // admin1234 BCrypt 해시 (다른 seed 계정과 동일)
+        final String passwordHash = "$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW";
+
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM users WHERE email = ?")) {
+            check.setString(1, email);
+            try (ResultSet rs = check.executeQuery()) {
+                if (rs.next()) {
+                    log.debug("Migration [seed-concierge-manager]: account exists, skipping");
+                    return;
+                }
+            }
+        }
+
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO users (email, password, first_name, last_name, phone, role, " +
+                "status, signup_source, email_verified, created_at, updated_at) " +
+                "VALUES (?, ?, 'Concierge', 'Manager', '+65-0000-0003', 'CONCIERGE_MANAGER', " +
+                "'ACTIVE', 'DIRECT_SIGNUP', TRUE, NOW(6), NOW(6))")) {
+            ps.setString(1, email);
+            ps.setString(2, passwordHash);
+            ps.executeUpdate();
+            log.info("Migration [seed-concierge-manager]: created seed account {}", email);
+        }
+    }
+
+    /**
+     * role_metadata 싱크:
+     * - UserRole enum 값 중 테이블에 없는 것은 기본값으로 INSERT (멱등)
+     * - 테이블에 있으나 enum에 없는 row 는 DELETE (enum 이 축소된 경우 정리)
+     * - 기존 row 는 sysadmin 이 수정한 값이 있을 수 있으므로 건드리지 않음
+     */
+    private void syncRoleMetadata(Connection conn) throws SQLException {
+        if (!tableExists(conn, "role_metadata")) {
+            log.warn("Migration [sync-role-metadata]: role_metadata table not found, skipping");
+            return;
+        }
+
+        // 기본값: (label, assignable, filterable, sortOrder)
+        // ADMIN/SYSTEM_ADMIN 은 UI 에서 assign 불가. SYSTEM_ADMIN 은 필터에도 노출하지 않음.
+        Object[][] defaults = {
+            {UserRole.APPLICANT,         "Applicant",         true,  true,  10},
+            {UserRole.LEW,               "LEW",               true,  true,  20},
+            {UserRole.SLD_MANAGER,       "SLD Manager",       true,  true,  30},
+            {UserRole.CONCIERGE_MANAGER, "Concierge Manager", true,  true,  40},
+            {UserRole.ADMIN,             "Administrator",     false, true,  50},
+            {UserRole.SYSTEM_ADMIN,      "System Admin",      false, false, 60},
+        };
+
+        int inserted = 0;
+        try (PreparedStatement check = conn.prepareStatement(
+                "SELECT 1 FROM role_metadata WHERE role_code = ?");
+             PreparedStatement insert = conn.prepareStatement(
+                "INSERT INTO role_metadata (role_code, display_label, assignable, filterable, sort_order, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, ?, NOW(6), NOW(6))")) {
+            for (Object[] row : defaults) {
+                String code = ((UserRole) row[0]).name();
+                check.setString(1, code);
+                try (ResultSet rs = check.executeQuery()) {
+                    if (rs.next()) continue;
+                }
+                insert.setString(1, code);
+                insert.setString(2, (String) row[1]);
+                insert.setBoolean(3, (Boolean) row[2]);
+                insert.setBoolean(4, (Boolean) row[3]);
+                insert.setInt(5, (Integer) row[4]);
+                insert.executeUpdate();
+                inserted++;
+            }
+        }
+
+        Set<String> validCodes = new HashSet<>();
+        for (UserRole r : UserRole.values()) validCodes.add(r.name());
+
+        List<String> stale = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement("SELECT role_code FROM role_metadata");
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String code = rs.getString(1);
+                if (!validCodes.contains(code)) stale.add(code);
+            }
+        }
+        if (!stale.isEmpty()) {
+            try (PreparedStatement del = conn.prepareStatement(
+                    "DELETE FROM role_metadata WHERE role_code = ?")) {
+                for (String c : stale) {
+                    del.setString(1, c);
+                    del.executeUpdate();
+                }
+            }
+            log.info("Migration [sync-role-metadata]: removed stale rows {}", stale);
+        }
+
+        if (inserted > 0) {
+            log.info("Migration [sync-role-metadata]: inserted {} new role rows", inserted);
+        } else if (stale.isEmpty()) {
+            log.debug("Migration [sync-role-metadata]: in sync with UserRole enum");
+        }
+    }
+
+    /**
+     * 마이그레이션 (P1.1): applications 테이블에 EMA ELISE 확장 컬럼 16개 추가.
+     * 각 컬럼을 개별적으로 columnExists 로 체크해 멱등성 보장.
+     * 데이터 저장소 준비만 담당 — 추후 P1.2 에서 DTO/Service 에 전파한다.
+     */
+    private void migrateApplicationsEmaFields(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] columns = {
+                {"installation_name",                  "VARCHAR(200)"},
+                {"premises_type",                      "VARCHAR(30)"},
+                {"is_rental_premises",                 "TINYINT(1)"},
+                {"landlord_ei_licence_no",             "VARCHAR(255)"},
+                {"renewal_company_name_changed",       "TINYINT(1)"},
+                {"renewal_address_changed",            "TINYINT(1)"},
+                {"installation_address_block",         "VARCHAR(20)"},
+                {"installation_address_unit",          "VARCHAR(20)"},
+                {"installation_address_street",        "VARCHAR(200)"},
+                {"installation_address_building",      "VARCHAR(200)"},
+                {"installation_address_postal_code",   "VARCHAR(10)"},
+                {"correspondence_address_block",       "VARCHAR(255)"},
+                {"correspondence_address_unit",        "VARCHAR(255)"},
+                {"correspondence_address_street",      "VARCHAR(500)"},
+                {"correspondence_address_building",    "VARCHAR(500)"},
+                {"correspondence_address_postal_code", "VARCHAR(10)"}
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : columns) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [applications-ema-fields]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [applications-ema-fields]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (P1.1): application_declaration_logs 테이블 생성.
+     * 신청 동의/선언 append-only 감사 로그.
+     */
+    private void migrateApplicationDeclarationLogsTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "application_declaration_logs")) {
+            log.debug("Migration [application-declaration-logs]: already exists, skipping");
+            return;
+        }
+
+        log.info("Migration [application-declaration-logs]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                    "CREATE TABLE application_declaration_logs (" +
+                            "  declaration_log_seq BIGINT       NOT NULL AUTO_INCREMENT," +
+                            "  application_seq     BIGINT       NOT NULL," +
+                            "  user_seq            BIGINT       NOT NULL," +
+                            "  consent_type        VARCHAR(60)  NOT NULL," +
+                            "  document_version    VARCHAR(30)," +
+                            "  form_snapshot_hash  VARCHAR(64)," +
+                            "  ip_address          VARCHAR(45)," +
+                            "  user_agent          VARCHAR(500)," +
+                            "  declared_at         DATETIME(6)  NOT NULL," +
+                            "  PRIMARY KEY (declaration_log_seq)," +
+                            "  KEY idx_decl_log_application (application_seq)," +
+                            "  KEY idx_decl_log_user (user_seq)," +
+                            "  CONSTRAINT fk_decl_log_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq)," +
+                            "  CONSTRAINT fk_decl_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)" +
+                            ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [application-declaration-logs]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션 (C.1): applications 테이블에 loa_phone_snapshot / loa_email_snapshot 컬럼 추가.
+     * Snapshot-at-submit 정책 — LOA 스냅샷 4개 컬럼과 같이 신청 시점 phone/email을 불변 기록.
+     * 엔티티 레벨 {@code @Column(updatable=false)}로 UPDATE 차단.
+     */
+    private void migrateApplicationsLoaPhoneEmailSnapshots(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] cols = {
+                {"loa_phone_snapshot", "VARCHAR(20)"},
+                {"loa_email_snapshot", "VARCHAR(100)"}
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : cols) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [loa-phone-email-snapshot]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [loa-phone-email-snapshot]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Review Form P1.B): applications 테이블에 신청자 hint 컬럼 8개 추가.
+     * <p>LEW Review Form Step 2에서 CoF Draft 초기값으로 prefill되는 용도. 형식 오류는 경고 수준이며
+     * 어떤 CHECK 제약도 걸지 않는다(스펙 §5.3). 기존 `sp_account_no` 컬럼은 legacy 병행 유지.</p>
+     */
+    private void migrateApplicationsApplicantHintColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] cols = {
+                {"applicant_mssl_hint_enc",         "VARCHAR(255)"},
+                {"applicant_mssl_hint_hmac",        "CHAR(64)"},
+                {"applicant_mssl_hint_last4",       "VARCHAR(4)"},
+                {"applicant_supply_voltage_hint",   "INT"},
+                {"applicant_consumer_type_hint",    "VARCHAR(20)"},
+                {"applicant_retailer_hint",         "VARCHAR(32)"},
+                {"applicant_has_generator_hint",    "TINYINT(1)"},
+                {"applicant_generator_capacity_hint", "INT"}
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : cols) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [applicant-hint-columns]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [applicant-hint-columns]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): lew_service_orders 에 체크인/아웃/보고서 컬럼 추가.
+     * <p>추가 컬럼: check_in_at, check_out_at, visit_report_file_seq.
+     * <p>visit_report_file_seq 는 기존 uploaded_file_seq 가 있는 경우 값을 복사하여 이관한다
+     * (uploaded_file_seq 는 하위호환을 위해 DROP 하지 않음).
+     */
+    private void migrateLewServiceOrdersVisitColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) {
+            log.debug("Migration [lew-service-visit-columns]: lew_service_orders not found, skipping");
+            return;
+        }
+        boolean hasCheckIn = columnExists(conn, "lew_service_orders", "check_in_at");
+        boolean hasCheckOut = columnExists(conn, "lew_service_orders", "check_out_at");
+        boolean hasVisitReport = columnExists(conn, "lew_service_orders", "visit_report_file_seq");
+        if (hasCheckIn && hasCheckOut && hasVisitReport) {
+            log.debug("Migration [lew-service-visit-columns]: already applied, skipping");
+            return;
+        }
+        log.info("Migration [lew-service-visit-columns]: starting...");
+        try (Statement stmt = conn.createStatement()) {
+            if (!hasCheckIn) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN check_in_at DATETIME(6) NULL AFTER visit_schedule_note"
+                );
+                log.info("Migration [lew-service-visit-columns]: added check_in_at");
+            }
+            if (!hasCheckOut) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN check_out_at DATETIME(6) NULL AFTER check_in_at"
+                );
+                log.info("Migration [lew-service-visit-columns]: added check_out_at");
+            }
+            if (!hasVisitReport) {
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN visit_report_file_seq BIGINT NULL AFTER check_out_at"
+                );
+                log.info("Migration [lew-service-visit-columns]: added visit_report_file_seq");
+                // Backfill from legacy uploaded_file_seq
+                if (columnExists(conn, "lew_service_orders", "uploaded_file_seq")) {
+                    int copied = stmt.executeUpdate(
+                        "UPDATE lew_service_orders SET visit_report_file_seq = uploaded_file_seq " +
+                        "WHERE visit_report_file_seq IS NULL AND uploaded_file_seq IS NOT NULL"
+                    );
+                    log.info("Migration [lew-service-visit-columns]: copied {} uploaded_file_seq → visit_report_file_seq", copied);
+                }
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): revision_comment → revisit_comment rename.
+     * <p>두 컬럼이 모두 없거나 revisit_comment 가 이미 있으면 스킵.
+     * <p>둘 다 있는 경우: revision_comment 값을 revisit_comment 로 복사 (revisit_comment 가 비어있을 때만).
+     * <p>revision_comment 만 있는 경우: revisit_comment 추가 후 데이터 복사.
+     * <p>revision_comment DROP 은 별도 PR 에서 수행 (하위호환 유지).
+     */
+    private void migrateLewServiceOrdersRevisitRename(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) return;
+        boolean hasRevision = columnExists(conn, "lew_service_orders", "revision_comment");
+        boolean hasRevisit = columnExists(conn, "lew_service_orders", "revisit_comment");
+        if (hasRevisit && !hasRevision) {
+            log.debug("Migration [lew-service-revisit-rename]: already applied, skipping");
+            return;
+        }
+        log.info("Migration [lew-service-revisit-rename]: starting (hasRevision={}, hasRevisit={})",
+                hasRevision, hasRevisit);
+        try (Statement stmt = conn.createStatement()) {
+            if (!hasRevisit) {
+                // 새 컬럼 추가 — revision_comment 뒤에
+                String after = hasRevision ? "revision_comment" : "manager_note";
+                stmt.executeUpdate(
+                    "ALTER TABLE lew_service_orders ADD COLUMN revisit_comment TEXT NULL AFTER " + after
+                );
+                log.info("Migration [lew-service-revisit-rename]: added revisit_comment");
+            }
+            if (hasRevision) {
+                // 데이터 복사 (revisit_comment 가 비어있을 때만)
+                int copied = stmt.executeUpdate(
+                    "UPDATE lew_service_orders SET revisit_comment = revision_comment " +
+                    "WHERE revisit_comment IS NULL AND revision_comment IS NOT NULL"
+                );
+                log.info("Migration [lew-service-revisit-rename]: copied {} rows revision_comment → revisit_comment", copied);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): status enum 값 rename.
+     * <p>MySQL 상 컬럼은 VARCHAR(30) 이므로 DDL 변경 불필요, 기존 row 만 UPDATE.
+     * <ul>
+     *   <li>IN_PROGRESS → VISIT_SCHEDULED</li>
+     *   <li>SLD_UPLOADED → VISIT_COMPLETED</li>
+     *   <li>REVISION_REQUESTED → REVISIT_REQUESTED</li>
+     * </ul>
+     */
+    private void migrateLewServiceOrdersStatusRename(Connection conn) throws SQLException {
+        if (!tableExists(conn, "lew_service_orders")) return;
+        try (Statement stmt = conn.createStatement()) {
+            int inProgress = stmt.executeUpdate(
+                "UPDATE lew_service_orders SET status = 'VISIT_SCHEDULED' WHERE status = 'IN_PROGRESS'"
+            );
+            int sldUploaded = stmt.executeUpdate(
+                "UPDATE lew_service_orders SET status = 'VISIT_COMPLETED' WHERE status = 'SLD_UPLOADED'"
+            );
+            int revRequested = stmt.executeUpdate(
+                "UPDATE lew_service_orders SET status = 'REVISIT_REQUESTED' WHERE status = 'REVISION_REQUESTED'"
+            );
+            int total = inProgress + sldUploaded + revRequested;
+            if (total > 0) {
+                log.info("Migration [lew-service-status-rename]: renamed {} rows " +
+                        "(IN_PROGRESS→VISIT_SCHEDULED={}, SLD_UPLOADED→VISIT_COMPLETED={}, " +
+                        "REVISION_REQUESTED→REVISIT_REQUESTED={})",
+                        total, inProgress, sldUploaded, revRequested);
+            } else {
+                log.debug("Migration [lew-service-status-rename]: no rows to rename");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션 (LEW Service 방문형 리스키닝 PR 3): lew_service_visit_photos 테이블 생성.
+     */
+    private void createLewServiceVisitPhotosTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "lew_service_visit_photos")) {
+            log.debug("Migration [lew-service-visit-photos-table]: already exists, skipping");
+            return;
+        }
+        log.info("Migration [lew-service-visit-photos-table]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE lew_service_visit_photos (" +
+                "  photo_seq   BIGINT       NOT NULL AUTO_INCREMENT," +
+                "  order_seq   BIGINT       NOT NULL," +
+                "  file_seq    BIGINT       NOT NULL," +
+                "  caption     TEXT         NULL," +
+                "  uploaded_at DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6)," +
+                "  deleted_at  DATETIME(6)  NULL," +
+                "  PRIMARY KEY (photo_seq)," +
+                "  KEY idx_lew_visit_photos_order (order_seq)," +
+                "  KEY idx_lew_visit_photos_file  (file_seq)," +
+                "  CONSTRAINT fk_lew_visit_photos_order " +
+                "    FOREIGN KEY (order_seq) REFERENCES lew_service_orders (lew_service_order_seq)," +
+                "  CONSTRAINT fk_lew_visit_photos_file " +
+                "    FOREIGN KEY (file_seq) REFERENCES files (file_seq)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [lew-service-visit-photos-table]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: soft-deleted 계정의 원본 이메일을 익명화 형식으로 일괄 치환.
+     * <p>
+     * 배경: User.anonymize() 패치(2026-04-30) 이전에 PDPA 삭제된 row는
+     * email이 원본 그대로 남아 uk_users_email UNIQUE 제약을 점유한다.
+     * @SQLRestriction("deleted_at IS NULL")이 existsByEmail()를 가리므로
+     * 재가입 시 중복 검사를 통과한 뒤 INSERT 단계에서 unique 제약 충돌로 500 발생.
+     * <p>
+     * 익명화 형식은 도메인 anonymize()와 동일: deleted-{user_seq}@deleted.licensekaki.sg
+     * 멱등성: 이미 익명화된 row(LIKE 패턴 매칭)는 제외한다.
+     */
+    private void backfillDeletedUserEmails(Connection conn) throws SQLException {
+        if (!columnExists(conn, "users", "deleted_at")) {
+            log.debug("Migration [backfill-deleted-emails]: users.deleted_at not present, skipping");
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE users " +
+                "SET email = CONCAT('deleted-', user_seq, '@deleted.licensekaki.sg') " +
+                "WHERE deleted_at IS NOT NULL " +
+                "  AND email NOT LIKE 'deleted-%@deleted.licensekaki.sg'"
+            );
+            if (updated > 0) {
+                log.info("Migration [backfill-deleted-emails]: anonymized {} legacy soft-deleted emails", updated);
+            } else {
+                log.debug("Migration [backfill-deleted-emails]: no legacy rows to backfill");
+            }
+        }
+    }
+
+    /**
      * 특정 테이블에 컬럼이 존재하는지 확인
      */
     private boolean columnExists(Connection conn, String table, String column) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet rs = meta.getColumns(conn.getCatalog(), null, table, column)) {
             return rs.next();
+        }
+    }
+
+    /**
+     * 마이그레이션: 결제 후 kVA 사후 변경 (PR-1).
+     * <p>
+     * invoices 테이블 변경:
+     * <ul>
+     *   <li>status / invalidated_reason / invalidated_at 컬럼 추가 (멱등).</li>
+     *   <li>uk_invoices_payment UNIQUE 제거 + idx_invoices_payment 일반 인덱스 추가
+     *       — INVALIDATED 후 같은 payment_seq 의 신규 영수증 발행 허용.</li>
+     * </ul>
+     * 스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §10 D3.
+     */
+    private void migrateInvoicesStatusColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "invoices")) {
+            log.debug("Migration [invoices-status-columns]: table missing, skipping");
+            return;
+        }
+
+        // 1) status 컬럼 추가 (멱등)
+        if (!columnExists(conn, "invoices", "status")) {
+            log.info("Migration [invoices-status-columns]: adding status column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE invoices ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' AFTER pdf_file_seq"
+                );
+                stmt.executeUpdate(
+                    "ALTER TABLE invoices ADD COLUMN invalidated_reason VARCHAR(200) NULL AFTER status"
+                );
+                stmt.executeUpdate(
+                    "ALTER TABLE invoices ADD COLUMN invalidated_at DATETIME(6) NULL AFTER invalidated_reason"
+                );
+                log.info("Migration [invoices-status-columns]: added status/invalidated_reason/invalidated_at");
+            }
+        }
+
+        // 2) uk_invoices_payment UNIQUE 제거 + idx_invoices_payment 추가 (멱등)
+        // ★ FK fk_invoices_payment 가 payment_seq 인덱스에 의존하므로, UNIQUE 를 바로 DROP 하면
+        //   "needed in a foreign key constraint" 에러. 대체 일반 인덱스를 먼저 생성한 뒤 UNIQUE 만 DROP.
+        if (indexExists(conn, "invoices", "uk_invoices_payment")) {
+            log.info("Migration [invoices-status-columns]: replacing uk_invoices_payment UNIQUE with regular indexes...");
+            try (Statement stmt = conn.createStatement()) {
+                if (!indexExists(conn, "invoices", "idx_invoices_payment")) {
+                    stmt.executeUpdate("ALTER TABLE invoices ADD INDEX idx_invoices_payment (payment_seq)");
+                }
+                if (!indexExists(conn, "invoices", "idx_invoices_payment_status")) {
+                    stmt.executeUpdate(
+                        "ALTER TABLE invoices ADD INDEX idx_invoices_payment_status (payment_seq, status)"
+                    );
+                }
+                if (!indexExists(conn, "invoices", "idx_invoices_application_status")) {
+                    stmt.executeUpdate(
+                        "ALTER TABLE invoices ADD INDEX idx_invoices_application_status (application_seq, status)"
+                    );
+                }
+                // FK 가 의존하는 인덱스가 만들어진 다음에야 UNIQUE 를 안전하게 제거할 수 있다.
+                stmt.executeUpdate("ALTER TABLE invoices DROP INDEX uk_invoices_payment");
+                log.info("Migration [invoices-status-columns]: UNIQUE replaced with regular indexes");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: 결제 후 kVA 사후 변경 (PR-4).
+     * <p>
+     * kva_adjustment_record 테이블에 settled_at 컬럼을 멱등 추가한다.
+     * <ul>
+     *   <li>PR-1~3 시점에는 schema.sql 신규 생성 + JPA 엔티티에서 settled_at 미정의.</li>
+     *   <li>PR-4 에서 settlement 마킹 엔드포인트({@code PATCH .../settlement}) 도입과 함께 추가.</li>
+     *   <li>이미 PR-1~3 으로 운영 중인 DB 에 본 컬럼이 누락되어 있을 수 있으므로 idempotent ALTER 보강.</li>
+     * </ul>
+     * 스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.3 / PR-4.
+     */
+    private void migrateKvaAdjustmentRecordSettledAt(Connection conn) throws SQLException {
+        if (!tableExists(conn, "kva_adjustment_record")) {
+            log.debug("Migration [kva-adj-settled-at]: table missing, skipping");
+            return;
+        }
+        if (columnExists(conn, "kva_adjustment_record", "settled_at")) {
+            return;
+        }
+        log.info("Migration [kva-adj-settled-at]: adding settled_at column...");
+        try (Statement stmt = conn.createStatement()) {
+            // admin_adjustment_at 다음에 두어 정산 관련 컬럼이 시간순으로 인접.
+            // 기존 행은 NULL — settlement 가 아직 마킹되지 않은 상태로 자연스럽게 동작.
+            stmt.executeUpdate(
+                "ALTER TABLE kva_adjustment_record "
+                + "ADD COLUMN settled_at DATETIME(6) NULL AFTER admin_adjustment_at"
+            );
+            log.info("Migration [kva-adj-settled-at]: added settled_at column");
+        }
+    }
+
+    /**
+     * ADMIN Manual Email Dispatch 테이블 idempotent 생성.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §13.1.</p>
+     *
+     * <p>{@code syncCreateTablesFromSchemaSql} 가 schema.sql 의 모든 CREATE TABLE IF NOT EXISTS 를
+     * 자동 실행하므로, 본 메서드는 사실상 중복이지만 다음 두 이유로 명시한다:
+     * <ol>
+     *   <li>코드 리뷰에서 신규 테이블 도입의 의도가 분명히 드러난다 (kVA PR-1 패턴 동일).</li>
+     *   <li>schema.sql 파싱이 어떤 이유로 실패했을 때(예: 주석 형태 변경)의 fallback.</li>
+     * </ol></p>
+     */
+    private void migrateManualEmailDispatchesTable(Connection conn) throws SQLException {
+        if (tableExists(conn, "manual_email_dispatches")) {
+            log.debug("Migration [manual-email-dispatches]: table exists, skipping");
+            return;
+        }
+        log.info("Migration [manual-email-dispatches]: creating table...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "CREATE TABLE IF NOT EXISTS manual_email_dispatches (" +
+                "  dispatch_seq             BIGINT         NOT NULL AUTO_INCREMENT," +
+                "  sender_user_seq          BIGINT         NOT NULL," +
+                "  recipient_type           VARCHAR(20)    NOT NULL," +
+                "  recipient_user_seq       BIGINT         NULL," +
+                "  recipient_email          VARCHAR(254)   NOT NULL," +
+                // PR-2: MULTI 컬럼 + 멱등성 해시 — 새 DB 도 즉시 보유하도록 본 CREATE 에 포함.
+                "  recipient_user_seqs_json TEXT           NULL," +
+                "  recipient_emails_json    TEXT           NULL," +
+                "  recipient_hash           VARCHAR(64)    NULL," +
+                "  related_application_seq  BIGINT         NULL," +
+                "  subject                  VARCHAR(200)   NOT NULL," +
+                "  body_text                TEXT           NOT NULL," +
+                "  body_format              VARCHAR(20)    NOT NULL DEFAULT 'PLAIN_TEXT'," +
+                "  category_tag             VARCHAR(50)    NULL," +
+                "  dispatch_status          VARCHAR(20)    NOT NULL," +
+                "  sent_count               INT            NOT NULL DEFAULT 0," +
+                "  failed_count             INT            NOT NULL DEFAULT 0," +
+                "  failed_reason            TEXT           NULL," +
+                "  dispatched_at            DATETIME(6)    NULL," +
+                // PR-4: 인앱 알림 동반 옵션 (D4=B). 기본 ON.
+                "  also_create_in_app_notification TINYINT(1) NOT NULL DEFAULT 1," +
+                "  created_at               DATETIME(6)," +
+                "  updated_at               DATETIME(6)," +
+                "  created_by               BIGINT," +
+                "  updated_by               BIGINT," +
+                "  deleted_at               DATETIME(6)," +
+                "  PRIMARY KEY (dispatch_seq)," +
+                "  KEY idx_manual_email_sender (sender_user_seq, dispatched_at DESC)," +
+                "  KEY idx_manual_email_dispatched (dispatched_at DESC)," +
+                "  KEY idx_manual_email_status (dispatch_status, dispatched_at DESC)," +
+                "  KEY idx_manual_email_application (related_application_seq)," +
+                "  KEY idx_manual_email_recipient_hash (sender_user_seq, recipient_hash, created_at DESC)," +
+                "  CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq)," +
+                "  CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq)," +
+                "  CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)" +
+                ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            );
+            log.info("Migration [manual-email-dispatches]: table created");
+        }
+    }
+
+    /**
+     * 마이그레이션: ADMIN Manual Email Dispatch — PR-2 MULTI 컬럼 + 멱등성 해시.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §4 / PR-2.</p>
+     *
+     * <ul>
+     *   <li>{@code recipient_user_seqs_json} TEXT NULL — MULTI 시 시스템 사용자 user_seq 목록 (JSON).</li>
+     *   <li>{@code recipient_emails_json} TEXT NULL — MULTI 시 이메일 목록 (JSON).</li>
+     *   <li>{@code recipient_hash} VARCHAR(64) NULL — 정렬된 수신자 + subject + body 의 SHA-256 hex.</li>
+     *   <li>{@code idx_manual_email_recipient_hash} 인덱스 — 멱등성 lookup 가속.</li>
+     * </ul>
+     *
+     * <p>PR-1 운영 DB 에 본 컬럼들이 누락되어 있을 수 있으므로 idempotent ALTER. 기존 PR-1 row 들은
+     * 단일 수신자 기반 backfill 로 {@code recipient_hash} 를 채워둔다 — MySQL SHA2 함수 + 정규화된
+     * 입력으로 Java 측 {@link com.bluelight.backend.api.admin.manualemail.ManualEmailRecipientHasher}
+     * 와 동일한 해시를 산출. (동일성 보장: 단일 수신자라 정렬 불필요, 소문자 + trim 만 일치하면 OK.)</p>
+     */
+    private void migrateManualEmailRecipientLists(Connection conn) throws SQLException {
+        if (!tableExists(conn, "manual_email_dispatches")) {
+            log.debug("Migration [manual-email-pr2]: table missing, skipping (will be created in schema.sql)");
+            return;
+        }
+
+        boolean userSeqsJsonExists = columnExists(conn, "manual_email_dispatches", "recipient_user_seqs_json");
+        boolean emailsJsonExists = columnExists(conn, "manual_email_dispatches", "recipient_emails_json");
+        boolean hashExists = columnExists(conn, "manual_email_dispatches", "recipient_hash");
+
+        if (!userSeqsJsonExists) {
+            log.info("Migration [manual-email-pr2]: adding recipient_user_seqs_json column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD COLUMN recipient_user_seqs_json TEXT NULL AFTER recipient_email"
+                );
+            }
+        }
+        if (!emailsJsonExists) {
+            log.info("Migration [manual-email-pr2]: adding recipient_emails_json column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD COLUMN recipient_emails_json TEXT NULL AFTER recipient_user_seqs_json"
+                );
+            }
+        }
+        if (!hashExists) {
+            log.info("Migration [manual-email-pr2]: adding recipient_hash column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD COLUMN recipient_hash VARCHAR(64) NULL AFTER recipient_emails_json"
+                );
+            }
+        }
+
+        // 멱등성 lookup 인덱스 — 컬럼 추가 후에 별도 가드.
+        if (!indexExists(conn, "manual_email_dispatches", "idx_manual_email_recipient_hash")) {
+            log.info("Migration [manual-email-pr2]: adding idx_manual_email_recipient_hash...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE manual_email_dispatches "
+                    + "ADD INDEX idx_manual_email_recipient_hash (sender_user_seq, recipient_hash, created_at DESC)"
+                );
+            }
+        }
+
+        // PR-1 row backfill — recipient_hash 가 NULL 인 row 만 단일 수신자 기반으로 채운다.
+        // Java 의 ManualEmailRecipientHasher 와 동일한 입력 정규화를 SQL 로 재현:
+        //   - 단일 수신자: LOWER(TRIM(recipient_email))
+        //   - "" (Unit Separator) 구분자: CONCAT(recipients, CHAR(31), subject, CHAR(31), body_text)
+        //   - SHA2(..., 256) → 64자 hex (소문자)
+        // 단일 수신자라 정렬 불필요 (해시 입력에 단일 항목만 등장).
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE manual_email_dispatches "
+                + "SET recipient_hash = LOWER(SHA2("
+                + "  CONCAT(LOWER(TRIM(recipient_email)), CHAR(31), "
+                + "         IFNULL(subject, ''), CHAR(31), "
+                + "         IFNULL(body_text, ''))"
+                + ", 256)) "
+                + "WHERE recipient_hash IS NULL"
+            );
+            if (updated > 0) {
+                log.info("Migration [manual-email-pr2]: backfilled recipient_hash for {} rows", updated);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: ADMIN Manual Email Dispatch — PR-4 인앱 동반 옵션 컬럼 추가.
+     *
+     * <p>스펙: {@code doc/Project Analysis/admin-manual-email-spec.md} §8.5 / D4=B.</p>
+     *
+     * <ul>
+     *   <li>{@code also_create_in_app_notification} TINYINT(1) NOT NULL DEFAULT 1 —
+     *       시스템 사용자 수신자에게 인앱 알림 동반 생성 여부. 기존 row 는 default 1
+     *       (true) 로 backfill — PR-1/2/3 동작 변경 없이 인앱 옵션이 뒤늦게 ON 된 형태.</li>
+     * </ul>
+     *
+     * <p>idempotent — 컬럼 존재 시 스킵. 기존 PR-1/2/3 row 의 값은 default 1 이 그대로 들어가며,
+     * AFTER_COMMIT 리스너는 row 가 보관된 후 새로 처리되는 발송에만 알림을 보낸다 (이미 처리된
+     * 과거 row 는 listener 가 다시 발화하지 않음 — DB row 단순 backfill 만 영향).</p>
+     */
+    private void migrateManualEmailInAppOptionColumn(Connection conn) throws SQLException {
+        if (!tableExists(conn, "manual_email_dispatches")) {
+            log.debug("Migration [manual-email-pr4]: table missing, skipping (will be created in schema.sql)");
+            return;
+        }
+        if (columnExists(conn, "manual_email_dispatches", "also_create_in_app_notification")) {
+            log.debug("Migration [manual-email-pr4]: also_create_in_app_notification column exists, skipping");
+            return;
+        }
+        log.info("Migration [manual-email-pr4]: adding also_create_in_app_notification column...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE manual_email_dispatches "
+                + "ADD COLUMN also_create_in_app_notification TINYINT(1) NOT NULL DEFAULT 1 "
+                + "AFTER dispatched_at"
+            );
+        }
+        log.info("Migration [manual-email-pr4]: column added (default 1 backfilled)");
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D1=B 다중 역할 정규화).
+     * <p>
+     * {@code user_roles} 테이블 생성 + 기존 {@code users.role} 백필.
+     * <ul>
+     *   <li>테이블이 없으면 CREATE (schema.sql 의 CREATE TABLE IF NOT EXISTS 와 동일).</li>
+     *   <li>users 테이블의 모든 active row(role 컬럼)에 대해 user_roles 에 INSERT IGNORE
+     *       — 동일 row 가 이미 있으면 무시 (PK 가 (user_seq, role) 이므로 충돌 없음).</li>
+     *   <li>soft-deleted 사용자도 백필 대상 — soft delete 는 조회 필터일 뿐 실제 row 는 보존.
+     *       따라서 그들의 primary role 도 user_roles 에 들어간다.</li>
+     * </ul>
+     * idempotent: 여러 번 실행해도 INSERT IGNORE 가 중복을 무시한다.
+     */
+    private void migrateUserRolesTable(Connection conn) throws SQLException {
+        // 1) 테이블 생성 (멱등). syncCreateTablesFromSchemaSql 가 이미 처리하지만
+        //    명시적으로 한 번 더 — 코드 리뷰 시 의도 가시성 + schema.sql 파싱 fallback.
+        if (!tableExists(conn, "user_roles")) {
+            log.info("Migration [user-roles]: creating table...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "CREATE TABLE IF NOT EXISTS user_roles (" +
+                    "  user_seq BIGINT       NOT NULL," +
+                    "  role     VARCHAR(40)  NOT NULL," +
+                    "  PRIMARY KEY (user_seq, role)," +
+                    "  KEY idx_user_roles_user (user_seq)," +
+                    "  CONSTRAINT fk_user_roles_user FOREIGN KEY (user_seq) " +
+                    "    REFERENCES users (user_seq) ON DELETE CASCADE" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+                );
+            }
+            log.info("Migration [user-roles]: table created");
+        }
+
+        // 2) 백필: 기존 users.role row 를 user_roles 에 1건씩 복제.
+        //    INSERT IGNORE 로 PK 충돌 무시 (재실행 시 중복 추가 방지).
+        try (Statement stmt = conn.createStatement()) {
+            int inserted = stmt.executeUpdate(
+                "INSERT IGNORE INTO user_roles (user_seq, role) " +
+                "SELECT user_seq, role FROM users WHERE role IS NOT NULL"
+            );
+            if (inserted > 0) {
+                log.info("Migration [user-roles]: backfilled {} primary role rows", inserted);
+            } else {
+                log.debug("Migration [user-roles]: no rows to backfill (already in sync)");
+            }
+        }
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D2=B PaymentMethod enum + offline 기록 컬럼).
+     * <p>
+     * 변경 요약:
+     * <ul>
+     *   <li>{@code payment_method} VARCHAR(20) → VARCHAR(40), 기본값 'CARD' → 'PAYNOW_ONLINE',
+     *       NOT NULL 강화. 기존 'CARD' row 는 'PAYNOW_ONLINE' 으로 갱신.</li>
+     *   <li>{@code recorded_by_user_seq} BIGINT NULL — offline 기록자 user_seq.</li>
+     *   <li>{@code recorded_at} DATETIME(6) NULL — 기록 시점.</li>
+     * </ul>
+     * idempotent: 컬럼 폭/기본값/NOT NULL 모두 멱등 ALTER. 백필 UPDATE 는 'CARD' row 만 영향.
+     */
+    private void migratePaymentsMethodColumns(Connection conn) throws SQLException {
+        if (!tableExists(conn, "payments")) {
+            log.debug("Migration [payments-method]: payments table missing, skipping");
+            return;
+        }
+
+        // 1) payment_method 컬럼 폭/기본값/NOT NULL 정정. 컬럼 자체는 PR#7 이전부터 존재.
+        //    MySQL 은 같은 정의로 MODIFY 호출해도 안전 (no-op). 따라서 무조건 1회 적용해도 멱등.
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE payments " +
+                "MODIFY COLUMN payment_method VARCHAR(40) NOT NULL DEFAULT 'PAYNOW_ONLINE'"
+            );
+            log.info("Migration [payments-method]: payment_method column normalized to VARCHAR(40) NOT NULL DEFAULT 'PAYNOW_ONLINE'");
+        }
+
+        // 2) 백필: 'CARD' / NULL row 를 PAYNOW_ONLINE 으로 갱신.
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE payments SET payment_method = 'PAYNOW_ONLINE' " +
+                "WHERE payment_method IS NULL OR payment_method = 'CARD'"
+            );
+            if (updated > 0) {
+                log.info("Migration [payments-method]: backfilled {} legacy rows ('CARD'/NULL → 'PAYNOW_ONLINE')", updated);
+            }
+        }
+
+        // 3) recorded_by_user_seq, recorded_at 컬럼 추가 (멱등).
+        if (!columnExists(conn, "payments", "recorded_by_user_seq")) {
+            log.info("Migration [payments-method]: adding recorded_by_user_seq column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE payments ADD COLUMN recorded_by_user_seq BIGINT NULL AFTER paid_at"
+                );
+            }
+        }
+        if (!columnExists(conn, "payments", "recorded_at")) {
+            log.info("Migration [payments-method]: adding recorded_at column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE payments ADD COLUMN recorded_at DATETIME(6) NULL AFTER recorded_by_user_seq"
+                );
+            }
+        }
+    }
+
+    /**
+     * ★ Concierge 강화 + 별도 수금 PR-1 (D6=A 셀프 할당) — concierge_requests LEW 배정 컬럼.
+     * <p>
+     * 추가 컬럼:
+     * <ul>
+     *   <li>{@code assigned_lew_seq} BIGINT NULL — 배정된 LEW user_seq.</li>
+     *   <li>{@code lew_assigned_at} DATETIME(6) NULL — 배정 시점.</li>
+     * </ul>
+     * 인덱스: {@code idx_concierge_assigned_lew (assigned_lew_seq)}.
+     */
+    private void migrateConciergeRequestsLewAssignment(Connection conn) throws SQLException {
+        if (!tableExists(conn, "concierge_requests")) {
+            log.debug("Migration [concierge-lew-assignment]: concierge_requests table missing, skipping");
+            return;
+        }
+
+        if (!columnExists(conn, "concierge_requests", "assigned_lew_seq")) {
+            log.info("Migration [concierge-lew-assignment]: adding assigned_lew_seq column...");
+            try (Statement stmt = conn.createStatement()) {
+                // verification_phrase 다음에 배치 — 기존 PR#1.5 컬럼들과 시간순 인접.
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN assigned_lew_seq BIGINT NULL AFTER verification_phrase"
+                );
+            }
+        }
+        if (!columnExists(conn, "concierge_requests", "lew_assigned_at")) {
+            log.info("Migration [concierge-lew-assignment]: adding lew_assigned_at column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD COLUMN lew_assigned_at DATETIME(6) NULL AFTER assigned_lew_seq"
+                );
+            }
+        }
+        if (!indexExists(conn, "concierge_requests", "idx_concierge_assigned_lew")) {
+            log.info("Migration [concierge-lew-assignment]: adding idx_concierge_assigned_lew index...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE concierge_requests ADD INDEX idx_concierge_assigned_lew (assigned_lew_seq)"
+                );
+            }
+        }
+    }
+
+    /**
+     * 특정 테이블에 특정 이름의 인덱스가 존재하는지 확인 (멱등 마이그레이션 가드용).
+     */
+    private boolean indexExists(Connection conn, String table, String indexName) throws SQLException {
+        String sql = "SELECT 1 FROM information_schema.STATISTICS " +
+                     "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, table);
+            ps.setString(2, indexName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 

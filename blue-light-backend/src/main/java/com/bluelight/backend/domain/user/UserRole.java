@@ -7,11 +7,13 @@ package com.bluelight.backend.domain.user;
  * - ADMIN: 관리자 (실무 관리자)
  * - SYSTEM_ADMIN: 시스템 관리자 (개발자 — 시스템 설정, API 키, 챗봇 프롬프트 관리)
  * - SLD_MANAGER: SLD 도면 전문가 (SLD 전용 주문 처리)
+ * - CONCIERGE_MANAGER: 화이트글러브 대행 서비스 담당자 (★ Kaki Concierge Phase 1)
  */
 public enum UserRole {
     APPLICANT,
     LEW,
     ADMIN,
     SYSTEM_ADMIN,
-    SLD_MANAGER
+    SLD_MANAGER,
+    CONCIERGE_MANAGER
 }

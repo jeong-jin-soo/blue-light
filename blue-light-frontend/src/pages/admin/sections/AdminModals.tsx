@@ -18,9 +18,11 @@ interface PaymentModalProps {
   paymentForm: { transactionId: string; paymentMethod: string; receiptFile: File | null };
   setPaymentForm: React.Dispatch<React.SetStateAction<{ transactionId: string; paymentMethod: string; receiptFile: File | null }>>;
   loading: boolean;
+  /** PR4: 배정된 LEW seq — null/undefined 면 LEW 알림 마이크로카피를 숨긴다. */
+  assignedLewSeq?: number | null;
 }
 
-export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentForm, setPaymentForm, loading }: PaymentModalProps) {
+export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentForm, setPaymentForm, loading, assignedLewSeq }: PaymentModalProps) {
   const receiptInputRef = useRef<HTMLInputElement>(null);
 
   const handleReceiptChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,6 +45,12 @@ export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentF
             <span className="font-semibold">SGD ${quoteAmount.toLocaleString()}</span>{' '}
             has been received for this application.
           </p>
+          {assignedLewSeq != null && (
+            <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
+              Confirming will notify the assigned LEW via email and in-app so they can start Phase 2
+              (SLD / LOA / CoF).
+            </p>
+          )}
           <Input
             label="Transaction ID"
             placeholder="e.g., TXN-20250101-001"

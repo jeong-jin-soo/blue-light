@@ -35,14 +35,22 @@ public class SldAgentConfig {
     @Value("${sld.agent.timeout-seconds:120}")
     private int timeoutSeconds;
 
+    /**
+     * WebClient ReadTimeout. SseEmitter timeout(`sld.agent.sse-timeout-ms`) 및
+     * AI service heartbeat 간격과 정합되어야 한다. 한쪽만 짧으면 정상 SSE도 끊긴다.
+     */
+    @Value("${sld.agent.read-timeout-seconds:600}")
+    private int readTimeoutSeconds;
+
     @Bean
     public WebClient sldAgentWebClient() {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)  // 연결 타임아웃 10초
                 // responseTimeout 제거 — SSE 스트리밍에서는 전체 응답 시간 제한 불필요
-                // SseEmitter(600s)와 Nginx(300s)가 상위 레벨에서 타임아웃 관리
+                // 상위 SseEmitter timeout과 동일한 값을 사용해 끊김 일관성 유지.
+                // Nginx 사용 시 proxy_read_timeout도 동일 값으로 설정할 것.
                 .doOnConnected(conn -> conn
-                        .addHandlerLast(new ReadTimeoutHandler(300, TimeUnit.SECONDS))  // Nginx proxy_read_timeout과 동일
+                        .addHandlerLast(new ReadTimeoutHandler(readTimeoutSeconds, TimeUnit.SECONDS))
                         .addHandlerLast(new WriteTimeoutHandler(timeoutSeconds, TimeUnit.SECONDS)));
 
         return WebClient.builder()

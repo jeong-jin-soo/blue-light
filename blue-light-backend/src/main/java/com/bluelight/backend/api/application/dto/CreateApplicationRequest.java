@@ -1,16 +1,23 @@
 package com.bluelight.backend.api.application.dto;
 
+import com.bluelight.backend.domain.application.ApplicantType;
+import com.bluelight.backend.domain.application.PremisesType;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Create application request DTO
  */
 @Getter
+@Setter
 @NoArgsConstructor
 public class CreateApplicationRequest {
 
@@ -28,6 +35,26 @@ public class CreateApplicationRequest {
     @NotNull(message = "Selected kVA is required")
     @Positive(message = "Selected kVA must be a positive number")
     private Integer selectedKva;
+
+    /**
+     * Phase 5 — "I don't know — let LEW confirm" 옵션.
+     * <p>{@code true} 이면 서버가:
+     * <ul>
+     *   <li>{@code selectedKva} 값을 무시하고 {@code 45} 로 강제 설정 (placeholder)</li>
+     *   <li>{@code kvaStatus=UNKNOWN}, {@code kvaSource=null} 로 저장</li>
+     *   <li>{@code quoteAmount} 는 45 kVA placeholder 기준 계산</li>
+     * </ul>
+     * {@code false} 또는 {@code null} 이면 기존 경로 — {@code kvaStatus=CONFIRMED}, {@code kvaSource=USER_INPUT}.
+     * <p>하위호환: 이 필드가 누락된 구버전 클라이언트는 {@code null} → {@code false} 취급.
+     */
+    private Boolean kvaUnknown;
+
+    /**
+     * 신청자 유형 (Phase 1 필수)
+     * INDIVIDUAL: 개인 / CORPORATE: 법인
+     */
+    @NotNull(message = "applicantType is required")
+    private ApplicantType applicantType;
 
     /**
      * SP Group 계정 번호 (선택)
@@ -73,4 +100,91 @@ public class CreateApplicationRequest {
      * SLD 제출 방식: "SELF_UPLOAD" (기본) / "REQUEST_LEW"
      */
     private String sldOption;
+
+    // ── Phase 2 PR#3: 법인 JIT 회사 정보 ──
+
+    /**
+     * applicantType=CORPORATE이고 User.companyName이 없을 때 필수.
+     * INDIVIDUAL일 때 전송되어도 무시된다(서비스 계층에서 처리).
+     *
+     * 필수성 조건부 검증은 {@link #isCompanyInfoValidForCorporate()} 참조.
+     * User에 이미 companyName이 저장돼 있는 경우에는 이 필드가 비어있어도 OK.
+     */
+    @Valid
+    private CompanyInfoRequest companyInfo;
+
+    // ── P1.2: EMA ELISE 필드 — 모두 선택 (JIT 원칙). 비어있으면 LEW 검토 단계에서 확정. ──
+
+    /** EMA ELISE "Installation Name" — 현장/시설 호칭. 미입력 시 자동 생성 허용. */
+    @Size(max = 200, message = "Installation name must be 200 characters or less")
+    private String installationName;
+
+    /** EMA ELISE "Premises Type" enum. 미입력 시 LEW가 판단. */
+    private PremisesType premisesType;
+
+    /** 임대 건물 여부. NEW + 체크 시 landlordEiLicenceNo 동반. */
+    private Boolean isRentalPremises;
+
+    /** 임대주 EI Licence 번호 — isRentalPremises=true일 때만 의미. 서버에서 암호화 저장. */
+    @Size(max = 100, message = "Landlord EI licence number must be 100 characters or less")
+    private String landlordEiLicenceNo;
+
+    /** RENEWAL 시: 회사명 변경 여부 플래그. */
+    private Boolean renewalCompanyNameChanged;
+
+    /** RENEWAL 시: 설치 주소 변경 여부 플래그. */
+    private Boolean renewalAddressChanged;
+
+    // Installation Address 5-part — 신청자는 단일 address 필드만 입력하므로 선택값.
+    // 추후 OneMap 파싱 또는 LEW/Admin 보정 단계에서 채움.
+    @Size(max = 20) private String installationAddressBlock;
+    @Size(max = 20) private String installationAddressUnit;
+    @Size(max = 200) private String installationAddressStreet;
+    @Size(max = 200) private String installationAddressBuilding;
+    @Size(max = 10) private String installationAddressPostalCode;
+
+    // Correspondence Address 5-part — "Installation과 동일" 체크 해제 시만 클라이언트가 전송.
+    @Size(max = 255) private String correspondenceAddressBlock;
+    @Size(max = 255) private String correspondenceAddressUnit;
+    @Size(max = 500) private String correspondenceAddressStreet;
+    @Size(max = 500) private String correspondenceAddressBuilding;
+    @Size(max = 10) private String correspondenceAddressPostalCode;
+
+    /** 제출 시점 form hash (감사 로그용). 없으면 서버가 요청 body로 재계산. */
+    @Size(max = 64)
+    private String formSnapshotHash;
+
+    // ── P1.B: LEW Review Form hint 필드 (스펙 §5.3·§5.4·§5.5) ──
+    // 모두 optional. @Pattern/@Size 같은 엄격 검증을 쓰지 않는다 — 형식 오류는 ApplicantHintValidator가
+    // warning-only로 처리 (신청 200 OK 유지, 부적합 값은 저장 생략 + 응답 warnings[]).
+
+    /** MSSL Account No 평문 힌트 (예: "123-45-6789-0"). 저장 시 enc/hmac/last4로 분리. */
+    private String msslHint;
+    /** 공급 전압 힌트(V): 230/400/6600/22000 권장. 밖의 값은 경고. */
+    private Integer supplyVoltageHint;
+    /** Consumer Type 힌트: "NON_CONTESTABLE" | "CONTESTABLE". */
+    private String consumerTypeHint;
+    /** Retailer 힌트: RetailerCode enum 문자열. */
+    private String retailerHint;
+    /** 발전기 보유 여부 힌트. */
+    private Boolean hasGeneratorHint;
+    /** 발전기 용량 힌트(kVA). */
+    private Integer generatorCapacityHint;
+
+    /**
+     * Bean Validation 조건부 검증 — applicantType=CORPORATE인데 companyInfo가 누락된 경우를
+     * 탐지한다. 단, User에 이미 companyName이 있는 케이스는 여기서 알 수 없으므로 서비스
+     * 계층에서 추가 분기한다. 이 단계에서는 "둘 다 누락"만 400으로 떨어뜨리지 말고,
+     * DTO 단에서는 applicantType 자체만 체크하여 *완전히 누락된 법인 신청*을 거른다.
+     *
+     * 실제 "User에 companyName이 없고 + companyInfo도 없음" 분기는 서비스에서 처리:
+     * errorCode="COMPANY_INFO_REQUIRED".
+     *
+     * 여기에는 null/not-null 자체 검증만 수행하지 않는다 — 서비스에서 복합 판단.
+     */
+    @JsonIgnore
+    @AssertTrue(message = "applicantType is required")
+    public boolean isApplicantTypePresent() {
+        return applicantType != null;
+    }
 }

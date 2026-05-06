@@ -5,11 +5,20 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
-import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { InfoBox } from '../../components/ui/InfoBox';
+import { ApplicantTypeCard } from '../../components/applicant/ApplicantTypeCard';
+import { CompanyInfoModal } from '../../components/applicant/CompanyInfoModal';
+import { KvaTipBox } from '../../components/applicant/KvaTipBox';
+import { KvaPriceCard } from '../../components/applicant/KvaPriceCard';
+import { OptionalFastTrackSection } from '../../components/applicant/OptionalFastTrackSection';
 import { StepTracker } from '../../components/domain/StepTracker';
-import { SpAccountEmailSample } from '../../components/domain/SpAccountEmailSample';
+import {
+  AddressInputGroup,
+  joinAddressParts,
+  hasAnyAddressPart,
+  type AddressInputValues,
+} from '../../components/domain/AddressInputGroup';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { SamplePreviewModal } from '../../components/domain/SamplePreviewModal';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
 import { useFormAutoSave } from '../../hooks/useFormAutoSave';
@@ -17,14 +26,15 @@ import { BeforeYouBeginGuide } from './steps/BeforeYouBeginGuide';
 import { StepReview } from './steps/StepReview';
 import applicationApi from '../../api/applicationApi';
 import priceApi from '../../api/priceApi';
-import fileApi from '../../api/fileApi';
-import sampleFileApi from '../../api/sampleFileApi';
+import { userApi } from '../../api/userApi';
 import {
   validateApplicationStep0,
   validateApplicationStep1,
   validateApplicationStep2,
 } from '../../utils/validation';
-import type { MasterPrice, PriceCalculation, Application, ApplicationType, CreateApplicationRequest, SampleFileInfo } from '../../types';
+import type { MasterPrice, PriceCalculation, Application, ApplicantType, ApplicationType, CreateApplicationRequest, CompanyInfo } from '../../types';
+import { BUILDING_TYPES, KVA_UNKNOWN_SENTINEL } from '../../constants/orderFormOptions';
+import { normalizeMsslHint, type ConsumerType, type RetailerCode } from '../../constants/cof';
 
 const STEPS = [
   { label: 'Type', description: 'Application type' },
@@ -33,26 +43,24 @@ const STEPS = [
   { label: 'Review', description: 'Confirm & submit' },
 ];
 
-const BUILDING_TYPES = [
-  { value: '', label: 'Select building type' },
-  { value: 'Residential', label: 'Residential' },
-  { value: 'Commercial', label: 'Commercial' },
-  { value: 'Industrial', label: 'Industrial' },
-  { value: 'Hotel', label: 'Hotel' },
-  { value: 'Healthcare', label: 'Healthcare' },
-  { value: 'Education', label: 'Education' },
-  { value: 'Government', label: 'Government' },
-  { value: 'Mixed Use', label: 'Mixed Use' },
-  { value: 'Other', label: 'Other' },
-];
-
 interface FormData {
   applicationType: ApplicationType;
+  applicantType: ApplicantType;
   spAccountNo: string;
+  // Legacy 단일 address/postalCode — 5-part 에서 auto-concat되어 채워진다.
+  // Backend UpdateApplicationRequest 가 아직 legacy 만 받기 때문에 유지.
   address: string;
   postalCode: string;
+  // EMA ELISE 5-part Installation Address (P2.B)
+  installationBlock: string;
+  installationUnit: string;
+  installationStreet: string;
+  installationBuilding: string;
+  installationPostalCode: string;
   buildingType: string;
   selectedKva: number | null;
+  // Phase 5: kVA UNKNOWN 플래그 (I don't know 선택 시 true)
+  kvaUnknown: boolean;
   // Renewal fields
   originalApplicationSeq: number | null;
   existingLicenceNo: string;
@@ -60,8 +68,33 @@ interface FormData {
   renewalPeriodMonths: number | null;
   renewalReferenceNo: string;
   manualEntry: boolean;
-  // SLD option
-  sldOption: 'SELF_UPLOAD' | 'REQUEST_LEW';
+  // SLD option (P1.2: 3-way로 확장)
+  sldOption: 'SELF_UPLOAD' | 'SUBMIT_WITHIN_3_MONTHS' | 'REQUEST_LEW';
+  // ── P1 Step 1: EMA 확장 플래그 ──
+  isRentalPremises: boolean;            // NEW + 임대 체크
+  renewalCompanyNameChanged: boolean;   // RENEWAL 시 변경 체크박스 2개
+  renewalAddressChanged: boolean;
+  // ── P1 Step 2: Installation Name ──
+  useCustomInstallationName: boolean;   // 기본 false → "이름 자동 생성"
+  installationName: string;             // useCustomInstallationName=true일 때만 편집 가능
+  // ── P1 Step 4: Declaration 3-group + Correspondence + Landlord JIT ──
+  declarationGroup1Accepted: boolean;   // "정보 사실·허위기재 법적 책임" (pre-check 허용)
+  declarationGroup2Accepted: boolean;   // "전기 설비가 SG 전기 규정/SP 기술요건 부합"
+  declarationGroup3Accepted: boolean;   // "LEW의 정기 점검·EMA 보고 동의"
+  correspondenceSameAsInstallation: boolean;  // 기본 true
+  correspondenceBlock: string;
+  correspondenceUnit: string;
+  correspondenceStreet: string;
+  correspondenceBuilding: string;
+  correspondencePostalCode: string;
+  landlordEiLicenceNo: string;          // NEW + 임대 시 Step 4에서 수집
+  // ── P2.A: Optional fast-track hint 필드 (모두 optional, 서버 warning-only) ──
+  msslHint: string;                     // "AAA-BB-CCCC-D" 포맷 문자열. 빈 값 허용.
+  supplyVoltageHint?: number;
+  consumerTypeHint?: ConsumerType;
+  retailerHint?: RetailerCode;
+  hasGeneratorHint: boolean;
+  generatorCapacityHint?: number;
 }
 
 export default function NewApplicationPage() {
@@ -73,28 +106,29 @@ export default function NewApplicationPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
-  // SLD file (held client-side until application is created)
-  const [sldFile, setSldFile] = useState<File | null>(null);
-  // LOA email screenshot (held client-side until application is created)
-  const [loaEmailFile, setLoaEmailFile] = useState<File | null>(null);
-  // Main breaker box photo (held client-side until application is created)
-  const [breakerBoxPhoto, setBreakerBoxPhoto] = useState<File | null>(null);
-  // SP Account document (held client-side until application is created)
-  const [spAccountFile, setSpAccountFile] = useState<File | null>(null);
-  // SP Account sample modal
-  const [showSpSample, setShowSpSample] = useState(false);
-  // Sample files for guide buttons
-  const [sampleFiles, setSampleFiles] = useState<SampleFileInfo[]>([]);
-  const [samplePreviewKey, setSamplePreviewKey] = useState<string | null>(null);
+  // Phase 2 PR#3 — 법인 JIT 모달 상태
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [jitSubmitError, setJitSubmitError] = useState<string | null>(null);
+  // User profile에 이미 회사정보가 있는지 여부 (Submit 시 한 번 조회)
+  const [userHasCompanyInfo, setUserHasCompanyInfo] = useState<boolean | null>(null);
+
+  // Phase 1 PR#3: 파일 업로드 UI/상태 전부 제거. LEW가 필요 시 이후 단계에서 요청함.
 
   // Form data
   const [formData, setFormData] = useState<FormData>({
     applicationType: 'NEW',
+    applicantType: 'INDIVIDUAL', // AC-A3: 기본값 INDIVIDUAL
     spAccountNo: '',
     address: '',
     postalCode: '',
+    installationBlock: '',
+    installationUnit: '',
+    installationStreet: '',
+    installationBuilding: '',
+    installationPostalCode: '',
     buildingType: '',
     selectedKva: null,
+    kvaUnknown: false,
     originalApplicationSeq: null,
     existingLicenceNo: '',
     existingExpiryDate: '',
@@ -102,6 +136,28 @@ export default function NewApplicationPage() {
     renewalReferenceNo: '',
     manualEntry: false,
     sldOption: 'SELF_UPLOAD',
+    isRentalPremises: false,
+    renewalCompanyNameChanged: false,
+    renewalAddressChanged: false,
+    useCustomInstallationName: false,
+    installationName: '',
+    declarationGroup1Accepted: true,   // 이미 상식에 속하는 사실 서약은 기본 체크 (UX 스펙 §5)
+    declarationGroup2Accepted: false,
+    declarationGroup3Accepted: false,
+    correspondenceSameAsInstallation: true,
+    correspondenceBlock: '',
+    correspondenceUnit: '',
+    correspondenceStreet: '',
+    correspondenceBuilding: '',
+    correspondencePostalCode: '',
+    landlordEiLicenceNo: '',
+    // P2.A — 전 hint 필드 빈 값으로 시작 (신청자가 펼치지 않으면 그대로 비어 있음)
+    msslHint: '',
+    supplyVoltageHint: undefined,
+    consumerTypeHint: undefined,
+    retailerHint: undefined,
+    hasGeneratorHint: false,
+    generatorCapacityHint: undefined,
   });
 
   // Price data
@@ -116,8 +172,28 @@ export default function NewApplicationPage() {
   // Form leave guard — warn when navigating away with unsaved data
   const isFormDirty = useMemo(() => {
     if (showGuide || submitting) return false;
-    return !!(formData.address || formData.postalCode || formData.spAccountNo || formData.selectedKva);
-  }, [showGuide, submitting, formData.address, formData.postalCode, formData.spAccountNo, formData.selectedKva]);
+    return !!(
+      formData.address ||
+      formData.postalCode ||
+      formData.installationBlock ||
+      formData.installationStreet ||
+      formData.installationPostalCode ||
+      formData.msslHint ||
+      formData.selectedKva ||
+      formData.kvaUnknown
+    );
+  }, [
+    showGuide,
+    submitting,
+    formData.address,
+    formData.postalCode,
+    formData.installationBlock,
+    formData.installationStreet,
+    formData.installationPostalCode,
+    formData.msslHint,
+    formData.selectedKva,
+    formData.kvaUnknown,
+  ]);
   useFormGuard(isFormDirty);
 
   // 폼 자동 저장 — sessionStorage 기반 (새로고침 시 복원)
@@ -129,17 +205,6 @@ export default function NewApplicationPage() {
       return true;
     },
   });
-
-  // Load sample files for guide buttons
-  useEffect(() => {
-    sampleFileApi.getSampleFiles()
-      .then(setSampleFiles)
-      .catch(() => { /* non-critical */ });
-  }, []);
-
-  const handleViewSample = (categoryKey: string) => {
-    setSamplePreviewKey(categoryKey);
-  };
 
   // Load completed applications when selecting RENEWAL
   useEffect(() => {
@@ -170,7 +235,12 @@ export default function NewApplicationPage() {
   }, [currentStep]);
 
   // Calculate price when kVA, licence period, or SLD option changes
+  // Phase 5: kvaUnknown 시에는 price breakdown을 숨기므로 계산 스킵
   useEffect(() => {
+    if (formData.kvaUnknown) {
+      setPriceResult(null);
+      return;
+    }
     if (formData.selectedKva) {
       priceApi.calculatePrice(
         formData.selectedKva,
@@ -183,7 +253,7 @@ export default function NewApplicationPage() {
     } else {
       setPriceResult(null);
     }
-  }, [formData.selectedKva, formData.renewalPeriodMonths, formData.sldOption, formData.applicationType]);
+  }, [formData.selectedKva, formData.kvaUnknown, formData.renewalPeriodMonths, formData.sldOption, formData.applicationType]);
 
   const updateField = <K extends keyof FormData>(field: K, value: FormData[K]) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -198,6 +268,8 @@ export default function NewApplicationPage() {
     }
     const app = completedApps.find((a) => a.applicationSeq === appSeq);
     if (app) {
+      // RENEWAL prefill: 5-part 가 이전 신청에 저장되어 있으면 그대로 복원,
+      // 없으면 legacy single address 만 채우고 5-part 는 공란 유지 (사용자가 5-part 에 재입력).
       setFormData((prev) => ({
         ...prev,
         originalApplicationSeq: app.applicationSeq,
@@ -205,6 +277,11 @@ export default function NewApplicationPage() {
         existingExpiryDate: app.licenseExpiryDate || '',
         address: app.address,
         postalCode: app.postalCode,
+        installationBlock: app.installationAddressBlock || '',
+        installationUnit: app.installationAddressUnit || '',
+        installationStreet: app.installationAddressStreet || '',
+        installationBuilding: app.installationAddressBuilding || '',
+        installationPostalCode: app.installationAddressPostalCode || app.postalCode || '',
         buildingType: app.buildingType || '',
         selectedKva: app.selectedKva,
       }));
@@ -244,82 +321,159 @@ export default function NewApplicationPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  /** 공통 payload 빌더 (JIT 모달 경로와 일반 경로 공유) */
+  const buildPayload = (companyInfo?: CompanyInfo): CreateApplicationRequest | null => {
+    // Phase 5: kvaUnknown 시 selectedKva는 placeholder 45 — 서버가 강제 덮어쓰지만 미리 세팅
+    if (!formData.kvaUnknown && !formData.selectedKva) return null;
+    // P2.A — MSSL hint를 정규화(10자리 → "AAA-BB-CCCC-D"). spAccountNo(legacy)는 동일 소스로 동기화.
+    const msslNormalized = normalizeMsslHint(formData.msslHint);
+    const spAccountFromMssl =
+      formData.msslHint && formData.msslHint.replace(/\D/g, '')
+        ? formData.msslHint.replace(/\D/g, '')
+        : undefined;
+    // Installation 5-part → legacy 단일 address/postalCode auto-concat
+    // (Backend 는 여전히 legacy 필드가 NotBlank. 5-part 가 있으면 concat, 없으면 formData.address 그대로.)
+    const installationValues: AddressInputValues = {
+      block: formData.installationBlock,
+      unit: formData.installationUnit,
+      street: formData.installationStreet,
+      building: formData.installationBuilding,
+      postalCode: formData.installationPostalCode,
+    };
+    const concatAddress = joinAddressParts(installationValues);
+    const legacyAddress = concatAddress || formData.address.trim();
+    const legacyPostalCode =
+      formData.installationPostalCode.trim() || formData.postalCode.trim();
+
+    const payload: CreateApplicationRequest = {
+      address: legacyAddress,
+      postalCode: legacyPostalCode,
+      buildingType: formData.buildingType || undefined,
+      selectedKva: formData.kvaUnknown ? 45 : (formData.selectedKva as number),
+      applicantType: formData.applicantType,
+      applicationType: formData.applicationType,
+      renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
+      // legacy spAccountNo는 msslHint와 동기화 (백엔드 하위호환). 둘 다 비어있으면 omit.
+      spAccountNo: spAccountFromMssl,
+      sldOption: formData.sldOption,
+      kvaUnknown: formData.kvaUnknown || undefined,
+      // P2.A — optional hint 필드 (비어있으면 omit)
+      msslHint: msslNormalized,
+      supplyVoltageHint: formData.supplyVoltageHint,
+      consumerTypeHint: formData.consumerTypeHint,
+      retailerHint: formData.retailerHint,
+      hasGeneratorHint: formData.hasGeneratorHint || undefined,
+      generatorCapacityHint: formData.hasGeneratorHint
+        ? formData.generatorCapacityHint
+        : undefined,
+      // ── P1.3: EMA ELISE 확장 필드 (Step 1에서 수집된 플래그) ──
+      isRentalPremises: formData.isRentalPremises || undefined,
+      renewalCompanyNameChanged: formData.applicationType === 'RENEWAL'
+        ? formData.renewalCompanyNameChanged
+        : undefined,
+      renewalAddressChanged: formData.applicationType === 'RENEWAL'
+        ? formData.renewalAddressChanged
+        : undefined,
+      // ── P1.4: Step 2·4에서 수집된 EMA 필드 ──
+      installationName: formData.useCustomInstallationName && formData.installationName.trim()
+        ? formData.installationName.trim()
+        : undefined,
+      landlordEiLicenceNo: formData.isRentalPremises && formData.landlordEiLicenceNo.trim()
+        ? formData.landlordEiLicenceNo.trim()
+        : undefined,
+      // Installation 5-part (P2.B) — 있는 값만 전송, legacy address/postalCode 와 병행.
+      installationAddressBlock: formData.installationBlock.trim() || undefined,
+      installationAddressUnit: formData.installationUnit.trim() || undefined,
+      installationAddressStreet: formData.installationStreet.trim() || undefined,
+      installationAddressBuilding: formData.installationBuilding.trim() || undefined,
+      installationAddressPostalCode: formData.installationPostalCode.trim() || undefined,
+      correspondenceAddressBlock: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceBlock.trim() || undefined
+        : undefined,
+      correspondenceAddressUnit: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceUnit.trim() || undefined
+        : undefined,
+      correspondenceAddressStreet: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceStreet.trim() || undefined
+        : undefined,
+      correspondenceAddressBuilding: !formData.correspondenceSameAsInstallation
+        ? formData.correspondenceBuilding.trim() || undefined
+        : undefined,
+      correspondenceAddressPostalCode: !formData.correspondenceSameAsInstallation
+        ? formData.correspondencePostalCode.trim() || undefined
+        : undefined,
+    };
+    if (formData.applicationType === 'RENEWAL') {
+      if (formData.renewalReferenceNo.trim()) {
+        payload.renewalReferenceNo = formData.renewalReferenceNo.trim();
+      }
+      if (formData.originalApplicationSeq && !formData.manualEntry) {
+        payload.originalApplicationSeq = formData.originalApplicationSeq;
+      } else {
+        payload.existingLicenceNo = formData.existingLicenceNo.trim();
+        payload.existingExpiryDate = formData.existingExpiryDate;
+      }
+    }
+    if (companyInfo) {
+      payload.companyInfo = companyInfo;
+    }
+    return payload;
+  };
+
+  /** 실제 API 호출 — 일반 경로와 JIT 경로 공유 */
+  const createApplicationCall = async (payload: CreateApplicationRequest) => {
+    const result = await applicationApi.createApplication(payload);
+    clearDraft();
+    toast.success('Application submitted successfully!');
+    // P2.A — 선택 hint 형식 오류가 있었던 경우 info 토스트로 안내 (에러 아님, 신청은 성공).
+    if (result.warnings && result.warnings.length > 0) {
+      toast.info(
+        "Some optional details couldn't be saved due to formatting — your LEW will confirm them on site.",
+      );
+    }
+    navigate(`/applications/${result.applicationSeq}`);
+    return result;
+  };
+
+  /**
+   * AC-J1 / AC-J5: Submit Confirm 에서 "Submit" 클릭 시 진입.
+   * - INDIVIDUAL 이면 즉시 API 호출.
+   * - CORPORATE + User에 회사정보가 이미 있으면 즉시 호출.
+   * - CORPORATE + User 회사정보 없음이면 JIT 모달 열고 API는 아직 호출하지 않는다.
+   */
   const handleSubmit = async () => {
-    if (!formData.selectedKva) return;
+    // Phase 5: kvaUnknown 상태면 selectedKva는 미정 → payload에서 45로 placeholder
+    if (!formData.kvaUnknown && !formData.selectedKva) return;
     setShowSubmitConfirm(false);
+
+    // 법인 preflight — 모달 표시 여부 결정
+    if (formData.applicantType === 'CORPORATE') {
+      // User.companyName 확인 — 캐시 없으면 1회 조회
+      let hasCompany = userHasCompanyInfo;
+      if (hasCompany === null) {
+        try {
+          const profile = await userApi.getMyProfile();
+          hasCompany = !!(profile.companyName && profile.companyName.trim());
+          setUserHasCompanyInfo(hasCompany);
+        } catch {
+          // 프로필 조회 실패 시 안전하게 모달 표시 (서버도 COMPANY_INFO_REQUIRED 방어)
+          hasCompany = false;
+          setUserHasCompanyInfo(false);
+        }
+      }
+
+      if (!hasCompany) {
+        setJitSubmitError(null);
+        setShowCompanyModal(true);
+        return; // 모달에서 confirm 시 제출
+      }
+    }
+
     setSubmitting(true);
     try {
-      const payload: CreateApplicationRequest = {
-        address: formData.address.trim(),
-        postalCode: formData.postalCode.trim(),
-        buildingType: formData.buildingType || undefined,
-        selectedKva: formData.selectedKva,
-        applicationType: formData.applicationType,
-        renewalPeriodMonths: formData.renewalPeriodMonths ?? undefined,
-        spAccountNo: formData.spAccountNo.trim() || undefined,
-        sldOption: formData.sldOption,
-      };
-      if (formData.applicationType === 'RENEWAL') {
-        if (formData.renewalReferenceNo.trim()) {
-          payload.renewalReferenceNo = formData.renewalReferenceNo.trim();
-        }
-        if (formData.originalApplicationSeq && !formData.manualEntry) {
-          payload.originalApplicationSeq = formData.originalApplicationSeq;
-        } else {
-          payload.existingLicenceNo = formData.existingLicenceNo.trim();
-          payload.existingExpiryDate = formData.existingExpiryDate;
-        }
-      }
-      const result = await applicationApi.createApplication(payload);
-      clearDraft(); // 신청서 생성 성공 → draft 삭제
-
-      // Upload SLD file if attached
-      if (sldFile && formData.sldOption === 'SELF_UPLOAD') {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, sldFile, 'DRAWING_SLD');
-        } catch {
-          // Application created successfully, but SLD upload failed — user can retry from detail page
-          toast.warning('Application submitted, but SLD upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      // Upload LOA document if attached (Renewal only)
-      if (loaEmailFile && formData.applicationType === 'RENEWAL') {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, loaEmailFile, 'OWNER_AUTH_LETTER');
-        } catch {
-          toast.warning('Application submitted, but LOA upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      // Upload main breaker box photo if attached
-      if (breakerBoxPhoto) {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, breakerBoxPhoto, 'SITE_PHOTO');
-        } catch {
-          toast.warning('Application submitted, but breaker box photo upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      // Upload SP Account document if attached (NEW only)
-      if (spAccountFile && formData.applicationType === 'NEW') {
-        try {
-          await fileApi.uploadFile(result.applicationSeq, spAccountFile, 'SP_ACCOUNT_DOC');
-        } catch {
-          toast.warning('Application submitted, but SP account document upload failed. You can upload it from the application detail page.');
-          navigate(`/applications/${result.applicationSeq}`);
-          return;
-        }
-      }
-
-      toast.success('Application submitted successfully!');
-      navigate(`/applications/${result.applicationSeq}`);
+      const payload = buildPayload();
+      if (!payload) return;
+      await createApplicationCall(payload);
     } catch {
       toast.error('Failed to submit application. Please try again.');
     } finally {
@@ -327,15 +481,57 @@ export default function NewApplicationPage() {
     }
   };
 
-  // Helper: reset renewal fields when switching type
+  /** AC-J2: JIT 모달 confirm — 단일 @Transactional 백엔드가 User 업데이트 + Application 생성 */
+  const handleCompanyModalConfirm = async (info: CompanyInfo) => {
+    setJitSubmitError(null);
+    setSubmitting(true);
+    try {
+      const payload = buildPayload(info);
+      if (!payload) {
+        setSubmitting(false);
+        return;
+      }
+      await createApplicationCall(payload);
+      setShowCompanyModal(false);
+      if (info.persistToProfile) {
+        setUserHasCompanyInfo(true); // 다음 신청 시 모달 생략
+      }
+    } catch (err: unknown) {
+      // 서버 400 INVALID_UEN / COMPANY_INFO_REQUIRED 등을 모달 내 표시
+      const e = err as { response?: { data?: { code?: string; message?: string } }; message?: string };
+      const code = e.response?.data?.code;
+      let msg = e.response?.data?.message || 'Could not submit. Please try again.';
+      if (code === 'INVALID_UEN') msg = 'Invalid UEN format. Check SG UEN rules.';
+      if (code === 'COMPANY_INFO_REQUIRED') msg = 'Company info is required for corporate applications.';
+      setJitSubmitError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  /** AC-J4: 모달 취소 — Step 3 폼 보존, API 호출 없음 */
+  const handleCompanyModalCancel = () => {
+    if (submitting) return;
+    setShowCompanyModal(false);
+    setJitSubmitError(null);
+  };
+
+  // Helper: reset renewal fields when switching type (applicantType은 사용자 선택 유지)
   const handleTypeChange = (type: ApplicationType) => {
-    setFormData({
+    setFormData((prev) => ({
       applicationType: type,
+      applicantType: prev.applicantType,
       spAccountNo: '',
       address: '',
       postalCode: '',
+      installationBlock: '',
+      installationUnit: '',
+      installationStreet: '',
+      installationBuilding: '',
+      installationPostalCode: '',
       buildingType: '',
       selectedKva: null,
+      kvaUnknown: false,
       originalApplicationSeq: null,
       existingLicenceNo: '',
       existingExpiryDate: '',
@@ -343,12 +539,31 @@ export default function NewApplicationPage() {
       renewalReferenceNo: '',
       manualEntry: false,
       sldOption: 'SELF_UPLOAD',
-    });
+      isRentalPremises: false,
+      renewalCompanyNameChanged: false,
+      renewalAddressChanged: false,
+      useCustomInstallationName: false,
+      installationName: '',
+      declarationGroup1Accepted: true,
+      declarationGroup2Accepted: false,
+      declarationGroup3Accepted: false,
+      correspondenceSameAsInstallation: true,
+      correspondenceBlock: '',
+      correspondenceUnit: '',
+      correspondenceStreet: '',
+      correspondenceBuilding: '',
+      correspondencePostalCode: '',
+      landlordEiLicenceNo: '',
+      // P2.A — 신청 타입 전환 시 hint도 초기화 (사용자가 방금 입력 중이었던 것 아님)
+      msslHint: '',
+      supplyVoltageHint: undefined,
+      consumerTypeHint: undefined,
+      retailerHint: undefined,
+      hasGeneratorHint: false,
+      generatorCapacityHint: undefined,
+    }));
     setErrors({});
     setPriceResult(null);
-    setSldFile(null);
-    setLoaEmailFile(null);
-    setSpAccountFile(null);
   };
 
   return (
@@ -430,178 +645,46 @@ export default function NewApplicationPage() {
               ))}
             </div>
 
-            {/* SP Account Notice + Input — NEW only */}
-            {formData.applicationType === 'NEW' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-xl mt-0.5">💡</span>
-                  <div>
-                    <p className="text-sm font-semibold text-blue-800">SP Group Account Required</p>
-                    <p className="text-sm text-blue-700 mt-1">
-                      New licence applications require an active SP Group electricity account. If you don't have one yet, please apply at{' '}
-                      <a
-                        href="https://www.spgroup.com.sg"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline font-medium hover:text-blue-900"
-                      >
-                        SP Group website
-                      </a>{' '}
-                      before proceeding.
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="spAccountNo" className="block text-sm font-medium text-blue-800 mb-1">
-                    SP Account Number
-                  </label>
-                  <input
-                    id="spAccountNo"
-                    type="text"
-                    placeholder="e.g. 1234567890"
-                    value={formData.spAccountNo}
-                    onChange={(e) => updateField('spAccountNo', e.target.value)}
-                    className="w-full px-3 py-2 border border-blue-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder-gray-400"
-                  />
-                  <p className="text-xs text-blue-600 mt-1">
-                    Enter your SP Group account number if available. You can also provide it later.
-                  </p>
-                </div>
-
-                {/* SP Account Email Screenshot/PDF Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-blue-800 mb-1">
-                    SP Account Email Screenshot / PDF <span className="text-red-500">*</span>
-                  </label>
-                  <p className="text-xs text-blue-600 mb-2">
-                    Upload a screenshot or PDF of your SP Group account confirmation email. Accepted formats: PDF, JPG, JPEG. You can also upload it later.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowSpSample(true)}
-                    className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 hover:text-blue-900 mb-2 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    View sample email
-                  </button>
-                  <div className="bg-white/60 rounded-lg p-3 border border-blue-200">
-                    {spAccountFile ? (
-                      <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-lg">📧</span>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-700 truncate">{spAccountFile.name}</p>
-                            <p className="text-xs text-gray-400">
-                              {spAccountFile.size < 1024 * 1024
-                                ? `${(spAccountFile.size / 1024).toFixed(1)} KB`
-                                : `${(spAccountFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setSpAccountFile(null)}
-                          className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                          aria-label="Remove SP account file"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-blue-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 transition-colors">
-                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span className="text-sm text-blue-600">Choose file</span>
-                        <input
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg"
-                          className="hidden"
-                          onChange={(e) => {
-                            const f = e.target.files?.[0];
-                            if (f) {
-                              if (f.size > 10 * 1024 * 1024) {
-                                toast.error('File size must be under 10 MB');
-                                return;
-                              }
-                              setSpAccountFile(f);
-                            }
-                            e.target.value = '';
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
+            {/* Applicant Type — 개인/법인 카드형 라디오 (Phase 1 PR#3, AC-A3) */}
+            <fieldset className="space-y-2 border-t border-gray-100 pt-5">
+              <legend className="block text-sm font-medium text-gray-700 mb-2">
+                Who is applying? <span className="text-red-500">*</span>
+                <span className="ml-2 text-xs font-normal text-gray-500">
+                  (default: Individual)
+                </span>
+              </legend>
+              <div
+                role="radiogroup"
+                aria-label="Applicant Type"
+                className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+              >
+                <ApplicantTypeCard
+                  value="INDIVIDUAL"
+                  checked={formData.applicantType === 'INDIVIDUAL'}
+                  onChange={(v) => updateField('applicantType', v)}
+                />
+                <ApplicantTypeCard
+                  value="CORPORATE"
+                  checked={formData.applicantType === 'CORPORATE'}
+                  onChange={(v) => updateField('applicantType', v)}
+                />
               </div>
-            )}
+              {formData.applicantType === 'CORPORATE' && (
+                <p
+                  className="text-xs text-gray-500 mt-3"
+                  role="status"
+                >
+                  You may be asked for company details in a later step.
+                </p>
+              )}
+              {errors.applicantType && (
+                <p className="text-sm text-red-600">{errors.applicantType}</p>
+              )}
+            </fieldset>
 
-            {/* LOA Upload — Renewal only */}
-            {formData.applicationType === 'RENEWAL' && (
-            <div className="space-y-2 border-t border-gray-100 pt-5">
-              <label className="block text-sm font-medium text-gray-700">
-                📄 Letter of Appointment (LOA) Document
-              </label>
-              <p className="text-xs text-gray-500 mb-2">
-                Upload the LOA document received from the relevant authority. You can also upload it later.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                {loaEmailFile ? (
-                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">🖼️</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">{loaEmailFile.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {loaEmailFile.size < 1024 * 1024
-                            ? `${(loaEmailFile.size / 1024).toFixed(1)} KB`
-                            : `${(loaEmailFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setLoaEmailFile(null)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      aria-label="Remove LOA file"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span className="text-sm text-gray-600">Choose LOA document</span>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) {
-                          if (f.size > 10 * 1024 * 1024) {
-                            toast.error('File size must be under 10 MB');
-                            return;
-                          }
-                          setLoaEmailFile(f);
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-            )}
+            {/* P2.A — 기존 SP Account Number 입력은 Review Step의 Optional Fast-Track 섹션으로
+                MSSL Account No로 승격 이동됨. spAccountNo는 msslHint에서 자동 동기화되므로 여기
+                입력 필드는 제거한다. formData.spAccountNo 자체는 하위호환 위해 타입 유지. */}
 
             {/* Licence Period Selection (applicable to both NEW and RENEWAL) */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
@@ -644,81 +727,6 @@ export default function NewApplicationPage() {
               )}
             </div>
 
-            {/* Main Breaker Box Photo */}
-            <div className="space-y-2 border-t border-gray-100 pt-5">
-              <div className="flex items-center gap-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Main Breaker Box Photo
-                </label>
-                <button
-                  type="button"
-                  onClick={() => handleViewSample('photo')}
-                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
-                  title="View sample file uploaded by admin"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  View Sample
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mb-2">
-                Upload a photo of the main breaker box at the installation site. This helps verify the electrical capacity (kVA). You can also upload it later.
-              </p>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                {breakerBoxPhoto ? (
-                  <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-lg">📷</span>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-700 truncate">{breakerBoxPhoto.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {breakerBoxPhoto.size < 1024 * 1024
-                            ? `${(breakerBoxPhoto.size / 1024).toFixed(1)} KB`
-                            : `${(breakerBoxPhoto.size / (1024 * 1024)).toFixed(1)} MB`}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setBreakerBoxPhoto(null)}
-                      className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                      aria-label="Remove breaker box photo"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="text-sm text-gray-600">Choose photo file</span>
-                    <input
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.heic,.heif"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          if (file.size > 10 * 1024 * 1024) {
-                            toast.error('File size must be less than 10MB');
-                            return;
-                          }
-                          setBreakerBoxPhoto(file);
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-
             {/* SLD Option Selection */}
             <div className="space-y-2 border-t border-gray-100 pt-5">
               <label className="block text-sm font-medium text-gray-700">
@@ -727,7 +735,7 @@ export default function NewApplicationPage() {
               <p className="text-xs text-gray-500 mb-2">
                 An SLD is required for your application. Choose how you'd like to provide it.
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => updateField('sldOption', 'SELF_UPLOAD')}
@@ -742,14 +750,33 @@ export default function NewApplicationPage() {
                     <div>
                       <p className="font-semibold text-gray-800">Upload Myself</p>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        I have an SLD ready and will attach it now or upload later
+                        I have an SLD ready and will attach it now
                       </p>
                     </div>
                   </div>
                 </button>
                 <button
                   type="button"
-                  onClick={() => { updateField('sldOption', 'REQUEST_LEW'); setSldFile(null); }}
+                  onClick={() => updateField('sldOption', 'SUBMIT_WITHIN_3_MONTHS')}
+                  className={`p-4 rounded-lg border-2 text-left transition-all ${
+                    formData.sldOption === 'SUBMIT_WITHIN_3_MONTHS'
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl flex-shrink-0 mt-0.5">⏳</span>
+                    <div>
+                      <p className="font-semibold text-gray-800">Submit Within 3 Months</p>
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        EMA allows submission within 3 months of application
+                      </p>
+                    </div>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField('sldOption', 'REQUEST_LEW')}
                   className={`p-4 rounded-lg border-2 text-left transition-all ${
                     formData.sldOption === 'REQUEST_LEW'
                       ? 'border-emerald-500 bg-emerald-50'
@@ -764,91 +791,34 @@ export default function NewApplicationPage() {
                         A Licensed Electrical Worker will prepare the SLD for you
                       </p>
                       <p className="text-xs text-emerald-600 font-medium mt-1">
-                        Additional fee may apply (to be determined)
+                        Additional fee may apply
                       </p>
                     </div>
                   </div>
                 </button>
               </div>
-
-              {/* SLD File Attachment (shown when SELF_UPLOAD is selected) */}
-              {formData.sldOption === 'SELF_UPLOAD' && (
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-start gap-2 mb-3">
-                    <span className="text-sm">📎</span>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-gray-700">Attach SLD File (Optional)</p>
-                        <button
-                          type="button"
-                          onClick={() => handleViewSample('sld')}
-                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 hover:underline"
-                          title="View sample file uploaded by admin"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                          View Sample
-                        </button>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        You can attach your SLD now, or upload it later from the application detail page.
-                      </p>
-                    </div>
-                  </div>
-
-                  {sldFile ? (
-                    <div className="flex items-center justify-between px-3 py-2.5 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-lg">📄</span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-700 truncate">{sldFile.name}</p>
-                          <p className="text-xs text-gray-400">
-                            {sldFile.size < 1024 * 1024
-                              ? `${(sldFile.size / 1024).toFixed(1)} KB`
-                              : `${(sldFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSldFile(null)}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                        aria-label="Remove SLD file"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      <span className="text-sm text-gray-600">Choose SLD file</span>
-                      <input
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf,.dgn,.tif,.tiff,.gif,.zip"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            if (file.size > 10 * 1024 * 1024) {
-                              toast.error('File size must be less than 10MB');
-                              return;
-                            }
-                            setSldFile(file);
-                          }
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  )}
-                </div>
-              )}
             </div>
+
+            {/* ── P1.3: NEW 경로 전용 — 임대 시설 체크 (Landlord EI Licence는 Step 4에서 JIT로 수집) ── */}
+            {formData.applicationType === 'NEW' && (
+              <div className="border-t border-gray-100 pt-5">
+                <label className="inline-flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.isRentalPremises}
+                    onChange={(e) => updateField('isRentalPremises', e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    This is a rental premises
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      You can add the landlord's EI licence number at Step 4, or leave it blank
+                      — the assigned LEW will collect it later if missing.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            )}
 
             {/* Renewal-specific fields */}
             {formData.applicationType === 'RENEWAL' && (
@@ -977,8 +947,53 @@ export default function NewApplicationPage() {
                   error={errors.renewalReferenceNo}
                   required
                 />
+
+                {/* ── P1.3: 이전 신청 대비 변경 사항 체크박스 2개 ── */}
+                <div className="border-t border-gray-100 pt-5 space-y-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    Changes since your last application
+                  </p>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.renewalCompanyNameChanged}
+                      onChange={(e) => updateField('renewalCompanyNameChanged', e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Company name has changed
+                      <span className="block text-xs text-gray-500 mt-0.5">
+                        We'll ask you to re-confirm company info before submit.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.renewalAddressChanged}
+                      onChange={(e) => updateField('renewalAddressChanged', e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className="text-sm text-gray-700">
+                      Installation address has changed
+                      <span className="block text-xs text-gray-500 mt-0.5">
+                        The address step will require your re-entry.
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </div>
             )}
+
+            {/* Phase 1 PR#3: "서류 제출 필요 없음" 안내 (AC-A1, 하단 고정) */}
+            <div className="border-t border-gray-100 pt-5">
+              <InfoBox title="No documents needed now">
+                Your assigned Licensed Electrical Worker (LEW) will review your
+                application and request any required documents — SP account,
+                LOA, main breaker photo, SLD — through the platform. This keeps
+                your first step fast.
+              </InfoBox>
+            </div>
           </div>
         )}
 
@@ -993,30 +1008,92 @@ export default function NewApplicationPage() {
                   : 'Enter the address of the electrical installation'}
               </p>
             </div>
-            <Input
-              label="Installation Address"
-              placeholder="e.g., 123 Orchard Road, #10-01, Singapore"
-              value={formData.address}
-              onChange={(e) => updateField('address', e.target.value)}
-              error={errors.address}
+            {/* EMA ELISE 5-part Installation Address.
+                legacy 단일 address/postalCode 는 buildPayload 시점에 concat 된다. */}
+            <AddressInputGroup
+              title="Installation Address"
+              description="EMA ELISE renewal form: Block / Unit / Street / Building / Postal."
+              values={{
+                block: formData.installationBlock,
+                unit: formData.installationUnit,
+                street: formData.installationStreet,
+                building: formData.installationBuilding,
+                postalCode: formData.installationPostalCode,
+              }}
+              onChange={(next) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  installationBlock: next.block,
+                  installationUnit: next.unit,
+                  installationStreet: next.street,
+                  installationBuilding: next.building,
+                  installationPostalCode: next.postalCode,
+                  // legacy mirror — 즉시 동기화 (auto-save draft 에서도 그대로 보임).
+                  address: [next.block, next.unit, next.street, next.building]
+                    .map((v) => v.trim())
+                    .filter((v) => v.length > 0)
+                    .join(', '),
+                  postalCode: next.postalCode,
+                }))
+              }
+              errors={{
+                block: errors.installationBlock,
+                street: errors.installationStreet,
+                postalCode: errors.installationPostalCode,
+              }}
               required
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label="Postal Code"
-                placeholder="e.g., 238888"
-                value={formData.postalCode}
-                onChange={(e) => updateField('postalCode', e.target.value)}
-                error={errors.postalCode}
-                required
-              />
-              <Select
-                label="Building Type"
-                value={formData.buildingType}
-                onChange={(e) => updateField('buildingType', e.target.value)}
-                options={BUILDING_TYPES}
-              />
-            </div>
+            {/* Legacy 단일 address 폴백 안내 — 5-part 비어 있는 draft 에서 복원된 케이스. */}
+            {!hasAnyAddressPart({
+              block: formData.installationBlock,
+              unit: formData.installationUnit,
+              street: formData.installationStreet,
+              building: formData.installationBuilding,
+              postalCode: formData.installationPostalCode,
+            }) && formData.address && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                We have the previous installation address on file as:
+                <span className="block mt-1 font-medium text-amber-900">
+                  "{formData.address}"
+                </span>
+                Please split it into the 5 fields above so it matches the EMA ELISE form.
+              </div>
+            )}
+            <Select
+              label="Building Type"
+              value={formData.buildingType}
+              onChange={(e) => updateField('buildingType', e.target.value)}
+              options={BUILDING_TYPES}
+            />
+
+            {/* ── P1.4: Installation Name — 기본 자동 생성, "다르게 지정" 토글 시 편집 ── */}
+            {formData.applicationType === 'NEW' && (
+              <div className="space-y-2 border-t border-gray-100 pt-4">
+                <label className="inline-flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.useCustomInstallationName}
+                    onChange={(e) => updateField('useCustomInstallationName', e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Use a custom installation name
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      Default: your applicant name + "Premises". Toggle to override.
+                    </span>
+                  </span>
+                </label>
+                {formData.useCustomInstallationName && (
+                  <Input
+                    label="Installation Name"
+                    placeholder="e.g., ABC Factory Block A"
+                    value={formData.installationName}
+                    onChange={(e) => updateField('installationName', e.target.value)}
+                    maxLength={200}
+                  />
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -1032,12 +1109,36 @@ export default function NewApplicationPage() {
                 <h2 className="text-lg font-semibold text-gray-800">Capacity & Pricing</h2>
                 <p className="text-sm text-gray-500 mt-1">Select the electrical capacity for your installation</p>
               </div>
+
+              {/* Phase 5 — Not sure about kVA? 안내 (pre-select 하지 않음) */}
+              <KvaTipBox buildingType={formData.buildingType} />
+
               <Select
                 label="Electric Box (kVA)"
-                value={formData.selectedKva ? String(formData.selectedKva) : ''}
-                onChange={(e) => updateField('selectedKva', e.target.value ? Number(e.target.value) : null)}
+                value={
+                  formData.kvaUnknown
+                    ? KVA_UNKNOWN_SENTINEL
+                    : (formData.selectedKva ? String(formData.selectedKva) : '')
+                }
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === KVA_UNKNOWN_SENTINEL) {
+                    // I don't know 선택 — selectedKva는 서버가 45로 강제
+                    setFormData((prev) => ({ ...prev, kvaUnknown: true, selectedKva: null }));
+                    setErrors((prev) => ({ ...prev, selectedKva: '' }));
+                  } else {
+                    setFormData((prev) => ({
+                      ...prev,
+                      kvaUnknown: false,
+                      selectedKva: v ? Number(v) : null,
+                    }));
+                    setErrors((prev) => ({ ...prev, selectedKva: '' }));
+                  }
+                }}
                 options={[
                   { value: '', label: 'Select kVA capacity' },
+                  { value: KVA_UNKNOWN_SENTINEL, label: "I don't know — let LEW confirm me later" },
+                  { value: '__DIVIDER__', label: '────────────────────', disabled: true },
                   ...priceTiers.map((tier) => ({
                     value: String(tier.kvaMin),
                     label: `${tier.description} — SGD $${tier.price.toLocaleString()}`,
@@ -1047,78 +1148,143 @@ export default function NewApplicationPage() {
                 required
               />
 
-              {/* Price breakdown */}
-              {priceResult && (
-                <div className="bg-primary-50 rounded-xl p-5 border border-primary-100 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-primary-700">Selected Tier</p>
-                      <p className="text-lg font-semibold text-primary-800 mt-1">{priceResult.tierDescription}</p>
-                    </div>
-                  </div>
-                  <div className="border-t border-primary-200 pt-3 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-primary-700">kVA Tier Price</span>
-                      <span className="font-medium text-primary-800">SGD ${priceResult.price.toLocaleString()}</span>
-                    </div>
-                    {priceResult.sldFee != null && priceResult.sldFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-primary-700">SLD Drawing Fee</span>
-                        <span className="font-medium text-primary-800">SGD ${priceResult.sldFee.toLocaleString()}</span>
-                      </div>
-                    )}
-                    {priceResult.emaFee != null && priceResult.emaFee > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>
-                        <span className="font-medium text-primary-800">SGD ${priceResult.emaFee.toLocaleString()}</span>
-                      </div>
-                    )}
-                    <div className="border-t border-primary-200 pt-2 flex justify-between">
-                      <span className="text-sm font-semibold text-primary-700">Total Amount</span>
-                      <span className="text-xl font-bold text-primary-800">
-                        SGD ${priceResult.totalAmount.toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Price reference table */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-600 mb-2">Price Reference Table</h3>
-                <div className="border border-gray-200 rounded-lg overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="text-left py-2 px-3 font-medium text-gray-600">Capacity</th>
-                        <th className="text-right py-2 px-3 font-medium text-gray-600">Price (SGD)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {priceTiers.map((tier) => (
-                        <tr
-                          key={tier.masterPriceSeq}
-                          className={`border-t border-gray-100 ${
-                            formData.selectedKva && formData.selectedKva >= tier.kvaMin && formData.selectedKva <= tier.kvaMax
-                              ? 'bg-primary-50 font-medium'
-                              : ''
-                          }`}
-                        >
-                          <td className="py-2 px-3">{tier.description}</td>
-                          <td className="py-2 px-3 text-right">${tier.price.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              {/* Phase 5 — 가격 카드 (UNKNOWN 시 "From S$350" + deactivated table) */}
+              <KvaPriceCard
+                kvaUnknown={formData.kvaUnknown}
+                selectedKva={formData.selectedKva}
+                priceResult={priceResult}
+                priceTiers={priceTiers}
+                renewalPeriodMonths={formData.renewalPeriodMonths}
+              />
             </div>
           )
         )}
 
         {/* ───── Step 3: Review ───── */}
         {currentStep === 3 && (
-          <StepReview formData={formData} priceResult={priceResult} sldFile={sldFile} loaEmailFile={loaEmailFile} breakerBoxPhoto={breakerBoxPhoto} spAccountFile={spAccountFile} />
+          <div className="space-y-5">
+            {/* P2.A — Optional fast-track 섹션. 기본 접힘 (localStorage 기억).
+                Declaration 위, Review 카드 맨 위에 위치 — 사용자가 submit 직전에 한 번 더
+                "아는 게 있으면 추가" 기회를 제공. */}
+            <OptionalFastTrackSection
+              formData={formData}
+              // 슬라이스 키는 모두 FormData의 키이므로 런타임 안전. 제네릭 variance 우회를 위해
+              // 단일 지점에서 캐스팅.
+              updateField={((field: string, value: unknown) =>
+                (updateField as (f: string, v: unknown) => void)(field, value)
+              ) as never}
+            />
+
+            <StepReview formData={formData} priceResult={priceResult} />
+
+            {/* ── P1.4: Correspondence Address — 기본은 Installation과 동일, 해제 시 5-part 노출 ── */}
+            <div className="bg-gray-50 rounded-lg p-4 space-y-3 border border-gray-100">
+              <label className="inline-flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.correspondenceSameAsInstallation}
+                  onChange={(e) => updateField('correspondenceSameAsInstallation', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  Correspondence address is the same as installation address
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Uncheck to enter a different postal address.
+                  </span>
+                </span>
+              </label>
+              {!formData.correspondenceSameAsInstallation && (
+                <div className="pt-2">
+                  <AddressInputGroup
+                    values={{
+                      block: formData.correspondenceBlock,
+                      unit: formData.correspondenceUnit,
+                      street: formData.correspondenceStreet,
+                      building: formData.correspondenceBuilding,
+                      postalCode: formData.correspondencePostalCode,
+                    }}
+                    onChange={(next) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        correspondenceBlock: next.block,
+                        correspondenceUnit: next.unit,
+                        correspondenceStreet: next.street,
+                        correspondenceBuilding: next.building,
+                        correspondencePostalCode: next.postalCode,
+                      }))
+                    }
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ── P1.4: Landlord EI Licence — NEW + 임대 체크 시에만 노출 ── */}
+            {formData.applicationType === 'NEW' && formData.isRentalPremises && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+                <h3 className="text-sm font-semibold text-amber-900">
+                  Landlord's Installation Licence <span className="font-normal text-amber-700">(Optional)</span>
+                </h3>
+                <p className="text-xs text-amber-800">
+                  If you know the landlord's EI Licence number, you can enter it now. It
+                  will be stored encrypted and visible only to the assigned LEW. If you
+                  don't know it, leave this blank — the assigned LEW will follow up with
+                  you to collect it before the application is finalized.
+                </p>
+                <Input
+                  label="Landlord EI Licence No (optional)"
+                  value={formData.landlordEiLicenceNo}
+                  onChange={(e) => updateField('landlordEiLicenceNo', e.target.value)}
+                  placeholder="e.g., E-12345 — leave blank if unknown"
+                  maxLength={100}
+                />
+              </div>
+            )}
+
+            {/* ── P1.4: Declaration 3-group (EMA 조항 4개를 의미 단위로 축약) ── */}
+            <div className="border-2 border-gray-200 rounded-lg p-4 space-y-3 bg-white">
+              <h3 className="text-sm font-semibold text-gray-800">Declaration</h3>
+              <p className="text-xs text-gray-500">
+                All three must be acknowledged before submission.
+              </p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.declarationGroup1Accepted}
+                  onChange={(e) => updateField('declarationGroup1Accepted', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I confirm that the information provided is <strong>true and complete</strong>,
+                  and I understand that false declarations are subject to legal liability
+                  under EMA regulations.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.declarationGroup2Accepted}
+                  onChange={(e) => updateField('declarationGroup2Accepted', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  My electrical installation <strong>complies with Singapore's electrical
+                  safety regulations</strong> and SP Group technical requirements.
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.declarationGroup3Accepted}
+                  onChange={(e) => updateField('declarationGroup3Accepted', e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I authorize the assigned LEW to perform <strong>periodic inspections
+                  and report results to EMA</strong> on my behalf.
+                </span>
+              </label>
+            </div>
+          </div>
         )}
 
         {/* Navigation buttons */}
@@ -1131,9 +1297,21 @@ export default function NewApplicationPage() {
           </Button>
           {currentStep < 3 ? (
             <Button onClick={handleNext}>Continue</Button>
-          ) : (
-            <Button onClick={() => setShowSubmitConfirm(true)} loading={submitting}>Submit Application</Button>
-          )}
+          ) : (() => {
+            // Declaration 3개 미체크 시에만 차단. Landlord EI 공란 허용 (LEW가 나중에 수집).
+            const submitDisabled =
+              !formData.declarationGroup1Accepted ||
+              !formData.declarationGroup2Accepted ||
+              !formData.declarationGroup3Accepted;
+            return (
+              <Button
+                onClick={() => setShowSubmitConfirm(true)}
+                loading={submitting}
+                disabled={submitDisabled}
+                aria-disabled={submitDisabled}
+              >Submit Application</Button>
+            );
+          })()}
         </div>
       </Card>}
 
@@ -1148,27 +1326,16 @@ export default function NewApplicationPage() {
         confirmLabel="Submit"
       />
 
-      {/* SP Account Email Sample Modal */}
-      <Modal isOpen={showSpSample} onClose={() => setShowSpSample(false)} size="lg">
-        <ModalHeader title="SP Account Email — Sample" onClose={() => setShowSpSample(false)} />
-        <ModalBody>
-          <p className="text-sm text-gray-600 mb-4">
-            Below are examples of the SP Services Ltd account confirmation emails. Please upload a screenshot or PDF of a similar email you received from SP Group.
-          </p>
-          <SpAccountEmailSample />
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="outline" onClick={() => setShowSpSample(false)}>Close</Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Sample File Preview Modal */}
-      <SamplePreviewModal
-        isOpen={samplePreviewKey !== null}
-        onClose={() => setSamplePreviewKey(null)}
-        categoryKey={samplePreviewKey}
-        sampleFiles={sampleFiles}
+      {/* Phase 2 PR#3: 법인 JIT 회사정보 모달 */}
+      <CompanyInfoModal
+        isOpen={showCompanyModal}
+        submitting={submitting}
+        submitError={jitSubmitError}
+        onConfirm={handleCompanyModalConfirm}
+        onCancel={handleCompanyModalCancel}
       />
+
+      {/* Phase 1 PR#3: SP Account Email Sample Modal, SamplePreviewModal 제거 (파일 업로드 UI 제거와 함께) */}
     </div>
   );
 }
