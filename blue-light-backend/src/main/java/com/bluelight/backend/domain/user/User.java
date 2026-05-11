@@ -229,6 +229,39 @@ public class User extends BaseEntity {
     @Column(name = "marketing_opt_in_at")
     private LocalDateTime marketingOptInAt;
 
+    // ============================================================
+    // ★ WhatsApp 알림 인프라 (PR-0A, 2026-05-11)
+    // ----------------------------------------------------------------
+    // phone_e164 가 WhatsApp/SMS 발송 정본 (E.164 정규화). 기존 phone 컬럼은 표시용 원본.
+    // 옵트인/옵트아웃은 채널×용도(transactional/marketing) 가 ConsentType 으로 분리되며
+    // (PR-0D 별건 + Phase 1), 본 필드는 단순 ON/OFF 토글 + 변경 시각만 보관한다.
+    // ============================================================
+
+    /** WhatsApp/SMS 발송 정본 — E.164 정규화(+65...). null 이면 발송 불가. */
+    @Column(name = "phone_e164", length = 20)
+    private String phoneE164;
+
+    /** 전화번호 OTP 검증 완료 여부 — 잘못된 번호로 PII 노출 방지 가드. */
+    @Column(name = "phone_verified", nullable = false)
+    private Boolean phoneVerified = false;
+
+    @Column(name = "phone_verified_at")
+    private LocalDateTime phoneVerifiedAt;
+
+    /** WhatsApp 알림 수신 옵트인 토글. STOP 응답 또는 사용자 설정으로 토글된다. */
+    @Column(name = "whatsapp_opt_in", nullable = false)
+    private Boolean whatsappOptIn = false;
+
+    @Column(name = "whatsapp_opt_in_at")
+    private LocalDateTime whatsappOptInAt;
+
+    @Column(name = "whatsapp_opt_out_at")
+    private LocalDateTime whatsappOptOutAt;
+
+    /** 알림 메시지 언어 — ISO 639-1 (en / ko / zh-Hans 등). 기본 en. */
+    @Column(name = "preferred_language", nullable = false, length = 10)
+    private String preferredLanguage = "en";
+
     @Builder
     public User(String email, String password, String firstName, String lastName, String phone,
                 UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
@@ -266,6 +299,11 @@ public class User extends BaseEntity {
         this.signupConsentAt = signupConsentAt;
         this.termsVersion = termsVersion;
         this.marketingOptIn = marketingOptIn != null ? marketingOptIn : false;
+        // ★ WhatsApp 컬럼은 가입 시점에 받지 않는다 — 옵트인 흐름에서 별도 메서드로 세팅.
+        //   Phase 1 SignupPage 가 phone 자체를 제거한 JIT 원칙(2026-04-17)을 존중.
+        this.phoneVerified = false;
+        this.whatsappOptIn = false;
+        this.preferredLanguage = "en";
     }
 
     /**
@@ -533,6 +571,13 @@ public class User extends BaseEntity {
         // ★ Concierge v1.3 — PDPA 삭제 시 마케팅 기록도 초기화
         this.marketingOptIn = false;
         this.marketingOptInAt = null;
+        // ★ PR-0A — WhatsApp 채널 정보 일괄 초기화 (옵트아웃 시각은 감사용으로 now() 기록)
+        this.phoneE164 = null;
+        this.phoneVerified = false;
+        this.phoneVerifiedAt = null;
+        this.whatsappOptIn = false;
+        this.whatsappOptInAt = null;
+        this.whatsappOptOutAt = LocalDateTime.now();
     }
 
     // ============================================================
@@ -632,5 +677,70 @@ public class User extends BaseEntity {
      */
     public void optOutMarketing() {
         this.marketingOptIn = false;
+    }
+
+    // ============================================================
+    // ★ WhatsApp 알림 인프라 도메인 메서드 (PR-0A)
+    // ============================================================
+
+    /**
+     * 전화번호 OTP 검증 성공 시 호출. 검증된 E.164 번호를 정본으로 기록한다.
+     * <p>호출 측이 E.164 정규화 + 형식 검증을 마친 값을 넘겨야 한다.</p>
+     */
+    public void verifyPhone(String e164, LocalDateTime at) {
+        if (e164 == null || e164.isBlank()) {
+            throw new IllegalArgumentException("phoneE164 must not be blank");
+        }
+        this.phoneE164 = e164;
+        this.phoneVerified = true;
+        this.phoneVerifiedAt = at;
+    }
+
+    /**
+     * 전화번호 변경 시 검증 무효화 (재OTP 요구). phoneE164 컬럼은 호출자가 별도 갱신.
+     */
+    public void clearPhoneVerification() {
+        this.phoneVerified = false;
+        this.phoneVerifiedAt = null;
+        // 옵트인 상태는 그대로 두되, 실제 발송은 isWhatsappReachable() 가드가 차단.
+    }
+
+    /**
+     * WhatsApp 알림 수신 옵트인.
+     * <p>채널×용도(transactional/marketing) 분리는 ConsentType 레이어가 담당하며,
+     * 본 메서드는 단순 채널 토글이다. 옵트아웃 이력 시각은 보존만 한다.</p>
+     */
+    public void optInWhatsapp(LocalDateTime at) {
+        this.whatsappOptIn = true;
+        this.whatsappOptInAt = at;
+    }
+
+    /**
+     * WhatsApp 알림 수신 거부 (사용자 설정 또는 STOP 응답 수신).
+     */
+    public void optOutWhatsapp(LocalDateTime at) {
+        this.whatsappOptIn = false;
+        this.whatsappOptOutAt = at;
+    }
+
+    /**
+     * WhatsApp 발송 가능 여부 — 적재 직전 가드.
+     * <p>요건: ① E.164 번호 보유 ② OTP 검증 완료 ③ 옵트인 ON ④ 익명화/삭제 상태 아님.</p>
+     */
+    public boolean isWhatsappReachable() {
+        if (this.status == UserStatus.DELETED) return false;
+        if (this.phoneE164 == null || this.phoneE164.isBlank()) return false;
+        if (!Boolean.TRUE.equals(this.phoneVerified)) return false;
+        return Boolean.TRUE.equals(this.whatsappOptIn);
+    }
+
+    /**
+     * 알림 메시지 언어 변경.
+     */
+    public void updatePreferredLanguage(String locale) {
+        if (locale == null || locale.isBlank()) {
+            throw new IllegalArgumentException("locale must not be blank");
+        }
+        this.preferredLanguage = locale;
     }
 }
