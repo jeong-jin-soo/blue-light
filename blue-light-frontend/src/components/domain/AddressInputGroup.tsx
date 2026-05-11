@@ -123,7 +123,11 @@ export function AddressInputGroup({
   );
 }
 
-/** Trimmed 5-part → single legacy `address` string (comma-joined, non-empty only). */
+/**
+ * Trimmed 5-part → single legacy `address` string (comma-joined, non-empty only).
+ * 컴포넌트와 강결합된 helper — 분리하면 import 분산. Fast Refresh 만 해당 파일에서 비활성.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
 export function joinAddressParts(values: AddressInputValues): string {
   return [values.block, values.unit, values.street, values.building]
     .map((v) => v.trim())
@@ -132,6 +136,7 @@ export function joinAddressParts(values: AddressInputValues): string {
 }
 
 /** True when at least one of the 5 parts is non-blank. */
+// eslint-disable-next-line react-refresh/only-export-components
 export function hasAnyAddressPart(values: AddressInputValues): boolean {
   return Object.values(values).some((v) => v && v.trim().length > 0);
 }

@@ -159,7 +159,10 @@ function ReadOnlyInstallationDetails({ application }: { application: Application
   };
   const hasFiveParts = hasAnyAddressPart(fiveParts);
 
-  const KvaLine = () => (
+  // JSX 변수로 보관 (props 없는 단순 JSX) — 컴포넌트 함수 안에서 컴포넌트를 정의하면
+  // react-hooks/static-components 규칙 위반 + 매 렌더링마다 새 컴포넌트 식별자가 생성되어
+  // 자식 트리가 unmount/remount 된다.
+  const kvaLine = (
     <div>
       <dt className="text-xs text-gray-500 mb-0.5">Electric Box (kVA)</dt>
       {application.kvaStatus === 'UNKNOWN' ? (
@@ -186,7 +189,7 @@ function ReadOnlyInstallationDetails({ application }: { application: Application
         <InfoField label="Installation Address" value={application.address} />
         <InfoField label="Postal Code" value={application.postalCode} />
         <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-        <KvaLine />
+        {kvaLine}
         {application.spAccountNo && (
           <InfoField label="SP Account No." value={application.spAccountNo} />
         )}
@@ -207,7 +210,7 @@ function ReadOnlyInstallationDetails({ application }: { application: Application
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-100">
         <InfoField label="Building Type" value={application.buildingType || 'Not specified'} />
-        <KvaLine />
+        {kvaLine}
         {application.spAccountNo && (
           <InfoField label="SP Account No." value={application.spAccountNo} />
         )}

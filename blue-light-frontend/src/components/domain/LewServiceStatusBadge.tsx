@@ -33,7 +33,9 @@ export function LewServiceStatusBadge({ status, className = '' }: Props) {
 
 /**
  * Status options for list filter dropdowns.
+ * 컴포넌트가 사용하는 상태 enum 과 같은 응집을 유지 — Fast Refresh 만 해당 파일에서 비활성.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const LEW_SERVICE_STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
   { value: 'PENDING_QUOTE', label: 'Pending Quote' },
