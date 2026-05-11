@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS users (
     terms_version             VARCHAR(30),
     marketing_opt_in          BOOLEAN       NOT NULL DEFAULT FALSE,
     marketing_opt_in_at       DATETIME(6),
+    -- ★ WhatsApp 알림 인프라 (PR-0A) — phone_e164 가 발송 정본, phone 은 표시용 원본 유지.
+    -- 옵트인은 채널×용도(transactional/marketing) 가 ConsentType 으로 분리되며, 본 컬럼은 ON/OFF 토글 + 최신 변경 시각만 보관.
+    phone_e164                VARCHAR(20),
+    phone_verified            BOOLEAN       NOT NULL DEFAULT FALSE,
+    phone_verified_at         DATETIME(6),
+    whatsapp_opt_in           BOOLEAN       NOT NULL DEFAULT FALSE,
+    whatsapp_opt_in_at        DATETIME(6),
+    whatsapp_opt_out_at       DATETIME(6),
+    preferred_language        VARCHAR(10)   NOT NULL DEFAULT 'en',
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
     created_by     BIGINT,
@@ -1232,3 +1241,135 @@ CREATE TABLE IF NOT EXISTS user_roles (
     KEY idx_user_roles_user (user_seq),
     CONSTRAINT fk_user_roles_user FOREIGN KEY (user_seq) REFERENCES users (user_seq) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- ★ 알림 인프라 일반화 (PR-0A) — WhatsApp 도입 사전 기반
+-- ----------------------------------------------------------------
+-- 이메일/인앱 단일 채널 발송을 ① 채널 어댑터 ② Outbox 패턴 ③ 사용자 환경설정 ④ 템플릿 카탈로그
+-- 로 일반화한다. 본 PR 은 스키마/엔티티만 추가하며 행위 변경은 없다 (PR-0B/0C 에서 적용).
+-- 참고: doc/Project Analysis/whatsapp-notification-plan.md (예정)
+-- ============================================
+
+-- 18. 알림 환경설정 — 사용자 × 이벤트 × 채널 enable/disable.
+-- 행이 없으면 system_settings 의 채널 기본값을 따른다 (Single Source of Truth, CLAUDE.md §설계 원칙).
+CREATE TABLE IF NOT EXISTS notification_preferences (
+    preference_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    user_seq         BIGINT       NOT NULL,
+    event_type       VARCHAR(60)  NOT NULL,   -- NotificationType enum 값
+    channel          VARCHAR(20)  NOT NULL,   -- IN_APP | EMAIL | WHATSAPP
+    enabled          BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at       DATETIME(6),
+    updated_at       DATETIME(6),
+    created_by       BIGINT,
+    updated_by       BIGINT,
+    deleted_at       DATETIME(6),
+    PRIMARY KEY (preference_seq),
+    UNIQUE KEY uk_notif_pref (user_seq, event_type, channel),
+    KEY idx_notif_pref_user (user_seq),
+    CONSTRAINT fk_notif_pref_user FOREIGN KEY (user_seq) REFERENCES users (user_seq) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19. 알림 템플릿 카탈로그 — (event_type, channel, locale) 단위. 코드 하드코딩 금지.
+-- WhatsApp 은 BSP/Meta 측 사전 승인된 template name 을 provider_template_name 컬럼이 매핑한다.
+CREATE TABLE IF NOT EXISTS notification_templates (
+    template_seq            BIGINT       NOT NULL AUTO_INCREMENT,
+    template_code           VARCHAR(80)  NOT NULL,   -- 예: PAYMENT_REQUEST_APPLICANT
+    channel                 VARCHAR(20)  NOT NULL,   -- IN_APP | EMAIL | WHATSAPP
+    locale                  VARCHAR(10)  NOT NULL,   -- en | ko | zh-Hans
+    provider_template_name  VARCHAR(120),            -- Meta/BSP 등록명 (WhatsApp 필수)
+    subject                 VARCHAR(200),            -- EMAIL 전용
+    body_text               TEXT         NOT NULL,   -- 미리보기 또는 fallback 본문
+    variables_json          TEXT,                    -- {{1}} {{2}} 변수 메타 (검증용 JSON 배열)
+    enabled                 BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at              DATETIME(6),
+    updated_at              DATETIME(6),
+    created_by              BIGINT,
+    updated_by              BIGINT,
+    deleted_at              DATETIME(6),
+    PRIMARY KEY (template_seq),
+    UNIQUE KEY uk_notif_template (template_code, channel, locale),
+    KEY idx_notif_template_code (template_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. 알림 Outbox — manual_email_dispatches 패턴을 모든 채널로 일반화.
+-- 도메인 트랜잭션 안에서 PENDING row 적재 → AFTER_COMMIT 단계에서 채널 어댑터가 외부 호출.
+-- 중복 발송 차단은 idempotency_key UNIQUE 가 1차 가드, BSP 측 dedup id 가 2차 가드.
+-- Soft delete 미적용 (감사 무결성 — ManualEmailDispatch 와 동일).
+CREATE TABLE IF NOT EXISTS notification_outbox (
+    outbox_seq         BIGINT        NOT NULL AUTO_INCREMENT,
+    idempotency_key    VARCHAR(160)  NOT NULL,    -- {eventType}:{refType}:{refId}:{userSeq}:{channel}
+    user_seq           BIGINT        NOT NULL,
+    channel            VARCHAR(20)   NOT NULL,    -- IN_APP | EMAIL | WHATSAPP
+    event_type         VARCHAR(60)   NOT NULL,    -- NotificationType enum 값
+    template_code      VARCHAR(80)   NOT NULL,
+    locale             VARCHAR(10)   NOT NULL DEFAULT 'en',
+    payload_json       TEXT          NOT NULL,    -- 렌더링 변수
+    reference_type     VARCHAR(50),
+    reference_id       BIGINT,
+    status             VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
+                                                  -- PENDING | SENDING | SENT | FAILED | DEAD | SKIPPED
+    attempt_count      INT           NOT NULL DEFAULT 0,
+    next_attempt_at    DATETIME(6),
+    last_error         TEXT,
+    sent_at            DATETIME(6),
+    -- BaseEntity audit (deleted_at 보존만, soft delete 미적용)
+    created_at         DATETIME(6),
+    updated_at         DATETIME(6),
+    created_by         BIGINT,
+    updated_by         BIGINT,
+    deleted_at         DATETIME(6),
+    PRIMARY KEY (outbox_seq),
+    UNIQUE KEY uk_outbox_idem (idempotency_key),
+    KEY idx_outbox_due (status, next_attempt_at),
+    KEY idx_outbox_ref (reference_type, reference_id),
+    KEY idx_outbox_user (user_seq, created_at DESC),
+    CONSTRAINT fk_outbox_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 21. WhatsApp 발송 로그 — 채널 특화 메타데이터 (BSP message id, 배달 상태 등).
+-- 본문 저장 금지 (PDPA 최소화). payload_json 은 변수 슬롯만.
+-- Soft delete 미적용 (감사 무결성).
+CREATE TABLE IF NOT EXISTS whatsapp_message_log (
+    log_seq             BIGINT       NOT NULL AUTO_INCREMENT,
+    outbox_seq          BIGINT       NOT NULL,
+    user_seq            BIGINT       NOT NULL,
+    phone_e164          VARCHAR(20)  NOT NULL,
+    template_code       VARCHAR(80)  NOT NULL,
+    template_locale     VARCHAR(10)  NOT NULL,
+    payload_json        TEXT         NOT NULL,
+    provider            VARCHAR(20)  NOT NULL,    -- META | MOCK (BSP 추가 시 확장)
+    provider_message_id VARCHAR(120),
+    status              VARCHAR(20)  NOT NULL,    -- QUEUED | SENT | DELIVERED | READ | FAILED
+    error_code          VARCHAR(60),
+    error_message       TEXT,
+    sent_at             DATETIME(6),
+    delivered_at        DATETIME(6),
+    read_at             DATETIME(6),
+    created_at          DATETIME(6),
+    updated_at          DATETIME(6),
+    created_by          BIGINT,
+    updated_by          BIGINT,
+    deleted_at          DATETIME(6),
+    PRIMARY KEY (log_seq),
+    KEY idx_wa_provider_msg (provider_message_id),
+    KEY idx_wa_user_status (user_seq, status, created_at DESC),
+    KEY idx_wa_outbox (outbox_seq),
+    CONSTRAINT fk_wa_outbox FOREIGN KEY (outbox_seq) REFERENCES notification_outbox (outbox_seq),
+    CONSTRAINT fk_wa_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 운영 DB 적용 가이드 (PR-0A) — schema.sql 의 sql.init.mode=always 는 매 부트마다 재실행되므로,
+-- ALTER 구문은 본 파일에 포함시키지 않는다 (MySQL 8.0 은 ADD COLUMN IF NOT EXISTS 미지원).
+-- 이미 users 테이블이 존재하는 환경에서는 아래 ALTER 를 ★ 1회만 ★ 수동 실행한다.
+-- 신규 DB 는 위 CREATE TABLE 정의로 컬럼이 함께 생성되므로 ALTER 불필요.
+--
+-- ALTER TABLE users
+--   ADD COLUMN phone_e164          VARCHAR(20),
+--   ADD COLUMN phone_verified      BOOLEAN     NOT NULL DEFAULT FALSE,
+--   ADD COLUMN phone_verified_at   DATETIME(6),
+--   ADD COLUMN whatsapp_opt_in     BOOLEAN     NOT NULL DEFAULT FALSE,
+--   ADD COLUMN whatsapp_opt_in_at  DATETIME(6),
+--   ADD COLUMN whatsapp_opt_out_at DATETIME(6),
+--   ADD COLUMN preferred_language  VARCHAR(10) NOT NULL DEFAULT 'en';
+-- ============================================
