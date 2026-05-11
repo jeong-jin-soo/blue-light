@@ -70,7 +70,7 @@ public class AuthController {
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
         log.info("회원가입 요청: email={}", request.getEmail());
-        TokenResponse response = authService.signup(request);
+        TokenResponse response = authService.signup(request, httpRequest);
         addJwtCookie(httpResponse, response.getAccessToken());
         auditLogService.log(
                 response.getUserSeq(), request.getEmail(), response.getRole(),

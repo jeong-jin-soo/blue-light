@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PR-0D: PII 마스킹 — 이메일·전화번호를 로그 출력 직전에 마스킹.
+
+  Spring Boot 의 기본 로깅 정책(레벨/색상)은 그대로 유지하되, 콘솔 메시지에 적용되는 %m 부분을
+  Logback 표준 컨버터 %replace 로 감싸 정규식 치환한다. 외부 클래스 추가 없이 동작.
+
+  마스킹 정규식 (의도적 lenient — false positive 가 있어도 PII 노출 감소가 우선):
+    - 이메일:   [A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}  →  ***@***
+    - 전화번호: \+?\d{8,15}                                       →  ***PHONE***
+
+  application.yaml 의 logging.level.* 매핑은 springProperty 로 보존된다.
+-->
+<configuration>
+
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <!-- 메시지(%m) 한 번에 두 단계 정규식 치환을 적용 — 이메일 먼저, 전화번호 다음. -->
+    <property name="MASKED_MESSAGE"
+              value="%replace(%replace(%m){'([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})','***@***'}){'(\+?\d{8,15})','***PHONE***'}"/>
+
+    <!-- Spring Boot 기본 콘솔 패턴에서 %m 만 ${MASKED_MESSAGE} 로 교체. 컬러/타임스탬프/로거명 유지. -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd HH:mm:ss.SSS}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} ${MASKED_MESSAGE}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}"/>
+
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- application.yaml 의 logging.level.* 매핑 보존 (Spring Boot 가 LoggingSystem 으로 별도 적용). -->
+    <springProperty scope="context" name="LOGGING_LEVEL_ROOT"
+                    source="logging.level.root" defaultValue="INFO"/>
+    <springProperty scope="context" name="APP_LOG_LEVEL"
+                    source="logging.level.com.bluelight.backend" defaultValue="INFO"/>
+    <springProperty scope="context" name="SQL_LOG_LEVEL"
+                    source="logging.level.org.hibernate.SQL" defaultValue="WARN"/>
+    <springProperty scope="context" name="SQL_BIND_LOG_LEVEL"
+                    source="logging.level.org.hibernate.orm.jdbc.bind" defaultValue="WARN"/>
+
+    <logger name="com.bluelight.backend" level="${APP_LOG_LEVEL}"/>
+    <logger name="org.hibernate.SQL" level="${SQL_LOG_LEVEL}"/>
+    <logger name="org.hibernate.orm.jdbc.bind" level="${SQL_BIND_LOG_LEVEL}"/>
+
+    <root level="${LOGGING_LEVEL_ROOT}">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>
