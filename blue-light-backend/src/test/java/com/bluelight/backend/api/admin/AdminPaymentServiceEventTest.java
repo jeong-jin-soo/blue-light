@@ -2,8 +2,8 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.PaymentConfirmRequest;
 import com.bluelight.backend.api.audit.AuditLogService;
-import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.invoice.InvoiceGenerationService;
+import com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
@@ -30,16 +30,18 @@ import static org.mockito.Mockito.when;
  * PR4 — {@link AdminPaymentService#confirmPayment} 가 결제 확정 후 {@link PaymentConfirmedEvent}
  * 를 발행하는지 검증.
  *
+ * <p>PR-0E (카나리): 신청자 결제 확인 알림이 {@link NotificationDispatchEvent} publish 로
+ * 전환되었는지 동시 검증. EmailService 직접 호출은 제거됨.</p>
+ *
  * <p>실제 LEW 알림 발송은 {@link LewPaymentNotificationListener} 의 책임이며 별도 테스트로 검증된다.
  * 이 테스트는 "이벤트가 발행되었는가" 만 본다 — 단위 테스트 경계 밖의 트랜잭션 페이즈 동작
  * (AFTER_COMMIT)은 통합 테스트 영역.</p>
  */
-@DisplayName("AdminPaymentService — PaymentConfirmedEvent 발행")
+@DisplayName("AdminPaymentService — PaymentConfirmedEvent + 카나리 알림 발행")
 class AdminPaymentServiceEventTest {
 
     private ApplicationRepository applicationRepository;
     private PaymentRepository paymentRepository;
-    private EmailService emailService;
     private ApplicationEventPublisher eventPublisher;
     private InvoiceGenerationService invoiceGenerationService;
     private AuditLogService auditLogService;
@@ -49,21 +51,21 @@ class AdminPaymentServiceEventTest {
     void setUp() {
         applicationRepository = mock(ApplicationRepository.class);
         paymentRepository = mock(PaymentRepository.class);
-        emailService = mock(EmailService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         invoiceGenerationService = mock(InvoiceGenerationService.class);
         auditLogService = mock(AuditLogService.class);
 
         service = new AdminPaymentService(
-                applicationRepository, paymentRepository, emailService,
+                applicationRepository, paymentRepository,
                 eventPublisher, invoiceGenerationService, auditLogService);
     }
 
     @Test
-    @DisplayName("PENDING_PAYMENT → PAID 전이 후 PaymentConfirmedEvent 가 publish 된다")
+    @DisplayName("PENDING_PAYMENT → PAID 전이 후 PaymentConfirmedEvent + NotificationDispatchEvent 둘 다 publish")
     void confirmPayment_이벤트_발행() {
         Application app = mock(Application.class);
         User applicant = mock(User.class);
+        when(applicant.getUserSeq()).thenReturn(7L);
         when(applicant.getEmail()).thenReturn("applicant@example.com");
         when(applicant.getFirstName()).thenReturn("A");
         when(applicant.getLastName()).thenReturn("B");
@@ -88,10 +90,11 @@ class AdminPaymentServiceEventTest {
 
         service.confirmPayment(1L, request);
 
-        // 이벤트 publish 확인 — ApplicationStatusChangedEvent + PaymentConfirmedEvent 둘 다 발행됨
+        // 이벤트 publish 확인 — ApplicationStatusChangedEvent + PaymentConfirmedEvent + NotificationDispatchEvent
         ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
         verify(eventPublisher, atLeastOnce()).publishEvent(eventCaptor.capture());
 
+        // PaymentConfirmedEvent (LEW 알림 listener 가 수신)
         PaymentConfirmedEvent paymentEvent = eventCaptor.getAllValues().stream()
                 .filter(PaymentConfirmedEvent.class::isInstance)
                 .map(PaymentConfirmedEvent.class::cast)
@@ -102,5 +105,23 @@ class AdminPaymentServiceEventTest {
         assertThat(paymentEvent.getPaymentSeq()).isEqualTo(99L);
         assertThat(paymentEvent.getAmount()).isEqualByComparingTo(new BigDecimal("1500.00"));
         assertThat(paymentEvent.getConfirmedAt()).isNotNull();
+
+        // PR-0E (카나리) — 신청자 알림 NotificationDispatchEvent
+        NotificationDispatchEvent applicantDispatch = eventCaptor.getAllValues().stream()
+                .filter(NotificationDispatchEvent.class::isInstance)
+                .map(NotificationDispatchEvent.class::cast)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("NotificationDispatchEvent was not published"));
+
+        assertThat(applicantDispatch.eventType()).isEqualTo("PAYMENT_CONFIRMED");
+        assertThat(applicantDispatch.recipientUserSeq()).isEqualTo(7L);
+        assertThat(applicantDispatch.referenceType()).isEqualTo("APPLICATION");
+        assertThat(applicantDispatch.referenceId()).isEqualTo(1L);
+        assertThat(applicantDispatch.templateCode()).isEqualTo("PAYMENT_CONFIRMED_APPLICANT");
+        assertThat(applicantDispatch.payload())
+                .containsEntry("applicantName", "A B")
+                .containsEntry("applicationSeq", "1")
+                .containsEntry("address", "123 Orchard")
+                .containsEntry("amount", "1500.00");
     }
 }

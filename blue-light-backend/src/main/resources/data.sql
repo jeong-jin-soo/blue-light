@@ -169,3 +169,30 @@ ON DUPLICATE KEY UPDATE
     display_order     = VALUES(display_order),
     active            = VALUES(active),
     updated_at        = NOW();
+
+-- ============================================
+-- PR-0E (카나리): 알림 템플릿 시드 — PAYMENT_CONFIRMED_APPLICANT (인앱 + 이메일, en)
+-- AdminPaymentService.confirmPayment 가 NotificationDispatchEvent publish → Orchestrator 가
+-- 본 템플릿을 (channel, locale) 매칭해서 render → 어댑터가 외부 발송.
+-- 변수: {{applicantName}} {{applicationSeq}} {{address}} {{amount}}
+-- ============================================
+INSERT INTO notification_templates
+    (template_code,                  channel,   locale, provider_template_name, subject,                                                body_text,                                                                                                                                                                                                            variables_json,                                                          enabled, created_at, updated_at)
+VALUES
+    ('PAYMENT_CONFIRMED_APPLICANT',  'IN_APP',  'en',   NULL,
+     'Payment received — APP-{{applicationSeq}}',
+     'Your payment of S${{amount}} for application #{{applicationSeq}} ({{address}}) has been confirmed. We''ll start preparing your installation next.',
+     '["applicantName","applicationSeq","address","amount"]',
+     TRUE, NOW(), NOW()),
+    ('PAYMENT_CONFIRMED_APPLICANT',  'EMAIL',   'en',   NULL,
+     'Payment received — Application #{{applicationSeq}} — LicenseKaki',
+     '<!DOCTYPE html><html><body style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5"><p>Dear {{applicantName}},</p><p>We have received your payment of <strong>S${{amount}}</strong> for application <strong>#{{applicationSeq}}</strong> ({{address}}).</p><p>Your installation will be scheduled with your assigned LEW shortly. You will receive a follow-up notification once a visit date is confirmed.</p><p>Thank you for choosing LicenseKaki.</p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="font-size:12px;color:#888">This is an automated message from LicenseKaki. Please do not reply.</p></body></html>',
+     '["applicantName","applicationSeq","address","amount"]',
+     TRUE, NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+    provider_template_name = VALUES(provider_template_name),
+    subject                = VALUES(subject),
+    body_text              = VALUES(body_text),
+    variables_json         = VALUES(variables_json),
+    enabled                = VALUES(enabled),
+    updated_at             = NOW();
