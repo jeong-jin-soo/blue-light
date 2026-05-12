@@ -5,6 +5,7 @@ import com.bluelight.backend.domain.notification.NotificationPreference;
 import com.bluelight.backend.domain.notification.NotificationPreferenceRepository;
 import com.bluelight.backend.domain.user.User;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,13 @@ public class NotificationPreferenceResolver {
     private final NotificationChannelDefaults channelDefaults;
 
     /**
+     * PR-1A: WhatsApp 채널 시스템 전체 토글. {@code false} 면 사용자 옵트인/preference row 와 무관하게
+     * WHATSAPP 채널을 enabled 채널 집합에서 제외 — 단계별 출시(카나리 → 일반) 및 비상 차단에 사용.
+     */
+    @Value("${whatsapp.enabled:true}")
+    private boolean whatsappEnabled;
+
+    /**
      * 사용자에게 발송 가능한 채널 집합을 반환.
      *
      * @param recipient   수신자 (WhatsApp 가드용 옵트인/검증 상태 포함)
@@ -52,6 +60,11 @@ public class NotificationPreferenceResolver {
     /** 단일 채널에 대한 발송 가능 여부 — 호출 측 디버깅/단위 검증용. */
     @Transactional(readOnly = true)
     public boolean isEnabledFor(User recipient, String eventType, NotificationChannel channel) {
+        // 0) 시스템 전체 토글 — whatsapp.enabled=false 이면 사용자 옵트인과 무관하게 차단 (PR-1A).
+        if (channel == NotificationChannel.WHATSAPP && !whatsappEnabled) {
+            return false;
+        }
+
         // 1) 사용자 환경설정 우선 — 행이 있으면 그 값을, 없으면 사용자 컨텍스트 기반 기본값.
         Optional<NotificationPreference> pref = preferenceRepository
                 .findByUserSeqAndEventTypeAndChannel(recipient.getUserSeq(), eventType, channel);

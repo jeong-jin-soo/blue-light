@@ -37,6 +37,7 @@ class NotificationPreferenceResolverTest {
         prefRepo = mock(NotificationPreferenceRepository.class);
         defaults = new NotificationChannelDefaults();
         resolver = new NotificationPreferenceResolver(prefRepo, defaults);
+        ReflectionTestUtils.setField(resolver, "whatsappEnabled", true); // 기본 활성
         when(prefRepo.findByUserSeqAndEventTypeAndChannel(anyLong(), anyString(), any(NotificationChannel.class)))
                 .thenReturn(Optional.empty());
     }
@@ -95,6 +96,20 @@ class NotificationPreferenceResolverTest {
 
         assertThat(result).doesNotContain(NotificationChannel.EMAIL);
         assertThat(result).contains(NotificationChannel.IN_APP); // 다른 채널은 영향 없음
+    }
+
+    @Test
+    @DisplayName("시스템 토글 - whatsapp.enabled=false 면 옵트인+검증 사용자도 WHATSAPP 차단 (PR-1A)")
+    void systemToggle_disabled_blocksWhatsappEntirely() {
+        User user = userWithSeq(1L);
+        user.verifyPhone("+6591234567", LocalDateTime.now());
+        user.optInWhatsapp(LocalDateTime.now());
+        ReflectionTestUtils.setField(resolver, "whatsappEnabled", false);
+
+        Set<NotificationChannel> result = resolver.resolveEnabledChannels(user, "PAYMENT_REQUEST");
+
+        assertThat(result).doesNotContain(NotificationChannel.WHATSAPP);
+        assertThat(result).contains(NotificationChannel.IN_APP, NotificationChannel.EMAIL);
     }
 
     @Test
