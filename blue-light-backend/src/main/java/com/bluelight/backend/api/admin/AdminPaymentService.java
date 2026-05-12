@@ -4,8 +4,8 @@ import com.bluelight.backend.api.admin.dto.PaymentConfirmRequest;
 import com.bluelight.backend.api.admin.dto.PaymentResponse;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
-import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.invoice.InvoiceGenerationService;
+import com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
@@ -23,8 +23,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Admin 결제 관리 서비스
@@ -37,10 +39,11 @@ public class AdminPaymentService {
 
     private final ApplicationRepository applicationRepository;
     private final PaymentRepository paymentRepository;
-    private final EmailService emailService;
     /**
      * ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행<br>
-     * ★ PR4: 결제 확인 → LEW 알림 (인앱+이메일) 트리거용 {@link PaymentConfirmedEvent} 발행
+     * ★ PR4: 결제 확인 → LEW 알림 (인앱+이메일) 트리거용 {@link PaymentConfirmedEvent} 발행<br>
+     * ★ PR-0E (카나리): 신청자에게 결제 확인 알림용 {@link NotificationDispatchEvent} 발행 —
+     * 인앱/이메일 채널은 NotificationOrchestrator + PreferenceResolver 가 결정.
      */
     private final ApplicationEventPublisher eventPublisher;
     /** invoice-spec §5: 결제 확인 직후 자동 영수증 발행 */
@@ -92,14 +95,23 @@ public class AdminPaymentService {
         log.info("Payment confirmed: applicationSeq={}, paymentSeq={}, amount={}",
                 applicationSeq, savedPayment.getPaymentSeq(), savedPayment.getAmount());
 
-        // 신청자에게 결제 확인 이메일 발송
+        // ★ PR-0E (카나리): 신청자에게 결제 확인 알림 — NotificationOrchestrator 경유.
+        // 기존 emailService.sendPaymentConfirmEmail 직접 호출을 대체. 채널(이메일+인앱)·언어·옵트인 가드는
+        // PreferenceResolver 가 사용자 컨텍스트로 결정. AFTER_COMMIT 단계에서 outbox 적재 + 비동기 발송.
         User applicant = application.getUser();
-        emailService.sendPaymentConfirmEmail(
-                applicant.getEmail(),
-                applicant.getFirstName() + " " + applicant.getLastName(),
+        BigDecimal amount = savedPayment.getAmount();
+        eventPublisher.publishEvent(new NotificationDispatchEvent(
+                "PAYMENT_CONFIRMED",
+                applicant.getUserSeq(),
+                "APPLICATION",
                 applicationSeq,
-                application.getAddress(),
-                savedPayment.getAmount());
+                "PAYMENT_CONFIRMED_APPLICANT",
+                Map.of(
+                        "applicantName", applicant.getFirstName() + " " + applicant.getLastName(),
+                        "applicationSeq", String.valueOf(applicationSeq),
+                        "address", application.getAddress(),
+                        "amount", amount == null ? "" : amount.toPlainString()
+                )));
 
         // ★ PR4: 배정된 LEW 에게 인앱 알림 + 이메일 발송은 LewPaymentNotificationListener 가
         // AFTER_COMMIT 단계에서 처리한다. 여기서는 이벤트만 발행 — 알림 발송 실패가
