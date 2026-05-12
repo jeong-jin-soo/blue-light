@@ -7,6 +7,7 @@ import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.PasswordResetTokenRepository;
 import com.bluelight.backend.domain.user.User;
+import com.bluelight.backend.domain.user.UserConsentLogRepository;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +40,8 @@ class AuthServiceSignupReuseEmailTest {
             mock(SystemSettingRepository.class),
             mock(PasswordResetTokenRepository.class),
             mock(EmailService.class),
-            mock(AuditLogService.class));
+            mock(AuditLogService.class),
+            mock(UserConsentLogRepository.class));
 
         when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))
             .thenReturn("jwt");
@@ -61,7 +63,7 @@ class AuthServiceSignupReuseEmailTest {
         ReflectionTestUtils.setField(req, "lastName", "Bar");
         ReflectionTestUtils.setField(req, "pdpaConsent", true);
 
-        TokenResponse resp = authService.signup(req);
+        TokenResponse resp = authService.signup(req, null);
 
         assertThat(resp).isNotNull();
         assertThat(resp.getEmail()).isEqualTo("foo@example.com");

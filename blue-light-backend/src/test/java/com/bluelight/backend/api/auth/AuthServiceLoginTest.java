@@ -10,6 +10,7 @@ import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.PasswordResetTokenRepository;
 import com.bluelight.backend.domain.user.User;
+import com.bluelight.backend.domain.user.UserConsentLogRepository;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
 import com.bluelight.backend.domain.user.UserStatus;
@@ -60,7 +61,8 @@ class AuthServiceLoginTest {
             mock(SystemSettingRepository.class),
             mock(PasswordResetTokenRepository.class),
             mock(EmailService.class),
-            auditLogService);
+            auditLogService,
+            mock(UserConsentLogRepository.class));
 
         // ★ Concierge 강화 + 별도 수금 PR-1 (D1=B): AuthService 가 다중 역할 토큰 발급으로 전환되어
         // 6-arg 오버로드를 호출한다. 5-arg 오버로드 stub 도 함께 둬서 legacy 호출이 있는 경우에도 안전.
