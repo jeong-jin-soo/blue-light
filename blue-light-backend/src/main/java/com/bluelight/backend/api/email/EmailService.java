@@ -400,4 +400,23 @@ public interface EmailService {
      * @return 안전하게 렌더된 HTML 문자열 (iframe sandbox 또는 dangerouslySetInnerHTML 로 주입 가능)
      */
     String renderManualPlainTextHtml(String subject, String bodyText, String adminEmailForFooter);
+
+    // ── PR-0C: Generic notification email (NotificationChannelAdapter 패턴) ──────
+
+    /**
+     * Generic 알림 발송 — 새 {@code NotificationChannelAdapter} 패턴이 사용 (PR-0C).
+     *
+     * <p>기존 {@code sendXxx} specific 메서드들은 점진 마이그레이션을 거쳐 본 메서드 위로 흡수된다.
+     * 본문은 호출 측({@code NotificationTemplateRegistry}) 이 이미 변수 치환 + HTML 안전화를 마친
+     * 완성된 HTML 이어야 한다 — 본 메서드는 단순 전송 책임만 가진다.</p>
+     *
+     * <p><b>예외 정책</b>: {@link #sendManualPlainTextEmail} 과 동일하게 SMTP 실패 시
+     * {@link RuntimeException} 을 던진다. 호출자({@code EmailChannelAdapter}) 가 try/catch 로 감싸
+     * outbox row 의 상태(FAILED/DEAD) 갱신에 사용한다.</p>
+     *
+     * @param to       수신자 이메일 주소 (검증/정규화된 값)
+     * @param subject  메시지 제목 (이미 변수 치환 완료)
+     * @param htmlBody 메시지 본문 HTML (이미 변수 치환 + 안전화 완료)
+     */
+    void sendGenericEmail(String to, String subject, String htmlBody);
 }

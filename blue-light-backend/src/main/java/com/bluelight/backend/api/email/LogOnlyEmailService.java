@@ -376,4 +376,16 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  PublicCode: {}", publicCode);
         log.info("==================================================");
     }
+
+    // ── PR-0C: Generic notification email (NotificationChannelAdapter 패턴) ──────
+
+    @Override
+    public void sendGenericEmail(String to, String subject, String htmlBody) {
+        log.info("==================================================");
+        log.info("[DEV] Generic Notification Email (PR-0C) (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Subject: {}", subject);
+        log.info("  Body length: {} chars", htmlBody == null ? 0 : htmlBody.length());
+        log.info("==================================================");
+    }
 }
