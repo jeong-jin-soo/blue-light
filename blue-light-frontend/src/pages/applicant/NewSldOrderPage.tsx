@@ -20,6 +20,8 @@ interface FormState {
   ampere: string;
   applicantNote: string;
   endorsementRequested: boolean;
+  /** endorsement 선택 시 추가 비용 발생을 확인했는지 여부 */
+  endorsementFeeAcknowledged: boolean;
 }
 
 export default function NewSldOrderPage() {
@@ -39,6 +41,7 @@ export default function NewSldOrderPage() {
     ampere: '',
     applicantNote: '',
     endorsementRequested: true,
+    endorsementFeeAcknowledged: false,
   });
 
   // kVA 옵션 tier 목록만 로드 (가격은 표시하지 않음 — SLD 주문은 별도 견적)
@@ -66,6 +69,10 @@ export default function NewSldOrderPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.endorsementRequested && !formData.endorsementFeeAcknowledged) {
+      toast.error('LEW endorsement 추가 비용 발생에 대한 확인이 필요합니다.');
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -195,7 +202,12 @@ export default function NewSldOrderPage() {
                       type="checkbox"
                       className="mt-0.5 w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                       checked={formData.endorsementRequested}
-                      onChange={(e) => updateField('endorsementRequested', e.target.checked)}
+                      onChange={(e) => {
+                        updateField('endorsementRequested', e.target.checked);
+                        if (!e.target.checked) {
+                          updateField('endorsementFeeAcknowledged', false);
+                        }
+                      }}
                     />
                     <div className="flex-1">
                       <div className="text-sm font-medium text-gray-800">
@@ -217,6 +229,36 @@ export default function NewSldOrderPage() {
                       )}
                     </div>
                   </label>
+
+                  {/* 추가 비용 발생 확인 — endorsement 선택 시에만 노출 */}
+                  {formData.endorsementRequested && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 w-4 h-4 text-warning-600 border-gray-300 rounded focus:ring-warning-500"
+                          checked={formData.endorsementFeeAcknowledged}
+                          onChange={(e) =>
+                            updateField('endorsementFeeAcknowledged', e.target.checked)
+                          }
+                          required
+                        />
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-warning-800">
+                            추가 비용 발생 확인 <span className="text-error-600">*</span>
+                          </div>
+                          <p className="text-xs text-warning-700 mt-0.5">
+                            LEW 인증 도장(endorsement)을 추가하면 SLD 도면 비용에 더해
+                            {endorseHint != null && (
+                              <> 약 ${Number(endorseHint).toFixed(2)}의</>
+                            )}{' '}
+                            추가 비용이 발생합니다. 최종 금액은 매니저 견적으로 확정됩니다.
+                            이에 동의합니다.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -302,7 +344,11 @@ export default function NewSldOrderPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" loading={submitting}>
+                <Button
+                  type="submit"
+                  loading={submitting}
+                  disabled={formData.endorsementRequested && !formData.endorsementFeeAcknowledged}
+                >
                   Submit Request
                 </Button>
               </div>
