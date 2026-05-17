@@ -341,19 +341,23 @@ CREATE TABLE IF NOT EXISTS sld_requests (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 9. 용량별 단가표
+-- sld_price        : LEW가 SLD 도면을 그려주는 기본 비용
+-- endorsement_price: SLD에 LEW 인증 도장(endorsement)까지 포함할 때 가산되는 비용
 CREATE TABLE IF NOT EXISTS master_prices (
-    master_price_seq BIGINT        NOT NULL AUTO_INCREMENT,
-    description      VARCHAR(50),
-    kva_min          INT           NOT NULL,
-    kva_max          INT           NOT NULL,
-    price            DECIMAL(10,2) NOT NULL,
-    sld_price        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    is_active        TINYINT(1)    DEFAULT 1,
-    created_at       DATETIME(6),
-    updated_at       DATETIME(6),
-    created_by       BIGINT,
-    updated_by       BIGINT,
-    deleted_at       DATETIME(6),
+    master_price_seq  BIGINT        NOT NULL AUTO_INCREMENT,
+    description       VARCHAR(50),
+    kva_min           INT           NOT NULL,
+    kva_max           INT           NOT NULL,
+    price             DECIMAL(10,2) NOT NULL,
+    renewal_price     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    sld_price         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    endorsement_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    is_active         TINYINT(1)    DEFAULT 1,
+    created_at        DATETIME(6),
+    updated_at        DATETIME(6),
+    created_by        BIGINT,
+    updated_by        BIGINT,
+    deleted_at        DATETIME(6),
     PRIMARY KEY (master_price_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

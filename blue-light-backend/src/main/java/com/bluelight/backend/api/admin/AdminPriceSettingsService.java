@@ -184,10 +184,11 @@ public class AdminPriceSettingsService {
                 mp.updatePrice(tier.getPrice());
                 mp.updateRenewalPrice(tier.getRenewalPrice());
                 mp.updateSldPrice(tier.getSldPrice());
+                mp.updateEndorsementPrice(tier.getEndorsementPrice());
                 mp.updateKvaRange(tier.getKvaMin(), tier.getKvaMax(), tier.getDescription());
                 mp.setActive(tier.getIsActive());
-                log.info("Price tier updated: priceSeq={}, kvaMin={}, kvaMax={}, price={}, renewalPrice={}, sldPrice={}",
-                        mp.getMasterPriceSeq(), tier.getKvaMin(), tier.getKvaMax(), tier.getPrice(), tier.getRenewalPrice(), tier.getSldPrice());
+                log.info("Price tier updated: priceSeq={}, kvaMin={}, kvaMax={}, price={}, renewalPrice={}, sldPrice={}, endorsementPrice={}",
+                        mp.getMasterPriceSeq(), tier.getKvaMin(), tier.getKvaMax(), tier.getPrice(), tier.getRenewalPrice(), tier.getSldPrice(), tier.getEndorsementPrice());
             } else {
                 // 신규 생성
                 MasterPrice newPrice = MasterPrice.builder()
@@ -197,11 +198,12 @@ public class AdminPriceSettingsService {
                         .price(tier.getPrice())
                         .renewalPrice(tier.getRenewalPrice())
                         .sldPrice(tier.getSldPrice())
+                        .endorsementPrice(tier.getEndorsementPrice())
                         .isActive(tier.getIsActive())
                         .build();
                 masterPriceRepository.save(newPrice);
-                log.info("Price tier created: kvaMin={}, kvaMax={}, price={}, renewalPrice={}, sldPrice={}",
-                        tier.getKvaMin(), tier.getKvaMax(), tier.getPrice(), tier.getRenewalPrice(), tier.getSldPrice());
+                log.info("Price tier created: kvaMin={}, kvaMax={}, price={}, renewalPrice={}, sldPrice={}, endorsementPrice={}",
+                        tier.getKvaMin(), tier.getKvaMax(), tier.getPrice(), tier.getRenewalPrice(), tier.getSldPrice(), tier.getEndorsementPrice());
             }
         }
 
