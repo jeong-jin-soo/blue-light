@@ -22,8 +22,11 @@ public class SldOrderResponse {
     private String ampere;
     private String applicantNote;
     private Long sketchFileSeq;
+    private Boolean endorsementRequested;
     private String status;
     private BigDecimal quoteAmount;
+    private BigDecimal sldFee;
+    private BigDecimal endorsementFee;
     private String quoteNote;
     private String managerNote;
     private Long uploadedFileSeq;
@@ -50,8 +53,11 @@ public class SldOrderResponse {
                 .ampere(order.getAmpere())
                 .applicantNote(order.getApplicantNote())
                 .sketchFileSeq(order.getSketchFileSeq())
+                .endorsementRequested(order.getEndorsementRequested())
                 .status(order.getStatus().name())
                 .quoteAmount(order.getQuoteAmount())
+                .sldFee(order.getSldFee())
+                .endorsementFee(order.getEndorsementFee())
                 .quoteNote(order.getQuoteNote())
                 .managerNote(order.getManagerNote())
                 .uploadedFileSeq(order.getUploadedFileSeq())

@@ -87,6 +87,12 @@ public class SldOrder extends BaseEntity {
     private Long sketchFileSeq;
 
     /**
+     * LEW 인증 도장(endorsement) 포함 여부 — 신청자가 주문 생성 시 선택
+     */
+    @Column(name = "endorsement_requested", nullable = false)
+    private Boolean endorsementRequested = true;
+
+    /**
      * 주문 상태
      */
     @Enumerated(EnumType.STRING)
@@ -94,10 +100,22 @@ public class SldOrder extends BaseEntity {
     private SldOrderStatus status = SldOrderStatus.PENDING_QUOTE;
 
     /**
-     * 견적 금액 (SLD_MANAGER가 제안)
+     * 견적 총액 — sldFee + endorsementFee 합계 (SLD_MANAGER가 제안)
      */
     @Column(name = "quote_amount", precision = 10, scale = 2)
     private BigDecimal quoteAmount;
+
+    /**
+     * SLD 도면 작성 비용 (견적 분해)
+     */
+    @Column(name = "sld_fee", precision = 10, scale = 2)
+    private BigDecimal sldFee;
+
+    /**
+     * LEW 인증 도장 비용 (견적 분해, endorsementRequested=false면 0)
+     */
+    @Column(name = "endorsement_fee", precision = 10, scale = 2)
+    private BigDecimal endorsementFee;
 
     /**
      * 견적 메모 (SLD_MANAGER)
@@ -125,7 +143,8 @@ public class SldOrder extends BaseEntity {
 
     @Builder
     public SldOrder(User user, String address, String postalCode,
-                    String buildingType, Integer selectedKva, String ampere, String applicantNote) {
+                    String buildingType, Integer selectedKva, String ampere,
+                    String applicantNote, Boolean endorsementRequested) {
         this.user = user;
         this.address = address;
         this.postalCode = postalCode;
@@ -133,19 +152,28 @@ public class SldOrder extends BaseEntity {
         this.selectedKva = selectedKva;
         this.ampere = ampere;
         this.applicantNote = applicantNote;
+        this.endorsementRequested = endorsementRequested != null ? endorsementRequested : true;
         this.status = SldOrderStatus.PENDING_QUOTE;
     }
 
     // ── 상태 전환 메서드 ────────────────────────────
 
     /**
-     * 견적 제안 (SLD_MANAGER)
+     * 견적 제안 (SLD_MANAGER) — sldFee + endorsementFee 분해 입력.
+     * endorsementRequested=false일 때 endorsementFee는 0으로 무시.
      */
-    public void proposeQuote(BigDecimal amount, String note) {
+    public void proposeQuote(BigDecimal sldFee, BigDecimal endorsementFee, String note) {
         if (this.status != SldOrderStatus.PENDING_QUOTE) {
             throw new IllegalStateException("견적 제안은 PENDING_QUOTE 상태에서만 가능합니다. 현재: " + this.status);
         }
-        this.quoteAmount = amount;
+        BigDecimal safeSldFee = sldFee != null ? sldFee : BigDecimal.ZERO;
+        BigDecimal safeEndorsementFee =
+                Boolean.TRUE.equals(this.endorsementRequested) && endorsementFee != null
+                        ? endorsementFee
+                        : BigDecimal.ZERO;
+        this.sldFee = safeSldFee;
+        this.endorsementFee = safeEndorsementFee;
+        this.quoteAmount = safeSldFee.add(safeEndorsementFee);
         this.quoteNote = note;
         this.status = SldOrderStatus.QUOTE_PROPOSED;
     }

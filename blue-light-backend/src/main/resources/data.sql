@@ -104,21 +104,22 @@ WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'sld_ai_gene
 
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입
--- sld_price: LEW에게 SLD 작성을 요청할 때의 추가 비용
-INSERT INTO master_prices (description, kva_min, kva_max, price, sld_price, is_active, created_at, updated_at)
-SELECT '45 kVA',              45,   45,   350.00,  150.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+-- sld_price        : LEW가 SLD 도면을 그려주는 비용
+-- endorsement_price: SLD에 LEW 인증 도장(endorsement)을 추가할 때 가산되는 비용
+INSERT INTO master_prices (description, kva_min, kva_max, price, renewal_price, sld_price, endorsement_price, is_active, created_at, updated_at)
+SELECT '45 kVA',              45,   45,   350.00,  350.00,  150.00,  50.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '46 - 100 kVA',        46,  100,   500.00,  200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '46 - 100 kVA',        46,  100,   500.00,  500.00,  200.00,  80.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '101 - 200 kVA',      101,  200,   750.00,  300.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '101 - 200 kVA',      101,  200,   750.00,  750.00,  300.00, 120.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '201 - 500 kVA',      201,  500,  1200.00,  450.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '201 - 500 kVA',      201,  500,  1200.00, 1200.00,  450.00, 180.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '501 - 1000 kVA',     501, 1000,  1800.00,  600.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '501 - 1000 kVA',     501, 1000,  1800.00, 1800.00,  600.00, 250.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '1001 - 2000 kVA',   1001, 2000,  2500.00,  800.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '1001 - 2000 kVA',   1001, 2000,  2500.00, 2500.00,  800.00, 350.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '2001 kVA and above', 2001, 9999,  3500.00, 1000.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1);
+SELECT '2001 kVA and above', 2001, 9999,  3500.00, 3500.00, 1000.00, 450.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1);
 
 
 -- ============================================

@@ -73,13 +73,15 @@ public class SldManagerService {
     }
 
     /**
-     * 견적 제안
+     * 견적 제안 — sldFee + endorsementFee 분해 저장.
+     * endorsementRequested=false인 주문은 endorsementFee를 강제로 0으로 처리.
      */
     @Transactional
     public SldOrderResponse proposeQuote(Long orderSeq, ProposeQuoteRequest request) {
         SldOrder order = findOrderOrThrow(orderSeq);
-        order.proposeQuote(request.getQuoteAmount(), request.getQuoteNote());
-        log.info("SLD 견적 제안: orderSeq={}, amount={}", orderSeq, request.getQuoteAmount());
+        order.proposeQuote(request.getSldFee(), request.getEndorsementFee(), request.getQuoteNote());
+        log.info("SLD 견적 제안: orderSeq={}, sldFee={}, endorsementFee={}, total={}",
+                orderSeq, order.getSldFee(), order.getEndorsementFee(), order.getQuoteAmount());
         return SldOrderResponse.from(order);
     }
 

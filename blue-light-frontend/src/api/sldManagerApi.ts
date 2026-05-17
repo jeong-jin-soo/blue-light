@@ -1,5 +1,5 @@
 import api from './axiosClient';
-import type { SldOrder, SldOrderDashboard, SldOrderPayment, Page, ProposeQuoteRequest } from '../types';
+import type { SldOrder, SldOrderDashboard, SldOrderPayment, Page, SldProposeQuoteRequest } from '../types';
 
 export const sldManagerApi = {
   getDashboard: () =>
@@ -11,7 +11,7 @@ export const sldManagerApi = {
   getOrder: (id: number) =>
     api.get<SldOrder>(`/sld-manager/orders/${id}`).then(r => r.data),
 
-  proposeQuote: (id: number, data: ProposeQuoteRequest) =>
+  proposeQuote: (id: number, data: SldProposeQuoteRequest) =>
     api.post<SldOrder>(`/sld-manager/orders/${id}/propose-quote`, data).then(r => r.data),
 
   assignManager: (id: number, managerUserSeq: number) =>
