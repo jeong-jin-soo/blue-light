@@ -892,9 +892,18 @@ export interface CreateSldOrderRequest {
 }
 
 /**
- * SLD 주문 견적 제안 요청 — SLD 비용과 endorsement 비용을 분해 입력.
+ * 일반 주문 견적 제안 요청 (Lighting / Power Socket / LEW Service / Expired License)
+ * SLD 주문은 endorsement 가격 분해 때문에 SldProposeQuoteRequest를 사용.
  */
 export interface ProposeQuoteRequest {
+  quoteAmount: number;
+  quoteNote?: string;
+}
+
+/**
+ * SLD 주문 견적 제안 요청 — SLD 비용과 endorsement 비용을 분해 입력.
+ */
+export interface SldProposeQuoteRequest {
   sldFee: number;
   endorsementFee: number;
   quoteNote?: string;
