@@ -1,0 +1,407 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420.0 400.0" width="420.0mm" height="400.0mm">
+  <rect width="420.0" height="400.0" fill="white" />
+  <text x="150.00" y="12.00" font-family="Helvetica, Arial, sans-serif" font-size="5.0" fill="#000000">SLD Symbol Library Catalog (IEC 60617 / Singapore Standard)</text>
+  <text x="160.00" y="17.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Red dots = pins  |  Blue dots = anchors  |  Dashed box = bounding box</text>
+  <rect x="10.0" y="30.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="46.40" y="35.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">MCB</text>
+  <text x="37.20" y="39.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">CB_MCB (10x16mm)</text>
+  <circle cx="50.00" cy="67.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="50.00" cy="61.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <path d="M 50.00,66.50 A 2.00,2.00 0 0,0 50.00,62.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="60.50" x2="50.00" y2="56.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="72.50" x2="50.00" y2="68.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="56.50" x2="50.00" y2="51.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="50.00" y1="72.50" x2="50.00" y2="77.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="45.0" y="56.5" width="10.0" height="16.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="50.0" cy="51.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="77.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="56.0" cy="60.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="80.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="48.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="90.0" y="30.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="125.20" y="35.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">MCCB</text>
+  <text x="116.40" y="39.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">CB_MCCB (14x20mm)</text>
+  <circle cx="130.00" cy="68.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="130.00" cy="60.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <path d="M 130.00,67.50 A 3.00,3.00 0 0,0 130.00,61.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="130.00" y1="59.50" x2="130.00" y2="54.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="130.00" y1="74.50" x2="130.00" y2="69.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="130.00" y1="54.50" x2="130.00" y2="49.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="130.00" y1="74.50" x2="130.00" y2="79.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="123.0" y="54.5" width="14.0" height="20.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="130.0" cy="49.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="79.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="137.0" cy="60.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="82.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="46.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="170.0" y="30.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="206.40" y="35.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">ACB</text>
+  <text x="197.20" y="39.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">CB_ACB (16x22mm)</text>
+  <circle cx="210.00" cy="69.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="210.00" cy="59.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <path d="M 210.00,68.50 A 4.00,4.00 0 0,0 210.00,60.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="210.00" y1="58.50" x2="210.00" y2="53.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="210.00" y1="75.50" x2="210.00" y2="70.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="210.00" y1="53.50" x2="210.00" y2="48.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="210.00" y1="75.50" x2="210.00" y2="80.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="203.00" y1="64.50" x2="217.00" y2="64.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <rect x="202.0" y="53.5" width="16.0" height="22.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="210.0" cy="48.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="80.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="219.0" cy="60.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="210.0" cy="83.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="210.0" cy="45.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="250.0" y="30.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="285.20" y="35.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">RCCB</text>
+  <text x="276.40" y="39.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">CB_RCCB (14x20mm)</text>
+  <circle cx="290.00" cy="68.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="290.00" cy="60.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <path d="M 290.00,67.50 A 3.00,3.00 0 0,0 290.00,61.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="59.50" x2="290.00" y2="54.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="74.50" x2="290.00" y2="69.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="293.00" y1="64.50" x2="298.00" y2="64.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="298.00" y1="67.50" x2="298.00" y2="61.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="54.50" x2="290.00" y2="49.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="290.00" y1="74.50" x2="290.00" y2="79.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="283.0" y="54.5" width="14.0" height="20.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="290.0" cy="49.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="290.0" cy="79.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="304.0" cy="60.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="290.0" cy="82.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="290.0" cy="46.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="330.0" y="30.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="365.20" y="35.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">ELCB</text>
+  <text x="356.40" y="39.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">CB_ELCB (14x20mm)</text>
+  <circle cx="370.00" cy="68.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="370.00" cy="60.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <path d="M 370.00,67.50 A 3.00,3.00 0 0,0 370.00,61.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="59.50" x2="370.00" y2="54.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="74.50" x2="370.00" y2="69.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="373.00" y1="64.50" x2="378.00" y2="64.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="378.00" y1="67.50" x2="378.00" y2="61.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="54.50" x2="370.00" y2="49.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="370.00" y1="74.50" x2="370.00" y2="79.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="363.0" y="54.5" width="14.0" height="20.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="370.0" cy="49.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="370.0" cy="79.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="384.0" cy="60.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="370.0" cy="82.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="370.0" cy="46.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="10.0" y="90.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="39.20" y="95.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">KWH Meter</text>
+  <text x="34.80" y="99.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">KWH_METER (20x14mm)</text>
+  <polygon points="40.00,131.50 60.00,131.50 60.00,117.50 40.00,117.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="44.00" y="125.70" font-family="Helvetica, Arial, sans-serif" font-size="4.0" fill="#262626">KWH</text>
+  <line x1="50.00" y1="117.50" x2="50.00" y2="112.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="50.00" y1="131.50" x2="50.00" y2="136.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="40.0" y="117.5" width="20.0" height="14.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="50.0" cy="112.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="136.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="63.0" cy="122.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="139.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="109.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="90.0" y="90.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="121.60" y="95.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Ammeter</text>
+  <text x="116.40" y="99.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">AMMETER (16x16mm)</text>
+  <circle cx="130.00" cy="124.50" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="127.50" y="126.30" font-family="Helvetica, Arial, sans-serif" font-size="6.0" fill="#262626">A</text>
+  <line x1="130.00" y1="116.50" x2="130.00" y2="111.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="130.00" y1="132.50" x2="130.00" y2="137.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="122.0" y="116.5" width="16.0" height="16.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="130.0" cy="111.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="137.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="141.0" cy="122.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="119.0" cy="124.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="108.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="170.0" y="90.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="199.20" y="95.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Voltmeter</text>
+  <text x="194.80" y="99.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">VOLTMETER (16x16mm)</text>
+  <circle cx="210.00" cy="124.50" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="207.50" y="126.30" font-family="Helvetica, Arial, sans-serif" font-size="6.0" fill="#262626">V</text>
+  <line x1="210.00" y1="116.50" x2="210.00" y2="111.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="210.00" y1="132.50" x2="210.00" y2="137.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="202.0" y="116.5" width="16.0" height="16.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="210.0" cy="111.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="137.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="221.0" cy="122.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="199.0" cy="124.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="210.0" cy="108.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="250.0" y="90.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="274.40" y="95.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Isolator (DB)</text>
+  <text x="275.60" y="99.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">ISOLATOR (12x18mm)</text>
+  <circle cx="290.00" cy="129.50" r="1.20" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="133.50" x2="290.00" y2="130.70" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="290.00" cy="119.50" r="1.20" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="118.30" x2="290.00" y2="115.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.54" y1="128.43" x2="295.00" y2="119.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="115.50" x2="290.00" y2="110.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="290.00" y1="133.50" x2="290.00" y2="138.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="284.0" y="115.5" width="12.0" height="18.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="290.0" cy="110.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="290.0" cy="138.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="299.0" cy="122.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="290.0" cy="141.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="290.0" cy="107.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="330.0" y="90.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="348.40" y="95.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Isolator (Machine)</text>
+  <text x="349.20" y="99.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">ISOLATOR_MACHINE (14x18mm)</text>
+  <polygon points="365.00,130.50 375.00,130.50 375.00,118.50 365.00,118.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="130.50" x2="374.00" y2="118.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="133.50" x2="370.00" y2="130.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="118.50" x2="370.00" y2="115.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="370.00" y1="115.50" x2="370.00" y2="110.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="370.00" y1="133.50" x2="370.00" y2="138.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="363.0" y="115.5" width="14.0" height="18.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="370.0" cy="110.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="370.0" cy="138.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="380.0" cy="122.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="370.0" cy="141.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="370.0" cy="107.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="10.0" y="150.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="28.40" y="155.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Double Pole Switch</text>
+  <text x="27.60" y="159.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">DOUBLE_POLE_SWITCH (16x18mm)</text>
+  <circle cx="47.00" cy="190.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="47.00" cy="178.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="47.32" y1="189.55" x2="51.00" y2="178.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="53.00" cy="190.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="53.00" cy="178.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="53.32" y1="189.55" x2="57.00" y2="178.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="49.00" y1="184.50" x2="50.00" y2="184.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="51.00" y1="184.50" x2="52.00" y2="184.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="53.00" y1="184.50" x2="54.00" y2="184.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="193.50" x2="50.00" y2="190.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="178.50" x2="50.00" y2="175.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="175.50" x2="50.00" y2="170.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="50.00" y1="193.50" x2="50.00" y2="198.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="42.0" y="175.5" width="16.0" height="18.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="50.0" cy="170.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="198.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="61.0" cy="182.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="201.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="167.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="90.0" y="150.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="115.60" y="155.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">BI Connector</text>
+  <text x="112.40" y="159.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">BI_CONNECTOR (16x10mm)</text>
+  <polygon points="123.00,181.50 128.00,184.50 123.00,187.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <polygon points="137.00,181.50 132.00,184.50 137.00,187.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="128.00" y1="184.50" x2="132.00" y2="184.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="122.00" y1="184.50" x2="123.00" y2="184.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="137.00" y1="184.50" x2="138.00" y2="184.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="130.00" y1="179.50" x2="130.00" y2="174.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="130.00" y1="189.50" x2="130.00" y2="194.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="122.0" y="179.5" width="16.0" height="10.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="122.0" cy="184.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="138.0" cy="184.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="174.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="194.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="192.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="176.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="170.0" y="150.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="206.40" y="155.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">ATS</text>
+  <text x="199.60" y="159.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">ATS (30x20mm)</text>
+  <polygon points="195.00,194.50 225.00,194.50 225.00,174.50 195.00,174.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="205.00" y="184.50" font-family="Helvetica, Arial, sans-serif" font-size="5.0" fill="#262626">ATS</text>
+  <line x1="203.00" y1="174.50" x2="203.00" y2="169.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="217.00" y1="174.50" x2="217.00" y2="169.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="210.00" y1="194.50" x2="210.00" y2="199.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="195.0" y="174.5" width="30.0" height="20.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="203.0" cy="169.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="217.0" cy="169.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="199.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="228.0" cy="182.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="210.0" cy="166.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="250.0" y="150.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="285.20" y="155.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Fuse</text>
+  <text x="279.60" y="159.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">FUSE (8x16mm)</text>
+  <polygon points="286.00,190.50 294.00,190.50 294.00,178.50 286.00,178.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="290.00" y1="178.50" x2="290.00" y2="171.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="290.00" y1="190.50" x2="290.00" y2="197.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="286.0" y="176.5" width="8.0" height="16.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="290.0" cy="171.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="290.0" cy="197.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="297.0" cy="182.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="290.0" cy="200.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="330.0" y="150.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="364.00" y="155.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Earth</text>
+  <text x="358.00" y="159.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">EARTH (16x18mm)</text>
+  <line x1="370.00" y1="175.50" x2="370.00" y2="183.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="362.00" y1="183.50" x2="378.00" y2="183.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="365.00" y1="187.50" x2="375.00" y2="187.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="368.00" y1="191.50" x2="372.00" y2="191.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="368.50" y="196.90" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">E</text>
+  <rect x="362.0" y="175.5" width="16.0" height="18.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="370.0" cy="175.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="370.0" cy="195.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="380.0" cy="187.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="10.0" y="210.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="46.40" y="215.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">SPD</text>
+  <text x="39.60" y="219.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">SPD (12x18mm)</text>
+  <polygon points="44.00,253.50 56.00,253.50 56.00,235.50 44.00,235.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <polyline points="50.00,238.50 53.00,243.50 47.00,245.50 50.00,250.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="50.00" y1="235.50" x2="50.00" y2="230.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="50.00" y1="253.50" x2="50.00" y2="258.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="44.0" y="235.5" width="12.0" height="18.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="50.0" cy="230.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="258.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="59.0" cy="242.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="261.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="90.0" y="210.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="109.60" y="215.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Power Transformer</text>
+  <text x="113.20" y="219.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">TRANSFORMER (16x28mm)</text>
+  <circle cx="130.00" cy="244.50" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="130.00" cy="252.50" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="130.00" y1="236.50" x2="130.00" y2="225.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="130.00" y1="260.50" x2="130.00" y2="263.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="122.0" y="230.5" width="16.0" height="28.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="130.0" cy="225.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="263.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="141.0" cy="242.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="222.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="266.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="170.0" y="210.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="207.60" y="215.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">CT</text>
+  <text x="200.40" y="219.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">CT (12x12mm)</text>
+  <circle cx="210.00" cy="242.90" r="4.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="210.00" cy="246.10" r="4.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="210.00" y1="238.90" x2="210.00" y2="235.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="210.00" y1="250.10" x2="210.00" y2="253.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="204.0" y="238.5" width="12.0" height="12.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="210.0" cy="235.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="253.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="218.0" cy="242.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="218.0" cy="246.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="250.0" y="210.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="287.60" y="215.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">PT</text>
+  <text x="280.40" y="219.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">PT (14x10mm)</text>
+  <polygon points="283.00,249.50 297.00,249.50 297.00,239.50 283.00,239.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="287.00" y="245.70" font-family="Helvetica, Arial, sans-serif" font-size="4.0" fill="#262626">PT</text>
+  <line x1="290.00" y1="239.50" x2="290.00" y2="236.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="290.00" y1="249.50" x2="290.00" y2="252.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="283.0" y="239.5" width="14.0" height="10.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="290.0" cy="236.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="290.0" cy="252.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="283.0" cy="244.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="297.0" cy="244.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="300.0" cy="242.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="290.0" cy="234.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="330.0" y="210.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="364.00" y="215.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Motor</text>
+  <text x="358.00" y="219.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">MOTOR (16x16mm)</text>
+  <circle cx="370.00" cy="244.50" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="368.00" y="246.30" font-family="Helvetica, Arial, sans-serif" font-size="6.0" fill="#262626">M</text>
+  <line x1="370.00" y1="236.50" x2="370.00" y2="233.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="362.0" y="236.5" width="16.0" height="16.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="370.0" cy="233.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="381.0" cy="242.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="370.0" cy="255.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="10.0" y="270.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="39.20" y="275.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Generator</text>
+  <text x="34.80" y="279.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">GENERATOR (20x20mm)</text>
+  <circle cx="50.00" cy="304.50" r="10.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="47.00" y="306.90" font-family="Helvetica, Arial, sans-serif" font-size="8.0" fill="#262626">G</text>
+  <line x1="50.00" y1="294.50" x2="50.00" y2="289.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="40.0" y="294.5" width="20.0" height="20.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="50.0" cy="289.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="63.0" cy="302.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="317.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="90.0" y="270.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="109.60" y="275.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Industrial Socket</text>
+  <text x="108.40" y="279.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">INDUSTRIAL_SOCKET (16x16mm)</text>
+  <circle cx="130.00" cy="304.50" r="7.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="130.00" cy="301.50" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="127.40" cy="306.00" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="132.60" cy="306.00" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="130.00" y1="297.50" x2="130.00" y2="291.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="122.0" y="296.5" width="16.0" height="16.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="130.0" cy="291.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="141.0" cy="302.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="315.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="318.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="170.0" y="270.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="204.00" y="275.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Timer</text>
+  <text x="198.00" y="279.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">TIMER (12x12mm)</text>
+  <circle cx="210.00" cy="304.50" r="5.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="208.00" y="305.20" font-family="Helvetica, Arial, sans-serif" font-size="4.0" fill="#262626">T</text>
+  <line x1="210.00" y1="299.50" x2="210.00" y2="293.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="210.00" y1="309.50" x2="210.00" y2="315.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="204.0" y="298.5" width="12.0" height="12.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="210.0" cy="293.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="315.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="219.0" cy="302.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="210.0" cy="290.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="250.0" y="270.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="272.00" y="275.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Timer w/ Bypass</text>
+  <text x="272.40" y="279.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">TIMER_BYPASS (28x24mm)</text>
+  <circle cx="282.00" cy="298.50" r="5.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="280.00" y="299.20" font-family="Helvetica, Arial, sans-serif" font-size="4.0" fill="#262626">T</text>
+  <polygon points="292.00,309.50 302.00,309.50 302.00,299.50 292.00,299.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="295.00" y="305.20" font-family="Helvetica, Arial, sans-serif" font-size="4.0" fill="#262626">C</text>
+  <line x1="282.00" y1="303.50" x2="282.00" y2="301.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="282.00" y1="301.50" x2="292.00" y2="299.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="282.00" y1="307.50" x2="292.00" y2="309.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="282.00" y1="307.50" x2="282.00" y2="316.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="282.00" y1="293.50" x2="282.00" y2="287.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="282.00" y1="316.50" x2="282.00" y2="321.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="276.0" y="292.5" width="28.0" height="24.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="282.0" cy="287.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="282.0" cy="321.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="307.0" cy="302.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="282.0" cy="284.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="330.0" y="270.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="358.00" y="275.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Shunt Trip</text>
+  <text x="354.00" y="279.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">SHUNT_TRIP (14x10mm)</text>
+  <polygon points="363.00,309.50 377.00,309.50 377.00,299.50 363.00,299.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="367.00" y="305.70" font-family="Helvetica, Arial, sans-serif" font-size="4.0" fill="#262626">ST</text>
+  <line x1="370.00" y1="299.50" x2="370.00" y2="296.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="370.00" y1="309.50" x2="370.00" y2="312.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="363.0" y="299.5" width="14.0" height="10.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="370.0" cy="296.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="370.0" cy="312.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="363.0" cy="304.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="377.0" cy="304.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="380.0" cy="302.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="370.0" cy="294.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="10.0" y="330.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="32.00" y="335.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Indicator Light</text>
+  <text x="34.00" y="339.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">IND_LIGHT_L1 (8x8mm)</text>
+  <circle cx="50.00" cy="364.50" r="3.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="48.00" y1="366.50" x2="52.00" y2="362.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="48.00" y1="362.50" x2="52.00" y2="366.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="48.50" y="358.50" font-family="Helvetica, Arial, sans-serif" font-size="2.5" fill="#262626">L1</text>
+  <line x1="47.00" y1="364.50" x2="46.00" y2="364.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="53.00" y1="364.50" x2="54.00" y2="364.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="46.0" y="360.5" width="8.0" height="8.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="46.0" cy="364.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="54.0" cy="364.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="357.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="371.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="50.0" cy="357.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="50.0" cy="371.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="90.0" y="330.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="110.80" y="335.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Protection Relay</text>
+  <text x="109.20" y="339.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">PROTECTION_RELAY (16x12mm)</text>
+  <polygon points="122.00,370.50 138.00,370.50 138.00,358.50 122.00,358.50" stroke="#000000" stroke-width="0.7" fill="none" />
+  <text x="126.50" y="362.80" font-family="Helvetica, Arial, sans-serif" font-size="3.5" fill="#262626">O/C</text>
+  <text x="127.00" y="366.80" font-family="Helvetica, Arial, sans-serif" font-size="3.5" fill="#262626">E/F</text>
+  <line x1="130.00" y1="358.50" x2="130.00" y2="355.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="130.00" y1="370.50" x2="130.00" y2="373.50" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="122.0" y="358.5" width="16.0" height="12.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="130.0" cy="355.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="130.0" cy="373.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="122.0" cy="364.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="138.0" cy="364.5" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="141.0" cy="362.5" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="130.0" cy="353.5" r="0.8" fill="blue" opacity="0.5" />
+  <rect x="170.0" y="330.0" width="80.0" height="60.0" fill="none" stroke="#ddd" stroke-width="0.3" />
+  <text x="202.80" y="335.40" font-family="Helvetica, Arial, sans-serif" font-size="3.0" fill="#262626">Busbar</text>
+  <text x="198.00" y="339.60" font-family="Helvetica, Arial, sans-serif" font-size="2.0" fill="#262626">BUSBAR (60x3mm)</text>
+  <line x1="180.00" y1="365.00" x2="240.00" y2="365.00" stroke="#000000" stroke-width="0.80" fill="none" />
+  <line x1="180.00" y1="367.00" x2="240.00" y2="367.00" stroke="#000000" stroke-width="0.80" fill="none" />
+  <rect x="180.0" y="363.0" width="60.0" height="3.0" fill="none" stroke="#999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="180.0" cy="366.0" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="240.0" cy="366.0" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="366.0" r="1.0" fill="red" opacity="0.7" />
+  <circle cx="210.0" cy="371.0" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="210.0" cy="361.0" r="0.8" fill="blue" opacity="0.5" />
+  <circle cx="243.0" cy="366.0" r="0.8" fill="blue" opacity="0.5" />
+</svg>

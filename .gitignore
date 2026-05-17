@@ -19,3 +19,48 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# ===================
+# Claude Code (local)
+# ===================
+.claude/agent-memory/
+.claude/agents/
+.claude/settings.json
+.claude/settings.local.json
+.claude/skills/
+blue-light-ai/.claude/
+
+# ===================
+# Local working notes / scratch (not for repo)
+# ===================
+/ANALYSIS_SUMMARY.md
+/DWG_ANALYSIS_COMPLETE.txt
+/DWG_EXTRACTED_DATA.json
+/DWG_REFERENCE_ANALYSIS.md
+/GENERATION_GAPS_ANALYSIS.md
+/PLAN.md
+/README_DWG_ANALYSIS.md
+/TECHNICAL_DWG_SPECIFICATIONS.md
+/plan-structural-fixes.md
+/user-request
+/sample.jpg
+/I2R-ETR-NLB-SLD-1.png
+/63A TPN Distribution Board
+/63A TPN Distribution Board/
+/output/
+/asset/
+/assets/
+
+# ===================
+# AI service generated / local
+# ===================
+blue-light-ai/.coverage
+blue-light-ai/preview_output.svg
+blue-light-ai/sld_dwg_calibrated.svg
+blue-light-ai/data/sld-info/sld_database_backup_*.json
+blue-light-ai/data/sld-info/sld-dwg-old/
+
+# ===================
+# Test results (local only)
+# ===================
+doc/test/
