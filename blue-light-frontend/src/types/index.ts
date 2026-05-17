@@ -342,6 +342,10 @@ export interface MasterPrice {
   kvaMax: number;
   price: number;
   renewalPrice: number;
+  /** SLD 도면 작성 비용 */
+  sldPrice?: number;
+  /** LEW 인증 도장(endorsement) 가산 비용 */
+  endorsementPrice?: number;
   isActive: boolean;
 }
 
@@ -734,7 +738,10 @@ export interface AdminPriceResponse {
   kvaMax: number;
   price: number;
   renewalPrice: number;
+  /** SLD 도면 작성 비용 */
   sldPrice: number;
+  /** LEW 인증 도장(endorsement) 가산 비용 */
+  endorsementPrice: number;
   isActive: boolean;
   updatedAt: string;
 }
@@ -761,6 +768,7 @@ export interface BatchPriceTierItem {
   price: number;
   renewalPrice: number;
   sldPrice: number;
+  endorsementPrice: number;
   isActive: boolean;
 }
 
