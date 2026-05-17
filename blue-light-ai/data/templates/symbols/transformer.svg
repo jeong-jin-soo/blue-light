@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 63 68" width="63mm" height="68mm">
+  <rect width="63" height="68" fill="white" />
+  <circle cx="20.00" cy="34.00" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="20.00" cy="42.00" r="8.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="20.00" y1="26.00" x2="20.00" y2="15.00" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="20.00" y1="50.00" x2="20.00" y2="53.00" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="12.00" y="20.00" width="16.00" height="28.00" fill="none" stroke="#999999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="20.00" cy="15.00" r="1.2" fill="red" stroke="none" opacity="0.8" />
+  <text x="22.00" y="14.00" font-size="2" fill="red" font-family="monospace">top</text>
+  <circle cx="20.00" cy="53.00" r="1.2" fill="red" stroke="none" opacity="0.8" />
+  <text x="22.00" y="52.00" font-size="2" fill="red" font-family="monospace">bottom</text>
+  <circle cx="31.00" cy="32.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="33.00" y="31.00" font-size="1.8" fill="blue" font-family="monospace">label_right</text>
+  <circle cx="20.00" cy="12.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="22.00" y="11.00" font-size="1.8" fill="blue" font-family="monospace">label_above</text>
+  <circle cx="20.00" cy="56.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="22.00" y="55.00" font-size="1.8" fill="blue" font-family="monospace">rating_below</text>
+  <text x="31.50" y="66.00" text-anchor="middle" font-size="3" fill="#333" font-family="sans-serif">TRANSFORMER (16x28mm)</text>
+</svg>
