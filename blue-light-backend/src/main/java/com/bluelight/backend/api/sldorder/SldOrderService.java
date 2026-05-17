@@ -50,6 +50,7 @@ public class SldOrderService {
                 .selectedKva(request.getSelectedKva())
                 .ampere(request.getAmpere())
                 .applicantNote(request.getApplicantNote())
+                .endorsementRequested(request.getEndorsementRequested())
                 .build();
 
         // SLD_MANAGER가 1명뿐이면 자동 배정

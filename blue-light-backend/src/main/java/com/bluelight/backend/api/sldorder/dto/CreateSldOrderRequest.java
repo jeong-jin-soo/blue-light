@@ -29,4 +29,9 @@ public class CreateSldOrderRequest {
 
     @Size(max = 2000, message = "Applicant note must be 2000 characters or less")
     private String applicantNote;
+
+    /**
+     * LEW 인증 도장(endorsement) 포함 여부. null이면 true로 처리(기본 포함).
+     */
+    private Boolean endorsementRequested;
 }
