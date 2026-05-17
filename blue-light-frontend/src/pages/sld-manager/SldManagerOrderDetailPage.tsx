@@ -10,9 +10,10 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { InfoField } from '../../components/common/InfoField';
 import { useToastStore } from '../../stores/toastStore';
 import { sldManagerApi } from '../../api/sldManagerApi';
+import priceApi from '../../api/priceApi';
 import fileApi from '../../api/fileApi';
 import { SldManagerSldSection } from './sections/SldManagerSldSection';
-import type { SldOrder, SldOrderStatus } from '../../types';
+import type { MasterPrice, SldOrder, SldOrderStatus } from '../../types';
 
 const STATUS_CONFIG: Record<SldOrderStatus, { label: string; color: string }> = {
   PENDING_QUOTE: { label: 'Pending Quote', color: 'bg-blue-100 text-blue-800' },
@@ -44,9 +45,13 @@ export default function SldManagerOrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Quote form
-  const [quoteAmount, setQuoteAmount] = useState('');
+  // Quote form — sldFee + endorsementFee 분해 입력. quoteAmount = 합계 (서버에서 계산)
+  const [sldFeeInput, setSldFeeInput] = useState('');
+  const [endorsementFeeInput, setEndorsementFeeInput] = useState('');
   const [quoteNote, setQuoteNote] = useState('');
+
+  // Master price catalog — kVA tier 별 표준 단가 힌트
+  const [priceTiers, setPriceTiers] = useState<MasterPrice[]>([]);
 
   // Payment confirm
   const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
@@ -72,22 +77,66 @@ export default function SldManagerOrderDetailPage() {
     fetchData();
   }, [fetchData]);
 
+  // 가격표 로드 — 견적 입력 시 indicative 단가 표시 용도
+  useEffect(() => {
+    priceApi.getPrices()
+      .then((tiers) => setPriceTiers(tiers.filter((t) => t.isActive)))
+      .catch(() => { /* non-critical */ });
+  }, []);
+
+  // kVA tier 매칭 (indicative price 힌트 + sldFee/endorsementFee 자동 prefill)
+  const matchedTier = order?.selectedKva
+    ? priceTiers.find(
+        (t) => order.selectedKva! >= t.kvaMin && order.selectedKva! <= t.kvaMax,
+      )
+    : null;
+
+  // PENDING_QUOTE 진입 시 매칭 tier 단가로 prefill (한 번만)
+  useEffect(() => {
+    if (order?.status !== 'PENDING_QUOTE') return;
+    if (!matchedTier) return;
+    if (sldFeeInput === '' && matchedTier.sldPrice != null) {
+      setSldFeeInput(String(matchedTier.sldPrice));
+    }
+    if (
+      endorsementFeeInput === '' &&
+      order.endorsementRequested !== false &&
+      matchedTier.endorsementPrice != null
+    ) {
+      setEndorsementFeeInput(String(matchedTier.endorsementPrice));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.status, matchedTier?.masterPriceSeq]);
+
   // ── Actions ──
 
   const handleProposeQuote = async () => {
-    const amount = Number(quoteAmount);
-    if (!amount || amount <= 0) {
-      toast.error('Please enter a valid quote amount');
+    const sldFee = Number(sldFeeInput);
+    const endorsementRequested = order?.endorsementRequested !== false;
+    const endorsementFee = endorsementRequested ? Number(endorsementFeeInput) : 0;
+
+    if (isNaN(sldFee) || sldFee < 0) {
+      toast.error('Please enter a valid SLD fee');
+      return;
+    }
+    if (endorsementRequested && (isNaN(endorsementFee) || endorsementFee < 0)) {
+      toast.error('Please enter a valid endorsement fee');
+      return;
+    }
+    if (sldFee + endorsementFee <= 0) {
+      toast.error('Total quote must be greater than 0');
       return;
     }
     setActionLoading(true);
     try {
       await sldManagerApi.proposeQuote(orderId, {
-        quoteAmount: amount,
+        sldFee,
+        endorsementFee,
         quoteNote: quoteNote.trim() || undefined,
       });
       toast.success('Quote proposed successfully');
-      setQuoteAmount('');
+      setSldFeeInput('');
+      setEndorsementFeeInput('');
       setQuoteNote('');
       fetchData();
     } catch { toast.error('Failed to propose quote'); }
@@ -197,37 +246,94 @@ export default function SldManagerOrderDetailPage() {
           {/* Status-specific action sections */}
 
           {/* PENDING_QUOTE: Quote proposal form */}
-          {order.status === 'PENDING_QUOTE' && (
-            <Card>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4">Propose Quote</h2>
-              <div className="space-y-4">
-                <Input
-                  label="Quote Amount (SGD)"
-                  type="number"
-                  placeholder="e.g., 500"
-                  value={quoteAmount}
-                  onChange={(e) => setQuoteAmount(e.target.value)}
-                  min={0}
-                  required
-                />
-                <Textarea
-                  label="Quote Note (Optional)"
-                  placeholder="Additional notes about the quote..."
-                  value={quoteNote}
-                  onChange={(e) => setQuoteNote(e.target.value)}
-                  maxLength={2000}
-                  rows={3}
-                />
-                <Button
-                  variant="primary"
-                  onClick={handleProposeQuote}
-                  loading={actionLoading}
-                >
-                  Submit Quote
-                </Button>
-              </div>
-            </Card>
-          )}
+          {order.status === 'PENDING_QUOTE' && (() => {
+            const endorsementRequested = order.endorsementRequested !== false;
+            const sldFeeNum = Number(sldFeeInput) || 0;
+            const endorsementFeeNum = endorsementRequested ? (Number(endorsementFeeInput) || 0) : 0;
+            const total = sldFeeNum + endorsementFeeNum;
+            return (
+              <Card>
+                <h2 className="text-lg font-semibold text-gray-800 mb-1">Propose Quote</h2>
+                <p className="text-xs text-gray-500 mb-4">
+                  Enter SLD drawing fee
+                  {endorsementRequested && ' and LEW endorsement fee'} separately.
+                  The applicant pays the total.
+                </p>
+
+                {/* Endorsement requested badge */}
+                <div className="mb-4 text-xs">
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium ${
+                      endorsementRequested
+                        ? 'bg-primary-100 text-primary-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {endorsementRequested
+                      ? 'Applicant: LEW endorsement INCLUDED'
+                      : 'Applicant: SLD drawing only (no endorsement)'}
+                  </span>
+                </div>
+
+                <div className="space-y-4">
+                  {matchedTier && (
+                    <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
+                      <span className="font-medium text-gray-600">
+                        Indicative tier ({matchedTier.description || `${matchedTier.kvaMin}–${matchedTier.kvaMax} kVA`}):
+                      </span>{' '}
+                      SLD ${Number(matchedTier.sldPrice ?? 0).toFixed(2)}
+                      {endorsementRequested && (
+                        <> + Endorsement ${Number(matchedTier.endorsementPrice ?? 0).toFixed(2)}</>
+                      )}
+                    </div>
+                  )}
+                  <Input
+                    label="SLD Drawing Fee (SGD)"
+                    type="number"
+                    placeholder="e.g., 200"
+                    value={sldFeeInput}
+                    onChange={(e) => setSldFeeInput(e.target.value)}
+                    min={0}
+                    step="0.01"
+                    required
+                  />
+                  {endorsementRequested && (
+                    <Input
+                      label="LEW Endorsement Fee (SGD)"
+                      type="number"
+                      placeholder="e.g., 80"
+                      value={endorsementFeeInput}
+                      onChange={(e) => setEndorsementFeeInput(e.target.value)}
+                      min={0}
+                      step="0.01"
+                      required
+                    />
+                  )}
+                  <div className="flex items-center justify-between border-t border-gray-100 pt-3">
+                    <span className="text-sm text-gray-600">Total quote</span>
+                    <span className="text-base font-semibold text-gray-900">
+                      SGD ${total.toFixed(2)}
+                    </span>
+                  </div>
+                  <Textarea
+                    label="Quote Note (Optional)"
+                    placeholder="Additional notes about the quote..."
+                    value={quoteNote}
+                    onChange={(e) => setQuoteNote(e.target.value)}
+                    maxLength={2000}
+                    rows={3}
+                  />
+                  <Button
+                    variant="primary"
+                    onClick={handleProposeQuote}
+                    loading={actionLoading}
+                  >
+                    Submit Quote
+                  </Button>
+                </div>
+              </Card>
+            );
+          })()}
 
           {/* QUOTE_PROPOSED: Waiting for applicant response */}
           {order.status === 'QUOTE_PROPOSED' && (
@@ -237,9 +343,17 @@ export default function SldManagerOrderDetailPage() {
                   <span className="text-lg">&#9202;</span>
                   <div>
                     <p className="text-sm font-medium text-yellow-800">Quote proposed. Waiting for applicant response.</p>
-                    <p className="text-xs text-yellow-700 mt-1">
-                      Quote: SGD ${order.quoteAmount?.toLocaleString()}
-                    </p>
+                    <div className="text-xs text-yellow-700 mt-1 space-y-0.5">
+                      {order.sldFee != null && (
+                        <p>SLD drawing: SGD ${order.sldFee.toLocaleString()}</p>
+                      )}
+                      {order.endorsementRequested !== false && order.endorsementFee != null && order.endorsementFee > 0 && (
+                        <p>LEW endorsement: SGD ${order.endorsementFee.toLocaleString()}</p>
+                      )}
+                      <p className="font-semibold">
+                        Total: SGD ${order.quoteAmount?.toLocaleString()}
+                      </p>
+                    </div>
                     {order.quoteNote && (
                       <div className="mt-2 bg-white rounded p-2 border border-yellow-100">
                         <p className="text-xs text-gray-500">Quote note:</p>
@@ -435,10 +549,28 @@ export default function SldManagerOrderDetailPage() {
                 <span className="text-gray-500">Status</span>
                 <SldStatusBadge status={order.status} />
               </div>
-              {order.quoteAmount != null && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Endorsement</span>
+                <span className="font-medium text-gray-700">
+                  {order.endorsementRequested === false ? 'Not requested' : 'Included'}
+                </span>
+              </div>
+              {order.sldFee != null && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Quote</span>
-                  <span className="font-medium text-gray-700">SGD ${order.quoteAmount.toLocaleString()}</span>
+                  <span className="text-gray-500">SLD fee</span>
+                  <span className="font-medium text-gray-700">SGD ${order.sldFee.toLocaleString()}</span>
+                </div>
+              )}
+              {order.endorsementRequested !== false && order.endorsementFee != null && order.endorsementFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Endorsement fee</span>
+                  <span className="font-medium text-gray-700">SGD ${order.endorsementFee.toLocaleString()}</span>
+                </div>
+              )}
+              {order.quoteAmount != null && (
+                <div className="flex justify-between border-t border-gray-100 pt-1.5 mt-1.5">
+                  <span className="text-gray-500 font-semibold">Total quote</span>
+                  <span className="font-semibold text-gray-800">SGD ${order.quoteAmount.toLocaleString()}</span>
                 </div>
               )}
               <div className="flex justify-between">

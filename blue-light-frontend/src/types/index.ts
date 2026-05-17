@@ -857,8 +857,15 @@ export interface SldOrder {
   ampere?: string;
   applicantNote?: string;
   sketchFileSeq?: number;
+  /** LEW 인증 도장(endorsement) 포함 여부 */
+  endorsementRequested?: boolean;
   status: SldOrderStatus;
+  /** 총 견적 금액 = sldFee + endorsementFee */
   quoteAmount?: number;
+  /** SLD 도면 작성 비용 (견적 분해) */
+  sldFee?: number;
+  /** LEW 인증 도장 비용 (견적 분해, endorsement 미선택 시 0) */
+  endorsementFee?: number;
   quoteNote?: string;
   managerNote?: string;
   uploadedFileSeq?: number;
@@ -880,13 +887,16 @@ export interface CreateSldOrderRequest {
   selectedKva?: number;
   ampere?: string;
   applicantNote?: string;
+  /** LEW 인증 도장(endorsement) 포함 여부. 생략 시 백엔드가 true로 처리. */
+  endorsementRequested?: boolean;
 }
 
 /**
- * SLD 주문 견적 제안 요청
+ * SLD 주문 견적 제안 요청 — SLD 비용과 endorsement 비용을 분해 입력.
  */
 export interface ProposeQuoteRequest {
-  quoteAmount: number;
+  sldFee: number;
+  endorsementFee: number;
   quoteNote?: string;
 }
 
