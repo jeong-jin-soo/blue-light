@@ -62,6 +62,7 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
     page_w = scene.page_w
     page_h = scene.page_h
     margin = scene.margin
+    margin_bottom = scene.effective_margin_bottom
 
     for b in scene.boxes:
         if b.variable_w:
@@ -74,7 +75,8 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
             x = model.NewIntVar(margin, page_w - b.w - margin, f"x_{b.name}")
             xiv = model.NewIntervalVar(x, b.w, x + b.w, f"xiv_{b.name}")
             w = None
-        y = model.NewIntVar(margin, page_h - b.h - margin, f"y_{b.name}")
+        # 비대칭 마진: 하단은 타이틀블록 영역만큼 별도 차감.
+        y = model.NewIntVar(margin_bottom, page_h - b.h - margin, f"y_{b.name}")
         yiv = model.NewIntervalVar(y, b.h, y + b.h, f"yiv_{b.name}")
         vars_[b.name] = (x, y, w, b)
         x_ivs.append(xiv)

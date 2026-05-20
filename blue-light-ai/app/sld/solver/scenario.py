@@ -81,6 +81,13 @@ def build_scene(requirements: dict) -> SolverScene:
         scene.page_w = mm(594)
         scene.page_h = mm(420)
 
+    # 타이틀블록은 페이지 하단 띠를 차지한다 (PageConfig.title_block_height=32 mm).
+    # 솔버 박스가 타이틀블록 영역으로 침범하지 않도록 별도의 하단 마진을 확보.
+    # 32 mm + 8 mm 안전 여유 = 40 mm. PageConfig 기본값(margin=10)과 합치면
+    # 페이지 좌표 y=10..42가 타이틀블록 → 솔버는 y ≥ ~40에 배치된다.
+    title_block_clearance = mm(40)
+    scene.margin_bottom = max(scene.margin, title_block_clearance)
+
     main = requirements.get("main_breaker", {}) or {}
     elcb = requirements.get("elcb", {}) or {}
     metering = (requirements.get("metering") or {}).get("type", "sp_meter")
@@ -257,9 +264,12 @@ def build_scene(requirements: dict) -> SolverScene:
         ))
 
     # ── Section 14: earth bar ──
+    # LEW 관습: EARTH 심볼은 점(약 8 mm 정도) 1개, DB 우측 하단에 배치.
+    # 솔버 박스를 80 mm로 잡으면 시각적으로 부스바와 같은 가로폭의 점선처럼
+    # 보여 어색하므로 심볼 크기에 맞춘 작은 박스(10×8 mm)로 모델링한다.
     scene.boxes.append(Box(
-        name="earth_bar", w=mm(80), h=mm(4), role=BoxRole.EARTH,
-        section=14, column="earth", text="EARTH BAR",
+        name="earth_bar", w=mm(10), h=mm(8), role=BoxRole.EARTH,
+        section=14, column="earth", text="EARTH",
     ))
     earth_text = str(requirements.get("earth_label", "EARTH BAR 35mm² CPC"))
     scene.boxes.append(Box(

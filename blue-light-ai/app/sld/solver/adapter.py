@@ -133,10 +133,53 @@ _SPINE_CHAIN_ORDER: tuple[str, ...] = (
 )
 
 
+def _center_placements_in_drawing_area(
+    scene: SolverScene, placements: dict[str, dict],
+) -> dict[str, dict]:
+    """Place output을 사용 가능한 그리기 영역의 중심으로 평행 이동.
+
+    솔버는 (max_top - min_bot) + (max_right - min_left)을 최소화하므로
+    bbox가 페이지의 한쪽 모서리에 몰리는 경향이 있다. 사용 가능
+    영역(margin 안쪽, 타이틀블록 제외)의 중심에 bbox 중심을 맞춘다.
+
+    placements dict는 in-place로 변형하지 않고 새 dict를 반환한다.
+    """
+    if not placements:
+        return placements
+
+    # bbox in solver units (0.1 mm 정수).
+    xs = [p["x"] for p in placements.values()]
+    ys = [p["y"] for p in placements.values()]
+    rights = [p["x"] + p["w"] for p in placements.values()]
+    tops = [p["y"] + p["h"] for p in placements.values()]
+    bbox_xmin, bbox_xmax = min(xs), max(rights)
+    bbox_ymin, bbox_ymax = min(ys), max(tops)
+
+    area_xmin = scene.margin
+    area_xmax = scene.page_w - scene.margin
+    area_ymin = scene.effective_margin_bottom
+    area_ymax = scene.page_h - scene.margin
+
+    # 중심 정렬에 필요한 평행 이동량.
+    dx = ((area_xmin + area_xmax) - (bbox_xmin + bbox_xmax)) // 2
+    dy = ((area_ymin + area_ymax) - (bbox_ymin + bbox_ymax)) // 2
+
+    # 경계 클램프: 시프트로 영역을 벗어나지 않게.
+    dx = max(area_xmin - bbox_xmin, min(area_xmax - bbox_xmax, dx))
+    dy = max(area_ymin - bbox_ymin, min(area_ymax - bbox_ymax, dy))
+
+    shifted: dict[str, dict] = {}
+    for name, p in placements.items():
+        shifted[name] = {**p, "x": p["x"] + dx, "y": p["y"] + dy}
+    return shifted
+
+
 def adapt_to_layout_result(
     scene: SolverScene,
     result: SolveResult,
     requirements: dict | None = None,
+    *,
+    center_in_drawing_area: bool = True,
 ) -> LayoutResult:
     """SolveResult + SolverScene → LayoutResult.
 
@@ -146,6 +189,8 @@ def adapt_to_layout_result(
         scene: 솔버 입력 (Box 그래프).
         result: 솔버 출력 (placements).
         requirements: 원본 requirements dict (supply_type, voltage 등 메타 추출).
+        center_in_drawing_area: True면 placements를 페이지 사용 영역 중심으로
+            평행 이동한다. 회귀 테스트에서 좌표를 고정하고 싶을 때만 False.
 
     Returns:
         components/port_connections/busbar 좌표가 채워진 LayoutResult.
@@ -160,7 +205,10 @@ def adapt_to_layout_result(
 
     catalog = get_catalog()
     box_by_name = {b.name: b for b in scene.boxes}
-    placement_by_name = result.placements
+    placement_by_name = (
+        _center_placements_in_drawing_area(scene, result.placements)
+        if center_in_drawing_area else result.placements
+    )
 
     sections_rendered: dict[str, bool] = {}
 
@@ -168,7 +216,25 @@ def adapt_to_layout_result(
     for name, placement in placement_by_name.items():
         box: Box = placement["box"]
         if box.role == BoxRole.LABEL:
-            continue  # 라벨은 부모에 흡수
+            # 라벨 흡수 vs 별도 emit 정책:
+            #   - 부모가 catalog 심볼(MCB/MCCB/RCCB/ELCB/ACB)이면 breaker_block
+            #     스타일로 부모에 흡수 (기존 엔진의 _draw_breaker_block_label이
+            #     적절한 위치로 그려준다).
+            #   - 부모가 비카탈로그(cable/meter_board/supply/busbar/earth_bar 등)
+            #     이거나 자유 anchor(앵커 2개 이상) 라벨이면 솔버가 결정한
+            #     위치를 살려 별도 LABEL 컴포넌트로 emit.
+            parent_box = box_by_name.get(box.parent)
+            parent_is_breaker = bool(parent_box and parent_box.symbol_kind)
+            free_anchor = len(box.label_anchors) >= 2
+            if box.text and (not parent_is_breaker or free_anchor):
+                bx, by, bw, bh = _placement_mm(placement)
+                layout.components.append(PlacedComponent(
+                    symbol_name="LABEL",
+                    x=bx, y=by + bh / 2,
+                    id=f"lbl_{box.name}",
+                    label=box.text,
+                ))
+            continue
 
         x_mm, y_mm, w_mm, h_mm = _placement_mm(placement)
 
@@ -198,6 +264,7 @@ def adapt_to_layout_result(
                     circuit_id=meta.get("circuit_id", ""),
                     load_info=meta.get("load", ""),
                     rotation=90.0,  # 서브회로 라벨은 항상 vertical
+                    label_style="breaker_block",  # LEW-style 다행 라벨
                 )
             else:
                 # 스파인 부품 (main_breaker, elcb, ...)
@@ -226,12 +293,15 @@ def adapt_to_layout_result(
             layout.busbar_visual_end_x = x_mm + w_mm
             layout.busbar_y_per_row = [cy]
             layout.busbar_x_per_row = {cy: (x_mm, x_mm + w_mm)}
+            # 부스바 라벨은 자식 LABEL 박스(label_anchors=top/bottom)가
+            # 자유 anchor 분기에서 별도 emit되므로 BUSBAR 컴포넌트의 rating은
+            # 비워둔다 (그렇지 않으면 라벨이 두 번 그려진다).
             layout.components.append(PlacedComponent(
                 symbol_name="BUSBAR",
                 x=x_mm,
                 y=cy,            # 부스바는 중심 Y로 그린다
                 id="busbar",
-                rating=_label_text_for(box, scene),
+                rating="",
                 ports={
                     "left": (x_mm, cy),
                     "right": (x_mm + w_mm, cy),
@@ -241,13 +311,11 @@ def adapt_to_layout_result(
             sections_rendered["main_busbar"] = True
             continue
 
-        # 어스바
+        # 어스바: 솔버 박스를 EARTH 심볼 본체(약 10×8 mm)에 1:1 대응.
+        # "EARTH BAR 35mm² CPC" 같은 도체 라벨은 별도 LABEL 박스로 솔버가
+        # 자유 anchor 안에서 배치하고, 어댑터의 LABEL 흡수 분기에서 emit된다.
         if box.role == BoxRole.EARTH:
             cy = y_mm + h_mm / 2
-            # 기존 엔진은 EARTH 심볼을 컴팩트하게 한 곳에 두고 도체 라인으로
-            # 부스바와 연결하는 방식이다. 솔버는 어스바를 폭이 넓은 박스로
-            # 모델링하므로 박스 좌측에 EARTH 심볼 placement만 등록하고 라벨은
-            # 별도 LABEL 컴포넌트로 분리한다.
             layout.components.append(PlacedComponent(
                 symbol_name="EARTH",
                 x=x_mm,
@@ -261,24 +329,16 @@ def adapt_to_layout_result(
                     "center": (x_mm + w_mm / 2, cy),
                 },
             ))
-            earth_text = _label_text_for(box, scene)
-            if earth_text:
-                layout.components.append(PlacedComponent(
-                    symbol_name="LABEL",
-                    x=x_mm + w_mm + 2.0,
-                    y=cy,
-                    id="earth_bar_lbl",
-                    label=earth_text,
-                ))
             sections_rendered["earth_bar"] = True
             continue
 
-        # 카탈로그 외 스파인 부품 (supply, cables, meter_board ...)
+        # 카탈로그 외 스파인 부품 (supply, cables, meter_board ...).
+        # 라벨 텍스트는 자식 LABEL 박스에서 별도로 emit되므로 여기서는
+        # *chain 포트만* 가진 invisible LABEL 컴포넌트로 등록한다.
+        # 예외: supply는 FLOW_ARROW_UP (AC 공급 심볼)로 시각 렌더.
         symbol_name = _NON_CATALOG_SPINE.get(box.name, "LABEL")
-        text = box.text or _label_text_for(box, scene)
         cx = x_mm + w_mm / 2
         cy = y_mm + h_mm / 2
-        # FLOW_ARROW_UP는 center anchor, 그 외 LABEL은 left-bottom anchor.
         anchor_x = cx if symbol_name in ("FLOW_ARROW", "FLOW_ARROW_UP") else x_mm
         anchor_y = cy if symbol_name in ("FLOW_ARROW", "FLOW_ARROW_UP") else y_mm
         layout.components.append(PlacedComponent(
@@ -286,7 +346,9 @@ def adapt_to_layout_result(
             x=anchor_x,
             y=anchor_y,
             id=f"spine_{box.name}",
-            label=text,
+            # supply는 라벨이 별도 LABEL 박스로 처리되므로 빈 label.
+            # 그 외 placeholder도 마찬가지.
+            label="",
             ports={
                 "top": (cx, y_mm + h_mm),
                 "bottom": (cx, y_mm),

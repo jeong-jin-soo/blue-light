@@ -59,12 +59,25 @@ class Box:
 
 @dataclass
 class SolverScene:
-    """Everything the CP-SAT model needs to lay out one SLD page."""
+    """Everything the CP-SAT model needs to lay out one SLD page.
+
+    Margin parameters
+    -----------------
+    `margin` is the legacy symmetric margin used for the left/right/top edges.
+    `margin_bottom` is independent so the scenario can reserve room for the
+    title block (occupies the lower band of the page in LEW drawings).
+    `None` falls back to `margin` (preserves Phase 1/2 behavior).
+    """
 
     boxes: list[Box] = field(default_factory=list)
     page_w: int = mm(420)   # A3 landscape default
     page_h: int = mm(297)
     margin: int = mm(10)
+    margin_bottom: Optional[int] = None  # None → use `margin`
+
+    @property
+    def effective_margin_bottom(self) -> int:
+        return self.margin if self.margin_bottom is None else self.margin_bottom
 
     # Logical groups — handy for constraint generation.
     def by_column(self, column: str) -> list[Box]:
