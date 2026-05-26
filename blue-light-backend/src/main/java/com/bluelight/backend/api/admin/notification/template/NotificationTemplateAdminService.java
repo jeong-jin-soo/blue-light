@@ -176,6 +176,33 @@ public class NotificationTemplateAdminService {
         return draftRepository.findById(draftSeq);
     }
 
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<NotificationTemplate> searchTemplates(
+            String code,
+            NotificationChannel channel,
+            String locale,
+            Boolean enabled,
+            NotificationCategory category,
+            String recipientRoleLike,
+            org.springframework.data.domain.Pageable pageable) {
+        return templateRepository.search(code, channel, locale, enabled, category, recipientRoleLike, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<NotificationTemplateDraft> listDraftsByStatus(
+            TemplateDraftStatus status,
+            org.springframework.data.domain.Pageable pageable) {
+        return draftRepository.findByStatusOrderBySubmittedAtAsc(status, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<NotificationTemplateDraft> listMyDrafts(
+            Long submittedBy,
+            TemplateDraftStatus status,
+            org.springframework.data.domain.Pageable pageable) {
+        return draftRepository.findBySubmittedByAndStatusOrderBySubmittedAtDesc(submittedBy, status, pageable);
+    }
+
     // ============================================================
     // Helpers
     // ============================================================
