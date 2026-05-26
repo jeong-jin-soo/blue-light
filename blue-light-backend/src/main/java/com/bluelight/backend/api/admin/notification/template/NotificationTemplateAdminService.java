@@ -203,6 +203,23 @@ public class NotificationTemplateAdminService {
         return draftRepository.findBySubmittedByAndStatusOrderBySubmittedAtDesc(submittedBy, status, pageable);
     }
 
+    @Transactional(readOnly = true)
+    public java.util.List<NotificationCatalog> listCatalog() {
+        return catalogRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<NotificationCatalog> findCatalog(String templateCode) {
+        return catalogRepository.findByTemplateCode(templateCode);
+    }
+
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<NotificationTemplateHistory> listHistory(
+            Long templateSeq,
+            org.springframework.data.domain.Pageable pageable) {
+        return historyRepository.findByTemplateSeqOrderByChangedAtDesc(templateSeq, pageable);
+    }
+
     // ============================================================
     // Helpers
     // ============================================================

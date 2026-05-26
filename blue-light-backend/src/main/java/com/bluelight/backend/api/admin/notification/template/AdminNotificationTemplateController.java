@@ -1,7 +1,9 @@
 package com.bluelight.backend.api.admin.notification.template;
 
+import com.bluelight.backend.api.admin.notification.template.dto.CatalogEntryResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.CreateDraftRequest;
 import com.bluelight.backend.api.admin.notification.template.dto.DisableTemplateRequest;
+import com.bluelight.backend.api.admin.notification.template.dto.HistoryItemResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateDetailResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateDraftResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateListItemResponse;
@@ -37,6 +39,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -231,6 +234,45 @@ public class AdminNotificationTemplateController {
                 clientIp(httpRequest),
                 hasRole(auth, "SYSTEM_ADMIN"));
         return ResponseEntity.noContent().build();
+    }
+
+    // ============================================================
+    // Catalog + History (PR-T5)
+    // ============================================================
+
+    @GetMapping("/catalog")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN','LEW','SLD_MANAGER','CONCIERGE_MANAGER')")
+    public ResponseEntity<List<CatalogEntryResponse>> listCatalog() {
+        return ResponseEntity.ok(adminService.listCatalog().stream()
+                .map(CatalogEntryResponse::from)
+                .toList());
+    }
+
+    @GetMapping("/catalog/{templateCode}")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN','LEW','SLD_MANAGER','CONCIERGE_MANAGER')")
+    public ResponseEntity<CatalogEntryResponse> getCatalog(@PathVariable String templateCode) {
+        return adminService.findCatalog(templateCode)
+                .map(c -> ResponseEntity.ok(CatalogEntryResponse.from(c)))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/{templateSeq}/history")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN','LEW','SLD_MANAGER','CONCIERGE_MANAGER')")
+    public ResponseEntity<Page<HistoryItemResponse>> getHistory(
+            @PathVariable Long templateSeq,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "30") int size,
+            Authentication auth) {
+        // D-5 — non-NM/SA 는 본인 역할 수신 템플릿의 history 만 볼 수 있도록 가드
+        NotificationTemplate template = adminService.findTemplate(templateSeq)
+                .orElseThrow(() -> new NotificationTemplateAdminService.TemplateNotFoundException(templateSeq));
+        ensureReadAuthorized(template, auth);
+
+        int validPage = Math.max(0, page);
+        int validSize = Math.min(Math.max(1, size), 100);
+        Pageable pageable = PageRequest.of(validPage, validSize);
+        return ResponseEntity.ok(adminService.listHistory(templateSeq, pageable)
+                .map(HistoryItemResponse::from));
     }
 
     // ============================================================

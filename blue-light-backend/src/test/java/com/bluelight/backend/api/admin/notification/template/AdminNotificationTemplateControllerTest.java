@@ -454,4 +454,95 @@ class AdminNotificationTemplateControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("UNSUPPORTED_TEST_CHANNEL"));
     }
+
+    // ============================================================
+    // PR-T5 — Catalog + History
+    // ============================================================
+
+    @Test
+    @DisplayName("GET /catalog - 카탈로그 메타 목록 반환")
+    void listCatalog_returnsEntries() throws Exception {
+        com.bluelight.backend.domain.notification.NotificationCatalog cat =
+                com.bluelight.backend.domain.notification.NotificationCatalog.builder()
+                        .templateCode("A-17")
+                        .allowedVariablesJson("[\"applicantName\",\"amount\"]")
+                        .defaultCategory(NotificationCategory.PAYMENT)
+                        .defaultSeverity(NotificationSeverity.CRITICAL)
+                        .defaultRecipientRoles("APPLICANT")
+                        .description("Payment requested")
+                        .requiredTokensJson("[\"{{paynowUen}}\"]")
+                        .build();
+        when(adminService.listCatalog()).thenReturn(List.of(cat));
+
+        mockMvc.perform(get("/api/admin/notification-templates/catalog").principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].templateCode").value("A-17"))
+                .andExpect(jsonPath("$[0].defaultCategory").value("PAYMENT"))
+                .andExpect(jsonPath("$[0].defaultSeverity").value("CRITICAL"));
+    }
+
+    @Test
+    @DisplayName("GET /catalog/{code} - 특정 코드 카탈로그 반환")
+    void getCatalogByCode_returnsEntry() throws Exception {
+        com.bluelight.backend.domain.notification.NotificationCatalog cat =
+                com.bluelight.backend.domain.notification.NotificationCatalog.builder()
+                        .templateCode("A-17")
+                        .allowedVariablesJson("[\"applicantName\"]")
+                        .defaultCategory(NotificationCategory.PAYMENT)
+                        .defaultSeverity(NotificationSeverity.CRITICAL)
+                        .defaultRecipientRoles("APPLICANT")
+                        .description("Payment requested")
+                        .build();
+        when(adminService.findCatalog("A-17")).thenReturn(java.util.Optional.of(cat));
+
+        mockMvc.perform(get("/api/admin/notification-templates/catalog/A-17").principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.templateCode").value("A-17"));
+    }
+
+    @Test
+    @DisplayName("GET /catalog/{code} - 미존재 코드 → 404")
+    void getCatalogByCode_notFound() throws Exception {
+        when(adminService.findCatalog("X-99")).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/api/admin/notification-templates/catalog/X-99").principal(nmAuth()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("GET /{seq}/history - 변경 이력 페이지네이션")
+    void getHistory_returnsPagedHistory() throws Exception {
+        NotificationTemplate t = buildTemplate(NotificationCategory.PAYMENT, "APPLICANT", true);
+        when(adminService.findTemplate(42L)).thenReturn(java.util.Optional.of(t));
+
+        com.bluelight.backend.domain.notification.NotificationTemplateHistory h =
+                com.bluelight.backend.domain.notification.NotificationTemplateHistory.builder()
+                        .templateSeq(42L)
+                        .changeType(com.bluelight.backend.domain.notification.TemplateChangeType.PUBLISH)
+                        .diffJson("{\"subject\":{\"before\":\"old\",\"after\":\"new\"}}")
+                        .beforeSnapshotJson("{\"subject\":\"old\"}")
+                        .afterSnapshotJson("{\"subject\":\"new\"}")
+                        .changeReason("법무 반영")
+                        .actorUserSeq(9001L)
+                        .actorIp("203.0.113.42")
+                        .build();
+        when(adminService.listHistory(eq(42L), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new PageImpl<>(List.of(h), PageRequest.of(0, 30), 1));
+
+        mockMvc.perform(get("/api/admin/notification-templates/42/history").principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].changeType").value("PUBLISH"))
+                .andExpect(jsonPath("$.content[0].actorUserSeq").value(9001))
+                .andExpect(jsonPath("$.content[0].actorIp").value("203.0.113.42"));
+    }
+
+    @Test
+    @DisplayName("GET /{seq}/history - D-5 LEW 가 APPLICANT-only 템플릿 history 접근 → 404")
+    void getHistory_lewBlockedByD5() throws Exception {
+        NotificationTemplate t = buildTemplate(NotificationCategory.STATUS, "APPLICANT", true);
+        when(adminService.findTemplate(42L)).thenReturn(java.util.Optional.of(t));
+
+        mockMvc.perform(get("/api/admin/notification-templates/42/history").principal(lewAuth()))
+                .andExpect(status().isNotFound());
+    }
 }

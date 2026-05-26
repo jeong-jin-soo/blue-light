@@ -197,3 +197,48 @@ ON DUPLICATE KEY UPDATE
     variables_json         = VALUES(variables_json),
     enabled                = VALUES(enabled),
     updated_at             = NOW();
+
+-- ============================================
+-- notification_catalog 카탈로그 메타 sample 시드 (PR-T5)
+-- ----------------------------------------------------------------
+-- 카탈로그 SSOT: doc/Project Analysis/notification-catalog.md
+-- 풀 97종 시드는 다음으로 생성하여 운영/CI 에 별도 실행:
+--   $ python3 scripts/import_notification_copy.py > /tmp/catalog_seed.sql
+--   $ mysql -h <host> -u <user> -p bluelight < /tmp/catalog_seed.sql
+-- 여기는 로컬 개발 시 Lint L1(변수 화이트리스트)이 즉시 동작하도록
+-- 대표 5종만 시드. WHERE NOT EXISTS 가드로 멱등 보장.
+-- ============================================
+INSERT INTO notification_catalog
+    (template_code, allowed_variables_json, default_category, default_severity,
+     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
+SELECT 'A-04', '["applicantName","changedAtDisplay","requestIp","supportUrl"]',
+       'SECURITY', 'CRITICAL', 'APPLICANT', 'Password change confirmation', '[]', NOW(6), NOW(6)
+WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'A-04');
+
+INSERT INTO notification_catalog
+    (template_code, allowed_variables_json, default_category, default_severity,
+     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
+SELECT 'A-17', '["applicantName","publicCode","kvaLabel","amount","deadline","ctaUrl"]',
+       'PAYMENT', 'CRITICAL', 'APPLICANT', 'Payment requested (PENDING_PAYMENT)', '[]', NOW(6), NOW(6)
+WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'A-17');
+
+INSERT INTO notification_catalog
+    (template_code, allowed_variables_json, default_category, default_severity,
+     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
+SELECT 'A-22', '["applicantName","publicCode","licenceNumber","licenceExpiryDate","ctaUrl"]',
+       'STATUS', 'CRITICAL', 'APPLICANT', 'Licence issued (COMPLETED)', '[]', NOW(6), NOW(6)
+WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'A-22');
+
+INSERT INTO notification_catalog
+    (template_code, allowed_variables_json, default_category, default_severity,
+     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
+SELECT 'L-01', '["lewName","ctaUrl"]',
+       'STATUS', 'CRITICAL', 'LEW', 'LEW signup approved', '[]', NOW(6), NOW(6)
+WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'L-01');
+
+INSERT INTO notification_catalog
+    (template_code, allowed_variables_json, default_category, default_severity,
+     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
+SELECT 'M-01', '["publicCode","kvaLabel"]',
+       'OPS', 'IMPORTANT', 'ADMIN', 'New application received', '[]', NOW(6), NOW(6)
+WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'M-01');
