@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -74,6 +75,31 @@ public class NotificationTemplate extends BaseEntity {
     @Column(name = "enabled", nullable = false)
     private boolean enabled;
 
+    /**
+     * 낙관락 버전 — admin 동시 편집 시 stale write 차단.
+     * GET 응답 ETag, PATCH 요청 If-Match 헤더와 1:1 매핑.
+     * (스펙 §6.3)
+     */
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
+    /** 카탈로그 ID — 예: {@code A-17} (카피북 §0 식별자). nullable: 시드 미연결 row 허용. */
+    @Column(name = "catalog_meta_key", length = 60)
+    private String catalogMetaKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", length = 30)
+    private NotificationCategory category;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "severity", length = 20)
+    private NotificationSeverity severity;
+
+    /** 수신자 역할 — comma-separated, 예: {@code APPLICANT,LEW}. D-5 read 범위 필터에 사용. */
+    @Column(name = "recipient_roles", length = 200)
+    private String recipientRoles;
+
     @Builder
     public NotificationTemplate(String templateCode,
                                 NotificationChannel channel,
@@ -82,7 +108,11 @@ public class NotificationTemplate extends BaseEntity {
                                 String subject,
                                 String bodyText,
                                 String variablesJson,
-                                boolean enabled) {
+                                boolean enabled,
+                                String catalogMetaKey,
+                                NotificationCategory category,
+                                NotificationSeverity severity,
+                                String recipientRoles) {
         this.templateCode = templateCode;
         this.channel = channel;
         this.locale = locale;
@@ -91,6 +121,10 @@ public class NotificationTemplate extends BaseEntity {
         this.bodyText = bodyText;
         this.variablesJson = variablesJson;
         this.enabled = enabled;
+        this.catalogMetaKey = catalogMetaKey;
+        this.category = category;
+        this.severity = severity;
+        this.recipientRoles = recipientRoles;
     }
 
     public void enable() {
@@ -109,5 +143,25 @@ public class NotificationTemplate extends BaseEntity {
 
     public void updateProviderTemplateName(String providerTemplateName) {
         this.providerTemplateName = providerTemplateName;
+    }
+
+    /**
+     * Draft approve 시 본 row 를 새 스냅샷으로 덮어쓴다. PR-T2 의 publish 경로에서 호출.
+     * version 필드는 JPA 가 자동 증가시킨다.
+     */
+    public void applyPublishedSnapshot(String subject,
+                                       String bodyText,
+                                       String variablesJson,
+                                       String providerTemplateName,
+                                       NotificationCategory category,
+                                       NotificationSeverity severity,
+                                       String recipientRoles) {
+        this.subject = subject;
+        this.bodyText = bodyText;
+        this.variablesJson = variablesJson;
+        this.providerTemplateName = providerTemplateName;
+        this.category = category;
+        this.severity = severity;
+        this.recipientRoles = recipientRoles;
     }
 }

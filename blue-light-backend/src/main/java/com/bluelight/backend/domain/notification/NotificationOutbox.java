@@ -98,6 +98,28 @@ public class NotificationOutbox extends BaseEntity {
     @Column(name = "sent_at")
     private LocalDateTime sentAt;
 
+    /**
+     * 발생 출처 — PRODUCTION(기본) vs ADMIN_TEST.
+     * {@link NotificationSource#ADMIN_TEST} 는 사용자 인박스 unread_count 에서 제외된다 (PR-T4).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", nullable = false, length = 20)
+    private NotificationSource source;
+
+    /**
+     * 테스트 발송 플래그 — {@code source=ADMIN_TEST} 와 1:1 정합이지만 인덱스/필터 편의용으로 boolean 으로도 보관.
+     * 기본값 false.
+     */
+    @Column(name = "is_test", nullable = false)
+    private boolean isTest;
+
+    /**
+     * 렌더링 경고 — TemplateRenderer 가 발견한 missing keys 등 비치명적 이슈를 JSON 으로 기록.
+     * 예: {@code {"missingKeys":["foo","bar"]}}. admin UI 가 가시화.
+     */
+    @Column(name = "render_warnings_json", columnDefinition = "TEXT")
+    private String renderWarningsJson;
+
     @Builder
     public NotificationOutbox(String idempotencyKey,
                               Long userSeq,
@@ -107,7 +129,10 @@ public class NotificationOutbox extends BaseEntity {
                               String locale,
                               String payloadJson,
                               String referenceType,
-                              Long referenceId) {
+                              Long referenceId,
+                              NotificationSource source,
+                              boolean isTest,
+                              String renderWarningsJson) {
         this.idempotencyKey = idempotencyKey;
         this.userSeq = userSeq;
         this.channel = channel;
@@ -119,6 +144,9 @@ public class NotificationOutbox extends BaseEntity {
         this.referenceId = referenceId;
         this.status = OutboxStatus.PENDING;
         this.attemptCount = 0;
+        this.source = source != null ? source : NotificationSource.PRODUCTION;
+        this.isTest = isTest;
+        this.renderWarningsJson = renderWarningsJson;
     }
 
     /** 외부 호출 직전 — 동시성 가드. */

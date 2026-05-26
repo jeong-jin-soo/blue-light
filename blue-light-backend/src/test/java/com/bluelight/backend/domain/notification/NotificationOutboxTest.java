@@ -158,4 +158,57 @@ class NotificationOutboxTest {
         assertThat(row.getNextAttemptAt()).isNull();
         assertThat(row.getAttemptCount()).isZero(); // 외부 호출 없었으므로 0 유지
     }
+
+    // ============================================================
+    // PR-T1 — source / isTest / renderWarningsJson
+    // ============================================================
+
+    @Test
+    @DisplayName("PR-T1 - 빌더 source 미지정 시 PRODUCTION 기본값, isTest=false")
+    void builder_defaultSourceIsProduction() {
+        NotificationOutbox row = buildOutbox();
+
+        assertThat(row.getSource()).isEqualTo(NotificationSource.PRODUCTION);
+        assertThat(row.isTest()).isFalse();
+        assertThat(row.getRenderWarningsJson()).isNull();
+    }
+
+    @Test
+    @DisplayName("PR-T1 - admin 테스트 발송 — source=ADMIN_TEST, isTest=true 영속")
+    void builder_adminTestSourceAndFlag() {
+        NotificationOutbox row = NotificationOutbox.builder()
+                .idempotencyKey("test:9001:42:1716700000")
+                .userSeq(9001L)
+                .channel(NotificationChannel.EMAIL)
+                .eventType("PAYMENT_REQUEST")
+                .templateCode("A-17")
+                .locale("en")
+                .payloadJson("{\"amount\":\"185.00\"}")
+                .referenceType("TEMPLATE_TEST")
+                .referenceId(42L)
+                .source(NotificationSource.ADMIN_TEST)
+                .isTest(true)
+                .build();
+
+        assertThat(row.getSource()).isEqualTo(NotificationSource.ADMIN_TEST);
+        assertThat(row.isTest()).isTrue();
+        assertThat(row.getReferenceType()).isEqualTo("TEMPLATE_TEST");
+    }
+
+    @Test
+    @DisplayName("PR-T1 - renderWarningsJson 영속 (missing keys 기록)")
+    void builder_persistsRenderWarnings() {
+        NotificationOutbox row = NotificationOutbox.builder()
+                .idempotencyKey("PAYMENT_REQUEST:APPLICATION:42:1001:EMAIL")
+                .userSeq(1001L)
+                .channel(NotificationChannel.EMAIL)
+                .eventType("PAYMENT_REQUEST")
+                .templateCode("A-17")
+                .locale("en")
+                .payloadJson("{\"amount\":\"185.00\"}")
+                .renderWarningsJson("{\"missingKeys\":[\"deadline\"]}")
+                .build();
+
+        assertThat(row.getRenderWarningsJson()).contains("deadline");
+    }
 }
