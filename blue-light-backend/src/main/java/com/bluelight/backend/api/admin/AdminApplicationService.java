@@ -203,25 +203,20 @@ public class AdminApplicationService {
      */
     public AdminApplicationResponse getApplication(Long applicationSeq, Long userSeq, String role) {
         Application application = findApplicationOrThrow(applicationSeq);
-
-        // LEW → 배정된 신청서만 접근 허용
-        if ("ROLE_LEW".equals(role)) {
-            Long assignedLewSeq = application.getAssignedLew() != null
-                    ? application.getAssignedLew().getUserSeq() : null;
-            if (assignedLewSeq == null || !assignedLewSeq.equals(userSeq)) {
-                throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-            }
-        }
-
+        ensureLewCanAccess(application, userSeq, role);
         return AdminApplicationResponse.from(application);
     }
 
     /**
      * Update application status
+     *
+     * <p>★ PR-T8 (보안 감사 H-2) — LEW 호출 시 본인 배정 신청서로 한정. ADMIN/SYSTEM_ADMIN 은 통과.</p>
      */
     @Transactional
-    public AdminApplicationResponse updateStatus(Long applicationSeq, UpdateStatusRequest request) {
+    public AdminApplicationResponse updateStatus(Long applicationSeq, UpdateStatusRequest request,
+                                                 Long userSeq, String role) {
         Application application = findApplicationOrThrow(applicationSeq);
+        ensureLewCanAccess(application, userSeq, role);
 
         // Validate status transition
         validateStatusTransition(application.getStatus(), request.getStatus());
@@ -243,10 +238,14 @@ public class AdminApplicationService {
 
     /**
      * Complete application and issue licence
+     *
+     * <p>★ PR-T8 (보안 감사 H-2) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public AdminApplicationResponse completeApplication(Long applicationSeq, CompleteApplicationRequest request) {
+    public AdminApplicationResponse completeApplication(Long applicationSeq, CompleteApplicationRequest request,
+                                                        Long userSeq, String role) {
         Application application = findApplicationOrThrow(applicationSeq);
+        ensureLewCanAccess(application, userSeq, role);
 
         if (application.getStatus() != ApplicationStatus.IN_PROGRESS) {
             throw new BusinessException(
@@ -284,10 +283,14 @@ public class AdminApplicationService {
 
     /**
      * LEW 보완 요청
+     *
+     * <p>★ PR-T8 (보안 감사 H-2) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public AdminApplicationResponse requestRevision(Long applicationSeq, RevisionRequestDto request) {
+    public AdminApplicationResponse requestRevision(Long applicationSeq, RevisionRequestDto request,
+                                                    Long userSeq, String role) {
         Application application = findApplicationOrThrow(applicationSeq);
+        ensureLewCanAccess(application, userSeq, role);
 
         if (application.getStatus() != ApplicationStatus.PENDING_REVIEW) {
             throw new BusinessException(
@@ -312,10 +315,13 @@ public class AdminApplicationService {
 
     /**
      * LEW 검토 승인 → 결제 요청
+     *
+     * <p>★ PR-T8 (보안 감사 H-2) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public AdminApplicationResponse approveForPayment(Long applicationSeq) {
+    public AdminApplicationResponse approveForPayment(Long applicationSeq, Long userSeq, String role) {
         Application application = findApplicationOrThrow(applicationSeq);
+        ensureLewCanAccess(application, userSeq, role);
 
         if (application.getStatus() != ApplicationStatus.PENDING_REVIEW) {
             throw new BusinessException(
@@ -347,6 +353,20 @@ public class AdminApplicationService {
     }
 
     // --- Private helpers ---
+
+    /**
+     * ★ PR-T8 (보안 감사 H-2) — LEW cross-tenant 가드.
+     * LEW 가 호출 시 본인 배정 신청서가 아니면 403. ADMIN/SYSTEM_ADMIN 등은 통과.
+     * role 은 "ROLE_LEW" 형식 (SimpleGrantedAuthority.getAuthority()). userSeq 는 SecurityContext principal.
+     */
+    private void ensureLewCanAccess(Application application, Long userSeq, String role) {
+        if (!"ROLE_LEW".equals(role)) return;
+        Long assignedLewSeq = application.getAssignedLew() != null
+                ? application.getAssignedLew().getUserSeq() : null;
+        if (assignedLewSeq == null || !assignedLewSeq.equals(userSeq)) {
+            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        }
+    }
 
     private Application findApplicationOrThrow(Long applicationSeq) {
         return applicationRepository.findById(applicationSeq)

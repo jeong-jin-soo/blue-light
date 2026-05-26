@@ -103,10 +103,13 @@ public class AdminApplicationController {
     @Auditable(action = AuditAction.APPLICATION_STATUS_CHANGE, category = AuditCategory.ADMIN, entityType = "Application")
     @PatchMapping("/applications/{id}/status")
     public ResponseEntity<AdminApplicationResponse> updateStatus(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody UpdateStatusRequest request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
         log.info("Admin update status: applicationSeq={}, status={}", id, request.getStatus());
-        AdminApplicationResponse response = adminApplicationService.updateStatus(id, request);
+        AdminApplicationResponse response = adminApplicationService.updateStatus(id, request, userSeq, role);
         return ResponseEntity.ok(response);
     }
 
@@ -155,10 +158,13 @@ public class AdminApplicationController {
     @Auditable(action = AuditAction.APPLICATION_COMPLETED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/complete")
     public ResponseEntity<AdminApplicationResponse> completeApplication(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody CompleteApplicationRequest request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
         log.info("Admin complete application: applicationSeq={}, licenseNumber={}", id, request.getLicenseNumber());
-        AdminApplicationResponse response = adminApplicationService.completeApplication(id, request);
+        AdminApplicationResponse response = adminApplicationService.completeApplication(id, request, userSeq, role);
         return ResponseEntity.ok(response);
     }
 
@@ -169,10 +175,13 @@ public class AdminApplicationController {
     @Auditable(action = AuditAction.APPLICATION_REVISION_REQUESTED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/revision")
     public ResponseEntity<AdminApplicationResponse> requestRevision(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody RevisionRequestDto request) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
         log.info("Admin request revision: applicationSeq={}", id);
-        AdminApplicationResponse response = adminApplicationService.requestRevision(id, request);
+        AdminApplicationResponse response = adminApplicationService.requestRevision(id, request, userSeq, role);
         return ResponseEntity.ok(response);
     }
 
@@ -182,9 +191,13 @@ public class AdminApplicationController {
      */
     @Auditable(action = AuditAction.APPLICATION_APPROVED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/approve")
-    public ResponseEntity<AdminApplicationResponse> approveForPayment(@PathVariable Long id) {
+    public ResponseEntity<AdminApplicationResponse> approveForPayment(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
         log.info("Admin approve for payment: applicationSeq={}", id);
-        AdminApplicationResponse response = adminApplicationService.approveForPayment(id);
+        AdminApplicationResponse response = adminApplicationService.approveForPayment(id, userSeq, role);
         return ResponseEntity.ok(response);
     }
 

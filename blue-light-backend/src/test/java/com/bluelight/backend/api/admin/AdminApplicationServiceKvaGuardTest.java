@@ -51,7 +51,8 @@ class AdminApplicationServiceKvaGuardTest {
         when(app.getKvaStatus()).thenReturn(KvaStatus.UNKNOWN);
         when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
 
-        assertThatThrownBy(() -> service.approveForPayment(1L))
+        // PR-T8: LEW 가드 추가에 따라 userSeq/role 파라미터 전달. ADMIN 호출 기준 (LEW 가드 통과).
+        assertThatThrownBy(() -> service.approveForPayment(1L, 1L, "ROLE_ADMIN"))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> {
                     BusinessException be = (BusinessException) ex;
