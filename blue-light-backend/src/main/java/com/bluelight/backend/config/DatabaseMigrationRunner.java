@@ -1248,13 +1248,15 @@ public class DatabaseMigrationRunner {
 
         // 기본값: (label, assignable, filterable, sortOrder)
         // ADMIN/SYSTEM_ADMIN 은 UI 에서 assign 불가. SYSTEM_ADMIN 은 필터에도 노출하지 않음.
+        // ★ PR-T7 (보안 감사 H-3) — NOTIFICATION_MANAGER 신규 시드. CLAUDE.md §1 설정 우선 원칙.
         Object[][] defaults = {
-            {UserRole.APPLICANT,         "Applicant",         true,  true,  10},
-            {UserRole.LEW,               "LEW",               true,  true,  20},
-            {UserRole.SLD_MANAGER,       "SLD Manager",       true,  true,  30},
-            {UserRole.CONCIERGE_MANAGER, "Concierge Manager", true,  true,  40},
-            {UserRole.ADMIN,             "Administrator",     false, true,  50},
-            {UserRole.SYSTEM_ADMIN,      "System Admin",      false, false, 60},
+            {UserRole.APPLICANT,            "Applicant",            true,  true,  10},
+            {UserRole.LEW,                  "LEW",                  true,  true,  20},
+            {UserRole.SLD_MANAGER,          "SLD Manager",          true,  true,  30},
+            {UserRole.CONCIERGE_MANAGER,    "Concierge Manager",    true,  true,  40},
+            {UserRole.NOTIFICATION_MANAGER, "Notification Manager", true,  true,  45},
+            {UserRole.ADMIN,                "Administrator",        false, true,  50},
+            {UserRole.SYSTEM_ADMIN,         "System Admin",         false, false, 60},
         };
 
         int inserted = 0;

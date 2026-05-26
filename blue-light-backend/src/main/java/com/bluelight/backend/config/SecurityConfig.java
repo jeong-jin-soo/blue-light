@@ -91,6 +91,12 @@ public class SecurityConfig {
                         // /api/lew/** 는 LEW 전용 경로. /api/admin/** 의 LEW 공유 이슈(H-4)와 별개로
                         // URL 단에서 역할 필터링하고, 배정 여부 검증은 메서드 @PreAuthorize("@appSec.isAssignedLew(...)")로.
                         .requestMatchers("/api/lew/**").hasRole("LEW")
+                        // ★ PR-T7 (보안 감사 H-1) — 알림 템플릿 관리 모듈 (PR-T3~T6)
+                        // NOTIFICATION_MANAGER + SYSTEM_ADMIN 편집, 그 외 6개 역할도 read-only 접근(D-5).
+                        // 더 구체적인 매처를 /api/admin/** 앞에 먼저 배치하여 URL 단 차단을 피한다.
+                        // 메서드별 fine-grained 가드는 컨트롤러 @PreAuthorize 가 책임.
+                        .requestMatchers("/api/admin/notification-templates/**")
+                        .hasAnyRole("NOTIFICATION_MANAGER", "SYSTEM_ADMIN", "ADMIN", "LEW", "SLD_MANAGER", "CONCIERGE_MANAGER")
                         // Admin/LEW/SystemAdmin 경로 (URL-level defense-in-depth)
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "LEW", "SYSTEM_ADMIN")
                         // SLD Manager 경로

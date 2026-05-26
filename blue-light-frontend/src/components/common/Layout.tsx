@@ -31,6 +31,8 @@ export default function Layout() {
   const isLew = user?.role === 'LEW' && user?.approved;
   const isSldManager = user?.role === 'SLD_MANAGER';
   const isConciergeManager = user?.role === 'CONCIERGE_MANAGER';
+  // ★ PR-T7 (보안 감사 H-4) — NOTIFICATION_MANAGER 분기. 알림 카피·미리보기·테스트 발송 전용.
+  const isNotificationManager = user?.role === 'NOTIFICATION_MANAGER';
 
   const handleLogout = () => {
     logout();
@@ -74,6 +76,12 @@ export default function Layout() {
     { path: '/lew/concierge-requests', label: 'My Concierge', icon: '🤝' },
   ];
 
+  // NOTIFICATION_MANAGER: 알림 카피 편집·미리보기·테스트 발송 전용 (PR-T7).
+  const notificationManagerMenu = [
+    { path: '/admin/notification-templates', label: '알림 템플릿', icon: '✉️' },
+    { path: '/admin/notification-templates/drafts', label: 'Draft 큐', icon: '📝' },
+  ];
+
   const sldManagerMenu = [
     { path: '/sld-manager/dashboard', label: 'SLD Dashboard', icon: '📊' },
     { path: '/sld-manager/orders', label: 'SLD Orders', icon: '📐' },
@@ -98,6 +106,7 @@ export default function Layout() {
     : isLew ? lewMenu
     : isSldManager ? sldManagerMenu
     : isConciergeManager ? conciergeManagerMenu
+    : isNotificationManager ? notificationManagerMenu
     : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
@@ -108,6 +117,7 @@ export default function Layout() {
     : isLew ? roleLabels.LEW
     : isSldManager ? roleLabels.SLD_MANAGER
     : isConciergeManager ? roleLabels.CONCIERGE_MANAGER
+    : isNotificationManager ? roleLabels.NOTIFICATION_MANAGER
     : roleLabels.APPLICANT;
 
   const homePath = isSystemAdmin ? '/admin/system'
@@ -115,6 +125,7 @@ export default function Layout() {
     : isLew ? '/lew/dashboard'
     : isSldManager ? '/sld-manager/dashboard'
     : isConciergeManager ? '/concierge-manager/dashboard'
+    : isNotificationManager ? '/admin/notification-templates'
     : '/dashboard';
 
   return (
