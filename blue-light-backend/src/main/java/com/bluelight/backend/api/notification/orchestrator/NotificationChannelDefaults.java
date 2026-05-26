@@ -36,6 +36,8 @@ public class NotificationChannelDefaults {
         return switch (channel) {
             case IN_APP, EMAIL -> true;
             case WHATSAPP -> Boolean.TRUE.equals(user.getWhatsappOptIn());
+            // PR-T2: SMS 어댑터는 미구현이므로 발송 차단 — Phase 1+ SMS 게이트웨이 도입 시 정책 추가.
+            case SMS -> false;
         };
     }
 }
