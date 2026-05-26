@@ -51,6 +51,10 @@ import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPag
 import AdminUserListPage from '../pages/admin/AdminUserListPage';
 import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 import AdminManualEmailPage from '../pages/admin/AdminManualEmailPage';
+// PR-T6 — 알림 템플릿 관리
+import AdminNotificationTemplateListPage from '../pages/admin/AdminNotificationTemplateListPage';
+import AdminNotificationTemplateEditPage from '../pages/admin/AdminNotificationTemplateEditPage';
+import AdminNotificationTemplateDraftReviewPage from '../pages/admin/AdminNotificationTemplateDraftReviewPage';
 
 // System Admin pages
 import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
@@ -220,6 +224,42 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/manual-emails', element: <AdminManualEmailPage /> },
+        ],
+      },
+    ],
+  },
+
+  // ★ PR-T6 — 알림 템플릿 관리 (NOTIFICATION_MANAGER + SYSTEM_ADMIN).
+  // ADMIN/LEW/SLD_MANAGER/CONCIERGE_MANAGER 도 read-only 로 접근 가능 (D-5 — recipient_roles 필터).
+  {
+    element: (
+      <ProtectedRoute
+        allowedRoles={[
+          'NOTIFICATION_MANAGER',
+          'SYSTEM_ADMIN',
+          'ADMIN',
+          'LEW',
+          'SLD_MANAGER',
+          'CONCIERGE_MANAGER',
+        ]}
+      />
+    ),
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          {
+            path: '/admin/notification-templates',
+            element: <AdminNotificationTemplateListPage />,
+          },
+          {
+            path: '/admin/notification-templates/drafts',
+            element: <AdminNotificationTemplateDraftReviewPage />,
+          },
+          {
+            path: '/admin/notification-templates/:id',
+            element: <AdminNotificationTemplateEditPage />,
+          },
         ],
       },
     ],
