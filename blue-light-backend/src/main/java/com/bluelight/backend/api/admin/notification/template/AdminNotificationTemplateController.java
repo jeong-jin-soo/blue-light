@@ -6,6 +6,10 @@ import com.bluelight.backend.api.admin.notification.template.dto.NotificationTem
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateDraftResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateListItemResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.ReviewDraftRequest;
+import com.bluelight.backend.api.admin.notification.template.dto.TemplatePreviewRequest;
+import com.bluelight.backend.api.admin.notification.template.dto.TemplatePreviewResponse;
+import com.bluelight.backend.api.admin.notification.template.dto.TemplateTestSendRequest;
+import com.bluelight.backend.api.admin.notification.template.dto.TemplateTestSendResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.UpdateDraftRequest;
 import com.bluelight.backend.domain.notification.NotificationCategory;
 import com.bluelight.backend.domain.notification.NotificationChannel;
@@ -56,6 +60,8 @@ public class AdminNotificationTemplateController {
 
     private final NotificationTemplateAdminService adminService;
     private final DraftReviewService reviewService;
+    private final TemplatePreviewService previewService;
+    private final TemplateTestSendService testSendService;
 
     // ============================================================
     // 템플릿 조회
@@ -225,6 +231,28 @@ public class AdminNotificationTemplateController {
                 clientIp(httpRequest),
                 hasRole(auth, "SYSTEM_ADMIN"));
         return ResponseEntity.noContent().build();
+    }
+
+    // ============================================================
+    // Preview + Test-send (PR-T4)
+    // ============================================================
+
+    @PostMapping("/{templateSeq}/preview")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    public ResponseEntity<TemplatePreviewResponse> preview(
+            @PathVariable Long templateSeq,
+            @Valid @RequestBody TemplatePreviewRequest request) {
+        return ResponseEntity.ok(previewService.preview(templateSeq, request.payloadOrEmpty()));
+    }
+
+    @PostMapping("/{templateSeq}/test-send")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    public ResponseEntity<TemplateTestSendResponse> testSend(
+            @PathVariable Long templateSeq,
+            @Valid @RequestBody TemplateTestSendRequest request,
+            Authentication auth) {
+        return ResponseEntity.ok(testSendService.sendTestToSelf(
+                templateSeq, principalUserSeq(auth), request.payloadOrEmpty()));
     }
 
     // ============================================================

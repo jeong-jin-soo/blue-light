@@ -77,6 +77,19 @@ public class TemplateAdminExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "INVALID_INPUT", e.getMessage());
     }
 
+    @ExceptionHandler(TestSendQuotaTracker.QuotaExceededException.class)
+    public ResponseEntity<Map<String, Object>> handleQuotaExceeded(TestSendQuotaTracker.QuotaExceededException e) {
+        // 429 Too Many Requests — 일일 50통 한도 초과
+        return error(HttpStatus.TOO_MANY_REQUESTS, "TEST_SEND_QUOTA_EXCEEDED", e.getMessage());
+    }
+
+    @ExceptionHandler(TemplateTestSendService.UnsupportedTestChannelException.class)
+    public ResponseEntity<Map<String, Object>> handleUnsupportedChannel(
+            TemplateTestSendService.UnsupportedTestChannelException e) {
+        // EMAIL 외 채널 테스트 발송 시도 → 400 (MVP 제약)
+        return error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_TEST_CHANNEL", e.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String code, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());

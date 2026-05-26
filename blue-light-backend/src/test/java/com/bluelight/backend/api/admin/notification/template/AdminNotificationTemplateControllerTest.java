@@ -56,6 +56,8 @@ class AdminNotificationTemplateControllerTest {
 
     private NotificationTemplateAdminService adminService;
     private DraftReviewService reviewService;
+    private TemplatePreviewService previewService;
+    private TemplateTestSendService testSendService;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -78,9 +80,12 @@ class AdminNotificationTemplateControllerTest {
     void setUp() {
         adminService = mock(NotificationTemplateAdminService.class);
         reviewService = mock(DraftReviewService.class);
+        previewService = mock(TemplatePreviewService.class);
+        testSendService = mock(TemplateTestSendService.class);
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders
-                .standaloneSetup(new AdminNotificationTemplateController(adminService, reviewService))
+                .standaloneSetup(new AdminNotificationTemplateController(
+                        adminService, reviewService, previewService, testSendService))
                 .setControllerAdvice(new TemplateAdminExceptionHandler())
                 .build();
     }
@@ -372,5 +377,81 @@ class AdminNotificationTemplateControllerTest {
 
         verify(adminService).withdrawDraft(7L, 1001L);
         verify(reviewService, never()).approve(anyLong(), anyLong(), any(), any());
+    }
+
+    // ============================================================
+    // PR-T4 — Preview + Test-send
+    // ============================================================
+
+    @Test
+    @DisplayName("POST preview - 렌더된 subject/body + warnings 반환")
+    void preview_returnsRendered() throws Exception {
+        com.bluelight.backend.api.admin.notification.template.dto.TemplatePreviewResponse resp =
+                new com.bluelight.backend.api.admin.notification.template.dto.TemplatePreviewResponse(
+                        "[LicenseKaki] Payment requested",
+                        "Hi Tan Ah Kow, please pay SGD 185.00.",
+                        38,
+                        null,
+                        List.of(),
+                        List.of()
+                );
+        when(previewService.preview(eq(42L), any())).thenReturn(resp);
+
+        String body = "{\"payload\":{\"applicantName\":\"Tan Ah Kow\",\"amount\":\"185.00\"}}";
+
+        mockMvc.perform(post("/api/admin/notification-templates/42/preview")
+                        .principal(nmAuth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subject").value("[LicenseKaki] Payment requested"))
+                .andExpect(jsonPath("$.body").value("Hi Tan Ah Kow, please pay SGD 185.00."))
+                .andExpect(jsonPath("$.charCount").value(38));
+    }
+
+    @Test
+    @DisplayName("POST test-send - 200 + outboxSeq + dailyQuota 정보")
+    void testSend_returnsOutboxSeq() throws Exception {
+        com.bluelight.backend.api.admin.notification.template.dto.TemplateTestSendResponse resp =
+                new com.bluelight.backend.api.admin.notification.template.dto.TemplateTestSendResponse(
+                        9001L, 3, 50);
+        when(testSendService.sendTestToSelf(eq(42L), eq(1001L), any())).thenReturn(resp);
+
+        mockMvc.perform(post("/api/admin/notification-templates/42/test-send")
+                        .principal(nmAuth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payload\":{}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outboxSeq").value(9001))
+                .andExpect(jsonPath("$.dailyQuotaUsed").value(3))
+                .andExpect(jsonPath("$.dailyQuotaMax").value(50));
+    }
+
+    @Test
+    @DisplayName("POST test-send - 일일 quota 초과 → 429 TEST_SEND_QUOTA_EXCEEDED")
+    void testSend_quotaExceeded() throws Exception {
+        when(testSendService.sendTestToSelf(eq(42L), eq(1001L), any()))
+                .thenThrow(new TestSendQuotaTracker.QuotaExceededException(1001L, 50));
+
+        mockMvc.perform(post("/api/admin/notification-templates/42/test-send")
+                        .principal(nmAuth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payload\":{}}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("TEST_SEND_QUOTA_EXCEEDED"));
+    }
+
+    @Test
+    @DisplayName("POST test-send - SMS 채널 시도 시 400 UNSUPPORTED_TEST_CHANNEL")
+    void testSend_unsupportedChannel() throws Exception {
+        when(testSendService.sendTestToSelf(eq(42L), eq(1001L), any()))
+                .thenThrow(new TemplateTestSendService.UnsupportedTestChannelException(NotificationChannel.SMS));
+
+        mockMvc.perform(post("/api/admin/notification-templates/42/test-send")
+                        .principal(nmAuth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payload\":{}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_TEST_CHANNEL"));
     }
 }
