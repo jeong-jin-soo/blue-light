@@ -51,8 +51,9 @@ class AdminApplicationServiceKvaGuardTest {
         when(app.getKvaStatus()).thenReturn(KvaStatus.UNKNOWN);
         when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
 
-        // PR-T8: LEW 가드 추가에 따라 userSeq/role 파라미터 전달. ADMIN 호출 기준 (LEW 가드 통과).
-        assertThatThrownBy(() -> service.approveForPayment(1L, 1L, "ROLE_ADMIN"))
+        // ★ 코드 부채 P0 단일화 — LEW 가드는 컨트롤러 SpEL @appSec.isAssignedLew 로 이관됨.
+        // 본 단위 테스트는 KVA_NOT_CONFIRMED 비즈니스 가드만 검증.
+        assertThatThrownBy(() -> service.approveForPayment(1L))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> {
                     BusinessException be = (BusinessException) ex;

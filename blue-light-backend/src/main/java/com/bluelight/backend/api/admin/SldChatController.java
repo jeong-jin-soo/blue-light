@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.SldChatMessageResponse;
 import com.bluelight.backend.api.admin.dto.SldChatRequest;
 import com.bluelight.backend.api.application.dto.SldRequestResponse;
+import com.bluelight.backend.common.security.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +22,8 @@ import java.util.Map;
  * - LEW/Admin이 AI와 대화하며 SLD를 생성
  * - Spring Boot가 Python AI 서비스를 프록시
  *
- * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.
- * 클래스 레벨 @PreAuthorize 는 역할 gate, 서비스의 ensureLewCanAccess 가 cross-tenant 차단.</p>
+ * <p>★ 코드 부채 P0 (PR-T8/L-3 후속) — LEW cross-tenant 가드는 메서드 @PreAuthorize 의
+ * @appSec.isAssignedLew SpEL 빈으로 단일화. 서비스 단 ensureLewCanAccess 제거.</p>
  */
 @Slf4j
 @RestController
@@ -36,21 +37,23 @@ public class SldChatController {
     /**
      * SSE 스트리밍 채팅
      * POST /api/admin/applications/:id/sld-chat/stream
+     *
+     * <p>userSeq 는 채팅 메시지 작성자 기록용으로 서비스에 전달 (가드 용도 아님).</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping(value = "/applications/{id}/sld-chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(
             @PathVariable Long id,
             @Valid @RequestBody SldChatRequest request,
             Authentication authentication) {
 
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("SLD chat stream: applicationSeq={}, userSeq={}, role={}, message={}",
-                id, userSeq, role,
+        Long userSeq = AuthPrincipal.userSeq(authentication);
+        log.info("SLD chat stream: applicationSeq={}, userSeq={}, message={}",
+                id, userSeq,
                 request.getMessage().substring(0, Math.min(request.getMessage().length(), 50)));
 
         SseEmitter emitter = new SseEmitter(600_000L);  // 10분 (Gemini API 호출 시 긴 대기 가능)
-        sldAgentService.chatStream(id, userSeq, role, request.getMessage(), request.getAttachedFileSeq(), emitter);
+        sldAgentService.chatStream(id, userSeq, request.getMessage(), request.getAttachedFileSeq(), emitter);
 
         return emitter;
     }
@@ -59,14 +62,11 @@ public class SldChatController {
      * 채팅 이력 조회
      * GET /api/admin/applications/:id/sld-chat/history
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/sld-chat/history")
-    public ResponseEntity<List<SldChatMessageResponse>> getChatHistory(
-            Authentication authentication,
-            @PathVariable Long id) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("SLD chat history request: applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
-        List<SldChatMessageResponse> history = sldAgentService.getChatHistory(id, userSeq, role);
+    public ResponseEntity<List<SldChatMessageResponse>> getChatHistory(@PathVariable Long id) {
+        log.info("SLD chat history request: applicationSeq={}", id);
+        List<SldChatMessageResponse> history = sldAgentService.getChatHistory(id);
         return ResponseEntity.ok(history);
     }
 
@@ -74,14 +74,11 @@ public class SldChatController {
      * 대화 초기화
      * POST /api/admin/applications/:id/sld-chat/reset
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-chat/reset")
-    public ResponseEntity<Map<String, String>> resetChat(
-            Authentication authentication,
-            @PathVariable Long id) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("SLD chat reset: applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
-        sldAgentService.resetChat(id, userSeq, role);
+    public ResponseEntity<Map<String, String>> resetChat(@PathVariable Long id) {
+        log.info("SLD chat reset: applicationSeq={}", id);
+        sldAgentService.resetChat(id);
         return ResponseEntity.ok(Map.of("message", "Chat history cleared"));
     }
 
@@ -89,17 +86,15 @@ public class SldChatController {
      * SLD 수락 — AI 생성 SLD PDF를 파일 저장소에 저장하고 SldRequest 상태를 UPLOADED로 전환
      * POST /api/admin/applications/:id/sld-chat/accept
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-chat/accept")
     public ResponseEntity<SldRequestResponse> acceptSld(
-            Authentication authentication,
             @PathVariable Long id,
             @RequestBody Map<String, String> body) {
 
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
         String fileId = body.get("fileId");
-        log.info("SLD accept: applicationSeq={}, fileId={}, userSeq={}, role={}", id, fileId, userSeq, role);
-        SldRequestResponse response = sldAgentService.acceptSld(id, fileId, userSeq, role);
+        log.info("SLD accept: applicationSeq={}, fileId={}", id, fileId);
+        SldRequestResponse response = sldAgentService.acceptSld(id, fileId);
         return ResponseEntity.ok(response);
     }
 
@@ -107,16 +102,14 @@ public class SldChatController {
      * SVG 미리보기 조회
      * GET /api/admin/applications/:id/sld-chat/preview/:fileId
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping(value = "/applications/{id}/sld-chat/preview/{fileId}", produces = "image/svg+xml")
     public ResponseEntity<String> getSvgPreview(
-            Authentication authentication,
             @PathVariable Long id,
             @PathVariable String fileId) {
 
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("SLD SVG preview: applicationSeq={}, fileId={}, userSeq={}, role={}", id, fileId, userSeq, role);
-        String svg = sldAgentService.getSvgPreview(id, fileId, userSeq, role);
+        log.info("SLD SVG preview: applicationSeq={}, fileId={}", id, fileId);
+        String svg = sldAgentService.getSvgPreview(id, fileId);
         return ResponseEntity.ok(svg);
     }
 
@@ -124,18 +117,15 @@ public class SldChatController {
      * AI 생성 파일 다운로드 (PDF/DXF)
      * GET /api/admin/applications/{id}/sld-chat/download/{fileId}?format=pdf|dxf
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/sld-chat/download/{fileId}")
     public ResponseEntity<byte[]> downloadGeneratedFile(
-            Authentication authentication,
             @PathVariable Long id,
             @PathVariable String fileId,
             @RequestParam(defaultValue = "pdf") String format) {
 
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("SLD file download: applicationSeq={}, fileId={}, format={}, userSeq={}, role={}",
-                id, fileId, format, userSeq, role);
-        byte[] fileBytes = sldAgentService.downloadGeneratedFile(id, fileId, format, userSeq, role);
+        log.info("SLD file download: applicationSeq={}, fileId={}, format={}", id, fileId, format);
+        byte[] fileBytes = sldAgentService.downloadGeneratedFile(id, fileId, format);
 
         String mediaType = "dxf".equals(format) ? "application/dxf" : "application/pdf";
         String filename = "SLD_" + fileId + "." + format;

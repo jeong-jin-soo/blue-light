@@ -3,7 +3,6 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.SldUploadedDto;
 import com.bluelight.backend.api.application.dto.SldRequestResponse;
 import com.bluelight.backend.common.exception.BusinessException;
-import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.SldRequest;
 import com.bluelight.backend.domain.application.SldRequestRepository;
@@ -16,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Admin SLD 도면 관리 서비스
+ *
+ * <p>★ 코드 부채 P0 (PR-T8/L-3 후속) — LEW cross-tenant 가드는 컨트롤러
+ * {@code @PreAuthorize("@appSec.isAssignedLew(...)")} 로 단일화. 서비스 내 가드 제거.</p>
  */
 @Slf4j
 @Service
@@ -28,11 +30,8 @@ public class AdminSldService {
 
     /**
      * SLD 요청 조회 (Admin/LEW)
-     *
-     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
-    public SldRequestResponse getAdminSldRequest(Long applicationSeq, Long userSeq, String role) {
-        ensureLewCanAccess(applicationSeq, userSeq, role);
+    public SldRequestResponse getAdminSldRequest(Long applicationSeq) {
         validateApplicationExists(applicationSeq);
         return sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .map(SldRequestResponse::from)
@@ -41,12 +40,9 @@ public class AdminSldService {
 
     /**
      * SLD 업로드 완료 마킹 (LEW)
-     *
-     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public SldRequestResponse uploadSld(Long applicationSeq, SldUploadedDto dto, Long userSeq, String role) {
-        ensureLewCanAccess(applicationSeq, userSeq, role);
+    public SldRequestResponse uploadSld(Long applicationSeq, SldUploadedDto dto) {
         validateApplicationExists(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
@@ -68,12 +64,9 @@ public class AdminSldService {
 
     /**
      * SLD AI 생성 시작 (REQUESTED/UPLOADED → AI_GENERATING)
-     *
-     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public SldRequestResponse startAiGeneration(Long applicationSeq, Long userSeq, String role) {
-        ensureLewCanAccess(applicationSeq, userSeq, role);
+    public SldRequestResponse startAiGeneration(Long applicationSeq) {
         validateApplicationExists(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
@@ -94,12 +87,9 @@ public class AdminSldService {
 
     /**
      * SLD 확인 (Admin/LEW)
-     *
-     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public SldRequestResponse confirmSld(Long applicationSeq, Long userSeq, String role) {
-        ensureLewCanAccess(applicationSeq, userSeq, role);
+    public SldRequestResponse confirmSld(Long applicationSeq) {
         validateApplicationExists(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
@@ -119,12 +109,9 @@ public class AdminSldService {
 
     /**
      * SLD 확인 해제 (Admin/LEW) — CONFIRMED → UPLOADED
-     *
-     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public SldRequestResponse unconfirmSld(Long applicationSeq, Long userSeq, String role) {
-        ensureLewCanAccess(applicationSeq, userSeq, role);
+    public SldRequestResponse unconfirmSld(Long applicationSeq) {
         validateApplicationExists(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
@@ -149,28 +136,6 @@ public class AdminSldService {
                     HttpStatus.NOT_FOUND,
                     "APPLICATION_NOT_FOUND"
             );
-        }
-    }
-
-    /**
-     * ★ L-3 (보안 감사 H-2 동일 패턴) — LEW cross-tenant 가드.
-     *
-     * <p>LEW 호출 시 본인 배정 신청서가 아니면 403. ADMIN/SYSTEM_ADMIN 등은 즉시 통과 (DB 미접근).
-     * role 은 "ROLE_LEW" 형식 (SimpleGrantedAuthority.getAuthority()). userSeq 는 SecurityContext principal.</p>
-     *
-     * <p>AdminApplicationService.ensureLewCanAccess 와 동일 패턴이지만, 본 서비스의
-     * 메서드들은 Application 엔티티를 직접 보유하지 않으므로 helper 내부에서 findById 로 조회.
-     * ADMIN/SA 는 early-return 으로 추가 DB 비용 없음.</p>
-     */
-    private void ensureLewCanAccess(Long applicationSeq, Long userSeq, String role) {
-        if (!"ROLE_LEW".equals(role)) return;
-        Application application = applicationRepository.findById(applicationSeq)
-                .orElseThrow(() -> new BusinessException(
-                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
-        Long assignedLewSeq = application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq() : null;
-        if (assignedLewSeq == null || !assignedLewSeq.equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         }
     }
 }
