@@ -41,11 +41,8 @@ jobs:
       - name: Build
         run: ./gradlew build --no-daemon -x test
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: blue-light-backend/build/libs/*.jar
+      # JAR artifact 업로드 불필요 — docker-push 가 자체 checkout+build (multi-stage Dockerfile)
+      # 과거 잔여 artifact 누적 → GitHub Actions storage quota 초과 사고. 의존성 없으니 제거.
 
   # ============================================
   # Frontend: Build & Lint
