@@ -67,7 +67,7 @@ public class SldAgentService {
      * WebClient subscribe()의 비동기 콜백은 트랜잭션 범위 밖에서 실행되므로,
      * 동기 DB 작업과 비동기 스트리밍을 분리하여 각각 별도 트랜잭션으로 처리.
      */
-    public void chatStream(Long applicationSeq, Long userSeq, String message, Long attachedFileSeq, SseEmitter emitter) {
+    public void chatStream(Long applicationSeq, Long userSeq, String role, String message, Long attachedFileSeq, SseEmitter emitter) {
         // AI SLD 생성 토글 확인
         if (!systemAdminService.isSldAiGenerationEnabled()) {
             throw new BusinessException(
@@ -81,6 +81,9 @@ public class SldAgentService {
             Application application = applicationRepository.findById(applicationSeq)
                     .orElseThrow(() -> new BusinessException(
                             "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+
+            // ★ L-3 (보안 감사 H-2 동일 패턴) — LEW cross-tenant 가드.
+            ensureLewCanAccess(application, userSeq, role);
 
             ensureAiGeneratingStatus(applicationSeq);
             sldChatMessageRepository.save(SldChatMessage.builder()
@@ -259,8 +262,11 @@ public class SldAgentService {
 
     /**
      * 채팅 이력 조회
+     *
+     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
-    public List<SldChatMessageResponse> getChatHistory(Long applicationSeq) {
+    public List<SldChatMessageResponse> getChatHistory(Long applicationSeq, Long userSeq, String role) {
+        ensureLewCanAccess(applicationSeq, userSeq, role);
         validateApplicationExists(applicationSeq);
         return sldChatMessageRepository.findByApplicationSeqOrderByCreatedAtAsc(applicationSeq)
                 .stream()
@@ -271,9 +277,12 @@ public class SldAgentService {
     /**
      * 대화 초기화 — MySQL 이력 + Python 체크포인트 + temp 파일 모두 삭제
      * Reset 후 다음 메시지는 완전히 새로운 AI 대화로 시작됨
+     *
+     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public void resetChat(Long applicationSeq) {
+    public void resetChat(Long applicationSeq, Long userSeq, String role) {
+        ensureLewCanAccess(applicationSeq, userSeq, role);
         validateApplicationExists(applicationSeq);
 
         // 1. MySQL 이력 삭제
@@ -298,9 +307,12 @@ public class SldAgentService {
     /**
      * SLD PDF 수락 — Python에서 생성된 PDF 파일을 가져와서 FileStorageService로 저장
      * → SldRequest를 UPLOADED 상태로 전환
+     *
+     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
     @Transactional
-    public SldRequestResponse acceptSld(Long applicationSeq, String fileId) {
+    public SldRequestResponse acceptSld(Long applicationSeq, String fileId, Long userSeq, String role) {
+        ensureLewCanAccess(applicationSeq, userSeq, role);
         validateApplicationExists(applicationSeq);
 
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
@@ -369,8 +381,11 @@ public class SldAgentService {
 
     /**
      * SVG 미리보기 조회 — Python 서비스에서 SVG 문자열 가져오기
+     *
+     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
-    public String getSvgPreview(Long applicationSeq, String fileId) {
+    public String getSvgPreview(Long applicationSeq, String fileId, Long userSeq, String role) {
+        ensureLewCanAccess(applicationSeq, userSeq, role);
         validateApplicationExists(applicationSeq);
 
         try {
@@ -390,8 +405,11 @@ public class SldAgentService {
 
     /**
      * AI 생성 파일 다운로드 (PDF/DXF) -- Python 서비스에서 바이트 가져오기
+     *
+     * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.</p>
      */
-    public byte[] downloadGeneratedFile(Long applicationSeq, String fileId, String format) {
+    public byte[] downloadGeneratedFile(Long applicationSeq, String fileId, String format, Long userSeq, String role) {
+        ensureLewCanAccess(applicationSeq, userSeq, role);
         validateApplicationExists(applicationSeq);
 
         try {
@@ -457,6 +475,33 @@ public class SldAgentService {
                     "APPLICATION_NOT_FOUND"
             );
         }
+    }
+
+    /**
+     * ★ L-3 (보안 감사 H-2 동일 패턴) — LEW cross-tenant 가드 (Application 이미 로드된 경로).
+     *
+     * <p>chatStream() 의 트랜잭션 블록은 Application 을 이미 로드하므로 중복 조회를 피한다.</p>
+     */
+    private void ensureLewCanAccess(Application application, Long userSeq, String role) {
+        if (!"ROLE_LEW".equals(role)) return;
+        Long assignedLewSeq = application.getAssignedLew() != null
+                ? application.getAssignedLew().getUserSeq() : null;
+        if (assignedLewSeq == null || !assignedLewSeq.equals(userSeq)) {
+            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
+        }
+    }
+
+    /**
+     * ★ L-3 (보안 감사 H-2 동일 패턴) — LEW cross-tenant 가드 (applicationSeq 만 보유한 경로).
+     *
+     * <p>ADMIN/SYSTEM_ADMIN 은 early-return 으로 DB 미접근. LEW 만 추가 findById 수행.</p>
+     */
+    private void ensureLewCanAccess(Long applicationSeq, Long userSeq, String role) {
+        if (!"ROLE_LEW".equals(role)) return;
+        Application application = applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
+        ensureLewCanAccess(application, userSeq, role);
     }
 
     /**

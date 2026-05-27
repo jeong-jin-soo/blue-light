@@ -7,10 +7,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 /**
  * Admin/LEW SLD 도면 관리 API 컨트롤러
+ *
+ * <p>★ L-3 (보안 감사 H-2 동일 패턴) — LEW 호출 시 본인 배정 신청서로 한정.
+ * 클래스 레벨 @PreAuthorize 는 역할 gate, 서비스의 ensureLewCanAccess 가 cross-tenant 차단.</p>
  */
 @Slf4j
 @RestController
@@ -26,9 +30,13 @@ public class AdminSldController {
      * GET /api/admin/applications/:id/sld-request
      */
     @GetMapping("/applications/{id}/sld-request")
-    public ResponseEntity<SldRequestResponse> getAdminSldRequest(@PathVariable Long id) {
-        log.info("Admin get SLD request: applicationSeq={}", id);
-        SldRequestResponse response = adminSldService.getAdminSldRequest(id);
+    public ResponseEntity<SldRequestResponse> getAdminSldRequest(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        log.info("Admin get SLD request: applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
+        SldRequestResponse response = adminSldService.getAdminSldRequest(id, userSeq, role);
         return ResponseEntity.ok(response);
     }
 
@@ -38,10 +46,14 @@ public class AdminSldController {
      */
     @PostMapping("/applications/{id}/sld-uploaded")
     public ResponseEntity<SldRequestResponse> uploadSld(
+            Authentication authentication,
             @PathVariable Long id,
             @Valid @RequestBody SldUploadedDto request) {
-        log.info("Admin/LEW SLD uploaded: applicationSeq={}, fileSeq={}", id, request.getFileSeq());
-        SldRequestResponse response = adminSldService.uploadSld(id, request);
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        log.info("Admin/LEW SLD uploaded: applicationSeq={}, fileSeq={}, userSeq={}, role={}",
+                id, request.getFileSeq(), userSeq, role);
+        SldRequestResponse response = adminSldService.uploadSld(id, request, userSeq, role);
         return ResponseEntity.ok(response);
     }
 
@@ -50,9 +62,13 @@ public class AdminSldController {
      * POST /api/admin/applications/:id/sld-confirm
      */
     @PostMapping("/applications/{id}/sld-confirm")
-    public ResponseEntity<SldRequestResponse> confirmSld(@PathVariable Long id) {
-        log.info("Admin/LEW SLD confirmed: applicationSeq={}", id);
-        SldRequestResponse response = adminSldService.confirmSld(id);
+    public ResponseEntity<SldRequestResponse> confirmSld(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        log.info("Admin/LEW SLD confirmed: applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
+        SldRequestResponse response = adminSldService.confirmSld(id, userSeq, role);
         return ResponseEntity.ok(response);
     }
 
@@ -61,9 +77,13 @@ public class AdminSldController {
      * POST /api/admin/applications/:id/sld-unconfirm
      */
     @PostMapping("/applications/{id}/sld-unconfirm")
-    public ResponseEntity<SldRequestResponse> unconfirmSld(@PathVariable Long id) {
-        log.info("Admin/LEW SLD unconfirmed (reopened): applicationSeq={}", id);
-        SldRequestResponse response = adminSldService.unconfirmSld(id);
+    public ResponseEntity<SldRequestResponse> unconfirmSld(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        log.info("Admin/LEW SLD unconfirmed (reopened): applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
+        SldRequestResponse response = adminSldService.unconfirmSld(id, userSeq, role);
         return ResponseEntity.ok(response);
     }
 }
