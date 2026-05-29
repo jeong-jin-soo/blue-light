@@ -90,6 +90,13 @@ public class TemplateAdminExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "UNSUPPORTED_TEST_CHANNEL", e.getMessage());
     }
 
+    @ExceptionHandler(TemplateLocalizationService.LocalizationException.class)
+    public ResponseEntity<Map<String, Object>> handleLocalization(
+            TemplateLocalizationService.LocalizationException e) {
+        // XLIFF/CSV 파싱·생성 오류, base locale import 시도 등 → 400
+        return error(HttpStatus.BAD_REQUEST, "LOCALIZATION_FAILED", e.getMessage());
+    }
+
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String code, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());

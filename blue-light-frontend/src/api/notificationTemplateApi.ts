@@ -185,6 +185,69 @@ export const getHistory = async (
 };
 
 // ─────────────────────────────────────────────────────────────
+// Localization Export / Import (PR-T7 P1) — 외주 번역 라운드
+// ─────────────────────────────────────────────────────────────
+export type LocalizationFormat = 'xliff' | 'csv';
+
+export interface ImportReportItem {
+  templateCode: string;
+  channel: string;
+  status: 'CREATED' | 'SKIPPED' | 'FAILED';
+  reason: string | null;
+  draftSeq: number | null;
+}
+
+export interface ImportReportResponse {
+  locale: string;
+  format: string;
+  totalRows: number;
+  draftsCreated: number;
+  skipped: number;
+  failed: number;
+  items: ImportReportItem[];
+}
+
+/**
+ * 지정 locale 의 활성 템플릿을 XLIFF/CSV 로 다운로드.
+ * 결과: 파일을 브라우저 다운로드로 트리거.
+ */
+export const exportTemplates = async (
+  locale: string,
+  format: LocalizationFormat
+): Promise<{ blob: Blob; filename: string }> => {
+  const response = await axiosClient.get(`${BASE}/export`, {
+    params: { locale, format },
+    responseType: 'blob',
+  });
+  // Content-Disposition 헤더에서 파일명 추출
+  const cd = response.headers['content-disposition'] ?? '';
+  const match = /filename="?([^";]+)"?/.exec(cd);
+  const filename = match ? match[1] : `notification-templates-${locale}.${format}`;
+  return { blob: response.data as Blob, filename };
+};
+
+/**
+ * 번역된 파일 업로드 → 행마다 draft 생성. 결과 리포트 반환.
+ */
+export const importTemplates = async (
+  locale: string,
+  format: LocalizationFormat,
+  file: File
+): Promise<ImportReportResponse> => {
+  const fd = new FormData();
+  fd.append('file', file);
+  const response = await axiosClient.post<ImportReportResponse>(
+    `${BASE}/import`,
+    fd,
+    {
+      params: { locale, format },
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+  return response.data;
+};
+
+// ─────────────────────────────────────────────────────────────
 // Metrics (PR-T7 P1) — 지난 N일 발송 메트릭스
 // ─────────────────────────────────────────────────────────────
 /**

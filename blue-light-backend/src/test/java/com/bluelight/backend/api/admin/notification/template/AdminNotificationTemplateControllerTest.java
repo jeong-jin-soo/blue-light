@@ -59,6 +59,7 @@ class AdminNotificationTemplateControllerTest {
     private TemplatePreviewService previewService;
     private TemplateTestSendService testSendService;
     private TemplateMetricsService metricsService;
+    private TemplateLocalizationService localizationService;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -84,10 +85,12 @@ class AdminNotificationTemplateControllerTest {
         previewService = mock(TemplatePreviewService.class);
         testSendService = mock(TemplateTestSendService.class);
         metricsService = mock(TemplateMetricsService.class);
+        localizationService = mock(TemplateLocalizationService.class);
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AdminNotificationTemplateController(
-                        adminService, reviewService, previewService, testSendService, metricsService))
+                        adminService, reviewService, previewService, testSendService,
+                        metricsService, localizationService))
                 .setControllerAdvice(new TemplateAdminExceptionHandler())
                 .build();
     }
@@ -588,5 +591,80 @@ class AdminNotificationTemplateControllerTest {
         mockMvc.perform(get("/api/admin/notification-templates/17/metrics").principal(nmAuth()))
                 .andExpect(status().isOk());
         // 컨트롤러가 days=30 으로 호출했는지 verify — 메서드 정적 검증 + 기본값 적용
+    }
+
+    // ============================================================
+    // PR-T7 P1 — Localization Export / Import
+    // ============================================================
+
+    @Test
+    @DisplayName("GET /export?locale=en&format=xliff - XLIFF 본문 + Content-Disposition")
+    void exportTemplates_xliff() throws Exception {
+        byte[] body = "<xliff>fake</xliff>".getBytes();
+        when(localizationService.export(eq("en"),
+                eq(com.bluelight.backend.api.admin.notification.template.dto.LocalizationFormat.XLIFF)))
+                .thenReturn(body);
+
+        mockMvc.perform(get("/api/admin/notification-templates/export")
+                        .param("locale", "en")
+                        .param("format", "xliff")
+                        .principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        org.hamcrest.Matchers.containsString("notification-templates-en.xliff")))
+                .andExpect(header().string("Content-Type",
+                        org.hamcrest.Matchers.containsString("xliff")));
+    }
+
+    @Test
+    @DisplayName("GET /export?format=csv - CSV 본문 + .csv 확장자")
+    void exportTemplates_csv() throws Exception {
+        byte[] body = "template_code,channel\n".getBytes();
+        when(localizationService.export(eq("en"),
+                eq(com.bluelight.backend.api.admin.notification.template.dto.LocalizationFormat.CSV)))
+                .thenReturn(body);
+
+        mockMvc.perform(get("/api/admin/notification-templates/export")
+                        .param("locale", "en")
+                        .param("format", "csv")
+                        .principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        org.hamcrest.Matchers.containsString("notification-templates-en.csv")));
+    }
+
+    @Test
+    @DisplayName("POST /import - multipart 업로드 → ImportReportResponse")
+    void importTemplates_returnsReport() throws Exception {
+        com.bluelight.backend.api.admin.notification.template.dto.ImportReportResponse report =
+                new com.bluelight.backend.api.admin.notification.template.dto.ImportReportResponse(
+                        "ko",
+                        com.bluelight.backend.api.admin.notification.template.dto.LocalizationFormat.XLIFF,
+                        2, 1, 1, 0, List.of()
+                );
+        when(localizationService.importTemplates(
+                eq("ko"),
+                eq(com.bluelight.backend.api.admin.notification.template.dto.LocalizationFormat.XLIFF),
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()))
+                .thenReturn(report);
+
+        org.springframework.mock.web.MockMultipartFile file =
+                new org.springframework.mock.web.MockMultipartFile(
+                        "file", "translations.xliff",
+                        "application/xliff+xml",
+                        "<xliff/>".getBytes()
+                );
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .multipart("/api/admin/notification-templates/import")
+                        .file(file)
+                        .param("locale", "ko")
+                        .param("format", "xliff")
+                        .principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.locale").value("ko"))
+                .andExpect(jsonPath("$.totalRows").value(2))
+                .andExpect(jsonPath("$.draftsCreated").value(1));
     }
 }

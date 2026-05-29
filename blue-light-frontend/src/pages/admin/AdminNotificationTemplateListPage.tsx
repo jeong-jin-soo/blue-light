@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useNotificationTemplateStore } from '../../stores/notificationTemplateStore';
+import * as api from '../../api/notificationTemplateApi';
+import type { LocalizationFormat, ImportReportResponse } from '../../api/notificationTemplateApi';
 import type {
   NotificationCategory,
   NotificationChannel,
@@ -44,6 +46,7 @@ export default function AdminNotificationTemplateListPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <LocalizationToolbar />
           <Link
             to="/admin/notification-templates/drafts"
             className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
@@ -244,6 +247,268 @@ export default function AdminNotificationTemplateListPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * PR-T7 P1 — 외주 번역 라운드용 export/import 툴바.
+ *
+ * Export: 지정 locale (보통 en) 활성 템플릿을 XLIFF/CSV 로 다운로드 → LSP 전달.
+ * Import: 번역된 파일 업로드 → target locale 의 draft 일괄 생성 (PENDING) → SA approve.
+ */
+function LocalizationToolbar() {
+  const [open, setOpen] = useState<'none' | 'export' | 'import'>('none');
+  const [exportLocale, setExportLocale] = useState('en');
+  const [exportFormat, setExportFormat] = useState<LocalizationFormat>('xliff');
+  const [importLocale, setImportLocale] = useState('ko');
+  const [importFormat, setImportFormat] = useState<LocalizationFormat>('xliff');
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importReport, setImportReport] = useState<ImportReportResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = async () => {
+    try {
+      setError(null);
+      const { blob, filename } = await api.exportTemplates(exportLocale, exportFormat);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setOpen('none');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Export 실패');
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) {
+      setError('파일을 선택해주세요');
+      return;
+    }
+    try {
+      setImporting(true);
+      setError(null);
+      const report = await api.importTemplates(importLocale, importFormat, importFile);
+      setImportReport(report);
+      setImportFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    } catch (e) {
+      // 백엔드가 LocalizationException → 400 LOCALIZATION_FAILED 로 변환
+      const apiError = e as { response?: { data?: { message?: string } } };
+      setError(apiError.response?.data?.message ?? (e instanceof Error ? e.message : 'Import 실패'));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen('export')}
+        className="px-3 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+      >
+        Export
+      </button>
+      <button
+        onClick={() => setOpen('import')}
+        className="px-3 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+      >
+        Import
+      </button>
+
+      {open === 'export' && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
+            <h3 className="text-lg font-semibold mb-4">번역용 파일 Export</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              지정 locale 의 활성 템플릿을 외주 LSP 전달용 파일로 다운로드.
+            </p>
+            <label className="block text-sm font-medium mb-1">소스 locale</label>
+            <input
+              value={exportLocale}
+              onChange={(e) => setExportLocale(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded mb-3"
+              placeholder="en"
+            />
+            <label className="block text-sm font-medium mb-1">포맷</label>
+            <select
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value as LocalizationFormat)}
+              className="w-full px-3 py-2 border border-gray-300 rounded mb-4"
+            >
+              <option value="xliff">XLIFF 1.2 (LSP 표준)</option>
+              <option value="csv">CSV (스프레드시트)</option>
+            </select>
+            {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setOpen('none'); setError(null); }}
+                className="px-4 py-2 text-sm border border-gray-300 rounded"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleExport}
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                다운로드
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {open === 'import' && (
+        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-[32rem] max-h-[80vh] overflow-auto shadow-xl">
+            <h3 className="text-lg font-semibold mb-2">번역된 파일 Import</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              업로드한 파일의 각 행마다 PENDING draft 가 생성됩니다. SYSTEM_ADMIN 이
+              Draft 리뷰 큐에서 일괄 approve 해야 publish 됩니다.
+            </p>
+
+            {!importReport && (
+              <>
+                <label className="block text-sm font-medium mb-1">타겟 locale</label>
+                <input
+                  value={importLocale}
+                  onChange={(e) => setImportLocale(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded mb-3"
+                  placeholder="ko / zh-Hans"
+                />
+                <label className="block text-sm font-medium mb-1">포맷</label>
+                <select
+                  value={importFormat}
+                  onChange={(e) => setImportFormat(e.target.value as LocalizationFormat)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded mb-3"
+                >
+                  <option value="xliff">XLIFF 1.2</option>
+                  <option value="csv">CSV</option>
+                </select>
+                <label className="block text-sm font-medium mb-1">파일</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xliff,.xml,.csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                  className="w-full mb-4 text-sm"
+                />
+                {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+                <div className="flex gap-2 justify-end">
+                  <button
+                    onClick={() => { setOpen('none'); setError(null); setImportFile(null); }}
+                    className="px-4 py-2 text-sm border border-gray-300 rounded"
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={importing || !importFile}
+                    className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {importing ? '처리 중…' : '업로드'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {importReport && (
+              <ImportReportView
+                report={importReport}
+                onClose={() => { setImportReport(null); setOpen('none'); }}
+                onRerun={() => setImportReport(null)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ImportReportView({
+  report,
+  onClose,
+  onRerun,
+}: {
+  report: ImportReportResponse;
+  onClose: () => void;
+  onRerun: () => void;
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-2 mb-4 text-center">
+        <div className="bg-gray-50 rounded p-2">
+          <div className="text-xs text-gray-500">총 처리</div>
+          <div className="text-lg font-semibold">{report.totalRows}</div>
+        </div>
+        <div className="bg-emerald-50 rounded p-2">
+          <div className="text-xs text-emerald-700">생성</div>
+          <div className="text-lg font-semibold text-emerald-700">{report.draftsCreated}</div>
+        </div>
+        <div className="bg-gray-50 rounded p-2">
+          <div className="text-xs text-gray-500">Skip</div>
+          <div className="text-lg font-semibold">{report.skipped}</div>
+        </div>
+        <div className="bg-red-50 rounded p-2">
+          <div className="text-xs text-red-700">실패</div>
+          <div className="text-lg font-semibold text-red-700">{report.failed}</div>
+        </div>
+      </div>
+
+      {report.items.length > 0 && (
+        <div className="border border-gray-200 rounded max-h-60 overflow-auto mb-4">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-50 sticky top-0">
+              <tr>
+                <th className="px-2 py-1 text-left">Code</th>
+                <th className="px-2 py-1 text-left">Channel</th>
+                <th className="px-2 py-1 text-left">Status</th>
+                <th className="px-2 py-1 text-left">Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.items.map((item, i) => (
+                <tr key={i} className="border-t border-gray-100">
+                  <td className="px-2 py-1 font-mono">{item.templateCode}</td>
+                  <td className="px-2 py-1">{item.channel}</td>
+                  <td className="px-2 py-1">
+                    {item.status === 'CREATED' && (
+                      <span className="text-emerald-700">✓ Draft #{item.draftSeq}</span>
+                    )}
+                    {item.status === 'SKIPPED' && (
+                      <span className="text-gray-500">Skip</span>
+                    )}
+                    {item.status === 'FAILED' && (
+                      <span className="text-red-600">실패</span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1 text-gray-600">{item.reason ?? ''}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="flex gap-2 justify-end">
+        <button onClick={onRerun} className="px-4 py-2 text-sm border border-gray-300 rounded">
+          다른 파일 업로드
+        </button>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          닫기
+        </button>
+      </div>
     </div>
   );
 }

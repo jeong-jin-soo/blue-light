@@ -4,6 +4,8 @@ import com.bluelight.backend.api.admin.notification.template.dto.CatalogEntryRes
 import com.bluelight.backend.api.admin.notification.template.dto.CreateDraftRequest;
 import com.bluelight.backend.api.admin.notification.template.dto.DisableTemplateRequest;
 import com.bluelight.backend.api.admin.notification.template.dto.HistoryItemResponse;
+import com.bluelight.backend.api.admin.notification.template.dto.ImportReportResponse;
+import com.bluelight.backend.api.admin.notification.template.dto.LocalizationFormat;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateDetailResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateDraftResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateListItemResponse;
@@ -28,6 +30,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -38,7 +41,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 import java.util.List;
 import java.util.Optional;
@@ -67,6 +74,7 @@ public class AdminNotificationTemplateController {
     private final TemplatePreviewService previewService;
     private final TemplateTestSendService testSendService;
     private final TemplateMetricsService metricsService;
+    private final TemplateLocalizationService localizationService;
 
     // ============================================================
     // 템플릿 조회
@@ -315,6 +323,48 @@ public class AdminNotificationTemplateController {
             @PathVariable Long templateSeq,
             @RequestParam(defaultValue = "30") int days) {
         return ResponseEntity.ok(metricsService.computeMetrics(templateSeq, days));
+    }
+
+    // ============================================================
+    // Localization Export / Import (PR-T7 P1) — 스펙 §10.2
+    // ============================================================
+
+    /**
+     * 지정 locale 의 활성 템플릿을 XLIFF 1.2 또는 CSV 로 export.
+     *
+     * <p>NM/SA 전용. 외주 LSP 에 전달할 base copy 추출.</p>
+     */
+    @GetMapping("/export")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    public ResponseEntity<byte[]> exportTemplates(
+            @RequestParam(defaultValue = "en") String locale,
+            @RequestParam(defaultValue = "xliff") String format) {
+        LocalizationFormat fmt = LocalizationFormat.fromString(format);
+        byte[] body = localizationService.export(locale, fmt);
+        String filename = "notification-templates-" + locale + "." + fmt.extension();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(fmt.mediaType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + filename + "\"")
+                .body(body);
+    }
+
+    /**
+     * 번역된 XLIFF/CSV 업로드 → target locale 의 draft 일괄 생성 (PENDING).
+     *
+     * <p>NM/SA 전용. 결과 리포트(생성/skip/실패 + 사유)를 반환.</p>
+     */
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    public ResponseEntity<ImportReportResponse> importTemplates(
+            @RequestParam String locale,
+            @RequestParam(defaultValue = "xliff") String format,
+            @RequestPart("file") MultipartFile file,
+            Authentication auth) throws IOException {
+        LocalizationFormat fmt = LocalizationFormat.fromString(format);
+        ImportReportResponse report = localizationService.importTemplates(
+                locale, fmt, file.getInputStream(), principalUserSeq(auth));
+        return ResponseEntity.ok(report);
     }
 
     // ============================================================

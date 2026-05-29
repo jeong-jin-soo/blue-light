@@ -32,6 +32,13 @@ public interface NotificationTemplateRepository
     List<NotificationTemplate> findByChannelOrderByTemplateCodeAscLocaleAsc(NotificationChannel channel);
 
     /**
+     * PR-T7 P1 — XLIFF/CSV export 용: 지정 locale 의 활성 row 전체 (code, channel) 정렬.
+     * 외주 LSP 에 전달할 base copy 추출 시 사용 (보통 locale=en, enabled=true).
+     */
+    List<NotificationTemplate> findByLocaleAndEnabledOrderByTemplateCodeAscChannelAsc(
+            String locale, boolean enabled);
+
+    /**
      * Admin 콘솔 list 검색 — code/채널/로케일/활성여부/카테고리/역할 다중 필터.
      * 모든 파라미터 nullable, null 이면 해당 필터 무시.
      */
