@@ -9,6 +9,7 @@ import com.bluelight.backend.api.admin.notification.template.dto.NotificationTem
 import com.bluelight.backend.api.admin.notification.template.dto.NotificationTemplateListItemResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.ReviewDraftRequest;
 import com.bluelight.backend.api.admin.notification.template.dto.TemplatePreviewRequest;
+import com.bluelight.backend.api.admin.notification.template.dto.TemplateMetricsResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.TemplatePreviewResponse;
 import com.bluelight.backend.api.admin.notification.template.dto.TemplateTestSendRequest;
 import com.bluelight.backend.api.admin.notification.template.dto.TemplateTestSendResponse;
@@ -65,6 +66,7 @@ public class AdminNotificationTemplateController {
     private final DraftReviewService reviewService;
     private final TemplatePreviewService previewService;
     private final TemplateTestSendService testSendService;
+    private final TemplateMetricsService metricsService;
 
     // ============================================================
     // 템플릿 조회
@@ -295,6 +297,24 @@ public class AdminNotificationTemplateController {
             Authentication auth) {
         return ResponseEntity.ok(testSendService.sendTestToSelf(
                 templateSeq, principalUserSeq(auth), request.payloadOrEmpty()));
+    }
+
+    // ============================================================
+    // Metrics (PR-T7 P1) — 스펙 §6.2, §4.2
+    // ============================================================
+
+    /**
+     * 템플릿 발송 메트릭스 — 지난 N일 (1~90, default 30) 의 sent/failed/skipped/pending
+     * + render warnings + 채널별 분해.
+     *
+     * <p>NM/SA 전용. 운영 발송만 집계 (is_test=false). Edit 화면 헤더 인라인 표시용.</p>
+     */
+    @GetMapping("/{templateSeq}/metrics")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    public ResponseEntity<TemplateMetricsResponse> getMetrics(
+            @PathVariable Long templateSeq,
+            @RequestParam(defaultValue = "30") int days) {
+        return ResponseEntity.ok(metricsService.computeMetrics(templateSeq, days));
     }
 
     // ============================================================

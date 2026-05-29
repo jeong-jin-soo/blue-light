@@ -162,3 +162,38 @@ export interface LintErrorBody {
     warnings: LintIssue[];
   };
 }
+
+/**
+ * PR-T7 P1 — 템플릿 발송 메트릭스 (지난 N일).
+ *
+ * 백엔드: GET /api/admin/notification-templates/{seq}/metrics?days=30
+ * 운영 발송만 집계 (is_test=false). Edit 화면 헤더에 인라인 표시.
+ */
+export interface TemplateMetricsChannelBreakdown {
+  channel: NotificationChannel;
+  sent: number;
+  failed: number;
+  skipped: number;
+  pending: number;
+  /** 0~1. (failed) / (sent + failed) */
+  failureRate: number;
+}
+
+export interface TemplateMetricsResponse {
+  templateCode: string;
+  days: number;
+  /** ISO datetime */
+  since: string;
+  totalCount: number;
+  totalSent: number;
+  /** FAILED + DEAD 합산 */
+  totalFailed: number;
+  totalSkipped: number;
+  /** PENDING + SENDING 합산 */
+  totalPending: number;
+  /** render_warnings_json 가 비어있지 않은 row 수 */
+  renderWarnings: number;
+  /** 0~1 */
+  failureRate: number;
+  byChannel: TemplateMetricsChannelBreakdown[];
+}

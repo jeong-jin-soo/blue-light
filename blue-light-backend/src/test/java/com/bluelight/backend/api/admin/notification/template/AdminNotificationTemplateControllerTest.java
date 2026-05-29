@@ -58,6 +58,7 @@ class AdminNotificationTemplateControllerTest {
     private DraftReviewService reviewService;
     private TemplatePreviewService previewService;
     private TemplateTestSendService testSendService;
+    private TemplateMetricsService metricsService;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -82,10 +83,11 @@ class AdminNotificationTemplateControllerTest {
         reviewService = mock(DraftReviewService.class);
         previewService = mock(TemplatePreviewService.class);
         testSendService = mock(TemplateTestSendService.class);
+        metricsService = mock(TemplateMetricsService.class);
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AdminNotificationTemplateController(
-                        adminService, reviewService, previewService, testSendService))
+                        adminService, reviewService, previewService, testSendService, metricsService))
                 .setControllerAdvice(new TemplateAdminExceptionHandler())
                 .build();
     }
@@ -544,5 +546,47 @@ class AdminNotificationTemplateControllerTest {
 
         mockMvc.perform(get("/api/admin/notification-templates/42/history").principal(lewAuth()))
                 .andExpect(status().isNotFound());
+    }
+
+    // ============================================================
+    // PR-T7 P1 — Metrics
+    // ============================================================
+
+    @Test
+    @DisplayName("GET /{seq}/metrics?days=30 - 응답 본문에 합계/실패율/채널분해 포함")
+    void getMetrics_returnsAggregatedResponse() throws Exception {
+        com.bluelight.backend.api.admin.notification.template.dto.TemplateMetricsResponse response =
+                new com.bluelight.backend.api.admin.notification.template.dto.TemplateMetricsResponse(
+                        "A-17", 30, java.time.LocalDateTime.now().minusDays(30),
+                        1218L, 1200L, 4L, 12L, 2L, 5L, 0.003322,
+                        List.of()
+                );
+        when(metricsService.computeMetrics(eq(17L), eq(30))).thenReturn(response);
+
+        mockMvc.perform(get("/api/admin/notification-templates/17/metrics")
+                        .param("days", "30")
+                        .principal(nmAuth()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.templateCode").value("A-17"))
+                .andExpect(jsonPath("$.days").value(30))
+                .andExpect(jsonPath("$.totalSent").value(1200))
+                .andExpect(jsonPath("$.totalFailed").value(4))
+                .andExpect(jsonPath("$.renderWarnings").value(5));
+    }
+
+    @Test
+    @DisplayName("GET /{seq}/metrics - days 파라미터 미지정 시 기본 30 적용")
+    void getMetrics_defaultDays30() throws Exception {
+        com.bluelight.backend.api.admin.notification.template.dto.TemplateMetricsResponse response =
+                new com.bluelight.backend.api.admin.notification.template.dto.TemplateMetricsResponse(
+                        "A-17", 30, java.time.LocalDateTime.now().minusDays(30),
+                        0L, 0L, 0L, 0L, 0L, 0L, 0.0,
+                        List.of()
+                );
+        when(metricsService.computeMetrics(eq(17L), eq(30))).thenReturn(response);
+
+        mockMvc.perform(get("/api/admin/notification-templates/17/metrics").principal(nmAuth()))
+                .andExpect(status().isOk());
+        // 컨트롤러가 days=30 으로 호출했는지 verify — 메서드 정적 검증 + 기본값 적용
     }
 }

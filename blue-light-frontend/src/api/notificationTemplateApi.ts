@@ -10,6 +10,7 @@ import type {
   NotificationTemplateDraft,
   NotificationTemplateListItem,
   TemplateDraftStatus,
+  TemplateMetricsResponse,
   TemplatePreviewResponse,
   TemplateTestSendResponse,
   UpdateDraftRequest,
@@ -180,5 +181,25 @@ export const getHistory = async (
   const response = await axiosClient.get<Page<HistoryItem>>(`${BASE}/${templateSeq}/history`, {
     params: { page, size },
   });
+  return response.data;
+};
+
+// ─────────────────────────────────────────────────────────────
+// Metrics (PR-T7 P1) — 지난 N일 발송 메트릭스
+// ─────────────────────────────────────────────────────────────
+/**
+ * 템플릿 발송 메트릭스 — 운영 발송만 집계 (admin test-send 제외).
+ *
+ * @param templateSeq 대상 템플릿 seq
+ * @param days        집계 기간 (1~90, default 30). 백엔드에서 clamp.
+ */
+export const getMetrics = async (
+  templateSeq: number,
+  days = 30
+): Promise<TemplateMetricsResponse> => {
+  const response = await axiosClient.get<TemplateMetricsResponse>(
+    `${BASE}/${templateSeq}/metrics`,
+    { params: { days } }
+  );
   return response.data;
 };

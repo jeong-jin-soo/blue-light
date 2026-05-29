@@ -6,6 +6,7 @@ import type {
   NotificationTemplateDraft,
   NotificationTemplateListItem,
   TemplateDraftStatus,
+  TemplateMetricsResponse,
 } from '../types/notificationTemplate';
 import * as api from '../api/notificationTemplateApi';
 
@@ -42,12 +43,18 @@ interface NotificationTemplateState {
   catalog: CatalogEntry[];
   catalogLoaded: boolean;
 
+  // Metrics (PR-T7 P1)
+  metrics: TemplateMetricsResponse | null;
+  metricsLoading: boolean;
+  metricsError: string | null;
+
   // Actions
   setFilters: (next: Partial<ListFilters>) => void;
   loadTemplates: () => Promise<void>;
   loadTemplate: (templateSeq: number) => Promise<void>;
   loadDraftQueue: (status?: TemplateDraftStatus, myOnly?: boolean) => Promise<void>;
   loadCatalog: () => Promise<void>;
+  loadMetrics: (templateSeq: number, days?: number) => Promise<void>;
   clearCurrent: () => void;
 }
 
@@ -71,6 +78,10 @@ export const useNotificationTemplateStore = create<NotificationTemplateState>((s
 
   catalog: [],
   catalogLoaded: false,
+
+  metrics: null,
+  metricsLoading: false,
+  metricsError: null,
 
   setFilters: (next) =>
     set((state) => ({
@@ -136,5 +147,23 @@ export const useNotificationTemplateStore = create<NotificationTemplateState>((s
     }
   },
 
-  clearCurrent: () => set({ current: null, currentError: null }),
+  /**
+   * PR-T7 P1 — 템플릿 발송 메트릭스 조회.
+   * 운영 발송만 집계 (admin test-send 제외). Edit 화면 진입 시 호출.
+   */
+  loadMetrics: async (templateSeq, days = 30) => {
+    set({ metricsLoading: true, metricsError: null });
+    try {
+      const data = await api.getMetrics(templateSeq, days);
+      set({ metrics: data, metricsLoading: false });
+    } catch (e) {
+      set({
+        metricsLoading: false,
+        metricsError: e instanceof Error ? e.message : 'Failed to load metrics',
+      });
+    }
+  },
+
+  clearCurrent: () =>
+    set({ current: null, currentError: null, metrics: null, metricsError: null }),
 }));

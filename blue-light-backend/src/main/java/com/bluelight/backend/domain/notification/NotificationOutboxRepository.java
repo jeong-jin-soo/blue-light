@@ -37,4 +37,38 @@ public interface NotificationOutboxRepository extends JpaRepository<Notification
 
     /** 사용자 기준 최근 발송 이력. */
     Page<NotificationOutbox> findByUserSeqOrderByCreatedAtDesc(Long userSeq, Pageable pageable);
+
+    /**
+     * PR-T7 P1 — 템플릿 코드 + 채널별 상태 집계 (지난 N일).
+     *
+     * <p>is_test=true (admin test-send) 는 운영 수치에서 제외한다 — 인박스/메트릭스가
+     * 어드민 자신의 테스트로 부풀려지는 것을 차단 (스펙 §17, §5.5).
+     * 반환: {@code [channel, status, count]} 행 묶음. 서비스에서 enum 매핑.</p>
+     */
+    @Query("SELECT o.channel, o.status, COUNT(o) " +
+            "FROM NotificationOutbox o " +
+            "WHERE o.templateCode = :code " +
+            "  AND o.isTest = false " +
+            "  AND o.createdAt >= :since " +
+            "GROUP BY o.channel, o.status")
+    List<Object[]> aggregateChannelStatusByTemplate(
+            @Param("code") String templateCode,
+            @Param("since") LocalDateTime since);
+
+    /**
+     * PR-T7 P1 — render_warnings_json 가 비어있지 않은 row 카운트 (지난 N일).
+     *
+     * <p>render warning 은 발송은 성공했으나 변수 치환 누락 등으로 본문이 불완전한
+     * 케이스를 의미. 운영자가 카피 정정 필요 시점을 판단하는 핵심 지표 (스펙 §14).</p>
+     */
+    @Query("SELECT COUNT(o) " +
+            "FROM NotificationOutbox o " +
+            "WHERE o.templateCode = :code " +
+            "  AND o.isTest = false " +
+            "  AND o.createdAt >= :since " +
+            "  AND o.renderWarningsJson IS NOT NULL " +
+            "  AND LENGTH(TRIM(o.renderWarningsJson)) > 2")  // "{}" 빈 객체 제외
+    long countRenderWarningsByTemplate(
+            @Param("code") String templateCode,
+            @Param("since") LocalDateTime since);
 }

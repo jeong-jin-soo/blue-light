@@ -10,6 +10,7 @@ import type {
   LintIssue,
   NotificationCategory,
   NotificationSeverity,
+  TemplateMetricsResponse,
   TemplatePreviewResponse,
 } from '../../types/notificationTemplate';
 import { useAuthStore } from '../../stores/authStore';
@@ -28,8 +29,17 @@ export default function AdminNotificationTemplateEditPage() {
   const { id } = useParams<{ id: string }>();
   const templateSeq = id ? Number(id) : 0;
   const navigate = useNavigate();
-  const { current, currentLoading, currentError, loadTemplate, catalog, loadCatalog } =
-    useNotificationTemplateStore();
+  const {
+    current,
+    currentLoading,
+    currentError,
+    loadTemplate,
+    catalog,
+    loadCatalog,
+    metrics,
+    metricsLoading,
+    loadMetrics,
+  } = useNotificationTemplateStore();
   const role = useAuthStore((s) => s.user?.role);
 
   const [subject, setSubject] = useState('');
@@ -53,7 +63,11 @@ export default function AdminNotificationTemplateEditPage() {
 
   useEffect(() => {
     loadCatalog();
-    if (templateSeq) loadTemplate(templateSeq);
+    if (templateSeq) {
+      loadTemplate(templateSeq);
+      // PR-T7 P1 — 헤더 인라인 메트릭스 (지난 30일 발송 현황)
+      loadMetrics(templateSeq, 30);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateSeq]);
 
@@ -204,6 +218,8 @@ export default function AdminNotificationTemplateEditPage() {
             </>
           )}
         </div>
+        {/* PR-T7 P1 — 지난 30일 발송 메트릭스 인라인 배지 */}
+        <MetricsBadge metrics={metrics} loading={metricsLoading} />
       </header>
 
       {/* 알림 메시지 영역 */}
@@ -602,4 +618,69 @@ function handleApiError(
   } else {
     setGenericError(e instanceof Error ? e.message : '요청 실패');
   }
+}
+
+/**
+ * PR-T7 P1 — 지난 30일 발송 메트릭스 인라인 배지.
+ *
+ * 운영 발송만 집계 (admin test-send 제외).
+ * 표시 형태: "지난 30일 1,204회 발송 · 실패 0.3% · 누락변수 5건"
+ * 발송 0 건이면 회색 안내. 실패율 ≥1% 또는 누락변수 ≥1 이면 강조색.
+ */
+function MetricsBadge({
+  metrics,
+  loading,
+}: {
+  metrics: TemplateMetricsResponse | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="mt-2 text-xs text-gray-400">지난 30일 통계 로딩 중…</div>
+    );
+  }
+  if (!metrics) return null;
+
+  const operationalTotal = metrics.totalSent + metrics.totalFailed;
+  if (operationalTotal === 0 && metrics.totalSkipped === 0) {
+    return (
+      <div className="mt-2 text-xs text-gray-400">
+        지난 {metrics.days}일 동안 운영 발송 이력 없음
+      </div>
+    );
+  }
+
+  const failurePct = (metrics.failureRate * 100).toFixed(2);
+  const failureAlert = metrics.failureRate >= 0.01;  // 1% 초과 강조
+  const warningAlert = metrics.renderWarnings > 0;
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-gray-600">
+        지난 <strong className="font-semibold">{metrics.days}일</strong>
+      </span>
+      <span className="text-gray-700">
+        <strong className="font-semibold">{metrics.totalSent.toLocaleString()}</strong> 회 발송
+      </span>
+      <span
+        className={
+          failureAlert
+            ? 'px-1.5 py-0.5 rounded bg-red-50 text-red-700 border border-red-200'
+            : 'text-gray-600'
+        }
+      >
+        실패 {failurePct}% ({metrics.totalFailed.toLocaleString()}건)
+      </span>
+      {metrics.totalSkipped > 0 && (
+        <span className="text-gray-500">
+          가드 컷 {metrics.totalSkipped.toLocaleString()}건
+        </span>
+      )}
+      {warningAlert && (
+        <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+          ⚠ 변수 누락 {metrics.renderWarnings.toLocaleString()}건
+        </span>
+      )}
+    </div>
+  );
 }
