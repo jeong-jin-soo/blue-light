@@ -29,12 +29,13 @@ class AdminSpELAuthorizationTest {
 
     static Stream<Arguments> guardedMethods() {
         return Stream.of(
-                // AdminApplicationController — 5 methods (1 read + 4 mutate)
+                // AdminApplicationController — 6 methods (2 read + 4 mutate)
                 Arguments.of(AdminApplicationController.class, "getApplication"),
                 Arguments.of(AdminApplicationController.class, "updateStatus"),
                 Arguments.of(AdminApplicationController.class, "completeApplication"),
                 Arguments.of(AdminApplicationController.class, "requestRevision"),
                 Arguments.of(AdminApplicationController.class, "approveForPayment"),
+                Arguments.of(AdminApplicationController.class, "getPayments"),
                 // AdminSldController — 4 methods
                 Arguments.of(AdminSldController.class, "getAdminSldRequest"),
                 Arguments.of(AdminSldController.class, "uploadSld"),

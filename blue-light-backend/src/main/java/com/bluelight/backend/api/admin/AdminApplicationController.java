@@ -204,7 +204,11 @@ public class AdminApplicationController {
     /**
      * Get payment history for an application
      * GET /api/admin/applications/:id/payments
+     *
+     * <p>★ 코드 부채 P0 확대 (PR-T8/L-3/P0 후속) — getPayments 만 누락되어 LEW 가 타인
+     * 배정 신청서의 결제 이력 열람 가능했음. 동일 SpEL 가드 적용.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/payments")
     public ResponseEntity<List<PaymentResponse>> getPayments(@PathVariable Long id) {
         log.info("Admin get payments: applicationSeq={}", id);
