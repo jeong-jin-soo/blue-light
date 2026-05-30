@@ -60,7 +60,15 @@ def _spine_label(parent: str, *, section: int, text: str,
 
 
 def _sub_label(parent: str, *, lines: list[str]) -> Box:
-    """Sub-circuit label — rotated 90°, above or below the sub-circuit."""
+    """Sub-circuit label — rotated 90°, beside the sub-circuit.
+
+    LEW 그림에서 sub-circuit 라벨은 회전된 세로 텍스트로 *회로 사이*
+    공간에 위치한다. 솔버 모델에서 라벨 cx를 sub.cx와 일치시키면
+    drop wire(=sub.cx에 수직)와 라벨 박스가 항상 겹친다 — 라벨 폭이
+    sub-circuit 폭보다 훨씬 넓기 때문. top-shift-right anchor로 라벨을
+    회로 우측으로 빼면 NoOverlap2D가 회로 간격을 라벨 폭만큼 자동
+    확장해 wire 통로가 확보된다.
+    """
     max_chars = max(len(line) for line in lines) if lines else 1
     w = mm(max(len(lines) * 3.6 + 1, 8))   # rotated bbox width on page
     h = mm(max_chars * 1.8 + 1)             # rotated bbox height on page
@@ -68,8 +76,9 @@ def _sub_label(parent: str, *, lines: list[str]) -> Box:
         name=f"{parent}_lbl", w=w, h=h, role=BoxRole.LABEL,
         section=12, column="sub_label",
         parent=parent, text="\n".join(lines), rotated=True,
-        label_anchors=["top"],  # always above sub-circuit, between sub and busbar
-        label_gap=40,
+        # drop wire와 분리하기 위해 sub-circuit 우측 옆에 배치.
+        label_anchors=["top-shift-right"],
+        label_gap=20,
     )
 
 
@@ -117,9 +126,15 @@ def build_scene(requirements: dict) -> SolverScene:
 
     # ── Sections 3/4/6/8 depend on metering topology ──
     if metering == "sp_meter":
-        # Section 3: SP meter board (ISO → KWH → MCB)
+        # Section 3: SP meter board (ISO → KWH → MCB).
+        # 박스 사이즈 결정: KWH 절차적 심볼 12 mm 폭 + 어댑터 padding 4 mm × 2 = 20 mm
+        # 최소 폭. 점선 박스 외곽선의 시각 무게감을 위해 30 mm로 확장. 높이는
+        # 7(ISO)+10(KWH)+8(MCB)+2gap×2+padding×2 ≈ 35 mm 최소, 시각 여유 위해 42 mm.
+        # 트랙 B 1차에서 사용한 60×50 mm는 KWH 폭(14) 대비 패딩이 너무 넓어 빈 공간
+        # 비율이 컸음 — 30×42로 줄여 LEW 레퍼런스(meter_board 박스 폭이 컴포넌트 폭
+        # 합 + 적당한 패딩)에 더 근접.
         scene.boxes.append(Box(
-            name="meter_board", w=mm(60), h=mm(50), role=BoxRole.SYMBOL,
+            name="meter_board", w=mm(30), h=mm(42), role=BoxRole.SYMBOL,
             section=3, column="spine", text="ISO → KWH → MCB",
         ))
         scene.boxes.append(_spine_label(
@@ -141,10 +156,16 @@ def build_scene(requirements: dict) -> SolverScene:
     elif metering == "ct_meter":
         # Section 4: unit isolator skipped (CT installations typically
         # have isolation in the CT panel itself)
-        # Section 6: CT pre-MCCB fuse + indicator lamp
+        # Section 6: CT pre-MCCB fuse + indicator lamps (incoming + outgoing).
+        # 박스 사이즈: 어댑터가 FUSE(스파인) + INDICATOR_LIGHTS 2개(상/하, 우측 분기)를
+        # 그리므로 너비 36 mm(FUSE half 1.75 + gap 3 + IND 13.2 + pad 4 ≈ 22, 좌측 여유 14),
+        # 높이 28 mm(pad 3 + IND 4 + gap 4 + FUSE 8 + gap 4 + IND 4 + pad 3 = 30 → 28로 컴팩트
+        # 컷) 잡는다. 트랙 B 1차의 18×16은 FUSE만 들어가는 최소 크기였으나 LEW
+        # 레퍼런스(200A TPN: 2A TP MCB + INCOMING/OUTGOING IND LIGHT 3 lamp set)에 부합
+        # 시키기 위해 확대.
         scene.boxes.append(Box(
-            name="ct_pre_fuse", w=mm(18), h=mm(16), role=BoxRole.SYMBOL,
-            section=6, column="spine", text="2A FUSE",
+            name="ct_pre_fuse", w=mm(36), h=mm(28), role=BoxRole.SYMBOL,
+            section=6, column="spine", text="2A FUSE + IND",
         ))
         scene.boxes.append(_spine_label(
             "ct_pre_fuse", section=6, text="2A HRC Fuse\nIndicator Lamp",
@@ -240,8 +261,10 @@ def build_scene(requirements: dict) -> SolverScene:
         role=BoxRole.LABEL,
         section=11, column="spine_label",
         parent="busbar", text=bus_label_text,
-        # Busbar is genuinely horizontal — top/bottom are the natural slots.
-        label_anchors=["top", "bottom"],
+        # Wire가 busbar의 cx로 들어와 끝나기 때문에, *top* 가운데 정렬은
+        # 라벨이 wire를 정확히 가린다. 라벨을 busbar 좌/우 끝 위로 보내
+        # wire와 분리한다.
+        label_anchors=["top-left", "top-right"],
         label_gap=20,
     ))
 
@@ -278,9 +301,35 @@ def build_scene(requirements: dict) -> SolverScene:
         role=BoxRole.LABEL,
         section=14, column="spine_label", parent="earth_bar",
         text=earth_text,
-        # Earth bar prefers top (right above the conductor), with right as fallback.
-        label_anchors=["top", "right"],
+        # Earth bar 심볼은 10 mm 폭으로 라벨(약 36 mm)보다 좁다. top 가운데
+        # 정렬은 라벨이 earth 심볼 + spine wire 양쪽을 덮어 가린다.
+        # right anchor 하나로 한정해 심볼 우측 옆 가로 라벨로 그린다.
+        label_anchors=["right"],
         label_gap=20,
     ))
+
+    # ── Adaptive section_gap so the layout fills target_height_ratio of the
+    # usable page height. Solver's objective minimises footprint, so without
+    # this hint the bbox stays tightly packed regardless of page size, leaving
+    # A2 pages roughly half-empty (see memory/sld-cpsat-next-session.md
+    # Track A baseline: A2 cases util_h ≈ 51-55%).
+    spine_boxes = [b for b in scene.boxes if b.column == "spine"]
+    sub_boxes = [b for b in scene.boxes if b.column == "sub_circuit"]
+    earth_boxes = [b for b in scene.boxes if b.role == BoxRole.EARTH]
+    if len(spine_boxes) >= 2:
+        spine_h_sum = sum(b.h for b in spine_boxes)
+        sub_h = max((b.h for b in sub_boxes), default=0)
+        earth_h = max((b.h for b in earth_boxes), default=0)
+        # Vertical chain below busbar in place.py: busbar -> 80u -> subs -> 60u -> earth.
+        bus_to_sub_gap = 80
+        sub_to_earth_gap = 60
+        chain_below = sub_h + earth_h + bus_to_sub_gap + sub_to_earth_gap if sub_boxes else 0
+        usable_h = scene.page_h - scene.margin - scene.effective_margin_bottom
+        target_h = int(usable_h * scene.target_height_ratio)
+        # Budget for the (N-1) spine gaps, after subtracting fixed heights.
+        gap_budget = target_h - spine_h_sum - chain_below
+        n_gaps = len(spine_boxes) - 1
+        if gap_budget > 0 and n_gaps > 0:
+            scene.section_gap = max(50, gap_budget // n_gaps)
 
     return scene

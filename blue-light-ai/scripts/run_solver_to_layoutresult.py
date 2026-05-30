@@ -103,6 +103,9 @@ def main() -> int:
     pipeline = SldPipeline()
     n = pipeline._draw_components(dxf, layout)
     pipeline._draw_connections(dxf, layout)
+    pipeline._draw_dashed_connections(dxf, layout)
+    pipeline._draw_junction_arrows(dxf, layout)
+    pipeline._draw_junction_dots(dxf, layout)
     print(f"Drawn: {n} components")
 
     fill_title_block_data(

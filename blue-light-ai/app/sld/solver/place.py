@@ -90,7 +90,9 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
         [b for b in scene.boxes if b.column == "spine"],
         key=lambda b: b.section,
     )
-    SECTION_GAP = 50  # 5 mm minimum between consecutive spine boxes
+    # Minimum gap between consecutive spine boxes. Scenario builder sizes
+    # this to fill the usable page height; floor is 5 mm.
+    SECTION_GAP = max(50, scene.section_gap)
     for a, b in zip(spine, spine[1:]):
         ya = vars_[a.name][1]
         yb = vars_[b.name][1]
@@ -148,6 +150,30 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
                 model.Add(yl + b.h + gap == yp).OnlyEnforceIf(bv)
                 model.Add(2 * xl + b.w - 2 * xp - parent_w <= ALIGN_SLACK).OnlyEnforceIf(bv)
                 model.Add(2 * xl + b.w - 2 * xp - parent_w >= -ALIGN_SLACK).OnlyEnforceIf(bv)
+            elif anchor == "top-left":
+                # Above parent, label *left edge* aligned to parent left edge.
+                # 가운데 정렬을 피해 spine wire(=parent.cx)가 라벨 박스 외부에 위치하게.
+                # 부스바·어스바처럼 wire가 parent 중심을 통과하는 컴포넌트에 사용.
+                model.Add(yl == yp + parent_box.h + gap).OnlyEnforceIf(bv)
+                model.Add(xl == xp).OnlyEnforceIf(bv)
+            elif anchor == "top-right":
+                # Above parent, label *right edge* aligned to parent right edge.
+                model.Add(yl == yp + parent_box.h + gap).OnlyEnforceIf(bv)
+                model.Add(xl + b.w == xp + parent_w).OnlyEnforceIf(bv)
+            elif anchor == "bottom-left":
+                model.Add(yl + b.h + gap == yp).OnlyEnforceIf(bv)
+                model.Add(xl == xp).OnlyEnforceIf(bv)
+            elif anchor == "bottom-right":
+                model.Add(yl + b.h + gap == yp).OnlyEnforceIf(bv)
+                model.Add(xl + b.w == xp + parent_w).OnlyEnforceIf(bv)
+            elif anchor == "top-shift-right":
+                # 라벨을 parent 우측 옆 + 위쪽으로 이동.
+                # 부모가 라벨보다 좁아 top·top-right로도 wire가 라벨을
+                # 통과하는 경우(예: sub_label vs drop wire) 라벨을 parent의
+                # *옆*으로 완전히 빼낸다. NoOverlap2D 때문에 인접 sub-circuit
+                # 간격이 라벨 폭만큼 자동으로 확장된다.
+                model.Add(yl == yp + parent_box.h + gap).OnlyEnforceIf(bv)
+                model.Add(xl == xp + parent_w + gap).OnlyEnforceIf(bv)
 
         if choice_vars:
             model.AddExactlyOne(list(choice_vars.values()))

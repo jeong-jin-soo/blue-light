@@ -74,6 +74,12 @@ class SolverScene:
     page_h: int = mm(297)
     margin: int = mm(10)
     margin_bottom: Optional[int] = None  # None → use `margin`
+    # Minimum vertical gap between consecutive spine boxes.
+    # The scenario builder sizes this to push usable_h utilisation up to
+    # `target_height_ratio` (default 0.85). 50 = 5 mm is the legacy minimum
+    # and is preserved as a floor for the small-page cases.
+    section_gap: int = 50
+    target_height_ratio: float = 0.85
 
     @property
     def effective_margin_bottom(self) -> int:
