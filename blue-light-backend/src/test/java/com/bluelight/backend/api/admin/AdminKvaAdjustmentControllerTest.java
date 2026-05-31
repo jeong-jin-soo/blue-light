@@ -77,7 +77,7 @@ class AdminKvaAdjustmentControllerTest {
         objectMapper = JsonMapper.builder().findAndAddModules().build();
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AdminKvaAdjustmentController(service))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(mock(com.bluelight.backend.api.audit.AuditLogService.class)))
                 .build();
         SecurityContextHolder.getContext().setAuthentication(adminAuth());
     }

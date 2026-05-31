@@ -12,6 +12,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+
+import com.bluelight.backend.api.audit.AuditLogService;
 
 /**
  * GlobalExceptionHandler — 낙관적 락 예외의 경로별 에러코드 변환 단위 테스트 (P1.C).
@@ -26,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("GlobalExceptionHandler - CoF optimistic lock mapping (P1.C)")
 class GlobalExceptionHandlerCofLockTest {
 
-    private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    private final GlobalExceptionHandler handler =
+            new GlobalExceptionHandler(mock(AuditLogService.class));
 
     @AfterEach
     void clear() {

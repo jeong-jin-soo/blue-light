@@ -156,5 +156,11 @@ public enum AuditAction {
     // LEW 셀프 할당 또는 ADMIN 의 LEW 배정 (PR-3, D6=A). metadata: conciergeRequestSeq, lewUserSeq, previousLewUserSeq.
     CONCIERGE_LEW_ASSIGNED,
     // 별도 수금 기록 직후 자동 발행된 영수증 (PR-2). metadata: invoiceSeq, paymentSeq, paymentMethod.
-    INVOICE_AUTO_GENERATED_FROM_MANUAL_PAYMENT
+    INVOICE_AUTO_GENERATED_FROM_MANUAL_PAYMENT,
+
+    // ★ 트랙 1.4 — 인가 거부(403) 기록. P0 SpEL 단일화 후 @PreAuthorize 가
+    // 컨트롤러 메서드 진입 전 거부하면서 @Auditable @Around 가 더이상 cross-tenant
+    // 시도를 기록하지 못하던 공백을 GlobalExceptionHandler 에서 메운다.
+    // metadata(requestUri/method/ip/userAgent)로 침해 시도 SQL 조회 가능.
+    ACCESS_DENIED
 }

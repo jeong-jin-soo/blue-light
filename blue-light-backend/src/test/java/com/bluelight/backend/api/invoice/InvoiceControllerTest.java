@@ -65,7 +65,7 @@ class InvoiceControllerTest {
                 .standaloneSetup(new InvoiceController(invoiceService))
                 // GlobalExceptionHandler를 장착하여 BusinessException/MethodArgumentNotValidException
                 // → HTTP status 매핑을 실제 운영과 동일하게 재현
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(mock(com.bluelight.backend.api.audit.AuditLogService.class)))
                 .build();
 
         // 기본 Authentication: 일반 사용자 (userSeq=10)

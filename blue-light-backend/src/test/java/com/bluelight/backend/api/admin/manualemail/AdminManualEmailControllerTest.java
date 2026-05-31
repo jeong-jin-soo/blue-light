@@ -65,7 +65,7 @@ class AdminManualEmailControllerTest {
         objectMapper = JsonMapper.builder().findAndAddModules().build();
         mockMvc = MockMvcBuilders
                 .standaloneSetup(new AdminManualEmailController(dispatcher))
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(mock(com.bluelight.backend.api.audit.AuditLogService.class)))
                 .build();
         SecurityContextHolder.getContext().setAuthentication(adminAuth());
     }
