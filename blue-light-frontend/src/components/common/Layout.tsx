@@ -43,7 +43,7 @@ export default function Layout() {
   const applicantMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/applications', label: 'My Applications', icon: '📋' },
-    { path: '/applications/new', label: 'New Application', icon: '➕' },
+    { path: '/applications/new', label: 'New / Renew Licence', icon: '➕' },
     { path: '/sld-orders', label: 'SLD Orders', icon: '📐' },
     { path: '/lighting-orders', label: 'Lighting Layout', icon: '💡' },
     { path: '/power-socket-orders', label: 'Power Socket', icon: '🔌' },

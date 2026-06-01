@@ -196,7 +196,7 @@ export default function ApplicationListPage() {
           </p>
         </div>
         <Button onClick={() => navigate('/applications/new')}>
-          + New Application
+          + New / Renew Licence
         </Button>
       </div>
 

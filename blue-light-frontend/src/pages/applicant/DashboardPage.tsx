@@ -77,7 +77,7 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 mt-1">Overview of your licence applications</p>
         </div>
         <Button onClick={() => navigate('/applications/new')}>
-          + New Application
+          + New / Renew Licence
         </Button>
       </div>
 
