@@ -19,6 +19,7 @@ import loaApi from '../../api/loaApi';
 import documentApi from '../../api/documentApi';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useRequestPayment } from '../../hooks/useRequestPayment';
 import type {
   CertificateOfFitnessRequest,
   CertificateOfFitnessResponse,
@@ -180,6 +181,23 @@ export default function LewReviewFormPage() {
   const guardsSatisfied = kvaConfirmed && pendingDocCount === 0 && sldReady;
 
   const cofFinalized = lewData?.cof?.finalized === true;
+
+  // ── PR3 결제 요청 (UX 검토 결론: 리뷰 폼에서도 결제 요청 가능) ──────
+  // 결제 요청 가드 = Phase 1 (kVA 확정 + 서류 0건). SLD 는 결제 후 작업이라 제외.
+  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출 (Phase 1 액션).
+  const appStatus = adminApp?.status;
+  const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
+  const phase1Ready = kvaConfirmed && pendingDocCount === 0;
+  const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
+  const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
+    applicationId,
+    {
+      onSuccess: loadData,
+      onStaleState: loadData,
+      // 가드 위반(kVA/서류) 시 이미 리뷰 폼이므로 해당 탭으로 점프.
+      onNeedsReview: (reason) => setActiveTab(reason === 'kva' ? 'kva' : 'documents'),
+    },
+  );
 
   // 기본 활성 탭 — 첫 미완료 탭. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
   useEffect(() => {
@@ -465,6 +483,53 @@ export default function LewReviewFormPage() {
             View full application →
           </button>
         </div>
+
+        {/* PR3 결제 요청 — Phase 1(PENDING_REVIEW/REVISION_REQUESTED)에서만 노출.
+            UX 검토 결론: 결제 요청은 '신청-수준 액션'이라 검토 화면 상단(모든 탭에서 보이는 곳)에 둔다.
+            가드 = kVA 확정 + 서류 0건 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
+        {inPhase1 && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
+            <span className="font-medium text-gray-700">Ready for payment?</span>
+            {/* Phase 1 진행도 — 어느 탭에 있든 무엇이 남았는지 인식 가능 */}
+            <span
+              className={`inline-flex items-center gap-1 ${kvaConfirmed ? 'text-success-700' : 'text-warning-700'}`}
+            >
+              <span aria-hidden>{kvaConfirmed ? '✓' : '•'}</span> kVA
+            </span>
+            {pendingDocCount === 0 ? (
+              <span className="inline-flex items-center gap-1 text-success-700">
+                <span aria-hidden>✓</span> Documents
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveTab('documents')}
+                className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
+              >
+                <span aria-hidden>•</span> {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending →
+              </button>
+            )}
+            {!kvaConfirmed && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('kva')}
+                className="text-warning-700 underline hover:text-warning-800"
+              >
+                Confirm kVA →
+              </button>
+            )}
+            <Button
+              size="sm"
+              className="ml-auto"
+              disabled={!phase1Ready || requestingPayment}
+              aria-disabled={!phase1Ready || requestingPayment}
+              loading={requestingPayment}
+              onClick={() => setShowRequestPaymentConfirm(true)}
+            >
+              Request payment
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Header */}
@@ -620,6 +685,19 @@ export default function LewReviewFormPage() {
         confirmLabel="Confirm SLD"
         onConfirm={handleSldConfirm}
         onClose={() => setShowSldConfirm(false)}
+      />
+
+      {/* PR3 결제 요청 confirm dialog — 비가역 액션(신청자에게 결제 알림 발송) */}
+      <ConfirmDialog
+        isOpen={showRequestPaymentConfirm}
+        title="Request payment?"
+        message="The applicant will be notified by email to pay the licence fee. This moves the application to the payment stage. SLD, LOA, and the Certificate of Fitness are completed after payment."
+        confirmLabel="Request payment"
+        onConfirm={() => {
+          setShowRequestPaymentConfirm(false);
+          void runRequestPayment();
+        }}
+        onClose={() => setShowRequestPaymentConfirm(false)}
       />
 
       {/* ───────────────────────────────────────────────────────────────────
