@@ -490,39 +490,54 @@ export default function LewReviewFormPage() {
         {inPhase1 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
             <span className="font-medium text-gray-700">Ready for payment?</span>
-            {/* Phase 1 진행도 — 어느 탭에 있든 무엇이 남았는지 인식 가능 */}
-            <span
-              className={`inline-flex items-center gap-1 ${kvaConfirmed ? 'text-success-700' : 'text-warning-700'}`}
-            >
-              <span aria-hidden>{kvaConfirmed ? '✓' : '•'}</span> kVA
-            </span>
-            {pendingDocCount === 0 ? (
-              <span className="inline-flex items-center gap-1 text-success-700">
-                <span aria-hidden>✓</span> Documents
+            {/* Phase 1 진행도 — 어느 탭에 있든 무엇이 남았는지 인식 가능.
+                상태는 색(시각) + ✓/• 글리프(시각) + sr-only(스크린리더) 삼중 인코딩.
+                id 부여 → 비활성 버튼이 aria-describedby 로 "왜 비활성인지"를 가리킨다. */}
+            <span id="phase1-progress" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span
+                className={`inline-flex items-center gap-1 ${kvaConfirmed ? 'text-success-700' : 'text-warning-700'}`}
+              >
+                <span aria-hidden>{kvaConfirmed ? '✓' : '•'}</span> kVA
+                <span className="sr-only">{kvaConfirmed ? 'confirmed' : 'not confirmed'}</span>
               </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setActiveTab('documents')}
-                className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
-              >
-                <span aria-hidden>•</span> {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending →
-              </button>
-            )}
-            {!kvaConfirmed && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('kva')}
-                className="text-warning-700 underline hover:text-warning-800"
-              >
-                Confirm kVA →
-              </button>
-            )}
+              {pendingDocCount === 0 ? (
+                <span className="inline-flex items-center gap-1 text-success-700">
+                  <span aria-hidden>✓</span> Documents
+                  <span className="sr-only">resolved</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('documents')}
+                  className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
+                >
+                  <span aria-hidden>•</span>
+                  {/* 모바일: "Docs 2" 축약 / sm 이상: 전체 문구 */}
+                  <span className="sm:hidden">Docs {pendingDocCount}</span>
+                  <span className="hidden sm:inline">
+                    {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending
+                  </span>
+                  <span className="sr-only"> pending — go to Documents tab</span>
+                  <span aria-hidden> →</span>
+                </button>
+              )}
+              {!kvaConfirmed && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('kva')}
+                  className="text-warning-700 underline hover:text-warning-800"
+                >
+                  Confirm kVA <span aria-hidden>→</span>
+                  <span className="sr-only"> — go to kVA tab</span>
+                </button>
+              )}
+            </span>
             <Button
               size="sm"
               className="ml-auto"
               disabled={!phase1Ready || requestingPayment}
               aria-disabled={!phase1Ready || requestingPayment}
+              aria-describedby={!phase1Ready ? 'phase1-progress' : undefined}
               loading={requestingPayment}
               onClick={() => setShowRequestPaymentConfirm(true)}
             >
