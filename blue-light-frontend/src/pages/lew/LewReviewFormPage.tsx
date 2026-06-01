@@ -527,6 +527,7 @@ export default function LewReviewFormPage() {
               canRequest={canRequestDocuments}
               applicantDisplayName={applicantDisplayName}
               applicationCode={applicationCode}
+              onRequestsChanged={loadData}
             />
           </TabPanel>
 
