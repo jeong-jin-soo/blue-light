@@ -34,9 +34,9 @@ jobs:
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
               mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" \
               -e "SELECT '--- BEFORE ---' AS step; \
-                  SELECT seq, first_name, last_name, role FROM users WHERE role='ADMIN'; \
+                  SELECT user_seq, first_name, last_name, role FROM users WHERE role='ADMIN'; \
                   UPDATE users SET first_name='LicenseKaki', last_name='Admin' \
                     WHERE role='ADMIN' AND first_name='System' AND last_name='Admin'; \
                   SELECT ROW_COUNT() AS rows_updated; \
                   SELECT '--- AFTER ---' AS step; \
-                  SELECT seq, first_name, last_name, role FROM users WHERE role='ADMIN';"
+                  SELECT user_seq, first_name, last_name, role FROM users WHERE role='ADMIN';"
