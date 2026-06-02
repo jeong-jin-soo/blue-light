@@ -4,13 +4,20 @@
 -- ============================================
 
 -- Admin 계정 (password: admin1234 / BCrypt encoded, 이메일 인증 완료)
+-- 이름을 'System Admin' 으로 두면 SYSTEM_ADMIN(이름 'System Administrator')과 헤더에서 혼동되므로
+-- 'LicenseKaki Admin' 으로 명확화. (헤더 우측 상단은 role 이 아닌 first_name+last_name 을 표시)
 INSERT INTO users (email, password, first_name, last_name, phone, role, email_verified, created_at, updated_at)
 SELECT 'admin@licensekaki.sg',
        '$2a$10$.QY0wEUfA7GCMfMER6OJaei/5MpW6NOOHiEGxREq6bqA.owWxrxzW',
-       'System', 'Admin', '+65-0000-0000', 'ADMIN', TRUE,
+       'LicenseKaki', 'Admin', '+65-0000-0000', 'ADMIN', TRUE,
        NOW(), NOW()
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'admin@licensekaki.sg');
+
+-- 기존 DB(dev/운영)에 이미 'System Admin' 이름으로 생성된 ADMIN 계정 이름 교정 (idempotent — 매 부팅 시 안전).
+-- 이메일이 아닌 role+이름 기준이라 어떤 이메일의 ADMIN 이든 'System Admin' 이면 교정됨. SYSTEM_ADMIN 은 미해당.
+UPDATE users SET first_name = 'LicenseKaki', last_name = 'Admin'
+WHERE role = 'ADMIN' AND first_name = 'System' AND last_name = 'Admin';
 
 -- LEW 계정 (password: admin1234 / BCrypt encoded, 사전 승인됨, Grade 9, 이메일 인증 완료)
 INSERT INTO users (email, password, first_name, last_name, phone, role, approved_status, lew_licence_no, lew_grade, email_verified, created_at, updated_at)
