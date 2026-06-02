@@ -42,7 +42,7 @@ export default function AdminNotificationTemplateListPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">알림 템플릿</h1>
           <p className="text-sm text-gray-500 mt-1">
-            카피 편집·미리보기·테스트 발송 (NOTIFICATION_MANAGER / SYSTEM_ADMIN)
+            카피 편집·미리보기·테스트 발송 (ADMIN / SYSTEM_ADMIN)
           </p>
         </div>
         <div className="flex gap-2">

@@ -229,8 +229,9 @@ const router = createBrowserRouter([
     ],
   },
 
-  // ★ PR-T6 — 알림 템플릿 관리 (NOTIFICATION_MANAGER + SYSTEM_ADMIN).
-  // ADMIN/LEW/SLD_MANAGER/CONCIERGE_MANAGER 도 read-only 로 접근 가능 (D-5 — recipient_roles 필터).
+  // ★ PR-T6 — 알림 템플릿 관리.
+  // ADMIN 단독 운영: ADMIN 은 작성·편집·발송·승인까지 full (NM 역할 미사용). SYSTEM_ADMIN 도 full.
+  // LEW/SLD_MANAGER/CONCIERGE_MANAGER 는 read-only 로 접근 가능 (D-5 — recipient_roles 필터).
   {
     element: (
       <ProtectedRoute

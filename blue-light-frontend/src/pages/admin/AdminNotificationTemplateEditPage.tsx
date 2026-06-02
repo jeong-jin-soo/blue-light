@@ -426,7 +426,8 @@ export default function AdminNotificationTemplateEditPage() {
                 onClick={() => handleEnableDisable(false)}
                 disabled={
                   (current.category === 'SECURITY' || current.category === 'PAYMENT') &&
-                  role !== 'SYSTEM_ADMIN'
+                  role !== 'SYSTEM_ADMIN' &&
+                  role !== 'ADMIN'
                 }
                 className="w-full px-4 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50"
               >
@@ -441,9 +442,10 @@ export default function AdminNotificationTemplateEditPage() {
               </button>
             )}
             {(current.category === 'SECURITY' || current.category === 'PAYMENT') &&
-              role !== 'SYSTEM_ADMIN' && (
+              role !== 'SYSTEM_ADMIN' &&
+              role !== 'ADMIN' && (
                 <p className="text-xs text-gray-500 mt-2">
-                  {current.category} 카테고리는 SYSTEM_ADMIN 만 비활성 가능 (H-S3).
+                  {current.category} 카테고리는 ADMIN/SYSTEM_ADMIN 만 비활성 가능 (H-S3).
                 </p>
               )}
           </div>

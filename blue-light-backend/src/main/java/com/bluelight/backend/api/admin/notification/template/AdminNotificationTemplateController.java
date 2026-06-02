@@ -122,7 +122,7 @@ public class AdminNotificationTemplateController {
     // ============================================================
 
     @PostMapping("/drafts")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<NotificationTemplateDraftResponse> createDraft(
             @Valid @RequestBody CreateDraftRequest request,
             Authentication auth) {
@@ -133,7 +133,7 @@ public class AdminNotificationTemplateController {
     }
 
     @PatchMapping("/drafts/{draftSeq}")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<NotificationTemplateDraftResponse> editDraft(
             @PathVariable Long draftSeq,
             @Valid @RequestBody UpdateDraftRequest request,
@@ -150,7 +150,7 @@ public class AdminNotificationTemplateController {
     }
 
     @PostMapping("/drafts/{draftSeq}/withdraw")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<Void> withdrawDraft(
             @PathVariable Long draftSeq,
             Authentication auth) {
@@ -159,7 +159,7 @@ public class AdminNotificationTemplateController {
     }
 
     @GetMapping("/drafts/{draftSeq}")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<NotificationTemplateDraftResponse> getDraft(
             @PathVariable Long draftSeq) {
         NotificationTemplateDraft draft = adminService.findDraft(draftSeq)
@@ -168,7 +168,7 @@ public class AdminNotificationTemplateController {
     }
 
     @GetMapping("/drafts")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<Page<NotificationTemplateDraftResponse>> listDrafts(
             @RequestParam(defaultValue = "PENDING") TemplateDraftStatus status,
             @RequestParam(required = false) Boolean myOnly,
@@ -192,7 +192,7 @@ public class AdminNotificationTemplateController {
     // ============================================================
 
     @PostMapping("/drafts/{draftSeq}/approve")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<NotificationTemplateDetailResponse> approveDraft(
             @PathVariable Long draftSeq,
             @Valid @RequestBody(required = false) ReviewDraftRequest request,
@@ -205,7 +205,7 @@ public class AdminNotificationTemplateController {
     }
 
     @PostMapping("/drafts/{draftSeq}/reject")
-    @PreAuthorize("hasRole('SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<Void> rejectDraft(
             @PathVariable Long draftSeq,
             @Valid @RequestBody ReviewDraftRequest request,
@@ -219,7 +219,7 @@ public class AdminNotificationTemplateController {
     // ============================================================
 
     @PostMapping("/{templateSeq}/enable")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<Void> enableTemplate(
             @PathVariable Long templateSeq,
             @Valid @RequestBody(required = false) DisableTemplateRequest request,
@@ -231,7 +231,7 @@ public class AdminNotificationTemplateController {
     }
 
     @PostMapping("/{templateSeq}/disable")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<Void> disableTemplate(
             @PathVariable Long templateSeq,
             @Valid @RequestBody DisableTemplateRequest request,
@@ -242,7 +242,9 @@ public class AdminNotificationTemplateController {
                 request.changeReason(),
                 principalUserSeq(auth),
                 clientIp(httpRequest),
-                hasRole(auth, "SYSTEM_ADMIN"));
+                // H-S3: SECURITY/PAYMENT 카테고리 disable 권한. ADMIN 단독 운영 정책상
+                // ADMIN 도 SYSTEM_ADMIN 과 동등하게 잠금 카테고리 비활성 허용.
+                hasRole(auth, "SYSTEM_ADMIN") || hasRole(auth, "ADMIN"));
         return ResponseEntity.noContent().build();
     }
 
@@ -290,7 +292,7 @@ public class AdminNotificationTemplateController {
     // ============================================================
 
     @PostMapping("/{templateSeq}/preview")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<TemplatePreviewResponse> preview(
             @PathVariable Long templateSeq,
             @Valid @RequestBody TemplatePreviewRequest request) {
@@ -298,7 +300,7 @@ public class AdminNotificationTemplateController {
     }
 
     @PostMapping("/{templateSeq}/test-send")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<TemplateTestSendResponse> testSend(
             @PathVariable Long templateSeq,
             @Valid @RequestBody TemplateTestSendRequest request,
@@ -318,7 +320,7 @@ public class AdminNotificationTemplateController {
      * <p>NM/SA 전용. 운영 발송만 집계 (is_test=false). Edit 화면 헤더 인라인 표시용.</p>
      */
     @GetMapping("/{templateSeq}/metrics")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<TemplateMetricsResponse> getMetrics(
             @PathVariable Long templateSeq,
             @RequestParam(defaultValue = "30") int days) {
@@ -335,7 +337,7 @@ public class AdminNotificationTemplateController {
      * <p>NM/SA 전용. 외주 LSP 에 전달할 base copy 추출.</p>
      */
     @GetMapping("/export")
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<byte[]> exportTemplates(
             @RequestParam(defaultValue = "en") String locale,
             @RequestParam(defaultValue = "xliff") String format) {
@@ -355,7 +357,7 @@ public class AdminNotificationTemplateController {
      * <p>NM/SA 전용. 결과 리포트(생성/skip/실패 + 사유)를 반환.</p>
      */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN')")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<ImportReportResponse> importTemplates(
             @RequestParam String locale,
             @RequestParam(defaultValue = "xliff") String format,
