@@ -6,6 +6,10 @@ name: One-off - Fix ADMIN name (System Admin -> LicenseKaki Admin)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-fix-admin-name.yml'
 
 jobs:
   fix-admin-name:
