@@ -1,0 +1,38 @@
+name: One-off - Fix ADMIN name (System Admin -> LicenseKaki Admin)
+
+# 일회성 수동 작업: dev 는 SQL_INIT_MODE=never 라 data.sql 의 이름 교정 UPDATE 가 실행되지 않으므로,
+# 기존 DEV_SERVER_* 시크릿 + 서버 .env 의 DB 접속정보를 재사용해 dev RDS 에 단발성 UPDATE 를 적용한다.
+# 대상: role='ADMIN' AND first_name='System' AND last_name='Admin' 인 행만. 실행 후 이 워크플로 파일은 제거.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-admin-name:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Targeted UPDATE on dev RDS via server (docker mysql client)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            echo "Target DB: host=$MYSQL_HOST port=${MYSQL_PORT:-3306} db=$MYSQL_DATABASE"
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" \
+              -e "SELECT '--- BEFORE ---' AS step; \
+                  SELECT seq, first_name, last_name, role FROM users WHERE role='ADMIN'; \
+                  UPDATE users SET first_name='LicenseKaki', last_name='Admin' \
+                    WHERE role='ADMIN' AND first_name='System' AND last_name='Admin'; \
+                  SELECT ROW_COUNT() AS rows_updated; \
+                  SELECT '--- AFTER ---' AS step; \
+                  SELECT seq, first_name, last_name, role FROM users WHERE role='ADMIN';"
