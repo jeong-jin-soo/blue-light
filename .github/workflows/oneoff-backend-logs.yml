@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Tail backend logs
+      - name: Dump dev DB notification schema
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -21,9 +21,18 @@ jobs:
           command_timeout: 3m
           script: |
             cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
-            echo "===== docker ps ====="
-            docker compose -f docker-compose.yml ps 2>&1 | head -20
-            echo "===== backend logs: notification-templates / Exception context (last 400) ====="
-            docker compose -f docker-compose.yml logs --tail=400 backend 2>&1 \
-              | grep -iE "notification-template|NotificationTemplate|Exception|ERROR|Caused by|at com.bluelight|nested exception|SQL|JdbcSQL|could not|Servlet" \
-              | tail -90 || echo "(no matching lines)"
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            echo "DB: $MYSQL_HOST:${MYSQL_PORT:-3306}/$MYSQL_DATABASE"
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                SELECT '### notification_templates columns ###';
+                SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema='$MYSQL_DATABASE' AND table_name='notification_templates' ORDER BY ordinal_position;
+                SELECT '### notification_outbox columns ###';
+                SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema='$MYSQL_DATABASE' AND table_name='notification_outbox' ORDER BY ordinal_position;
+                SELECT '### notification template-related tables present ###';
+                SELECT table_name FROM information_schema.tables WHERE table_schema='$MYSQL_DATABASE' AND table_name LIKE 'notification%' ORDER BY table_name;
+              "
