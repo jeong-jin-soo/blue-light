@@ -60,6 +60,8 @@ export default function AdminNotificationTemplateEditPage() {
   const [previewResult, setPreviewResult] = useState<TemplatePreviewResponse | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [testSendStatus, setTestSendStatus] = useState<string | null>(null);
+  // EMAIL 본문은 HTML — 미리보기에서 태그 노출 방지 위해 렌더(iframe) / 소스 보기 토글.
+  const [showPreviewSource, setShowPreviewSource] = useState(false);
 
   useEffect(() => {
     loadCatalog();
@@ -569,16 +571,37 @@ export default function AdminNotificationTemplateEditPage() {
                     </div>
                   )}
                   <div>
-                    <div className="text-xs font-medium text-gray-700 mb-1">
-                      Body ({previewResult.charCount} chars
-                      {previewResult.smsSegments != null
-                        ? ` · ${previewResult.smsSegments} segment`
-                        : ''}
-                      )
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-xs font-medium text-gray-700">
+                        Body ({previewResult.charCount} chars
+                        {previewResult.smsSegments != null
+                          ? ` · ${previewResult.smsSegments} segment`
+                          : ''}
+                        )
+                      </div>
+                      {current.channel === 'EMAIL' && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPreviewSource((s) => !s)}
+                          className="text-xs text-teal-600 hover:underline cursor-pointer"
+                        >
+                          {showPreviewSource ? 'View rendered' : 'View HTML source'}
+                        </button>
+                      )}
                     </div>
-                    <pre className="bg-gray-50 px-3 py-2 rounded text-sm whitespace-pre-wrap font-mono max-h-96 overflow-auto">
-                      {previewResult.body}
-                    </pre>
+                    {current.channel === 'EMAIL' && !showPreviewSource ? (
+                      // 신뢰된 운영자 작성 HTML — sandbox(스크립트 비허용) iframe 으로 렌더해 태그 노출 방지 + XSS 격리
+                      <iframe
+                        title="email-preview"
+                        sandbox=""
+                        srcDoc={previewResult.body}
+                        className="w-full h-96 bg-white border border-gray-200 rounded"
+                      />
+                    ) : (
+                      <pre className="bg-gray-50 px-3 py-2 rounded text-sm whitespace-pre-wrap font-mono max-h-96 overflow-auto">
+                        {previewResult.body}
+                      </pre>
+                    )}
                   </div>
                 </div>
               )}

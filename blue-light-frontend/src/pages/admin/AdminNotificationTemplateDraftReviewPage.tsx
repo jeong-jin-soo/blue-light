@@ -13,6 +13,14 @@ export default function AdminNotificationTemplateDraftReviewPage() {
   const { draftQueue, draftQueueLoading, draftQueueError, draftStatusFilter, loadDraftQueue } =
     useNotificationTemplateStore();
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  // EMAIL draft 본문(HTML)은 기본 렌더(iframe)로 보여 태그 노출 방지. 소스 보기 토글된 draftSeq 집합.
+  const [sourceView, setSourceView] = useState<Set<number>>(new Set());
+  const toggleSource = (seq: number) =>
+    setSourceView((prev) => {
+      const next = new Set(prev);
+      next.has(seq) ? next.delete(seq) : next.add(seq);
+      return next;
+    });
 
   useEffect(() => {
     loadDraftQueue('PENDING');
@@ -163,10 +171,30 @@ export default function AdminNotificationTemplateDraftReviewPage() {
               </div>
             )}
             <div>
-              <div className="text-xs font-medium text-gray-700">Body</div>
-              <pre className="bg-gray-50 px-3 py-2 rounded text-xs whitespace-pre-wrap font-mono max-h-40 overflow-auto">
-                {d.bodyText}
-              </pre>
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-medium text-gray-700">Body</div>
+                {d.channel === 'EMAIL' && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSource(d.draftSeq)}
+                    className="text-xs text-teal-600 hover:underline cursor-pointer"
+                  >
+                    {sourceView.has(d.draftSeq) ? 'View rendered' : 'View HTML source'}
+                  </button>
+                )}
+              </div>
+              {d.channel === 'EMAIL' && !sourceView.has(d.draftSeq) ? (
+                <iframe
+                  title={`draft-${d.draftSeq}-preview`}
+                  sandbox=""
+                  srcDoc={d.bodyText}
+                  className="w-full h-64 bg-white border border-gray-200 rounded"
+                />
+              ) : (
+                <pre className="bg-gray-50 px-3 py-2 rounded text-xs whitespace-pre-wrap font-mono max-h-40 overflow-auto">
+                  {d.bodyText}
+                </pre>
+              )}
             </div>
             {d.reviewNote && (
               <div className="mt-2 text-xs text-gray-600">
