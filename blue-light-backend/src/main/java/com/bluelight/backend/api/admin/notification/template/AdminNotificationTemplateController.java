@@ -385,11 +385,12 @@ public class AdminNotificationTemplateController {
 
     /**
      * D-5 — read 권한 범위 필터.
-     * NM/SA 는 모든 템플릿 열람 가능 (요청 role 파라미터 그대로 사용).
-     * 그 외 역할(ADMIN/LEW/SLD_MANAGER/CONCIERGE_MANAGER)은 자기 역할이 recipient_roles 에 포함된 row 만.
+     * ADMIN/NM/SA 는 모든 템플릿 열람 가능 (요청 role 파라미터 그대로 사용).
+     * ADMIN 단독 운영 정책상 ADMIN 도 풀 매니저로 전체 열람.
+     * 그 외 역할(LEW/SLD_MANAGER/CONCIERGE_MANAGER)은 자기 역할이 recipient_roles 에 포함된 row 만.
      */
     private static String resolveRecipientRoleFilter(Authentication auth, String requestedRole) {
-        if (hasRole(auth, "NOTIFICATION_MANAGER") || hasRole(auth, "SYSTEM_ADMIN")) {
+        if (hasRole(auth, "NOTIFICATION_MANAGER") || hasRole(auth, "SYSTEM_ADMIN") || hasRole(auth, "ADMIN")) {
             return requestedRole;
         }
         // 첫 번째 권한을 자기 역할로 사용 (RoleHierarchy 미사용 가정)
@@ -399,9 +400,9 @@ public class AdminNotificationTemplateController {
                 .orElse(requestedRole);
     }
 
-    /** Detail 권한 가드 — D-5 read 범위 일치 확인. */
+    /** Detail 권한 가드 — D-5 read 범위 일치 확인. ADMIN/NM/SA 는 전체 열람 (단독 운영). */
     private static void ensureReadAuthorized(NotificationTemplate template, Authentication auth) {
-        if (hasRole(auth, "NOTIFICATION_MANAGER") || hasRole(auth, "SYSTEM_ADMIN")) return;
+        if (hasRole(auth, "NOTIFICATION_MANAGER") || hasRole(auth, "SYSTEM_ADMIN") || hasRole(auth, "ADMIN")) return;
         String mine = auth.getAuthorities().stream().findFirst()
                 .map(a -> a.getAuthority().replaceFirst("^ROLE_", "")).orElse("");
         String recipientRoles = template.getRecipientRoles();
