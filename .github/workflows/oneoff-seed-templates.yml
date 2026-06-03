@@ -1,0 +1,55 @@
+name: One-off - Seed notification templates
+
+# 일회성: 카피북(notification-copy-templates.en.md) → notification_templates 시드를
+# dev RDS 에 적용. runner 에서 파서 실행 → SQL 생성 → 서버로 scp → EC2 에서 mysql 적용
+# (RDS 는 private 이라 runner 직접 접속 불가, EC2 경유). 실행 후 워크플로 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-seed-templates.yml'
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate seed SQL from copybook
+        run: |
+          python3 scripts/import_notification_templates.py > seed_templates.sql
+          echo "rows: $(grep -c '^INSERT INTO notification_templates' seed_templates.sql)"
+          head -3 seed_templates.sql
+      - name: Copy seed SQL to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          source: "seed_templates.sql"
+          target: "/home/${{ secrets.DEV_SERVER_USER }}/bluelight"
+      - name: Apply seed on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            echo "Applying seed to $MYSQL_HOST/$MYSQL_DATABASE"
+            docker run --rm -i -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" \
+              < seed_templates.sql
+            echo "=== row count after seed ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e \
+              "SELECT CONCAT('total=', COUNT(*)) FROM notification_templates;
+               SELECT channel, COUNT(*) FROM notification_templates GROUP BY channel;"
+            rm -f seed_templates.sql
