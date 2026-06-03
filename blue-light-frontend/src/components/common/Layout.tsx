@@ -58,8 +58,8 @@ export default function Layout() {
     // admin-manual-email-spec.md §7.1: ADMIN 사이드바 노출, SYSTEM_ADMIN 은 미노출(직접 URL 진입만 가능)
     { path: '/admin/manual-emails', label: 'Manual Email', icon: '✉️' },
     // ADMIN 단독 운영 — 알림 템플릿 작성·편집·발송·승인까지 ADMIN 권한 (NM 역할 미사용).
-    { path: '/admin/notification-templates', label: '알림 템플릿', icon: '🔔' },
-    { path: '/admin/notification-templates/drafts', label: 'Draft 큐', icon: '📝' },
+    { path: '/admin/notification-templates', label: 'Notification Templates', icon: '🔔' },
+    { path: '/admin/notification-templates/drafts', label: 'Draft Queue', icon: '📝' },
     { path: '/admin/prices', label: 'Settings', icon: '⚙️' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
@@ -81,8 +81,8 @@ export default function Layout() {
 
   // NOTIFICATION_MANAGER: 알림 카피 편집·미리보기·테스트 발송 전용 (PR-T7).
   const notificationManagerMenu = [
-    { path: '/admin/notification-templates', label: '알림 템플릿', icon: '✉️' },
-    { path: '/admin/notification-templates/drafts', label: 'Draft 큐', icon: '📝' },
+    { path: '/admin/notification-templates', label: 'Notification Templates', icon: '✉️' },
+    { path: '/admin/notification-templates/drafts', label: 'Draft Queue', icon: '📝' },
   ];
 
   const sldManagerMenu = [
