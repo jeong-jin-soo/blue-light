@@ -40,9 +40,9 @@ export default function AdminNotificationTemplateListPage() {
     <div className="p-6">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">알림 템플릿</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Notification Templates</h1>
           <p className="text-sm text-gray-500 mt-1">
-            카피 편집·미리보기·테스트 발송 (ADMIN / SYSTEM_ADMIN)
+            Copy editing · Preview · Test Send (ADMIN / SYSTEM_ADMIN)
           </p>
         </div>
         <div className="flex gap-2">
@@ -51,7 +51,7 @@ export default function AdminNotificationTemplateListPage() {
             to="/admin/notification-templates/drafts"
             className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
           >
-            Draft 리뷰 큐
+            Draft Review Queue
           </Link>
         </div>
       </header>
@@ -59,7 +59,7 @@ export default function AdminNotificationTemplateListPage() {
       {/* 필터 바 */}
       <div className="bg-white border border-gray-200 rounded p-4 mb-4 grid grid-cols-2 lg:grid-cols-6 gap-3">
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">코드 검색</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Search code</label>
           <input
             type="text"
             value={filters.code ?? ''}
@@ -69,7 +69,7 @@ export default function AdminNotificationTemplateListPage() {
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">채널</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Channel</label>
           <select
             value={filters.channel ?? ''}
             onChange={(e) =>
@@ -77,7 +77,7 @@ export default function AdminNotificationTemplateListPage() {
             }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
           >
-            <option value="">전체</option>
+            <option value="">All</option>
             <option value="EMAIL">EMAIL</option>
             <option value="IN_APP">IN_APP</option>
             <option value="SMS">SMS</option>
@@ -91,14 +91,14 @@ export default function AdminNotificationTemplateListPage() {
             onChange={(e) => setFilters({ locale: e.target.value || undefined })}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
           >
-            <option value="">전체</option>
+            <option value="">All</option>
             <option value="en">en</option>
             <option value="ko">ko</option>
             <option value="zh-Hans">zh-Hans</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">카테고리</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
           <select
             value={filters.category ?? ''}
             onChange={(e) =>
@@ -106,7 +106,7 @@ export default function AdminNotificationTemplateListPage() {
             }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
           >
-            <option value="">전체</option>
+            <option value="">All</option>
             <option value="SECURITY">SECURITY</option>
             <option value="STATUS">STATUS</option>
             <option value="PAYMENT">PAYMENT</option>
@@ -119,7 +119,7 @@ export default function AdminNotificationTemplateListPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">상태</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
           <select
             value={filters.enabled === undefined ? '' : String(filters.enabled)}
             onChange={(e) =>
@@ -129,9 +129,9 @@ export default function AdminNotificationTemplateListPage() {
             }
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded"
           >
-            <option value="">전체</option>
-            <option value="true">활성</option>
-            <option value="false">비활성</option>
+            <option value="">All</option>
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
           </select>
         </div>
       </div>
@@ -147,28 +147,28 @@ export default function AdminNotificationTemplateListPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-700">
             <tr>
-              <th className="text-left px-4 py-2 font-medium">상태</th>
-              <th className="text-left px-4 py-2 font-medium">코드</th>
-              <th className="text-left px-4 py-2 font-medium">채널 · Locale</th>
-              <th className="text-left px-4 py-2 font-medium">카테고리</th>
-              <th className="text-left px-4 py-2 font-medium">중요도</th>
-              <th className="text-left px-4 py-2 font-medium">수신자</th>
+              <th className="text-left px-4 py-2 font-medium">Status</th>
+              <th className="text-left px-4 py-2 font-medium">Code</th>
+              <th className="text-left px-4 py-2 font-medium">Channel · Locale</th>
+              <th className="text-left px-4 py-2 font-medium">Category</th>
+              <th className="text-left px-4 py-2 font-medium">Severity</th>
+              <th className="text-left px-4 py-2 font-medium">Recipients</th>
               <th className="text-left px-4 py-2 font-medium">Subject</th>
-              <th className="text-left px-4 py-2 font-medium">수정일</th>
+              <th className="text-left px-4 py-2 font-medium">Updated</th>
             </tr>
           </thead>
           <tbody>
             {templatesLoading && (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-gray-500">
-                  로딩 중...
+                  Loading...
                 </td>
               </tr>
             )}
             {!templatesLoading && templates.length === 0 && (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-gray-500">
-                  결과가 없습니다.
+                  No results found.
                 </td>
               </tr>
             )}
@@ -180,7 +180,7 @@ export default function AdminNotificationTemplateListPage() {
                       'inline-flex items-center justify-center w-2 h-2 rounded-full ' +
                       (t.enabled ? 'bg-emerald-500' : 'bg-gray-300')
                     }
-                    title={t.enabled ? '활성' : '비활성'}
+                    title={t.enabled ? 'Active' : 'Inactive'}
                   />
                 </td>
                 <td className="px-4 py-2 font-mono text-xs">
@@ -211,10 +211,10 @@ export default function AdminNotificationTemplateListPage() {
                 </td>
                 <td className="px-4 py-2 text-gray-700">{t.recipientRoles ?? '-'}</td>
                 <td className="px-4 py-2 text-gray-700 max-w-md truncate">
-                  {t.subject ?? <span className="text-gray-400">(없음)</span>}
+                  {t.subject ?? <span className="text-gray-400">(none)</span>}
                 </td>
                 <td className="px-4 py-2 text-gray-500 text-xs">
-                  {new Date(t.updatedAt).toLocaleString('ko-KR')}
+                  {new Date(t.updatedAt).toLocaleString('en-SG')}
                 </td>
               </tr>
             ))}
@@ -226,8 +226,7 @@ export default function AdminNotificationTemplateListPage() {
       {templatesPage && templatesPage.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-between text-sm">
           <div className="text-gray-600">
-            총 {templatesPage.totalElements}건 · {templatesPage.number + 1} / {templatesPage.totalPages}{' '}
-            페이지
+            {templatesPage.totalElements} total · {templatesPage.number + 1} / {templatesPage.totalPages}{' '}
           </div>
           <div className="flex gap-2">
             <button
@@ -235,14 +234,14 @@ export default function AdminNotificationTemplateListPage() {
               onClick={() => setFilters({ page: Math.max(0, filters.page - 1) })}
               className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50"
             >
-              이전
+              Previous
             </button>
             <button
               disabled={templatesPage.last}
               onClick={() => setFilters({ page: filters.page + 1 })}
               className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50"
             >
-              다음
+              Next
             </button>
           </div>
         </div>
@@ -283,13 +282,13 @@ function LocalizationToolbar() {
       URL.revokeObjectURL(url);
       setOpen('none');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Export 실패');
+      setError(e instanceof Error ? e.message : 'Export failed');
     }
   };
 
   const handleImport = async () => {
     if (!importFile) {
-      setError('파일을 선택해주세요');
+      setError('Please select a file');
       return;
     }
     try {
@@ -302,7 +301,7 @@ function LocalizationToolbar() {
     } catch (e) {
       // 백엔드가 LocalizationException → 400 LOCALIZATION_FAILED 로 변환
       const apiError = e as { response?: { data?: { message?: string } } };
-      setError(apiError.response?.data?.message ?? (e instanceof Error ? e.message : 'Import 실패'));
+      setError(apiError.response?.data?.message ?? (e instanceof Error ? e.message : 'Import failed'));
     } finally {
       setImporting(false);
     }
@@ -326,25 +325,25 @@ function LocalizationToolbar() {
       {open === 'export' && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-96 shadow-xl">
-            <h3 className="text-lg font-semibold mb-4">번역용 파일 Export</h3>
+            <h3 className="text-lg font-semibold mb-4">Export File for Translation</h3>
             <p className="text-xs text-gray-500 mb-4">
-              지정 locale 의 활성 템플릿을 외주 LSP 전달용 파일로 다운로드.
+              Download active templates of the given locale as a file for the external LSP.
             </p>
-            <label className="block text-sm font-medium mb-1">소스 locale</label>
+            <label className="block text-sm font-medium mb-1">Source locale</label>
             <input
               value={exportLocale}
               onChange={(e) => setExportLocale(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded mb-3"
               placeholder="en"
             />
-            <label className="block text-sm font-medium mb-1">포맷</label>
+            <label className="block text-sm font-medium mb-1">Format</label>
             <select
               value={exportFormat}
               onChange={(e) => setExportFormat(e.target.value as LocalizationFormat)}
               className="w-full px-3 py-2 border border-gray-300 rounded mb-4"
             >
-              <option value="xliff">XLIFF 1.2 (LSP 표준)</option>
-              <option value="csv">CSV (스프레드시트)</option>
+              <option value="xliff">XLIFF 1.2 (LSP standard)</option>
+              <option value="csv">CSV (spreadsheet)</option>
             </select>
             {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
             <div className="flex gap-2 justify-end">
@@ -352,13 +351,13 @@ function LocalizationToolbar() {
                 onClick={() => { setOpen('none'); setError(null); }}
                 className="px-4 py-2 text-sm border border-gray-300 rounded"
               >
-                취소
+                Cancel
               </button>
               <button
                 onClick={handleExport}
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
               >
-                다운로드
+                Download
               </button>
             </div>
           </div>
@@ -368,22 +367,22 @@ function LocalizationToolbar() {
       {open === 'import' && (
         <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-[32rem] max-h-[80vh] overflow-auto shadow-xl">
-            <h3 className="text-lg font-semibold mb-2">번역된 파일 Import</h3>
+            <h3 className="text-lg font-semibold mb-2">Import Translated File</h3>
             <p className="text-xs text-gray-500 mb-4">
-              업로드한 파일의 각 행마다 PENDING draft 가 생성됩니다. SYSTEM_ADMIN 이
-              Draft 리뷰 큐에서 일괄 approve 해야 publish 됩니다.
+              A PENDING draft is created for each row of the uploaded file. A SYSTEM_ADMIN must
+              batch-approve them in the Draft Review Queue before they are published.
             </p>
 
             {!importReport && (
               <>
-                <label className="block text-sm font-medium mb-1">타겟 locale</label>
+                <label className="block text-sm font-medium mb-1">Target locale</label>
                 <input
                   value={importLocale}
                   onChange={(e) => setImportLocale(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded mb-3"
                   placeholder="ko / zh-Hans"
                 />
-                <label className="block text-sm font-medium mb-1">포맷</label>
+                <label className="block text-sm font-medium mb-1">Format</label>
                 <select
                   value={importFormat}
                   onChange={(e) => setImportFormat(e.target.value as LocalizationFormat)}
@@ -392,7 +391,7 @@ function LocalizationToolbar() {
                   <option value="xliff">XLIFF 1.2</option>
                   <option value="csv">CSV</option>
                 </select>
-                <label className="block text-sm font-medium mb-1">파일</label>
+                <label className="block text-sm font-medium mb-1">File</label>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -406,14 +405,14 @@ function LocalizationToolbar() {
                     onClick={() => { setOpen('none'); setError(null); setImportFile(null); }}
                     className="px-4 py-2 text-sm border border-gray-300 rounded"
                   >
-                    취소
+                    Cancel
                   </button>
                   <button
                     onClick={handleImport}
                     disabled={importing || !importFile}
                     className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
                   >
-                    {importing ? '처리 중…' : '업로드'}
+                    {importing ? 'Processing…' : 'Upload'}
                   </button>
                 </div>
               </>
@@ -446,11 +445,11 @@ function ImportReportView({
     <div>
       <div className="grid grid-cols-4 gap-2 mb-4 text-center">
         <div className="bg-gray-50 rounded p-2">
-          <div className="text-xs text-gray-500">총 처리</div>
+          <div className="text-xs text-gray-500">Total processed</div>
           <div className="text-lg font-semibold">{report.totalRows}</div>
         </div>
         <div className="bg-emerald-50 rounded p-2">
-          <div className="text-xs text-emerald-700">생성</div>
+          <div className="text-xs text-emerald-700">Created</div>
           <div className="text-lg font-semibold text-emerald-700">{report.draftsCreated}</div>
         </div>
         <div className="bg-gray-50 rounded p-2">
@@ -458,7 +457,7 @@ function ImportReportView({
           <div className="text-lg font-semibold">{report.skipped}</div>
         </div>
         <div className="bg-red-50 rounded p-2">
-          <div className="text-xs text-red-700">실패</div>
+          <div className="text-xs text-red-700">Failed</div>
           <div className="text-lg font-semibold text-red-700">{report.failed}</div>
         </div>
       </div>
@@ -487,7 +486,7 @@ function ImportReportView({
                       <span className="text-gray-500">Skip</span>
                     )}
                     {item.status === 'FAILED' && (
-                      <span className="text-red-600">실패</span>
+                      <span className="text-red-600">Failed</span>
                     )}
                   </td>
                   <td className="px-2 py-1 text-gray-600">{item.reason ?? ''}</td>
@@ -500,13 +499,13 @@ function ImportReportView({
 
       <div className="flex gap-2 justify-end">
         <button onClick={onRerun} className="px-4 py-2 text-sm border border-gray-300 rounded">
-          다른 파일 업로드
+          Upload another file
         </button>
         <button
           onClick={onClose}
           className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          닫기
+          Close
         </button>
       </div>
     </div>

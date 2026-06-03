@@ -28,9 +28,9 @@ export default function AdminNotificationTemplateDraftReviewPage() {
       category === 'SECURITY' || category === 'PAYMENT' || category === 'MARKETING';
     let note: string | null = null;
     if (requiresReason) {
-      note = window.prompt(`${category} 카테고리 publish — 사유를 입력하세요:`);
+      note = window.prompt(`Publish ${category} category — enter a reason:`);
       if (!note || !note.trim()) {
-        setActionStatus('사유 입력 취소 — approve 중단');
+        setActionStatus('Reason input cancelled — approve aborted');
         return;
       }
     }
@@ -39,14 +39,14 @@ export default function AdminNotificationTemplateDraftReviewPage() {
       setActionStatus(`Draft #${draftSeq} approved`);
       void loadDraftQueue(draftStatusFilter);
     } catch (e) {
-      setActionStatus(`Approve 실패: ${e instanceof Error ? e.message : String(e)}`);
+      setActionStatus(`Approve failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
   const handleReject = async (draftSeq: number) => {
-    const note = window.prompt('Reject 사유를 입력하세요 (필수):');
+    const note = window.prompt('Enter a reject reason (required):');
     if (!note || !note.trim()) {
-      setActionStatus('사유 입력 취소 — reject 중단');
+      setActionStatus('Reason input cancelled — reject aborted');
       return;
     }
     try {
@@ -54,7 +54,7 @@ export default function AdminNotificationTemplateDraftReviewPage() {
       setActionStatus(`Draft #${draftSeq} rejected`);
       void loadDraftQueue(draftStatusFilter);
     } catch (e) {
-      setActionStatus(`Reject 실패: ${e instanceof Error ? e.message : String(e)}`);
+      setActionStatus(`Reject failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -62,16 +62,16 @@ export default function AdminNotificationTemplateDraftReviewPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Draft 리뷰 큐</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Draft Queue</h1>
           <p className="text-sm text-gray-500 mt-1">
-            NOTIFICATION_MANAGER 가 submit 한 카피 변경을 SYSTEM_ADMIN 이 검토·publish.
+            ADMIN/SYSTEM_ADMIN reviews and publishes submitted copy changes.
           </p>
         </div>
         <Link
           to="/admin/notification-templates"
           className="text-sm text-gray-600 hover:underline"
         >
-          ← 템플릿 목록
+          ← Notification Templates
         </Link>
       </header>
 
@@ -104,11 +104,11 @@ export default function AdminNotificationTemplateDraftReviewPage() {
         </div>
       )}
 
-      {draftQueueLoading && <div className="text-gray-500">로딩 중...</div>}
+      {draftQueueLoading && <div className="text-gray-500">Loading...</div>}
 
       {!draftQueueLoading && draftQueue.length === 0 && (
         <div className="bg-gray-50 border border-gray-200 text-gray-500 text-sm px-4 py-8 rounded text-center">
-          {draftStatusFilter} 상태의 draft 가 없습니다.
+          No drafts in {draftStatusFilter} status.
         </div>
       )}
 
@@ -130,7 +130,7 @@ export default function AdminNotificationTemplateDraftReviewPage() {
                   )}
                 </div>
                 <div className="text-xs text-gray-500">
-                  submittedBy #{d.submittedBy} · {new Date(d.submittedAt).toLocaleString('ko-KR')}
+                  submittedBy #{d.submittedBy} · {new Date(d.submittedAt).toLocaleString('en-SG')}
                 </div>
               </div>
               {draftStatusFilter === 'PENDING' && (
@@ -152,7 +152,7 @@ export default function AdminNotificationTemplateDraftReviewPage() {
             </div>
             {d.submissionNote && (
               <div className="text-sm bg-amber-50 px-3 py-2 rounded mb-3 text-amber-900">
-                <span className="font-medium">제출 사유: </span>
+                <span className="font-medium">Submission reason: </span>
                 {d.submissionNote}
               </div>
             )}
@@ -170,7 +170,7 @@ export default function AdminNotificationTemplateDraftReviewPage() {
             </div>
             {d.reviewNote && (
               <div className="mt-2 text-xs text-gray-600">
-                <span className="font-medium">리뷰 노트: </span>
+                <span className="font-medium">Review note: </span>
                 {d.reviewNote}
               </div>
             )}

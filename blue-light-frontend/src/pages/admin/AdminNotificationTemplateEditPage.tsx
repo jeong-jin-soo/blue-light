@@ -83,9 +83,9 @@ export default function AdminNotificationTemplateEditPage() {
     }
   }, [current]);
 
-  if (currentLoading) return <div className="p-6">로딩 중...</div>;
+  if (currentLoading) return <div className="p-6">Loading...</div>;
   if (currentError) return <div className="p-6 text-red-600">{currentError}</div>;
-  if (!current) return <div className="p-6 text-gray-500">템플릿을 찾을 수 없습니다.</div>;
+  if (!current) return <div className="p-6 text-gray-500">Template not found.</div>;
 
   const catalogEntry: CatalogEntry | undefined = catalog.find(
     (c) => c.templateCode === current.templateCode
@@ -117,7 +117,7 @@ export default function AdminNotificationTemplateEditPage() {
       };
       const draft = await api.createDraft(request);
       setSuccessMessage(
-        `Draft #${draft.draftSeq} 생성됨. SYSTEM_ADMIN 승인 후 publish 됩니다.`
+        `Draft #${draft.draftSeq} created. Will be published after ADMIN/SYSTEM_ADMIN approval.`
       );
     } catch (e) {
       handleApiError(e, setLintErrors, setGenericError);
@@ -138,10 +138,10 @@ export default function AdminNotificationTemplateEditPage() {
     if (reasonRequired) {
       const minLength = current.category === 'SECURITY' ? 50 : 1;
       reason = window.prompt(
-        `${current.category} 카테고리 disable — 사유를 입력하세요 (${minLength}자 이상):`
+        `Disable ${current.category} category — enter a reason (at least ${minLength} characters):`
       );
       if (!reason || reason.length < minLength) {
-        setGenericError(`사유가 ${minLength}자 이상이어야 합니다.`);
+        setGenericError(`Reason must be at least ${minLength} characters.`);
         return;
       }
     }
@@ -151,7 +151,7 @@ export default function AdminNotificationTemplateEditPage() {
       } else {
         await api.disableTemplate(current.templateSeq, reason ?? '');
       }
-      setSuccessMessage(enable ? '활성화 완료' : '비활성화 완료');
+      setSuccessMessage(enable ? 'Enabled' : 'Disabled');
       await loadTemplate(current.templateSeq);
     } catch (e) {
       handleApiError(e, setLintErrors, setGenericError);
@@ -164,7 +164,7 @@ export default function AdminNotificationTemplateEditPage() {
       const result = await api.previewTemplate(current.templateSeq, previewPayload);
       setPreviewResult(result);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '미리보기 실패';
+      const msg = e instanceof Error ? e.message : 'Preview failed';
       setPreviewResult(null);
       setGenericError(msg);
     } finally {
@@ -177,16 +177,16 @@ export default function AdminNotificationTemplateEditPage() {
     try {
       const result = await api.testSendTemplate(current.templateSeq, previewPayload);
       setTestSendStatus(
-        `테스트 발송 완료. outbox #${result.outboxSeq} · 오늘 ${result.dailyQuotaUsed}/${result.dailyQuotaMax} 사용.`
+        `Test send complete. outbox #${result.outboxSeq} · ${result.dailyQuotaUsed}/${result.dailyQuotaMax} used today.`
       );
     } catch (e) {
       const err = e as AxiosError<{ code?: string; message?: string }>;
       if (err.response?.status === 429) {
-        setTestSendStatus(`한도 초과: ${err.response.data.message ?? ''}`);
+        setTestSendStatus(`Quota exceeded: ${err.response.data.message ?? ''}`);
       } else if (err.response?.status === 400) {
-        setTestSendStatus(`불가: ${err.response.data.message ?? ''}`);
+        setTestSendStatus(`Not allowed: ${err.response.data.message ?? ''}`);
       } else {
-        setTestSendStatus(`발송 실패: ${err.message}`);
+        setTestSendStatus(`Send failed: ${err.message}`);
       }
     }
   };
@@ -195,7 +195,7 @@ export default function AdminNotificationTemplateEditPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-4">
         <button onClick={() => navigate(-1)} className="text-sm text-gray-600 hover:underline">
-          ← 목록으로
+          ← Back to list
         </button>
       </div>
 
@@ -206,7 +206,7 @@ export default function AdminNotificationTemplateEditPage() {
             <span className="text-red-600 text-sm font-medium">★ Critical</span>
           )}
           {!current.enabled && (
-            <span className="px-2 py-0.5 text-xs bg-gray-200 rounded">비활성</span>
+            <span className="px-2 py-0.5 text-xs bg-gray-200 rounded">Inactive</span>
           )}
         </div>
         <div className="text-sm text-gray-500">
@@ -235,7 +235,7 @@ export default function AdminNotificationTemplateEditPage() {
       )}
       {lintErrors.length > 0 && (
         <div className="bg-red-50 border border-red-200 px-4 py-3 rounded mb-4">
-          <div className="font-medium text-red-900 mb-2">Lint 차단 — {lintErrors.length} 개 오류</div>
+          <div className="font-medium text-red-900 mb-2">Lint blocked — {lintErrors.length} error(s)</div>
           <ul className="space-y-1 text-sm">
             {lintErrors.map((e, idx) => (
               <li key={idx} className="text-red-700">
@@ -250,7 +250,7 @@ export default function AdminNotificationTemplateEditPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 좌측: 편집 폼 */}
         <section className="bg-white border border-gray-200 rounded p-4 space-y-4">
-          <h2 className="font-semibold text-gray-900">편집</h2>
+          <h2 className="font-semibold text-gray-900">Edit</h2>
 
           {current.channel === 'EMAIL' && (
             <div>
@@ -274,7 +274,7 @@ export default function AdminNotificationTemplateEditPage() {
             />
             {current.channel === 'SMS' && (
               <div className="text-xs text-gray-500 mt-1">
-                현재 {body.length} 자 · 160자 이내 권장
+                Currently {body.length} characters · 160 characters or fewer recommended
               </div>
             )}
           </div>
@@ -287,7 +287,7 @@ export default function AdminNotificationTemplateEditPage() {
                 onChange={(e) => setCategory(e.target.value as NotificationCategory | '')}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
               >
-                <option value="">(미설정)</option>
+                <option value="">(not set)</option>
                 {[
                   'SECURITY',
                   'STATUS',
@@ -313,7 +313,7 @@ export default function AdminNotificationTemplateEditPage() {
                 onChange={(e) => setSeverity(e.target.value as NotificationSeverity | '')}
                 className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
               >
-                <option value="">(미설정)</option>
+                <option value="">(not set)</option>
                 <option value="CRITICAL">CRITICAL</option>
                 <option value="IMPORTANT">IMPORTANT</option>
                 <option value="INFORMATIONAL">INFORMATIONAL</option>
@@ -338,7 +338,7 @@ export default function AdminNotificationTemplateEditPage() {
           {current.channel === 'WHATSAPP' && (
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">
-                Provider Template Name (Meta 등록명)
+                Provider Template Name (Meta registered name)
               </label>
               <input
                 type="text"
@@ -351,7 +351,7 @@ export default function AdminNotificationTemplateEditPage() {
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Variables JSON 배열
+              Variables JSON array
             </label>
             <input
               type="text"
@@ -364,13 +364,13 @@ export default function AdminNotificationTemplateEditPage() {
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">
-              Submission Note (선택)
+              Submission Note (optional)
             </label>
             <input
               type="text"
               value={submissionNote}
               onChange={(e) => setSubmissionNote(e.target.value)}
-              placeholder="법무 요청 반영 / 오탈자 수정 등"
+              placeholder="e.g. Applied legal request / Typo fix"
               className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
             />
           </div>
@@ -381,13 +381,13 @@ export default function AdminNotificationTemplateEditPage() {
               disabled={saving || body.length === 0}
               className="px-4 py-2 text-sm bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50"
             >
-              {saving ? '제출 중...' : 'Draft 제출 (SA 승인 대기)'}
+              {saving ? 'Submitting...' : 'Submit Draft (awaiting SA approval)'}
             </button>
             <button
               onClick={() => setPreviewOpen(true)}
               className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
             >
-              미리보기
+              Preview
             </button>
           </div>
         </section>
@@ -395,15 +395,15 @@ export default function AdminNotificationTemplateEditPage() {
         {/* 우측: 메타 + 활성토글 + history */}
         <section className="space-y-4">
           <div className="bg-white border border-gray-200 rounded p-4">
-            <h2 className="font-semibold text-gray-900 mb-3">메타</h2>
+            <h2 className="font-semibold text-gray-900 mb-3">Metadata</h2>
             <dl className="text-sm space-y-2">
               <div className="flex justify-between">
-                <dt className="text-gray-600">상태</dt>
+                <dt className="text-gray-600">Status</dt>
                 <dd>
                   {current.enabled ? (
-                    <span className="text-emerald-700">● 활성</span>
+                    <span className="text-emerald-700">● Active</span>
                   ) : (
-                    <span className="text-gray-500">○ 비활성</span>
+                    <span className="text-gray-500">○ Inactive</span>
                   )}
                 </dd>
               </div>
@@ -412,15 +412,15 @@ export default function AdminNotificationTemplateEditPage() {
                 <dd className="font-mono">{current.version}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-600">최종 수정</dt>
-                <dd className="text-xs">{new Date(current.updatedAt).toLocaleString('ko-KR')}</dd>
+                <dt className="text-gray-600">Last modified</dt>
+                <dd className="text-xs">{new Date(current.updatedAt).toLocaleString('en-SG')}</dd>
               </div>
             </dl>
           </div>
 
           {/* 활성 토글 */}
           <div className="bg-white border border-gray-200 rounded p-4">
-            <h2 className="font-semibold text-gray-900 mb-3">활성 제어</h2>
+            <h2 className="font-semibold text-gray-900 mb-3">Activation Control</h2>
             {current.enabled ? (
               <button
                 onClick={() => handleEnableDisable(false)}
@@ -431,21 +431,21 @@ export default function AdminNotificationTemplateEditPage() {
                 }
                 className="w-full px-4 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50"
               >
-                비활성화
+                Disable
               </button>
             ) : (
               <button
                 onClick={() => handleEnableDisable(true)}
                 className="w-full px-4 py-2 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100"
               >
-                활성화
+                Enable
               </button>
             )}
             {(current.category === 'SECURITY' || current.category === 'PAYMENT') &&
               role !== 'SYSTEM_ADMIN' &&
               role !== 'ADMIN' && (
                 <p className="text-xs text-gray-500 mt-2">
-                  {current.category} 카테고리는 ADMIN/SYSTEM_ADMIN 만 비활성 가능 (H-S3).
+                  Only ADMIN/SYSTEM_ADMIN can disable the {current.category} category (H-S3).
                 </p>
               )}
           </div>
@@ -453,15 +453,15 @@ export default function AdminNotificationTemplateEditPage() {
           {/* 카탈로그 메타 (있을 때만) */}
           {catalogEntry && (
             <div className="bg-white border border-gray-200 rounded p-4">
-              <h2 className="font-semibold text-gray-900 mb-3">카탈로그 메타</h2>
+              <h2 className="font-semibold text-gray-900 mb-3">Catalog metadata</h2>
               <div className="text-sm space-y-1">
                 <div>
-                  <span className="text-gray-600">허용 변수:</span>{' '}
+                  <span className="text-gray-600">Allowed variables:</span>{' '}
                   <span className="font-mono text-xs">{allowedVariables.join(', ') || '-'}</span>
                 </div>
                 {catalogEntry.requiredTokensJson && (
                   <div>
-                    <span className="text-gray-600">강제 토큰:</span>{' '}
+                    <span className="text-gray-600">Required tokens:</span>{' '}
                     <span className="font-mono text-xs">
                       {safeParseStringArray(catalogEntry.requiredTokensJson).join(', ')}
                     </span>
@@ -493,12 +493,12 @@ export default function AdminNotificationTemplateEditPage() {
             <div className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Sample 변수 값
+                  Sample variable values
                 </label>
                 <div className="space-y-2">
                   {allowedVariables.length === 0 && (
                     <div className="text-xs text-gray-500">
-                      카탈로그·variables_json 가 비어있어 변수 슬롯 자동 검출 불가.
+                      Catalog and variables_json are empty, so variable slots cannot be auto-detected.
                     </div>
                   )}
                   {allowedVariables.map((key) => (
@@ -523,14 +523,14 @@ export default function AdminNotificationTemplateEditPage() {
                   disabled={previewLoading}
                   className="px-4 py-2 text-sm bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50"
                 >
-                  {previewLoading ? '렌더 중...' : '미리보기 실행'}
+                  {previewLoading ? 'Rendering...' : 'Run preview'}
                 </button>
                 {current.channel === 'EMAIL' && (
                   <button
                     onClick={handleTestSend}
                     className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
                   >
-                    내게 테스트 발송
+                    Test send to me
                   </button>
                 )}
               </div>
@@ -545,7 +545,7 @@ export default function AdminNotificationTemplateEditPage() {
                 <div className="border-t pt-4 space-y-3">
                   {previewResult.missingKeys.length > 0 && (
                     <div className="bg-amber-50 border border-amber-200 px-3 py-2 rounded text-sm text-amber-800">
-                      ⚠ 누락 변수: {previewResult.missingKeys.join(', ')}
+                      ⚠ Missing variables: {previewResult.missingKeys.join(', ')}
                     </div>
                   )}
                   {previewResult.warnings.length > 0 && (
@@ -570,7 +570,7 @@ export default function AdminNotificationTemplateEditPage() {
                   )}
                   <div>
                     <div className="text-xs font-medium text-gray-700 mb-1">
-                      Body ({previewResult.charCount} 자
+                      Body ({previewResult.charCount} chars
                       {previewResult.smsSegments != null
                         ? ` · ${previewResult.smsSegments} segment`
                         : ''}
@@ -615,10 +615,10 @@ function handleApiError(
       return;
     }
     const message =
-      (body as { message?: string })?.message ?? e.message ?? '요청 실패';
+      (body as { message?: string })?.message ?? e.message ?? 'Request failed';
     setGenericError(message);
   } else {
-    setGenericError(e instanceof Error ? e.message : '요청 실패');
+    setGenericError(e instanceof Error ? e.message : 'Request failed');
   }
 }
 
@@ -638,7 +638,7 @@ function MetricsBadge({
 }) {
   if (loading) {
     return (
-      <div className="mt-2 text-xs text-gray-400">지난 30일 통계 로딩 중…</div>
+      <div className="mt-2 text-xs text-gray-400">Loading last 30 days stats…</div>
     );
   }
   if (!metrics) return null;
@@ -647,7 +647,7 @@ function MetricsBadge({
   if (operationalTotal === 0 && metrics.totalSkipped === 0) {
     return (
       <div className="mt-2 text-xs text-gray-400">
-        지난 {metrics.days}일 동안 운영 발송 이력 없음
+        No operational sends in the last {metrics.days} days
       </div>
     );
   }
@@ -659,10 +659,10 @@ function MetricsBadge({
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
       <span className="text-gray-600">
-        지난 <strong className="font-semibold">{metrics.days}일</strong>
+        Last <strong className="font-semibold">{metrics.days} days</strong>
       </span>
       <span className="text-gray-700">
-        <strong className="font-semibold">{metrics.totalSent.toLocaleString()}</strong> 회 발송
+        <strong className="font-semibold">{metrics.totalSent.toLocaleString()}</strong> sent
       </span>
       <span
         className={
@@ -671,16 +671,16 @@ function MetricsBadge({
             : 'text-gray-600'
         }
       >
-        실패 {failurePct}% ({metrics.totalFailed.toLocaleString()}건)
+        Failure {failurePct}% ({metrics.totalFailed.toLocaleString()})
       </span>
       {metrics.totalSkipped > 0 && (
         <span className="text-gray-500">
-          가드 컷 {metrics.totalSkipped.toLocaleString()}건
+          Guard-cut {metrics.totalSkipped.toLocaleString()}
         </span>
       )}
       {warningAlert && (
         <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-          ⚠ 변수 누락 {metrics.renderWarnings.toLocaleString()}건
+          ⚠ Missing variables {metrics.renderWarnings.toLocaleString()}
         </span>
       )}
     </div>
