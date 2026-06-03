@@ -1,0 +1,49 @@
+name: One-off - Migrate dev notification schema
+
+# 일회성: dev RDS 의 notification_templates / notification_outbox 누락 컬럼 추가.
+# dev 는 SQL_INIT_MODE=never 라 schema.sql 미실행 → 신규 컬럼 ALTER 가 적용 안 됨.
+# 실행 후 이 워크플로 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-db-migrate-notif.yml'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: ALTER add missing columns
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            echo "DB: $MYSQL_HOST:${MYSQL_PORT:-3306}/$MYSQL_DATABASE"
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -e "
+                ALTER TABLE notification_templates
+                  ADD COLUMN version BIGINT NOT NULL DEFAULT 0,
+                  ADD COLUMN catalog_meta_key VARCHAR(60) NULL,
+                  ADD COLUMN category VARCHAR(30) NULL,
+                  ADD COLUMN severity VARCHAR(20) NULL,
+                  ADD COLUMN recipient_roles VARCHAR(200) NULL;
+                ALTER TABLE notification_outbox
+                  ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'PRODUCTION',
+                  ADD COLUMN is_test BOOLEAN NOT NULL DEFAULT FALSE,
+                  ADD COLUMN render_warnings_json TEXT NULL;
+                SELECT '### notification_templates AFTER ###' AS info;
+                SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='notification_templates' ORDER BY ordinal_position;
+                SELECT '### notification_outbox AFTER ###' AS info;
+                SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='notification_outbox' ORDER BY ordinal_position;
+              "
