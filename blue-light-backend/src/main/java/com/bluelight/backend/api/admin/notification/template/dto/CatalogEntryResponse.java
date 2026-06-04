@@ -15,7 +15,8 @@ public record CatalogEntryResponse(
         NotificationSeverity defaultSeverity,
         String defaultRecipientRoles,
         String description,
-        String requiredTokensJson
+        String requiredTokensJson,
+        String triggerRef
 ) {
     public static CatalogEntryResponse from(NotificationCatalog c) {
         return new CatalogEntryResponse(
@@ -26,7 +27,8 @@ public record CatalogEntryResponse(
                 c.getDefaultSeverity(),
                 c.getDefaultRecipientRoles(),
                 c.getDescription(),
-                c.getRequiredTokensJson()
+                c.getRequiredTokensJson(),
+                c.getTriggerRef()
         );
     }
 }

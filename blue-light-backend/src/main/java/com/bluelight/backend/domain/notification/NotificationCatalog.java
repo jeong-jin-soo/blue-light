@@ -72,6 +72,14 @@ public class NotificationCatalog extends BaseEntity {
     private String description;
 
     /**
+     * 발송 트리거 — 이 코드를 발화하는 기능/호출부. Admin UI 가 "어느 기능이 이 템플릿을 쏘는지"
+     * 표시하는 데 사용한다. 카피북(notification-copy-templates.en.md) 각 카드의 {@code Trigger}
+     * 필드가 SSOT. 예: {@code AdminPaymentService.confirmPayment}.
+     */
+    @Column(name = "trigger_ref", length = 255)
+    private String triggerRef;
+
+    /**
      * 카테고리별 강제 토큰 JSON 배열 — lint L4/L7 검증 대상.
      * 예: PAYMENT 카테고리는 {@code ["{{paynowUen}}","{{paynowReference}}"]},
      * MARKETING 은 {@code ["{{optOutUrl}}"]}.
@@ -86,7 +94,8 @@ public class NotificationCatalog extends BaseEntity {
                                NotificationSeverity defaultSeverity,
                                String defaultRecipientRoles,
                                String description,
-                               String requiredTokensJson) {
+                               String requiredTokensJson,
+                               String triggerRef) {
         this.templateCode = templateCode;
         this.allowedVariablesJson = allowedVariablesJson;
         this.defaultCategory = defaultCategory;
@@ -94,6 +103,7 @@ public class NotificationCatalog extends BaseEntity {
         this.defaultRecipientRoles = defaultRecipientRoles;
         this.description = description;
         this.requiredTokensJson = requiredTokensJson;
+        this.triggerRef = triggerRef;
     }
 
     /** Admin UI 에서 카탈로그 정의를 수정할 때 사용. (실제 템플릿 본문은 별도 publish 워크플로) */
@@ -102,12 +112,14 @@ public class NotificationCatalog extends BaseEntity {
                                NotificationSeverity defaultSeverity,
                                String defaultRecipientRoles,
                                String description,
-                               String requiredTokensJson) {
+                               String requiredTokensJson,
+                               String triggerRef) {
         this.allowedVariablesJson = allowedVariablesJson;
         this.defaultCategory = defaultCategory;
         this.defaultSeverity = defaultSeverity;
         this.defaultRecipientRoles = defaultRecipientRoles;
         this.description = description;
         this.requiredTokensJson = requiredTokensJson;
+        this.triggerRef = triggerRef;
     }
 }

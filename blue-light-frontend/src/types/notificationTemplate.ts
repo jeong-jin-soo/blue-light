@@ -89,6 +89,8 @@ export interface CatalogEntry {
   defaultRecipientRoles: string;
   description: string | null;
   requiredTokensJson: string | null;
+  /** 발송 트리거(기능/호출부) — 예: 'AdminPaymentService.confirmPayment'. */
+  triggerRef: string | null;
 }
 
 export interface HistoryItem {

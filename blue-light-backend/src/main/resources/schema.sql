@@ -1396,6 +1396,7 @@ CREATE TABLE IF NOT EXISTS notification_catalog (
     default_recipient_roles   VARCHAR(200) NOT NULL,   -- 'APPLICANT,LEW' comma-separated
     description               VARCHAR(500),
     required_tokens_json      TEXT,                    -- ["{{paynowUen}}","{{optOutUrl}}"] 카테고리별 강제
+    trigger_ref               VARCHAR(255),            -- 발송 트리거(기능/호출부) — 예: 'AdminPaymentService.confirmPayment'
     created_at                DATETIME(6),
     updated_at                DATETIME(6),
     created_by                BIGINT,
@@ -1404,6 +1405,8 @@ CREATE TABLE IF NOT EXISTS notification_catalog (
     PRIMARY KEY (catalog_seq),
     UNIQUE KEY uk_notif_catalog_code (template_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- 기존 DB(운영/dev RDS) 적용 가이드 — trigger_ref 컬럼 ★ 1회만 ★ 수동 실행:
+--   ALTER TABLE notification_catalog ADD COLUMN trigger_ref VARCHAR(255);
 
 -- 23. 알림 템플릿 Draft — 2-step publish 워크플로 staging row.
 -- NM 이 편집·submit → SYSTEM_ADMIN approve → 본 테이블(notification_templates) 반영.

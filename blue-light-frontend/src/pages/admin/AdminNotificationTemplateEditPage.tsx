@@ -225,6 +225,15 @@ export default function AdminNotificationTemplateEditPage() {
             </>
           )}
         </div>
+        {/* 발송 트리거 — 어느 기능이 이 템플릿을 발화하는지 표시 */}
+        {catalogEntry?.triggerRef && (
+          <div className="mt-1 text-xs text-gray-500">
+            <span className="font-medium text-gray-600">Triggered by:</span>{' '}
+            <code className="px-1 py-0.5 bg-gray-100 rounded text-gray-700">
+              {catalogEntry.triggerRef}
+            </code>
+          </div>
+        )}
         {/* PR-T7 P1 — 지난 30일 발송 메트릭스 인라인 배지 */}
         <MetricsBadge metrics={metrics} loading={metricsLoading} />
       </header>

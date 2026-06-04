@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
@@ -98,19 +99,30 @@ public class AdminPaymentService {
         // ★ PR-0E (카나리): 신청자에게 결제 확인 알림 — NotificationOrchestrator 경유.
         // 기존 emailService.sendPaymentConfirmEmail 직접 호출을 대체. 채널(이메일+인앱)·언어·옵트인 가드는
         // PreferenceResolver 가 사용자 컨텍스트로 결정. AFTER_COMMIT 단계에서 outbox 적재 + 비동기 발송.
+        // ★ PR-W0 (결정 #1): template_code 를 카탈로그 코드 A-20 으로 정합화. payload 키는 카피북
+        // A-20 변수명에 맞춘다 — Application 은 publicCode 가 없으므로 applicationSeq 를 슬롯에 매핑.
         User applicant = application.getUser();
         BigDecimal amount = savedPayment.getAmount();
+        User assignedLew = application.getAssignedLew();
+        String lewName = assignedLew != null
+                ? assignedLew.getFirstName() + " " + assignedLew.getLastName()
+                : "your assigned LEW";
+        LocalDateTime paidAt = savedPayment.getPaidAt() != null
+                ? savedPayment.getPaidAt() : LocalDateTime.now();
+        String paidAtDisplay = paidAt.format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
         eventPublisher.publishEvent(new NotificationDispatchEvent(
                 "PAYMENT_CONFIRMED",
                 applicant.getUserSeq(),
                 "APPLICATION",
                 applicationSeq,
-                "PAYMENT_CONFIRMED_APPLICANT",
+                "A-20",
                 Map.of(
                         "applicantName", applicant.getFirstName() + " " + applicant.getLastName(),
-                        "applicationSeq", String.valueOf(applicationSeq),
-                        "address", application.getAddress(),
-                        "amount", amount == null ? "" : amount.toPlainString()
+                        "publicCode", String.valueOf(applicationSeq),
+                        "amount", amount == null ? "" : amount.toPlainString(),
+                        "paidAtDisplay", paidAtDisplay,
+                        "lewName", lewName,
+                        "ctaUrl", "/applications/" + applicationSeq
                 )));
 
         // ★ PR4: 배정된 LEW 에게 인앱 알림 + 이메일 발송은 LewPaymentNotificationListener 가

@@ -179,31 +179,61 @@ ON DUPLICATE KEY UPDATE
     updated_at        = NOW();
 
 -- ============================================
--- PR-0E (카나리): 알림 템플릿 시드 — PAYMENT_CONFIRMED_APPLICANT (인앱 + 이메일, en)
--- AdminPaymentService.confirmPayment 가 NotificationDispatchEvent publish → Orchestrator 가
--- 본 템플릿을 (channel, locale) 매칭해서 render → 어댑터가 외부 발송.
--- 변수: {{applicantName}} {{applicationSeq}} {{address}} {{amount}}
+-- PR-W0: 알림 발송 본문 시드 (notification_templates)
+-- 카탈로그 코드(A-NN) = template_code (결정 #1). 변수명 = payload 키 — 호출부가 도메인 데이터를
+-- 카피북 변수 슬롯에 매핑한다(예: Application 은 publicCode 가 없으므로 applicationSeq 를
+-- "publicCode" 키로 전달). 렌더러는 footer 자동주입 없음 → 본문은 자기완결형 HTML.
+-- 본문 SSOT: doc/Project Analysis/notification-copy-templates.en.md
+-- 생성: scripts/seed_notification_templates.py  (A-20 카나리는 결제 payload 정렬 위해 수기 관리)
 -- ============================================
+
+-- 카나리 코드 정합화(결정 #1): 구 PAYMENT_CONFIRMED_APPLICANT → A-20 hard-replace. 구 row 제거.
+-- data.sql 은 매 부팅 재실행되므로(SQL_INIT_MODE=always) dev RDS 도 다음 배포 시 자동 정리됨.
+DELETE FROM notification_templates WHERE template_code = 'PAYMENT_CONFIRMED_APPLICANT';
+
+-- A-20 Payment confirmed (PAID) — AdminPaymentService.confirmPayment
+-- 변수: {{applicantName}} {{publicCode}} {{amount}} {{paidAtDisplay}} {{lewName}} {{ctaUrl}}
 INSERT INTO notification_templates
-    (template_code,                  channel,   locale, provider_template_name, subject,                                                body_text,                                                                                                                                                                                                            variables_json,                                                          enabled, created_at, updated_at)
+    (template_code, channel, locale, provider_template_name, subject, body_text,
+     variables_json, catalog_meta_key, category, severity, recipient_roles, enabled,
+     created_at, updated_at)
 VALUES
-    ('PAYMENT_CONFIRMED_APPLICANT',  'IN_APP',  'en',   NULL,
-     'Payment received — APP-{{applicationSeq}}',
-     'Your payment of S${{amount}} for application #{{applicationSeq}} ({{address}}) has been confirmed. We''ll start preparing your installation next.',
-     '["applicantName","applicationSeq","address","amount"]',
-     TRUE, NOW(), NOW()),
-    ('PAYMENT_CONFIRMED_APPLICANT',  'EMAIL',   'en',   NULL,
-     'Payment received — Application #{{applicationSeq}} — LicenseKaki',
-     '<!DOCTYPE html><html><body style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5"><p>Dear {{applicantName}},</p><p>We have received your payment of <strong>S${{amount}}</strong> for application <strong>#{{applicationSeq}}</strong> ({{address}}).</p><p>Your installation will be scheduled with your assigned LEW shortly. You will receive a follow-up notification once a visit date is confirmed.</p><p>Thank you for choosing LicenseKaki.</p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="font-size:12px;color:#888">This is an automated message from LicenseKaki. Please do not reply.</p></body></html>',
-     '["applicantName","applicationSeq","address","amount"]',
-     TRUE, NOW(), NOW())
+    ('A-20', 'IN_APP', 'en', NULL, 'Payment confirmed on #{{publicCode}}',
+     'SGD {{amount}} received. {{lewName}} will start work shortly.',
+     '["applicantName","publicCode","amount","paidAtDisplay","lewName","ctaUrl"]',
+     'A-20', 'PAYMENT', 'IMPORTANT', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-20', 'EMAIL', 'en', NULL, '[LicenseKaki] Payment received · #{{publicCode}}',
+     '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px"><div style="border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F766E">LicenseKaki</span><br><span style="font-size:12px;color:#888">Singapore Electrical Installation Licence Platform</span></div><h1 style="font-size:20px;margin:0 0 16px">Payment received. Work is starting.</h1><p style="margin:0 0 16px">Hello {{applicantName}},</p><p style="margin:0 0 16px">We''ve received your PayNow payment of <strong>SGD {{amount}}</strong> for application <strong>#{{publicCode}}</strong> on <strong>{{paidAtDisplay}}</strong>. Thank you.</p><p style="margin:0 0 16px">Your reviewer <strong>{{lewName}}</strong> will now coordinate the work and submit the licence to authorities. We''ll keep you posted as the status changes.</p><p style="margin:24px 0"><a href="{{ctaUrl}}" style="display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">View application</a></p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="margin:0;font-size:12px;color:#888">This is a transactional email from LicenseKaki. You are receiving it because your payment was confirmed.</p><p style="margin:8px 0 0;font-size:12px;color:#888">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email. Verify any link before clicking.</p><p style="margin:8px 0 0;font-size:12px;color:#888">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>',
+     '["applicantName","publicCode","amount","paidAtDisplay","lewName","ctaUrl"]',
+     'A-20', 'PAYMENT', 'IMPORTANT', 'APPLICANT', TRUE, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
-    provider_template_name = VALUES(provider_template_name),
-    subject                = VALUES(subject),
-    body_text              = VALUES(body_text),
-    variables_json         = VALUES(variables_json),
-    enabled                = VALUES(enabled),
-    updated_at             = NOW();
+    subject = VALUES(subject), body_text = VALUES(body_text),
+    variables_json = VALUES(variables_json), catalog_meta_key = VALUES(catalog_meta_key),
+    category = VALUES(category), severity = VALUES(severity),
+    recipient_roles = VALUES(recipient_roles), enabled = VALUES(enabled),
+    deleted_at = NULL, updated_at = NOW();
+
+-- W1 대상 본문 (A-10/A-15/A-17/A-22) — PR-W1 이 호출부를 이벤트로 이관할 때 소비.
+-- 생성: python3 scripts/seed_notification_templates.py --codes A-10,A-15,A-17,A-22
+INSERT INTO notification_templates
+    (template_code, channel, locale, provider_template_name, subject, body_text,
+     variables_json, catalog_meta_key, category, severity, recipient_roles, enabled,
+     created_at, updated_at)
+VALUES
+    ('A-10', 'EMAIL', 'en', NULL, '[LicenseKaki] Your reviewer has been assigned · #{{publicCode}}', '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px"><div style="border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F766E">LicenseKaki</span><br><span style="font-size:12px;color:#888">Singapore Electrical Installation Licence Platform</span></div><h1 style="font-size:20px;margin:0 0 16px">Your Licensed Electrical Worker is on the case.</h1><p style="margin:0 0 16px">Hello {{applicantName}},</p><p style="margin:0 0 16px">Good news — <strong>{{lewName}}</strong> ({{lewGradeLabel}}) has been assigned as the Licensed Electrical Worker (LEW) for application <strong>#{{publicCode}}</strong>.</p><p style="margin:0 0 16px"><strong>What happens next</strong>: {{expectedNextStepText}}. You''ll be notified each time the status changes — there''s nothing for you to do right now.</p><p style="margin:24px 0"><a href="{{ctaUrl}}" style="display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">View application</a></p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="margin:0;font-size:12px;color:#888">This is a transactional email from LicenseKaki. You are receiving it because a reviewer was assigned to your application.</p><p style="margin:8px 0 0;font-size:12px;color:#888">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>', '["applicantName","publicCode","lewName","lewGradeLabel","expectedNextStepText","ctaUrl"]', 'A-10', 'STATUS', 'IMPORTANT', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-10', 'IN_APP', 'en', NULL, 'Reviewer assigned: {{lewName}}', 'Your LEW will review #{{publicCode}} within the next 48 hours.', '["applicantName","publicCode","lewName","lewGradeLabel","expectedNextStepText","ctaUrl"]', 'A-10', 'STATUS', 'IMPORTANT', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-15', 'EMAIL', 'en', NULL, '[LicenseKaki] Your application needs a revision · #{{publicCode}}', '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px"><div style="border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F766E">LicenseKaki</span><br><span style="font-size:12px;color:#888">Singapore Electrical Installation Licence Platform</span></div><h1 style="font-size:20px;margin:0 0 16px">Your reviewer requested a revision.</h1><p style="margin:0 0 16px">Hello {{applicantName}},</p><p style="margin:0 0 16px">Your Licensed Electrical Worker has reviewed application <strong>#{{publicCode}}</strong> and asked for revisions before approval. Their notes:</p><blockquote style="margin:0 0 16px;padding:8px 16px;border-left:3px solid #ccc;color:#555">{{revisionNotes}}</blockquote><p style="margin:0 0 16px">Please make the changes and resubmit by <strong>{{deadline}}</strong> to avoid auto-cancellation on D+7.</p><p style="margin:24px 0"><a href="{{ctaUrl}}" style="display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Edit my application</a></p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="margin:0;font-size:12px;color:#888">This is a transactional email from LicenseKaki. You are receiving it because your reviewer requested changes to your application.</p><p style="margin:8px 0 0;font-size:12px;color:#888">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>', '["applicantName","publicCode","revisionNotes","deadline","ctaUrl"]', 'A-15', 'STATUS', 'CRITICAL', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-15', 'IN_APP', 'en', NULL, 'Revision requested on #{{publicCode}}', 'Make the requested changes by {{deadline}} to keep your application active.', '["applicantName","publicCode","revisionNotes","deadline","ctaUrl"]', 'A-15', 'STATUS', 'CRITICAL', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-17', 'EMAIL', 'en', NULL, '[LicenseKaki] Payment requested · #{{publicCode}}', '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px"><div style="border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F766E">LicenseKaki</span><br><span style="font-size:12px;color:#888">Singapore Electrical Installation Licence Platform</span></div><h1 style="font-size:20px;margin:0 0 16px">Your application is approved. Please complete payment to start work.</h1><p style="margin:0 0 16px">Hello {{applicantName}},</p><p style="margin:0 0 16px">Good news — your Licensed Electrical Worker has confirmed the scope of work for application <strong>#{{publicCode}}</strong> ({{kvaLabel}}). To begin the work, please settle the payment below by <strong>{{deadline}}</strong>.</p><p style="margin:0 0 16px"><strong>Amount due</strong>: SGD {{amount}}<br><strong>PayNow UEN</strong>: {{paynowUen}}<br><strong>Payee name</strong>: {{paynowAccountName}}<br><strong>Reference (must include)</strong>: {{paynowReference}}</p><p style="margin:0 0 16px">Including the reference code lets us match your payment automatically — usually within 1 business hour.</p><p style="margin:24px 0"><a href="{{ctaUrl}}" style="display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">Pay via PayNow</a></p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="margin:0;font-size:12px;color:#888">This is a transactional email from LicenseKaki. You are receiving it because your application is awaiting payment.</p><p style="margin:8px 0 0;font-size:12px;color:#888">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email. Verify any link before clicking.</p><p style="margin:8px 0 0;font-size:12px;color:#888">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>', '["applicantName","publicCode","kvaLabel","amount","paynowUen","paynowAccountName","paynowReference","deadline","ctaUrl"]', 'A-17', 'PAYMENT', 'CRITICAL', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-17', 'IN_APP', 'en', NULL, 'Payment requested on #{{publicCode}}', 'Pay SGD {{amount}} via PayNow by {{deadline}} to start work.', '["applicantName","publicCode","kvaLabel","amount","paynowUen","paynowAccountName","paynowReference","deadline","ctaUrl"]', 'A-17', 'PAYMENT', 'CRITICAL', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-22', 'EMAIL', 'en', NULL, '[LicenseKaki] Your installation licence has been issued · #{{publicCode}}', '<div style="font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px"><div style="border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px"><span style="font-size:18px;font-weight:700;color:#0F766E">LicenseKaki</span><br><span style="font-size:12px;color:#888">Singapore Electrical Installation Licence Platform</span></div><h1 style="font-size:20px;margin:0 0 16px">Congratulations — your installation licence is live.</h1><p style="margin:0 0 16px">Hello {{applicantName}},</p><p style="margin:0 0 16px">Your electrical installation licence has been issued by the Energy Market Authority.</p><p style="margin:0 0 16px"><strong>Licence number</strong>: {{licenceNumber}}<br><strong>Valid until</strong>: {{licenceExpiryDate}}</p><p style="margin:0 0 16px">A signed PDF is available in your dashboard for your records. We''ll send renewal reminders 90, 60, 30, and 7 days before expiry — no need to set a calendar reminder.</p><p style="margin:24px 0"><a href="{{ctaUrl}}" style="display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600">View licence</a></p><hr style="border:none;border-top:1px solid #ddd;margin:24px 0"><p style="margin:0;font-size:12px;color:#888">This is a transactional email from LicenseKaki. You are receiving it because your installation licence has been issued.</p><p style="margin:8px 0 0;font-size:12px;color:#888">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>', '["applicantName","publicCode","licenceNumber","licenceExpiryDate","ctaUrl","shortUrl","licencePdfUrl"]', 'A-22', 'STATUS', 'CRITICAL', 'APPLICANT', TRUE, NOW(), NOW()),
+    ('A-22', 'IN_APP', 'en', NULL, 'Licence issued for #{{publicCode}}', 'Valid until {{licenceExpiryDate}}. View or download your licence PDF.', '["applicantName","publicCode","licenceNumber","licenceExpiryDate","ctaUrl","shortUrl","licencePdfUrl"]', 'A-22', 'STATUS', 'CRITICAL', 'APPLICANT', TRUE, NOW(), NOW())
+ON DUPLICATE KEY UPDATE
+    subject = VALUES(subject), body_text = VALUES(body_text),
+    variables_json = VALUES(variables_json), catalog_meta_key = VALUES(catalog_meta_key),
+    category = VALUES(category), severity = VALUES(severity),
+    recipient_roles = VALUES(recipient_roles), enabled = VALUES(enabled),
+    deleted_at = NULL, updated_at = NOW();
 
 -- ============================================
 -- notification_catalog 카탈로그 메타 sample 시드 (PR-T5)
@@ -212,40 +242,41 @@ ON DUPLICATE KEY UPDATE
 -- 풀 97종 시드는 다음으로 생성하여 운영/CI 에 별도 실행:
 --   $ python3 scripts/import_notification_copy.py > /tmp/catalog_seed.sql
 --   $ mysql -h <host> -u <user> -p bluelight < /tmp/catalog_seed.sql
--- 여기는 로컬 개발 시 Lint L1(변수 화이트리스트)이 즉시 동작하도록
--- 대표 5종만 시드. WHERE NOT EXISTS 가드로 멱등 보장.
+-- 로컬 개발 시 Lint L1(변수 화이트리스트) + Admin UI 트리거 표시가 즉시 동작하도록 대표 코드 시드.
+-- trigger_ref = 발송 트리거(기능/호출부) — 카피북 각 카드 Trigger 필드. Admin Edit 화면에 표시.
+-- ON DUPLICATE KEY UPDATE 로 기존 row 의 trigger_ref 도 백필. 풀 카탈로그는 import_notification_copy.py.
 -- ============================================
 INSERT INTO notification_catalog
     (template_code, allowed_variables_json, default_category, default_severity,
-     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
-SELECT 'A-04', '["applicantName","changedAtDisplay","requestIp","supportUrl"]',
-       'SECURITY', 'CRITICAL', 'APPLICANT', 'Password change confirmation', '[]', NOW(6), NOW(6)
-WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'A-04');
-
-INSERT INTO notification_catalog
-    (template_code, allowed_variables_json, default_category, default_severity,
-     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
-SELECT 'A-17', '["applicantName","publicCode","kvaLabel","amount","deadline","ctaUrl"]',
-       'PAYMENT', 'CRITICAL', 'APPLICANT', 'Payment requested (PENDING_PAYMENT)', '[]', NOW(6), NOW(6)
-WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'A-17');
-
-INSERT INTO notification_catalog
-    (template_code, allowed_variables_json, default_category, default_severity,
-     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
-SELECT 'A-22', '["applicantName","publicCode","licenceNumber","licenceExpiryDate","ctaUrl"]',
-       'STATUS', 'CRITICAL', 'APPLICANT', 'Licence issued (COMPLETED)', '[]', NOW(6), NOW(6)
-WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'A-22');
-
-INSERT INTO notification_catalog
-    (template_code, allowed_variables_json, default_category, default_severity,
-     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
-SELECT 'L-01', '["lewName","ctaUrl"]',
-       'STATUS', 'CRITICAL', 'LEW', 'LEW signup approved', '[]', NOW(6), NOW(6)
-WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'L-01');
-
-INSERT INTO notification_catalog
-    (template_code, allowed_variables_json, default_category, default_severity,
-     default_recipient_roles, description, required_tokens_json, created_at, updated_at)
-SELECT 'M-01', '["publicCode","kvaLabel"]',
-       'OPS', 'IMPORTANT', 'ADMIN', 'New application received', '[]', NOW(6), NOW(6)
-WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = 'M-01');
+     default_recipient_roles, description, required_tokens_json, trigger_ref, created_at, updated_at)
+VALUES
+    ('A-04', '["applicantName","changedAtDisplay","requestIp","supportUrl"]',
+     'SECURITY', 'CRITICAL', 'APPLICANT', 'Password change confirmation', '[]',
+     'AuthService.resetPassword', NOW(6), NOW(6)),
+    ('A-10', '["applicantName","publicCode","lewName","lewGradeLabel","expectedNextStepText","ctaUrl"]',
+     'STATUS', 'IMPORTANT', 'APPLICANT', 'LEW assigned', '[]',
+     'AdminLewService.assignLew', NOW(6), NOW(6)),
+    ('A-15', '["applicantName","publicCode","revisionNotes","deadline","ctaUrl"]',
+     'STATUS', 'CRITICAL', 'APPLICANT', 'Revision requested (REVISION_REQUESTED)', '[]',
+     'AdminApplicationService.requestRevision', NOW(6), NOW(6)),
+    ('A-17', '["applicantName","publicCode","kvaLabel","amount","paynowUen","paynowAccountName","paynowReference","deadline","ctaUrl"]',
+     'PAYMENT', 'CRITICAL', 'APPLICANT', 'Payment requested (PENDING_PAYMENT)', '[]',
+     'AdminApplicationService.approveForPayment', NOW(6), NOW(6)),
+    ('A-20', '["applicantName","publicCode","amount","paidAtDisplay","lewName","ctaUrl"]',
+     'PAYMENT', 'IMPORTANT', 'APPLICANT', 'Payment confirmed (PAID)', '[]',
+     'AdminPaymentService.confirmPayment', NOW(6), NOW(6)),
+    ('A-22', '["applicantName","publicCode","licenceNumber","licenceExpiryDate","ctaUrl","shortUrl","licencePdfUrl"]',
+     'STATUS', 'CRITICAL', 'APPLICANT', 'Licence issued (COMPLETED)', '[]',
+     'AdminApplicationService.completeApplication', NOW(6), NOW(6)),
+    ('L-01', '["lewName","ctaUrl"]',
+     'STATUS', 'CRITICAL', 'LEW', 'LEW signup approved', '[]',
+     'AdminUserController.approveLew', NOW(6), NOW(6)),
+    ('M-01', '["publicCode","kvaLabel"]',
+     'OPS', 'IMPORTANT', 'ADMIN', 'New application received', '[]',
+     'ApplicationService.createApplication', NOW(6), NOW(6))
+ON DUPLICATE KEY UPDATE
+    allowed_variables_json = VALUES(allowed_variables_json),
+    default_category = VALUES(default_category), default_severity = VALUES(default_severity),
+    default_recipient_roles = VALUES(default_recipient_roles), description = VALUES(description),
+    required_tokens_json = VALUES(required_tokens_json), trigger_ref = VALUES(trigger_ref),
+    updated_at = NOW(6);

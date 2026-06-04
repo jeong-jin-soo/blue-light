@@ -117,11 +117,14 @@ class AdminPaymentServiceEventTest {
         assertThat(applicantDispatch.recipientUserSeq()).isEqualTo(7L);
         assertThat(applicantDispatch.referenceType()).isEqualTo("APPLICATION");
         assertThat(applicantDispatch.referenceId()).isEqualTo(1L);
-        assertThat(applicantDispatch.templateCode()).isEqualTo("PAYMENT_CONFIRMED_APPLICANT");
+        // PR-W0 (결정 #1): 카탈로그 코드 A-20 으로 정합화 + payload 키를 카피북 변수명에 맞춤.
+        assertThat(applicantDispatch.templateCode()).isEqualTo("A-20");
         assertThat(applicantDispatch.payload())
                 .containsEntry("applicantName", "A B")
-                .containsEntry("applicationSeq", "1")
-                .containsEntry("address", "123 Orchard")
-                .containsEntry("amount", "1500.00");
+                .containsEntry("publicCode", "1")
+                .containsEntry("amount", "1500.00")
+                .containsEntry("lewName", "your assigned LEW")
+                .containsEntry("ctaUrl", "/applications/1")
+                .containsKey("paidAtDisplay");
     }
 }

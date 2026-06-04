@@ -155,12 +155,34 @@ class CatalogRow:
     recipient_roles: str
     allowed_variables: list[str]
     required_tokens: list[str]
+    trigger_ref: str = ""  # 발송 트리거(기능/호출부) — 카피북 Trigger 필드
 
 
 # 카탈로그 표 한 row 예: "| A-01 | 회원가입 → 이메일 인증 요청 | 가입 직후 | ..."
 ROW_PATTERN = re.compile(
     r"^\|\s*(?P<code>[A-Z]-\d{2})\s*\|\s*(?P<event>[^|]+?)\s*\|"
 )
+
+# 카피북(본문) 위치 — 카드별 Trigger 필드를 trigger_ref 로 사용.
+COPYBOOK_MD = Path("doc/Project Analysis/notification-copy-templates.en.md")
+_CARD_HDR = re.compile(r"^####\s+([A-Z]-\d{2})\s+—")
+_TRIGGER_ROW = re.compile(r"^\|\s*Trigger\s*\|\s*(.*?)\s*\|\s*$")
+
+
+def load_triggers(copybook_md: str) -> dict[str, str]:
+    """카피북에서 {code: trigger} 추출. 코드 첫 등장의 Trigger 행만 사용."""
+    triggers: dict[str, str] = {}
+    cur: str | None = None
+    for line in copybook_md.splitlines():
+        h = _CARD_HDR.match(line)
+        if h:
+            cur = h.group(1)
+            continue
+        if cur and cur not in triggers:
+            t = _TRIGGER_ROW.match(line)
+            if t:
+                triggers[cur] = t.group(1).replace("`", "").strip()
+    return triggers
 
 
 def parse_catalog(md: str) -> Iterable[CatalogRow]:
@@ -208,12 +230,14 @@ def emit_row(row: CatalogRow) -> str:
     description = sql_escape((row.event or "")[:500])
     allowed_json = sql_escape(to_json_array(row.allowed_variables))
     required_json = sql_escape(to_json_array(row.required_tokens))
+    trigger = sql_escape((row.trigger_ref or "")[:255])
+    trigger_sql = f"'{trigger}'" if trigger else "NULL"
     return (
         "INSERT INTO notification_catalog "
         "(template_code, allowed_variables_json, default_category, default_severity, "
-        "default_recipient_roles, description, required_tokens_json, created_at, updated_at) "
+        "default_recipient_roles, description, required_tokens_json, trigger_ref, created_at, updated_at) "
         f"SELECT '{row.code}', '{allowed_json}', '{row.category}', '{row.severity}', "
-        f"'{row.recipient_roles}', '{description}', '{required_json}', NOW(6), NOW(6) "
+        f"'{row.recipient_roles}', '{description}', '{required_json}', {trigger_sql}, NOW(6), NOW(6) "
         f"WHERE NOT EXISTS (SELECT 1 FROM notification_catalog WHERE template_code = '{row.code}');"
     )
 
@@ -230,9 +254,16 @@ def main(argv: list[str]) -> int:
 
     md = md_path.read_text(encoding="utf-8")
     rows = list(parse_catalog(md))
+
+    # 카피북에서 trigger 백필 (있으면)
+    copybook_path = project_root / COPYBOOK_MD
+    triggers = load_triggers(copybook_path.read_text(encoding="utf-8")) if copybook_path.exists() else {}
+    for row in rows:
+        row.trigger_ref = triggers.get(row.code, "")
+
     print("-- PR-T5: notification_catalog seed (auto-generated)")
-    print(f"-- Source: {CATALOG_MD}")
-    print(f"-- Rows: {len(rows)}")
+    print(f"-- Source: {CATALOG_MD} (+ trigger_ref from {COPYBOOK_MD})")
+    print(f"-- Rows: {len(rows)} ({sum(1 for r in rows if r.trigger_ref)} with trigger)")
     print()
     for row in rows:
         print(emit_row(row))

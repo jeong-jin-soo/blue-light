@@ -51,12 +51,14 @@ class NotificationCatalogTest {
                 NotificationSeverity.CRITICAL,
                 "APPLICANT,LEW",
                 "결제 요청 — 마감일 변수 추가",
-                "[\"{{paynowUen}}\",\"{{paynowReference}}\",\"{{deadline}}\"]"
+                "[\"{{paynowUen}}\",\"{{paynowReference}}\",\"{{deadline}}\"]",
+                "AdminApplicationService.approveForPayment"
         );
 
         assertThat(catalog.getAllowedVariablesJson()).contains("deadline");
         assertThat(catalog.getDefaultRecipientRoles()).isEqualTo("APPLICANT,LEW");
         assertThat(catalog.getDescription()).contains("마감일 변수 추가");
         assertThat(catalog.getRequiredTokensJson()).contains("{{deadline}}");
+        assertThat(catalog.getTriggerRef()).isEqualTo("AdminApplicationService.approveForPayment");
     }
 }
