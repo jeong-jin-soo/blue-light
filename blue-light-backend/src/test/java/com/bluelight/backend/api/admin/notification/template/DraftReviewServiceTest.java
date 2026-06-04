@@ -98,7 +98,8 @@ class DraftReviewServiceTest {
         NotificationTemplate result = service.approve(1L, 9001L, "ok", "127.0.0.1");
 
         assertThat(result.getTemplateCode()).isEqualTo("A-17");
-        assertThat(result.isEnabled()).isTrue();
+        // 신규 템플릿은 비활성으로 생성 — 운영자가 확인 후 수동 활성화.
+        assertThat(result.isEnabled()).isFalse();
         assertThat(draft.getStatus()).isEqualTo(TemplateDraftStatus.APPROVED);
         verify(templateRepository, times(1)).save(any(NotificationTemplate.class));
         verify(historyRepository, times(1)).save(any(NotificationTemplateHistory.class));

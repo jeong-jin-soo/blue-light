@@ -97,7 +97,7 @@ export default function AdminNotificationTemplateEditPage() {
     ? safeParseStringArray(catalogEntry.allowedVariablesJson)
     : safeParseStringArray(variablesJson);
 
-  const handleSubmitDraft = async () => {
+  const handleSave = async () => {
     setSaving(true);
     setLintErrors([]);
     setGenericError(null);
@@ -117,10 +117,14 @@ export default function AdminNotificationTemplateEditPage() {
         recipientRoles: recipientRoles || null,
         submissionNote: submissionNote || null,
       };
-      const draft = await api.createDraft(request);
+      // 2단계 승인 없이 즉시 라이브 반영. 신규는 비활성 생성 / 기존 수정은 활성 상태 유지.
+      const saved = await api.saveTemplate(request);
       setSuccessMessage(
-        `Draft #${draft.draftSeq} created. Will be published after ADMIN/SYSTEM_ADMIN approval.`
+        saved.enabled
+          ? 'Saved and applied to the live template.'
+          : 'Saved (inactive). Preview/test, then enable it from Activation Control when ready.'
       );
+      await loadTemplate(current.templateSeq);
     } catch (e) {
       handleApiError(e, setLintErrors, setGenericError);
     } finally {
@@ -379,11 +383,11 @@ export default function AdminNotificationTemplateEditPage() {
 
           <div className="flex gap-2 pt-2 border-t">
             <button
-              onClick={handleSubmitDraft}
+              onClick={handleSave}
               disabled={saving || body.length === 0}
               className="px-4 py-2 text-sm bg-teal-600 text-white rounded hover:bg-teal-700 disabled:opacity-50"
             >
-              {saving ? 'Submitting...' : 'Submit Draft (awaiting SA approval)'}
+              {saving ? 'Saving...' : 'Save'}
             </button>
             <button
               onClick={() => setPreviewOpen(true)}

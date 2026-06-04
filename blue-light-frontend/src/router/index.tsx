@@ -254,6 +254,8 @@ const router = createBrowserRouter([
             element: <AdminNotificationTemplateListPage />,
           },
           {
+            // 편집은 직접 저장(2단계 없음). 이 큐는 XLIFF/CSV 번역 일괄 import 가 만든
+            // draft 검토·게시 전용으로 유지 (메인 메뉴에서는 비노출).
             path: '/admin/notification-templates/drafts',
             element: <AdminNotificationTemplateDraftReviewPage />,
           },

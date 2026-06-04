@@ -81,6 +81,17 @@ export const createDraft = async (
   return response.data;
 };
 
+/**
+ * 직접 저장 — 2단계 승인 없이 편집 내용을 라이브 템플릿에 즉시 반영.
+ * 신규 템플릿은 비활성으로 생성, 기존 수정은 활성 상태 유지.
+ */
+export const saveTemplate = async (
+  request: CreateDraftRequest
+): Promise<NotificationTemplateDetail> => {
+  const response = await axiosClient.post<NotificationTemplateDetail>(`${BASE}/save`, request);
+  return response.data;
+};
+
 export const editDraft = async (
   draftSeq: number,
   request: UpdateDraftRequest

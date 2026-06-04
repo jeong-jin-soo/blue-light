@@ -132,6 +132,25 @@ public class AdminNotificationTemplateController {
                 .body(NotificationTemplateDraftResponse.from(draft));
     }
 
+    /**
+     * 직접 저장 — 2단계 승인 없이 편집 내용을 라이브 템플릿에 즉시 반영.
+     * 내부적으로 createDraft(lint 검증) → approve(스냅샷 적용 + history) 를 한 번에 수행한다.
+     * 신규 템플릿은 비활성으로 생성되고, 기존 템플릿 수정은 활성 상태를 유지한다(approve 가 enabled 미변경).
+     * SECURITY/PAYMENT/MARKETING 카테고리는 submissionNote 가 변경 사유(reviewNote)로 사용된다.
+     */
+    @PostMapping("/save")
+    @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
+    public ResponseEntity<NotificationTemplateDetailResponse> saveDirect(
+            @Valid @RequestBody CreateDraftRequest request,
+            Authentication auth,
+            HttpServletRequest httpRequest) {
+        Long actor = principalUserSeq(auth);
+        NotificationTemplateDraft draft = adminService.createDraft(request.toInput(), actor);
+        NotificationTemplate result = reviewService.approve(
+                draft.getDraftSeq(), actor, request.submissionNote(), clientIp(httpRequest));
+        return ResponseEntity.ok(NotificationTemplateDetailResponse.from(result));
+    }
+
     @PatchMapping("/drafts/{draftSeq}")
     @PreAuthorize("hasAnyRole('NOTIFICATION_MANAGER','SYSTEM_ADMIN','ADMIN')")
     public ResponseEntity<NotificationTemplateDraftResponse> editDraft(

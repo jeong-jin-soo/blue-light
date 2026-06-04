@@ -73,7 +73,8 @@ public class DraftReviewService {
                     .bodyText(draft.getBodyText())
                     .variablesJson(draft.getVariablesJson())
                     .providerTemplateName(draft.getProviderTemplateName())
-                    .enabled(true)
+                    // 신규 템플릿은 비활성으로 생성 — 운영자가 미리보기/테스트로 확인 후 수동 활성화.
+                    .enabled(false)
                     .catalogMetaKey(draft.getTemplateCode())
                     .category(draft.getCategory())
                     .severity(draft.getSeverity())
