@@ -14,6 +14,7 @@ import type {
   TemplatePreviewResponse,
 } from '../../types/notificationTemplate';
 import { useAuthStore } from '../../stores/authStore';
+import HtmlBodyEditor from '../../components/admin/HtmlBodyEditor';
 
 /**
  * 알림 템플릿 편집 화면 — PR-T6.
@@ -272,12 +273,16 @@ export default function AdminNotificationTemplateEditPage() {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={14}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded font-mono"
-            />
+            {current.channel === 'EMAIL' ? (
+              <HtmlBodyEditor value={body} onChange={setBody} variables={allowedVariables} />
+            ) : (
+              <textarea
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={14}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded font-mono"
+              />
+            )}
             {current.channel === 'SMS' && (
               <div className="text-xs text-gray-500 mt-1">
                 Currently {body.length} characters · 160 characters or fewer recommended
