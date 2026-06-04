@@ -1,0 +1,53 @@
+name: One-off - Fix template mojibake
+
+# 일회성: notification_templates 의 이중 인코딩(mojibake) 문자 치환.
+# runner 에서 fix SQL 생성 → scp → EC2 에서 mysql --default-character-set=utf8mb4 로 적용.
+# (utf8mb4 connection 필수 — 안 그러면 치환문이 또 깨짐). 실행 후 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-fix-mojibake.yml'
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v5
+      - name: Generate fix SQL
+        run: |
+          python3 scripts/fix_template_mojibake.py > fix_mojibake.sql 2>/dev/null
+          wc -l fix_mojibake.sql
+      - name: Copy to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          source: "fix_mojibake.sql"
+          target: "/home/${{ secrets.DEV_SERVER_USER }}/bluelight"
+      - name: Apply (utf8mb4)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -i -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" \
+              < fix_mojibake.sql
+            echo "=== verify ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e \
+              "SELECT CONCAT('mojibake_rows_after=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%â€%' OR body_text LIKE '%Â·%' OR subject LIKE '%â€%' OR subject LIKE '%Â·%';
+               SELECT CONCAT('clean_emdash_after=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%—%';"
+            rm -f fix_mojibake.sql
