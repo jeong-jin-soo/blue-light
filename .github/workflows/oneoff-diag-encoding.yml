@@ -1,0 +1,37 @@
+name: One-off - Diagnose template encoding
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-diag-encoding.yml'
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Inspect encoding
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                SELECT CONCAT('total=', COUNT(*)) FROM notification_templates;
+                SELECT CONCAT('mojibake_rows=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%\xC3\xA2%' OR subject LIKE '%\xC3\xA2%';
+                SELECT CONCAT('edited_version_gt0=', COUNT(*)) FROM notification_templates WHERE version > 0;
+                SELECT CONCAT('col_charset=', CHARACTER_SET_NAME, '/', COLLATION_NAME) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='notification_templates' AND column_name='body_text';
+                SELECT CONCAT('A-01 sample: ', SUBSTRING(body_text, LOCATE('LicenseKaki', body_text), 30)) FROM notification_templates WHERE template_code='A-01' AND channel='EMAIL';
+                SELECT CONCAT('A-01 hex: ', HEX(SUBSTRING(body_text, LOCATE('LicenseKaki', body_text)+12, 6))) FROM notification_templates WHERE template_code='A-01' AND channel='EMAIL';
+              "
