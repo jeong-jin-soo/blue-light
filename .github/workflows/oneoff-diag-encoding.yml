@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Inspect encoding
+      - name: Inspect encoding (literal chars)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -28,10 +28,8 @@ jobs:
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
               mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
-                SELECT CONCAT('total=', COUNT(*)) FROM notification_templates;
-                SELECT CONCAT('mojibake_rows=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%\xC3\xA2%' OR subject LIKE '%\xC3\xA2%';
-                SELECT CONCAT('edited_version_gt0=', COUNT(*)) FROM notification_templates WHERE version > 0;
-                SELECT CONCAT('col_charset=', CHARACTER_SET_NAME, '/', COLLATION_NAME) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='notification_templates' AND column_name='body_text';
-                SELECT CONCAT('A-01 sample: ', SUBSTRING(body_text, LOCATE('LicenseKaki', body_text), 30)) FROM notification_templates WHERE template_code='A-01' AND channel='EMAIL';
-                SELECT CONCAT('A-01 hex: ', HEX(SUBSTRING(body_text, LOCATE('LicenseKaki', body_text)+12, 6))) FROM notification_templates WHERE template_code='A-01' AND channel='EMAIL';
+                SELECT CONCAT('mojibake_rows=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%â€%' OR subject LIKE '%â€%';
+                SELECT CONCAT('clean_emdash_rows=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%—%';
+                SELECT CONCAT('A01_hex_near_Singapore=', HEX(SUBSTRING(body_text, GREATEST(LOCATE('Singapore', body_text)-5, 1), 6))) FROM notification_templates WHERE template_code='A-01' AND channel='EMAIL';
+                SELECT CONCAT('has_meta_charset=', SUM(body_text LIKE '%charset%')) FROM notification_templates WHERE channel='EMAIL';
               "
