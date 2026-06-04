@@ -1,0 +1,45 @@
+name: One-off - Strip on-site work wording
+
+# 일회성: dev notification_templates 본문/제목에서 'on-site work' 문구 제거(치환).
+# 전체 재시드 대신 REPLACE 로 해당 문구만 바꿔 운영자 수동 편집 보존. 실행 후 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-strip-onsite.yml'
+
+jobs:
+  strip:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: REPLACE on-site work wording
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -e "
+                SELECT CONCAT('before: ', COUNT(*)) FROM notification_templates
+                  WHERE body_text LIKE '%on-site work%' OR body_text LIKE '%On-site work%'
+                     OR subject LIKE '%on-site work%' OR subject LIKE '%On-site work%';
+                UPDATE notification_templates
+                SET body_text = REPLACE(REPLACE(body_text, 'on-site work', 'work'), 'On-site work', 'Work'),
+                    subject   = REPLACE(REPLACE(subject,   'on-site work', 'work'), 'On-site work', 'Work')
+                WHERE body_text LIKE '%on-site work%' OR body_text LIKE '%On-site work%'
+                   OR subject LIKE '%on-site work%' OR subject LIKE '%On-site work%';
+                SELECT CONCAT('rows_updated: ', ROW_COUNT());
+                SELECT CONCAT('after: ', COUNT(*)) FROM notification_templates
+                  WHERE body_text LIKE '%on-site work%' OR body_text LIKE '%On-site work%'
+                     OR subject LIKE '%on-site work%' OR subject LIKE '%On-site work%';
+              "
