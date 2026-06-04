@@ -1,0 +1,39 @@
+name: One-off - Disable unused templates
+
+# 일회성: 실제 발송 코드가 사용하는 template_code 만 활성 유지하고 나머지 전부 비활성.
+# 현재 코드 기준 실제 dispatch 되는 템플릿은 'A-20'(PAYMENT_CONFIRMED, AdminPaymentService) 단 하나.
+# 실행 후 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-disable-unused.yml'
+
+jobs:
+  disable:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Disable non-A-20 templates
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                SELECT CONCAT('before total=', COUNT(*), ' active=', IFNULL(SUM(enabled),0)) FROM notification_templates;
+                UPDATE notification_templates SET enabled = FALSE WHERE template_code <> 'A-20';
+                UPDATE notification_templates SET enabled = TRUE  WHERE template_code = 'A-20';
+                SELECT CONCAT('after total=', COUNT(*), ' active=', IFNULL(SUM(enabled),0)) FROM notification_templates;
+                SELECT CONCAT('active rows: ', template_code, '/', channel, '/enabled=', enabled) FROM notification_templates WHERE enabled = TRUE;
+              "
