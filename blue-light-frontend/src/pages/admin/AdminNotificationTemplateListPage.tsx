@@ -46,13 +46,8 @@ export default function AdminNotificationTemplateListPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* 2단계 승인 제거 — Draft Review Queue 링크 비노출. 번역 import draft 검토는 직접 URL(/drafts)로만. */}
           <LocalizationToolbar />
-          <Link
-            to="/admin/notification-templates/drafts"
-            className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
-          >
-            Draft Review Queue
-          </Link>
         </div>
       </header>
 
