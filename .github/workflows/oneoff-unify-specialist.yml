@@ -8,11 +8,11 @@ on:
       - '.github/workflows/oneoff-unify-specialist.yml'
 
 jobs:
-  find:
+  restore:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Extract broken token
+      - name: Restore {{managerNote?}} token
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -27,10 +27,11 @@ jobs:
             DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
-              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -t -e "
-                SELECT template_code, channel,
-                  SUBSTRING(body_text, GREATEST(LOCATE('{{specialist', body_text)-2,1), 35) AS body_snip,
-                  SUBSTRING(subject, GREATEST(LOCATE('{{specialist', subject)-2,1), 35) AS subj_snip
-                FROM notification_templates
-                WHERE subject LIKE '%{{specialist%' OR body_text LIKE '%{{specialist%';
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                UPDATE notification_templates SET
+                  body_text = REPLACE(body_text, '{{specialistNote?}}', '{{managerNote?}}'),
+                  subject   = REPLACE(subject,   '{{specialistNote?}}', '{{managerNote?}}')
+                WHERE body_text LIKE '%{{specialistNote?}}%' OR subject LIKE '%{{specialistNote?}}%';
+                SELECT CONCAT('rows=', ROW_COUNT());
+                SELECT CONCAT('broken_specialist_after=', COUNT(*)) FROM notification_templates WHERE subject LIKE '%{{specialist%' OR body_text LIKE '%{{specialist%';
               "
