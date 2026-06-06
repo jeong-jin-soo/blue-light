@@ -28,8 +28,8 @@ jobs:
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
               mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
-                SELECT CONCAT(template_code,'/',channel,' :: ',
-                  REGEXP_SUBSTR(CONCAT(subject,' ',body_text), '\\\\{\\\\{specialist[A-Za-z]*\\\\}\\\\}'))
-                FROM notification_templates
-                WHERE subject LIKE '%{{specialist%' OR body_text LIKE '%{{specialist%';
+                SELECT CONCAT('SUBJ ', template_code,'/',channel,' :: ', SUBSTRING(subject, GREATEST(LOCATE('{{specialist', subject)-3,1), 40))
+                  FROM notification_templates WHERE subject LIKE '%{{specialist%';
+                SELECT CONCAT('BODY ', template_code,'/',channel,' :: ', SUBSTRING(body_text, GREATEST(LOCATE('{{specialist', body_text)-3,1), 45))
+                  FROM notification_templates WHERE body_text LIKE '%{{specialist%';
               "
