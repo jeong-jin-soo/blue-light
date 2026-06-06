@@ -1,0 +1,51 @@
+name: One-off - Unify manager to specialist
+
+# 컨시어지 알림 템플릿의 고객/역할 표현 'manager' → 'specialist' 통일.
+# {{managerName}}/{{managerContactWindow}}/{{managerPhone}}/{{managerNote}} 토큰은 보호-복원으로 보존.
+# SLD_MANAGER(D-xx) 등 다른 매니저 역할은 제외(컨시어지 코드만). 실행 후 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-unify-specialist.yml'
+
+jobs:
+  unify:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: REPLACE manager->specialist (token-safe)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                UPDATE notification_templates SET
+                  subject = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(subject,
+                      'manager','specialist'),'Manager','Specialist'),
+                      '{{specialistName}}','{{managerName}}'),
+                      '{{specialistContactWindow}}','{{managerContactWindow}}'),
+                      '{{specialistPhone}}','{{managerPhone}}'),
+                      '{{specialistNote}}','{{managerNote}}'),
+                  body_text = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(body_text,
+                      'manager','specialist'),'Manager','Specialist'),
+                      '{{specialistName}}','{{managerName}}'),
+                      '{{specialistContactWindow}}','{{managerContactWindow}}'),
+                      '{{specialistPhone}}','{{managerPhone}}'),
+                      '{{specialistNote}}','{{managerNote}}')
+                WHERE template_code IN ('A-31','A-32','A-33','A-34','A-35','A-36','A-37','A-38','A-39','A-40','A-41','A-42','C-01','C-02','C-03','C-04','C-05','C-06','C-07','C-08','C-09','M-03','M-04');
+                SELECT CONCAT('rows=', ROW_COUNT());
+                SELECT CONCAT(template_code,'/',channel,' :: ', subject) FROM notification_templates WHERE template_code IN ('A-32','A-36','M-03') ORDER BY template_code, channel;
+                SELECT CONCAT('leftover manager tokens broken? specialistName count=', (SELECT COUNT(*) FROM notification_templates WHERE body_text LIKE '%{{specialist%'));
+              "
