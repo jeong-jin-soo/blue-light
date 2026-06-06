@@ -2886,8 +2886,21 @@ See §8 digest card 2.
 | Channels | E + I |
 | Trigger | `ConciergeNotifier.notifySubmitted` (already implemented) |
 | Reference | `ConciergeRequest#{publicCode}` |
+| Variables | `{{publicCode}}`, `{{ctaUrl}}` |
 
-Same content shape as M-03 but routed to manager team. Subject: `[LicenseKaki] New concierge request · #{{publicCode}}`.
+**Email**
+- **Subject**: `[LicenseKaki] New concierge request · #{{publicCode}}`
+- **Pre-header**: `Begin first contact within the 24-hour SLA.`
+- **Headline**: `New concierge request to handle.`
+- **Body**:
+  > A new concierge request **#{{publicCode}}** has been submitted. Open it to begin first contact within the 24-hour SLA.
+- **Primary CTA**: `Open request` → `{{ctaUrl}}`
+- **Opt-out**: STATUS — opt-out unavailable
+
+**In-app**
+- **Title**: `New concierge: #{{publicCode}}`
+- **Body**: `A new request needs a manager.`
+- **Deep-link**: `/concierge-manager/requests`
 
 ---
 
