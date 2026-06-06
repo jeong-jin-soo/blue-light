@@ -79,4 +79,25 @@ class TemplateRendererTest {
                 Map.of("user.first_name", "Alice", "lew-grade", "GRADE_9"));
         assertThat(result).isEqualTo("Alice (GRADE_9)");
     }
+
+    @Test
+    @DisplayName("안전장치 - optional `?` 토큰 {{managerNote?}} 은 고객 노출 없이 제거")
+    void renders_stripsOptionalQuestionMarkToken() {
+        // 카피북 optional 표기가 그대로 들어간 토큰은 VAR_PATTERN 미매칭 → 잔여 제거로 비워짐.
+        String result = renderer.render(
+                "Note: {{managerNote?}} end", Map.of("managerNote", "ignored"));
+        assertThat(result).isEqualTo("Note:  end");
+        assertThat(result).doesNotContain("{{");
+    }
+
+    @Test
+    @DisplayName("안전장치 - 치환되지 않은 어떤 {{...}} 도 출력에 남지 않음")
+    void renders_neverLeaksAnyPlaceholder() {
+        String result = renderer.render(
+                "Hi {{applicantName}}, ref {{unknownKey}} / {{weird key!}}",
+                Map.of("applicantName", "Bob"));
+        assertThat(result).isEqualTo("Hi Bob, ref  / ");
+        assertThat(result).doesNotContain("{{");
+        assertThat(result).doesNotContain("}}");
+    }
 }

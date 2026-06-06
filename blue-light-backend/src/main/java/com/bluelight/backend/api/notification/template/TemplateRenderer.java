@@ -31,6 +31,13 @@ public class TemplateRenderer {
     private static final Pattern VAR_PATTERN = Pattern.compile("\\{\\{\\s*([A-Za-z0-9_.\\-]+)\\s*}}");
 
     /**
+     * 안전장치 패턴 — 치환 후에도 남은 모든 <code>{{...}}</code> 잔여 플레이스홀더.
+     * 카피북 optional 표기 <code>{{managerNote?}}</code>(키에 {@code ?} 포함)처럼 VAR_PATTERN 에
+     * 매칭되지 않아 통과한 토큰까지 제거해 <strong>고객에게 {{...}} 가 절대 노출되지 않도록</strong> 보장한다.
+     */
+    private static final Pattern LEFTOVER_PATTERN = Pattern.compile("\\{\\{[^{}]*}}");
+
+    /**
      * 본문 변수 치환.
      *
      * @param template 본문 템플릿 (예: {@code notification_templates.body_text})
@@ -49,6 +56,7 @@ public class TemplateRenderer {
             m.appendReplacement(sb, Matcher.quoteReplacement(value));
         }
         m.appendTail(sb);
-        return sb.toString();
+        // 안전장치: 치환되지 않고 남은 {{...}} (optional `?` 토큰·오타 등) 를 모두 제거 → 고객 노출 방지.
+        return LEFTOVER_PATTERN.matcher(sb).replaceAll("");
     }
 }

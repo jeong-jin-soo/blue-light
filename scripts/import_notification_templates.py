@@ -245,7 +245,18 @@ def compose_email_body(fields) -> str:
     return "".join(parts)
 
 
+# 카피북 optional 표기 {{var?}} → 유효 토큰 {{var}} 로 정규화.
+# `?` 가 남으면 렌더러 VAR_PATTERN 에 매칭 안 돼 고객에게 {{var?}} 가 그대로 노출됨.
+_OPTIONAL_TOKEN = re.compile(r"\{\{([A-Za-z0-9_.\-]+)\?\}\}")
+
+
+def strip_optional_markers(text: str) -> str:
+    return _OPTIONAL_TOKEN.sub(r"{{\1}}", text)
+
+
 def emit_row(code, channel, subject, body, variables, category, severity, recipient):
+    subject = strip_optional_markers(subject) if subject else subject
+    body = strip_optional_markers(body)
     subj = "NULL" if subject is None else f"'{sql_escape(subject)}'"
     vars_json = json.dumps(variables, ensure_ascii=False)
     return (
