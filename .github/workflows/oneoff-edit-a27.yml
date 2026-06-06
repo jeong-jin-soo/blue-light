@@ -1,0 +1,38 @@
+name: One-off - Edit A-27 body
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-edit-a27.yml'
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Replace renew sentence in A-27 EMAIL
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            MYSQL_PORT=$(grep '^MYSQL_PORT=' .env | head -1 | cut -d= -f2-)
+            MYSQL_DATABASE=$(grep '^MYSQL_DATABASE=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                UPDATE notification_templates
+                SET body_text = REPLACE(body_text,
+                  'Please renew today, or book a same-week concierge visit if you can''t fit a full application in.',
+                  'Please renew today through LicenseKaki''s simple and quick online service.')
+                WHERE template_code='A-27' AND channel='EMAIL';
+                SELECT CONCAT('rows=', ROW_COUNT());
+                SELECT CONCAT('BODY: ', body_text) FROM notification_templates WHERE template_code='A-27' AND channel='EMAIL';
+              "
