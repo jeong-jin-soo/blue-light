@@ -63,6 +63,7 @@ class LoaServiceUploadSignatureTest {
     private UserRepository userRepository;
     private ConciergeRequestRepository conciergeRequestRepository;
     private EmailService emailService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private LoaService service;
 
     @BeforeEach
@@ -75,11 +76,12 @@ class LoaServiceUploadSignatureTest {
         userRepository = mock(UserRepository.class);
         conciergeRequestRepository = mock(ConciergeRequestRepository.class);
         emailService = mock(EmailService.class);
+        eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
 
         service = new LoaService(
             applicationRepository, fileRepository, loaGenerationService,
             fileStorageService, auditLogService,
-            userRepository, conciergeRequestRepository, emailService);
+            userRepository, conciergeRequestRepository, emailService, eventPublisher);
 
         // 기본 stubs
         when(fileStorageService.store(any(MultipartFile.class), anyString()))
@@ -191,9 +193,17 @@ class LoaServiceUploadSignatureTest {
             eq(com.bluelight.backend.domain.audit.AuditAction.LOA_SIGNATURE_UPLOADED_BY_MANAGER),
             any(), eq("application"), eq("42"), anyString(),
             any(), any(), any(), any(), anyString(), anyString(), eq(201));
-        // 트랜잭션 컨텍스트 없음 → 즉시 이메일 발송
-        verify(emailService).sendConciergeLoaUploadConfirmEmail(
-            eq(applicant.getEmail()), anyString(), anyString(), eq(42L), eq("email receipt"));
+        // PR-W3a: 레거시 이메일 직접발송 → 오케스트레이터 dispatch 이벤트(A-36) 발행으로 이관
+        org.mockito.ArgumentCaptor<com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent> cap =
+            org.mockito.ArgumentCaptor.forClass(
+                com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent.class);
+        verify(eventPublisher).publishEvent(cap.capture());
+        com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent ev = cap.getValue();
+        assertThat(ev.eventType()).isEqualTo("CONCIERGE_LOA_UPLOAD_CONFIRM");
+        assertThat(ev.templateCode()).isEqualTo("A-36");
+        assertThat(ev.payload().get("managerNote")).isEqualTo("email receipt");
+        verify(emailService, never()).sendConciergeLoaUploadConfirmEmail(
+            anyString(), anyString(), anyString(), anyLong(), anyString());
     }
 
     // ────────────────────────────────────────────────────────────
