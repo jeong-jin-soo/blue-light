@@ -1,4 +1,4 @@
-name: One-off - Read A-20 body
+name: One-off - Edit A-20 reviewer wording
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
       - '.github/workflows/oneoff-read-a20.yml'
 
 jobs:
-  read:
+  edit:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Dump A-20 EMAIL body
+      - name: Replace 'reviewer' with 'License Lew' in A-20 EMAIL
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -27,7 +27,10 @@ jobs:
             DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
-              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e \
-              "SELECT CONCAT('SUBJECT: ', subject) FROM notification_templates WHERE template_code='A-20' AND channel='EMAIL';
-               SELECT CONCAT('BODY: ', body_text) FROM notification_templates WHERE template_code='A-20' AND channel='EMAIL';
-               SELECT CONCAT('INAPP: ', body_text) FROM notification_templates WHERE template_code='A-20' AND channel='IN_APP';"
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
+                UPDATE notification_templates
+                SET body_text = REPLACE(body_text, 'Your reviewer ', 'Your License Lew ')
+                WHERE template_code='A-20' AND channel='EMAIL';
+                SELECT CONCAT('rows=', ROW_COUNT());
+                SELECT CONCAT('BODY: ', body_text) FROM notification_templates WHERE template_code='A-20' AND channel='EMAIL';
+              "
