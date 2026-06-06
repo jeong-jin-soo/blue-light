@@ -8,11 +8,11 @@ on:
       - '.github/workflows/oneoff-unify-specialist.yml'
 
 jobs:
-  verify:
+  find:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Verify token integrity
+      - name: Extract broken token
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -27,8 +27,10 @@ jobs:
             DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
-              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -N -e "
-                SELECT CONCAT('broken_specialist_tokens=', COUNT(*)) FROM notification_templates WHERE subject LIKE '%{{specialist%' OR body_text LIKE '%{{specialist%';
-                SELECT CONCAT('rows_with_managerName_token=', COUNT(*)) FROM notification_templates WHERE body_text LIKE '%{{managerName}}%' OR subject LIKE '%{{managerName}}%';
-                SELECT CONCAT('concierge rows still saying manager(prose)=', COUNT(*)) FROM notification_templates WHERE template_code IN ('A-31','A-32','A-33','A-34','A-35','A-36','A-37','A-38','A-39','A-40','A-41','A-42','C-01','C-02','C-03','C-04','C-05','C-06','C-07','C-08','C-09','M-03','M-04') AND (LOWER(body_text) LIKE '% manager%' OR LOWER(subject) LIKE '%manager %');
+              mysql --default-character-set=utf8mb4 -h "$MYSQL_HOST" -P "${MYSQL_PORT:-3306}" -u "$DB_USERNAME" "$MYSQL_DATABASE" -t -e "
+                SELECT template_code, channel,
+                  SUBSTRING(body_text, GREATEST(LOCATE('{{specialist', body_text)-2,1), 35) AS body_snip,
+                  SUBSTRING(subject, GREATEST(LOCATE('{{specialist', subject)-2,1), 35) AS subj_snip
+                FROM notification_templates
+                WHERE subject LIKE '%{{specialist%' OR body_text LIKE '%{{specialist%';
               "
