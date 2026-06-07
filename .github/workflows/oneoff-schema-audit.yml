@@ -1,4 +1,4 @@
-name: One-off - Schema drift audit
+name: One-off - Gen prod ALTER
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
       - '.github/workflows/oneoff-schema-audit.yml'
 
 jobs:
-  audit:
+  gen:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Diff dev vs prod columns
+      - name: Generate ALTER statements from dev defs
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -24,21 +24,17 @@ jobs:
             MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
             DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
-            echo '=== [A] 양쪽 존재 테이블 중 prod 에 누락된 컬럼 (드리프트 후보) ==='
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
               mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "
-                SELECT CONCAT(d.table_name,'.',d.column_name)
-                FROM information_schema.columns d
-                JOIN (SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema='bluelight_prod') p
-                  ON p.table_name=d.table_name
-                WHERE d.table_schema='bluelight'
-                  AND NOT EXISTS (SELECT 1 FROM information_schema.columns x
-                     WHERE x.table_schema='bluelight_prod' AND x.table_name=d.table_name AND x.column_name=d.column_name)
-                ORDER BY d.table_name, d.ordinal_position;"
-            echo '=== [B] dev 엔 있고 prod 엔 아예 없는 테이블 (배포 시 신규 생성 → 드리프트 아님) ==='
-            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
-              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "
-                SELECT DISTINCT d.table_name FROM information_schema.tables d
-                WHERE d.table_schema='bluelight'
-                  AND d.table_name NOT IN (SELECT table_name FROM information_schema.tables WHERE table_schema='bluelight_prod')
-                ORDER BY d.table_name;"
+                SELECT CONCAT('ALTER TABLE ', table_name, ' ADD COLUMN \`', column_name, '\` ', column_type,
+                  IF(is_nullable='NO',' NOT NULL',' NULL'),
+                  IF(column_default IS NULL, '',
+                     CONCAT(' DEFAULT ',
+                       CASE WHEN column_default IN ('CURRENT_TIMESTAMP','NULL') OR column_type RLIKE '^(int|bigint|tinyint|decimal|double|float|bit)'
+                            THEN column_default ELSE CONCAT(CHAR(39), column_default, CHAR(39)) END)),
+                  ';') AS stmt
+                FROM information_schema.columns
+                WHERE table_schema='bluelight'
+                  AND ( (table_name='users' AND column_name IN ('phone_e164','phone_verified','phone_verified_at','whatsapp_opt_in','whatsapp_opt_in_at','whatsapp_opt_out_at','preferred_language'))
+                     OR (table_name='applications' AND column_name IN ('applicant_name_snapshot','company_name_snapshot','uen_snapshot','designation_snapshot','snapshot_backfilled_at','applicant_type','kva_status','kva_source','kva_confirmed_by','kva_confirmed_at','version')) )
+                ORDER BY table_name, ordinal_position;"
