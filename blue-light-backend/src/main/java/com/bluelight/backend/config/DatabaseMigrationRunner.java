@@ -131,6 +131,10 @@ public class DatabaseMigrationRunner {
             // User.anonymize() 패치 이전에 삭제된 row는 원본 이메일을 점유하고 있어
             // 동일 이메일 재가입 시 INSERT가 unique 제약으로 실패한다.
             backfillDeletedUserEmails(conn);
+            // ── prod 패리티: dev/schema.sql 에만 반영되고 runner 에 누락됐던 컬럼 보정 ──
+            //   (WhatsApp/전화/i18n users 컬럼 + kVA·snapshot·applicant_type·version applications 컬럼)
+            //   bluelight_prod 드리프트 감사(2026-06)로 식별. 각 컬럼 columnExists 가드 → 멱등.
+            migrateProdParityColumns(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -242,6 +246,45 @@ public class DatabaseMigrationRunner {
      * 마이그레이션: applications 테이블에 LOA 서명 컬럼 추가
      * - loa_signature_url, loa_signed_at 컬럼이 없으면 추가
      */
+    /**
+     * 마이그레이션: prod 패리티 — dev/schema.sql 에만 있고 runner 에 누락됐던 컬럼들.
+     * <p>각 컬럼을 {@link #columnExists}로 가드해 개별 멱등 추가 (부분 적용 환경에도 안전).
+     * 정의는 dev(`bluelight`) 실제 스키마에서 추출. 전부 additive(nullable 또는 안전 default).
+     */
+    private void migrateProdParityColumns(Connection conn) throws SQLException {
+        // users — WhatsApp/전화/i18n (WhatsApp 알림 Phase 0)
+        addColumnIfMissing(conn, "users", "phone_e164",          "ALTER TABLE users ADD COLUMN phone_e164 VARCHAR(20) NULL");
+        addColumnIfMissing(conn, "users", "phone_verified",      "ALTER TABLE users ADD COLUMN phone_verified TINYINT(1) NOT NULL DEFAULT 0");
+        addColumnIfMissing(conn, "users", "phone_verified_at",   "ALTER TABLE users ADD COLUMN phone_verified_at DATETIME(6) NULL");
+        addColumnIfMissing(conn, "users", "whatsapp_opt_in",     "ALTER TABLE users ADD COLUMN whatsapp_opt_in TINYINT(1) NOT NULL DEFAULT 0");
+        addColumnIfMissing(conn, "users", "whatsapp_opt_in_at",  "ALTER TABLE users ADD COLUMN whatsapp_opt_in_at DATETIME(6) NULL");
+        addColumnIfMissing(conn, "users", "whatsapp_opt_out_at", "ALTER TABLE users ADD COLUMN whatsapp_opt_out_at DATETIME(6) NULL");
+        addColumnIfMissing(conn, "users", "preferred_language",  "ALTER TABLE users ADD COLUMN preferred_language VARCHAR(10) NOT NULL DEFAULT 'en'");
+        // applications — snapshot-at-submit + kVA 사후변경 + applicant_type + 낙관락 version
+        addColumnIfMissing(conn, "applications", "applicant_name_snapshot", "ALTER TABLE applications ADD COLUMN applicant_name_snapshot VARCHAR(100) NULL");
+        addColumnIfMissing(conn, "applications", "company_name_snapshot",   "ALTER TABLE applications ADD COLUMN company_name_snapshot VARCHAR(100) NULL");
+        addColumnIfMissing(conn, "applications", "uen_snapshot",            "ALTER TABLE applications ADD COLUMN uen_snapshot VARCHAR(20) NULL");
+        addColumnIfMissing(conn, "applications", "designation_snapshot",    "ALTER TABLE applications ADD COLUMN designation_snapshot VARCHAR(50) NULL");
+        addColumnIfMissing(conn, "applications", "snapshot_backfilled_at",  "ALTER TABLE applications ADD COLUMN snapshot_backfilled_at DATETIME(6) NULL");
+        addColumnIfMissing(conn, "applications", "applicant_type",          "ALTER TABLE applications ADD COLUMN applicant_type VARCHAR(20) NOT NULL DEFAULT 'INDIVIDUAL'");
+        addColumnIfMissing(conn, "applications", "kva_status",              "ALTER TABLE applications ADD COLUMN kva_status VARCHAR(20) NOT NULL DEFAULT 'CONFIRMED'");
+        addColumnIfMissing(conn, "applications", "kva_source",              "ALTER TABLE applications ADD COLUMN kva_source VARCHAR(20) NULL");
+        addColumnIfMissing(conn, "applications", "kva_confirmed_by",        "ALTER TABLE applications ADD COLUMN kva_confirmed_by BIGINT NULL");
+        addColumnIfMissing(conn, "applications", "kva_confirmed_at",        "ALTER TABLE applications ADD COLUMN kva_confirmed_at DATETIME(6) NULL");
+        addColumnIfMissing(conn, "applications", "version",                 "ALTER TABLE applications ADD COLUMN version BIGINT NOT NULL DEFAULT 0");
+    }
+
+    /** 컬럼이 없을 때만 ADD COLUMN 실행 (멱등). */
+    private void addColumnIfMissing(Connection conn, String table, String column, String ddl) throws SQLException {
+        if (columnExists(conn, table, column)) {
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(ddl);
+            log.info("Migration [prod-parity]: added {}.{}", table, column);
+        }
+    }
+
     private void migrateApplicationsLoaColumns(Connection conn) throws SQLException {
         if (columnExists(conn, "applications", "loa_signature_url")) {
             log.debug("Migration [applications-loa-columns]: already applied, skipping");
