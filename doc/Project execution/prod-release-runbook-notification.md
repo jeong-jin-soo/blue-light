@@ -9,13 +9,15 @@
   - 알림 템플릿 관리/배선(PR-T·W), WhatsApp 알림 Phase 0, LEW 리뷰 동선, SLD 등 develop 의 모든 변경 포함.
 - **결정 필요**: 전체 릴리스로 진행할지, 아니면 별도 릴리스 브랜치로 범위를 좁힐지(cherry-pick 은 104커밋 교차로 비현실적).
 
-## 1. 현재 상태 (확인 완료)
+## 1. 현재 상태 (확인 완료 2026-06-07)
 | 항목 | 상태 |
 |------|------|
 | prod 서버 a/b | running, 2026-04-12 이후 미재시작, SSH 22 OPEN, 웹 200 |
 | prod IP | 자동 할당(EIP 아님) — 재시작 시 IP 변경 → `PROD_SERVER_HOST_1/2` 시크릿 stale 위험 |
-| prod DB | `SQL_INIT_MODE=never`. 마이그레이션은 `DatabaseMigrationRunner`(@PostConstruct, 매 부팅) 담당 |
-| 알림 테이블 | 05-06 이후 추가 → **prod RDS 엔 아직 없음(추정)** → 배포 부팅 시 `CREATE TABLE IF NOT EXISTS` 로 **완전한 스키마로 신규 생성**(dev 같은 컬럼 드리프트 없음) |
+| RDS | **단일 인스턴스 `bluelight-db`** 에 `bluelight`(dev) + `bluelight_prod`(prod) 두 DB 공존 |
+| prod DB | `SQL_INIT_MODE=never`. 마이그레이션은 `DatabaseMigrationRunner`(@PostConstruct, 매 부팅) |
+| **prod 알림 테이블** | **`bluelight_prod` 엔 `notifications`(레거시 인앱)만 존재. notification_templates/outbox/drafts/history/catalog 전부 없음(확인됨).** → 배포 부팅 시 `CREATE TABLE IF NOT EXISTS` 로 **완전한 스키마로 신규 생성** (dev 같은 드리프트 없음) |
+| 사전 백업 | RDS 스냅샷 `bluelight-db-prerelease-notif-20260607` 생성됨 |
 
 ## 2. DB 마이그레이션 (자동 vs 수동)
 - **자동**: `DatabaseMigrationRunner` 가 부팅 시 ① schema.sql 의 `CREATE TABLE IF NOT EXISTS` 전부 실행(신규 테이블 생성) ② 명시적 `ALTER TABLE ADD COLUMN` 마이그레이션(기존 테이블 컬럼 추가, idempotent).
@@ -28,10 +30,26 @@ prod 알림 테이블은 신규 생성되므로 **비어 있음**. dev 의 현�
   - mojibake 치환, on-site work 제거, manager→specialist 통일, optional 토큰 정규화
   - A-20(reviewer→License Lew), A-27(renew 문장), A-31(specialist)
   - enabled 상태: **A-20 + PR-W3a(A-31/A-33/A-36/C-01/M-03) 만 활성, 나머지 비활성**
-- **권장 방식: dev → prod 데이터 이식** (콘텐츠/enabled 정확 일치 보장)
-  - `mysqldump`(dev RDS).notification_templates / notification_catalog → prod RDS 적재 (`--default-character-set=utf8mb4`, INSERT ... ON DUPLICATE KEY UPDATE).
-  - 또는 copybook 갱신(누락 수정 역반영) 후 `import_notification_templates.py` 재생성 — 더 정합하지만 작업 큼.
-- ⚠️ `--default-character-set=utf8mb4` 필수 (인코딩 이중인코딩 사고 방지).
+- **권장 방식: 같은 인스턴스 내 크로스 DB 복사** (dev `bluelight` → prod `bluelight_prod`, 콘텐츠/enabled 정확 일치)
+  - 배포로 prod 테이블 생성된 후 실행:
+    ```sql
+    INSERT INTO bluelight_prod.notification_templates
+      (template_code, channel, locale, provider_template_name, subject, body_text,
+       variables_json, enabled, version, catalog_meta_key, category, severity,
+       recipient_roles, created_at, updated_at)
+    SELECT template_code, channel, locale, provider_template_name, subject, body_text,
+       variables_json, enabled, version, catalog_meta_key, category, severity,
+       recipient_roles, NOW(6), NOW(6)
+    FROM bluelight.notification_templates
+    ON DUPLICATE KEY UPDATE subject=VALUES(subject), body_text=VALUES(body_text),
+       variables_json=VALUES(variables_json), enabled=VALUES(enabled),
+       category=VALUES(category), severity=VALUES(severity),
+       recipient_roles=VALUES(recipient_roles), catalog_meta_key=VALUES(catalog_meta_key);
+    -- notification_catalog 도 동일 패턴으로 복사
+    ```
+  - template_seq(PK)는 복사 제외 → prod 자동 증가. (template_code,channel,locale) 유니크로 중복 방지.
+  - ⚠️ 연결은 `--default-character-set=utf8mb4` (이중 인코딩 사고 방지). 같은 인스턴스 utf8mb4 복사라 mojibake 위험 없음.
+  - 콘텐츠 수정(reviewer→License Lew, manager→specialist, on-site 제거, optional 토큰 등)이 전부 dev 에 반영돼 있어 그대로 이식됨.
 
 ## 4. 배포 절차 (제안 순서)
 1. **사전 점검**
