@@ -19,10 +19,14 @@
 | **prod 알림 테이블** | **`bluelight_prod` 엔 `notifications`(레거시 인앱)만 존재. notification_templates/outbox/drafts/history/catalog 전부 없음(확인됨).** → 배포 부팅 시 `CREATE TABLE IF NOT EXISTS` 로 **완전한 스키마로 신규 생성** (dev 같은 드리프트 없음) |
 | 사전 백업 | RDS 스냅샷 `bluelight-db-prerelease-notif-20260607` 생성됨 |
 
-## 2. DB 마이그레이션 (자동 vs 수동)
-- **자동**: `DatabaseMigrationRunner` 가 부팅 시 ① schema.sql 의 `CREATE TABLE IF NOT EXISTS` 전부 실행(신규 테이블 생성) ② 명시적 `ALTER TABLE ADD COLUMN` 마이그레이션(기존 테이블 컬럼 추가, idempotent).
-- **리스크 — 기존 테이블 컬럼 드리프트**: 104커밋 중 *기존 테이블*에 컬럼을 schema.sql 에만 추가하고 runner ALTER 를 누락한 경우, prod 에서 컬럼 누락 → `Unknown column` 런타임 에러 (알림 테이블은 신규라 해당 없음, **그 외 테이블은 배포 후 로그 확인 필요**).
-- **검증 단계**: 배포 직후 backend 로그에서 `Unknown column` / `SQLGrammarException` 모니터링.
+## 2. DB 마이그레이션 (자동) — ✅ 드리프트 감사·해소 완료
+- **자동**: `DatabaseMigrationRunner` 가 부팅 시 ① schema.sql 의 `CREATE TABLE IF NOT EXISTS` 전부 실행(신규 테이블 생성) ② 명시적 `ALTER TABLE ADD COLUMN`(idempotent).
+- **사전 드리프트 감사 결과 (2026-06)**: `bluelight_prod`(기존 테이블)에 신규 코드가 기대하는 컬럼 **18종 누락** 확인:
+  - `users`: phone_e164, phone_verified(+_at), whatsapp_opt_in(+_at, _out_at), preferred_language (7)
+  - `applications`: applicant_name/company_name/uen/designation_snapshot, snapshot_backfilled_at, applicant_type, kva_status/source/confirmed_by/confirmed_at, version (11)
+  - 신규 테이블(notification_*, whatsapp_message_log)은 부팅 시 자동 생성 → 드리프트 아님.
+- **해소**: 이 18종을 `DatabaseMigrationRunner.migrateProdParityColumns`(columnExists 가드, 멱등)로 추가 → **prod 배포 부팅 시 자동 보정**. 별도 수동 ALTER 불필요. (커밋 2979b15, dev no-op 검증)
+- **검증 단계(잔여 안전망)**: 배포 직후 backend 로그에서 `Unknown column` / `SQLGrammarException` 모니터링.
 
 ## 3. 알림 템플릿 데이터 시드 (prod 핵심 작업)
 prod 알림 테이블은 신규 생성되므로 **비어 있음**. dev 의 현재 콘텐츠(시드 142행 + 모든 카피 수정 + enabled 상태)를 prod 에 이식해야 함.
@@ -53,10 +57,10 @@ prod 알림 테이블은 신규 생성되므로 **비어 있음**. dev 의 현�
 
 ## 4. 배포 절차 (제안 순서)
 1. **사전 점검**
-   - [ ] develop CI 그린, dev 동작 정상 확인
+   - [x] 스키마 드리프트 감사 → 18컬럼 runner 보정 추가(2979b15)
+   - [x] prod RDS 스냅샷 `bluelight-db-prerelease-notif-20260607`
+   - [ ] develop CI 그린, dev 배포에서 `migrateProdParityColumns` 무에러(no-op) 확인
    - [ ] `PROD_SERVER_HOST_1/2` 시크릿 == 현재 prod IP(43.209.205.207 / 43.210.100.80) 확인
-   - [ ] prod RDS 백업(스냅샷) 생성
-   - [ ] 알림 외 104커밋의 DB 변경 점검(runner ALTER 누락 여부 스폿체크)
 2. **코드 릴리스**: develop → main 머지 → `deploy-prod` 자동 실행(빌드·이미지·2서버 배포, 부팅 시 runner 마이그레이션)
 3. **배포 검증**: 두 서버 컨테이너 health, 웹 200, 로그 `Unknown column` 없음
 4. **알림 시드**: prod RDS 에 notification_catalog + notification_templates 이식(utf8mb4)
