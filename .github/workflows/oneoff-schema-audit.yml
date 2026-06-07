@@ -1,0 +1,44 @@
+name: One-off - Schema drift audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-schema-audit.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Diff dev vs prod columns
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 4m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            echo '=== [A] 양쪽 존재 테이블 중 prod 에 누락된 컬럼 (드리프트 후보) ==='
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "
+                SELECT CONCAT(d.table_name,'.',d.column_name)
+                FROM information_schema.columns d
+                JOIN (SELECT DISTINCT table_name FROM information_schema.columns WHERE table_schema='bluelight_prod') p
+                  ON p.table_name=d.table_name
+                WHERE d.table_schema='bluelight'
+                  AND NOT EXISTS (SELECT 1 FROM information_schema.columns x
+                     WHERE x.table_schema='bluelight_prod' AND x.table_name=d.table_name AND x.column_name=d.column_name)
+                ORDER BY d.table_name, d.ordinal_position;"
+            echo '=== [B] dev 엔 있고 prod 엔 아예 없는 테이블 (배포 시 신규 생성 → 드리프트 아님) ==='
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "
+                SELECT DISTINCT d.table_name FROM information_schema.tables d
+                WHERE d.table_schema='bluelight'
+                  AND d.table_name NOT IN (SELECT table_name FROM information_schema.tables WHERE table_schema='bluelight_prod')
+                ORDER BY d.table_name;"
