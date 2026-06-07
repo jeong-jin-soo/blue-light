@@ -1,0 +1,31 @@
+name: One-off - Show databases
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-show-databases.yml'
+
+jobs:
+  show:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: SHOW DATABASES + dev DB identity
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            echo "=== dev .env DB identity ==="
+            grep -E '^DB_URL=|^MYSQL_DATABASE=' .env | sed 's/password.*/.../'
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            echo "=== SHOW DATABASES ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "SHOW DATABASES;"
