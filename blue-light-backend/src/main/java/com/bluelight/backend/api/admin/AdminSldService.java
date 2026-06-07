@@ -15,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Admin SLD 도면 관리 서비스
+ *
+ * <p>★ 코드 부채 P0 (PR-T8/L-3 후속) — LEW cross-tenant 가드는 컨트롤러
+ * {@code @PreAuthorize("@appSec.isAssignedLew(...)")} 로 단일화. 서비스 내 가드 제거.</p>
  */
 @Slf4j
 @Service

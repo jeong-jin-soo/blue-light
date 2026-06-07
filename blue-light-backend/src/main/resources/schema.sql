@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS users (
     terms_version             VARCHAR(30),
     marketing_opt_in          BOOLEAN       NOT NULL DEFAULT FALSE,
     marketing_opt_in_at       DATETIME(6),
+    -- ★ WhatsApp 알림 인프라 (PR-0A) — phone_e164 가 발송 정본, phone 은 표시용 원본 유지.
+    -- 옵트인은 채널×용도(transactional/marketing) 가 ConsentType 으로 분리되며, 본 컬럼은 ON/OFF 토글 + 최신 변경 시각만 보관.
+    phone_e164                VARCHAR(20),
+    phone_verified            BOOLEAN       NOT NULL DEFAULT FALSE,
+    phone_verified_at         DATETIME(6),
+    whatsapp_opt_in           BOOLEAN       NOT NULL DEFAULT FALSE,
+    whatsapp_opt_in_at        DATETIME(6),
+    whatsapp_opt_out_at       DATETIME(6),
+    preferred_language        VARCHAR(10)   NOT NULL DEFAULT 'en',
     created_at     DATETIME(6),
     updated_at     DATETIME(6),
     created_by     BIGINT,
@@ -332,19 +341,23 @@ CREATE TABLE IF NOT EXISTS sld_requests (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 9. 용량별 단가표
+-- sld_price        : LEW가 SLD 도면을 그려주는 기본 비용
+-- endorsement_price: SLD에 LEW 인증 도장(endorsement)까지 포함할 때 가산되는 비용
 CREATE TABLE IF NOT EXISTS master_prices (
-    master_price_seq BIGINT        NOT NULL AUTO_INCREMENT,
-    description      VARCHAR(50),
-    kva_min          INT           NOT NULL,
-    kva_max          INT           NOT NULL,
-    price            DECIMAL(10,2) NOT NULL,
-    sld_price        DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-    is_active        TINYINT(1)    DEFAULT 1,
-    created_at       DATETIME(6),
-    updated_at       DATETIME(6),
-    created_by       BIGINT,
-    updated_by       BIGINT,
-    deleted_at       DATETIME(6),
+    master_price_seq  BIGINT        NOT NULL AUTO_INCREMENT,
+    description       VARCHAR(50),
+    kva_min           INT           NOT NULL,
+    kva_max           INT           NOT NULL,
+    price             DECIMAL(10,2) NOT NULL,
+    renewal_price     DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    sld_price         DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    endorsement_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    is_active         TINYINT(1)    DEFAULT 1,
+    created_at        DATETIME(6),
+    updated_at        DATETIME(6),
+    created_by        BIGINT,
+    updated_by        BIGINT,
+    deleted_at        DATETIME(6),
     PRIMARY KEY (master_price_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -512,28 +525,33 @@ CREATE TABLE IF NOT EXISTS sld_chat_messages (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 17. SLD 전용 주문
+-- endorsement_requested: 신청자가 LEW 인증 도장(endorsement) 포함 여부 선택 (default true)
+-- sld_fee / endorsement_fee: 견적 제안 시 매니저가 분해 입력. 합계가 quote_amount
 CREATE TABLE IF NOT EXISTS sld_orders (
-    sld_order_seq        BIGINT        NOT NULL AUTO_INCREMENT,
-    user_seq             BIGINT        NOT NULL,
-    assigned_manager_seq BIGINT,
-    address              VARCHAR(255),
-    postal_code          VARCHAR(10),
-    building_type        VARCHAR(50),
-    selected_kva         INT,
-    ampere               VARCHAR(30),
-    applicant_note       TEXT,
-    sketch_file_seq      BIGINT,
-    status               VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
-    quote_amount         DECIMAL(10,2),
-    quote_note           TEXT,
-    manager_note         TEXT,
-    uploaded_file_seq    BIGINT,
-    revision_comment     TEXT,
-    created_at           DATETIME(6),
-    updated_at           DATETIME(6),
-    created_by           BIGINT,
-    updated_by           BIGINT,
-    deleted_at           DATETIME(6),
+    sld_order_seq         BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq              BIGINT        NOT NULL,
+    assigned_manager_seq  BIGINT,
+    address               VARCHAR(255),
+    postal_code           VARCHAR(10),
+    building_type         VARCHAR(50),
+    selected_kva          INT,
+    ampere                VARCHAR(30),
+    applicant_note        TEXT,
+    sketch_file_seq       BIGINT,
+    endorsement_requested TINYINT(1)    NOT NULL DEFAULT 1,
+    status                VARCHAR(30)   NOT NULL DEFAULT 'PENDING_QUOTE',
+    quote_amount          DECIMAL(10,2),
+    sld_fee               DECIMAL(10,2),
+    endorsement_fee       DECIMAL(10,2),
+    quote_note            TEXT,
+    manager_note          TEXT,
+    uploaded_file_seq     BIGINT,
+    revision_comment      TEXT,
+    created_at            DATETIME(6),
+    updated_at            DATETIME(6),
+    created_by            BIGINT,
+    updated_by            BIGINT,
+    deleted_at            DATETIME(6),
     PRIMARY KEY (sld_order_seq),
     KEY idx_sld_orders_user (user_seq),
     KEY idx_sld_orders_status (status),
@@ -1232,3 +1250,244 @@ CREATE TABLE IF NOT EXISTS user_roles (
     KEY idx_user_roles_user (user_seq),
     CONSTRAINT fk_user_roles_user FOREIGN KEY (user_seq) REFERENCES users (user_seq) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- ★ 알림 인프라 일반화 (PR-0A) — WhatsApp 도입 사전 기반
+-- ----------------------------------------------------------------
+-- 이메일/인앱 단일 채널 발송을 ① 채널 어댑터 ② Outbox 패턴 ③ 사용자 환경설정 ④ 템플릿 카탈로그
+-- 로 일반화한다. 본 PR 은 스키마/엔티티만 추가하며 행위 변경은 없다 (PR-0B/0C 에서 적용).
+-- 참고: doc/Project Analysis/whatsapp-notification-plan.md (예정)
+-- ============================================
+
+-- 18. 알림 환경설정 — 사용자 × 이벤트 × 채널 enable/disable.
+-- 행이 없으면 system_settings 의 채널 기본값을 따른다 (Single Source of Truth, CLAUDE.md §설계 원칙).
+CREATE TABLE IF NOT EXISTS notification_preferences (
+    preference_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    user_seq         BIGINT       NOT NULL,
+    event_type       VARCHAR(60)  NOT NULL,   -- NotificationType enum 값
+    channel          VARCHAR(20)  NOT NULL,   -- IN_APP | EMAIL | WHATSAPP
+    enabled          BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at       DATETIME(6),
+    updated_at       DATETIME(6),
+    created_by       BIGINT,
+    updated_by       BIGINT,
+    deleted_at       DATETIME(6),
+    PRIMARY KEY (preference_seq),
+    UNIQUE KEY uk_notif_pref (user_seq, event_type, channel),
+    KEY idx_notif_pref_user (user_seq),
+    CONSTRAINT fk_notif_pref_user FOREIGN KEY (user_seq) REFERENCES users (user_seq) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 19. 알림 템플릿 카탈로그 — (event_type, channel, locale) 단위. 코드 하드코딩 금지.
+-- WhatsApp 은 BSP/Meta 측 사전 승인된 template name 을 provider_template_name 컬럼이 매핑한다.
+-- PR-T1: version(낙관락) + catalog_meta_key/category/severity/recipient_roles (admin 콘솔 메타) 추가.
+CREATE TABLE IF NOT EXISTS notification_templates (
+    template_seq            BIGINT       NOT NULL AUTO_INCREMENT,
+    template_code           VARCHAR(80)  NOT NULL,   -- 예: PAYMENT_REQUEST_APPLICANT
+    channel                 VARCHAR(20)  NOT NULL,   -- IN_APP | EMAIL | WHATSAPP
+    locale                  VARCHAR(10)  NOT NULL,   -- en | ko | zh-Hans
+    provider_template_name  VARCHAR(120),            -- Meta/BSP 등록명 (WhatsApp 필수)
+    subject                 VARCHAR(200),            -- EMAIL 전용
+    body_text               TEXT         NOT NULL,   -- 미리보기 또는 fallback 본문
+    variables_json          TEXT,                    -- {{1}} {{2}} 변수 메타 (검증용 JSON 배열)
+    enabled                 BOOLEAN      NOT NULL DEFAULT TRUE,
+    version                 BIGINT       NOT NULL DEFAULT 0,    -- @Version 낙관락 (ETag/If-Match)
+    catalog_meta_key        VARCHAR(60),                         -- 예: 'A-17' (카피북 §0 식별자)
+    category                VARCHAR(30),                         -- NotificationCategory enum
+    severity                VARCHAR(20),                         -- NotificationSeverity enum
+    recipient_roles         VARCHAR(200),                        -- 'APPLICANT,LEW' D-5 read 필터
+    created_at              DATETIME(6),
+    updated_at              DATETIME(6),
+    created_by              BIGINT,
+    updated_by              BIGINT,
+    deleted_at              DATETIME(6),
+    PRIMARY KEY (template_seq),
+    UNIQUE KEY uk_notif_template (template_code, channel, locale),
+    KEY idx_notif_template_code (template_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 20. 알림 Outbox — manual_email_dispatches 패턴을 모든 채널로 일반화.
+-- 도메인 트랜잭션 안에서 PENDING row 적재 → AFTER_COMMIT 단계에서 채널 어댑터가 외부 호출.
+-- 중복 발송 차단은 idempotency_key UNIQUE 가 1차 가드, BSP 측 dedup id 가 2차 가드.
+-- Soft delete 미적용 (감사 무결성 — ManualEmailDispatch 와 동일).
+-- PR-T1: source/is_test/render_warnings_json 컬럼 추가 — admin 테스트 발송 격리 + 렌더 경고 가시화.
+CREATE TABLE IF NOT EXISTS notification_outbox (
+    outbox_seq            BIGINT        NOT NULL AUTO_INCREMENT,
+    idempotency_key       VARCHAR(160)  NOT NULL,    -- {eventType}:{refType}:{refId}:{userSeq}:{channel}
+    user_seq              BIGINT        NOT NULL,
+    channel               VARCHAR(20)   NOT NULL,    -- IN_APP | EMAIL | WHATSAPP
+    event_type            VARCHAR(60)   NOT NULL,    -- NotificationType enum 값
+    template_code         VARCHAR(80)   NOT NULL,
+    locale                VARCHAR(10)   NOT NULL DEFAULT 'en',
+    payload_json          TEXT          NOT NULL,    -- 렌더링 변수
+    reference_type        VARCHAR(50),
+    reference_id          BIGINT,
+    status                VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
+                                                     -- PENDING | SENDING | SENT | FAILED | DEAD | SKIPPED
+    attempt_count         INT           NOT NULL DEFAULT 0,
+    next_attempt_at       DATETIME(6),
+    last_error            TEXT,
+    sent_at               DATETIME(6),
+    source                VARCHAR(20)   NOT NULL DEFAULT 'PRODUCTION',
+                                                     -- PRODUCTION | ADMIN_TEST (인박스 unread_count 격리)
+    is_test               BOOLEAN       NOT NULL DEFAULT FALSE,  -- source=ADMIN_TEST 와 1:1, 필터 편의
+    render_warnings_json  TEXT,                      -- {"missingKeys":["foo"]} 비치명적 렌더 이슈
+    -- BaseEntity audit (deleted_at 보존만, soft delete 미적용)
+    created_at            DATETIME(6),
+    updated_at            DATETIME(6),
+    created_by            BIGINT,
+    updated_by            BIGINT,
+    deleted_at            DATETIME(6),
+    PRIMARY KEY (outbox_seq),
+    UNIQUE KEY uk_outbox_idem (idempotency_key),
+    KEY idx_outbox_due (status, next_attempt_at),
+    KEY idx_outbox_ref (reference_type, reference_id),
+    KEY idx_outbox_user (user_seq, created_at DESC),
+    CONSTRAINT fk_outbox_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 21. WhatsApp 발송 로그 — 채널 특화 메타데이터 (BSP message id, 배달 상태 등).
+-- 본문 저장 금지 (PDPA 최소화). payload_json 은 변수 슬롯만.
+-- Soft delete 미적용 (감사 무결성).
+CREATE TABLE IF NOT EXISTS whatsapp_message_log (
+    log_seq             BIGINT       NOT NULL AUTO_INCREMENT,
+    outbox_seq          BIGINT       NOT NULL,
+    user_seq            BIGINT       NOT NULL,
+    phone_e164          VARCHAR(20)  NOT NULL,
+    template_code       VARCHAR(80)  NOT NULL,
+    template_locale     VARCHAR(10)  NOT NULL,
+    payload_json        TEXT         NOT NULL,
+    provider            VARCHAR(20)  NOT NULL,    -- META | MOCK (BSP 추가 시 확장)
+    provider_message_id VARCHAR(120),
+    status              VARCHAR(20)  NOT NULL,    -- QUEUED | SENT | DELIVERED | READ | FAILED
+    error_code          VARCHAR(60),
+    error_message       TEXT,
+    sent_at             DATETIME(6),
+    delivered_at        DATETIME(6),
+    read_at             DATETIME(6),
+    created_at          DATETIME(6),
+    updated_at          DATETIME(6),
+    created_by          BIGINT,
+    updated_by          BIGINT,
+    deleted_at          DATETIME(6),
+    PRIMARY KEY (log_seq),
+    KEY idx_wa_provider_msg (provider_message_id),
+    KEY idx_wa_user_status (user_seq, status, created_at DESC),
+    KEY idx_wa_outbox (outbox_seq),
+    CONSTRAINT fk_wa_outbox FOREIGN KEY (outbox_seq) REFERENCES notification_outbox (outbox_seq),
+    CONSTRAINT fk_wa_user FOREIGN KEY (user_seq) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- ★ 알림 템플릿 관리 (PR-T1) — Admin 콘솔에서 카피 편집·publish 2-step·history·롤백
+-- ----------------------------------------------------------------
+-- 스펙: doc/Project Analysis/notification-template-manager-spec.md §5
+-- 기존 notification_templates / notification_outbox 컬럼 추가는 본 파일 하단 ALTER 가이드 참조.
+-- ============================================
+
+-- 22. 알림 카탈로그 메타 — template_code 단위로 허용 변수·기본 카테고리·강제 토큰 정의.
+-- TemplateLinter(L1) 가 본 테이블의 allowed_variables_json 을 SSOT 로 사용한다.
+CREATE TABLE IF NOT EXISTS notification_catalog (
+    catalog_seq               BIGINT       NOT NULL AUTO_INCREMENT,
+    template_code             VARCHAR(80)  NOT NULL,   -- 예: 'A-17' 또는 NotificationType enum 값
+    allowed_variables_json    TEXT         NOT NULL,   -- ["applicantName","amount","publicCode"]
+    default_category          VARCHAR(30)  NOT NULL,   -- NotificationCategory enum
+    default_severity          VARCHAR(20)  NOT NULL,   -- NotificationSeverity enum
+    default_recipient_roles   VARCHAR(200) NOT NULL,   -- 'APPLICANT,LEW' comma-separated
+    description               VARCHAR(500),
+    required_tokens_json      TEXT,                    -- ["{{paynowUen}}","{{optOutUrl}}"] 카테고리별 강제
+    trigger_ref               VARCHAR(255),            -- 발송 트리거(기능/호출부) — 예: 'AdminPaymentService.confirmPayment'
+    created_at                DATETIME(6),
+    updated_at                DATETIME(6),
+    created_by                BIGINT,
+    updated_by                BIGINT,
+    deleted_at                DATETIME(6),
+    PRIMARY KEY (catalog_seq),
+    UNIQUE KEY uk_notif_catalog_code (template_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- 기존 DB(운영/dev RDS) 적용 가이드 — trigger_ref 컬럼 ★ 1회만 ★ 수동 실행:
+--   ALTER TABLE notification_catalog ADD COLUMN trigger_ref VARCHAR(255);
+
+-- 23. 알림 템플릿 Draft — 2-step publish 워크플로 staging row.
+-- NM 이 편집·submit → SYSTEM_ADMIN approve → 본 테이블(notification_templates) 반영.
+-- template_seq=NULL 이면 신규 템플릿 draft, non-null 이면 기존 row 수정 draft.
+CREATE TABLE IF NOT EXISTS notification_template_drafts (
+    draft_seq               BIGINT       NOT NULL AUTO_INCREMENT,
+    template_seq            BIGINT,                   -- FK to notification_templates (nullable)
+    template_code           VARCHAR(80)  NOT NULL,
+    channel                 VARCHAR(20)  NOT NULL,
+    locale                  VARCHAR(10)  NOT NULL,
+    subject                 VARCHAR(200),
+    body_text               TEXT         NOT NULL,
+    variables_json          TEXT,
+    provider_template_name  VARCHAR(120),
+    category                VARCHAR(30),
+    severity                VARCHAR(20),
+    recipient_roles         VARCHAR(200),
+    submitted_by            BIGINT       NOT NULL,    -- NM user_seq
+    submitted_at            DATETIME(6)  NOT NULL,
+    submission_note         VARCHAR(500),
+    status                  VARCHAR(20)  NOT NULL,    -- PENDING | APPROVED | REJECTED | WITHDRAWN
+    reviewed_by             BIGINT,                   -- SYSTEM_ADMIN user_seq
+    reviewed_at             DATETIME(6),
+    review_note             VARCHAR(500),
+    created_at              DATETIME(6),
+    updated_at              DATETIME(6),
+    created_by              BIGINT,
+    updated_by              BIGINT,
+    deleted_at              DATETIME(6),
+    PRIMARY KEY (draft_seq),
+    KEY idx_draft_status (status, submitted_at),
+    KEY idx_draft_template (template_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 24. 알림 템플릿 변경 이력 — append-only 감사 로그 + 롤백 진입점.
+-- BaseEntity 미상속 (감사 무결성). soft delete 미적용.
+CREATE TABLE IF NOT EXISTS notification_template_history (
+    history_seq             BIGINT       NOT NULL AUTO_INCREMENT,
+    template_seq            BIGINT       NOT NULL,
+    change_type             VARCHAR(20)  NOT NULL,    -- CREATE | PUBLISH | ENABLE | DISABLE | ROLLBACK
+    diff_json               TEXT         NOT NULL,    -- {before:{...}, after:{...}} 변경 필드만
+    before_snapshot_json    TEXT         NOT NULL,    -- 전체 row 스냅샷 (롤백용)
+    after_snapshot_json     TEXT         NOT NULL,
+    change_reason           VARCHAR(500),             -- SECURITY/PAYMENT/MARKETING 은 서비스에서 필수 검증
+    actor_user_seq          BIGINT       NOT NULL,
+    actor_ip                VARCHAR(45),
+    changed_at              DATETIME(6)  NOT NULL,
+    PRIMARY KEY (history_seq),
+    KEY idx_history_template (template_seq, changed_at DESC),
+    KEY idx_history_actor (actor_user_seq, changed_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 운영 DB 적용 가이드 (PR-0A) — schema.sql 의 sql.init.mode=always 는 매 부트마다 재실행되므로,
+-- ALTER 구문은 본 파일에 포함시키지 않는다 (MySQL 8.0 은 ADD COLUMN IF NOT EXISTS 미지원).
+-- 이미 users 테이블이 존재하는 환경에서는 아래 ALTER 를 ★ 1회만 ★ 수동 실행한다.
+-- 신규 DB 는 위 CREATE TABLE 정의로 컬럼이 함께 생성되므로 ALTER 불필요.
+--
+-- ALTER TABLE users
+--   ADD COLUMN phone_e164          VARCHAR(20),
+--   ADD COLUMN phone_verified      BOOLEAN     NOT NULL DEFAULT FALSE,
+--   ADD COLUMN phone_verified_at   DATETIME(6),
+--   ADD COLUMN whatsapp_opt_in     BOOLEAN     NOT NULL DEFAULT FALSE,
+--   ADD COLUMN whatsapp_opt_in_at  DATETIME(6),
+--   ADD COLUMN whatsapp_opt_out_at DATETIME(6),
+--   ADD COLUMN preferred_language  VARCHAR(10) NOT NULL DEFAULT 'en';
+--
+-- ============================================
+-- 운영 DB 적용 가이드 (PR-T1) — notification_templates / notification_outbox 컬럼 추가
+-- 신규 DB(local·CI)는 위 CREATE TABLE 정의에 컬럼이 포함되어 자동 생성됨.
+-- 이미 운영 DB 에 두 테이블이 존재하는 환경에서는 아래 ALTER 를 ★ 1회만 ★ 수동 실행한다.
+--
+-- ALTER TABLE notification_templates
+--   ADD COLUMN version           BIGINT       NOT NULL DEFAULT 0,
+--   ADD COLUMN catalog_meta_key  VARCHAR(60),
+--   ADD COLUMN category          VARCHAR(30),
+--   ADD COLUMN severity          VARCHAR(20),
+--   ADD COLUMN recipient_roles   VARCHAR(200);
+--
+-- ALTER TABLE notification_outbox
+--   ADD COLUMN source                VARCHAR(20)  NOT NULL DEFAULT 'PRODUCTION',
+--   ADD COLUMN is_test               BOOLEAN      NOT NULL DEFAULT FALSE,
+--   ADD COLUMN render_warnings_json  TEXT;
+-- ============================================

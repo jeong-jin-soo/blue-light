@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 61 58" width="61mm" height="58mm">
+  <rect width="61" height="58" fill="white" />
+  <polygon points="14.00,35.00 24.00,35.00 24.00,23.00 14.00,23.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="19.00" y1="35.00" x2="23.00" y2="23.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="19.00" y1="38.00" x2="19.00" y2="35.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="19.00" y1="23.00" x2="19.00" y2="20.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="19.00" y1="20.00" x2="19.00" y2="15.00" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="19.00" y1="38.00" x2="19.00" y2="43.00" stroke="#000000" stroke-width="0.5" fill="none" />
+  <rect x="12.00" y="20.00" width="14.00" height="18.00" fill="none" stroke="#999999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="19.00" cy="15.00" r="1.2" fill="red" stroke="none" opacity="0.8" />
+  <text x="21.00" y="14.00" font-size="2" fill="red" font-family="monospace">top</text>
+  <circle cx="19.00" cy="43.00" r="1.2" fill="red" stroke="none" opacity="0.8" />
+  <text x="21.00" y="42.00" font-size="2" fill="red" font-family="monospace">bottom</text>
+  <circle cx="29.00" cy="27.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="31.00" y="26.00" font-size="1.8" fill="blue" font-family="monospace">label_right</text>
+  <circle cx="19.00" cy="46.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="21.00" y="45.00" font-size="1.8" fill="blue" font-family="monospace">rating_below</text>
+  <circle cx="19.00" cy="12.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="21.00" y="11.00" font-size="1.8" fill="blue" font-family="monospace">label_above</text>
+  <text x="30.50" y="56.00" text-anchor="middle" font-size="3" fill="#333" font-family="sans-serif">ISOLATOR_MACHINE (14x18mm)</text>
+</svg>

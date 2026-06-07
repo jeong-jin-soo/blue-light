@@ -34,6 +34,12 @@ interface LewDocumentReviewSectionProps {
   canRequest: boolean;
   applicantDisplayName?: string;
   applicationCode?: string;
+  /**
+   * 서류 요청 상태(승인/반려/취소/생성)가 변동될 때 호출.
+   * 부모(LewReviewFormPage)가 pendingDocCount 가드 등 파생 상태를 갱신하도록
+   * loadData 를 연결한다. 이게 없으면 CoF 탭의 prerequisite 체크리스트가 stale 해진다.
+   */
+  onRequestsChanged?: () => void;
 }
 
 export function LewDocumentReviewSection({
@@ -41,6 +47,7 @@ export function LewDocumentReviewSection({
   canRequest,
   applicantDisplayName,
   applicationCode,
+  onRequestsChanged,
 }: LewDocumentReviewSectionProps) {
   const toast = useToastStore();
 
@@ -112,6 +119,7 @@ export function LewDocumentReviewSection({
       toast.success('Approved');
       // 서버 상태로 refresh (reviewedBy 등 메타 정확화)
       fetchAll();
+      onRequestsChanged?.();  // 부모 가드(pendingDocCount) 갱신
     } catch (err) {
       // 롤백
       setRequests(prev);
@@ -131,6 +139,7 @@ export function LewDocumentReviewSection({
       toast.success('Rejected');
       setRejectTarget(null);
       fetchAll();
+      onRequestsChanged?.();  // 부모 가드(pendingDocCount) 갱신
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
@@ -149,6 +158,7 @@ export function LewDocumentReviewSection({
       toast.success('Request cancelled');
       setCancelTarget(null);
       fetchAll();
+      onRequestsChanged?.();  // 부모 가드(pendingDocCount) 갱신
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
@@ -228,7 +238,10 @@ export function LewDocumentReviewSection({
           applicationCode={applicationCode}
           existingActiveRequests={activeRequests}
           onClose={() => setShowCreateModal(false)}
-          onSuccess={() => fetchAll()}
+          onSuccess={() => {
+            fetchAll();
+            onRequestsChanged?.();  // 새 요청 생성 → 부모 가드(pendingDocCount) 갱신
+          }}
         />
       )}
 

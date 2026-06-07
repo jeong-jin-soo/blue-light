@@ -47,6 +47,8 @@ public class AuthService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailService emailService;
     private final AuditLogService auditLogService;
+    /** PR-0D: signup 시 PDPA/TERMS GRANTED 를 UserConsentLog 에 기록 (감사 증적). */
+    private final UserConsentLogRepository consentLogRepository;
 
     @Value("${password-reset.token-expiry-minutes:60}")
     private int tokenExpiryMinutes;
@@ -67,11 +69,16 @@ public class AuthService {
     /**
      * 회원가입
      *
-     * @param request 회원가입 요청 정보
+     * <p>PR-0D: PDPA/TERMS GRANTED 동의를 {@link UserConsentLog} 에 기록 (IP/UA/document_version
+     * 포함). 컨시어지 경로({@code ConciergeService})와 증적 비대칭을 해소하기 위해 동일한
+     * {@code recordConsent} 패턴 적용. 감사 액션은 {@code USER_CONSENT_RECORDED}.</p>
+     *
+     * @param request      회원가입 요청 정보
+     * @param httpRequest  IP/User-Agent 추출용 (nullable — 내부 호출/테스트용)
      * @return 토큰 응답
      */
     @Transactional
-    public TokenResponse signup(SignupRequest request) {
+    public TokenResponse signup(SignupRequest request, HttpServletRequest httpRequest) {
         // PDPA 동의 검증
         if (request.getPdpaConsent() == null || !request.getPdpaConsent()) {
             throw new BusinessException(
@@ -133,6 +140,8 @@ public class AuthService {
         String emailVerificationToken = emailVerificationEnabled ? UUID.randomUUID().toString() : null;
 
         // 사용자 생성 (LEW는 승인 대기 상태로 시작)
+        LocalDateTime now = LocalDateTime.now();
+        String termsVersion = TermsVersion.CURRENT;
         User user = User.builder()
                 .email(request.getEmail())
                 .password(encodedPassword)
@@ -146,12 +155,22 @@ public class AuthService {
                 .lewGrade(lewGrade)
                 .emailVerified(!emailVerificationEnabled)
                 .emailVerificationToken(emailVerificationToken)
-                .pdpaConsentAt(LocalDateTime.now())
+                .pdpaConsentAt(now)
+                // PR-0D: signup 동의 스냅샷 (컨시어지 경로와 일관성). signupSource 는 DIRECT_SIGNUP.
+                .signupConsentAt(now)
+                .termsVersion(termsVersion)
+                .signupSource(SignupSource.DIRECT_SIGNUP)
                 .build();
 
         User savedUser = userRepository.save(user);
         log.info("회원가입 완료: userSeq={}, email={}, emailVerified={}",
                 savedUser.getUserSeq(), savedUser.getEmail(), savedUser.isEmailVerified());
+
+        // PR-0D: PDPA + TERMS GRANTED 를 UserConsentLog 에 기록 (감사 증적, ConciergeService 패턴).
+        String ip = extractIp(httpRequest);
+        String ua = userAgent(httpRequest);
+        recordSignupConsent(savedUser, ConsentType.PDPA, termsVersion, ip, ua);
+        recordSignupConsent(savedUser, ConsentType.TERMS, termsVersion, ip, ua);
 
         // 이메일 인증 메일 발송
         if (emailVerificationEnabled) {
@@ -161,6 +180,30 @@ public class AuthService {
 
         // JWT 토큰 생성 및 반환
         return createTokenResponse(savedUser);
+    }
+
+    /**
+     * PR-0D: signup 시 동의 1건을 {@link UserConsentLog} 에 GRANTED 로 기록.
+     * {@link com.bluelight.backend.api.concierge.ConciergeService#recordConsent} 패턴과 동일하며
+     * {@link ConsentSourceContext#DIRECT_SIGNUP} 으로 발생 맥락을 구분한다.
+     */
+    private void recordSignupConsent(User user, ConsentType type, String version, String ip, String ua) {
+        UserConsentLog entry = UserConsentLog.builder()
+                .user(user)
+                .consentType(type)
+                .action(ConsentAction.GRANTED)
+                .documentVersion(version)
+                .sourceContext(ConsentSourceContext.DIRECT_SIGNUP)
+                .ipAddress(ip)
+                .userAgent(ua)
+                .build();
+        consentLogRepository.save(entry);
+
+        auditLogService.logAsync(
+                user.getUserSeq(), AuditAction.USER_CONSENT_RECORDED, AuditCategory.DATA_PROTECTION,
+                "user_consent_log", null,
+                "Consent recorded: type=" + type + " version=" + version,
+                null, null, ip, ua, "POST", "/api/auth/signup", 201);
     }
 
     /**

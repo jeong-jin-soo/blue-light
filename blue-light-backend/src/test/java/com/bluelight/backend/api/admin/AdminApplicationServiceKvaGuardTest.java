@@ -51,6 +51,8 @@ class AdminApplicationServiceKvaGuardTest {
         when(app.getKvaStatus()).thenReturn(KvaStatus.UNKNOWN);
         when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
 
+        // ★ 코드 부채 P0 단일화 — LEW 가드는 컨트롤러 SpEL @appSec.isAssignedLew 로 이관됨.
+        // 본 단위 테스트는 KVA_NOT_CONFIRMED 비즈니스 가드만 검증.
         assertThatThrownBy(() -> service.approveForPayment(1L))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> {

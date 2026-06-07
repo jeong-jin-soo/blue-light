@@ -31,6 +31,9 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	// Jackson — Spring Boot 4 의 분리된 starter 구조에서 jackson 이 transitive 로 안 와서 명시 추가
+	// (PR-0B: NotificationOutboxWriter 의 payload JSON 직렬화). 버전은 Spring Boot BOM 관리.
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
 
 	// PDF Generation (LOA)
 	implementation 'com.github.librepdf:openpdf:2.0.3'

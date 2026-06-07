@@ -140,3 +140,16 @@ mail:
 audit:
   retention-days: ${AUDIT_RETENTION_DAYS:365}          # 원본 보존 기간 (이후 아카이브)
   archive-retention-years: ${AUDIT_ARCHIVE_YEARS:5}    # 아카이브 보유 기간 (Privacy Policy 5년)
+
+# WhatsApp 알림 (Phase 1, PR-1A)
+# - provider=mock (기본): MockWhatsappClient — 외부 호출 없이 stdout 로그.
+# - provider=meta:        MetaCloudWhatsappClient (PR-1B) — Meta Graph API 직접 호출. 자격증명 필요.
+# - enabled=false 면 PreferenceResolver 가 WHATSAPP 채널 자체를 비활성 (사용자 옵트인과 무관, 시스템 토글).
+whatsapp:
+  provider: ${WHATSAPP_PROVIDER:mock}
+  enabled: ${WHATSAPP_ENABLED:true}
+  # Meta Cloud API 자격증명 (provider=meta 일 때만 필요, PR-1B 에서 활성화)
+  # meta:
+  #   phone-number-id: ${WHATSAPP_META_PHONE_NUMBER_ID:}
+  #   access-token:    ${WHATSAPP_META_ACCESS_TOKEN:}
+  #   app-secret:      ${WHATSAPP_META_APP_SECRET:}    # Webhook 서명 검증용

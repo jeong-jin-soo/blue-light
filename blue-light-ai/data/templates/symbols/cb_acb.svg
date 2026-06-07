@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 61.0 62" width="61.0mm" height="62mm">
+  <rect width="61.0" height="62" fill="white" />
+  <circle cx="20.00" cy="36.00" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <circle cx="20.00" cy="26.00" r="1.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <path d="M 20.00,35.00 A 4.00,4.00 0 0,0 20.00,27.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="20.00" y1="25.00" x2="20.00" y2="20.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="20.00" y1="42.00" x2="20.00" y2="37.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <line x1="20.00" y1="20.00" x2="20.00" y2="15.00" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="20.00" y1="42.00" x2="20.00" y2="47.00" stroke="#000000" stroke-width="0.5" fill="none" />
+  <line x1="13.00" y1="31.00" x2="27.00" y2="31.00" stroke="#000000" stroke-width="0.7" fill="none" />
+  <rect x="12.00" y="20.00" width="16.00" height="22.00" fill="none" stroke="#999999" stroke-width="0.2" stroke-dasharray="2,2" />
+  <circle cx="20.00" cy="15.00" r="1.2" fill="red" stroke="none" opacity="0.8" />
+  <text x="22.00" y="14.00" font-size="2" fill="red" font-family="monospace">top</text>
+  <circle cx="20.00" cy="47.00" r="1.2" fill="red" stroke="none" opacity="0.8" />
+  <text x="22.00" y="46.00" font-size="2" fill="red" font-family="monospace">bottom</text>
+  <circle cx="29.00" cy="27.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="31.00" y="26.00" font-size="1.8" fill="blue" font-family="monospace">label_right</text>
+  <circle cx="20.00" cy="50.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="22.00" y="49.00" font-size="1.8" fill="blue" font-family="monospace">rating_below</text>
+  <circle cx="20.00" cy="12.00" r="1.0" fill="blue" stroke="none" opacity="0.7" />
+  <text x="22.00" y="11.00" font-size="1.8" fill="blue" font-family="monospace">label_above</text>
+  <text x="30.50" y="60.00" text-anchor="middle" font-size="3" fill="#333" font-family="sans-serif">CB_ACB (16x22mm)</text>
+</svg>

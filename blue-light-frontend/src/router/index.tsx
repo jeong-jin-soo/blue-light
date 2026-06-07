@@ -51,6 +51,10 @@ import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPag
 import AdminUserListPage from '../pages/admin/AdminUserListPage';
 import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
 import AdminManualEmailPage from '../pages/admin/AdminManualEmailPage';
+// PR-T6 — 알림 템플릿 관리
+import AdminNotificationTemplateListPage from '../pages/admin/AdminNotificationTemplateListPage';
+import AdminNotificationTemplateEditPage from '../pages/admin/AdminNotificationTemplateEditPage';
+import AdminNotificationTemplateDraftReviewPage from '../pages/admin/AdminNotificationTemplateDraftReviewPage';
 
 // System Admin pages
 import SystemSettingsPage from '../pages/admin/SystemSettingsPage';
@@ -220,6 +224,45 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/manual-emails', element: <AdminManualEmailPage /> },
+        ],
+      },
+    ],
+  },
+
+  // ★ PR-T6 — 알림 템플릿 관리.
+  // ADMIN 단독 운영: ADMIN 은 작성·편집·발송·승인까지 full (NM 역할 미사용). SYSTEM_ADMIN 도 full.
+  // LEW/SLD_MANAGER/CONCIERGE_MANAGER 는 read-only 로 접근 가능 (D-5 — recipient_roles 필터).
+  {
+    element: (
+      <ProtectedRoute
+        allowedRoles={[
+          'NOTIFICATION_MANAGER',
+          'SYSTEM_ADMIN',
+          'ADMIN',
+          'LEW',
+          'SLD_MANAGER',
+          'CONCIERGE_MANAGER',
+        ]}
+      />
+    ),
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          {
+            path: '/admin/notification-templates',
+            element: <AdminNotificationTemplateListPage />,
+          },
+          {
+            // 편집은 직접 저장(2단계 없음). 이 큐는 XLIFF/CSV 번역 일괄 import 가 만든
+            // draft 검토·게시 전용으로 유지 (메인 메뉴에서는 비노출).
+            path: '/admin/notification-templates/drafts',
+            element: <AdminNotificationTemplateDraftReviewPage />,
+          },
+          {
+            path: '/admin/notification-templates/:id',
+            element: <AdminNotificationTemplateEditPage />,
+          },
         ],
       },
     ],

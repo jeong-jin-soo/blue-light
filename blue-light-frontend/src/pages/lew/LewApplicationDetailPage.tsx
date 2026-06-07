@@ -11,7 +11,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
 import documentApi from '../../api/documentApi';
-import lewReviewApi from '../../api/lewReviewApi';
+import { useRequestPayment } from '../../hooks/useRequestPayment';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import {
   deriveLewPrimaryAction,
@@ -48,9 +48,8 @@ export default function LewApplicationDetailPage() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // PR3: "Request payment" CTA 흐름 — confirm dialog + 호출 진행 상태
+  // PR3: "Request payment" CTA 흐름 — confirm dialog 오픈 상태 (호출 진행 상태는 useRequestPayment 훅이 관리)
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
-  const [requestingPayment, setRequestingPayment] = useState(false);
 
   // PR-3 (kva-postpayment): LEW kVA 조정 요청 모달 오픈 상태
   const [showKvaAdjustmentModal, setShowKvaAdjustmentModal] = useState(false);
@@ -90,55 +89,17 @@ export default function LewApplicationDetailPage() {
   }, [applicationId, toast]);
 
   /**
-   * PR3: LEW가 결제 요청을 트리거.
-   *
-   * - 가드 위반 코드(KVA_NOT_CONFIRMED / DOCUMENT_REQUESTS_PENDING)는 toast + review 페이지로 이동 안내
-   * - 성공 시 toast + 페이지 새로고침 (status가 PENDING_PAYMENT로 전이됨)
+   * PR3: LEW 결제 요청 — 공통 훅으로 단일화 (진입 페이지/리뷰 폼 공유).
+   * 가드 위반(kVA/서류)은 리뷰 폼으로 이동, 성공/stale 은 데이터 리프레시.
    */
-  const handleRequestPayment = useCallback(async () => {
+  const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
+    applicationId,
+    { onSuccess: fetchData, onStaleState: fetchData },
+  );
+  const handleRequestPayment = useCallback(() => {
     setShowRequestPaymentConfirm(false);
-    setRequestingPayment(true);
-    try {
-      await lewReviewApi.requestPayment(applicationId);
-      toast.success('Payment requested. The applicant will be notified to pay the licence fee.');
-      await fetchData();
-    } catch (err: unknown) {
-      const e = err as {
-        response?: { data?: { code?: string; message?: string } };
-        message?: string;
-      };
-      const code = e?.response?.data?.code ?? null;
-      const message =
-        e?.response?.data?.message ?? e?.message ?? 'Failed to request payment';
-      const reviewUrl = `/lew/applications/${applicationId}/review`;
-      switch (code) {
-        case 'KVA_NOT_CONFIRMED':
-          toast.error('kVA must be confirmed before requesting payment.');
-          navigate(reviewUrl);
-          break;
-        case 'DOCUMENT_REQUESTS_PENDING':
-          toast.error(
-            'Resolve all pending document requests before requesting payment.',
-          );
-          navigate(reviewUrl);
-          break;
-        case 'INVALID_STATUS_TRANSITION':
-          toast.warning(
-            'This application is no longer in review — refreshing latest state.',
-          );
-          await fetchData();
-          break;
-        case 'APPLICATION_NOT_ASSIGNED':
-          toast.error('You are no longer assigned to this application.');
-          navigate('/lew/applications');
-          break;
-        default:
-          toast.error(message);
-      }
-    } finally {
-      setRequestingPayment(false);
-    }
-  }, [applicationId, fetchData, navigate, toast]);
+    void runRequestPayment();
+  }, [runRequestPayment]);
 
   useEffect(() => {
     fetchData();

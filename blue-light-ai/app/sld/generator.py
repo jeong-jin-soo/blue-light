@@ -384,9 +384,13 @@ class SldPipeline:
 
     # -- 이하 모든 _draw_* 메서드는 SldPipeline._generate_once()에서 호출 --
 
-    def _get_symbol(self, symbol_name: str) -> Symbol | None:
-        """Get a unified Symbol instance (Block or Procedural)."""
-        return create_symbol(symbol_name, _BLOCK_REPLAYER)
+    def _get_symbol(self, symbol_name: str, *, force_procedural: bool = False) -> Symbol | None:
+        """Get a unified Symbol instance (Block or Procedural).
+
+        force_procedural=True 시 BlockReplayer를 무시하고 항상 ProceduralSymbol을 반환.
+        sub-component 합성에서 native-horizontal block의 텍스트 회전을 피하기 위해 사용.
+        """
+        return create_symbol(symbol_name, None if force_procedural else _BLOCK_REPLAYER)
 
     @staticmethod
     def _build_ditto_map(
@@ -513,7 +517,10 @@ class SldPipeline:
 
         Uses the unified Symbol interface — no block_used branching.
         """
-        symbol = self._get_symbol(comp.symbol_name)
+        symbol = self._get_symbol(
+            comp.symbol_name,
+            force_procedural=getattr(comp, "force_procedural", False),
+        )
         if not symbol:
             if comp.symbol_name == "CB_SPARE" and comp.label:
                 _cfg = layout_result.config or LayoutConfig()

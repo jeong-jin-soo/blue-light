@@ -199,25 +199,19 @@ public class AdminApplicationService {
 
     /**
      * Get application detail (admin view)
-     * LEW는 자신에게 배정된 신청서만 조회 가능
+     *
+     * <p>★ 코드 부채 P0 (PR-T8 H-2 단일화) — LEW cross-tenant 가드는 컨트롤러
+     * {@code @PreAuthorize("@appSec.isAssignedLew(...)")} 가 단일 책임. 서비스 내 가드 제거.</p>
      */
-    public AdminApplicationResponse getApplication(Long applicationSeq, Long userSeq, String role) {
+    public AdminApplicationResponse getApplication(Long applicationSeq) {
         Application application = findApplicationOrThrow(applicationSeq);
-
-        // LEW → 배정된 신청서만 접근 허용
-        if ("ROLE_LEW".equals(role)) {
-            Long assignedLewSeq = application.getAssignedLew() != null
-                    ? application.getAssignedLew().getUserSeq() : null;
-            if (assignedLewSeq == null || !assignedLewSeq.equals(userSeq)) {
-                throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-            }
-        }
-
         return AdminApplicationResponse.from(application);
     }
 
     /**
      * Update application status
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     @Transactional
     public AdminApplicationResponse updateStatus(Long applicationSeq, UpdateStatusRequest request) {
@@ -243,6 +237,8 @@ public class AdminApplicationService {
 
     /**
      * Complete application and issue licence
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     @Transactional
     public AdminApplicationResponse completeApplication(Long applicationSeq, CompleteApplicationRequest request) {
@@ -284,6 +280,8 @@ public class AdminApplicationService {
 
     /**
      * LEW 보완 요청
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     @Transactional
     public AdminApplicationResponse requestRevision(Long applicationSeq, RevisionRequestDto request) {
@@ -312,6 +310,8 @@ public class AdminApplicationService {
 
     /**
      * LEW 검토 승인 → 결제 요청
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     @Transactional
     public AdminApplicationResponse approveForPayment(Long applicationSeq) {
@@ -348,6 +348,11 @@ public class AdminApplicationService {
 
     // --- Private helpers ---
 
+    /**
+     * ★ 코드 부채 P0 — 이전 PR-T8 의 {@code ensureLewCanAccess} 는 컨트롤러
+     * {@code @PreAuthorize("@appSec.isAssignedLew(...)")} 로 이관 완료. 본 서비스에서 제거.
+     * SpEL 빈: {@link com.bluelight.backend.common.security.AppSecurity}.
+     */
     private Application findApplicationOrThrow(Long applicationSeq) {
         return applicationRepository.findById(applicationSeq)
                 .orElseThrow(() -> new BusinessException(

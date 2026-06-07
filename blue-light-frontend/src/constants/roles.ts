@@ -8,6 +8,7 @@ export const USER_ROLES = [
   'CONCIERGE_MANAGER',
   'ADMIN',
   'SYSTEM_ADMIN',
+  'NOTIFICATION_MANAGER',
 ] as const;
 
 export type UserRole = typeof USER_ROLES[number];
@@ -21,4 +22,5 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   CONCIERGE_MANAGER: 'Concierge Manager',
   ADMIN: 'Administrator',
   SYSTEM_ADMIN: 'System Admin',
+  NOTIFICATION_MANAGER: '알림 매니저',
 };

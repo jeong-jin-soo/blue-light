@@ -72,7 +72,8 @@ public class SldManagerController {
     public ResponseEntity<SldOrderResponse> proposeQuote(
             @PathVariable Long id,
             @Valid @RequestBody ProposeQuoteRequest request) {
-        log.info("SLD 견적 제안: orderSeq={}, amount={}", id, request.getQuoteAmount());
+        log.info("SLD 견적 제안: orderSeq={}, sldFee={}, endorsementFee={}",
+                id, request.getSldFee(), request.getEndorsementFee());
         SldOrderResponse response = sldManagerService.proposeQuote(id, request);
         return ResponseEntity.ok(response);
     }

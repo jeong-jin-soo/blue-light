@@ -45,6 +45,10 @@ public class BatchPriceTierItem {
     @DecimalMin(value = "0.00", message = "SLD price must be non-negative")
     private BigDecimal sldPrice;
 
+    @NotNull(message = "Endorsement price is required")
+    @DecimalMin(value = "0.00", message = "Endorsement price must be non-negative")
+    private BigDecimal endorsementPrice;
+
     @NotNull(message = "Active status is required")
     private Boolean isActive;
 }

@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.SldChatMessageResponse;
 import com.bluelight.backend.api.admin.dto.SldChatRequest;
 import com.bluelight.backend.api.application.dto.SldRequestResponse;
+import com.bluelight.backend.common.security.AuthPrincipal;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,9 @@ import java.util.Map;
  * SLD AI 채팅 API 컨트롤러
  * - LEW/Admin이 AI와 대화하며 SLD를 생성
  * - Spring Boot가 Python AI 서비스를 프록시
+ *
+ * <p>★ 코드 부채 P0 (PR-T8/L-3 후속) — LEW cross-tenant 가드는 메서드 @PreAuthorize 의
+ * @appSec.isAssignedLew SpEL 빈으로 단일화. 서비스 단 ensureLewCanAccess 제거.</p>
  */
 @Slf4j
 @RestController
@@ -33,16 +37,20 @@ public class SldChatController {
     /**
      * SSE 스트리밍 채팅
      * POST /api/admin/applications/:id/sld-chat/stream
+     *
+     * <p>userSeq 는 채팅 메시지 작성자 기록용으로 서비스에 전달 (가드 용도 아님).</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping(value = "/applications/{id}/sld-chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter chatStream(
             @PathVariable Long id,
             @Valid @RequestBody SldChatRequest request,
             Authentication authentication) {
 
-        Long userSeq = (Long) authentication.getPrincipal();
+        Long userSeq = AuthPrincipal.userSeq(authentication);
         log.info("SLD chat stream: applicationSeq={}, userSeq={}, message={}",
-                id, userSeq, request.getMessage().substring(0, Math.min(request.getMessage().length(), 50)));
+                id, userSeq,
+                request.getMessage().substring(0, Math.min(request.getMessage().length(), 50)));
 
         SseEmitter emitter = new SseEmitter(600_000L);  // 10분 (Gemini API 호출 시 긴 대기 가능)
         sldAgentService.chatStream(id, userSeq, request.getMessage(), request.getAttachedFileSeq(), emitter);
@@ -54,6 +62,7 @@ public class SldChatController {
      * 채팅 이력 조회
      * GET /api/admin/applications/:id/sld-chat/history
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/sld-chat/history")
     public ResponseEntity<List<SldChatMessageResponse>> getChatHistory(@PathVariable Long id) {
         log.info("SLD chat history request: applicationSeq={}", id);
@@ -65,6 +74,7 @@ public class SldChatController {
      * 대화 초기화
      * POST /api/admin/applications/:id/sld-chat/reset
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-chat/reset")
     public ResponseEntity<Map<String, String>> resetChat(@PathVariable Long id) {
         log.info("SLD chat reset: applicationSeq={}", id);
@@ -76,6 +86,7 @@ public class SldChatController {
      * SLD 수락 — AI 생성 SLD PDF를 파일 저장소에 저장하고 SldRequest 상태를 UPLOADED로 전환
      * POST /api/admin/applications/:id/sld-chat/accept
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-chat/accept")
     public ResponseEntity<SldRequestResponse> acceptSld(
             @PathVariable Long id,
@@ -91,6 +102,7 @@ public class SldChatController {
      * SVG 미리보기 조회
      * GET /api/admin/applications/:id/sld-chat/preview/:fileId
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping(value = "/applications/{id}/sld-chat/preview/{fileId}", produces = "image/svg+xml")
     public ResponseEntity<String> getSvgPreview(
             @PathVariable Long id,
@@ -105,6 +117,7 @@ public class SldChatController {
      * AI 생성 파일 다운로드 (PDF/DXF)
      * GET /api/admin/applications/{id}/sld-chat/download/{fileId}?format=pdf|dxf
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/sld-chat/download/{fileId}")
     public ResponseEntity<byte[]> downloadGeneratedFile(
             @PathVariable Long id,

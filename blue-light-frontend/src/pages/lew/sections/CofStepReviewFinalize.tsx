@@ -278,12 +278,15 @@ function GuardChecklist({
 }) {
   const items: {
     key: 'kva' | 'documents' | 'sld';
+    /** 미충족 시 이동 버튼에 표시할 목적지 탭 이름 (각 항목을 구분하기 위함). */
+    tabLabel: string;
     ok: boolean;
     label: string;
     hint: string;
   }[] = [
     {
       key: 'kva',
+      tabLabel: 'kVA',
       ok: guards.kvaConfirmed,
       label: 'kVA confirmed',
       hint: guards.kvaConfirmed
@@ -292,6 +295,7 @@ function GuardChecklist({
     },
     {
       key: 'documents',
+      tabLabel: 'Documents',
       ok: guards.pendingDocCount === 0,
       label: 'Document requests resolved',
       hint:
@@ -302,6 +306,7 @@ function GuardChecklist({
     ...(guards.sldRequired
       ? [{
           key: 'sld' as const,
+          tabLabel: 'SLD',
           ok: guards.sldReady,
           label: 'SLD uploaded and confirmed',
           hint: guards.sldReady
@@ -341,9 +346,9 @@ function GuardChecklist({
               <button
                 type="button"
                 onClick={() => onJumpToTab(item.key)}
-                className="text-xs font-medium text-primary-600 hover:text-primary-800 underline"
+                className="shrink-0 text-xs font-medium text-primary-600 hover:text-primary-800 underline whitespace-nowrap"
               >
-                Go to tab →
+                Go to {item.tabLabel} →
               </button>
             )}
           </li>

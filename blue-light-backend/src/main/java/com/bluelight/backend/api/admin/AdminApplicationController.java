@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.*;
+import com.bluelight.backend.common.security.AuthPrincipal;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.application.KvaStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
@@ -49,8 +50,8 @@ public class AdminApplicationController {
      */
     @GetMapping("/dashboard")
     public ResponseEntity<AdminDashboardResponse> getDashboard(Authentication authentication) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        Long userSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
         log.info("Admin dashboard requested: userSeq={}, role={}", userSeq, role);
         AdminDashboardResponse response = adminApplicationService.getDashboardSummary(userSeq, role);
         return ResponseEntity.ok(response);
@@ -69,8 +70,8 @@ public class AdminApplicationController {
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
+        Long userSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
         int validPage = Math.max(0, page);
         int validSize = Math.min(Math.max(1, size), 100);
         log.info("Admin get all applications: userSeq={}, role={}, status={}, kvaStatus={}, search={}, page={}, size={}",
@@ -84,22 +85,25 @@ public class AdminApplicationController {
     /**
      * Get application detail (admin view)
      * GET /api/admin/applications/:id
-     * LEW는 자신에게 배정된 신청서만 조회 가능
+     *
+     * <p>★ 코드 부채 P0 (PR-T8/L-3 후속) — LEW cross-tenant 가드는 메서드 @PreAuthorize 의
+     * @appSec.isAssignedLew SpEL 빈으로 단일화. 서비스 내 ensureLewCanAccess 제거.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}")
-    public ResponseEntity<AdminApplicationResponse> getApplication(
-            Authentication authentication, @PathVariable Long id) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("Admin get application detail: applicationSeq={}, userSeq={}, role={}", id, userSeq, role);
-        AdminApplicationResponse response = adminApplicationService.getApplication(id, userSeq, role);
+    public ResponseEntity<AdminApplicationResponse> getApplication(@PathVariable Long id) {
+        log.info("Admin get application detail: applicationSeq={}", id);
+        AdminApplicationResponse response = adminApplicationService.getApplication(id);
         return ResponseEntity.ok(response);
     }
 
     /**
      * Update application status
      * PATCH /api/admin/applications/:id/status
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 SpEL @appSec.isAssignedLew 로 단일화.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @Auditable(action = AuditAction.APPLICATION_STATUS_CHANGE, category = AuditCategory.ADMIN, entityType = "Application")
     @PatchMapping("/applications/{id}/status")
     public ResponseEntity<AdminApplicationResponse> updateStatus(
@@ -151,7 +155,10 @@ public class AdminApplicationController {
     /**
      * Complete application and issue licence
      * POST /api/admin/applications/:id/complete
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 SpEL @appSec.isAssignedLew 로 단일화.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @Auditable(action = AuditAction.APPLICATION_COMPLETED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/complete")
     public ResponseEntity<AdminApplicationResponse> completeApplication(
@@ -165,7 +172,10 @@ public class AdminApplicationController {
     /**
      * Request revision from applicant
      * POST /api/admin/applications/:id/revision
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 SpEL @appSec.isAssignedLew 로 단일화.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @Auditable(action = AuditAction.APPLICATION_REVISION_REQUESTED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/revision")
     public ResponseEntity<AdminApplicationResponse> requestRevision(
@@ -179,7 +189,10 @@ public class AdminApplicationController {
     /**
      * Approve application and request payment
      * POST /api/admin/applications/:id/approve
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 SpEL @appSec.isAssignedLew 로 단일화.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @Auditable(action = AuditAction.APPLICATION_APPROVED, category = AuditCategory.ADMIN, entityType = "Application")
     @PostMapping("/applications/{id}/approve")
     public ResponseEntity<AdminApplicationResponse> approveForPayment(@PathVariable Long id) {
@@ -191,7 +204,11 @@ public class AdminApplicationController {
     /**
      * Get payment history for an application
      * GET /api/admin/applications/:id/payments
+     *
+     * <p>★ 코드 부채 P0 확대 (PR-T8/L-3/P0 후속) — getPayments 만 누락되어 LEW 가 타인
+     * 배정 신청서의 결제 이력 열람 가능했음. 동일 SpEL 가드 적용.</p>
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/payments")
     public ResponseEntity<List<PaymentResponse>> getPayments(@PathVariable Long id) {
         log.info("Admin get payments: applicationSeq={}", id);

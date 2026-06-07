@@ -1933,4 +1933,32 @@ public class SmtpEmailService implements EmailService {
                 </html>
                 """.formatted(code, name, code, supportMail);
     }
+
+    // ── PR-0C: Generic notification email (NotificationChannelAdapter 패턴) ──────
+
+    /**
+     * Generic 알림 발송 — {@code EmailChannelAdapter} 가 호출한다.
+     *
+     * <p>본문은 호출 측이 이미 변수 치환 + HTML 안전화를 마친 완성된 HTML. 본 메서드는 단순 SMTP
+     * 전송만 책임. 실패 시 {@link RuntimeException} 전파 ({@code sendManualPlainTextEmail} 정책과 동일).</p>
+     */
+    @Override
+    public void sendGenericEmail(String to, String subject, String htmlBody) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject(subject == null || subject.isBlank() ? "[LicenseKaki] Notice" : subject);
+            helper.setText(htmlBody == null ? "" : htmlBody, true);
+            mailSender.send(message);
+            log.info("Generic notification email sent: to={}, subjectLen={}, bodyLen={}",
+                    to,
+                    subject == null ? 0 : subject.length(),
+                    htmlBody == null ? 0 : htmlBody.length());
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send generic notification email to: {}", to, e);
+            throw new RuntimeException("Generic email dispatch failed: " + e.getMessage(), e);
+        }
+    }
 }

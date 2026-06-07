@@ -8,6 +8,10 @@ env:
   AWS_REGION: ap-southeast-7
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-southeast-7.amazonaws.com
   IMAGE_TAG: ${{ github.sha }}
+  # ★ 트랙 4.2 Node 24 마이그 — 6/16 default 전환 전 안전망.
+  # 핵심 actions(checkout/setup-node/cache/setup-java/setup-python/configure-aws-creds)는
+  # v5+/v6+ 로 이미 Node 24 사용. 잔여 v2 (amazon-ecr-login)도 본 env 로 Node 24 강제.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ============================================
@@ -21,16 +25,16 @@ jobs:
         working-directory: blue-light-backend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Cache Gradle dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -41,11 +45,8 @@ jobs:
       - name: Build
         run: ./gradlew build --no-daemon -x test
 
-      - name: Upload JAR artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-jar
-          path: blue-light-backend/build/libs/*.jar
+      # JAR artifact 업로드 불필요 — docker-push 가 자체 checkout+build (multi-stage Dockerfile)
+      # 과거 잔여 artifact 누적 → GitHub Actions storage quota 초과 사고. 의존성 없으니 제거.
 
   # ============================================
   # Frontend: Build & Lint
@@ -58,10 +59,10 @@ jobs:
         working-directory: blue-light-frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'npm'
@@ -85,10 +86,10 @@ jobs:
     environment: development
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -135,7 +136,7 @@ jobs:
     environment: development
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Copy docker-compose to server
         uses: appleboy/scp-action@v0.1.7

@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 /**
  * Admin/LEW SLD 도면 관리 API 컨트롤러
+ *
+ * <p>★ 코드 부채 P0 (PR-T8/L-3 후속) — LEW cross-tenant 가드는 메서드 @PreAuthorize
+ * 의 @appSec.isAssignedLew SpEL 빈으로 단일화. 서비스 단 ensureLewCanAccess 제거.</p>
  */
 @Slf4j
 @RestController
@@ -25,6 +28,7 @@ public class AdminSldController {
      * Get SLD request for an application
      * GET /api/admin/applications/:id/sld-request
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @GetMapping("/applications/{id}/sld-request")
     public ResponseEntity<SldRequestResponse> getAdminSldRequest(@PathVariable Long id) {
         log.info("Admin get SLD request: applicationSeq={}", id);
@@ -36,6 +40,7 @@ public class AdminSldController {
      * Mark SLD as uploaded by LEW
      * POST /api/admin/applications/:id/sld-uploaded
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-uploaded")
     public ResponseEntity<SldRequestResponse> uploadSld(
             @PathVariable Long id,
@@ -49,6 +54,7 @@ public class AdminSldController {
      * Confirm SLD
      * POST /api/admin/applications/:id/sld-confirm
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-confirm")
     public ResponseEntity<SldRequestResponse> confirmSld(@PathVariable Long id) {
         log.info("Admin/LEW SLD confirmed: applicationSeq={}", id);
@@ -60,6 +66,7 @@ public class AdminSldController {
      * Unconfirm SLD (reopen for re-upload)
      * POST /api/admin/applications/:id/sld-unconfirm
      */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
     @PostMapping("/applications/{id}/sld-unconfirm")
     public ResponseEntity<SldRequestResponse> unconfirmSld(@PathVariable Long id) {
         log.info("Admin/LEW SLD unconfirmed (reopened): applicationSeq={}", id);

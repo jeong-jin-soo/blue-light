@@ -506,6 +506,11 @@ class PlacedComponent:
     no_trip_arrow: bool = False  # True = skip trip mechanism arrow (e.g., BI crossbar feeder MCB)
     label_side: str = ""         # "left" = label on left side (CT metering spine/crossbar MCBs)
     crossbar_extend: float = 0   # >0 = draw extended horizontal crossbar through BI_CONNECTOR center (mm right)
+    # 트랙 B: BlockSymbol이 native horizontal block(예: KWH_METER 1067×533 DU)을 vertical 배치 시
+    # 90°로 회전시키면서 내부 텍스트("KWH")도 함께 회전하는 문제 회피용.
+    # True면 generator가 BlockReplayer를 무시하고 ProceduralSymbol로 fallback해
+    # 텍스트가 항상 수평으로 그려진다.
+    force_procedural: bool = False
     # -- DB_INFO_BOX sub-anchors (layout determines, renderer uses as-is) --
     rating_offset_y: float = -4.0    # Y offset for rating text relative to title
     title_char_height: float = 3.0   # Title text char_height (mm)

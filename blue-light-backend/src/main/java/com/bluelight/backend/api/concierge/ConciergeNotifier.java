@@ -1,8 +1,6 @@
 package com.bluelight.backend.api.concierge;
 
-import com.bluelight.backend.api.email.EmailService;
-import com.bluelight.backend.api.notification.NotificationService;
-import com.bluelight.backend.domain.notification.NotificationType;
+import com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent;
 import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -11,15 +9,16 @@ import com.bluelight.backend.domain.user.UserStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Concierge 신청 관련 알림 오케스트레이터 (★ Kaki Concierge v1.5, Phase 1 PR#2 Stage B).
@@ -39,8 +38,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ConciergeNotifier {
 
-    private final NotificationService notificationService;
-    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
     private final UserRepository userRepository;
     private final SystemSettingRepository systemSettingRepository;
 
@@ -69,89 +67,43 @@ public class ConciergeNotifier {
                                  String setupTokenUuid,
                                  LocalDateTime expiresAt,
                                  ConciergeCaseResolver.Case resolverCase) {
-        afterCommit(() -> {
-            safeSendApplicantEmail(applicantEmail, applicantFullName, setupTokenUuid, expiresAt, resolverCase);
-            safeCreateApplicantNotification(conciergeRequestSeq, applicantEmail, publicCode);
-            safeNotifyStaff(conciergeRequestSeq, publicCode, applicantFullName, applicantEmail);
-        });
-    }
-
-    // ─── 신청자 이메일 (N1 / N1-Alt) ─────────────────────────────
-
-    private void safeSendApplicantEmail(String email, String name, String token,
-                                         LocalDateTime expiresAt,
-                                         ConciergeCaseResolver.Case c) {
-        if (!hasEmail(email)) return;
-        try {
-            if (c == ConciergeCaseResolver.Case.C2_EXISTING_ACTIVE) {
-                emailService.sendConciergeRequestReceivedExistingUserEmail(email, name);
-            } else {
-                // C1, C3 — 활성화 링크 포함 N1
-                String setupUrl = setupBaseUrl + "/setup-account/" + token;
-                String expStr = expiresAt == null ? "" :
-                    expiresAt.atZone(SG_ZONE).format(EXPIRES_FMT);
-                emailService.sendConciergeRequestReceivedEmail(email, name, setupUrl, expStr);
-            }
-        } catch (Exception e) {
-            log.warn("Concierge applicant email send failed (suppressed): email={}, case={}, err={}",
-                email, c, e.getMessage());
+        // 신청자 접수 확인 (A-31) — #A 옵션1: 단일 템플릿. C2(기존 활성계정)는 setupUrl/expiresAtDisplay 빈 값.
+        User applicant = userRepository.findByEmail(applicantEmail).orElse(null);
+        if (applicant != null) {
+            String setupUrl = setupTokenUuid != null ? setupBaseUrl + "/setup-account/" + setupTokenUuid : "";
+            String expStr = expiresAt != null ? expiresAt.atZone(SG_ZONE).format(EXPIRES_FMT) : "";
+            Map<String, String> a31 = new LinkedHashMap<>();
+            a31.put("applicantName", applicantFullName);
+            a31.put("publicCode", publicCode);
+            a31.put("setupUrl", setupUrl);
+            a31.put("expiresAtDisplay", expStr);
+            a31.put("ctaUrl", !setupUrl.isEmpty() ? setupUrl : "/dashboard");
+            eventPublisher.publishEvent(new NotificationDispatchEvent(
+                    "CONCIERGE_REQUEST_SUBMITTED", applicant.getUserSeq(),
+                    "CONCIERGE_REQUEST", conciergeRequestSeq, "A-31", a31));
         }
-    }
 
-    // ─── 신청자 인앱 알림 ─────────────────────────────
-
-    private void safeCreateApplicantNotification(Long conciergeRequestSeq, String email, String publicCode) {
-        try {
-            User user = userRepository.findByEmail(email).orElse(null);
-            if (user == null) return;
-            notificationService.createNotification(
-                user.getUserSeq(),
-                NotificationType.CONCIERGE_REQUEST_SUBMITTED,
-                "Concierge request received",
-                "Your Kaki Concierge request (" + publicCode
-                    + ") has been received. A manager will contact you within 24 hours.",
-                "CONCIERGE_REQUEST", conciergeRequestSeq);
-        } catch (Exception e) {
-            log.warn("Concierge applicant in-app notification failed (suppressed): email={}, err={}",
-                email, e.getMessage());
-        }
-    }
-
-    // ─── 스태프 이메일 + 인앱 (N2) ─────────────────────────────
-
-    private void safeNotifyStaff(Long conciergeRequestSeq, String publicCode,
-                                  String applicantName, String applicantEmail) {
+        // 스태프 알림 — 매니저(C-01) / 어드민(M-03) 분리. 권한자 전원(ACTIVE) 대상.
         List<User> staff;
         try {
             staff = userRepository.findByRoleInAndStatus(
-                List.of(UserRole.ADMIN, UserRole.CONCIERGE_MANAGER),
-                UserStatus.ACTIVE);
+                    List.of(UserRole.ADMIN, UserRole.CONCIERGE_MANAGER), UserStatus.ACTIVE);
         } catch (Exception e) {
             log.warn("Concierge staff lookup failed (suppressed): err={}", e.getMessage());
             return;
         }
-
         for (User s : staff) {
-            try {
-                if (hasEmail(s.getEmail())) {
-                    emailService.sendConciergeStaffNewRequestEmail(
-                        s.getEmail(), s.getFullName(), publicCode, applicantName, applicantEmail);
-                }
-            } catch (Exception e) {
-                log.warn("Concierge staff email failed (suppressed): userSeq={}, err={}",
-                    s.getUserSeq(), e.getMessage());
-            }
-            try {
-                notificationService.createNotification(
-                    s.getUserSeq(),
-                    NotificationType.CONCIERGE_REQUEST_SUBMITTED,
-                    "New Kaki Concierge request",
-                    publicCode + " — " + applicantName + " (" + applicantEmail + ")",
-                    "CONCIERGE_REQUEST", conciergeRequestSeq);
-            } catch (Exception e) {
-                log.warn("Concierge staff in-app notification failed (suppressed): userSeq={}, err={}",
-                    s.getUserSeq(), e.getMessage());
-            }
+            boolean isManager = s.getRole() == UserRole.CONCIERGE_MANAGER;
+            Map<String, String> sp = new LinkedHashMap<>();
+            sp.put("publicCode", publicCode);
+            sp.put("applicantName", applicantFullName);
+            sp.put("applicantEmail", applicantEmail);
+            sp.put("managerName", s.getFullName());
+            sp.put("ctaUrl", isManager ? "/concierge-manager/requests" : "/admin/applications");
+            eventPublisher.publishEvent(new NotificationDispatchEvent(
+                    "CONCIERGE_REQUEST_SUBMITTED", s.getUserSeq(),
+                    "CONCIERGE_REQUEST", conciergeRequestSeq,
+                    isManager ? "C-01" : "M-03", sp));
         }
     }
 
@@ -169,37 +121,33 @@ public class ConciergeNotifier {
                                  LocalDateTime callScheduledAt,
                                  String managerNote,
                                  String verificationPhrase) {
-        // PayNow 설정값을 tx 내에서 fetch — afterCommit 훅에선 DB 세션이 닫힘
+        // A-33 (CONCIERGE_QUOTE_SENT) — 오케스트레이터 경로. 채널(E+I)·locale·옵트인은 orchestrator 결정.
+        // PayNow 설정은 설정 우선 원칙대로 system_settings 에서 조회.
+        User applicant = userRepository.findByEmail(applicantEmail).orElse(null);
+        if (applicant == null) return;
         String paynowUen = readSetting("payment_paynow_uen");
         String paynowName = readSetting("payment_paynow_name");
 
-        afterCommit(() -> {
-            if (!hasEmail(applicantEmail)) return;
-            try {
-                emailService.sendConciergeQuoteEmail(
-                    applicantEmail, applicantName, publicCode,
-                    quotedAmount, callScheduledAt, managerNote,
-                    verificationPhrase, paynowUen, paynowName);
-            } catch (Exception e) {
-                log.warn("Concierge quote email send failed (suppressed): email={}, publicCode={}, err={}",
-                    applicantEmail, publicCode, e.getMessage());
-            }
-            // 인앱 알림도 병행 발송
-            try {
-                User user = userRepository.findByEmail(applicantEmail).orElse(null);
-                if (user != null) {
-                    notificationService.createNotification(
-                        user.getUserSeq(),
-                        NotificationType.CONCIERGE_REQUEST_SUBMITTED,
-                        "Quote ready for your concierge request",
-                        "We have emailed you payment details for " + publicCode + ".",
-                        "CONCIERGE_REQUEST", conciergeRequestSeq);
-                }
-            } catch (Exception e) {
-                log.warn("Concierge quote in-app notification failed (suppressed): email={}, err={}",
-                    applicantEmail, e.getMessage());
-            }
-        });
+        Map<String, String> p = new LinkedHashMap<>();
+        p.put("applicantName", applicantName);
+        p.put("publicCode", publicCode);
+        p.put("quotedAmount", quotedAmount != null ? quotedAmount.toPlainString() : "");
+        p.put("verificationPhrase", verificationPhrase != null ? verificationPhrase : "");
+        p.put("paynowUen", paynowUen != null ? paynowUen : "");
+        p.put("paynowAccountName", paynowName != null ? paynowName : "");
+        p.put("paynowReference", publicCode); // 수취 식별용 — 컨시어지 공개 코드 사용
+        if (managerNote != null && !managerNote.isBlank()) {
+            p.put("managerNote", managerNote);
+        }
+        if (callScheduledAt != null) {
+            p.put("callScheduledAt",
+                    callScheduledAt.atZone(SG_ZONE).format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm 'SGT'")));
+        }
+        eventPublisher.publishEvent(new NotificationDispatchEvent(
+                "CONCIERGE_QUOTE_SENT",
+                applicant.getUserSeq(),
+                "CONCIERGE_REQUEST", conciergeRequestSeq,
+                "A-33", p));
     }
 
     private String readSetting(String key) {
@@ -213,25 +161,4 @@ public class ConciergeNotifier {
         }
     }
 
-    // ─── 내부 헬퍼 ─────────────────────────────
-
-    /**
-     * afterCommit 훅 등록. 활성 트랜잭션이 없으면 즉시 실행 (테스트/예외 경로 견고성).
-     */
-    private void afterCommit(Runnable task) {
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                @Override
-                public void afterCommit() {
-                    task.run();
-                }
-            });
-        } else {
-            task.run();
-        }
-    }
-
-    private static boolean hasEmail(String email) {
-        return email != null && !email.isBlank();
-    }
 }

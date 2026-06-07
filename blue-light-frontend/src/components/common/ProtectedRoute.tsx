@@ -30,11 +30,13 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     // 역할 불일치 시 역할별 기본 페이지로 리다이렉트
+    // ★ PR-T7 (보안 감사 H-4) — NOTIFICATION_MANAGER 분기 추가, 무한 redirect 회피.
     const redirectPath = user.role === 'SYSTEM_ADMIN' ? '/admin/system'
       : user.role === 'ADMIN' ? '/admin/dashboard'
       : user.role === 'LEW' ? '/lew/dashboard'
       : user.role === 'SLD_MANAGER' ? '/sld-manager/dashboard'
       : user.role === 'CONCIERGE_MANAGER' ? '/concierge-manager/dashboard'
+      : user.role === 'NOTIFICATION_MANAGER' ? '/admin/notification-templates'
       : '/dashboard';
     return <Navigate to={redirectPath} replace />;
   }

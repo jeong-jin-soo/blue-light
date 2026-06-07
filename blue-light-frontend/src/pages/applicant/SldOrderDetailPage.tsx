@@ -252,12 +252,30 @@ export default function SldOrderDetailPage() {
             <Card>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">Quote Proposal</h2>
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Quote Amount</span>
+                {/* Breakdown */}
+                {order.sldFee != null && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">SLD drawing fee</span>
+                    <span className="text-gray-800">SGD ${order.sldFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {order.endorsementRequested !== false && order.endorsementFee != null && order.endorsementFee > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">LEW endorsement fee</span>
+                    <span className="text-gray-800">SGD ${order.endorsementFee.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t border-yellow-200 pt-3">
+                  <span className="text-sm font-medium text-gray-700">Total quote</span>
                   <span className="text-xl font-bold text-gray-800">
                     SGD ${order.quoteAmount?.toLocaleString()}
                   </span>
                 </div>
+                {order.endorsementRequested === false && (
+                  <p className="text-xs text-gray-500 italic">
+                    LEW endorsement was not requested for this order.
+                  </p>
+                )}
                 {order.quoteNote && (
                   <div className="border-t border-yellow-200 pt-3">
                     <p className="text-xs text-gray-500 mb-1">Quote Note:</p>

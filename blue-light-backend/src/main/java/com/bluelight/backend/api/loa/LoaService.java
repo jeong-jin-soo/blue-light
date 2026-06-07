@@ -25,13 +25,15 @@ import com.bluelight.backend.domain.user.UserRole;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +58,8 @@ public class LoaService {
     private final UserRepository userRepository;
     private final ConciergeRequestRepository conciergeRequestRepository;
     private final EmailService emailService;
+    // PR-W3a: 알림 오케스트레이터 경로(A-36 등) — 레거시 EmailService 직접발송 대체.
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * LOA PDF 생성 (Admin/LEW 액션)
@@ -307,31 +311,23 @@ public class LoaService {
                 extractIp(httpRequest), userAgent(httpRequest),
                 "POST", "/api/admin/applications/{id}/loa/upload-signature", 201);
 
-        // 10. afterCommit — N5-UploadConfirm 이메일 (7일 이의 제기 창구)
-        final String applicantEmail = application.getUser().getEmail();
-        final String applicantName = application.getUser().getFullName();
-        final String managerName = manager.getFullName();
-        final String memoFinal = memo;
-        Runnable sendConfirm = () -> {
-            try {
-                emailService.sendConciergeLoaUploadConfirmEmail(
-                        applicantEmail, applicantName, managerName, applicationSeq, memoFinal);
-            } catch (Exception e) {
-                log.warn("LOA upload confirm email failed (suppressed): applicationSeq={}, err={}",
-                        applicationSeq, e.getMessage());
-            }
-        };
-        if (TransactionSynchronizationManager.isSynchronizationActive()) {
-            TransactionSynchronizationManager.registerSynchronization(
-                    new TransactionSynchronization() {
-                        @Override
-                        public void afterCommit() {
-                            sendConfirm.run();
-                        }
-                    });
-        } else {
-            sendConfirm.run();
+        // 10. A-36 (CONCIERGE_LOA_UPLOAD_CONFIRM) — 오케스트레이터 경로.
+        //     orchestrator 의 @TransactionalEventListener(AFTER_COMMIT) 가 커밋 후 발송을 보장하므로
+        //     수동 TransactionSynchronization 불필요. 채널(현재 EMAIL)·locale·옵트인은 orchestrator 결정.
+        Map<String, String> a36 = new LinkedHashMap<>();
+        a36.put("applicantName", application.getUser().getFullName());
+        a36.put("managerName", manager.getFullName());
+        a36.put("publicCode", linkedCr != null ? linkedCr.getPublicCode() : "APP-" + applicationSeq);
+        if (memo != null && !memo.isBlank()) {
+            a36.put("managerNote", memo);
         }
+        a36.put("objectionDeadline",
+                LocalDateTime.now().plusDays(7).format(DateTimeFormatter.ofPattern("dd MMM yyyy")));
+        eventPublisher.publishEvent(new NotificationDispatchEvent(
+                "CONCIERGE_LOA_UPLOAD_CONFIRM",
+                application.getUser().getUserSeq(),
+                "APPLICATION", applicationSeq,
+                "A-36", a36));
 
         log.info("LOA signature uploaded by manager: applicationSeq={}, managerSeq={}, role={}",
                 applicationSeq, managerSeq, role);

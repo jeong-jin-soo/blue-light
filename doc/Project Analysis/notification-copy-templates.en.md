@@ -428,7 +428,7 @@ Every in-app notification creates a `Notification` row with:
   > 1. We match a LEW to your application based on workload and location.
   > 2. The LEW reviews your floor plan and may request additional documents.
   > 3. Once approved, we'll prompt you for payment via PayNow.
-  > 4. After payment, on-site work begins and your licence is issued upon completion.
+  > 4. After payment, work begins and your licence is issued upon completion.
   >
   > A PDF receipt is attached to this email for your records.
 - **Primary CTA**: `Track my application` → `{{ctaUrl}}` (`/applications/{{publicCode}}`)
@@ -758,7 +758,7 @@ Every in-app notification creates a `Notification` row with:
 - **Body**:
   > Hello {{applicantName}},
   >
-  > Good news — your Licensed Electrical Worker has confirmed the scope of work for application **#{{publicCode}}** ({{kvaLabel}}). To begin the on-site work, please settle the payment below by **{{deadline}}**.
+  > Good news — your Licensed Electrical Worker has confirmed the scope of work for application **#{{publicCode}}** ({{kvaLabel}}). To begin the work, please settle the payment below by **{{deadline}}**.
   >
   > **Amount due**: SGD {{amount}}
   > **PayNow UEN**: {{paynowUen}}
@@ -811,7 +811,7 @@ Every in-app notification creates a `Notification` row with:
   > **PayNow UEN**: {{paynowUen}}
   > **Reference**: {{paynowReference}}
   >
-  > Once we match your payment, your LEW will begin on-site work right away.
+  > Once we match your payment, your LEW will begin work right away.
 - **Primary CTA**: `Pay via PayNow` → `{{ctaUrl}}` (`/applications/{{publicCode}}/payment`)
 - **Footer reason**: `you have an outstanding payment on LicenseKaki.`
 - **Opt-out**: REMINDER — opt-out available (note: D-1 escalation cannot be disabled)
@@ -877,14 +877,14 @@ Every in-app notification creates a `Notification` row with:
 
 **Email**
 - **Subject**: `[LicenseKaki] Payment received · #{{publicCode}}`
-- **Pre-header**: `On-site work will now begin. Receipt attached.`
+- **Pre-header**: `Work will now begin. Receipt attached.`
 - **Headline**: `Payment received. Work is starting.`
 - **Body**:
   > Hello {{applicantName}},
   >
   > We've received your PayNow payment of **SGD {{amount}}** for application **#{{publicCode}}** on **{{paidAtDisplay}}**. Thank you.
   >
-  > Your reviewer **{{lewName}}** will now coordinate the on-site work and submit the licence to authorities. We'll keep you posted as the status changes.
+  > Your reviewer **{{lewName}}** will now coordinate the work and submit the licence to authorities. We'll keep you posted as the status changes.
   >
   > A PDF receipt is attached for your records.
 - **Primary CTA**: `View application` → `{{ctaUrl}}` (`/applications/{{publicCode}}`)
@@ -2195,11 +2195,11 @@ Same structure as A-39. Identifier text changed to "Expired Licence visit". SMS 
 **Email**
 - **Subject**: `[LicenseKaki] Payment received — work can start · #{{publicCode}}`
 - **Pre-header**: `Site address and applicant contact inside.`
-- **Headline**: `Payment confirmed. You can now begin on-site work.`
+- **Headline**: `Payment confirmed. You can now begin work.`
 - **Body**:
   > Hello {{lewName}},
   >
-  > Application **#{{publicCode}}** has been paid. You can now coordinate on-site work.
+  > Application **#{{publicCode}}** has been paid. You can now coordinate the work.
   >
   > - **Site address**: {{installationAddress}}
   > - **Applicant phone**: {{applicantPhone?}}
@@ -2886,8 +2886,21 @@ See §8 digest card 2.
 | Channels | E + I |
 | Trigger | `ConciergeNotifier.notifySubmitted` (already implemented) |
 | Reference | `ConciergeRequest#{publicCode}` |
+| Variables | `{{publicCode}}`, `{{ctaUrl}}` |
 
-Same content shape as M-03 but routed to manager team. Subject: `[LicenseKaki] New concierge request · #{{publicCode}}`.
+**Email**
+- **Subject**: `[LicenseKaki] New concierge request · #{{publicCode}}`
+- **Pre-header**: `Begin first contact within the 24-hour SLA.`
+- **Headline**: `New concierge request to handle.`
+- **Body**:
+  > A new concierge request **#{{publicCode}}** has been submitted. Open it to begin first contact within the 24-hour SLA.
+- **Primary CTA**: `Open request` → `{{ctaUrl}}`
+- **Opt-out**: STATUS — opt-out unavailable
+
+**In-app**
+- **Title**: `New concierge: #{{publicCode}}`
+- **Body**: `A new request needs a manager.`
+- **Deep-link**: `/concierge-manager/requests`
 
 ---
 

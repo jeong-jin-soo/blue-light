@@ -90,7 +90,7 @@ class LewReviewControllerTest {
             // GlobalExceptionHandler advice를 장착하여 실제 운영과 동일한 예외→응답 매핑을 재현.
             // BusinessException, MethodArgumentNotValidException, ObjectOptimisticLockingFailureException을
             // 모두 advice가 처리한다. 별도 custom resolver를 세팅하면 advice resolver가 대체되므로 쓰지 않는다.
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(new GlobalExceptionHandler(mock(com.bluelight.backend.api.audit.AuditLogService.class)))
             .build();
         SecurityContextHolder.getContext().setAuthentication(lewAuth());
     }

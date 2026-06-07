@@ -49,6 +49,7 @@ public enum NotificationType {
     CONCIERGE_REQUEST_ASSIGNED,               // N3: 담당자 배정 시 담당자
     CONCIERGE_ACCOUNT_SETUP_LINK_SENT,        // N-Activation: 계정 설정 링크 발송
     CONCIERGE_LOA_SIGN_REQUIRED,              // N5: LOA 서명 요청 (신청자)
+    CONCIERGE_QUOTE_SENT,                     // A-33: 견적(수수료/PayNow) 발송 (신청자) — PR-W3a
     CONCIERGE_LOA_UPLOAD_CONFIRM,             // N5-UploadConfirm: 대리 업로드 확인 (7일 이의 제기)
     CONCIERGE_LICENCE_PAYMENT_REQUIRED,       // N6b: 라이선스 결제 요청 (신청자)
     CONCIERGE_COMPLETED,                      // N7: 컨시어지 프로세스 완료

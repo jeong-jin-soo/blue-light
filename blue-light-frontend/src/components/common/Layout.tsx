@@ -31,6 +31,8 @@ export default function Layout() {
   const isLew = user?.role === 'LEW' && user?.approved;
   const isSldManager = user?.role === 'SLD_MANAGER';
   const isConciergeManager = user?.role === 'CONCIERGE_MANAGER';
+  // ★ PR-T7 (보안 감사 H-4) — NOTIFICATION_MANAGER 분기. 알림 카피·미리보기·테스트 발송 전용.
+  const isNotificationManager = user?.role === 'NOTIFICATION_MANAGER';
 
   const handleLogout = () => {
     logout();
@@ -41,7 +43,7 @@ export default function Layout() {
   const applicantMenu = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/applications', label: 'My Applications', icon: '📋' },
-    { path: '/applications/new', label: 'New Application', icon: '➕' },
+    { path: '/applications/new', label: 'New / Renew Licence', icon: '➕' },
     { path: '/sld-orders', label: 'SLD Orders', icon: '📐' },
     { path: '/lighting-orders', label: 'Lighting Layout', icon: '💡' },
     { path: '/power-socket-orders', label: 'Power Socket', icon: '🔌' },
@@ -55,6 +57,8 @@ export default function Layout() {
     { path: '/admin/applications', label: 'Applications', icon: '📋' },
     // admin-manual-email-spec.md §7.1: ADMIN 사이드바 노출, SYSTEM_ADMIN 은 미노출(직접 URL 진입만 가능)
     { path: '/admin/manual-emails', label: 'Manual Email', icon: '✉️' },
+    // ADMIN 단독 운영 — 알림 템플릿 직접 저장(2단계 승인 없음). 신규는 비활성 생성 → 확인 후 활성.
+    { path: '/admin/notification-templates', label: 'Notification Templates', icon: '🔔' },
     { path: '/admin/prices', label: 'Settings', icon: '⚙️' },
     { path: '/admin/users', label: 'Users', icon: '👥' },
   ];
@@ -72,6 +76,11 @@ export default function Layout() {
     { path: '/lew/applications', label: 'Applications', icon: '📋' },
     // ★ Concierge 강화 PR-4 — LEW 본인에 배정된 컨시어지 요청 목록.
     { path: '/lew/concierge-requests', label: 'My Concierge', icon: '🤝' },
+  ];
+
+  // NOTIFICATION_MANAGER: 알림 카피 편집·미리보기·테스트 발송 전용 (PR-T7).
+  const notificationManagerMenu = [
+    { path: '/admin/notification-templates', label: 'Notification Templates', icon: '✉️' },
   ];
 
   const sldManagerMenu = [
@@ -98,6 +107,7 @@ export default function Layout() {
     : isLew ? lewMenu
     : isSldManager ? sldManagerMenu
     : isConciergeManager ? conciergeManagerMenu
+    : isNotificationManager ? notificationManagerMenu
     : applicantMenu;
 
   const isActive = (path: string) => location.pathname === path;
@@ -108,6 +118,7 @@ export default function Layout() {
     : isLew ? roleLabels.LEW
     : isSldManager ? roleLabels.SLD_MANAGER
     : isConciergeManager ? roleLabels.CONCIERGE_MANAGER
+    : isNotificationManager ? roleLabels.NOTIFICATION_MANAGER
     : roleLabels.APPLICANT;
 
   const homePath = isSystemAdmin ? '/admin/system'
@@ -115,6 +126,7 @@ export default function Layout() {
     : isLew ? '/lew/dashboard'
     : isSldManager ? '/sld-manager/dashboard'
     : isConciergeManager ? '/concierge-manager/dashboard'
+    : isNotificationManager ? '/admin/notification-templates'
     : '/dashboard';
 
   return (

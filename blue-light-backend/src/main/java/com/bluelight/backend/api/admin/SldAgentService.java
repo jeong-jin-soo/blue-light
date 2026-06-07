@@ -76,7 +76,9 @@ public class SldAgentService {
         }
 
         // 동기 트랜잭션: 신청 정보 조회 + 사용자 메시지 저장 + SLD 상태 전환
-        // Lazy 연관(User, AssignedLew)을 트랜잭션 내에서 접근하기 위해 묶어서 처리
+        // Lazy 연관(User, AssignedLew)을 트랜잭션 내에서 접근하기 위해 묶어서 처리.
+        // ★ 코드 부채 P0 — LEW cross-tenant 가드는 컨트롤러 @PreAuthorize SpEL 단일화.
+        //   userSeq 는 SldChatMessage 작성자 기록용으로 계속 전달.
         Map<String, Object> applicationInfo = transactionTemplate.execute(status -> {
             Application application = applicationRepository.findById(applicationSeq)
                     .orElseThrow(() -> new BusinessException(
@@ -259,6 +261,8 @@ public class SldAgentService {
 
     /**
      * 채팅 이력 조회
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     public List<SldChatMessageResponse> getChatHistory(Long applicationSeq) {
         validateApplicationExists(applicationSeq);
@@ -271,6 +275,8 @@ public class SldAgentService {
     /**
      * 대화 초기화 — MySQL 이력 + Python 체크포인트 + temp 파일 모두 삭제
      * Reset 후 다음 메시지는 완전히 새로운 AI 대화로 시작됨
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     @Transactional
     public void resetChat(Long applicationSeq) {
@@ -298,6 +304,8 @@ public class SldAgentService {
     /**
      * SLD PDF 수락 — Python에서 생성된 PDF 파일을 가져와서 FileStorageService로 저장
      * → SldRequest를 UPLOADED 상태로 전환
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     @Transactional
     public SldRequestResponse acceptSld(Long applicationSeq, String fileId) {
@@ -369,6 +377,8 @@ public class SldAgentService {
 
     /**
      * SVG 미리보기 조회 — Python 서비스에서 SVG 문자열 가져오기
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     public String getSvgPreview(Long applicationSeq, String fileId) {
         validateApplicationExists(applicationSeq);
@@ -390,6 +400,8 @@ public class SldAgentService {
 
     /**
      * AI 생성 파일 다운로드 (PDF/DXF) -- Python 서비스에서 바이트 가져오기
+     *
+     * <p>★ 코드 부채 P0 — LEW 가드는 컨트롤러 SpEL 단일화.</p>
      */
     public byte[] downloadGeneratedFile(Long applicationSeq, String fileId, String format) {
         validateApplicationExists(applicationSeq);
@@ -458,6 +470,9 @@ public class SldAgentService {
             );
         }
     }
+
+    // ★ 코드 부채 P0 — 이전 L-3 의 ensureLewCanAccess 오버로드는 컨트롤러
+    //   @PreAuthorize("@appSec.isAssignedLew(...)") 로 이관 완료. 서비스 단 가드 제거.
 
     /**
      * SLD 생성에 필요한 신청 정보를 Map으로 구성 (Python 서비스에 전달)

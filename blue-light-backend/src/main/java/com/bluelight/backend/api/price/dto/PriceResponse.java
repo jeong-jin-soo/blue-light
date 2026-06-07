@@ -19,6 +19,8 @@ public class PriceResponse {
     private Integer kvaMax;
     private BigDecimal price;
     private BigDecimal renewalPrice;
+    private BigDecimal sldPrice;
+    private BigDecimal endorsementPrice;
     /**
      * 공개 API는 is_active=true만 반환하지만, FE가 `tiers.filter(t => t.isActive)`로
      * 재필터링하는 기존 관례를 유지할 수 있도록 명시적으로 true를 포함한다.
@@ -34,6 +36,8 @@ public class PriceResponse {
                 .kvaMax(masterPrice.getKvaMax())
                 .price(masterPrice.getPrice())
                 .renewalPrice(masterPrice.getRenewalPrice())
+                .sldPrice(masterPrice.getSldPrice())
+                .endorsementPrice(masterPrice.getEndorsementPrice())
                 .isActive(Boolean.TRUE.equals(masterPrice.getIsActive()))
                 .build();
     }

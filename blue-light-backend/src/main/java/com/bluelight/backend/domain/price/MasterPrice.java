@@ -58,10 +58,17 @@ public class MasterPrice extends BaseEntity {
     private BigDecimal renewalPrice = BigDecimal.ZERO;
 
     /**
-     * SLD 작성 비용 (SGD) — LEW에게 SLD 요청 시 추가 비용
+     * SLD 작성 비용 (SGD) — LEW가 SLD 도면을 그려주는 기본 비용
      */
     @Column(name = "sld_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal sldPrice = BigDecimal.ZERO;
+
+    /**
+     * SLD endorsement 비용 (SGD) — LEW 인증 도장 추가 시 가산되는 비용
+     * 총 SLD 가격 = sldPrice + endorsementPrice (endorsement 옵션 선택 시)
+     */
+    @Column(name = "endorsement_price", nullable = false, precision = 10, scale = 2)
+    private BigDecimal endorsementPrice = BigDecimal.ZERO;
 
     /**
      * 사용 여부
@@ -70,13 +77,17 @@ public class MasterPrice extends BaseEntity {
     private Boolean isActive = true;
 
     @Builder
-    public MasterPrice(String description, Integer kvaMin, Integer kvaMax, BigDecimal price, BigDecimal renewalPrice, BigDecimal sldPrice, Boolean isActive) {
+    public MasterPrice(String description, Integer kvaMin, Integer kvaMax,
+                       BigDecimal price, BigDecimal renewalPrice,
+                       BigDecimal sldPrice, BigDecimal endorsementPrice,
+                       Boolean isActive) {
         this.description = description;
         this.kvaMin = kvaMin;
         this.kvaMax = kvaMax;
         this.price = price;
         this.renewalPrice = renewalPrice != null ? renewalPrice : BigDecimal.ZERO;
         this.sldPrice = sldPrice != null ? sldPrice : BigDecimal.ZERO;
+        this.endorsementPrice = endorsementPrice != null ? endorsementPrice : BigDecimal.ZERO;
         this.isActive = isActive != null ? isActive : true;
     }
 
@@ -99,6 +110,13 @@ public class MasterPrice extends BaseEntity {
      */
     public void updateSldPrice(BigDecimal sldPrice) {
         this.sldPrice = sldPrice != null ? sldPrice : BigDecimal.ZERO;
+    }
+
+    /**
+     * Endorsement 비용 수정
+     */
+    public void updateEndorsementPrice(BigDecimal endorsementPrice) {
+        this.endorsementPrice = endorsementPrice != null ? endorsementPrice : BigDecimal.ZERO;
     }
 
     /**
