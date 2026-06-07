@@ -1,4 +1,4 @@
-name: One-off - Show databases
+name: One-off - Inspect prod DB
 
 on:
   workflow_dispatch:
@@ -8,11 +8,11 @@ on:
       - '.github/workflows/oneoff-show-databases.yml'
 
 jobs:
-  show:
+  inspect:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: SHOW DATABASES + dev DB identity
+      - name: Inspect bluelight_prod notification tables
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
@@ -21,11 +21,18 @@ jobs:
           command_timeout: 3m
           script: |
             cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
-            echo "=== dev .env DB identity ==="
-            grep -E '^DB_URL=|^MYSQL_DATABASE=' .env | sed 's/password.*/.../'
             MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
             DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
-            echo "=== SHOW DATABASES ==="
+            echo "=== bluelight_prod: notification% 테이블 ==="
             docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
-              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "SHOW DATABASES;"
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e \
+              "SELECT table_name FROM information_schema.tables WHERE table_schema='bluelight_prod' AND table_name LIKE 'notification%' ORDER BY table_name;"
+            echo "=== bluelight_prod.notification_templates 컬럼 (있으면) ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e \
+              "SELECT COLUMN_NAME FROM information_schema.columns WHERE table_schema='bluelight_prod' AND table_name='notification_templates' ORDER BY ordinal_position;"
+            echo "=== bluelight_prod.notification_templates row 수 (있으면) ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e \
+              "SELECT IFNULL((SELECT COUNT(*) FROM bluelight_prod.notification_templates), 'TABLE_ABSENT');" 2>&1 | tail -1
