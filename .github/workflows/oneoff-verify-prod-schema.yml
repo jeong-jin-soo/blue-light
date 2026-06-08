@@ -1,0 +1,33 @@
+name: One-off - Verify prod schema
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-verify-prod-schema.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: Verify bluelight_prod migration
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "
+                SELECT CONCAT('notif_tables=', GROUP_CONCAT(table_name)) FROM information_schema.tables WHERE table_schema='bluelight_prod' AND table_name LIKE 'notification%';
+                SELECT CONCAT('users_new_cols=', COUNT(*),'/7') FROM information_schema.columns WHERE table_schema='bluelight_prod' AND table_name='users' AND column_name IN ('phone_e164','phone_verified','phone_verified_at','whatsapp_opt_in','whatsapp_opt_in_at','whatsapp_opt_out_at','preferred_language');
+                SELECT CONCAT('apps_new_cols=', COUNT(*),'/11') FROM information_schema.columns WHERE table_schema='bluelight_prod' AND table_name='applications' AND column_name IN ('applicant_name_snapshot','company_name_snapshot','uen_snapshot','designation_snapshot','snapshot_backfilled_at','applicant_type','kva_status','kva_source','kva_confirmed_by','kva_confirmed_at','version');
+                SELECT CONCAT('prod_templates_rows=', (SELECT COUNT(*) FROM bluelight_prod.notification_templates));
+              "
