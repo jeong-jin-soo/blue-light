@@ -1,0 +1,51 @@
+name: One-off - Purge prod tx data
+
+# 일회성: bluelight_prod 의 신청/처리 내역 삭제 (계정·설정·템플릿은 보존).
+# 대상: applications, payments, files, notifications, audit_logs. dev(bluelight) 미접촉.
+# 백업: RDS 스냅샷 bluelight-db-prerelease-notif-20260607. 실행 후 워크플로 제거.
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop]
+    paths:
+      - '.github/workflows/oneoff-prod-purge-tx.yml'
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - name: DELETE tx data in bluelight_prod
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_SERVER_HOST }}
+          username: ${{ secrets.DEV_SERVER_USER }}
+          key: ${{ secrets.DEV_SERVER_SSH_KEY }}
+          command_timeout: 3m
+          script: |
+            cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
+            MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
+            DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
+            DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -e "
+                SELECT CONCAT('before: apps=', (SELECT COUNT(*) FROM bluelight_prod.applications),
+                  ' payments=', (SELECT COUNT(*) FROM bluelight_prod.payments),
+                  ' files=', (SELECT COUNT(*) FROM bluelight_prod.files),
+                  ' notifications=', (SELECT COUNT(*) FROM bluelight_prod.notifications),
+                  ' audit_logs=', (SELECT COUNT(*) FROM bluelight_prod.audit_logs));
+                SET FOREIGN_KEY_CHECKS=0;
+                DELETE FROM bluelight_prod.payments;
+                DELETE FROM bluelight_prod.files;
+                DELETE FROM bluelight_prod.notifications;
+                DELETE FROM bluelight_prod.audit_logs;
+                DELETE FROM bluelight_prod.applications;
+                SET FOREIGN_KEY_CHECKS=1;
+                SELECT CONCAT('after:  apps=', (SELECT COUNT(*) FROM bluelight_prod.applications),
+                  ' payments=', (SELECT COUNT(*) FROM bluelight_prod.payments),
+                  ' files=', (SELECT COUNT(*) FROM bluelight_prod.files),
+                  ' notifications=', (SELECT COUNT(*) FROM bluelight_prod.notifications),
+                  ' audit_logs=', (SELECT COUNT(*) FROM bluelight_prod.audit_logs));
+                SELECT CONCAT('users(보존)=', (SELECT COUNT(*) FROM bluelight_prod.users),
+                  ' templates(보존)=', (SELECT COUNT(*) FROM bluelight_prod.notification_templates));
+              "
