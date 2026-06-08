@@ -12,25 +12,30 @@ jobs:
     runs-on: ubuntu-latest
     environment: development
     steps:
-      - name: Row counts per table (bluelight_prod)
+      - name: Table list + approx rows (single query)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEV_SERVER_HOST }}
           username: ${{ secrets.DEV_SERVER_USER }}
           key: ${{ secrets.DEV_SERVER_SSH_KEY }}
-          command_timeout: 4m
+          command_timeout: 3m
           script: |
             cd /home/${{ secrets.DEV_SERVER_USER }}/bluelight
             MYSQL_HOST=$(grep '^MYSQL_HOST=' .env | head -1 | cut -d= -f2-)
             DB_USERNAME=$(grep '^DB_USERNAME=' .env | head -1 | cut -d= -f2-)
             DB_PASSWORD=$(grep '^DB_PASSWORD=' .env | head -1 | cut -d= -f2-)
-            DB=bluelight_prod
-            echo "=== 테이블별 정확 row 수 (비어있지 않은 것 위주로 전수) ==="
-            TABLES=$(docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+            echo "=== bluelight_prod 전 테이블 + 대략 row수 (table_rows desc) ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
               mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e \
-              "SELECT table_name FROM information_schema.tables WHERE table_schema='$DB' AND table_type='BASE TABLE' ORDER BY table_name;")
-            for t in $TABLES; do
-              c=$(docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
-                mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "SELECT COUNT(*) FROM \`$DB\`.\`$t\`;" 2>/dev/null)
-              echo "$c | $t"
-            done
+              "SELECT CONCAT(LPAD(IFNULL(table_rows,0),7,' '), '  ', table_name)
+               FROM information_schema.tables
+               WHERE table_schema='bluelight_prod' AND table_type='BASE TABLE'
+               ORDER BY table_rows DESC, table_name;"
+            echo "=== 핵심 거래 테이블 정확 count (한 번에) ==="
+            docker run --rm -e MYSQL_PWD="$DB_PASSWORD" mysql:8.0 \
+              mysql -h "$MYSQL_HOST" -u "$DB_USERNAME" -N -e "
+                SELECT CONCAT('applications=', (SELECT COUNT(*) FROM bluelight_prod.applications));
+                SELECT CONCAT('payments=', (SELECT COUNT(*) FROM bluelight_prod.payments));
+                SELECT CONCAT('files=', (SELECT COUNT(*) FROM bluelight_prod.files));
+                SELECT CONCAT('notifications=', (SELECT COUNT(*) FROM bluelight_prod.notifications));
+              "
