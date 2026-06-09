@@ -100,9 +100,9 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    // 3단 표면(§9-1): 페이지 배경 = canvas, 카드 = 흰색. main 패딩을 깨고 full-bleed.
-    <div className="-m-4 lg:-m-6 p-4 lg:p-6 bg-canvas min-h-[calc(100vh-4rem)]">
-      <div className="max-w-7xl mx-auto space-y-6">
+    // 3단 표면(§9-1): 페이지 배경 = canvas(Layout 전역), 카드 = 흰색.
+    <div className="max-w-7xl mx-auto">
+      <div className="space-y-6">
         {/* 페이지 헤더 — 로고 레드 슬래시 모티프(좌측 액센트 바) */}
         <div className="flex items-center gap-3">
           <span className="block w-1 h-9 rounded-full bg-accent" aria-hidden />

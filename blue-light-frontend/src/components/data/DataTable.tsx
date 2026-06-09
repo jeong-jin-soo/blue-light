@@ -25,6 +25,8 @@ interface DataTableProps<T> {
   className?: string;
   /** Optional mobile card renderer. When provided, cards are shown on mobile (<640px) instead of the table. */
   mobileCardRender?: (item: T) => ReactNode;
+  /** Optional per-row extra classes (예: 좌측 액센트 보더로 "액션 필요" 행 강조). */
+  rowClassName?: (item: T) => string;
 }
 
 export function DataTable<T>({
@@ -39,6 +41,7 @@ export function DataTable<T>({
   keyExtractor,
   className = '',
   mobileCardRender,
+  rowClassName,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
@@ -114,7 +117,7 @@ export function DataTable<T>({
             : sortedData.map((item) => (
                 <div
                   key={keyExtractor(item)}
-                  className={onRowClick ? 'cursor-pointer active:bg-gray-50' : ''}
+                  className={`${onRowClick ? 'cursor-pointer active:bg-gray-50' : ''} ${rowClassName?.(item) ?? ''}`}
                   role={onRowClick ? 'button' : undefined}
                   tabIndex={onRowClick ? 0 : undefined}
                   onClick={() => onRowClick?.(item)}
@@ -179,7 +182,7 @@ export function DataTable<T>({
                       onRowClick
                         ? 'cursor-pointer hover:bg-gray-50 focus-within:ring-2 focus-within:ring-primary/20'
                         : ''
-                    }`}
+                    } ${rowClassName?.(item) ?? ''}`}
                     tabIndex={onRowClick ? 0 : undefined}
                     onClick={() => onRowClick?.(item)}
                     onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(item); } } : undefined}

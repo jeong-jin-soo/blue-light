@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { fullName } from '../../utils/formatName';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Card } from '../../components/ui/Card';
@@ -12,17 +13,28 @@ import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
 import { getBasePath } from '../../utils/routeUtils';
-import type { AdminApplication, ApplicationStatus, KvaStatus } from '../../types';
+import type { AdminApplication, AdminDashboard, ApplicationStatus, KvaStatus } from '../../types';
 
-const STATUS_OPTIONS = [
-  { value: '', label: 'All Statuses' },
-  { value: 'PENDING_REVIEW', label: 'Pending Review' },
-  { value: 'REVISION_REQUESTED', label: 'Revision Requested' },
-  { value: 'PENDING_PAYMENT', label: 'Pending Payment' },
-  { value: 'PAID', label: 'Paid' },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'EXPIRED', label: 'Expired' },
+// 닻 열 아바타 이니셜.
+function initials(first?: string, last?: string): string {
+  const a = (first ?? '').trim()[0] ?? '?';
+  const b = (last ?? '').trim()[0] ?? '';
+  return (a + b).toUpperCase();
+}
+
+// "액션 필요" 상태 — 행 좌측 레드 보더 + 칩 강조(§9-2 B).
+const ACTION_NEEDED = new Set<string>(['PENDING_REVIEW', 'REVISION_REQUESTED']);
+
+// 필터 칩 정의 + 카운트 매핑 키(AdminDashboard 필드).
+const STATUS_CHIPS: { value: string; label: string; countKey: keyof AdminDashboard }[] = [
+  { value: '', label: 'All', countKey: 'totalApplications' },
+  { value: 'PENDING_REVIEW', label: 'Pending Review', countKey: 'pendingReview' },
+  { value: 'REVISION_REQUESTED', label: 'Revision', countKey: 'revisionRequested' },
+  { value: 'PENDING_PAYMENT', label: 'Pending Payment', countKey: 'pendingPayment' },
+  { value: 'PAID', label: 'Paid', countKey: 'paid' },
+  { value: 'IN_PROGRESS', label: 'In Progress', countKey: 'inProgress' },
+  { value: 'COMPLETED', label: 'Completed', countKey: 'completed' },
+  { value: 'EXPIRED', label: 'Expired', countKey: 'expired' },
 ];
 
 // Phase 5 PR#3 — kVA Status filter (AC-P3)
@@ -52,7 +64,13 @@ export default function AdminApplicationListPage() {
   const [kvaStatusFilter, setKvaStatusFilter] = useState(initialKvaStatus);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [counts, setCounts] = useState<AdminDashboard | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // 필터 칩 카운트(상태별 건수) — 대시보드 집계 1회 로드.
+  useEffect(() => {
+    adminApi.getDashboard().then(setCounts).catch(() => { /* 칩 카운트는 보조 정보 — 실패해도 무시 */ });
+  }, []);
 
   // Debounce search input (300ms)
   const handleSearchChange = useCallback((value: string) => {
@@ -126,10 +144,16 @@ export default function AdminApplicationListPage() {
     {
       key: 'userName',
       header: 'Applicant',
+      // 닻 열: 아바타 이니셜 + 이름(굵게) — 시선이 이름→상태→금액으로 흐르게(§9-2 B).
       render: (app) => (
-        <div>
-          <div className="font-medium text-gray-800">{fullName(app.userFirstName, app.userLastName)}</div>
-          <div className="text-xs text-gray-400">{app.userEmail}</div>
+        <div className="flex items-center gap-3">
+          <span className="grid place-items-center w-8 h-8 rounded-full bg-primary-100 text-primary-800 text-xs font-semibold shrink-0">
+            {initials(app.userFirstName, app.userLastName)}
+          </span>
+          <div className="min-w-0">
+            <div className="font-semibold text-gray-900 truncate">{fullName(app.userFirstName, app.userLastName)}</div>
+            <div className="text-xs text-gray-400 truncate">{app.userEmail}</div>
+          </div>
         </div>
       ),
     },
@@ -228,20 +252,51 @@ export default function AdminApplicationListPage() {
             </button>
           );
         }
-        return <span className="text-gray-400">→</span>;
+        return <ChevronRight className="w-4 h-4 text-gray-300 inline" />;
       },
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">All Applications</h1>
-        <p className="text-sm text-gray-500 mt-1">Monitor and manage all licence applications</p>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Page header — 로고 레드 슬래시 모티프 */}
+      <div className="flex items-center gap-3">
+        <span className="block w-1 h-9 rounded-full bg-accent" aria-hidden />
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">All Applications</h1>
+          <p className="text-sm text-gray-500">Monitor and manage all licence applications</p>
+        </div>
       </div>
 
-      {/* Filters */}
+      {/* 상태 필터 칩(카운트 배지) — 드롭다운 대체(§9-2 B) */}
+      <div className="flex flex-wrap gap-2">
+        {STATUS_CHIPS.map((chip) => {
+          const active = statusFilter === chip.value;
+          const n = counts ? (counts[chip.countKey] as number) : undefined;
+          const action = ACTION_NEEDED.has(chip.value);
+          return (
+            <button
+              key={chip.value || 'all'}
+              type="button"
+              onClick={() => handleStatusChange(chip.value)}
+              aria-pressed={active}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-colors
+                ${active
+                  ? 'bg-primary text-white border-primary'
+                  : `bg-white border-primary-100 text-gray-600 hover:border-primary-300 ${action ? 'border-l-2 border-l-accent' : ''}`}`}
+            >
+              {chip.label}
+              {n !== undefined && n > 0 && (
+                <span className={`text-xs tabular-nums rounded-full px-1.5 ${
+                  active ? 'bg-white/25 text-white' : action ? 'bg-accent-50 text-accent-600' : 'bg-primary-50 text-primary-700'
+                }`}>{n}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 검색 + kVA 필터 */}
       <Card>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
@@ -249,13 +304,6 @@ export default function AdminApplicationListPage() {
               placeholder="Search by address, name, email, or ID..."
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
-            />
-          </div>
-          <div className="w-full sm:w-48">
-            <Select
-              value={statusFilter}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              options={STATUS_OPTIONS}
             />
           </div>
           <div className="w-full sm:w-44">
@@ -276,6 +324,7 @@ export default function AdminApplicationListPage() {
         loading={loading}
         keyExtractor={(app) => app.applicationSeq}
         onRowClick={(app) => navigate(`${basePath}/applications/${app.applicationSeq}`)}
+        rowClassName={(app) => (ACTION_NEEDED.has(app.status) ? 'border-l-2 border-l-accent' : '')}
         emptyIcon="📋"
         emptyTitle="No applications found"
         emptyDescription={
