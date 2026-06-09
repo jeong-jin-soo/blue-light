@@ -97,6 +97,23 @@
   --shadow-dropdown: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   --shadow-modal: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-auth: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* ---- 디자인 개선(§4/§9): Brand Accent — 로고 레드 슬래시 ----
+     ⚠️ 브랜드·강조 전용. "에러" 의미는 --color-error 사용. */
+  --color-accent-50:  #fef2f2;
+  --color-accent-100: #fde4e4;
+  --color-accent-200: #fbcccc;
+  --color-accent-500: #e03e3e;
+  --color-accent-600: #c62828;
+  --color-accent-700: #a31f1f;
+  --color-accent:       #c62828;
+  --color-accent-hover: #a31f1f;
+
+  /* ---- 3단 표면 시스템(§9-1): 배경(canvas) < 카드(흰색) < 강조 ---- */
+  --color-canvas: #f1f4f8;   /* 페이지 배경 — 살짝 navy 기운 cool-slate */
+
+  /* ---- Hero elevation(§9-2) ---- */
+  --shadow-hero: 0 25px 50px -12px rgb(13 31 51 / 0.40);
 }
 
 /* ============================================
