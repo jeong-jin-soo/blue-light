@@ -15,6 +15,7 @@ import type {
 } from '../../types/notificationTemplate';
 import { useAuthStore } from '../../stores/authStore';
 import HtmlBodyEditor from '../../components/admin/HtmlBodyEditor';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 /**
  * 알림 템플릿 편집 화면 — PR-T6.
@@ -206,25 +207,31 @@ export default function AdminNotificationTemplateEditPage() {
         </button>
       </div>
 
-      <header className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold font-mono">{current.templateCode}</h1>
-          {current.severity === 'CRITICAL' && (
-            <span className="text-red-600 text-sm font-medium">★ Critical</span>
-          )}
-          {!current.enabled && (
-            <span className="px-2 py-0.5 text-xs bg-gray-200 rounded">Inactive</span>
-          )}
-        </div>
-        <div className="text-sm text-gray-500">
-          {current.channel} · {current.locale} · version {current.version}
-          {catalogEntry && (
-            <>
-              {' · '}
-              <span className="text-gray-700">{catalogEntry.description}</span>
-            </>
-          )}
-        </div>
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3 font-mono">
+            {current.templateCode}
+            {current.severity === 'CRITICAL' && (
+              <span className="text-red-600 text-sm font-medium">★ Critical</span>
+            )}
+            {!current.enabled && (
+              <span className="px-2 py-0.5 text-xs bg-gray-200 rounded">Inactive</span>
+            )}
+          </span>
+        }
+        subtitle={
+          <span>
+            {current.channel} · {current.locale} · version {current.version}
+            {catalogEntry && (
+              <>
+                {' · '}
+                <span className="text-gray-700">{catalogEntry.description}</span>
+              </>
+            )}
+          </span>
+        }
+      />
+      <div className="mb-6 mt-1">
         {/* 발송 트리거 — 어느 기능이 이 템플릿을 발화하는지 표시 */}
         {catalogEntry?.triggerRef && (
           <div className="mt-1 text-xs text-gray-500">
@@ -236,7 +243,7 @@ export default function AdminNotificationTemplateEditPage() {
         )}
         {/* PR-T7 P1 — 지난 30일 발송 메트릭스 인라인 배지 */}
         <MetricsBadge metrics={metrics} loading={metricsLoading} />
-      </header>
+      </div>
 
       {/* 알림 메시지 영역 */}
       {successMessage && (

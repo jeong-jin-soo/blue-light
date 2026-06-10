@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Pagination } from '../components/data/Pagination';
 import { useToastStore } from '../stores/toastStore';
@@ -168,15 +169,17 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Notifications</h1>
-        {notifications.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead}>
-            Mark all as read
-          </Button>
-        )}
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Notifications"
+        actions={
+          notifications.length > 0 ? (
+            <Button variant="ghost" size="sm" onClick={handleMarkAllAsRead}>
+              Mark all as read
+            </Button>
+          ) : undefined
+        }
+      />
 
       {notifications.length === 0 ? (
         <Card>

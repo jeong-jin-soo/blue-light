@@ -6,6 +6,8 @@ import { Select } from '../../components/ui/Select';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Pagination } from '../../components/data/Pagination';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { ChevronRight } from 'lucide-react';
 import { useToastStore } from '../../stores/toastStore';
 import { sldManagerApi } from '../../api/sldManagerApi';
 import type { SldOrder, SldOrderStatus } from '../../types';
@@ -89,12 +91,9 @@ export default function SldManagerOrderListPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">SLD Orders</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage all SLD drawing orders</p>
-      </div>
+      <PageHeader title="SLD Orders" subtitle="Manage all SLD drawing orders" />
 
       {/* Filters */}
       <Card>
@@ -202,7 +201,7 @@ export default function SldManagerOrderListPage() {
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <span className="text-gray-400">&rarr;</span>
+                        <ChevronRight className="w-4 h-4 text-gray-300 inline" />
                       </td>
                     </tr>
                   ))}

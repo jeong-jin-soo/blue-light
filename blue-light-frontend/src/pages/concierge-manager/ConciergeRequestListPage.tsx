@@ -14,6 +14,7 @@ import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
 import { ConciergeStatusBadge } from '../../components/concierge/ConciergeStatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import conciergeManagerApi, {
   type ConciergeRequestSummary,
   type ConciergeStatus,
@@ -166,10 +167,7 @@ export default function ConciergeRequestListPage() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Concierge Requests</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Kaki Concierge service requests
-        </p>
+        <PageHeader title="Concierge Requests" subtitle="Kaki Concierge service requests" />
       </div>
 
       <form

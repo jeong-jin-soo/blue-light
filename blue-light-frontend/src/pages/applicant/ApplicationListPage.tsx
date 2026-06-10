@@ -1,11 +1,13 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronRight } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import applicationApi from '../../api/applicationApi';
@@ -181,24 +183,21 @@ export default function ApplicationListPage() {
       header: '',
       width: '40px',
       align: 'center',
-      render: () => <span className="text-gray-400">→</span>,
+      render: () => <ChevronRight className="w-4 h-4 text-gray-300 inline" />,
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My Applications</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Track and manage your licence applications
-          </p>
-        </div>
-        <Button onClick={() => navigate('/applications/new')}>
-          + New / Renew Licence
-        </Button>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="My Applications"
+        subtitle="Track and manage your licence applications"
+        actions={
+          <Button onClick={() => navigate('/applications/new')}>
+            + New / Renew Licence
+          </Button>
+        }
+      />
 
       {/* Search & filter */}
       {applications.length > 0 && (

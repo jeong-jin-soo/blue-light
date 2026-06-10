@@ -11,6 +11,7 @@ import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ConciergeStatusBadge } from '../../components/concierge/ConciergeStatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import ConciergeTimeline from './sections/ConciergeTimeline';
 import ConciergeNotesPanel from './sections/ConciergeNotesPanel';
 import ConciergeAccountStatusPanel from './sections/ConciergeAccountStatusPanel';
@@ -226,21 +227,23 @@ export default function ConciergeRequestDetailPage() {
       </nav>
 
       {/* 상태 헤더 */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {detail.submitterName}
-          </h1>
-          <div className="mt-1 text-sm text-gray-600 space-x-3">
-            <span className="font-mono text-gray-500">{detail.publicCode}</span>
-            <span className="break-all">{detail.submitterEmail}</span>
-            <span>{detail.submitterPhone}</span>
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <ConciergeStatusBadge status={detail.status} />
-          {detail.slaBreached && <Badge variant="error">SLA Breach</Badge>}
-        </div>
+      <div className="mb-4">
+        <PageHeader
+          title={detail.submitterName}
+          subtitle={
+            <span className="space-x-3">
+              <span className="font-mono text-gray-500">{detail.publicCode}</span>
+              <span className="break-all">{detail.submitterEmail}</span>
+              <span>{detail.submitterPhone}</span>
+            </span>
+          }
+          actions={
+            <div className="flex flex-col items-end gap-1.5">
+              <ConciergeStatusBadge status={detail.status} />
+              {detail.slaBreached && <Badge variant="error">SLA Breach</Badge>}
+            </div>
+          }
+        />
       </div>
 
       {/* Memo (있을 때만) */}

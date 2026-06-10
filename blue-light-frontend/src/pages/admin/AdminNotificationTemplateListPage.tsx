@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useNotificationTemplateStore } from '../../stores/notificationTemplateStore';
 import * as api from '../../api/notificationTemplateApi';
 import type { LocalizationFormat, ImportReportResponse } from '../../api/notificationTemplateApi';
@@ -38,18 +39,15 @@ export default function AdminNotificationTemplateListPage() {
 
   return (
     <div className="p-6">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notification Templates</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Copy editing · Preview · Test Send (ADMIN / SYSTEM_ADMIN)
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {/* 2단계 승인 제거 — Draft Review Queue 링크 비노출. 번역 import draft 검토는 직접 URL(/drafts)로만. */}
+      <PageHeader
+        title="Notification Templates"
+        subtitle="Copy editing · Preview · Test Send (ADMIN / SYSTEM_ADMIN)"
+        actions={
+          /* 2단계 승인 제거 — Draft Review Queue 링크 비노출. 번역 import draft 검토는 직접 URL(/drafts)로만. */
           <LocalizationToolbar />
-        </div>
-      </header>
+        }
+      />
+      <div className="mb-6" />
 
       {/* 필터 바 */}
       <div className="bg-white border border-gray-200 rounded p-4 mb-4 grid grid-cols-2 lg:grid-cols-6 gap-3">

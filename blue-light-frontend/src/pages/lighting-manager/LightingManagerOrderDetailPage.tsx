@@ -9,6 +9,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { InfoField } from '../../components/common/InfoField';
 import { ManagerOrderStatusBadge } from '../../components/domain/ManagerOrderStatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { lightingManagerApi } from '../../api/lightingManagerApi';
 import fileApi from '../../api/fileApi';
@@ -106,28 +107,25 @@ export default function LightingManagerOrderDetailPage() {
   const showDeliverableSection = ['PAID', 'IN_PROGRESS', 'REVISION_REQUESTED', 'SLD_UPLOADED'].includes(order.status);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/lighting-manager/orders')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to orders list"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              Lighting Order #{order.lightingOrderSeq}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">Manager view</p>
-          </div>
-        </div>
-        <ManagerOrderStatusBadge status={order.status} />
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Back button */}
+      <button
+        onClick={() => navigate('/lighting-manager/orders')}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+        aria-label="Back to orders list"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Back</span>
+      </button>
+
+      {/* Page header */}
+      <PageHeader
+        title={`Lighting Order #${order.lightingOrderSeq}`}
+        subtitle="Manager view"
+        actions={<ManagerOrderStatusBadge status={order.status} />}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

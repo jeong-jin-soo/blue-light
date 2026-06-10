@@ -9,7 +9,11 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DashboardCard } from '../../components/domain/DashboardCard';
+import {
+  PhoneCall, FileSignature, CreditCard, Hourglass,
+  AlertTriangle, ChevronRight,
+} from 'lucide-react';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { ConciergeStatusBadge } from '../../components/concierge/ConciergeStatusBadge';
@@ -57,31 +61,34 @@ export default function ConciergeManagerDashboardPage() {
   ).length;
   const recent = items.slice(0, 10);
 
+  // 2차 KPI(참고용) — 작은 칩 행으로 강등.
+  const chips = [
+    { label: 'Awaiting LOA', value: countBy('AWAITING_APPLICANT_LOA_SIGN'), icon: FileSignature },
+    { label: 'Awaiting payment', value: countBy('AWAITING_LICENCE_PAYMENT'), icon: CreditCard },
+    { label: 'Pending activation', value: pendingActivationCount, icon: Hourglass },
+  ];
+
   return (
-    <div className="max-w-6xl mx-auto">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Concierge Dashboard</h1>
-          <p className="text-sm text-gray-600 mt-1">
-            Kaki Concierge request management
-          </p>
-        </div>
-        <Button
-          variant="concierge"
-          onClick={() => navigate('/concierge-manager/requests')}
-        >
-          View all requests
-        </Button>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Concierge Dashboard"
+        subtitle="Kaki Concierge request management"
+        actions={
+          <Button
+            variant="concierge"
+            onClick={() => navigate('/concierge-manager/requests')}
+          >
+            View all requests
+          </Button>
+        }
+      />
 
       {slaBreachCount > 0 && (
         <div
           role="alert"
-          className="mb-4 p-3 rounded-md bg-error-50 border border-error-200 flex items-center gap-3"
+          className="p-3 rounded-md bg-error-50 border border-error-200 flex items-center gap-3"
         >
-          <span aria-hidden="true" className="text-error-600">
-            ⚠
-          </span>
+          <AlertTriangle aria-hidden="true" className="w-4 h-4 text-error-600 shrink-0" />
           <div className="text-sm text-error-700">
             <strong>{slaBreachCount} request{slaBreachCount !== 1 ? 's' : ''}</strong>{' '}
             exceed the 24h SLA without first contact.
@@ -89,28 +96,37 @@ export default function ConciergeManagerDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <DashboardCard label="In contact" value={countBy('CONTACTING')} icon="📞" />
-        <DashboardCard
-          label="Awaiting LOA"
-          value={countBy('AWAITING_APPLICANT_LOA_SIGN')}
-          icon="✍️"
-        />
-        <DashboardCard
-          label="Awaiting payment"
-          value={countBy('AWAITING_LICENCE_PAYMENT')}
-          icon="💳"
-        />
-        <DashboardCard
-          label="Pending activation"
-          value={pendingActivationCount}
-          icon="⏳"
-        />
+      {/* Hero KPI(진행 중 통화) + 2차 KPI 칩 행 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-1 bg-white rounded-xl border-t-[3px] border-accent shadow-dropdown p-6">
+          <div className="flex items-center gap-2 text-accent-600 mb-3">
+            <PhoneCall className="w-5 h-5" />
+            <span className="text-sm font-semibold">In contact</span>
+          </div>
+          <div className="text-5xl font-bold text-gray-900 tabular-nums leading-none">{countBy('CONTACTING')}</div>
+          <div className="mt-3 text-sm text-gray-500">Active first-contact requests</div>
+        </div>
+
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 content-start">
+          {chips.map(({ label, value, icon: Icon }) => (
+            <div
+              key={label}
+              className="flex items-center gap-3 bg-white rounded-lg border border-primary-100 px-4 py-3"
+            >
+              <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-lg font-semibold text-gray-900 tabular-nums leading-none">{value}</div>
+                <div className="text-xs text-gray-500 truncate">{label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="bg-surface rounded-xl shadow-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-gray-800">Recent requests</h2>
+      {/* 최근 요청 — 주인공 */}
+      <div className="bg-white rounded-xl border border-primary-100 shadow-dropdown overflow-hidden">
+        <div className="px-5 py-4 border-b border-primary-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">Recent requests</h2>
           <span className="text-xs text-gray-500">Showing latest {recent.length}</span>
         </div>
         {loading ? (
@@ -120,11 +136,11 @@ export default function ConciergeManagerDashboardPage() {
         ) : recent.length === 0 ? (
           <p className="p-4 text-sm text-gray-500">No requests yet.</p>
         ) : (
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-gray-50">
             {recent.map((r) => (
               <li
                 key={r.conciergeRequestSeq}
-                className="px-4 py-3 hover:bg-gray-50 cursor-pointer focus-within:bg-gray-50"
+                className="px-5 py-3 hover:bg-surface-secondary cursor-pointer focus-within:bg-surface-secondary transition-colors"
                 onClick={() =>
                   navigate(`/concierge-manager/requests/${r.conciergeRequestSeq}`)
                 }
@@ -139,15 +155,15 @@ export default function ConciergeManagerDashboardPage() {
                   }
                 }}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="font-mono text-xs text-gray-500">
                       {r.publicCode}
                     </div>
-                    <div className="font-medium text-gray-900 truncate">
+                    <div className="font-semibold text-gray-900 truncate">
                       {r.submitterName}
                     </div>
-                    <div className="text-xs text-gray-500 truncate">
+                    <div className="text-xs text-gray-400 truncate">
                       {r.submitterEmail}
                     </div>
                   </div>
@@ -158,6 +174,7 @@ export default function ConciergeManagerDashboardPage() {
                       <Badge variant="warning">Pending activation</Badge>
                     )}
                   </div>
+                  <ChevronRight className="w-4 h-4 text-gray-300 shrink-0" />
                 </div>
               </li>
             ))}

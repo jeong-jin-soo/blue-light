@@ -7,6 +7,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
@@ -123,8 +124,8 @@ export default function LewApplicationDetailPage() {
 
   if (errorCode === 'APPLICATION_NOT_ASSIGNED' || (!loading && application && !isAuthorisedLew)) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div>
           <button
             onClick={() => navigate('/lew/applications')}
             className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
@@ -135,8 +136,8 @@ export default function LewApplicationDetailPage() {
             </svg>
             <span>Back</span>
           </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">LEW Review</h1>
         </div>
+        <PageHeader title="LEW Review" />
         <Card>
           <div className="flex items-start gap-3">
             <span className="text-lg" aria-hidden>🔒</span>
@@ -160,8 +161,8 @@ export default function LewApplicationDetailPage() {
   // 일반 에러 (load 실패) — application 자체가 없는 케이스
   if (!application) {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div>
           <button
             onClick={() => navigate('/lew/applications')}
             className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
@@ -172,8 +173,8 @@ export default function LewApplicationDetailPage() {
             </svg>
             <span>Back</span>
           </button>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">LEW Review</h1>
         </div>
+        <PageHeader title="LEW Review" />
         <Card>
           <div className="flex items-start gap-3">
             <span className="text-lg" aria-hidden>⚠️</span>
@@ -219,34 +220,33 @@ export default function LewApplicationDetailPage() {
   const showCtaCard = primaryAction.kind !== 'expired' && primaryAction.kind !== 'completed';
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/lew/applications')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to applications list"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-                LEW Review &mdash; Application #{application.applicationSeq}
-              </h1>
-              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
-                {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
-              </Badge>
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">{headerSubtitle}</p>
-          </div>
-        </div>
-        <StatusBadge status={application.status} />
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Back navigation — PageHeader 위에 유지 */}
+      <div>
+        <button
+          onClick={() => navigate('/lew/applications')}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+          aria-label="Back to applications list"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back</span>
+        </button>
       </div>
+
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            LEW Review — Application #{application.applicationSeq}
+            <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
+              {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+            </Badge>
+          </span>
+        }
+        subtitle={headerSubtitle}
+        actions={<StatusBadge status={application.status} />}
+      />
 
       {/* Review Comment (admin이 남긴 review comment가 있다면 노출) */}
       {application.reviewComment && (
