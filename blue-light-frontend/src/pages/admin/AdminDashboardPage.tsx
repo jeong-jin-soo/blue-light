@@ -6,6 +6,7 @@ import {
   RefreshCw, Flag, AlarmClock, Users, ChevronRight, ArrowRight,
 } from 'lucide-react';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useToastStore } from '../../stores/toastStore';
@@ -103,20 +104,14 @@ export default function AdminDashboardPage() {
     // 3단 표면(§9-1): 페이지 배경 = canvas(Layout 전역), 카드 = 흰색.
     <div className="max-w-7xl mx-auto">
       <div className="space-y-6">
-        {/* 페이지 헤더 — 로고 레드 슬래시 모티프(좌측 액센트 바) */}
-        <div className="flex items-center gap-3">
-          <span className="block w-1 h-9 rounded-full bg-accent" aria-hidden />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {isAdmin ? 'Admin Dashboard' : 'LEW Dashboard'}
-            </h1>
-            <p className="text-sm text-gray-500">
-              {reviewCount + revisionCount > 0
-                ? `${reviewCount + revisionCount} item${reviewCount + revisionCount > 1 ? 's' : ''} need your attention`
-                : 'All caught up — nothing pending review'}
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          title={isAdmin ? 'Admin Dashboard' : 'LEW Dashboard'}
+          subtitle={
+            reviewCount + revisionCount > 0
+              ? `${reviewCount + revisionCount} item${reviewCount + revisionCount > 1 ? 's' : ''} need your attention`
+              : 'All caught up — nothing pending review'
+          }
+        />
 
         {/* Hero 행: 주인공 지표(검토 대기) + 작업 큐 요약 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

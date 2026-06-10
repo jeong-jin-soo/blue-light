@@ -8,6 +8,7 @@ import { Card } from '../../components/ui/Card';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Badge } from '../../components/ui/Badge';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
@@ -259,14 +260,7 @@ export default function AdminApplicationListPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      {/* Page header — 로고 레드 슬래시 모티프 */}
-      <div className="flex items-center gap-3">
-        <span className="block w-1 h-9 rounded-full bg-accent" aria-hidden />
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">All Applications</h1>
-          <p className="text-sm text-gray-500">Monitor and manage all licence applications</p>
-        </div>
-      </div>
+      <PageHeader title="All Applications" subtitle="Monitor and manage all licence applications" />
 
       {/* 상태 필터 칩(카운트 배지) — 드롭다운 대체(§9-2 B) */}
       <div className="flex flex-wrap gap-2">

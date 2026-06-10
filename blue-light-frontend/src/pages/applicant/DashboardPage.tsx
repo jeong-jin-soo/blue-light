@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from '../../components/ui/Card';
+import { Files, Search, CreditCard, RefreshCw, BadgeCheck, ChevronRight, Plus } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
-import { DashboardCard } from '../../components/domain/DashboardCard';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -20,10 +20,13 @@ function PendingDocsBadge({ count }: { count: number }) {
       className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-warning-800 bg-warning-50 border border-warning-500/40 rounded-full"
       title="Awaiting requested documents"
     >
-      🟡 {count} awaiting
+      {count} awaiting
     </span>
   );
 }
+
+// 신청자 입장의 "액션 필요" 상태 — 행 좌측 레드 보더(§9-2).
+const ACTION_NEEDED = new Set<string>(['REVISION_REQUESTED', 'PENDING_PAYMENT']);
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -56,6 +59,7 @@ export default function DashboardPage() {
       }
     };
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (loading) {
@@ -66,72 +70,75 @@ export default function DashboardPage() {
     );
   }
 
+  // 액션 필요 건수 — 헤더 부제로 안내(§9-2 역할 차등: 신청자는 "내 신청 진행"이 주인공).
+  const actionCount = recentApps.filter((a) => ACTION_NEEDED.has(a.status)).length;
+
+  const stats = [
+    { label: 'Total', value: summary?.total ?? 0, icon: Files },
+    { label: 'Pending Review', value: summary?.pendingReview ?? 0, icon: Search },
+    { label: 'Pending Payment', value: summary?.pendingPayment ?? 0, icon: CreditCard },
+    { label: 'In Progress', value: summary?.inProgress ?? 0, icon: RefreshCw },
+    { label: 'Completed', value: summary?.completed ?? 0, icon: BadgeCheck },
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-            Welcome back{user?.firstName ? `, ${user.firstName}` : ''}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">Overview of your licence applications</p>
-        </div>
-        <Button onClick={() => navigate('/applications/new')}>
-          + New / Renew Licence
-        </Button>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title={`Welcome back${user?.firstName ? `, ${user.firstName}` : ''}`}
+        subtitle={
+          actionCount > 0
+            ? `${actionCount} application${actionCount > 1 ? 's' : ''} need${actionCount > 1 ? '' : 's'} your action`
+            : 'Overview of your licence applications'
+        }
+        actions={
+          <Button onClick={() => navigate('/applications/new')}>
+            <Plus className="w-4 h-4 mr-1.5 inline" />
+            New / Renew Licence
+          </Button>
+        }
+      />
+
+      {/* 통계 — 작은 칩 행으로 강등(참고 정보). 신청자 대시보드의 주인공은 아래 진행 목록. */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {stats.map(({ label, value, icon: Icon }) => (
+          <div key={label} className="flex items-center gap-3 bg-white rounded-lg border border-primary-100 px-4 py-3">
+            <Icon className="w-4 h-4 text-gray-400 shrink-0" />
+            <div className="min-w-0">
+              <div className="text-lg font-semibold text-gray-900 tabular-nums leading-none">{value}</div>
+              <div className="text-xs text-gray-500 truncate">{label}</div>
+            </div>
+          </div>
+        ))}
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <DashboardCard
-          label="Total Applications"
-          value={summary?.total ?? 0}
-          icon="📋"
-        />
-        <DashboardCard
-          label="Pending Review"
-          value={summary?.pendingReview ?? 0}
-          icon="🔍"
-        />
-        <DashboardCard
-          label="Pending Payment"
-          value={summary?.pendingPayment ?? 0}
-          icon="⏳"
-        />
-        <DashboardCard
-          label="In Progress"
-          value={summary?.inProgress ?? 0}
-          icon="🔄"
-        />
-        <DashboardCard
-          label="Completed"
-          value={summary?.completed ?? 0}
-          icon="✅"
-        />
-      </div>
-
-      {/* Recent applications */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Recent Applications</h2>
+      {/* Hero: 내 신청 진행 — 강한 elevation, 액션필요 행 레드 보더 */}
+      <div className="bg-white rounded-xl border border-primary-100 shadow-dropdown overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-primary-100">
+          <h2 className="text-base font-semibold text-gray-900">My Applications</h2>
           {recentApps.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={() => navigate('/applications')}>
-              View All
-            </Button>
+            <button
+              type="button"
+              onClick={() => navigate('/applications')}
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-accent-600 transition-colors"
+            >
+              View all <ChevronRight className="w-4 h-4" />
+            </button>
           )}
         </div>
 
         {recentApps.length === 0 ? (
-          <EmptyState
-            icon="📋"
-            title="No applications yet"
-            description="Get started by creating your first licence application."
-            action={
-              <Button variant="outline" size="sm" onClick={() => navigate('/applications/new')}>
-                Create Application
-              </Button>
-            }
-          />
+          <div className="p-6">
+            <EmptyState
+              icon="📭"
+              title="No applications yet"
+              description="Get started by creating your first licence application."
+              action={
+                <Button variant="outline" size="sm" onClick={() => navigate('/applications/new')}>
+                  Create Application
+                </Button>
+              }
+            />
+          </div>
         ) : (
           <>
             {/* Mobile card view */}
@@ -139,7 +146,9 @@ export default function DashboardPage() {
               {recentApps.map((app) => (
                 <div
                   key={app.applicationSeq}
-                  className="py-3 cursor-pointer active:bg-gray-50"
+                  className={`py-3 px-4 cursor-pointer active:bg-gray-50 ${
+                    ACTION_NEEDED.has(app.status) ? 'border-l-2 border-l-accent' : ''
+                  }`}
                   role="button"
                   tabIndex={0}
                   onClick={() => navigate(`/applications/${app.applicationSeq}`)}
@@ -147,7 +156,7 @@ export default function DashboardPage() {
                 >
                   <div className="flex items-start justify-between mb-1.5">
                     <div className="min-w-0 flex-1 mr-3">
-                      <p className="font-medium text-gray-800 truncate">{app.address}</p>
+                      <p className="font-semibold text-gray-900 truncate">{app.address}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{app.postalCode}</p>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
@@ -172,40 +181,37 @@ export default function DashboardPage() {
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left py-3 px-2 font-medium text-gray-500">Address</th>
-                    <th className="text-left py-3 px-2 font-medium text-gray-500">kVA</th>
-                    <th className="text-right py-3 px-2 font-medium text-gray-500">Amount</th>
-                    <th className="text-left py-3 px-2 font-medium text-gray-500">Status</th>
-                    <th className="text-left py-3 px-2 font-medium text-gray-500">Date</th>
-                    <th className="py-3 px-2"></th>
+                  <tr className="bg-surface-tertiary text-left">
+                    <th className="py-2.5 px-5 font-medium text-gray-500">Address</th>
+                    <th className="py-2.5 px-2 font-medium text-gray-500">kVA</th>
+                    <th className="py-2.5 px-2 font-medium text-gray-500 text-right">Amount</th>
+                    <th className="py-2.5 px-2 font-medium text-gray-500">Status</th>
+                    <th className="py-2.5 px-2 font-medium text-gray-500">Date</th>
+                    <th className="py-2.5 px-5"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentApps.map((app) => (
                     <tr
                       key={app.applicationSeq}
-                      className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary/20"
+                      className={`border-b border-gray-50 last:border-0 hover:bg-surface-secondary cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-primary/20 ${
+                        ACTION_NEEDED.has(app.status) ? 'border-l-2 border-l-accent' : 'border-l-2 border-l-transparent'
+                      }`}
                       tabIndex={0}
                       onClick={() => navigate(`/applications/${app.applicationSeq}`)}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/applications/${app.applicationSeq}`); } }}
                     >
-                      <td className="py-3 px-2">
-                        <div className="font-medium text-gray-800 truncate max-w-[200px]">
-                          {app.address}
-                        </div>
+                      <td className="py-3 px-5">
+                        {/* 닻 열: 주소(굵게) + 우편번호 강등 */}
+                        <div className="font-semibold text-gray-900 truncate max-w-[220px]">{app.address}</div>
                         <div className="text-xs text-gray-400">{app.postalCode}</div>
                       </td>
-                      <td className="py-3 px-2 text-gray-600">
-                        {app.kvaStatus === 'UNKNOWN' ? (
-                          <KvaPendingBadge />
-                        ) : (
-                          <>{app.selectedKva} kVA</>
-                        )}
+                      <td className="py-3 px-2 text-gray-500">
+                        {app.kvaStatus === 'UNKNOWN' ? <KvaPendingBadge /> : <>{app.selectedKva} kVA</>}
                       </td>
-                      <td className="py-3 px-2 text-right font-medium text-gray-800">
+                      <td className="py-3 px-2 text-right font-semibold text-gray-900 tabular-nums">
                         {app.kvaStatus === 'UNKNOWN'
-                          ? <span className="text-gray-500">From ${app.quoteAmount.toLocaleString()}</span>
+                          ? <span className="text-gray-500 font-medium">From ${app.quoteAmount.toLocaleString()}</span>
                           : `$${app.quoteAmount.toLocaleString()}`}
                       </td>
                       <td className="py-3 px-2">
@@ -214,11 +220,11 @@ export default function DashboardPage() {
                           <PendingDocsBadge count={pendingDocCounts[app.applicationSeq] ?? 0} />
                         </div>
                       </td>
-                      <td className="py-3 px-2 text-gray-500">
+                      <td className="py-3 px-2 text-gray-400 text-xs tabular-nums">
                         {new Date(app.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-2 text-right">
-                        <span className="text-gray-400">→</span>
+                      <td className="py-3 px-5 text-right">
+                        <ChevronRight className="w-4 h-4 text-gray-300 inline" />
                       </td>
                     </tr>
                   ))}
@@ -227,7 +233,7 @@ export default function DashboardPage() {
             </div>
           </>
         )}
-      </Card>
+      </div>
     </div>
   );
 }
