@@ -1,3 +1,4 @@
+import { Plug, FileText, Info } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 
@@ -6,6 +7,11 @@ interface BeforeYouBeginGuideProps {
   onCancel: () => void;
 }
 
+/**
+ * Before You Begin — 신청 전 체크리스트.
+ * §9-2 C: 색색 박스(green/amber/blue) 나열 → 무채(surface-tertiary) + navy 아이콘으로 통일,
+ * 필수 요건(SP Group 계정)에만 레드 액센트 바 1점. 카피는 기존 문구 유지.
+ */
 export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuideProps) {
   return (
     <Card>
@@ -22,28 +28,28 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
           </Button>
         </div>
 
-        {/* SP Group Account Notice */}
-        <div className="bg-green-50 rounded-xl p-5 border border-green-200">
+        {/* SP Group Account Notice — 유일한 하드 요건이라 레드 액센트 바로 강조 */}
+        <div className="bg-surface-tertiary rounded-xl p-5 border border-primary-100 border-l-[3px] border-l-accent">
           <div className="flex items-start gap-3">
-            <span className="text-2xl">🔌</span>
+            <Plug className="w-5 h-5 text-primary shrink-0 mt-0.5" />
             <div>
-              <h3 className="text-sm font-semibold text-green-800 uppercase tracking-wider mb-2">
+              <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wider mb-2">
                 SP Group Account (New Licence Only)
               </h3>
-              <p className="text-sm text-green-700 leading-relaxed">
+              <p className="text-sm text-gray-600 leading-relaxed">
                 If you are applying for a <strong>New Licence</strong>, you must have an active SP Group electricity account for the installation address.
                 If you don't have one, please open a group account at{' '}
                 <a
                   href="https://www.spgroup.com.sg"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="underline font-medium hover:text-green-900"
+                  className="underline font-medium text-primary hover:text-primary-700"
                 >
                   www.spgroup.com.sg
                 </a>{' '}
                 before submitting your application.
               </p>
-              <p className="text-xs text-green-600 mt-2">
+              <p className="text-xs text-gray-500 mt-2">
                 * This is not required for Licence Renewal applications.
               </p>
             </div>
@@ -51,7 +57,7 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
         </div>
 
         {/* Process Overview */}
-        <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
+        <div className="bg-surface-tertiary rounded-xl p-5 border border-primary-100">
           <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Application Process</h3>
           <div className="space-y-3">
             {[
@@ -75,9 +81,9 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
         </div>
 
         {/* Required Documents Checklist */}
-        <div className="bg-amber-50 rounded-xl p-5 border border-amber-200">
-          <h3 className="text-sm font-semibold text-amber-800 uppercase tracking-wider mb-3">Required Documents</h3>
-          <p className="text-xs text-amber-700 mb-3">Prepare these documents before starting your application. You can upload them after submission.</p>
+        <div className="bg-surface-tertiary rounded-xl p-5 border border-primary-100">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Required Documents</h3>
+          <p className="text-xs text-gray-500 mb-3">Prepare these documents before starting your application. You can upload them after submission.</p>
           <ul className="space-y-2">
             {[
               { label: 'SP Account Email Screenshot (New Licence)', desc: 'Screenshot or PDF of SP Group account confirmation email (PDF, JPG)' },
@@ -86,12 +92,10 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
               { label: 'Main Breaker Box Photo', desc: 'Photo of the main breaker box at the installation site (JPG, PNG)' },
             ].map(({ label, desc }) => (
               <li key={label} className="flex items-start gap-2.5">
-                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
+                <FileText className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-amber-900">{label}</p>
-                  <p className="text-xs text-amber-700">{desc}</p>
+                  <p className="text-sm font-medium text-gray-800">{label}</p>
+                  <p className="text-xs text-gray-500">{desc}</p>
                 </div>
               </li>
             ))}
@@ -99,20 +103,20 @@ export function BeforeYouBeginGuide({ onStart, onCancel }: BeforeYouBeginGuidePr
         </div>
 
         {/* Key Information */}
-        <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
-          <h3 className="text-sm font-semibold text-blue-800 uppercase tracking-wider mb-3">Key Information</h3>
+        <div className="bg-surface-tertiary rounded-xl p-5 border border-primary-100">
+          <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Key Information</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
-              { icon: '💰', title: 'Pricing', desc: 'Pricing is based on kVA capacity tier and EMA fee (if applicable).' },
-              { icon: '⏱️', title: 'Licence Period', desc: 'Choose between 3-month or 12-month licence validity.' },
-              { icon: '🔌', title: 'SP Group Account', desc: 'An SP Group utilities account is required for New Licence applications.' },
-              { icon: '📋', title: 'File Submission', desc: 'Files for licence submission must be under 2MB each.' },
-            ].map(({ icon, title, desc }) => (
+              { title: 'Pricing', desc: 'Pricing is based on kVA capacity tier and EMA fee (if applicable).' },
+              { title: 'Licence Period', desc: 'Choose between 3-month or 12-month licence validity.' },
+              { title: 'SP Group Account', desc: 'An SP Group utilities account is required for New Licence applications.' },
+              { title: 'File Submission', desc: 'Files for licence submission must be under 2MB each.' },
+            ].map(({ title, desc }) => (
               <div key={title} className="flex items-start gap-2">
-                <span className="text-blue-600 mt-0.5">{icon}</span>
+                <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-sm font-medium text-blue-900">{title}</p>
-                  <p className="text-xs text-blue-700">{desc}</p>
+                  <p className="text-sm font-medium text-gray-800">{title}</p>
+                  <p className="text-xs text-gray-500">{desc}</p>
                 </div>
               </div>
             ))}

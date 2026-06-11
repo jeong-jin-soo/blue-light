@@ -601,8 +601,9 @@ export default function NewApplicationPage() {
         </Card>
       )}
 
-      {/* Step content */}
-      {!showGuide && <Card>
+      {/* Step content — 2-col(§9-2 C): 좌측 입력이 주인공, 안내는 우측 좁은 레일로 */}
+      {!showGuide && <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start">
+      <div className="lg:col-span-2"><Card>
         {/* ───── Step 0: Application Type ───── */}
         {currentStep === 0 && (
           <div className="space-y-6">
@@ -985,15 +986,7 @@ export default function NewApplicationPage() {
               </div>
             )}
 
-            {/* Phase 1 PR#3: "서류 제출 필요 없음" 안내 (AC-A1, 하단 고정) */}
-            <div className="border-t border-gray-100 pt-5">
-              <InfoBox title="No documents needed now">
-                Your assigned Licensed Electrical Worker (LEW) will review your
-                application and request any required documents — SP account,
-                LOA, main breaker photo, SLD — through the platform. This keeps
-                your first step fast.
-              </InfoBox>
-            </div>
+            {/* Phase 1 PR#3 "서류 제출 필요 없음" 안내 → 우측 가이드 레일로 이동(§9-2 C) */}
           </div>
         )}
 
@@ -1110,9 +1103,7 @@ export default function NewApplicationPage() {
                 <p className="text-sm text-gray-500 mt-1">Select the electrical capacity for your installation</p>
               </div>
 
-              {/* Phase 5 — Not sure about kVA? 안내 (pre-select 하지 않음) */}
-              <KvaTipBox buildingType={formData.buildingType} />
-
+              {/* Phase 5 "Not sure about kVA?" 안내 → 우측 가이드 레일로 이동(§9-2 C) */}
               <Select
                 label="Electric Box (kVA)"
                 value={
@@ -1313,7 +1304,15 @@ export default function NewApplicationPage() {
             );
           })()}
         </div>
-      </Card>}
+      </Card></div>
+
+      {/* 우측 가이드 레일 — 단계별 안내·체크리스트 (lg 이상 sticky, 모바일은 폼 아래) */}
+      <StepGuideRail
+        currentStep={currentStep}
+        applicationType={formData.applicationType}
+        buildingType={formData.buildingType}
+      />
+      </div>}
 
       <ConfirmDialog
         isOpen={showSubmitConfirm}
@@ -1337,5 +1336,81 @@ export default function NewApplicationPage() {
 
       {/* Phase 1 PR#3: SP Account Email Sample Modal, SamplePreviewModal 제거 (파일 업로드 UI 제거와 함께) */}
     </div>
+  );
+}
+
+/**
+ * 우측 가이드 레일(§9-2 C) — 현재 단계에 필요한 안내만 좁은 사이드에.
+ * 입력 필드(좌측)가 시각적 주인공이 되도록, 안내 카피는 본문에서 이곳으로 이동.
+ * 카피는 기존 문구(BeforeYouBeginGuide·InfoBox·KvaTipBox) 재사용 — 신규 문구 없음.
+ */
+function StepGuideRail({
+  currentStep,
+  applicationType,
+  buildingType,
+}: {
+  currentStep: number;
+  applicationType: ApplicationType;
+  buildingType?: string;
+}) {
+  return (
+    <aside aria-label="Step guide" className="mt-6 lg:mt-0 lg:sticky lg:top-20 space-y-4">
+      {currentStep === 0 && (
+        <>
+          <InfoBox title="No documents needed now">
+            Your assigned Licensed Electrical Worker (LEW) will review your
+            application and request any required documents — SP account,
+            LOA, main breaker photo, SLD — through the platform. This keeps
+            your first step fast.
+          </InfoBox>
+          {applicationType === 'NEW' && (
+            <div className="bg-surface-tertiary border border-primary-100 border-l-[3px] border-l-accent rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-800">SP Group Account</h3>
+              <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                A New Licence requires an active SP Group electricity account for the
+                installation address. If you don&rsquo;t have one, open an account at{' '}
+                <a
+                  href="https://www.spgroup.com.sg"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-medium text-primary hover:text-primary-700"
+                >
+                  www.spgroup.com.sg
+                </a>{' '}
+                before submitting.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {currentStep === 1 && (
+        <div className="bg-surface-tertiary border border-primary-100 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-800">Key information</h3>
+          <ul className="mt-2 space-y-2 text-xs text-gray-600 leading-relaxed">
+            <li><span className="font-medium text-gray-700">Pricing</span> — based on kVA capacity tier and EMA fee (if applicable).</li>
+            <li><span className="font-medium text-gray-700">Licence period</span> — choose between 3-month or 12-month validity.</li>
+            <li><span className="font-medium text-gray-700">File submission</span> — files for licence submission must be under 2MB each.</li>
+          </ul>
+        </div>
+      )}
+
+      {currentStep === 2 && <KvaTipBox buildingType={buildingType} />}
+
+      {currentStep === 3 && (
+        <div className="bg-surface-tertiary border border-primary-100 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-800">Documents to prepare</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            You can upload these after submission, when your LEW requests them.
+          </p>
+          <ul className="mt-2 space-y-1.5 text-xs text-gray-600">
+            <li>SP Account Email Screenshot <span className="text-gray-400">(New Licence)</span></li>
+            <li>Single Line Diagram (SLD)</li>
+            <li>Letter of Appointment</li>
+            <li>Main Breaker Box Photo</li>
+          </ul>
+        </div>
+      )}
+    </aside>
   );
 }
