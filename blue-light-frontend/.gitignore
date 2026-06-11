@@ -28,3 +28,7 @@ lerna-debug.log*
 # ===================
 *.local
 *.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
