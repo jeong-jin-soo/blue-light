@@ -68,6 +68,7 @@ export default function Layout() {
     { path: '/admin/notification-templates', label: 'Notification Templates', icon: Bell },
     { path: '/admin/prices', label: 'Settings', icon: Settings },
     { path: '/admin/users', label: 'Users', icon: Users },
+    { path: '/profile', label: 'My Profile', icon: User },
   ];
 
   // SYSTEM_ADMIN: 시스템 설정 전용
@@ -76,6 +77,7 @@ export default function Layout() {
     { path: '/admin/roles', label: 'Roles', icon: KeyRound },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { path: '/admin/data-breaches', label: 'Data Breach', icon: ShieldAlert },
+    { path: '/profile', label: 'My Profile', icon: User },
   ];
 
   const lewMenu: MenuItem[] = [
@@ -83,6 +85,7 @@ export default function Layout() {
     { path: '/lew/applications', label: 'Applications', icon: FileText },
     // ★ Concierge 강화 PR-4 — LEW 본인에 배정된 컨시어지 요청 목록.
     { path: '/lew/concierge-requests', label: 'My Concierge', icon: Handshake },
+    { path: '/profile', label: 'My Profile', icon: User },
   ];
 
   // NOTIFICATION_MANAGER: 알림 카피 편집·미리보기·테스트 발송 전용 (PR-T7).
