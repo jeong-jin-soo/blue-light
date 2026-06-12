@@ -189,8 +189,22 @@ const router = createBrowserRouter([
           { path: '/expired-license-orders', element: <ExpiredLicenseOrderListPage /> },
           { path: '/expired-license-orders/new', element: <NewExpiredLicenseOrderPage /> },
           { path: '/expired-license-orders/:id', element: <ExpiredLicenseOrderDetailPage /> },
-          { path: '/profile', element: <ProfilePage /> },
           { path: '/notifications', element: <NotificationsPage /> },
+        ],
+      },
+    ],
+  },
+
+  // My Profile — 전 역할 공용 (비밀번호 변경 포함)
+  // APPLICANT 외 ADMIN/LEW/SYSTEM_ADMIN 도 접근 가능. 신청자 전용 섹션(서명·PDPA 등)은
+  // ProfilePage 내부에서 역할별로 분기 렌더링.
+  {
+    element: <ProtectedRoute allowedRoles={['APPLICANT', 'ADMIN', 'LEW', 'SYSTEM_ADMIN']} />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/profile', element: <ProfilePage /> },
         ],
       },
     ],

@@ -254,6 +254,11 @@ export default function ProfilePage() {
     }
   };
 
+  // 신청자 전용 섹션 노출 여부 — 비즈니스 정보(LOA/EMA 인쇄용), 서명(LOA 프리로드),
+  // PDPA 데이터 관리(고객 셀프서비스)는 APPLICANT 에게만 의미가 있다.
+  // ADMIN/LEW/SYSTEM_ADMIN 은 개인 정보 + 비밀번호 변경 + 계정 상세만 노출.
+  const isApplicant = (profile?.role || authUser?.role) === 'APPLICANT';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -348,7 +353,8 @@ export default function ProfilePage() {
             </>
           )}
 
-          {/* Business Information (Phase 1 B-2: 수집 목적 고지) */}
+          {/* Business Information (Phase 1 B-2: 수집 목적 고지) — APPLICANT 전용 */}
+          {isApplicant && (<>
           <div className="border-t border-gray-100 pt-4 mt-2">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="text-sm font-semibold text-gray-700">Business Information</h3>
@@ -399,6 +405,7 @@ export default function ProfilePage() {
             maxLength={10}
             placeholder="e.g., 387429"
           />
+          </>)}
           <div className="pt-2">
             <Button onClick={handleProfileSave} loading={profileSaving}>
               Save Changes
@@ -407,7 +414,8 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      {/* ───── Signature Management ───── */}
+      {/* ───── Signature Management ───── APPLICANT 전용 (LOA 서명 프리로드 용도) */}
+      {isApplicant && (<>
       <Card>
         <CardHeader title="My Signature" description="Your saved signature will be pre-loaded when signing LOA documents" />
         <div className="space-y-4">
@@ -485,6 +493,7 @@ export default function ProfilePage() {
         confirmLabel="Delete"
         variant="danger"
       />
+      </>)}
 
       {/* Change password */}
       <Card>
@@ -558,7 +567,8 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      {/* PDPA: Data Management */}
+      {/* PDPA: Data Management — APPLICANT 전용 (고객 셀프서비스. 운영 계정은 admin 이 관리) */}
+      {isApplicant && (<>
       <Card>
         <CardHeader title="Data Management" description="Your data rights under PDPA (Personal Data Protection Act)" />
         <div className="space-y-4">
@@ -648,6 +658,7 @@ export default function ProfilePage() {
         confirmLabel="Delete My Account"
         variant="danger"
       />
+      </>)}
     </div>
   );
 }
