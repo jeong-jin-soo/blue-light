@@ -20,6 +20,7 @@ import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Pagination } from '../../components/data/Pagination';
 import { ConciergeStatusBadge } from '../../components/concierge/ConciergeStatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import conciergeManagerApi, {
   type ConciergeRequestSummary,
 } from '../../api/conciergeManagerApi';
@@ -70,13 +71,11 @@ export default function LewConciergeRequestListPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">My Concierge Requests</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          Concierge requests assigned to you. Use the detail page to create the application
-          on behalf of the applicant.
-        </p>
-      </div>
+      <PageHeader
+        title="My Concierge Requests"
+        subtitle="Concierge requests assigned to you. Use the detail page to create the application on behalf of the applicant."
+      />
+      <div className="mb-4" />
 
       {error && (
         <div role="alert" className="mb-4 p-3 rounded-md bg-error-50 border border-error-200 text-sm text-error-700">

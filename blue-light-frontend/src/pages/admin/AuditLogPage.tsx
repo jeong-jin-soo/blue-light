@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getAuditLogs, type AuditLogFilter } from '../../api/auditLogApi';
 import type { AuditLog, AuditCategory } from '../../types';
 import { Pagination } from '../../components/data/Pagination';
+import { PageHeader } from '../../components/ui/PageHeader';
 
 const PAGE_SIZE = 20;
 
@@ -286,14 +287,11 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Audit Logs</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          System activity logs — {totalElements.toLocaleString()} total records
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Audit Logs"
+        subtitle={`System activity logs — ${totalElements.toLocaleString()} total records`}
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">

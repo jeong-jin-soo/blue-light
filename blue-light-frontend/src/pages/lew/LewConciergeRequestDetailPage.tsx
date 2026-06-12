@@ -21,6 +21,7 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConciergeStatusBadge } from '../../components/concierge/ConciergeStatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import ConciergeCreateApplicationModal from '../concierge-manager/sections/ConciergeCreateApplicationModal';
 import conciergeManagerApi, {
   type ConciergeRequestDetail,
@@ -115,20 +116,23 @@ export default function LewConciergeRequestDetailPage() {
       </nav>
 
       {/* 상태 헤더 */}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-gray-900">{detail.submitterName}</h1>
-          <div className="mt-1 text-sm text-gray-600 space-x-3">
+      <PageHeader
+        title={detail.submitterName}
+        subtitle={
+          <span className="space-x-3">
             <span className="font-mono text-gray-500">{detail.publicCode}</span>
             <span className="break-all">{detail.submitterEmail}</span>
             <span>{detail.submitterPhone}</span>
+          </span>
+        }
+        actions={
+          <div className="flex flex-col items-end gap-1.5">
+            <ConciergeStatusBadge status={detail.status} />
+            {detail.slaBreached && <Badge variant="error">SLA Breach</Badge>}
           </div>
-        </div>
-        <div className="flex flex-col items-end gap-1.5">
-          <ConciergeStatusBadge status={detail.status} />
-          {detail.slaBreached && <Badge variant="error">SLA Breach</Badge>}
-        </div>
-      </div>
+        }
+      />
+      <div className="mb-4" />
 
       {/* Memo */}
       {detail.memo && (

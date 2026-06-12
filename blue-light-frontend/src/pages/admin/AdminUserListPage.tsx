@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User, UserRole, ApprovalStatus } from '../../types';
@@ -273,12 +274,8 @@ export default function AdminUserListPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">User Management</h1>
-        <p className="text-sm text-gray-500 mt-1">View and manage registered users</p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader title="User Management" subtitle="View and manage registered users" />
 
       {/* Search & Filter */}
       <Card>

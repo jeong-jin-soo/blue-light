@@ -5,6 +5,7 @@ import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
@@ -366,34 +367,33 @@ export default function AdminApplicationDetailPage() {
   if (!application) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(`${basePath}/applications`)}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to applications list"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-                Application #{application.applicationSeq}
-              </h1>
-              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
-                {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
-              </Badge>
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">Admin view &mdash; manage status and payments</p>
-          </div>
-        </div>
-        <StatusBadge status={application.status} />
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Back navigation — PageHeader 위에 유지 */}
+      <div>
+        <button
+          onClick={() => navigate(`${basePath}/applications`)}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+          aria-label="Back to applications list"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back</span>
+        </button>
       </div>
+
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            Application #{application.applicationSeq}
+            <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
+              {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+            </Badge>
+          </span>
+        }
+        subtitle="Admin view — manage status and payments"
+        actions={<StatusBadge status={application.status} />}
+      />
 
       {/* Review Comment */}
       {application.reviewComment && (

@@ -6,6 +6,8 @@ import { Select } from '../../components/ui/Select';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Pagination } from '../../components/data/Pagination';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { ChevronRight } from 'lucide-react';
 import { useToastStore } from '../../stores/toastStore';
 import { lightingManagerApi } from '../../api/lightingManagerApi';
 import {
@@ -59,11 +61,8 @@ export default function LightingManagerOrderListPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Lighting Layout Orders</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage all Lighting Layout orders</p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader title="Lighting Layout Orders" subtitle="Manage all Lighting Layout orders" />
 
       <Card>
         <div className="flex flex-col sm:flex-row gap-3">
@@ -169,7 +168,7 @@ export default function LightingManagerOrderListPage() {
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <span className="text-gray-400">&rarr;</span>
+                        <ChevronRight className="w-4 h-4 text-gray-300 inline" />
                       </td>
                     </tr>
                   ))}

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { lightingOrderApi } from '../../api/lightingOrderApi';
 import priceApi from '../../api/priceApi';
@@ -95,24 +96,23 @@ export default function NewLightingOrderPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/lighting-orders')}
-          className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-          aria-label="Back to Lighting Layout orders"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          <span>Back</span>
-        </button>
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">New Lighting Layout Order</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Request a lighting layout drawing</p>
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Back navigation */}
+      <button
+        onClick={() => navigate('/lighting-orders')}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+        aria-label="Back to Lighting Layout orders"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Back</span>
+      </button>
+
+      <PageHeader
+        title="New Lighting Layout Order"
+        subtitle="Request a lighting layout drawing"
+      />
 
       <form onSubmit={handleSubmit}>
         <Card>

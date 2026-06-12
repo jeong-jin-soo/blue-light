@@ -45,7 +45,7 @@ function HorizontalSteps({
                   status === 'completed'
                     ? 'bg-primary border-primary text-white'
                     : status === 'current'
-                    ? 'bg-white border-primary text-primary'
+                    ? 'bg-white border-primary text-primary ring-4 ring-primary/15'
                     : 'bg-white border-gray-300 text-gray-400'
                 }`}
               >
@@ -104,7 +104,7 @@ function VerticalSteps({
                   status === 'completed'
                     ? 'bg-primary border-primary text-white'
                     : status === 'current'
-                    ? 'bg-white border-primary text-primary'
+                    ? 'bg-white border-primary text-primary ring-4 ring-primary/15'
                     : 'bg-white border-gray-300 text-gray-400'
                 }`}
               >

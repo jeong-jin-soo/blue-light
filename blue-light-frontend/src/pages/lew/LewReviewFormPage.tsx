@@ -7,6 +7,7 @@ import { InfoBox } from '../../components/ui/InfoBox';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/domain/StatusBadge';
 import { StepTracker } from '../../components/domain/StepTracker';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
@@ -547,29 +548,26 @@ export default function LewReviewFormPage() {
         )}
       </div>
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(id ? `/lew/applications/${id}` : '/lew/applications')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to application"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back to application</span>
-          </button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              LEW Review — Application #{app.applicationSeq}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">{app.address}</p>
-          </div>
-        </div>
-        <StatusBadge status={app.status} />
+      {/* Back navigation — PageHeader 위에 유지 */}
+      <div>
+        <button
+          type="button"
+          onClick={() => navigate(id ? `/lew/applications/${id}` : '/lew/applications')}
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+          aria-label="Back to application"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          <span>Back to application</span>
+        </button>
       </div>
+
+      <PageHeader
+        title={`LEW Review — Application #${app.applicationSeq}`}
+        subtitle={app.address}
+        actions={<StatusBadge status={app.status} />}
+      />
 
       {/* Review comment (ADMIN이 남긴 코멘트, view-only) */}
       {adminApp.reviewComment && (

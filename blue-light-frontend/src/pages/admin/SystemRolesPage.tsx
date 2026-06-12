@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { useRoleStore } from '../../stores/roleStore';
 import type { UserRole } from '../../constants/roles';
@@ -69,13 +70,11 @@ export default function SystemRolesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-primary">Role Metadata</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          역할별 표시 라벨과 노출 여부를 관리합니다. 역할 추가·삭제는 코드 배포가 필요합니다.
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Role Metadata"
+        subtitle="역할별 표시 라벨과 노출 여부를 관리합니다. 역할 추가·삭제는 코드 배포가 필요합니다."
+      />
 
       <Card>
         <div className="overflow-x-auto">

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Tabs, TabPanel } from '../../components/ui/Tabs';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { ManualEmailComposeForm } from '../../components/admin/manualemail/ManualEmailComposeForm';
 import { ManualEmailHistoryTable } from '../../components/admin/manualemail/ManualEmailHistoryTable';
 import { getManualEmailQuota } from '../../api/adminManualEmailApi';
@@ -54,30 +55,27 @@ export default function AdminManualEmailPage() {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <div className="mb-4 flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Manual Email Dispatch</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Send ad-hoc operational notices to applicants, LEWs, or external addresses. All dispatches
-            are permanently recorded in the audit log.
-          </p>
-        </div>
-        {/* PR-4: 잔여 발송 한도 표시 (D5=B) — Today: X / Y sent. system_settings 에서 cap 로드. */}
-        {quota && (
-          <div
-            className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
-              quota.remaining === 0
-                ? 'bg-error-50 border-error-200 text-error-700'
-                : quota.remaining <= 10
-                  ? 'bg-warning-50 border-warning-200 text-warning-700'
-                  : 'bg-gray-50 border-gray-200 text-gray-700'
-            }`}
-            title={`Daily cap resets at 00:00 SGT. Used ${quota.usedToday} of ${quota.dailyCap}.`}
-          >
-            Today: {quota.usedToday} / {quota.dailyCap} sent · {quota.remaining} left
-          </div>
-        )}
-      </div>
+      <PageHeader
+        title="Manual Email Dispatch"
+        subtitle="Send ad-hoc operational notices to applicants, LEWs, or external addresses. All dispatches are permanently recorded in the audit log."
+        actions={
+          /* PR-4: 잔여 발송 한도 표시 (D5=B) — Today: X / Y sent. system_settings 에서 cap 로드. */
+          quota ? (
+            <div
+              className={`text-xs font-medium px-3 py-1.5 rounded-full border ${
+                quota.remaining === 0
+                  ? 'bg-error-50 border-error-200 text-error-700'
+                  : quota.remaining <= 10
+                    ? 'bg-warning-50 border-warning-200 text-warning-700'
+                    : 'bg-gray-50 border-gray-200 text-gray-700'
+              }`}
+              title={`Daily cap resets at 00:00 SGT. Used ${quota.usedToday} of ${quota.dailyCap}.`}
+            >
+              Today: {quota.usedToday} / {quota.dailyCap} sent · {quota.remaining} left
+            </div>
+          ) : undefined
+        }
+      />
 
       <Tabs<TabKey>
         tabs={[
@@ -86,7 +84,7 @@ export default function AdminManualEmailPage() {
         ]}
         activeKey={active}
         onChange={setActive}
-        className="mb-4"
+        className="mt-6 mb-4"
       />
 
       <TabPanel active={active === 'compose'}>

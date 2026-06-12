@@ -6,6 +6,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Pagination } from '../../components/data/Pagination';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import * as api from '../../api/dataBreachApi';
 import type { DataBreach, DataBreachRequest } from '../../api/dataBreachApi';
@@ -138,16 +139,16 @@ export default function DataBreachPage() {
   const formatDate = (d?: string) => d ? new Date(d).toLocaleString() : '-';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Data Breach Management</h1>
-          <p className="text-sm text-gray-500 mt-1">PDPA compliance &mdash; Track and manage data breach notifications</p>
-        </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          {showForm ? 'Cancel' : 'Report New Breach'}
-        </Button>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Data Breach Management"
+        subtitle="PDPA compliance — Track and manage data breach notifications"
+        actions={
+          <Button onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : 'Report New Breach'}
+          </Button>
+        }
+      />
 
       {/* Report form */}
       {showForm && (

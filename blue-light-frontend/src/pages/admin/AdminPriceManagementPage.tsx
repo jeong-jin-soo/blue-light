@@ -3,6 +3,7 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminPriceResponse, BatchUpdatePricesRequest } from '../../types';
@@ -425,14 +426,8 @@ export default function AdminPriceManagementPage() {
   // ── 렌더링 ──────────────────────────────
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Settings</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Manage pricing and payment information
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader title="Settings" subtitle="Manage pricing and payment information" />
 
       {/* Payment Information Card */}
       <Card>

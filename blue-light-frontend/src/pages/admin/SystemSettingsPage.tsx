@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, type ChangeEvent } from 'reac
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import * as systemAdminApi from '../../api/systemAdminApi';
 import type { GeminiKeyStatus } from '../../api/systemAdminApi';
@@ -310,14 +311,11 @@ export default function SystemSettingsPage() {
   // ── Render ──────────────────────────────
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">System Configuration</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Manage system-level settings — chatbot prompt, API keys, and platform configuration
-        </p>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="System Configuration"
+        subtitle="Manage system-level settings — chatbot prompt, API keys, and platform configuration"
+      />
 
       {/* ── Email Verification ────────────────────── */}
       <Card>

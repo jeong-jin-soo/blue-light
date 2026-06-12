@@ -314,18 +314,18 @@ function HintSummary({ formData }: { formData: FormData }) {
   }
 
   return (
-    <div className="bg-blue-50 rounded-lg p-4 space-y-3 border border-blue-100">
-      <h3 className="text-sm font-semibold text-blue-700 uppercase tracking-wider">
+    <div className="bg-surface-tertiary rounded-lg p-4 space-y-3 border border-primary-100">
+      <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
         Details you shared to speed up review
       </h3>
       <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {items.map((it) => (
           <div key={it.label}>
-            <dt className="text-xs text-blue-600 flex items-center gap-1.5">
+            <dt className="text-xs text-gray-500 flex items-center gap-1.5">
               <Badge variant="info">Provided</Badge>
               <span>{it.label}</span>
             </dt>
-            <dd className="text-sm font-medium text-blue-800 mt-1">{it.display}</dd>
+            <dd className="text-sm font-medium text-gray-800 mt-1">{it.display}</dd>
           </div>
         ))}
       </dl>

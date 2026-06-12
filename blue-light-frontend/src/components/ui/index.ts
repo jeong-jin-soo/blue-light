@@ -8,4 +8,5 @@ export { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal';
 export { ConfirmDialog } from './ConfirmDialog';
 export { LoadingSpinner, PageSpinner, LoadingWrapper } from './LoadingSpinner';
 export { EmptyState } from './EmptyState';
+export { PageHeader } from './PageHeader';
 export { ToastProvider } from './Toast';

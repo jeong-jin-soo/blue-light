@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { useNotificationTemplateStore } from '../../stores/notificationTemplateStore';
 import * as api from '../../api/notificationTemplateApi';
 import type { TemplateDraftStatus } from '../../types/notificationTemplate';
@@ -68,20 +69,21 @@ export default function AdminNotificationTemplateDraftReviewPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Draft Queue</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            ADMIN/SYSTEM_ADMIN reviews and publishes submitted copy changes.
-          </p>
-        </div>
+      <div className="mb-4">
         <Link
           to="/admin/notification-templates"
           className="text-sm text-gray-600 hover:underline"
         >
           ← Notification Templates
         </Link>
-      </header>
+      </div>
+
+      <PageHeader
+        title="Draft Queue"
+        subtitle="ADMIN/SYSTEM_ADMIN reviews and publishes submitted copy changes."
+      />
+
+      <div className="mb-6" />
 
       <div className="flex gap-2 mb-4">
         {(['PENDING', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as TemplateDraftStatus[]).map((s) => (

@@ -7,6 +7,7 @@ import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { StatusBadge } from '../../components/domain/StatusBadge';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { StepTracker } from '../../components/domain/StepTracker';
 import { InfoField } from '../../components/common/InfoField';
 import { useToastStore } from '../../stores/toastStore';
@@ -337,53 +338,50 @@ export default function ApplicationDetailPage() {
     .includes(application.status);
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/applications')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to applications list"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-                Application #{application.applicationSeq}
-              </h1>
-              <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
-                {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
-              </Badge>
-            </div>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Submitted on {new Date(application.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* P2.C — CoF 발급 배지. cofFinalized=true일 때 status와 나란히 표시.
-              툴팁: LEW가 CoF를 발급해 결제 단계로 이행됐음을 안내. */}
-          {application.cofFinalized && (
-            <span
-              title="Your LEW issued the Certificate of Fitness. The application is ready for payment."
-              className="inline-flex"
-            >
-              <Badge variant="success">
-                <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                CoF issued
-              </Badge>
-            </span>
-          )}
-          <StatusBadge status={application.status} />
-        </div>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Back navigation */}
+      <button
+        onClick={() => navigate('/applications')}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+        aria-label="Back to applications list"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Back</span>
+      </button>
+
+      <PageHeader
+        title={
+          <span className="flex items-center gap-2">
+            Application #{application.applicationSeq}
+            <Badge variant={application.applicationType === 'RENEWAL' ? 'warning' : 'info'}>
+              {application.applicationType === 'RENEWAL' ? 'Renewal' : 'New'}
+            </Badge>
+          </span>
+        }
+        subtitle={`Submitted on ${new Date(application.createdAt).toLocaleDateString()}`}
+        actions={
+          <>
+            {/* P2.C — CoF 발급 배지. cofFinalized=true일 때 status와 나란히 표시.
+                툴팁: LEW가 CoF를 발급해 결제 단계로 이행됐음을 안내. */}
+            {application.cofFinalized && (
+              <span
+                title="Your LEW issued the Certificate of Fitness. The application is ready for payment."
+                className="inline-flex"
+              >
+                <Badge variant="success">
+                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  CoF issued
+                </Badge>
+              </span>
+            )}
+            <StatusBadge status={application.status} />
+          </>
+        }
+      />
 
       {/* PENDING_REVIEW Banner */}
       {application.status === 'PENDING_REVIEW' && (

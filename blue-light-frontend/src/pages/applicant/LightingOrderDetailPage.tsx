@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Textarea } from '../../components/ui/Textarea';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { PageHeader } from '../../components/ui/PageHeader';
 import { InfoField } from '../../components/common/InfoField';
 import { useToastStore } from '../../stores/toastStore';
 import { lightingOrderApi } from '../../api/lightingOrderApi';
@@ -167,31 +168,24 @@ export default function LightingOrderDetailPage() {
   if (!order) return null;
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/lighting-orders')}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
-            aria-label="Back to Lighting Layout orders"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back</span>
-          </button>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
-              Lighting Layout Order #{order.lightingOrderSeq}
-            </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Requested on {new Date(order.createdAt).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-        <LightingStatusBadge status={order.status} />
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      {/* Back navigation */}
+      <button
+        onClick={() => navigate('/lighting-orders')}
+        className="flex items-center gap-1 px-2 py-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-sm transition-colors"
+        aria-label="Back to Lighting Layout orders"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Back</span>
+      </button>
+
+      <PageHeader
+        title={`Lighting Layout Order #${order.lightingOrderSeq}`}
+        subtitle={`Requested on ${new Date(order.createdAt).toLocaleDateString()}`}
+        actions={<LightingStatusBadge status={order.status} />}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}

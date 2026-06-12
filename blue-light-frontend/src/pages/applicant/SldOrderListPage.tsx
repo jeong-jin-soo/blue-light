@@ -4,6 +4,8 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { ChevronRight } from 'lucide-react';
 import { useToastStore } from '../../stores/toastStore';
 import { sldOrderApi } from '../../api/sldOrderApi';
 import type { SldOrder, SldOrderStatus } from '../../types';
@@ -51,17 +53,16 @@ export default function SldOrderListPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My SLD Orders</h1>
-          <p className="text-sm text-gray-500 mt-1">Your SLD drawing order history</p>
-        </div>
-        <Button onClick={() => navigate('/sld-orders/new')}>
-          + New SLD Order
-        </Button>
-      </div>
+    <div className="max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="My SLD Orders"
+        subtitle="Your SLD drawing order history"
+        actions={
+          <Button onClick={() => navigate('/sld-orders/new')}>
+            + New SLD Order
+          </Button>
+        }
+      />
 
       {/* Order list */}
       <Card>
@@ -150,7 +151,7 @@ export default function SldOrderListPage() {
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-2 text-right">
-                        <span className="text-gray-400">&rarr;</span>
+                        <ChevronRight className="w-4 h-4 text-gray-300 inline" />
                       </td>
                     </tr>
                   ))}

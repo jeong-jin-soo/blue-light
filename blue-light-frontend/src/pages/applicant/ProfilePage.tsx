@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { PageHeader } from '../../components/ui/PageHeader';
 import SignaturePad, { type SignaturePadHandle } from '../../components/domain/SignaturePad';
 import { useToastStore } from '../../stores/toastStore';
 import { useFormGuard } from '../../hooks/useFormGuard';
@@ -263,11 +264,7 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      {/* Page header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">My Profile</h1>
-        <p className="text-sm text-gray-500 mt-1">Manage your account information</p>
-      </div>
+      <PageHeader title="My Profile" subtitle="Manage your account information" />
 
       {/* Account summary */}
       <Card>

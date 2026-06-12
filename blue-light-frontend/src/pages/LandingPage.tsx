@@ -1,5 +1,9 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  FileText, DraftingCompass, Lightbulb, Plug, Zap, RefreshCw,
+  Lock, ShieldCheck, ScrollText, ArrowRight, Check,
+} from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
 import licensekakiLogo from '../assets/licensekaki-logo.png';
@@ -8,13 +12,14 @@ import licensekakiLogo from '../assets/licensekaki-logo.png';
 /*  Data                                                               */
 /* ------------------------------------------------------------------ */
 
+// 아이콘은 사이드바 메뉴와 동일 매핑(lucide) — 랜딩→앱 연속성.
 const services = [
-  { icon: '📋', label: 'Apply for Licence', to: '/applications/new' },
-  { icon: '📐', label: 'SLD Drawing',       to: '/sld-orders/new' },
-  { icon: '💡', label: 'Lighting Layout',   to: '/lighting-orders/new' },
-  { icon: '🔌', label: 'Power Socket',      to: '/power-socket-orders/new' },
-  { icon: '⚡', label: 'LEW Service',        to: '/lew-service-orders/new' },
-  { icon: '🔄', label: 'Expired License',   to: '/expired-license-orders/new' },
+  { icon: FileText,        label: 'Apply for Licence', to: '/applications/new' },
+  { icon: DraftingCompass, label: 'SLD Drawing',       to: '/sld-orders/new' },
+  { icon: Lightbulb,       label: 'Lighting Layout',   to: '/lighting-orders/new' },
+  { icon: Plug,            label: 'Power Socket',      to: '/power-socket-orders/new' },
+  { icon: Zap,             label: 'LEW Service',       to: '/lew-service-orders/new' },
+  { icon: RefreshCw,       label: 'Expired License',   to: '/expired-license-orders/new' },
 ];
 
 const steps = [
@@ -25,9 +30,9 @@ const steps = [
 ];
 
 const trustItems = [
-  { icon: '🔒', label: 'AES-256 Encryption', desc: 'Enterprise-grade file encryption at rest' },
-  { icon: '🛡️', label: 'PDPA Compliant', desc: 'Singapore data protection compliance' },
-  { icon: '📝', label: 'Audit Trail', desc: 'Complete logging for transparency' },
+  { icon: Lock,        label: 'AES-256 Encryption', desc: 'Enterprise-grade file encryption at rest' },
+  { icon: ShieldCheck, label: 'PDPA Compliant', desc: 'Singapore data protection compliance' },
+  { icon: ScrollText,  label: 'Audit Trail', desc: 'Complete logging for transparency' },
 ];
 
 const statusSteps = [
@@ -82,32 +87,47 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* ── B. Hero Section ── */}
-      <section className="bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* ── B. Hero Section — navy 단색 브랜드 모먼트 + 레드 슬래시 1점(§9-4) ── */}
+      <section className="relative overflow-hidden bg-primary">
+        {/* 시그니처: 로고의 레드 슬래시를 키운 단 하나의 그래픽 디테일 */}
+        <div
+          className="hidden lg:block absolute -top-[10%] right-[34%] h-[120%] w-1.5 bg-accent-500 rotate-[24deg] pointer-events-none"
+          aria-hidden
+        />
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 lg:py-28">
           <div className="lg:grid lg:grid-cols-2 lg:gap-16 items-center">
             {/* Left — Copy */}
             <div>
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary mb-6">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-white/10 text-primary-100 mb-6">
                 Electrical Installation Licensing Platform
               </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
                 Electrical Installation Licences,{' '}
-                <span className="text-primary">Simplified</span>
+                <span className="relative inline-block">
+                  Simplified
+                  {/* 레드 슬래시 언더라인 — 브랜드 모티프 */}
+                  <span className="absolute left-0 -bottom-1.5 h-1 w-full bg-accent-500 rounded-full -skew-x-12" aria-hidden />
+                </span>
               </h1>
-              <p className="mt-6 text-sm sm:text-base text-gray-600 leading-relaxed max-w-xl">
+              <p className="mt-6 text-sm sm:text-base text-primary-100 leading-relaxed max-w-xl">
                 The end-to-end digital platform for applying, tracking, and managing EMA electrical installation licences in Singapore. For building, business, and shop owners, LEWs, and SLD professionals.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
                 <Link to="/signup?role=APPLICANT">
-                  <Button size="lg">Apply for a Licence</Button>
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="!bg-white !text-primary !border-white hover:!bg-gray-100"
+                  >
+                    Apply for a Licence
+                  </Button>
                 </Link>
                 <button
                   type="button"
                   onClick={scrollToFeatures}
-                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg border-2 border-emerald-500 text-emerald-600 bg-white hover:bg-emerald-50 hover:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-400/30 transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg border border-white/40 text-white hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30 transition-colors cursor-pointer"
                 >
-                  more
+                  Learn more
                 </button>
               </div>
             </div>
@@ -152,16 +172,13 @@ export default function LandingPage() {
                   A Concierge Manager will contact you within 24 hours.
                 </p>
               </div>
-              {/* Decorative blobs — desktop만 (모바일 공간 절약) */}
-              <div className="hidden lg:block absolute -top-4 -right-4 w-24 h-24 bg-concierge-100/60 rounded-full -z-10" />
-              <div className="hidden lg:block absolute -bottom-6 -left-6 w-32 h-32 bg-concierge-50 rounded-full -z-10" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── C. Features Grid ── */}
-      <section id="features" className="py-16 sm:py-24 bg-gradient-to-br from-emerald-50 to-green-50/60">
+      {/* ── C. Features Grid — 그라디언트·무지개 텍스트 제거(§9-4 "절제가 프리미엄") ── */}
+      <section id="features" className="py-16 sm:py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="text-xs font-semibold tracking-widest text-primary uppercase">
@@ -169,45 +186,46 @@ export default function LandingPage() {
             </span>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-gray-900">
               Everything You Need for Licence Management{' '}
-              <span className="italic font-extrabold text-3xl sm:text-4xl bg-gradient-to-r from-emerald-500 to-green-600 bg-clip-text text-transparent">
-                &amp; more
-              </span>
+              <span className="italic text-accent-600">&amp; more</span>
             </h2>
           </div>
 
           {/* Services Grid — Apply + 4 direct entry points */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 max-w-5xl mx-auto">
-            {services.map((item) => (
-              <button
-                key={item.to}
-                type="button"
-                onClick={() => {
-                  if (isAuthenticated) {
-                    navigate(item.to);
-                  } else {
-                    // 회원가입 후 원래 기능 요청 페이지로 리다이렉트
-                    navigate(`/signup?role=APPLICANT&returnTo=${encodeURIComponent(item.to)}`);
-                  }
-                }}
-                className="group flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl bg-white border border-emerald-100/80 hover:shadow-lg hover:border-primary/40 transition-all text-center"
-              >
-                <span className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl group-hover:bg-primary/10 transition-colors">
-                  {item.icon}
-                </span>
-                <span className="text-sm font-semibold text-gray-800 group-hover:text-primary transition-colors">
-                  {item.label}
-                </span>
-                <span className="text-xs text-gray-400 group-hover:text-primary/70 transition-colors">
-                  Request now →
-                </span>
-              </button>
-            ))}
+            {services.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.to}
+                  type="button"
+                  onClick={() => {
+                    if (isAuthenticated) {
+                      navigate(item.to);
+                    } else {
+                      // 회원가입 후 원래 기능 요청 페이지로 리다이렉트
+                      navigate(`/signup?role=APPLICANT&returnTo=${encodeURIComponent(item.to)}`);
+                    }
+                  }}
+                  className="group flex flex-col items-center gap-2 p-4 sm:p-5 rounded-2xl bg-white border border-primary-100 hover:shadow-lg hover:border-primary/40 transition-all text-center"
+                >
+                  <span className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <Icon className="w-6 h-6 text-primary" />
+                  </span>
+                  <span className="text-sm font-semibold text-gray-800 group-hover:text-primary transition-colors">
+                    {item.label}
+                  </span>
+                  <span className="inline-flex items-center gap-0.5 text-xs text-gray-400 group-hover:text-primary/70 transition-colors">
+                    Request now <ArrowRight className="w-3 h-3" />
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
 
       {/* ── D. How It Works ── */}
-      <section className="py-16 sm:py-24 bg-gray-50">
+      <section className="py-16 sm:py-24 bg-canvas">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="text-xs font-semibold tracking-widest text-primary uppercase">
@@ -251,21 +269,21 @@ export default function LandingPage() {
                           s.current
                             ? 'bg-primary ring-4 ring-primary/20'
                             : s.done
-                              ? 'bg-emerald-500'
+                              ? 'bg-success-500'
                               : 'bg-gray-200'
                         }`}
                       />
                       <span className={`text-sm ${s.current ? 'font-semibold text-primary' : s.done ? 'text-gray-600' : 'text-gray-400'}`}>
                         {s.label}
                       </span>
-                      {s.done && <span className="text-emerald-500 text-xs ml-auto">✓</span>}
+                      {s.done && <Check className="w-3.5 h-3.5 text-success-500 ml-auto" />}
                       {s.current && <span className="text-primary text-xs ml-auto font-medium">Processing…</span>}
                     </div>
                   ))}
                 </div>
               </div>
               <div className="absolute -top-4 -right-4 w-20 h-20 bg-primary/5 rounded-full -z-10" />
-              <div className="absolute -bottom-6 -left-6 w-28 h-28 bg-blue-100/50 rounded-full -z-10" />
+              <div className="absolute -bottom-6 -left-6 w-28 h-28 bg-primary-100/50 rounded-full -z-10" />
             </div>
           </div>
         </div>
@@ -275,15 +293,18 @@ export default function LandingPage() {
       <section className="py-14 sm:py-20">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-            {trustItems.map((t) => (
-              <div key={t.label} className="text-center">
-                <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-2xl mx-auto mb-3">
-                  {t.icon}
+            {trustItems.map((t) => {
+              const Icon = t.icon;
+              return (
+                <div key={t.label} className="text-center">
+                  <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center mx-auto mb-3">
+                    <Icon className="w-6 h-6 text-primary" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-gray-800">{t.label}</h4>
+                  <p className="mt-1 text-xs text-gray-500">{t.desc}</p>
                 </div>
-                <h4 className="text-sm font-semibold text-gray-800">{t.label}</h4>
-                <p className="mt-1 text-xs text-gray-500">{t.desc}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -295,7 +316,7 @@ export default function LandingPage() {
             Ready to Simplify Your Licence Application{' '}
             <span className="italic">&amp; more</span>?
           </h2>
-          <p className="text-blue-200 mb-8 max-w-2xl mx-auto">
+          <p className="text-primary-200 mb-8 max-w-2xl mx-auto">
             Singapore's first seamless online electrical licensing platform.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
