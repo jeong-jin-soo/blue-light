@@ -16,6 +16,8 @@ services:
     ports:
       - "8090:8090"
     environment:
+      # Spring 프로필 — prod면 FILE_ENCRYPTION_KEY 누락 시 기동 차단 가드 활성(B-4)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
       # DB (외부 DB 서버)
       SPRING_DATASOURCE_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}

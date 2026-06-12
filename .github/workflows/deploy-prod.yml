@@ -175,6 +175,9 @@ jobs:
           FILE_STORAGE_TYPE=s3
           AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
           AWS_S3_REGION=ap-southeast-7
+          # 파일 암호화(AES-256-GCM) — 키 누락 시 prod 프로필 가드가 기동을 차단한다
+          FILE_ENCRYPTION_KEY=${{ secrets.FILE_ENCRYPTION_KEY }}
+          SPRING_PROFILES_ACTIVE=prod
           SLD_AGENT_SERVICE_KEY=${{ secrets.SLD_AGENT_SERVICE_KEY }}
           MAIL_HOST=${{ secrets.MAIL_HOST }}
           MAIL_PORT=${{ secrets.MAIL_PORT }}
