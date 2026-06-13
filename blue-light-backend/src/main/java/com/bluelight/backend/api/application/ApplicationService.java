@@ -35,6 +35,7 @@ import com.bluelight.backend.service.application.ApplicantHintValidator;
 import com.bluelight.backend.service.application.NormalizedHints;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -65,6 +66,8 @@ public class ApplicationService {
     private final ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
     /** P1.B — LEW Review Form 신청자 hint 경고 수준 검증. */
     private final ApplicantHintValidator applicantHintValidator;
+    /** LEW 자동 배정 시 AFTER_COMMIT 알림(인앱+이메일) 트리거용 — LewAssignmentNotificationListener 수신. */
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Declaration 문서 버전 상수 — 문구가 바뀌면 증가시켜 법적 증거 체인을 분리한다. */
     private static final String DECLARATION_DOCUMENT_VERSION = "2026-04-declaration-v1";
@@ -288,9 +291,11 @@ public class ApplicationService {
                 UserRole.LEW, ApprovalStatus.APPROVED).stream()
                 .filter(lew -> kva != null && lew.canHandleKva(kva))
                 .toList();
+        User autoAssignedLew = null;
         if (eligibleLews.size() == 1) {
-            application.assignLew(eligibleLews.get(0));
-            log.info("LEW auto-assigned: lewSeq={}", eligibleLews.get(0).getUserSeq());
+            autoAssignedLew = eligibleLews.get(0);
+            application.assignLew(autoAssignedLew);
+            log.info("LEW auto-assigned: lewSeq={}", autoAssignedLew.getUserSeq());
         }
 
         // ── P1.B: 신청자 hint 경고 수준 검증 + 엔티티 반영 ──
@@ -316,6 +321,16 @@ public class ApplicationService {
         if (hintResult.hasWarnings()) {
             log.info("Applicant hint warnings on create: applicationSeq={}, count={}",
                     saved.getApplicationSeq(), hintResult.getWarnings().size());
+        }
+
+        // LEW 자동 배정이 발생했다면 배정된 LEW 에게 인앱+이메일 통보 (AFTER_COMMIT — save 후 seq 확보).
+        if (autoAssignedLew != null) {
+            eventPublisher.publishEvent(new LewAssignedEvent(
+                    saved.getApplicationSeq(),
+                    autoAssignedLew.getUserSeq(),
+                    user.getFullName(),
+                    saved.getAddress(),
+                    true));
         }
 
         // C.1: Snapshot-at-submit — Application을 "신청 당시 정본"으로 격상
@@ -642,9 +657,11 @@ public class ApplicationService {
                 UserRole.LEW, ApprovalStatus.APPROVED).stream()
                 .filter(lew -> kvaForOnBehalf != null && lew.canHandleKva(kvaForOnBehalf))
                 .toList();
+        User autoAssignedLewOnBehalf = null;
         if (eligibleLewsOnBehalf.size() == 1) {
-            application.assignLew(eligibleLewsOnBehalf.get(0));
-            log.info("LEW auto-assigned on-behalf: lewSeq={}", eligibleLewsOnBehalf.get(0).getUserSeq());
+            autoAssignedLewOnBehalf = eligibleLewsOnBehalf.get(0);
+            application.assignLew(autoAssignedLewOnBehalf);
+            log.info("LEW auto-assigned on-behalf: lewSeq={}", autoAssignedLewOnBehalf.getUserSeq());
         }
 
         // ── P1.B: Concierge 대리 생성 경로도 동일 hint 검증 + 반영 ──
@@ -665,6 +682,16 @@ public class ApplicationService {
         log.info("Application created ON-BEHALF: seq={}, targetApplicantSeq={}, conciergeRequestSeq={}, type={}, kva={}, amount={}",
                 saved.getApplicationSeq(), targetApplicantSeq, conciergeRequestSeq, appType,
                 request.getSelectedKva(), quoteAmount);
+
+        // LEW 자동 배정이 발생했다면 배정된 LEW 에게 통보 (대리 생성 경로도 applicant 경로와 동일).
+        if (autoAssignedLewOnBehalf != null) {
+            eventPublisher.publishEvent(new LewAssignedEvent(
+                    saved.getApplicationSeq(),
+                    autoAssignedLewOnBehalf.getUserSeq(),
+                    user.getFullName(),
+                    saved.getAddress(),
+                    true));
+        }
 
         // C.1: Snapshot-at-submit (Concierge 대리 생성 경로도 동일 로직 적용)
         recordApplicationSubmitSnapshot(saved, user, request);

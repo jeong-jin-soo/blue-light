@@ -3,7 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminApplicationResponse;
 import com.bluelight.backend.api.admin.dto.AssignLewRequest;
 import com.bluelight.backend.api.admin.dto.LewSummaryResponse;
-import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.application.LewAssignedEvent;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -13,6 +13,7 @@ import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,7 +31,8 @@ public class AdminLewService {
 
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
-    private final EmailService emailService;
+    /** LEW 배정 시 AFTER_COMMIT 알림(인앱+이메일) 트리거 — LewAssignmentNotificationListener 수신. */
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 신청에 LEW 할당
@@ -68,14 +70,16 @@ public class AdminLewService {
         application.assignLew(lew);
         log.info("LEW assigned: applicationSeq={}, lewSeq={}", applicationSeq, lew.getUserSeq());
 
-        // LEW에게 할당 알림 이메일 발송
+        // LEW에게 할당 알림 (인앱 + 이메일) — AFTER_COMMIT 이벤트로 통일.
+        // 자동 배정(ApplicationService) 경로와 동일하게 LewAssignmentNotificationListener 가 처리한다.
+        // 기존엔 여기서 이메일만 직접 발송했으나 인앱 알림이 누락돼 있었다.
         User applicant = application.getUser();
-        emailService.sendLewAssignedEmail(
-                lew.getEmail(),
-                lew.getFirstName() + " " + lew.getLastName(),
+        eventPublisher.publishEvent(new LewAssignedEvent(
                 applicationSeq,
+                lew.getUserSeq(),
+                applicant.getFullName(),
                 application.getAddress(),
-                applicant.getFirstName() + " " + applicant.getLastName());
+                false));
 
         return AdminApplicationResponse.from(application);
     }
