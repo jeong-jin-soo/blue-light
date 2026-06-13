@@ -135,6 +135,11 @@ public class DatabaseMigrationRunner {
             //   (WhatsApp/전화/i18n users 컬럼 + kVA·snapshot·applicant_type·version applications 컬럼)
             //   bluelight_prod 드리프트 감사(2026-06)로 식별. 각 컬럼 columnExists 가드 → 멱등.
             migrateProdParityColumns(conn);
+            // ── 알림 카탈로그 시드 (PR-T5) ──
+            // notification_catalog 는 SQL_INIT_MODE=never 인 dev/prod 에서 data.sql 이 실행되지 않아
+            // 비어 있을 수 있다(템플릿 142종은 별도 import 됐으나 카탈로그 시드 단계 누락 → Admin Edit
+            // 화면의 "Triggered by"·카탈로그 설명 미표시). 풀 97종을 idempotent 하게 시드한다.
+            seedNotificationCatalog(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -194,6 +199,57 @@ public class DatabaseMigrationRunner {
             log.info("Migration [sync-create-tables]: processed {} CREATE TABLE IF NOT EXISTS statements", created);
         } else {
             log.debug("Migration [sync-create-tables]: no statements processed");
+        }
+    }
+
+    /**
+     * 알림 카탈로그(notification_catalog) 풀 시드를 idempotent 하게 적용한다.
+     * <p>
+     * 배경: 운영/개발은 {@code SQL_INIT_MODE=never} 라 {@code data.sql}(샘플 8종)이 실행되지 않고,
+     * 풀 카탈로그(97종)는 {@code scripts/import_notification_copy.py} 로 만든 SQL 을 수동 실행하도록
+     * 되어 있었다. 이 수동 단계가 누락되면 카탈로그가 비어 Admin Edit 화면에서 "Triggered by"·
+     * 카탈로그 설명·Lint 변수 화이트리스트가 모두 동작하지 않는다.
+     * <p>
+     * 시드 SQL({@code db/seed/notification_catalog_seed.sql})의 각 문장은 한 줄·
+     * {@code INSERT ... SELECT ... WHERE NOT EXISTS} 형태라 재실행해도 중복 삽입되지 않는다.
+     * 따라서 매 부팅 실행해도 안전하며, 누락분만 채운다. (trigger_ref 값에 ';' 가 포함될 수 있어
+     * ';' 분리는 쓰지 않고 줄 단위로 파싱한다.)
+     */
+    private void seedNotificationCatalog(Connection conn) {
+        String sql;
+        try (InputStream is = new ClassPathResource("db/seed/notification_catalog_seed.sql").getInputStream()) {
+            sql = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            log.warn("seedNotificationCatalog: seed file read failed — skipping: {}", e.getMessage());
+            return;
+        }
+
+        int inserted = 0;
+        int processed = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String line : sql.split("\\R")) {
+                String s = line.trim();
+                // 빈 줄·전체 주석 줄 건너뜀 (값 내부 '--' 는 없음 — 생성기 보장)
+                if (s.isEmpty() || s.startsWith("--")) continue;
+                if (s.endsWith(";")) s = s.substring(0, s.length() - 1);
+                if (s.isEmpty()) continue;
+                processed++;
+                try {
+                    inserted += stmt.executeUpdate(s);
+                } catch (SQLException e) {
+                    log.warn("seedNotificationCatalog statement warn: {} — err: {}",
+                        s.substring(0, Math.min(80, s.length())), e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedNotificationCatalog execution aborted: {}", e.getMessage());
+        }
+        if (inserted > 0) {
+            log.info("Migration [seed-notification-catalog]: inserted {} new catalog rows ({} statements)",
+                inserted, processed);
+        } else {
+            log.debug("Migration [seed-notification-catalog]: catalog already seeded ({} statements, 0 new)",
+                processed);
         }
     }
 
