@@ -71,7 +71,7 @@ export default function NewSldOrderPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.endorsementRequested && !formData.endorsementFeeAcknowledged) {
-      toast.error('LEW endorsement 추가 비용 발생에 대한 확인이 필요합니다.');
+      toast.error('Please acknowledge the additional cost for the LEW endorsement.');
       return;
     }
     setSubmitting(true);
@@ -211,11 +211,11 @@ export default function NewSldOrderPage() {
                     />
                     <div className="flex-1">
                       <div className="text-sm font-medium text-gray-800">
-                        Include LEW endorsement (인증 도장)
+                        Include LEW endorsement (certification stamp)
                       </div>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        SP Group 제출 시 필요한 LEW 인증 도장을 SLD 도면에 함께 받습니다. 도면만
-                        필요하면 체크를 해제하세요.
+                        Get the LEW certification stamp required for SP Group submission on your SLD
+                        drawing. Uncheck if you only need the drawing.
                       </p>
                       {(sldHint != null || endorseHint != null) && (
                         <p className="text-xs text-gray-500 mt-1.5">
@@ -245,15 +245,15 @@ export default function NewSldOrderPage() {
                         />
                         <div className="flex-1">
                           <div className="text-sm font-medium text-warning-800">
-                            추가 비용 발생 확인 <span className="text-error-600">*</span>
+                            Acknowledge additional cost <span className="text-error-600">*</span>
                           </div>
                           <p className="text-xs text-warning-700 mt-0.5">
-                            LEW 인증 도장(endorsement)을 추가하면 SLD 도면 비용에 더해
+                            Adding the LEW endorsement incurs an additional cost
                             {endorseHint != null && (
-                              <> 약 ${Number(endorseHint).toFixed(2)}의</>
+                              <> of approximately ${Number(endorseHint).toFixed(2)}</>
                             )}{' '}
-                            추가 비용이 발생합니다. 최종 금액은 매니저 견적으로 확정됩니다.
-                            이에 동의합니다.
+                            on top of the SLD drawing fee. The final amount is confirmed by the
+                            manager's quote. I agree to this.
                           </p>
                         </div>
                       </label>
