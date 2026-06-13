@@ -51,6 +51,7 @@ class ApplicationServiceKvaTest {
     private AuditLogService auditLogService;
     private ApplicationDeclarationLogRepository applicationDeclarationLogRepository;
     private ApplicantHintValidator applicantHintValidator;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private ApplicationService service;
 
     @BeforeEach
@@ -70,10 +71,11 @@ class ApplicationServiceKvaTest {
                         .normalized(NormalizedHints.builder().build())
                         .warnings(java.util.List.of())
                         .build());
+        eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
         service = new ApplicationService(
                 applicationRepository, sldRequestRepository, masterPriceRepository,
                 paymentRepository, userRepository, fileRepository, auditLogService,
-                applicationDeclarationLogRepository, applicantHintValidator);
+                applicationDeclarationLogRepository, applicantHintValidator, eventPublisher);
     }
 
     private CreateApplicationRequest baseReq(Integer kva, Boolean unknown) {

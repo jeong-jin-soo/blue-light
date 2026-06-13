@@ -1400,7 +1400,9 @@ export type NotificationType =
   // (PR-2) 신청자에게 자동 발행 영수증 발급 안내. referenceType=APPLICATION 또는 CONCIERGE_REQUEST.
   | 'INVOICE_ISSUED_APPLICANT'
   // (PR-3) LEW 가 ConciergeRequest 에 배정될 때 해당 LEW 에게 발송. referenceType=CONCIERGE_REQUEST.
-  | 'CONCIERGE_LEW_ASSIGNED_LEW';
+  | 'CONCIERGE_LEW_ASSIGNED_LEW'
+  // LEW 가 Application 에 배정될 때(자동/ADMIN 수동) 해당 LEW 에게 발송. referenceType=APPLICATION.
+  | 'APPLICATION_LEW_ASSIGNED_LEW';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

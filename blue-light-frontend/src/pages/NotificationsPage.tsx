@@ -39,6 +39,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   INVOICE_ISSUED_APPLICANT: '🧾',
   // ★ PR-3 — 컨시어지 LEW 배정 알림 (🤝 컨시어지)
   CONCIERGE_LEW_ASSIGNED_LEW: '🤝',
+  // Application LEW 배정 알림 (자동/ADMIN 수동) — 📋 신청서
+  APPLICATION_LEW_ASSIGNED_LEW: '📋',
 };
 
 export default function NotificationsPage() {
@@ -95,7 +97,9 @@ export default function NotificationsPage() {
         n.type === 'PAYMENT_CONFIRMED_LEW' ||
         n.type === 'KVA_ADJUSTED_BY_ADMIN_LEW' ||
         // PR-4: settlement 마킹 알림 — 수신자가 LEW 이므로 LEW 워크스페이스로.
-        n.type === 'KVA_ADJUSTMENT_SETTLED_LEW'
+        n.type === 'KVA_ADJUSTMENT_SETTLED_LEW' ||
+        // LEW 배정 알림 — 수신자가 LEW 이므로 LEW 워크스페이스 신청 상세로.
+        n.type === 'APPLICATION_LEW_ASSIGNED_LEW'
       ) {
         navigate(`/lew/applications/${n.referenceId}`);
       } else if (n.type === 'KVA_ADJUSTMENT_REQUESTED_ADMIN') {

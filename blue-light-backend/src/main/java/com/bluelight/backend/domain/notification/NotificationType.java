@@ -62,5 +62,10 @@ public enum NotificationType {
     // (PR-2) 별도 수금 기록 직후 자동 발행된 영수증을 신청자에게 안내.
     INVOICE_ISSUED_APPLICANT,
     // (PR-3) LEW 가 ConciergeRequest 에 셀프/타인 배정될 때 해당 LEW 에게 발송.
-    CONCIERGE_LEW_ASSIGNED_LEW
+    CONCIERGE_LEW_ASSIGNED_LEW,
+
+    // LEW 가 Application 에 배정될 때(자동 단일 적격 배정 또는 ADMIN 수동 배정) 해당 LEW 에게 발송.
+    // 기존엔 ADMIN 수동 경로만 이메일을 보냈고 자동 경로는 무알림이었던 누락을 보완 — 두 경로를
+    // LewAssignedEvent → LewAssignmentNotificationListener 단일 흐름으로 통일. referenceType=APPLICATION.
+    APPLICATION_LEW_ASSIGNED_LEW
 }
