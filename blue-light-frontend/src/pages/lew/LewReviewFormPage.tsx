@@ -11,6 +11,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
+import { AdminLoaSection } from '../admin/sections/AdminLoaSection';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import lewReviewApi from '../../api/lewReviewApi';
@@ -93,6 +94,8 @@ export default function LewReviewFormPage() {
   // /api/admin/applications/{id} — KvaSection/LOA/SLD 모두 이 형상 요구
   const [adminApp, setAdminApp] = useState<AdminApplication | null>(null);
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
+  const [loaGenerating, setLoaGenerating] = useState(false);
+  const [loaUploading, setLoaUploading] = useState(false);
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [documentRequests, setDocumentRequests] = useState<DocumentRequest[]>([]);
@@ -170,6 +173,37 @@ export default function LewReviewFormPage() {
     void loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idValid, applicationId]);
+
+  // ── LOA 액션 (동선 재설계 A: LoA 생성을 LEW 검토 흐름에 개방) ──
+  // 백엔드는 /api/admin/** = ADMIN/LEW/SYSTEM_ADMIN 허용. admin 상세와 동일 핸들러.
+  const handleGenerateLoa = async () => {
+    setLoaGenerating(true);
+    try {
+      await loaApi.generateLoa(applicationId);
+      toast.success('LOA generated successfully');
+      setLoaStatus(await loaApi.getLoaStatus(applicationId));
+    } catch {
+      toast.error('Failed to generate LOA');
+    } finally {
+      setLoaGenerating(false);
+    }
+  };
+  const handleUploadLoa = async (file: File) => {
+    setLoaUploading(true);
+    try {
+      await adminApi.uploadFile(applicationId, file, 'OWNER_AUTH_LETTER');
+      toast.success('LOA uploaded successfully');
+      setLoaStatus(await loaApi.getLoaStatus(applicationId));
+    } catch {
+      toast.error('Failed to upload LOA');
+    } finally {
+      setLoaUploading(false);
+    }
+  };
+  const handleLoaDownload = async (fileSeq: number, filename: string) => {
+    try { await fileApi.downloadFile(fileSeq, filename); }
+    catch { toast.error('Failed to download LOA'); }
+  };
 
   // ── Derived / Guards ─────────────────────────────────
   const pendingDocCount = useMemo(
@@ -639,7 +673,19 @@ export default function LewReviewFormPage() {
           )}
 
           <TabPanel active={activeTab === 'loa'}>
-            <LoaReadOnlyView loaStatus={loaStatus} application={adminApp} />
+            {adminApp ? (
+              <AdminLoaSection
+                application={adminApp}
+                loaStatus={loaStatus}
+                onGenerate={handleGenerateLoa}
+                onUploadLoa={handleUploadLoa}
+                onDownload={handleLoaDownload}
+                generating={loaGenerating}
+                uploading={loaUploading}
+              />
+            ) : (
+              <LoaReadOnlyView loaStatus={loaStatus} application={adminApp} />
+            )}
           </TabPanel>
 
           <TabPanel active={activeTab === 'cof'}>

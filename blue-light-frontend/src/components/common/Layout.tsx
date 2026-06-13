@@ -71,9 +71,10 @@ export default function Layout() {
     { path: '/profile', label: 'My Profile', icon: User },
   ];
 
-  // SYSTEM_ADMIN: 시스템 설정 전용
+  // SYSTEM_ADMIN: 시스템 설정 전용 + 신청 접근(LoA 생성 등, 동선 재설계 A)
   const systemAdminMenu: MenuItem[] = [
     { path: '/admin/system', label: 'System', icon: Wrench },
+    { path: '/admin/applications', label: 'Applications', icon: FileText },
     { path: '/admin/roles', label: 'Roles', icon: KeyRound },
     { path: '/admin/audit-logs', label: 'Audit Logs', icon: ScrollText },
     { path: '/admin/data-breaches', label: 'Data Breach', icon: ShieldAlert },
