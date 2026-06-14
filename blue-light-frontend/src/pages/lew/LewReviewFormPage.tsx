@@ -10,7 +10,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
-import { AdminLoaSection } from '../admin/sections/AdminLoaSection';
+import { LewLoaExchangeSection } from './sections/LewLoaExchangeSection';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import lewReviewApi from '../../api/lewReviewApi';
@@ -139,35 +139,41 @@ export default function LewReviewFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idValid, applicationId]);
 
-  // ── LOA 액션 (동선 재설계 A: LoA 생성을 LEW 검토 흐름에 개방) ──
-  // 백엔드는 /api/admin/** = ADMIN/LEW/SYSTEM_ADMIN 허용. admin 상세와 동일 핸들러.
-  const handleGenerateLoa = async () => {
+  // ── LoA 교환 모델 액션 (loa-exchange-redesign-spec.md §3.3, PR3b) ──
+  // send-form / final-upload 는 /api/lew/** (담당 LEW 전용) 경로 사용.
+  // (loaGenerating/loaUploading state 는 각각 sending/uploading 의미로 재사용)
+  const handleSendLoaForm = async () => {
     setLoaGenerating(true);
     try {
-      await loaApi.generateLoa(applicationId);
-      toast.success('LOA generated successfully');
-      setLoaStatus(await loaApi.getLoaStatus(applicationId));
-    } catch {
-      toast.error('Failed to generate LOA');
+      const status = await loaApi.sendLoaForm(applicationId);
+      setLoaStatus(status);
+      toast.success('LoA form sent to applicant');
+    } catch (err) {
+      const code = (err as ApiErrorShape).response?.data?.code;
+      if (code === 'NO_ACTIVE_LOA_FORM') {
+        toast.error('No active LoA form is configured. Please contact an administrator.');
+      } else {
+        toast.error('Failed to send LoA form');
+      }
     } finally {
       setLoaGenerating(false);
     }
   };
-  const handleUploadLoa = async (file: File) => {
+  const handleUploadFinalLoa = async (file: File) => {
     setLoaUploading(true);
     try {
-      await adminApi.uploadFile(applicationId, file, 'OWNER_AUTH_LETTER');
-      toast.success('LOA uploaded successfully');
-      setLoaStatus(await loaApi.getLoaStatus(applicationId));
+      const status = await loaApi.uploadFinalLoa(applicationId, file);
+      setLoaStatus(status);
+      toast.success('Final LoA uploaded');
     } catch {
-      toast.error('Failed to upload LOA');
+      toast.error('Failed to upload final LoA');
     } finally {
       setLoaUploading(false);
     }
   };
   const handleLoaDownload = async (fileSeq: number, filename: string) => {
     try { await fileApi.downloadFile(fileSeq, filename); }
-    catch { toast.error('Failed to download LOA'); }
+    catch { toast.error('Failed to download LoA'); }
   };
 
   // ── Derived / Guards ─────────────────────────────────
@@ -487,14 +493,14 @@ export default function LewReviewFormPage() {
           )}
 
           <TabPanel active={activeTab === 'loa'}>
-            <AdminLoaSection
-              application={adminApp}
+            <LewLoaExchangeSection
+              applicationType={adminApp.applicationType}
               loaStatus={loaStatus}
-              onGenerate={handleGenerateLoa}
-              onUploadLoa={handleUploadLoa}
-              onDownload={handleLoaDownload}
-              generating={loaGenerating}
-              uploading={loaUploading}
+              onSendForm={handleSendLoaForm}
+              onUploadFinal={handleUploadFinalLoa}
+              onDownloadFile={handleLoaDownload}
+              sendingForm={loaGenerating}
+              uploadingFinal={loaUploading}
             />
           </TabPanel>
         </div>

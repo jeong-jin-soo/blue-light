@@ -39,6 +39,11 @@ public enum AuditAction {
     // LOA snapshot (Phase 2 PR#4)
     LOA_SNAPSHOT_CREATED,
 
+    // LOA 교환 모델 (loa-exchange-redesign-spec.md §3.3, PR3b)
+    LOA_FORM_SENT,
+    LOA_APPLICANT_UPLOADED,
+    LOA_FINAL_UPLOADED,
+
     // Admin user management
     LEW_APPROVED,
     LEW_REJECTED,

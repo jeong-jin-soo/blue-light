@@ -1,5 +1,6 @@
 package com.bluelight.backend.api.loa;
 
+import com.bluelight.backend.api.admin.LoaFormTemplateService;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.file.FileStorageService;
@@ -60,6 +61,8 @@ public class LoaService {
     private final EmailService emailService;
     // PR-W3a: 알림 오케스트레이터 경로(A-36 등) — 레거시 EmailService 직접발송 대체.
     private final ApplicationEventPublisher eventPublisher;
+    // 교환 모델 (PR3b) — active LoA 폼 소비 (설정 우선 원칙).
+    private final LoaFormTemplateService loaFormTemplateService;
 
     /**
      * LOA PDF 생성 (Admin/LEW 액션)
@@ -335,6 +338,194 @@ public class LoaService {
         return FileResponse.from(loaFile);
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  교환 모델 (loa-exchange-redesign-spec.md §3.3, PR3b)
+    //  send-form (LEW) → applicant-upload (Owner) → final-upload (LEW)
+    // ══════════════════════════════════════════════════════════════════
+
+    /** applicant-upload 허용 MIME (오프라인 서명본). */
+    private static final String LOA_UPLOAD_MIME = "application/pdf,image/jpeg,image/png";
+    /** LoA 파일 크기 상한(MB). */
+    private static final int LOA_UPLOAD_MAX_MB = 20;
+
+    /**
+     * §3.3 — LEW 가 active LoA 폼을 신청자에게 전달 (NEW 전용).
+     * <p>active 폼 버전을 신청에 고정({@code loaFormTemplateSeq}) + {@code loaStage → FORM_SENT} +
+     * 신청자 알림. active 폼이 없으면 409 {@code NO_ACTIVE_LOA_FORM}.</p>
+     *
+     * <p>권한(담당 LEW)은 컨트롤러 {@code @PreAuthorize("@appSec.isAssignedLew(...)")}에서 강제한다.</p>
+     */
+    @Transactional
+    public LoaStatusResponse sendLoaForm(Long lewUserSeq, Long applicationSeq) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        // RENEWAL 은 플랫폼이 폼을 제공하지 않는다 (신청자 지참 첨부 또는 DocumentRequest 경로).
+        if (application.getApplicationType() == ApplicationType.RENEWAL) {
+            throw new BusinessException(
+                    "LoA form is not applicable for renewal applications.",
+                    HttpStatus.CONFLICT, "LOA_FORM_NOT_APPLICABLE");
+        }
+
+        // PR2 LoaFormTemplateService.getActiveForm()은 active 폼이 없으면 404 NO_ACTIVE_LOA_FORM throw.
+        var active = loaFormTemplateService.getActiveForm();
+
+        application.markLoaFormSent(active.getLoaFormTemplateSeq());
+
+        // 신청자 알림 — 레거시 EmailService 직접발송 (오케스트레이터 풀 시드는 PR-W 범위).
+        sendFormSentNotification(application);
+
+        auditLogService.logAsync(
+                lewUserSeq, AuditAction.LOA_FORM_SENT, AuditCategory.APPLICATION,
+                "Application", String.valueOf(applicationSeq),
+                "LEW sent active LoA form (template " + active.getLoaFormTemplateSeq()
+                        + ") to applicant",
+                null, null, null, null,
+                "POST", "/api/lew/applications/" + applicationSeq + "/loa/send-form", 200);
+
+        log.info("LoA form sent: applicationSeq={}, lewUserSeq={}, templateSeq={}",
+                applicationSeq, lewUserSeq, active.getLoaFormTemplateSeq());
+
+        return buildStatus(application);
+    }
+
+    /**
+     * §3.3 — 신청자가 오프라인 서명본 업로드.
+     * <p>소유자 검증 → MIME/크기 검증 → FileEntity(OWNER_AUTH_LETTER) 저장(기존 최신본 교체) →
+     * 신원 스냅샷 최초 기록 → {@code loaStage → APPLICANT_UPLOADED}.</p>
+     */
+    @Transactional
+    public LoaStatusResponse applicantUploadLoa(Long userSeq, String role,
+                                                Long applicationSeq, MultipartFile file) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        // 소유자 검증 (ADMIN 대리 업로드 허용 — 권한표 §5).
+        OwnershipValidator.validateOwnerOrAdmin(
+                application.getUser().getUserSeq(), userSeq, role);
+
+        MimeTypeValidator.validate(file, LOA_UPLOAD_MIME);
+        MimeTypeValidator.validateSize(file, LOA_UPLOAD_MAX_MB);
+
+        // 재업로드 시 기존 OWNER_AUTH_LETTER 최신본 교체 (엣지 §8-2).
+        List<FileEntity> existing = fileRepository
+                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
+        existing.forEach(fileRepository::delete);
+
+        String subDirectory = "applications/" + applicationSeq;
+        String storedPath = fileStorageService.store(file, subDirectory);
+
+        FileEntity fileEntity = FileEntity.builder()
+                .application(application)
+                .fileType(FileType.OWNER_AUTH_LETTER)
+                .fileUrl(storedPath)
+                .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .build();
+        FileEntity saved = fileRepository.save(fileEntity);
+
+        // 신원 스냅샷 최초 기록 (생성→업로드 시점으로 트리거 이동, §2.3).
+        User applicant = application.getUser();
+        boolean snapshotRecorded = application.recordLoaSnapshot(
+                applicant.getFullName(), applicant.getCompanyName(),
+                applicant.getUen(), applicant.getDesignation());
+        if (snapshotRecorded) {
+            Map<String, Object> after = new LinkedHashMap<>();
+            after.put("applicantNameSnapshot", applicant.getFullName());
+            after.put("companyNameSnapshot", applicant.getCompanyName());
+            after.put("uenSnapshot", applicant.getUen());
+            after.put("designationSnapshot", applicant.getDesignation());
+            auditLogService.logAsync(
+                    applicant.getUserSeq(), AuditAction.LOA_SNAPSHOT_CREATED,
+                    AuditCategory.DATA_PROTECTION, "Application", String.valueOf(applicationSeq),
+                    "LoA applicant identity snapshot captured at applicant upload time (immutable)",
+                    null, after, null, null,
+                    "POST", "/api/applications/" + applicationSeq + "/loa/applicant-upload", 200);
+        }
+
+        application.markLoaApplicantUploaded();
+
+        auditLogService.logAsync(
+                userSeq, AuditAction.LOA_APPLICANT_UPLOADED, AuditCategory.APPLICATION,
+                "Application", String.valueOf(applicationSeq),
+                "Applicant uploaded signed LoA (fileSeq=" + saved.getFileSeq() + ")",
+                null, null, null, null,
+                "POST", "/api/applications/" + applicationSeq + "/loa/applicant-upload", 200);
+
+        log.info("LoA applicant upload: applicationSeq={}, userSeq={}, fileSeq={}",
+                applicationSeq, userSeq, saved.getFileSeq());
+
+        return buildStatus(application);
+    }
+
+    /**
+     * §3.3 — LEW 가 보완한 최종본 업로드.
+     * <p>FileEntity(LOA_FINAL) 저장(기존 최신본 교체) → {@code loaStage → FINAL_UPLOADED}.</p>
+     *
+     * <p>권한(담당 LEW)은 컨트롤러 {@code @PreAuthorize}에서 강제한다.</p>
+     */
+    @Transactional
+    public LoaStatusResponse finalUploadLoa(Long lewUserSeq, Long applicationSeq, MultipartFile file) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        MimeTypeValidator.validate(file, LOA_UPLOAD_MIME);
+        MimeTypeValidator.validateSize(file, LOA_UPLOAD_MAX_MB);
+
+        List<FileEntity> existing = fileRepository
+                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.LOA_FINAL);
+        existing.forEach(fileRepository::delete);
+
+        String subDirectory = "applications/" + applicationSeq;
+        String storedPath = fileStorageService.store(file, subDirectory);
+
+        FileEntity fileEntity = FileEntity.builder()
+                .application(application)
+                .fileType(FileType.LOA_FINAL)
+                .fileUrl(storedPath)
+                .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .build();
+        FileEntity saved = fileRepository.save(fileEntity);
+
+        application.markLoaFinalUploaded();
+
+        auditLogService.logAsync(
+                lewUserSeq, AuditAction.LOA_FINAL_UPLOADED, AuditCategory.APPLICATION,
+                "Application", String.valueOf(applicationSeq),
+                "LEW uploaded final LoA (fileSeq=" + saved.getFileSeq() + ")",
+                null, null, null, null,
+                "POST", "/api/lew/applications/" + applicationSeq + "/loa/final-upload", 200);
+
+        log.info("LoA final upload: applicationSeq={}, lewUserSeq={}, fileSeq={}",
+                applicationSeq, lewUserSeq, saved.getFileSeq());
+
+        return buildStatus(application);
+    }
+
+    // §3.2 active LoA 폼 메타/다운로드는 PR2 LoaActiveFormController 가 단독 담당
+    // (/api/applications/{id}/loa/active-form[/download]). 여기서 중복 제공하지 않는다.
+    // 신청별 고정 버전(AC-6) 반영은 후속 — 현재 PR2 컨트롤러는 글로벌 active 를 반환.
+
+    private void sendFormSentNotification(Application application) {
+        try {
+            User applicant = application.getUser();
+            String subject = "[LicenseKaki] LoA form ready for your application #" + application.getApplicationSeq();
+            String body = "Dear " + escape(applicant.getFullName()) + ",<br><br>"
+                    + "Your assigned LEW has shared the Letter of Appointment (LoA) form for your "
+                    + "application. Please download the form, sign it offline, and upload the signed copy "
+                    + "in your application page.<br><br>"
+                    + "This is an automated notification from LicenseKaki. We will never ask for your "
+                    + "password or payment details by email.";
+            emailService.sendGenericEmail(applicant.getEmail(), subject, body);
+        } catch (Exception e) {
+            // 알림 실패는 흐름을 막지 않는다 (다른 알림 메서드와 동일 정책).
+            log.warn("Failed to send LoA form-sent notification: applicationSeq={}",
+                    application.getApplicationSeq(), e);
+        }
+    }
+
+    private static String escape(String s) {
+        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
     private static String extractIp(HttpServletRequest request) {
         if (request == null) return null;
         String xff = request.getHeader("X-Forwarded-For");
@@ -359,20 +550,55 @@ public class LoaService {
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
                 application.getUser().getUserSeq(), userSeq, role, assignedLewSeq);
 
-        List<FileEntity> loaFiles = fileRepository
-                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
+        return buildStatus(application);
+    }
 
-        boolean loaGenerated = !loaFiles.isEmpty();
+    /**
+     * 교환 모델 상태 응답 빌드 (§3.3) — loaStage + 파일 seq 2종(applicant/final) + active 폼 메타.
+     * 레거시 필드(loaGenerated/loaSigned/loaFileSeq/loaSignedAt)는 하위호환을 위해 함께 채운다.
+     */
+    private LoaStatusResponse buildStatus(Application application) {
+        Long applicationSeq = application.getApplicationSeq();
+
+        List<FileEntity> applicantFiles = fileRepository
+                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
+        List<FileEntity> finalFiles = fileRepository
+                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.LOA_FINAL);
+
+        Long applicantFileSeq = applicantFiles.isEmpty()
+                ? null : applicantFiles.get(applicantFiles.size() - 1).getFileSeq();
+        Long finalFileSeq = finalFiles.isEmpty()
+                ? null : finalFiles.get(finalFiles.size() - 1).getFileSeq();
+
+        // active 폼 메타 (NEW 전용). PR2 getActiveForm()은 미설정 시 404 throw → unavailable 처리.
+        boolean activeFormAvailable = false;
+        String activeFormLabel = null;
+        if (application.getApplicationType() != ApplicationType.RENEWAL) {
+            try {
+                var active = loaFormTemplateService.getActiveForm();
+                activeFormAvailable = true;
+                activeFormLabel = active.getLabel();
+            } catch (BusinessException ignored) {
+                // active 폼 미설정 → unavailable
+            }
+        }
+
+        boolean loaGenerated = applicantFileSeq != null || finalFileSeq != null;
         boolean loaSigned = application.getLoaSignatureUrl() != null;
-        Long loaFileSeq = loaGenerated ? loaFiles.get(loaFiles.size() - 1).getFileSeq() : null;
 
         return LoaStatusResponse.builder()
                 .applicationSeq(applicationSeq)
+                .applicationType(application.getApplicationType().name())
+                .loaStage(application.getLoaStage() != null ? application.getLoaStage().name() : null)
+                .applicantFileSeq(applicantFileSeq)
+                .finalFileSeq(finalFileSeq)
+                .activeFormAvailable(activeFormAvailable)
+                .activeFormLabel(activeFormLabel)
+                // 레거시 (하위호환)
                 .loaGenerated(loaGenerated)
                 .loaSigned(loaSigned)
                 .loaSignedAt(application.getLoaSignedAt())
-                .loaFileSeq(loaFileSeq)
-                .applicationType(application.getApplicationType().name())
+                .loaFileSeq(applicantFileSeq != null ? applicantFileSeq : finalFileSeq)
                 .build();
     }
 
