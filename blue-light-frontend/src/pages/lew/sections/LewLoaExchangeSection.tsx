@@ -82,7 +82,14 @@ export function LewLoaExchangeSection({
                 <p className="mt-1 text-xs text-gray-400">Active form: {loaStatus.activeFormLabel}</p>
               )}
             </div>
-            {stage === 'FORM_SENT' || applicantUploaded || finalUploaded ? (
+            {/*
+             * "Sent" 는 오직 loaStage 가 실제로 전진했을 때만 표기한다.
+             * applicantFileSeq/finalFileSeq(파일 존재)는 일반 문서 업로드·DocumentRequest("LOA")
+             * 경로로도 생성되므로 send-form 을 호출하지 않았는데 "Sent" 로 오표기되는 원인이었다.
+             * loaStage 전이(markLoaFormSent/markLoaApplicantUploaded/markLoaFinalUploaded)만이
+             * LoA 교환 흐름의 정본 — NOT_STARTED 가 아니면 폼이 전달된 것이다.
+             */}
+            {stage !== 'NOT_STARTED' ? (
               <Badge variant="success">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Sent
               </Badge>
