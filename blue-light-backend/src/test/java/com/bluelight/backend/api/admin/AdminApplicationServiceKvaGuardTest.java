@@ -30,6 +30,7 @@ class AdminApplicationServiceKvaGuardTest {
     private ApplicationRepository applicationRepository;
     private UserRepository userRepository;
     private EmailService emailService;
+    private com.bluelight.backend.domain.file.FileRepository fileRepository;
     private AdminApplicationService service;
 
     @BeforeEach
@@ -40,8 +41,10 @@ class AdminApplicationServiceKvaGuardTest {
         // ★ PR#7: ApplicationEventPublisher mock 추가
         org.springframework.context.ApplicationEventPublisher eventPublisher =
             mock(org.springframework.context.ApplicationEventPublisher.class);
+        // PR4: FileRepository mock (완료 LICENSE_PDF 게이트용)
+        fileRepository = mock(com.bluelight.backend.domain.file.FileRepository.class);
         service = new AdminApplicationService(
-            applicationRepository, userRepository, emailService, eventPublisher);
+            applicationRepository, userRepository, emailService, eventPublisher, fileRepository);
     }
 
     @Test
@@ -65,5 +68,25 @@ class AdminApplicationServiceKvaGuardTest {
 
     // CONFIRMED 성공 경로는 AdminApplicationResponse.from 이 applicationType 등을 요구하므로
     // 통합 테스트(MockMvc) 스코프로 이관하고, 여기서는 B-1 가드만 검증.
-    // (CoF 발급 게이트는 CoF 기능 제거와 함께 삭제됨.)
+
+    @Test
+    void completeApplication_LICENSE_PDF_없으면_409() {
+        // PR4 완료 게이트: IN_PROGRESS여도 LICENSE_PDF 첨부 없으면 차단.
+        Application app = mock(Application.class);
+        when(app.getStatus()).thenReturn(ApplicationStatus.IN_PROGRESS);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        when(fileRepository.findByApplicationApplicationSeqAndFileType(
+                1L, com.bluelight.backend.domain.file.FileType.LICENSE_PDF))
+                .thenReturn(java.util.List.of());
+
+        var request = new com.bluelight.backend.api.admin.dto.CompleteApplicationRequest();
+
+        assertThatThrownBy(() -> service.completeApplication(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex ->
+                        assertThat(((BusinessException) ex).getCode()).isEqualTo("LICENSE_PDF_REQUIRED"));
+
+        verify(app, never()).issueLicense(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
 }

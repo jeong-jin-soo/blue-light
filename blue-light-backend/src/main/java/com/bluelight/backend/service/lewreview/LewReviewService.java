@@ -101,6 +101,13 @@ public class LewReviewService {
         assertKvaConfirmed(application);
         assertNoPendingDocumentRequests(applicationSeq);
 
+        // 3) PR4 (D-1): LoA 수령(신청자 업로드 이상) 전에는 결제 요청 불가. NEW/RENEWAL 공통.
+        if (!application.isLoaReceivedForPayment()) {
+            throw new BusinessException(
+                    "The signed LoA must be received before requesting payment.",
+                    HttpStatus.CONFLICT, "LOA_NOT_RECEIVED");
+        }
+
         // 상태 전이 — 도메인 메서드 사용 (reviewComment 클리어 포함)
         application.approveForPayment();
         log.info("LEW requested payment: applicationSeq={}, lewUserSeq={}, prevStatus={}",

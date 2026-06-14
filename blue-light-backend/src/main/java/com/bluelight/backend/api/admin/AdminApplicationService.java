@@ -5,6 +5,8 @@ import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.*;
+import com.bluelight.backend.domain.file.FileRepository;
+import com.bluelight.backend.domain.file.FileType;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -38,6 +40,8 @@ public class AdminApplicationService {
     private final EmailService emailService;
     /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
     private final ApplicationEventPublisher eventPublisher;
+    /** PR4 게이트: 완료 시 LICENSE_PDF 첨부 검증용 */
+    private final FileRepository fileRepository;
 
     /**
      * Get admin dashboard summary (역할별 범위 분리)
@@ -220,6 +224,15 @@ public class AdminApplicationService {
         // Validate status transition
         validateStatusTransition(application.getStatus(), request.getStatus());
 
+        // PR4 (D-2): PAID → IN_PROGRESS 진입은 LEW 최종본(LOA_FINAL) 업로드 완료가 전제.
+        if (application.getStatus() == ApplicationStatus.PAID
+                && request.getStatus() == ApplicationStatus.IN_PROGRESS
+                && application.getLoaStage() != LoaStage.FINAL_UPLOADED) {
+            throw new BusinessException(
+                    "The final LoA must be uploaded by the LEW before starting EMA submission.",
+                    HttpStatus.CONFLICT, "LOA_FINAL_NOT_UPLOADED");
+        }
+
         ApplicationStatus previousStatus = application.getStatus();
         application.changeStatus(request.getStatus());
         log.info("Application status updated: applicationSeq={}, oldStatus={}, newStatus={}",
@@ -250,6 +263,17 @@ public class AdminApplicationService {
                     HttpStatus.BAD_REQUEST,
                     "INVALID_STATUS_FOR_COMPLETION"
             );
+        }
+
+        // PR4 (완료 게이트): EMA 발급 라이선스 PDF 첨부 필수. "번호만 입력·파일 누락" 차단.
+        // (EMA 추적 서브-상태 머신은 보류 — APPROVED는 PDF 첨부+완료 행위로 갈음.)
+        boolean licensePdfAttached = !fileRepository
+                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.LICENSE_PDF)
+                .isEmpty();
+        if (!licensePdfAttached) {
+            throw new BusinessException(
+                    "The EMA-issued licence PDF must be attached before completing the application.",
+                    HttpStatus.CONFLICT, "LICENSE_PDF_REQUIRED");
         }
 
         ApplicationStatus previousStatus = application.getStatus();
@@ -329,6 +353,13 @@ public class AdminApplicationService {
             throw new BusinessException(
                     "Payment will be enabled after LEW confirms the kVA",
                     HttpStatus.BAD_REQUEST, "KVA_NOT_CONFIRMED");
+        }
+
+        // PR4 (D-1): LoA 수령(신청자 업로드 이상) 전에는 결제 요청 불가. NEW/RENEWAL 공통.
+        if (!application.isLoaReceivedForPayment()) {
+            throw new BusinessException(
+                    "The signed LoA must be received before requesting payment.",
+                    HttpStatus.CONFLICT, "LOA_NOT_RECEIVED");
         }
 
         application.approveForPayment();
