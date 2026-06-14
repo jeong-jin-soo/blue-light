@@ -1686,7 +1686,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PDPA: 제목에 금액·주소·이름 제외, publicCode 만 포함
-            helper.setSubject(code("A-37") + "[LicenseKaki] Payment details for your concierge request " + publicCode);
+            helper.setSubject(code("A-33") + "[LicenseKaki] Payment details for your concierge request " + publicCode);
 
             String htmlContent = buildConciergeQuoteHtml(
                 applicantName, publicCode, quotedAmount, callScheduledAt,
