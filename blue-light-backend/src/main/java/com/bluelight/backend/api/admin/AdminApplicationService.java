@@ -383,14 +383,8 @@ public class AdminApplicationService {
         application.approveForPayment();
         log.info("Application approved for payment: applicationSeq={}", applicationSeq);
 
-        // 신청자에게 결제 요청 이메일 발송
-        User applicant = application.getUser();
-        emailService.sendPaymentRequestEmail(
-                applicant.getEmail(),
-                applicant.getFirstName() + " " + applicant.getLastName(),
-                applicationSeq,
-                application.getAddress(),
-                application.getQuoteAmount());
+        // 신청자에게 결제 요청 알림 (A-17 인앱+이메일, 오케스트레이터). LEW 경로와 통일.
+        com.bluelight.backend.api.notification.PaymentRequestNotifier.dispatch(eventPublisher, application);
 
         return AdminApplicationResponse.from(application);
     }

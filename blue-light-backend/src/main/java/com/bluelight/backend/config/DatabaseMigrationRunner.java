@@ -142,6 +142,10 @@ public class DatabaseMigrationRunner {
             // 비어 있을 수 있다(템플릿 142종은 별도 import 됐으나 카탈로그 시드 단계 누락 → Admin Edit
             // 화면의 "Triggered by"·카탈로그 설명 미표시). 풀 97종을 idempotent 하게 시드한다.
             seedNotificationCatalog(conn);
+            // ── 결제 요청 알림 배선(A-17) 활성화 ──
+            // 미사용 템플릿 일괄 비활성화 시 A-17(Payment requested)도 꺼졌을 수 있으나, 이제
+            // LEW/ADMIN 결제 요청이 A-17 을 오케스트레이터로 발송하므로 EMAIL/IN_APP 을 멱등 활성화.
+            enableWiredNotificationTemplates(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -2262,6 +2266,27 @@ public class DatabaseMigrationRunner {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet rs = meta.getTables(conn.getCatalog(), null, table, new String[]{"TABLE"})) {
             return rs.next();
+        }
+    }
+
+    /**
+     * 실제 코드에 배선된 알림 템플릿을 멱등 활성화한다.
+     * 현재: A-17(Payment requested) — LEW/ADMIN 결제 요청이 오케스트레이터로 발송하므로 EMAIL/IN_APP 필요.
+     * (E2/E3 등 추가 배선 시 여기에 코드 추가.)
+     */
+    private void enableWiredNotificationTemplates(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            if (!tableExists(conn, "notification_templates")) {
+                return;
+            }
+            int n = stmt.executeUpdate(
+                    "UPDATE notification_templates SET enabled = TRUE " +
+                    "WHERE template_code = 'A-17' AND channel IN ('EMAIL','IN_APP') AND enabled = FALSE");
+            if (n > 0) {
+                log.info("Migration: enabled {} wired notification template rows (A-17)", n);
+            }
+        } catch (SQLException e) {
+            log.warn("enableWiredNotificationTemplates skipped: {}", e.getMessage());
         }
     }
 }

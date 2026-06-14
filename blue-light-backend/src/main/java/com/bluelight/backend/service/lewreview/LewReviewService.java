@@ -2,6 +2,7 @@ package com.bluelight.backend.service.lewreview;
 
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.notification.PaymentRequestNotifier;
 import com.bluelight.backend.api.lew.dto.LewApplicationResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.exception.LewReviewErrorCode;
@@ -48,6 +49,8 @@ public class LewReviewService {
     private final DocumentRequestRepository documentRequestRepository;
     // LEW가 결제 요청 트리거 시 신청자 메일 발송 (ADMIN 흐름과 동일)
     private final EmailService emailService;
+    // 결제 요청 알림(A-17 인앱+이메일) 오케스트레이터 디스패치
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /** 배정 신청 상세 조회. */
     public LewApplicationResponse getAssignedApplication(Long applicationSeq, Long lewUserSeq) {
@@ -163,23 +166,6 @@ public class LewReviewService {
      * 메일 발송 실패는 swallow 하여 상태 전이 트랜잭션을 롤백하지 않는다.
      */
     private void notifyPaymentRequested(Application application) {
-        try {
-            User applicant = application.getUser();
-            if (applicant == null || applicant.getEmail() == null) {
-                log.warn("결제 요청 메일 발송 스킵 — 신청자 정보 없음: applicationId={}",
-                        application.getApplicationSeq());
-                return;
-            }
-            emailService.sendPaymentRequestEmail(
-                    applicant.getEmail(),
-                    (applicant.getFirstName() != null ? applicant.getFirstName() : "") + " "
-                            + (applicant.getLastName() != null ? applicant.getLastName() : ""),
-                    application.getApplicationSeq(),
-                    application.getAddress(),
-                    application.getQuoteAmount());
-        } catch (RuntimeException ex) {
-            log.warn("결제 요청 메일 발송 실패 (LEW trigger): applicationId={}, err={}",
-                    application.getApplicationSeq(), ex.getMessage());
-        }
+        PaymentRequestNotifier.dispatch(eventPublisher, application);
     }
 }
