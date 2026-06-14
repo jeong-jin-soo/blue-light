@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.admin.dto;
 
 import com.bluelight.backend.domain.loaform.LoaFormTemplate;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -19,6 +20,8 @@ public class LoaFormTemplateResponse {
     private Long loaFormTemplateSeq;
     private String label;
     private Long fileSeq;
+    /** Lombok 게터 isActive() → Jackson 기본 직렬화는 "active". 프론트(isActive) 계약 유지 위해 명시. */
+    @JsonProperty("isActive")
     private boolean isActive;
     private Long uploadedBy;
     /** 업로더 표시명 (users 조회 결과; 사용자 삭제/미존재 시 null). */
