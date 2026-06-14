@@ -8,6 +8,7 @@ import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { AdminPriceResponse, BatchUpdatePricesRequest } from '../../types';
 import { generateUUID } from '../../utils/uuid';
+import LoaFormTemplatesSection from './LoaFormTemplatesSection';
 import * as XLSX from 'xlsx';
 
 // ── Editable Tier 타입 ──────────────────────────────
@@ -527,6 +528,9 @@ export default function AdminPriceManagementPage() {
           )}
         </div>
       </Card>
+
+      {/* ── LoA Forms (LoA 교환 동선 재설계 PR2) ────────────────────── */}
+      <LoaFormTemplatesSection />
 
       {/* ── Price Tiers (인라인 편집) ────────────────────── */}
       <Card>

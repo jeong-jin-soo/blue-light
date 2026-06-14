@@ -1205,6 +1205,37 @@ CREATE TABLE IF NOT EXISTS manual_email_dispatches (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
+-- ★ LoA(Letter of Appointment) 폼 템플릿 버전 관리 (LoA 교환 동선 재설계 PR2)
+-- 스펙: doc/Project Analysis/loa-exchange-redesign-spec.md §2.1
+-- - active 단일성은 서비스 레벨 보장 (MySQL 8.0 부분 유니크 인덱스 미지원).
+-- - soft delete 표준 (deleted_at + @SQLRestriction).
+-- - DatabaseMigrationRunner.syncCreateTablesFromSchemaSql 가 부팅 시 자동 반영.
+-- ============================================
+CREATE TABLE IF NOT EXISTS loa_form_templates (
+    loa_form_template_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    -- 운영용 표시 라벨 (예: "EMA NEW LoA v2026.06")
+    label                   VARCHAR(150) NOT NULL,
+    -- files.file_seq FK (저장된 폼 PDF)
+    file_seq                BIGINT       NOT NULL,
+    -- 현재 active 폼 여부. 동시 active 1건은 서비스 레벨 보장.
+    is_active               TINYINT(1)   NOT NULL DEFAULT 0,
+    -- 업로더 user_seq (users.user_seq FK)
+    uploaded_by             BIGINT       NOT NULL,
+    uploaded_at             DATETIME(6)  NOT NULL,
+    -- BaseEntity audit + soft delete
+    created_at              DATETIME(6),
+    updated_at              DATETIME(6),
+    created_by              BIGINT,
+    updated_by              BIGINT,
+    deleted_at              DATETIME(6),
+    PRIMARY KEY (loa_form_template_seq),
+    KEY idx_loa_form_active (is_active),
+    KEY idx_loa_form_uploaded_at (uploaded_at DESC),
+    CONSTRAINT fk_loa_form_file FOREIGN KEY (file_seq) REFERENCES files (file_seq),
+    CONSTRAINT fk_loa_form_uploader FOREIGN KEY (uploaded_by) REFERENCES users (user_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
 -- ★ Concierge 강화 + 별도 수금 + 영수증 자동 발행 PR-1 (D1=B 다중 역할 정규화 1:N)
 -- ============================================
 -- user_roles — User 와 1:N. primary role 은 users.role 컬럼에 그대로 두고,
