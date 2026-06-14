@@ -928,6 +928,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     message           VARCHAR(1000) NOT NULL,
     reference_type    VARCHAR(50),
     reference_id      BIGINT,
+    link_url          VARCHAR(300),
     is_read           BOOLEAN      NOT NULL DEFAULT FALSE,
     read_at           DATETIME(6),
     created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),

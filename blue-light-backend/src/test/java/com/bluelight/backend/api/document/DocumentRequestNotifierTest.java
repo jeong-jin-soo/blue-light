@@ -103,8 +103,9 @@ class DocumentRequestNotifierTest {
                 eq(20L),
                 eq(NotificationType.DOCUMENT_REQUEST_FULFILLED),
                 anyString(), anyString(),
-                eq("DOCUMENT_REQUEST"),
-                eq(7L));
+                // 딥링크 정규화: referenceType=APPLICATION(+appSeq) → LEW Documents 탭으로 라우팅
+                eq("APPLICATION"),
+                eq(42L));
         verify(emailService).sendDocumentRequestFulfilledEmail(
                 eq("lew@example.com"),
                 eq("Lee Wong"),
@@ -136,7 +137,7 @@ class DocumentRequestNotifierTest {
 
         verify(notificationService).createNotification(
                 eq(10L), eq(NotificationType.DOCUMENT_REQUEST_APPROVED),
-                anyString(), anyString(), eq("DOCUMENT_REQUEST"), eq(7L));
+                anyString(), anyString(), eq("APPLICATION"), eq(42L));
         verify(emailService).sendDocumentRequestApprovedEmail(
                 eq("a@example.com"), eq("John Tan"), eq(42L), eq("LOA"));
     }
@@ -152,7 +153,7 @@ class DocumentRequestNotifierTest {
 
         verify(notificationService).createNotification(
                 eq(10L), eq(NotificationType.DOCUMENT_REQUEST_REJECTED),
-                anyString(), anyString(), eq("DOCUMENT_REQUEST"), eq(7L));
+                anyString(), anyString(), eq("APPLICATION"), eq(42L));
         verify(emailService).sendDocumentRequestRejectedEmail(
                 eq("a@example.com"), eq("John Tan"), eq(42L), eq("LOA"), eq(reason));
     }
@@ -167,7 +168,7 @@ class DocumentRequestNotifierTest {
 
         verify(notificationService).createNotification(
                 eq(10L), eq(NotificationType.DOCUMENT_REQUEST_APPROVED),
-                anyString(), anyString(), eq("DOCUMENT_REQUEST"), eq(7L));
+                anyString(), anyString(), eq("APPLICATION"), eq(42L));
         verify(emailService, never()).sendDocumentRequestApprovedEmail(
                 anyString(), anyString(), anyLong(), anyString());
     }

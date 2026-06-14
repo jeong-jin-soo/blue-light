@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -43,6 +43,7 @@ import type { AdminApplication, FileInfo, FileType, Payment, LewSummary, SldRequ
 export default function AdminApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToastStore();
 
   const [application, setApplication] = useState<AdminApplication | null>(null);
@@ -134,6 +135,17 @@ export default function AdminApplicationDetailPage() {
   }, [applicationId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // 알림 딥링크 — URL 해시(#payment/#documents)가 가리키는 섹션으로 스크롤.
+  useEffect(() => {
+    if (loading || !location.hash) return;
+    const hashId = location.hash.slice(1);
+    const t = setTimeout(() => {
+      const el = document.getElementById(hashId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [loading, location.hash]);
 
   // EMA 상태 로드 (상세 진입 시). 응답은 NOT_SUBMITTED 도 정상.
   const emaRefresh = ema.refresh;
@@ -529,19 +541,24 @@ export default function AdminApplicationDetailPage() {
             onFileDelete={handleFileDelete}
           />
 
-          {/* Phase 3 PR#2 — LEW/ADMIN 서류 요청 섹션 */}
-          <LewDocumentReviewSection
-            applicationSeq={applicationId}
-            canRequest={canRequestDocuments}
-            applicantDisplayName={
-              application.userFirstName || application.userLastName
-                ? `${application.userFirstName ?? ''} ${application.userLastName ?? ''}`.trim()
-                : application.userEmail
-            }
-            applicationCode={`APP-${String(application.applicationSeq).padStart(6, '0')}`}
-          />
+          {/* Phase 3 PR#2 — LEW/ADMIN 서류 요청 섹션. id="documents": 서류 알림 딥링크 타깃 */}
+          <div id="documents" className="scroll-mt-24">
+            <LewDocumentReviewSection
+              applicationSeq={applicationId}
+              canRequest={canRequestDocuments}
+              applicantDisplayName={
+                application.userFirstName || application.userLastName
+                  ? `${application.userFirstName ?? ''} ${application.userLastName ?? ''}`.trim()
+                  : application.userEmail
+              }
+              applicationCode={`APP-${String(application.applicationSeq).padStart(6, '0')}`}
+            />
+          </div>
 
-          <AdminPaymentSection payments={payments} files={files} applicationStatus={application.status} />
+          {/* id="payment": 결제 증빙/확인 요청 알림 딥링크 타깃 */}
+          <div id="payment" className="scroll-mt-24">
+            <AdminPaymentSection payments={payments} files={files} applicationStatus={application.status} />
+          </div>
 
           {/* ★ Concierge 강화 PR-4 — 영수증 이력 카드 (ADMIN/SYSTEM_ADMIN 전용 표시).
               LEW 는 영수증 카드를 노출하지 않는다(스펙 §11 — invoice 는 신청자에 귀속). */}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { InfoBox } from '../../components/ui/InfoBox';
@@ -62,6 +62,7 @@ type ApiErrorShape = AxiosError<{ code?: string; message?: string }> & {
 export default function LewReviewFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToastStore();
   const { user: currentUser } = useAuthStore();
 
@@ -217,13 +218,15 @@ export default function LewReviewFormPage() {
     },
   );
 
-  // 기본 활성 탭 — LEW 가 검토 진입 시 가장 먼저 확인할 것은 Documents 이므로 항상 Documents 로 시작.
-  // 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
+  // 기본 활성 탭 — 알림 딥링크 해시(#documents/#kva/#sld/#loa/#ema)가 있으면 해당 탭 선택,
+  // 없으면 Documents 로 시작. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
   useEffect(() => {
     if (activeTab !== null) return;
     if (!adminApp || !lewData) return;
-    setActiveTab('documents');
-  }, [activeTab, adminApp, lewData]);
+    const hash = location.hash.slice(1);
+    const valid: TabKey[] = ['documents', 'kva', 'sld', 'loa', 'ema'];
+    setActiveTab((valid as string[]).includes(hash) ? (hash as TabKey) : 'documents');
+  }, [activeTab, adminApp, lewData, location.hash]);
 
   // EMA 상태 로드 — IN_PROGRESS 진입 이후 의미가 있으나, 탭은 항상 보이므로 status 가 있으면 로드.
   // (백엔드 GET /ema 는 IN_PROGRESS 전에도 NOT_SUBMITTED 응답을 준다 → 탭 비활성 안내에 사용.)

@@ -38,6 +38,9 @@ public class NotificationService {
         User recipient = userRepository.findById(recipientSeq)
                 .orElseThrow(() -> new BusinessException("User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
 
+        // 딥링크(linkUrl) — 수신자 역할 인지 단일 해석기로 생성. 클릭 시 처리 화면의 해당 위치로 이동.
+        String linkUrl = NotificationLinkResolver.resolve(type, referenceType, referenceId, recipient.getRole());
+
         Notification notification = Notification.builder()
                 .recipient(recipient)
                 .type(type)
@@ -45,6 +48,7 @@ public class NotificationService {
                 .message(message)
                 .referenceType(referenceType)
                 .referenceId(referenceId)
+                .linkUrl(linkUrl)
                 .build();
 
         Notification saved = notificationRepository.saveAndFlush(notification);

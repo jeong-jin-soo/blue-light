@@ -344,6 +344,8 @@ public class DatabaseMigrationRunner {
         // LoA 교환 모델 (loa-exchange 재설계 PR3)
         addColumnIfMissing(conn, "applications", "loa_stage",               "ALTER TABLE applications ADD COLUMN loa_stage VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED'");
         addColumnIfMissing(conn, "applications", "loa_form_template_seq",   "ALTER TABLE applications ADD COLUMN loa_form_template_seq BIGINT NULL");
+        // 인앱 알림 딥링크 — 클릭 시 처리 화면의 해당 위치로 이동(NotificationLinkResolver 생성)
+        addColumnIfMissing(conn, "notifications", "link_url",               "ALTER TABLE notifications ADD COLUMN link_url VARCHAR(300) NULL");
     }
 
     /** 컬럼이 없을 때만 ADD COLUMN 실행 (멱등). */

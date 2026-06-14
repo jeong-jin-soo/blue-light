@@ -1445,6 +1445,23 @@ export interface AuditLog {
 
 export type NotificationType =
   | 'PAYMENT_CONFIRMED'
+  // 결제 요청(A-17) → 신청자. 클릭 시 결제 섹션으로.
+  | 'PAYMENT_REQUESTED'
+  // 결제 증빙 업로드(A-55) → ADMIN. 결제 확인 처리 위치로.
+  | 'PAYMENT_EVIDENCE_UPLOADED'
+  // 결제 확인 요청(A-56) → ADMIN.
+  | 'PAYMENT_CONFIRMATION_REQUESTED'
+  // LoA 폼 전달(A-57) → 신청자. LoA 섹션으로.
+  | 'LOA_FORM_SENT'
+  // 매니저 대리 LoA 업로드 확인(7일 이의제기) → 신청자
+  | 'CONCIERGE_LOA_UPLOAD_CONFIRM'
+  // EMA 제출 리마인더 → LEW (EMA 탭)
+  | 'EMA_SUBMISSION_REMINDER_LEW'
+  // EMA 반려 → LEW (EMA 탭)
+  | 'EMA_REJECTED_LEW'
+  // 컨시어지 접수 확인 / 견적 발송 (수신자별 라우팅 상이)
+  | 'CONCIERGE_REQUEST_SUBMITTED'
+  | 'CONCIERGE_QUOTE_SENT'
   // PR4 — ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 알림
   | 'PAYMENT_CONFIRMED_LEW'
   // Phase 3 — LEW 서류 요청 워크플로
@@ -1489,6 +1506,8 @@ export interface AppNotification {
   message: string;
   referenceType?: string;
   referenceId?: number;
+  /** 백엔드 NotificationLinkResolver 가 생성한 딥링크 상대경로(+섹션 해시). 클릭 시 이 위치로 이동. */
+  linkUrl?: string;
   isRead: boolean;
   read: boolean;
   readAt?: string;
