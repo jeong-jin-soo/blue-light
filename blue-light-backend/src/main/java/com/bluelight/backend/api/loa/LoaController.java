@@ -1,7 +1,6 @@
 package com.bluelight.backend.api.loa;
 
 import com.bluelight.backend.api.file.dto.FileResponse;
-import com.bluelight.backend.common.exception.BusinessException;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,10 +42,9 @@ public class LoaController {
             Authentication authentication,
             @PathVariable Long id,
             @RequestParam("signature") MultipartFile signatureImage) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        log.info("Sign LOA: userSeq={}, applicationSeq={}", userSeq, id);
-        FileResponse response = loaService.signLoa(userSeq, id, signatureImage);
-        return ResponseEntity.ok(response);
+        // 전자서명 기능 비활성화 (보안 이슈 — 2026-06-13). LOA 문서 생성/다운로드는 유지하되
+        // 인앱 서명 수집은 전면 차단. 복구 시 이 가드만 제거.
+        throw SignatureDisabled.exception();
     }
 
     /**
@@ -77,19 +75,9 @@ public class LoaController {
             @RequestParam("acknowledgeReceipt") boolean acknowledgeReceipt,
             Authentication authentication,
             HttpServletRequest httpRequest) {
-        Long managerSeq = (Long) authentication.getPrincipal();
-        log.info("Manager upload LOA signature: applicationSeq={}, managerSeq={}",
-                applicationSeq, managerSeq);
-
-        if (!acknowledgeReceipt) {
-            throw new BusinessException(
-                    "You must acknowledge that you received this signature from the applicant.",
-                    HttpStatus.BAD_REQUEST, "ACKNOWLEDGEMENT_REQUIRED");
-        }
-
-        FileResponse response = loaService.uploadSignatureByManager(
-                managerSeq, applicationSeq, signature, memo, httpRequest);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        // 전자서명 기능 비활성화 (보안 이슈 — 2026-06-13). Manager 대리 서명 업로드 경로 차단.
+        // 서비스 로직(LoaService.uploadSignatureByManager)은 복구를 위해 보존. 가드만 제거하면 복구.
+        throw SignatureDisabled.exception();
     }
 
     /**

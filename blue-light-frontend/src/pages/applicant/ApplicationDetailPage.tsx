@@ -361,26 +361,7 @@ export default function ApplicationDetailPage() {
           </span>
         }
         subtitle={`Submitted on ${new Date(application.createdAt).toLocaleDateString()}`}
-        actions={
-          <>
-            {/* P2.C — CoF 발급 배지. cofFinalized=true일 때 status와 나란히 표시.
-                툴팁: LEW가 CoF를 발급해 결제 단계로 이행됐음을 안내. */}
-            {application.cofFinalized && (
-              <span
-                title="Your LEW issued the Certificate of Fitness. The application is ready for payment."
-                className="inline-flex"
-              >
-                <Badge variant="success">
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden="true">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                  CoF issued
-                </Badge>
-              </span>
-            )}
-            <StatusBadge status={application.status} />
-          </>
-        }
+        actions={<StatusBadge status={application.status} />}
       />
 
       {/* PENDING_REVIEW Banner */}

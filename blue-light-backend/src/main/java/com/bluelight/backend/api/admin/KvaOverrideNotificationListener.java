@@ -33,7 +33,6 @@ import java.math.BigDecimal;
  *   <li>같은 application + LEW + type 알림이 이미 존재 → 멱등성 보장 위해 스킵.</li>
  *   <li>인앱 알림 생성 ({@code referenceType=APPLICATION}, {@code referenceId=applicationSeq}).</li>
  *   <li>이메일 발송 — 인앱과 독립 채널 (둘 중 하나만 실패해도 다른 쪽은 진행).</li>
- *   <li>{@code cofReissueTriggered=true} 인 경우 메시지에 CoF 재서명 안내 라인 통합 (별도 알림 미발행).</li>
  * </ol>
  *
  * <p><b>실패 격리</b>: 리스너에서 RuntimeException 이 빠져나가지 않도록 모든 채널을 try/catch 로
@@ -124,15 +123,15 @@ public class KvaOverrideNotificationListener {
                             event.getPreviousKva(), event.getNewKva(),
                             event.getPreviousQuoteAmount(), event.getNewQuoteAmount(),
                             event.getAmountDifference(),
-                            event.isCofReissueTriggered(), event.getReason());
+                            event.getReason());
                 }
             } catch (RuntimeException ex) {
                 log.warn("kVA override email failed: applicationSeq={}, lewSeq={}, err={}",
                         applicationSeq, lewUserSeq, ex.getMessage());
             }
 
-            log.info("LEW notified of kVA override: applicationSeq={}, lewSeq={}, adjustmentSeq={}, cofReissue={}",
-                    applicationSeq, lewUserSeq, event.getAdjustmentSeq(), event.isCofReissueTriggered());
+            log.info("LEW notified of kVA override: applicationSeq={}, lewSeq={}, adjustmentSeq={}",
+                    applicationSeq, lewUserSeq, event.getAdjustmentSeq());
         } catch (RuntimeException ex) {
             // AFTER_COMMIT 이므로 비즈니스 트랜잭션은 이미 커밋됨 — 이 단계의 어떤 예외도 결과를 바꾸지 않지만,
             // 호출자(이벤트 디스패처) 로그 노이즈와 혼동 방지를 위해 방어.
@@ -152,9 +151,6 @@ public class KvaOverrideNotificationListener {
         sb.append("Previous: ").append(prev).append(" → New: ").append(next);
         if (diff != null) {
             sb.append(" · ").append(diff);
-        }
-        if (event.isCofReissueTriggered()) {
-            sb.append(" · CoF re-issue required");
         }
         return sb.toString();
     }

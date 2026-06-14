@@ -78,7 +78,7 @@ public class LewPaymentNotificationListener {
 
             // 1) 인앱 알림
             String title = "Payment confirmed — Application #" + applicationSeq;
-            String body = "Ready for SLD/LOA/CoF. Tap to start Phase 2.";
+            String body = "Ready for SLD/LOA. Tap to start Phase 2.";
             try {
                 notificationService.createNotification(
                         lew.getUserSeq(),

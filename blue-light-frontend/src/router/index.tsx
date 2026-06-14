@@ -218,8 +218,6 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/dashboard', element: <AdminDashboardPage /> },
-          { path: '/admin/applications', element: <AdminApplicationListPage /> },
-          { path: '/admin/applications/:id', element: <AdminApplicationDetailPage /> },
           { path: '/admin/users', element: <AdminUserListPage /> },
           { path: '/admin/prices', element: <AdminPriceManagementPage /> },
           { path: '/admin/notifications', element: <NotificationsPage /> },
@@ -238,6 +236,10 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/manual-emails', element: <AdminManualEmailPage /> },
+          // 동선 재설계 A: 신청 목록·상세를 SYSTEM_ADMIN 에도 개방 (LoA 생성 포함).
+          // 백엔드 /api/admin/** 는 이미 ADMIN/LEW/SYSTEM_ADMIN 허용.
+          { path: '/admin/applications', element: <AdminApplicationListPage /> },
+          { path: '/admin/applications/:id', element: <AdminApplicationDetailPage /> },
         ],
       },
     ],
@@ -309,7 +311,7 @@ const router = createBrowserRouter([
           { path: '/lew/dashboard', element: <AdminDashboardPage /> },
           { path: '/lew/applications', element: <AdminApplicationListPage /> },
           { path: '/lew/applications/:id', element: <LewApplicationDetailPage /> },
-          // LEW Review Form (P2.B) — CoF 3-step
+          // LEW Review Form — Documents/kVA/SLD/LOA 탭
           { path: '/lew/applications/:id/review', element: <LewReviewFormPage /> },
           // ★ Concierge 강화 PR-4 — LEW 컨시어지 워크스페이스
           { path: '/lew/concierge-requests', element: <LewConciergeRequestListPage /> },

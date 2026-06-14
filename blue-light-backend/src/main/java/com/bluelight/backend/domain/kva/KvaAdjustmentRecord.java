@@ -137,10 +137,6 @@ public class KvaAdjustmentRecord extends BaseEntity {
     @Column(name = "settled_at")
     private LocalDateTime settledAt;
 
-    /** CoF unfinalize 가 본 변경에 의해 트리거되었는지 (이력 카드 배지용). */
-    @Column(name = "cof_reissue_triggered", nullable = false)
-    private Boolean cofReissueTriggered = false;
-
     @Builder
     public KvaAdjustmentRecord(Application application,
                                Long lewRequestSeq,
@@ -161,8 +157,7 @@ public class KvaAdjustmentRecord extends BaseEntity {
                                String receiptReferenceNumber,
                                String settlementMemo,
                                LocalDateTime adminAdjustmentAt,
-                               LocalDateTime settledAt,
-                               Boolean cofReissueTriggered) {
+                               LocalDateTime settledAt) {
         this.application = application;
         this.lewRequestSeq = lewRequestSeq;
         this.previousKva = previousKva;
@@ -183,15 +178,6 @@ public class KvaAdjustmentRecord extends BaseEntity {
         this.settlementMemo = settlementMemo;
         this.adminAdjustmentAt = adminAdjustmentAt;
         this.settledAt = settledAt;
-        this.cofReissueTriggered = cofReissueTriggered != null ? cofReissueTriggered : false;
-    }
-
-    /**
-     * CoF unfinalize 가 본 변경에 의해 트리거되었음을 마킹.
-     * {@code KvaPostPaymentService} 가 단일 트랜잭션 내에서 호출.
-     */
-    public void markCofReissueTriggered() {
-        this.cofReissueTriggered = true;
     }
 
     /**

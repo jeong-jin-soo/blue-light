@@ -6,7 +6,7 @@ import type { AdminApplication, ApplicationStatus } from '../types';
  * Phase 모델 (사용자 결정, sg-lew-expert 검증):
  *   Phase 1 (PENDING_REVIEW / REVISION_REQUESTED): 신청 검토 + 서류 보강 + kVA 확정
  *   Phase Gate                                   : LEW가 결제 요청 → ADMIN 입금 확인 → LEW 알림
- *   Phase 2 (PAID / IN_PROGRESS)                 : SLD / LOA / CoF 발행
+ *   Phase 2 (PAID / IN_PROGRESS)                 : SLD / LOA 발행
  *
  * PR3 변경: Phase 1 가드(`pendingDocCount===0 && kvaConfirmed`)를 충족하면 CTA가
  * "Start review" → "Request payment"로 전환된다. SLD 가드는 결제 후 수행되므로 제외.
@@ -63,7 +63,7 @@ export function deriveLewPrimaryAction(
           kind: 'requestPayment',
           label: 'Request payment',
           description:
-            'Phase 1 review is complete. Notify the applicant to pay the licence fee. SLD, LOA, and Certificate of Fitness will be completed after payment.',
+            'Phase 1 review is complete. Notify the applicant to pay the licence fee. SLD and LOA will be completed after payment.',
           // request-payment는 in-page 액션(POST + 페이지 새로고침). navigate 대신 onClick 핸들러로 처리.
           targetUrl: null,
           disabled: false,
@@ -83,7 +83,7 @@ export function deriveLewPrimaryAction(
         kind: 'awaitingPayment',
         label: 'Awaiting payment',
         description:
-          'Admin will confirm payment shortly. You will be notified when the application is ready for SLD, LOA, and Certificate of Fitness.',
+          'Admin will confirm payment shortly. You will be notified when the application is ready for SLD and LOA.',
         targetUrl: null,
         disabled: true,
       };
@@ -93,7 +93,7 @@ export function deriveLewPrimaryAction(
         kind: 'continueCertification',
         label: 'Continue certification',
         description:
-          'Payment confirmed. Complete SLD, LOA, and the Certificate of Fitness to issue the licence.',
+          'Payment confirmed. Complete SLD and LOA to issue the licence.',
         targetUrl: reviewUrl,
         disabled: false,
       };
@@ -125,7 +125,7 @@ export function deriveLewHeaderSubtitle(status: ApplicationStatus): string {
     case 'PENDING_PAYMENT':
       return 'Awaiting payment confirmation by admin.';
     case 'PAID':
-      return 'Payment confirmed — proceed with SLD, LOA, and Certificate of Fitness.';
+      return 'Payment confirmed — proceed with SLD and LOA.';
     case 'IN_PROGRESS':
       return 'Continue certification work.';
     case 'COMPLETED':

@@ -1,14 +1,11 @@
 package com.bluelight.backend.api.loa;
 
-import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
-import com.bluelight.backend.domain.file.FileType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -24,8 +21,6 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -84,65 +79,34 @@ class LoaControllerUploadSignatureTest {
             new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A});
     }
 
-    @Test
-    @DisplayName("POST upload-signature - acknowledgeReceipt=true + 정상 파일 → 201")
-    void upload_acknowledged_201() throws Exception {
-        when(loaService.uploadSignatureByManager(eq(MANAGER_SEQ), eq(42L), any(), anyString(), any()))
-            .thenReturn(FileResponse.builder()
-                .fileSeq(777L)
-                .fileType(FileType.OWNER_AUTH_LETTER)
-                .originalFilename("LOA_SIGNED_42.pdf")
-                .build());
+    // 전자서명 기능 비활성화 (보안 이슈 — 2026-06-13).
+    // 엔드포인트는 acknowledgeReceipt 값/서비스 로직에 도달하기 전에 SIGNATURE_DISABLED(403)로 차단된다.
+    // 서비스 로직(uploadSignatureByManager) 자체의 검증은 LoaServiceUploadSignatureTest 가 계속 보장한다.
 
+    @Test
+    @DisplayName("POST upload-signature - 서명 비활성화 → 403, 서비스 미호출")
+    void upload_signatureDisabled_403() throws Exception {
         mockMvc.perform(auth(
                 MockMvcRequestBuilders.multipart("/api/admin/applications/42/loa/upload-signature")
                     .file(samplePng())
                     .param("acknowledgeReceipt", "true")
                     .param("memo", "email receipt")))
-            .andExpect(status().isCreated());
+            .andExpect(status().isForbidden());
 
-        verify(loaService).uploadSignatureByManager(
-            eq(MANAGER_SEQ), eq(42L), any(), eq("email receipt"), any());
+        verify(loaService, never()).uploadSignatureByManager(
+            anyLong(), anyLong(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("POST upload-signature - acknowledgeReceipt=false → 400 ACKNOWLEDGEMENT_REQUIRED")
-    void upload_notAcknowledged_400() throws Exception {
+    @DisplayName("POST upload-signature - acknowledgeReceipt=false 여도 동일하게 403 차단")
+    void upload_signatureDisabled_evenWithoutAck_403() throws Exception {
         mockMvc.perform(auth(
                 MockMvcRequestBuilders.multipart("/api/admin/applications/42/loa/upload-signature")
                     .file(samplePng())
                     .param("acknowledgeReceipt", "false")))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isForbidden());
 
         verify(loaService, never()).uploadSignatureByManager(
-            anyLong(), anyLong(), any(), anyString(), any());
-    }
-
-    @Test
-    @DisplayName("POST upload-signature - Service가 CONCIERGE_NOT_ASSIGNED 던지면 403")
-    void upload_notAssigned_403() throws Exception {
-        when(loaService.uploadSignatureByManager(anyLong(), anyLong(), any(), any(), any()))
-            .thenThrow(new BusinessException("not assigned",
-                HttpStatus.FORBIDDEN, "CONCIERGE_NOT_ASSIGNED"));
-
-        mockMvc.perform(auth(
-                MockMvcRequestBuilders.multipart("/api/admin/applications/42/loa/upload-signature")
-                    .file(samplePng())
-                    .param("acknowledgeReceipt", "true")))
-            .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("POST upload-signature - Service가 LOA_ALREADY_SIGNED 던지면 400")
-    void upload_alreadySigned_400() throws Exception {
-        when(loaService.uploadSignatureByManager(anyLong(), anyLong(), any(), any(), any()))
-            .thenThrow(new BusinessException("already signed",
-                HttpStatus.BAD_REQUEST, "LOA_ALREADY_SIGNED"));
-
-        mockMvc.perform(auth(
-                MockMvcRequestBuilders.multipart("/api/admin/applications/42/loa/upload-signature")
-                    .file(samplePng())
-                    .param("acknowledgeReceipt", "true")))
-            .andExpect(status().isBadRequest());
+            anyLong(), anyLong(), any(), any(), any());
     }
 }

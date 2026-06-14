@@ -1,7 +1,6 @@
 /**
- * Certificate of Fitness (CoF) 관련 상수 — 신청자 optional fast-track 섹션과
- * LEW Review Form(P2.B)에서 공유된다. 라벨은 EMA ELISE / SP Retailer 용어를
- * 그대로 표기하되, 신청자에게는 중립적으로 번역한 보조 설명을 함께 두 수 있다.
+ * 전력 공급 유형/리테일러/공급전압 상수 — 신청자 optional fast-track(hint) 섹션에서 사용한다.
+ * 라벨은 SP Group / EMA 용어를 그대로 표기하되, 신청자에게는 중립적 보조 설명을 함께 둘 수 있다.
  */
 
 /**

@@ -15,7 +15,7 @@ import java.math.BigDecimal;
  *
  * <h3>왜 AFTER_COMMIT 인가</h3>
  * 본 트랜잭션의 본질은 {@code KvaAdjustmentRecord} 작성 + {@code Application.kva}/quoteAmount
- * 갱신 + Invoice 재발행 + (필요시) CoF unfinalize 다. 알림 발송은 부수 효과이며 SMTP/외부
+ * 갱신 + Invoice 재발행이다. 알림 발송은 부수 효과이며 SMTP/외부
  * 서비스 장애가 비즈니스 트랜잭션을 롤백시켜선 안 된다. 그래서 AFTER_COMMIT 단계로 분리한다.
  * (PR4 의 {@link PaymentConfirmedEvent} 와 동일 원칙.)
  *
@@ -27,7 +27,6 @@ import java.math.BigDecimal;
  * @param previousQuoteAmount   변경 전 견적가
  * @param newQuoteAmount        변경 후 견적가 (master_prices 변경 시점 현재가)
  * @param amountDifference      newQuote − previousQuote (signed)
- * @param cofReissueTriggered   CoF unfinalize 가 동시에 트리거되었는지
  * @param reason                LEW 에게 표시할 사유 (ADMIN 입력값)
  * @param triggeredByUserSeq    변경 주체 user_seq (ADMIN userSeq)
  * @param triggeredByRole       변경 주체 역할 ("ADMIN")
@@ -43,7 +42,6 @@ public class KvaOverrideAppliedEvent {
     private final BigDecimal previousQuoteAmount;
     private final BigDecimal newQuoteAmount;
     private final BigDecimal amountDifference;
-    private final boolean cofReissueTriggered;
     private final String reason;
     private final Long triggeredByUserSeq;
     private final String triggeredByRole;

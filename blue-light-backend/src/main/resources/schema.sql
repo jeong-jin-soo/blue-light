@@ -396,41 +396,8 @@ CREATE TABLE IF NOT EXISTS data_breach_notifications (
     KEY idx_breach_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 11b. LEW Review Form — Certificate of Fitness (P1.A)
--- lew-review-form-spec.md §2.1 — Application과 1:1, LEW Draft Save 시 생성
-CREATE TABLE IF NOT EXISTS certificate_of_fitness (
-    cof_seq                    BIGINT        NOT NULL AUTO_INCREMENT,
-    application_seq            BIGINT        NOT NULL,
-    mssl_account_no_enc        VARCHAR(255),
-    mssl_account_no_hmac       CHAR(64),
-    mssl_account_no_last4      VARCHAR(4),
-    consumer_type              VARCHAR(20)   NOT NULL DEFAULT 'NON_CONTESTABLE',
-    retailer_code              VARCHAR(32)   DEFAULT 'SP_SERVICES_LIMITED',
-    supply_voltage_v           INT           NOT NULL,
-    approved_load_kva          INT           NOT NULL,
-    has_generator              BOOLEAN       NOT NULL DEFAULT FALSE,
-    generator_capacity_kva     INT,
-    inspection_interval_months INT           NOT NULL,
-    lew_appointment_date       DATE          NOT NULL,
-    lew_consent_date           DATE,
-    certified_by_lew_seq       BIGINT,
-    certified_at               DATETIME(6),
-    draft_saved_at             DATETIME(6),
-    version                    INT           NOT NULL DEFAULT 0,
-    created_at                 DATETIME(6),
-    updated_at                 DATETIME(6),
-    created_by                 BIGINT,
-    updated_by                 BIGINT,
-    deleted_at                 DATETIME(6),
-    PRIMARY KEY (cof_seq),
-    UNIQUE KEY uk_cof_application (application_seq),
-    KEY idx_cof_hmac (mssl_account_no_hmac),
-    KEY idx_cof_lew (certified_by_lew_seq),
-    CONSTRAINT fk_cof_application FOREIGN KEY (application_seq) REFERENCES applications (application_seq),
-    CONSTRAINT fk_cof_lew FOREIGN KEY (certified_by_lew_seq) REFERENCES users (user_seq),
-    CONSTRAINT chk_cof_voltage CHECK (supply_voltage_v IN (230, 400, 6600, 22000)),
-    CONSTRAINT chk_cof_interval CHECK (inspection_interval_months IN (6, 12, 24, 36, 60))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- 11b. (제거됨) Certificate of Fitness — 서비스에서 CoF 기능 제거 (2026-06).
+-- 기존 운영 DB는 schema.sql 하단 "운영 DB 적용 가이드"의 DROP TABLE 구문을 1회 적용.
 
 -- 12. 감사 로그 (append-only)
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -1164,7 +1131,7 @@ CREATE TABLE IF NOT EXISTS kva_adjustment_record (
     admin_adjustment_at       DATETIME(6)    NULL,
     -- PR-4: settlement 마킹 시각. PAID_DIFFERENCE/REFUNDED/WAIVED 로 finalize 될 때 한번만 기록.
     settled_at                DATETIME(6)    NULL,
-    cof_reissue_triggered     BOOLEAN        NOT NULL DEFAULT FALSE,
+    -- (제거됨) cof_reissue_triggered — CoF 기능 제거 (2026-06). 기존 DB는 하단 가이드의 DROP COLUMN 적용.
     -- BaseEntity audit (deleted_at 은 보존만, soft delete 미적용)
     created_at                DATETIME(6),
     updated_at                DATETIME(6),
@@ -1490,4 +1457,12 @@ CREATE TABLE IF NOT EXISTS notification_template_history (
 --   ADD COLUMN source                VARCHAR(20)  NOT NULL DEFAULT 'PRODUCTION',
 --   ADD COLUMN is_test               BOOLEAN      NOT NULL DEFAULT FALSE,
 --   ADD COLUMN render_warnings_json  TEXT;
+-- ============================================
+-- 운영 DB 적용 가이드 (CoF 제거, 2026-06) — Certificate of Fitness 기능 전체 제거.
+-- 신규 DB(local·CI)는 위 CREATE/컬럼 정의에서 이미 빠져 있으므로 조치 불필요.
+-- 이미 certificate_of_fitness 테이블 / kva_adjustment_record.cof_reissue_triggered 컬럼이
+-- 존재하는 운영·개발 RDS 에서는 아래를 ★ 1회만 ★ 수동 실행한다.
+--
+-- ALTER TABLE kva_adjustment_record DROP COLUMN cof_reissue_triggered;
+-- DROP TABLE IF EXISTS certificate_of_fitness;
 -- ============================================

@@ -74,10 +74,9 @@ public class UserController {
     public ResponseEntity<UserResponse> uploadSignature(
             Authentication authentication,
             @RequestParam("signature") MultipartFile signatureImage) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        log.info("Upload signature: userSeq={}", userSeq);
-        UserResponse response = userService.uploadSignature(userSeq, signatureImage);
-        return ResponseEntity.ok(response);
+        // 전자서명 기능 비활성화 (보안 이슈 — 2026-06-13). 프로필 서명 저장 차단.
+        // 기존 서명 삭제(DELETE)·조회(GET)는 정리 목적상 유지. 복구 시 이 가드만 제거.
+        throw com.bluelight.backend.api.loa.SignatureDisabled.exception();
     }
 
     /**

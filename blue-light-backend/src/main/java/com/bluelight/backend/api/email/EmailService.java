@@ -127,14 +127,13 @@ public interface EmailService {
      * @param previousQuoteAmount   변경 전 견적가 (nullable — 알 수 없으면 표시 생략)
      * @param newQuoteAmount        변경 후 견적가 (nullable)
      * @param amountDifference      차액 (signed, nullable)
-     * @param cofReissueTriggered   CoF re-issue 동반 여부 (true 면 추가 안내 라인)
      * @param reason                ADMIN 이 입력한 사유 (HTML escape 후 본문 표시)
      */
     void sendKvaAdjustedToLewEmail(String to, String lewName, Long appSeq,
                                     Integer previousKva, Integer newKva,
                                     BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
                                     BigDecimal amountDifference,
-                                    boolean cofReissueTriggered, String reason);
+                                    String reason);
 
     /**
      * PR-3: LEW 가 결제 후 kVA 변경을 요청한 직후, ADMIN/SYSTEM_ADMIN 사용자에게 발송하는 알림 이메일.

@@ -813,7 +813,7 @@ export default function NewApplicationPage() {
                   <span className="text-sm text-gray-700">
                     This is a rental premises
                     <span className="block text-xs text-gray-500 mt-0.5">
-                      You can add the landlord's EI licence number at Step 4, or leave it blank
+                      You can add the landlord's Electrical Installation Licence number at Step 4, or leave it blank
                       — the assigned LEW will collect it later if missing.
                     </span>
                   </span>
@@ -1216,13 +1216,13 @@ export default function NewApplicationPage() {
                   Landlord's Installation Licence <span className="font-normal text-amber-700">(Optional)</span>
                 </h3>
                 <p className="text-xs text-amber-800">
-                  If you know the landlord's EI Licence number, you can enter it now. It
+                  If you know the landlord's Electrical Installation (EI) Licence number, you can enter it now. It
                   will be stored encrypted and visible only to the assigned LEW. If you
                   don't know it, leave this blank — the assigned LEW will follow up with
                   you to collect it before the application is finalized.
                 </p>
                 <Input
-                  label="Landlord EI Licence No (optional)"
+                  label="Landlord's Electrical Installation Licence No (optional)"
                   value={formData.landlordEiLicenceNo}
                   onChange={(e) => updateField('landlordEiLicenceNo', e.target.value)}
                   placeholder="e.g., E-12345 — leave blank if unknown"

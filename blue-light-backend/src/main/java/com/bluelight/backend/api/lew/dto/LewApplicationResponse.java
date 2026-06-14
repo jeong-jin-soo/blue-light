@@ -2,7 +2,6 @@ package com.bluelight.backend.api.lew.dto;
 
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.domain.application.Application;
-import com.bluelight.backend.domain.cof.CertificateOfFitness;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,7 +9,7 @@ import lombok.Getter;
  * LEW Review Form — 배정 신청 상세 응답 (lew-review-form-spec.md §3.1).
  *
  * <p>신청자 입력 전체 + Correspondence Address 평문 + Landlord EI Licence 평문 +
- * CoF Draft 현재 값 + 신청자 hint 값 + 입력 여부 플래그를 포함한다. 이 응답은 LEW에게만
+ * 신청자 hint 값 + 입력 여부 플래그를 포함한다. 이 응답은 LEW에게만
  * 반환되며, ADMIN/APPLICANT는 별도 응답 DTO를 사용한다(§3.4, §3.5).</p>
  */
 @Getter
@@ -46,9 +45,6 @@ public class LewApplicationResponse {
     private Boolean retailerHintProvided;
     private Boolean generatorHintProvided;
 
-    /** CoF Draft 현재 값. null이면 아직 LEW가 Draft Save를 하지 않은 상태. */
-    private CertificateOfFitnessResponse cof;
-
     /**
      * LEW 조회 응답 변환.
      *
@@ -56,15 +52,11 @@ public class LewApplicationResponse {
      * @param landlordPlain       Landlord EI Licence 평문 (Application의 암호화 컬럼에서 복호화된 값)
      * @param correspondencePlain Correspondence Address 4-part 평문 (block/unit/street/building)
      * @param msslHintPlain       신청자 hint MSSL 평문 (없으면 null)
-     * @param cof                 CoF Draft 엔티티 (없으면 null)
-     * @param cofMsslPlain        CoF MSSL 평문 (LEW Draft Save 후 세팅된 값, 없으면 null)
      */
     public static LewApplicationResponse from(Application application,
                                                String landlordPlain,
                                                String[] correspondencePlain,
-                                               String msslHintPlain,
-                                               CertificateOfFitness cof,
-                                               String cofMsslPlain) {
+                                               String msslHintPlain) {
         String[] cp = correspondencePlain != null && correspondencePlain.length == 4
                 ? correspondencePlain : new String[]{null, null, null, null};
 
@@ -88,7 +80,6 @@ public class LewApplicationResponse {
                 .consumerTypeHintProvided(application.getApplicantConsumerTypeHint() != null)
                 .retailerHintProvided(application.getApplicantRetailerHint() != null)
                 .generatorHintProvided(application.getApplicantHasGeneratorHint() != null)
-                .cof(cof != null ? CertificateOfFitnessResponse.from(cof, cofMsslPlain) : null)
                 .build();
     }
 }

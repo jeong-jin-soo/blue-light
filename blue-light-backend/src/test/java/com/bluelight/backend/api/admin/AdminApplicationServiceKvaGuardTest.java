@@ -65,4 +65,5 @@ class AdminApplicationServiceKvaGuardTest {
 
     // CONFIRMED 성공 경로는 AdminApplicationResponse.from 이 applicationType 등을 요구하므로
     // 통합 테스트(MockMvc) 스코프로 이관하고, 여기서는 B-1 가드만 검증.
+    // (CoF 발급 게이트는 CoF 기능 제거와 함께 삭제됨.)
 }

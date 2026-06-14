@@ -24,9 +24,6 @@ public class KvaPostPaymentOverrideResponse {
     private BigDecimal newQuoteAmount;
     private BigDecimal amountDifference;
 
-    /** CoF 가 본 변경에 의해 unfinalize 되었는지. */
-    private Boolean cofReissueTriggered;
-
     public static KvaPostPaymentOverrideResponse from(KvaAdjustmentRecord record) {
         return KvaPostPaymentOverrideResponse.builder()
                 .adjustmentSeq(record.getAdjustmentSeq())
@@ -35,7 +32,6 @@ public class KvaPostPaymentOverrideResponse {
                 .previousQuoteAmount(record.getPreviousQuoteAmount())
                 .newQuoteAmount(record.getNewQuoteAmount())
                 .amountDifference(record.getAmountDifference())
-                .cofReissueTriggered(record.getCofReissueTriggered())
                 .build();
     }
 }

@@ -74,12 +74,8 @@ public enum AuditAction {
     KVA_OVERRIDDEN_BY_ADMIN,
     KVA_CONFIRMATION_DENIED,
 
-    // Phase 6: 통합 LEW 리뷰 — finalize된 CoF가 kVA override로 재발급 요구
-    COF_REISSUED_BY_KVA_OVERRIDE,
-
     // 결제 후 kVA 사후 변경 (kva-postpayment-adjustment-spec.md PR-1)
     KVA_OVERRIDE_POSTPAYMENT,
-    COF_UNFINALIZED_BY_KVA_ADJUSTMENT,
 
     // 결제 후 kVA 사후 변경 — LEW 요청 흐름 (kva-postpayment-adjustment-spec.md §4.2 / PR-3)
     KVA_ADJUSTMENT_REQUESTED_BY_LEW,
@@ -120,13 +116,8 @@ public enum AuditAction {
     LOGIN_FAILED_BAD_PASSWORD,             // v1.5 AC-29 관련
     LOGIN_FAILED_DELETED,                  // v1.5 AC-29 관련
 
-    // LEW Review Form — Certificate of Fitness (P1.A)
-    // lew-review-form-spec.md §7 감사 로그
+    // LEW Review Form — 배정 신청 조회 감사 로그
     APPLICATION_VIEWED_BY_LEW,
-    CERTIFICATE_OF_FITNESS_CREATED,
-    CERTIFICATE_OF_FITNESS_UPDATED,
-    CERTIFICATE_OF_FITNESS_FINALIZED,
-    MSSL_UNMASKED_VIEW,
 
     // PR3: LEW가 명시적으로 결제 요청을 트리거 (옵션 R — Phase 1 종료 후)
     // CoF finalize 와 분리되어 status PENDING_REVIEW/REVISION_REQUESTED → PENDING_PAYMENT 전이를 일으킨다.

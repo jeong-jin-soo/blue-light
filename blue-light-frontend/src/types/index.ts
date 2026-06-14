@@ -216,9 +216,6 @@ export interface Application {
   retailerHint?: string;
   hasGeneratorHint?: boolean;
   generatorCapacityHint?: number;
-  /** CoF finalize 여부 — 상세 화면 "CoF 발급됨" 배지용 (P2.C에서 사용). */
-  cofFinalized?: boolean;
-  cofCertifiedAt?: string;
   /** 경고 수준 검증 결과. 200 OK 차단하지 않음. */
   warnings?: ApplicantHintWarning[];
 }

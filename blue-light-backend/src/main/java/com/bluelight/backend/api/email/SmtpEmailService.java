@@ -255,7 +255,7 @@ public class SmtpEmailService implements EmailService {
                                           Integer previousKva, Integer newKva,
                                           BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
                                           BigDecimal amountDifference,
-                                          boolean cofReissueTriggered, String reason) {
+                                          String reason) {
         try {
             MimeMessage message = createMessageWithConfigSet();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -266,10 +266,10 @@ public class SmtpEmailService implements EmailService {
             helper.setSubject("[LicenseKaki] kVA adjusted by Admin · Application #" + appSeq);
             helper.setText(buildKvaAdjustedToLewHtml(lewName, appSeq, previousKva, newKva,
                     previousQuoteAmount, newQuoteAmount, amountDifference,
-                    cofReissueTriggered, reason), true);
+                    reason), true);
             mailSender.send(message);
-            log.info("kVA adjusted (LEW) email sent to: {}, appSeq={}, prev={}kVA, new={}kVA, cofReissue={}",
-                    to, appSeq, previousKva, newKva, cofReissueTriggered);
+            log.info("kVA adjusted (LEW) email sent to: {}, appSeq={}, prev={}kVA, new={}kVA",
+                    to, appSeq, previousKva, newKva);
         } catch (MessagingException | java.io.UnsupportedEncodingException e) {
             log.error("Failed to send kVA adjusted (LEW) email to: {}", to, e);
         }
@@ -871,13 +871,13 @@ public class SmtpEmailService implements EmailService {
      * PR-2: 결제 후 ADMIN 의 kVA 변경 → 배정 LEW 이메일 본문.
      *
      * <p>스펙: {@code kva-postpayment-adjustment-spec.md} §8 PR-2 + notification-copy-templates.en.md
-     * 의 LEW 톤(격식체, 1 CTA, 반피싱 푸터). CoF re-issue 동반 시 별도 박스로 추가 안내.</p>
+     * 의 LEW 톤(격식체, 1 CTA, 반피싱 푸터).</p>
      */
     private String buildKvaAdjustedToLewHtml(String lewName, Long appSeq,
                                              Integer previousKva, Integer newKva,
                                              BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
                                              BigDecimal amountDifference,
-                                             boolean cofReissueTriggered, String reason) {
+                                             String reason) {
         String deepLink = appBaseUrl + "/lew/applications/" + appSeq;
         String escapedDeepLink = esc(deepLink);
 
@@ -898,19 +898,6 @@ public class SmtpEmailService implements EmailService {
         } else {
             amountDifferenceText = "$0.00";
         }
-
-        // CoF re-issue 박스: 트리거된 경우에만 노출.
-        String cofBox = cofReissueTriggered
-                ? """
-                <div style="background-color: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 16px 0;">
-                  <p style="color: #9a3412; line-height: 1.6; margin: 0; font-size: 14px;">
-                    <strong>Action required — CoF re-signature.</strong> Because the kVA changed,
-                    the previously finalized Certificate of Fitness has been reopened. Please
-                    review the application and sign the CoF again.
-                  </p>
-                </div>
-                """
-                : "";
 
         // 사유 박스: ADMIN 입력 사유. 항상 표시 (필수 입력 — 빈 값이어도 placeholder).
         String reasonText = reason != null && !reason.isBlank() ? reason : "(no reason provided)";
@@ -955,7 +942,6 @@ public class SmtpEmailService implements EmailService {
                           </tr>
                         </table>
                       </div>
-                      %s
                       <p style="color: #555555; line-height: 1.6; margin: 0 0 6px;"><strong>Reason from Admin:</strong></p>
                       <p style="color: #555555; line-height: 1.6; margin: 0 0 16px; padding: 12px; background-color: #f8fafc; border-left: 3px solid #1a3a5c; font-style: italic;">
                         %s
@@ -984,7 +970,6 @@ public class SmtpEmailService implements EmailService {
                         previousKva != null ? previousKva.toString() : "—",
                         newKva != null ? newKva.toString() : "—",
                         previousQuoteText, newQuoteText, amountDifferenceText,
-                        cofBox,
                         esc(reasonText),
                         escapedDeepLink, escapedDeepLink, escapedDeepLink);
     }

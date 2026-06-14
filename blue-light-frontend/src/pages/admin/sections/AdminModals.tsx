@@ -48,7 +48,7 @@ export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentF
           {assignedLewSeq != null && (
             <p className="text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-md px-3 py-2">
               Confirming will notify the assigned LEW via email and in-app so they can start Phase 2
-              (SLD / LOA / CoF).
+              (SLD / LOA).
             </p>
           )}
           <Input

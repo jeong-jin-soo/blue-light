@@ -66,11 +66,8 @@ export function AdminLoaSection({
     <Card>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment (LOA)</h2>
-        {loaStatus?.loaSigned && (
-          <Badge variant="success">Signed</Badge>
-        )}
-        {loaStatus?.loaGenerated && !loaStatus?.loaSigned && (
-          <Badge variant="warning">Awaiting Signature</Badge>
+        {loaStatus?.loaGenerated && (
+          <Badge variant="gray">Ready</Badge>
         )}
       </div>
 
@@ -112,7 +109,7 @@ export function AdminLoaSection({
           {canGenerate && !loaStatus?.loaGenerated && (
             <div className="space-y-3">
               <p className="text-sm text-gray-600">
-                Generate the LOA document with applicant and LEW details. The applicant will be able to sign it digitally.
+                Generate the LOA document with applicant and LEW details.
               </p>
               <button
                 onClick={onGenerate}
@@ -140,7 +137,7 @@ export function AdminLoaSection({
       {isRenewal && !loaStatus?.loaGenerated && (
         <div className="space-y-3">
           <p className="text-sm text-gray-600">
-            For renewal applications, upload the LOA document received from the relevant authority. The applicant will be able to sign it digitally.
+            For renewal applications, upload the LOA document received from the relevant authority.
           </p>
 
           {/* 파일 선택 영역 */}
@@ -217,11 +214,7 @@ export function AdminLoaSection({
                 <p className="text-sm font-medium text-gray-800">
                   LOA_{application.applicationSeq}.pdf
                 </p>
-                <p className="text-xs text-gray-500">
-                  {loaStatus.loaSigned
-                    ? `Signed on ${new Date(loaStatus.loaSignedAt!).toLocaleDateString()}`
-                    : 'Waiting for applicant signature'}
-                </p>
+                <p className="text-xs text-gray-500">LOA document ready</p>
               </div>
             </div>
             <button
@@ -235,22 +228,8 @@ export function AdminLoaSection({
             </button>
           </div>
 
-          {/* 서명 상태 상세 */}
-          {loaStatus.loaSigned && (
-            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">
-              <span>✅</span>
-              <span>
-                Applicant signed on{' '}
-                {new Date(loaStatus.loaSignedAt!).toLocaleDateString('en-SG', {
-                  year: 'numeric', month: 'short', day: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              </span>
-            </div>
-          )}
-
-          {/* 미서명 상태에서의 재생성/재업로드 */}
-          {!loaStatus.loaSigned && (
+          {/* 재생성/재업로드 */}
+          {(
             isRenewal ? (
               // RENEWAL: Replace LOA (재업로드)
               <div className="space-y-2">
