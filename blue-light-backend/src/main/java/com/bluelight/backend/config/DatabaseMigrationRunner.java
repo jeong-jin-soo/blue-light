@@ -328,6 +328,9 @@ public class DatabaseMigrationRunner {
         addColumnIfMissing(conn, "applications", "kva_confirmed_by",        "ALTER TABLE applications ADD COLUMN kva_confirmed_by BIGINT NULL");
         addColumnIfMissing(conn, "applications", "kva_confirmed_at",        "ALTER TABLE applications ADD COLUMN kva_confirmed_at DATETIME(6) NULL");
         addColumnIfMissing(conn, "applications", "version",                 "ALTER TABLE applications ADD COLUMN version BIGINT NOT NULL DEFAULT 0");
+        // LoA 교환 모델 (loa-exchange 재설계 PR3)
+        addColumnIfMissing(conn, "applications", "loa_stage",               "ALTER TABLE applications ADD COLUMN loa_stage VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED'");
+        addColumnIfMissing(conn, "applications", "loa_form_template_seq",   "ALTER TABLE applications ADD COLUMN loa_form_template_seq BIGINT NULL");
     }
 
     /** 컬럼이 없을 때만 ADD COLUMN 실행 (멱등). */

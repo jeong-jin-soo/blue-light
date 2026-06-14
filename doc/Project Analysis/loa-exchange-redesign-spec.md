@@ -391,7 +391,7 @@ GIVEN/WHEN/THEN 형식. 시나리오별.
 
 - **D-1 (RENEWAL LoA 필수 시점)**: ✅ **결제 전 게이트로 강제**. RENEWAL도 NEW와 동일하게 "신청자 LoA(신청 첨부 또는 DocumentRequest 수령) 확보"를 **결제 요청 선행조건**으로 둔다. → §3.4 결제 게이트는 NEW/RENEWAL 공통 "LoA 수령" 조건.
 - **D-2 (최종 LoA 게이트 위치)**: ✅ **`PAID → IN_PROGRESS` 진입 조건**. LEW 최종본 업로드 완료가 IN_PROGRESS 진입을 연다. IN_PROGRESS = "EMA 제출/처리 진행 중"으로 도메인 의미 재정의(기존 "점검 시작" 의미 폐기).
-- **D-3 (EMA 제출 기록)**: ✅ **단순 체크/메모**. 별도 상태머신/SLA 필드 없이 boolean(emaSubmitted) + 선택 메모/타임스탬프 정도로 기록.
+- **D-3 (EMA 제출 기록)**: ✅ **EMA 제출 추적(서브-상태 머신)은 보류**(2026-06-14, "단계가 너무 많다"). `ema-submission-tracking-spec.md`는 shelved. 대신 **완료 게이트만 단순화**: `IN_PROGRESS → COMPLETED`(`completeApplication`)에서 **LICENSE_PDF 파일 첨부를 필수**로 요구(현 "번호만 입력·파일 누락" 공백 차단). "APPROVED"는 별도 상태/플래그 없이 — EMA가 발급한 라이선스 번호+PDF를 첨부해 완료하는 행위로 갈음. 신규 에러코드 `LICENSE_PDF_REQUIRED`(409).
 - **D-4 (컨시어지 범위)**: ✅ **둘 다 가능**. Manager가 폼 전달·서명본 대리 업로드 **모두 수행 가능**(신청자 직접도 허용). 권한표에 Manager 행 추가.
 - **D-5 (디프리케이트 컬럼 처리)**: ✅ **즉시 DROP**. `loaSignatureUrl` 등 6종을 PR5에서 보존 없이 DROP. (운영 신청 데이터 purge 상태라 부담 없음)
 - **D-6 (용어 리네이밍)**: ✅ **불요**. CoF 전체 제거로 남는 "CoF" 라벨이 없으므로 리네이밍 작업 자체가 사라짐.

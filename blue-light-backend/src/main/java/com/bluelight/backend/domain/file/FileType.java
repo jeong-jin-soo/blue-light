@@ -10,9 +10,14 @@ public enum FileType {
     DRAWING_SLD,
 
     /**
-     * Letter of Appointment
+     * Letter of Appointment — 신청자 서명본(applicant-upload) 및 admin 폼 템플릿에 재사용
      */
     OWNER_AUTH_LETTER,
+
+    /**
+     * LEW가 정보 보완해 올린 LoA 최종본 (신청자 서명본과 구분, loa-exchange 재설계 PR3)
+     */
+    LOA_FINAL,
 
     /**
      * 현장 사진

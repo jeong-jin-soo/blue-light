@@ -272,6 +272,22 @@ public class Application extends BaseEntity {
     @Column(name = "designation_snapshot", length = 50, updatable = false)
     private String loaDesignationSnapshot;
 
+    // ── LoA 교환 모델 (loa-exchange 재설계 PR3) ──
+    /**
+     * LoA 진행 단계 (파일 교환 모델). 기존 디지털 서명 필드(loaSignatureUrl 등)를 대체.
+     * 신청 생성 시 NOT_STARTED. 전이는 도메인 메서드(markFormSent/markApplicantUploaded/markFinalUploaded).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "loa_stage", length = 30, nullable = false)
+    private LoaStage loaStage = LoaStage.NOT_STARTED;
+
+    /**
+     * (NEW 전용) 신청자에게 전달된 LoA 폼 템플릿 버전 스냅샷. 전달 시점 active 버전으로 1회 고정.
+     * 이후 admin이 폼을 교체해도 이 신청은 전달받은 버전 유지(법적 추적). RENEWAL은 null.
+     */
+    @Column(name = "loa_form_template_seq")
+    private Long loaFormTemplateSeq;
+
     /**
      * 신청 시점 phone 스냅샷 (C.1 Snapshot-at-submit / SMS 용).
      * {@code updatable=false} — LOA 스냅샷 불변 정책 동일 적용.
@@ -785,11 +801,39 @@ public class Application extends BaseEntity {
     }
 
     /**
-     * LOA 전자서명 등록
+     * LOA 전자서명 등록 (레거시 — 디지털 서명 모델, 신규 동선 미사용)
      */
     public void registerLoaSignature(String signatureUrl) {
         this.loaSignatureUrl = signatureUrl;
         this.loaSignedAt = LocalDateTime.now();
+    }
+
+    // ── LoA 교환 모델 전이 (loa-exchange 재설계 PR3) ──
+
+    /** (NEW) LEW가 LoA 폼 전달: active 폼 버전 스냅샷 고정 + 단계 FORM_SENT. */
+    public void markLoaFormSent(Long formTemplateSeq) {
+        this.loaFormTemplateSeq = formTemplateSeq;
+        if (this.loaStage == LoaStage.NOT_STARTED) {
+            this.loaStage = LoaStage.FORM_SENT;
+        }
+    }
+
+    /** 신청자가 서명본 업로드: 단계 APPLICANT_UPLOADED (이미 FINAL이면 되돌리지 않음). */
+    public void markLoaApplicantUploaded() {
+        if (this.loaStage == LoaStage.NOT_STARTED || this.loaStage == LoaStage.FORM_SENT) {
+            this.loaStage = LoaStage.APPLICANT_UPLOADED;
+        }
+    }
+
+    /** LEW가 최종본 업로드: 단계 FINAL_UPLOADED. */
+    public void markLoaFinalUploaded() {
+        this.loaStage = LoaStage.FINAL_UPLOADED;
+    }
+
+    /** 결제 요청 가능 여부 — LoA 수령(신청자 업로드 이상). NEW/RENEWAL 공통(D-1). */
+    public boolean isLoaReceivedForPayment() {
+        return this.loaStage == LoaStage.APPLICANT_UPLOADED
+                || this.loaStage == LoaStage.FINAL_UPLOADED;
     }
 
     /**
