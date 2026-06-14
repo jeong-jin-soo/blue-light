@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
+import { Button } from '../../../components/ui/Button';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { useToastStore } from '../../../stores/toastStore';
 import fileApi from '../../../api/fileApi';
@@ -14,6 +15,8 @@ interface ApplicationPaymentProps {
   files?: FileInfo[];
   onPaymentAdviceUpload?: (file: File) => Promise<void>;
   onPaymentAdviceDelete?: (fileSeq: number) => Promise<void>;
+  /** E3 — applicant clicks "Request payment confirmation" → notifies ADMIN (A-56). */
+  onRequestPaymentConfirmation?: () => Promise<void>;
 }
 
 /** Inline image/file preview card for a payment advice file */
@@ -101,6 +104,7 @@ export function ApplicationPayment({
   files = [],
   onPaymentAdviceUpload,
   onPaymentAdviceDelete,
+  onRequestPaymentConfirmation,
 }: ApplicationPaymentProps) {
   const toast = useToastStore();
   const receiptFiles = files.filter(f => f.fileType === 'PAYMENT_RECEIPT');
@@ -108,8 +112,26 @@ export function ApplicationPayment({
   const [uploading, setUploading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FileInfo | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [requestingConfirmation, setRequestingConfirmation] = useState(false);
 
   const canUploadAdvice = application.status === 'PENDING_PAYMENT' && !!onPaymentAdviceUpload;
+  const canRequestConfirmation =
+    application.status === 'PENDING_PAYMENT'
+    && application.kvaStatus !== 'UNKNOWN'
+    && !!onRequestPaymentConfirmation;
+
+  const handleRequestConfirmation = async () => {
+    if (!onRequestPaymentConfirmation) return;
+    setRequestingConfirmation(true);
+    try {
+      await onRequestPaymentConfirmation();
+      toast.success('Payment confirmation requested. Our team will verify shortly.');
+    } catch {
+      toast.error('Failed to request payment confirmation');
+    } finally {
+      setRequestingConfirmation(false);
+    }
+  };
 
   const handleDownloadReceipt = async (file: FileInfo) => {
     try {
@@ -313,6 +335,25 @@ export function ApplicationPayment({
                   className="hidden"
                   onChange={handleFileSelect}
                 />
+              </div>
+            )}
+
+            {/* Request payment confirmation (E3) — notifies our team to verify your payment */}
+            {canRequestConfirmation && (
+              <div className="bg-primary-50 rounded-lg p-4 border border-primary-100">
+                <p className="text-sm font-medium text-primary-800 mb-1">Already paid?</p>
+                <p className="text-xs text-primary-700 mb-3">
+                  If you have completed the PayNow transfer, let us know so we can verify and confirm your payment faster.
+                </p>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  loading={requestingConfirmation}
+                  onClick={handleRequestConfirmation}
+                >
+                  Request payment confirmation
+                </Button>
               </div>
             )}
           </div>

@@ -64,6 +64,7 @@ class LoaServiceUploadSignatureTest {
     private ConciergeRequestRepository conciergeRequestRepository;
     private EmailService emailService;
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private com.bluelight.backend.api.admin.LoaFormTemplateService loaFormTemplateService;
     private LoaService service;
 
     @BeforeEach
@@ -77,11 +78,13 @@ class LoaServiceUploadSignatureTest {
         conciergeRequestRepository = mock(ConciergeRequestRepository.class);
         emailService = mock(EmailService.class);
         eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
+        loaFormTemplateService = mock(com.bluelight.backend.api.admin.LoaFormTemplateService.class);
 
         service = new LoaService(
             applicationRepository, fileRepository, loaGenerationService,
             fileStorageService, auditLogService,
-            userRepository, conciergeRequestRepository, emailService, eventPublisher);
+            userRepository, conciergeRequestRepository, emailService, eventPublisher,
+            loaFormTemplateService);
 
         // 기본 stubs
         when(fileStorageService.store(any(MultipartFile.class), anyString()))

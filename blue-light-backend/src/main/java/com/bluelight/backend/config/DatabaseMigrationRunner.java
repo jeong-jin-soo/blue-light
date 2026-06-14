@@ -89,6 +89,8 @@ public class DatabaseMigrationRunner {
             createLewServiceVisitPhotosTable(conn);
             // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
             migrateApplicationsEmaFields(conn);
+            // ── EMA 제출 추적 (ema-submission-tracking-spec.md §6) — 7컬럼 + OQ-1 backfill ──
+            migrateApplicationsEmaSubmissionTracking(conn);
             migrateApplicationDeclarationLogsTable(conn);
             // ── C.1: Snapshot-at-submit — applications.loa_phone_snapshot, loa_email_snapshot ──
             migrateApplicationsLoaPhoneEmailSnapshots(conn);
@@ -140,6 +142,17 @@ public class DatabaseMigrationRunner {
             // 비어 있을 수 있다(템플릿 142종은 별도 import 됐으나 카탈로그 시드 단계 누락 → Admin Edit
             // 화면의 "Triggered by"·카탈로그 설명 미표시). 풀 97종을 idempotent 하게 시드한다.
             seedNotificationCatalog(conn);
+            // ── 결제 요청 알림 배선(A-17) 활성화 ──
+            // 미사용 템플릿 일괄 비활성화 시 A-17(Payment requested)도 꺼졌을 수 있으나, 이제
+            // LEW/ADMIN 결제 요청이 A-17 을 오케스트레이터로 발송하므로 EMAIL/IN_APP 을 멱등 활성화.
+            enableWiredNotificationTemplates(conn);
+            // ── 신청자 결제 알림 템플릿(A-17 결제요청 / A-20 결제확인) 본문 멱등 시드+활성 ──
+            //    data.sql 은 dev/prod(SQL_INIT_MODE=never)에 미적용 → 행 누락 시 이메일 발송 실패 방지.
+            seedApplicantPaymentNotificationTemplates(conn);
+            // ── 결제 신호 ADMIN 알림 템플릿(A-55 증빙업로드 / A-56 확인요청) 멱등 시드+활성 ──
+            seedPaymentSignalNotificationTemplates(conn);
+            // ── LoA 폼 전달 → 신청자 알림 템플릿(A-57) 멱등 시드+활성 ──
+            seedLoaFormSentNotificationTemplate(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -328,6 +341,11 @@ public class DatabaseMigrationRunner {
         addColumnIfMissing(conn, "applications", "kva_confirmed_by",        "ALTER TABLE applications ADD COLUMN kva_confirmed_by BIGINT NULL");
         addColumnIfMissing(conn, "applications", "kva_confirmed_at",        "ALTER TABLE applications ADD COLUMN kva_confirmed_at DATETIME(6) NULL");
         addColumnIfMissing(conn, "applications", "version",                 "ALTER TABLE applications ADD COLUMN version BIGINT NOT NULL DEFAULT 0");
+        // LoA 교환 모델 (loa-exchange 재설계 PR3)
+        addColumnIfMissing(conn, "applications", "loa_stage",               "ALTER TABLE applications ADD COLUMN loa_stage VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED'");
+        addColumnIfMissing(conn, "applications", "loa_form_template_seq",   "ALTER TABLE applications ADD COLUMN loa_form_template_seq BIGINT NULL");
+        // 인앱 알림 딥링크 — 클릭 시 처리 화면의 해당 위치로 이동(NotificationLinkResolver 생성)
+        addColumnIfMissing(conn, "notifications", "link_url",               "ALTER TABLE notifications ADD COLUMN link_url VARCHAR(300) NULL");
     }
 
     /** 컬럼이 없을 때만 ADD COLUMN 실행 (멱등). */
@@ -1157,6 +1175,13 @@ public class DatabaseMigrationRunner {
             // D4=B (스펙 §13.3): Compose UI 카테고리 추천 드롭다운 옵션 (CSV). 자유 입력은 항상 허용.
             {"admin_manual_email_category_suggestions", "PAYMENT_NOTICE,MAINTENANCE,INFO,MISC",
              "Comma-separated category tag suggestions for manual email Compose UI"},
+
+            // ── EMA 제출 추적 (ema-submission-tracking-spec.md §5.4) — 운영 가변 값(설정 우선 원칙) ──
+            // 하드코딩 금지: 서비스가 system_settings 에서 조회한다(EmaSubmissionSettings).
+            {"ema.reminder.days", "3",
+             "Reminder threshold N days after EMA SUBMITTED/RESUBMITTED with no change"},
+            {"ema.ack.required", "false",
+             "Require EMA_ACK attachment on EMA submit-class transitions (T1/T3/T10)"},
         };
 
         int seeded = 0;
@@ -1449,6 +1474,68 @@ public class DatabaseMigrationRunner {
             log.info("Migration [applications-ema-fields]: added {} column(s)", added);
         } else {
             log.debug("Migration [applications-ema-fields]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (EMA 제출 추적): applications 테이블에 EMA 제출 추적 7컬럼 추가 + OQ-1 backfill.
+     * <p>스펙: {@code doc/Project Analysis/ema-submission-tracking-spec.md} §6. P1.1
+     * {@link #migrateApplicationsEmaFields} 와 동일 패턴(컬럼별 {@link #columnExists} 가드 → 멱등).
+     *
+     * <h3>OQ-1 배포 호환 backfill (grandfathering)</h3>
+     * 이미 IN_PROGRESS 인 기존 신청은 새 종료 게이트(ema=APPROVED 필수)에 걸려 발급 불가가 된다.
+     * 이를 막기 위해 컬럼 신규 추가가 발생한 "이번 마이그레이션에서만" IN_PROGRESS 행을 APPROVED 로 일괄 세팅.
+     * <ul>
+     *   <li>(a) {@code added>0} 인 첫 실행에서만 backfill — 재실행 시 컬럼이 이미 있어 added=0 → 스킵.</li>
+     *   <li>(b) backfill UPDATE 자체도 {@code status='IN_PROGRESS' AND ema_submission_status='NOT_SUBMITTED'}
+     *       조건이라, 만에 하나 재실행돼도 이미 진행/전이된 행을 덮어쓰지 않는다(이중 가드).</li>
+     * </ul>
+     * grandfathering 은 "EMA 가 실제 승인됐다"는 단언이 아니라 신규 게이트로부터의 소급 면제다.
+     * LICENSE_PDF 게이트(§4)는 여전히 적용되므로 PDF 미첨부면 종료 시점에 막힌다(§11 R3).
+     */
+    private void migrateApplicationsEmaSubmissionTracking(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] columns = {
+                {"ema_submission_status",     "VARCHAR(30) NOT NULL DEFAULT 'NOT_SUBMITTED'"},
+                {"ema_submitted_at",          "DATETIME(6)"},
+                {"ema_reference_no",          "VARCHAR(60)"},
+                {"ema_submitted_by_user_seq", "BIGINT"},
+                {"ema_decision_at",           "DATETIME(6)"},
+                {"ema_query_note",            "VARCHAR(1000)"},
+                {"ema_status_before_decision", "VARCHAR(30)"},  // 허점#1 — Revert 복원 슬롯
+                {"ema_reminder_notified_at",  "DATETIME(6)"}    // PR-E5 — 리마인더 중복 발송 가드(1일 1회 멱등)
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : columns) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [applications-ema-submission]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [applications-ema-submission]: all columns exist, skipping");
+        }
+
+        // ── OQ-1 backfill — 컬럼 신규 추가가 발생한 첫 실행에서만 (이중 멱등 가드) ──
+        if (added > 0) {
+            try (Statement stmt = conn.createStatement()) {
+                int backfilled = stmt.executeUpdate(
+                        "UPDATE applications " +
+                                "SET ema_submission_status = 'APPROVED' " +
+                                "WHERE status = 'IN_PROGRESS' " +
+                                "  AND ema_submission_status = 'NOT_SUBMITTED' " +
+                                "  AND deleted_at IS NULL");   // soft-delete 행 제외 (프로젝트 패턴)
+                if (backfilled > 0) {
+                    log.info("Migration [applications-ema-submission]: backfilled {} IN_PROGRESS row(s) to APPROVED",
+                            backfilled);
+                }
+            }
         }
     }
 
@@ -2188,6 +2275,258 @@ public class DatabaseMigrationRunner {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet rs = meta.getTables(conn.getCatalog(), null, table, new String[]{"TABLE"})) {
             return rs.next();
+        }
+    }
+
+    /**
+     * 실제 코드에 배선된 알림 템플릿을 멱등 활성화한다.
+     * 현재: A-17(Payment requested) — LEW/ADMIN 결제 요청이 오케스트레이터로 발송하므로 EMAIL/IN_APP 필요.
+     * (E2/E3 등 추가 배선 시 여기에 코드 추가.)
+     */
+    private void enableWiredNotificationTemplates(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            if (!tableExists(conn, "notification_templates")) {
+                return;
+            }
+            int n = stmt.executeUpdate(
+                    "UPDATE notification_templates SET enabled = TRUE " +
+                    "WHERE template_code = 'A-17' AND channel IN ('EMAIL','IN_APP') AND enabled = FALSE");
+            if (n > 0) {
+                log.info("Migration: enabled {} wired notification template rows (A-17)", n);
+            }
+        } catch (SQLException e) {
+            log.warn("enableWiredNotificationTemplates skipped: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 결제 신호 ADMIN 알림 템플릿(A-55 증빙업로드 / A-56 확인요청)을 멱등 시드 + 활성화.
+     * 기존 DB(SQL_INIT_MODE=never)엔 data.sql 미적용이라 INSERT...WHERE NOT EXISTS 로 주입.
+     */
+    private void seedPaymentSignalNotificationTemplates(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        // {code, channel, subject, body}
+        String[][] rows = {
+            {"A-55", "EMAIL",
+                "[LicenseKaki] Payment evidence uploaded · #{{publicCode}}",
+                "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\"><div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br><span style=\"font-size:12px;color:#888\">Admin notification</span></div><h1 style=\"font-size:18px;margin:0 0 16px\">Payment evidence uploaded</h1><p style=\"margin:0 0 16px\">Applicant <strong>{{applicantName}}</strong> uploaded payment evidence for application <strong>#{{publicCode}}</strong> (SGD {{amount}}). Please review and confirm the payment.</p><p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">LicenseKaki internal admin notification.</p></div>"},
+            {"A-55", "IN_APP",
+                "Payment evidence uploaded on #{{publicCode}}",
+                "{{applicantName}} uploaded payment evidence (SGD {{amount}}). Review and confirm."},
+            {"A-56", "EMAIL",
+                "[LicenseKaki] Payment confirmation requested · #{{publicCode}}",
+                "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\"><div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br><span style=\"font-size:12px;color:#888\">Admin notification</span></div><h1 style=\"font-size:18px;margin:0 0 16px\">Payment confirmation requested</h1><p style=\"margin:0 0 16px\">Applicant <strong>{{applicantName}}</strong> indicated they have completed payment for application <strong>#{{publicCode}}</strong> (SGD {{amount}}) and is requesting confirmation. Please verify and confirm the payment.</p><p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">LicenseKaki internal admin notification.</p></div>"},
+            {"A-56", "IN_APP",
+                "Applicant requested payment confirmation on #{{publicCode}}",
+                "{{applicantName}} says payment is done (SGD {{amount}}). Verify and confirm."},
+        };
+        final String variablesJson = "[\"applicantName\",\"publicCode\",\"amount\",\"ctaUrl\"]";
+
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'PAYMENT', 'IMPORTANT', 'ADMIN', TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (" +
+            "  SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                String code = r[0], channel = r[1], subject = r[2], body = r[3];
+                try {
+                    insertPs.setString(1, code);
+                    insertPs.setString(2, channel);
+                    insertPs.setString(3, subject);
+                    insertPs.setString(4, body);
+                    insertPs.setString(5, variablesJson);
+                    insertPs.setString(6, code);
+                    insertPs.setString(7, code);
+                    insertPs.setString(8, channel);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, code);
+                    enablePs.setString(2, channel);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedPaymentSignalNotificationTemplates {} {} warn: {}", code, channel, e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedPaymentSignalNotificationTemplates aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} payment-signal template rows (A-55/A-56)", inserted);
+        }
+    }
+
+    /**
+     * LoA 폼 전달 → 신청자 알림 템플릿(A-57, EMAIL+IN_APP, recipient APPLICANT)을 멱등 시드+활성.
+     * send-form 하드코딩 직접발송을 오케스트레이터로 전환하며 도입.
+     */
+    private void seedLoaFormSentNotificationTemplate(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        String emailBody =
+            "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+            + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br>"
+            + "<span style=\"font-size:12px;color:#888\">Singapore Electrical Installation Licence Platform</span></div>"
+            + "<h1 style=\"font-size:20px;margin:0 0 16px\">Your LoA form is ready</h1>"
+            + "<p style=\"margin:0 0 16px\">Hello {{applicantName}},</p>"
+            + "<p style=\"margin:0 0 16px\">Your assigned Licensed Electrical Worker has shared the Letter of Appointment (LoA) form for application <strong>#{{publicCode}}</strong>. "
+            + "Please download the form, sign it offline, and upload the signed copy on your application page.</p>"
+            + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p>"
+            + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
+            + "<p style=\"margin:0;font-size:12px;color:#888\">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email.</p></div>";
+        String[][] rows = {
+            {"A-57", "EMAIL", "[LicenseKaki] Your LoA form is ready · #{{publicCode}}", emailBody},
+            {"A-57", "IN_APP", "LoA form ready on #{{publicCode}}",
+                "Your LEW shared the LoA form. Download, sign offline, and upload the signed copy."},
+        };
+        final String variablesJson = "[\"applicantName\",\"publicCode\",\"ctaUrl\"]";
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'STATUS', 'IMPORTANT', 'APPLICANT', TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                try {
+                    insertPs.setString(1, r[0]); insertPs.setString(2, r[1]);
+                    insertPs.setString(3, r[2]); insertPs.setString(4, r[3]);
+                    insertPs.setString(5, variablesJson); insertPs.setString(6, r[0]);
+                    insertPs.setString(7, r[0]); insertPs.setString(8, r[1]);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, r[0]); enablePs.setString(2, r[1]);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedLoaFormSentNotificationTemplate {} {} warn: {}", r[0], r[1], e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedLoaFormSentNotificationTemplate aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} LoA-form-sent template rows (A-57)", inserted);
+        }
+    }
+
+    /**
+     * 신청자 결제 알림 템플릿(A-17 결제 요청 / A-20 결제 확인)을 EMAIL+IN_APP 멱등 시드+활성.
+     *
+     * <p>이 본문은 그동안 {@code data.sql} 에만 존재했는데, 운영/개발 RDS 는
+     * {@code SQL_INIT_MODE=never} 라 data.sql 이 적용되지 않는다. 따라서 결제 요청(A-17)
+     * 이메일이 {@code TEMPLATE_NOT_FOUND} 로 영구 실패할 수 있었다(인앱은 별도 경로).
+     * A-55/56/57 과 동일하게 {@code INSERT ... WHERE NOT EXISTS} 로 누락 행만 주입하므로
+     * 관리자가 편집한 기존 행은 보존한다. EMAIL CTA 의 상대경로 ctaUrl 은
+     * {@code EmailChannelAdapter} 가 절대 URL 로 변환한다.</p>
+     */
+    private void seedApplicantPaymentNotificationTemplates(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        final String a17Email =
+            "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+            + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br>"
+            + "<span style=\"font-size:12px;color:#888\">Singapore Electrical Installation Licence Platform</span></div>"
+            + "<h1 style=\"font-size:20px;margin:0 0 16px\">Your application is approved. Please complete payment to start work.</h1>"
+            + "<p style=\"margin:0 0 16px\">Hello {{applicantName}},</p>"
+            + "<p style=\"margin:0 0 16px\">Good news — your Licensed Electrical Worker has confirmed the scope of work for application <strong>#{{publicCode}}</strong> ({{kvaLabel}}). To begin the work, please settle the payment below by <strong>{{deadline}}</strong>.</p>"
+            + "<p style=\"margin:0 0 16px\"><strong>Amount due</strong>: SGD {{amount}}<br><strong>PayNow UEN</strong>: {{paynowUen}}<br><strong>Payee name</strong>: {{paynowAccountName}}<br><strong>Reference (must include)</strong>: {{paynowReference}}</p>"
+            + "<p style=\"margin:0 0 16px\">Including the reference code lets us match your payment automatically — usually within 1 business hour.</p>"
+            + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Pay via PayNow</a></p>"
+            + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
+            + "<p style=\"margin:0;font-size:12px;color:#888\">This is a transactional email from LicenseKaki. You are receiving it because your application is awaiting payment.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email. Verify any link before clicking.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>";
+        final String a20Email =
+            "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+            + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br>"
+            + "<span style=\"font-size:12px;color:#888\">Singapore Electrical Installation Licence Platform</span></div>"
+            + "<h1 style=\"font-size:20px;margin:0 0 16px\">Payment received. Work is starting.</h1>"
+            + "<p style=\"margin:0 0 16px\">Hello {{applicantName}},</p>"
+            + "<p style=\"margin:0 0 16px\">We've received your PayNow payment of <strong>SGD {{amount}}</strong> for application <strong>#{{publicCode}}</strong> on <strong>{{paidAtDisplay}}</strong>. Thank you.</p>"
+            + "<p style=\"margin:0 0 16px\">Your reviewer <strong>{{lewName}}</strong> will now coordinate the work and submit the licence to authorities. We'll keep you posted as the status changes.</p>"
+            + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">View application</a></p>"
+            + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
+            + "<p style=\"margin:0;font-size:12px;color:#888\">This is a transactional email from LicenseKaki. You are receiving it because your payment was confirmed.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email. Verify any link before clicking.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>";
+        final String a17Vars =
+            "[\"applicantName\",\"publicCode\",\"kvaLabel\",\"amount\",\"paynowUen\",\"paynowAccountName\",\"paynowReference\",\"deadline\",\"ctaUrl\"]";
+        final String a20Vars =
+            "[\"applicantName\",\"publicCode\",\"amount\",\"paidAtDisplay\",\"lewName\",\"ctaUrl\"]";
+
+        // {code, channel, subject, body, variablesJson, severity}
+        String[][] rows = {
+            {"A-17", "EMAIL", "[LicenseKaki] Payment requested · #{{publicCode}}", a17Email, a17Vars, "CRITICAL"},
+            {"A-17", "IN_APP", "Payment requested on #{{publicCode}}",
+                "Pay SGD {{amount}} via PayNow by {{deadline}} to start work.", a17Vars, "CRITICAL"},
+            {"A-20", "EMAIL", "[LicenseKaki] Payment received · #{{publicCode}}", a20Email, a20Vars, "IMPORTANT"},
+            {"A-20", "IN_APP", "Payment confirmed on #{{publicCode}}",
+                "SGD {{amount}} received. {{lewName}} will start work shortly.", a20Vars, "IMPORTANT"},
+        };
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'PAYMENT', ?, 'APPLICANT', TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                try {
+                    insertPs.setString(1, r[0]); insertPs.setString(2, r[1]);
+                    insertPs.setString(3, r[2]); insertPs.setString(4, r[3]);
+                    insertPs.setString(5, r[4]); insertPs.setString(6, r[0]);
+                    insertPs.setString(7, r[5]);
+                    insertPs.setString(8, r[0]); insertPs.setString(9, r[1]);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, r[0]); enablePs.setString(2, r[1]);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedApplicantPaymentNotificationTemplates {} {} warn: {}", r[0], r[1], e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedApplicantPaymentNotificationTemplates aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} applicant payment template rows (A-17/A-20)", inserted);
+        }
+    }
+
+    /** notification_templates 존재 여부 — SQLException 삼킴(시드는 비치명적). */
+    private boolean tableExistsSafe(Connection conn) {
+        try {
+            return tableExists(conn, "notification_templates");
+        } catch (SQLException e) {
+            return false;
         }
     }
 }

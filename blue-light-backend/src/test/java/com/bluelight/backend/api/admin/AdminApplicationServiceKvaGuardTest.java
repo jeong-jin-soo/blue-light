@@ -30,6 +30,7 @@ class AdminApplicationServiceKvaGuardTest {
     private ApplicationRepository applicationRepository;
     private UserRepository userRepository;
     private EmailService emailService;
+    private com.bluelight.backend.domain.file.FileRepository fileRepository;
     private AdminApplicationService service;
 
     @BeforeEach
@@ -40,8 +41,17 @@ class AdminApplicationServiceKvaGuardTest {
         // ★ PR#7: ApplicationEventPublisher mock 추가
         org.springframework.context.ApplicationEventPublisher eventPublisher =
             mock(org.springframework.context.ApplicationEventPublisher.class);
+        // PR4 게이트(LICENSE_PDF) + EMA 추적 공용 FileRepository mock (단일 주입).
+        fileRepository = mock(com.bluelight.backend.domain.file.FileRepository.class);
+        // ── EMA 제출 추적 의존성 (감사/설정) mock ──
+        com.bluelight.backend.api.audit.AuditLogService auditLogService =
+            mock(com.bluelight.backend.api.audit.AuditLogService.class);
+        EmaSubmissionSettings emaSubmissionSettings = mock(EmaSubmissionSettings.class);
+        // @RequiredArgsConstructor — 필드 선언 순서: appRepo, userRepo, email, eventPublisher,
+        // fileRepository, auditLogService, emaSubmissionSettings
         service = new AdminApplicationService(
-            applicationRepository, userRepository, emailService, eventPublisher);
+            applicationRepository, userRepository, emailService, eventPublisher,
+            fileRepository, auditLogService, emaSubmissionSettings);
     }
 
     @Test
@@ -65,5 +75,48 @@ class AdminApplicationServiceKvaGuardTest {
 
     // CONFIRMED 성공 경로는 AdminApplicationResponse.from 이 applicationType 등을 요구하므로
     // 통합 테스트(MockMvc) 스코프로 이관하고, 여기서는 B-1 가드만 검증.
-    // (CoF 발급 게이트는 CoF 기능 제거와 함께 삭제됨.)
+
+    @Test
+    void completeApplication_EMA_미승인이면_차단() {
+        // 머지된 완료 게이트(EMA PR-E3 가 PR4 LICENSE_PDF 단독 게이트 대체):
+        // emaSubmissionStatus != APPROVED 이면 LICENSE_PDF 검사 이전에 EMA_NOT_APPROVED 로 차단.
+        Application app = mock(Application.class);
+        when(app.getStatus()).thenReturn(ApplicationStatus.IN_PROGRESS);
+        when(app.getEmaSubmissionStatus()).thenReturn(
+                com.bluelight.backend.domain.application.EmaSubmissionStatus.SUBMITTED);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+
+        var request = new com.bluelight.backend.api.admin.dto.CompleteApplicationRequest();
+
+        assertThatThrownBy(() -> service.completeApplication(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex ->
+                        assertThat(((BusinessException) ex).getCode()).isEqualTo("EMA_NOT_APPROVED"));
+
+        verify(app, never()).issueLicense(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void completeApplication_EMA승인됐어도_LICENSE_PDF_없으면_차단() {
+        // PR4 의도(LICENSE_PDF 필수)는 유지 — 단 EMA=APPROVED 전제 충족 후 LICENSE_PDF_MISSING(400)로 차단.
+        Application app = mock(Application.class);
+        when(app.getStatus()).thenReturn(ApplicationStatus.IN_PROGRESS);
+        when(app.getEmaSubmissionStatus()).thenReturn(
+                com.bluelight.backend.domain.application.EmaSubmissionStatus.APPROVED);
+        when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        when(fileRepository.findByApplicationApplicationSeqAndFileType(
+                1L, com.bluelight.backend.domain.file.FileType.LICENSE_PDF))
+                .thenReturn(java.util.List.of());
+
+        var request = new com.bluelight.backend.api.admin.dto.CompleteApplicationRequest();
+
+        assertThatThrownBy(() -> service.completeApplication(1L, request))
+                .isInstanceOf(BusinessException.class)
+                .satisfies(ex ->
+                        assertThat(((BusinessException) ex).getCode()).isEqualTo("LICENSE_PDF_MISSING"));
+
+        verify(app, never()).issueLicense(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
 }

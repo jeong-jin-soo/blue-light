@@ -67,6 +67,24 @@ public class SmtpEmailService implements EmailService {
     }
 
     /**
+     * 활성 Spring 프로필. 운영(prod)이 아닌 환경(개발서버 등)에서는 메일 제목 앞에
+     * 메일 코드(알림 카탈로그 코드, 예: {@code [A-17]})를 붙여 어떤 알림인지 식별하기 쉽게 한다.
+     * 운영 서버만 {@code SPRING_PROFILES_ACTIVE=prod} 로 뜨므로 prod 가 아니면 코드를 노출한다.
+     */
+    @Value("${spring.profiles.active:default}")
+    private String activeProfiles;
+
+    /**
+     * 비운영(개발서버 등) 환경에서 메일 제목 앞에 붙일 {@code "[코드] "} prefix 를 반환한다.
+     * 운영(prod 프로필)에서는 빈 문자열을 반환하므로 운영 제목에는 변화가 없다.
+     *
+     * @param mailCode 알림 카탈로그 코드(예: {@code "A-17"}). null/blank 면 prefix 없음.
+     */
+    private String code(String mailCode) {
+        return MailSubjectCode.prefix(activeProfiles, mailCode);
+    }
+
+    /**
      * MimeMessage 생성 시 SES Configuration Set 헤더를 자동 부착하는 팩토리.
      * Spring의 JavaMailSender가 그대로 전송하므로 SMTP 레벨에서 헤더가 유지된다.
      * {@code mail.ses.configuration-set} 설정이 비어있으면 일반 createMimeMessage()와 동일.
@@ -88,7 +106,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Reset Your Password - LicenseKaki");
+            helper.setSubject(code("A-03") + "Reset Your Password - LicenseKaki");
 
             String htmlContent = buildPasswordResetHtml(userName, resetLink);
             helper.setText(htmlContent, true);
@@ -110,7 +128,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Verify Your Email - LicenseKaki");
+            helper.setSubject(code("A-01") + "Verify Your Email - LicenseKaki");
 
             String htmlContent = buildEmailVerificationHtml(userName, verificationLink);
             helper.setText(htmlContent, true);
@@ -133,7 +151,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Licence Expiry Notice - LicenseKaki");
+            helper.setSubject(code("A-24") + "Licence Expiry Notice - LicenseKaki");
 
             String htmlContent = buildLicenseExpiryHtml(userName, licenseNumber, address, expiryDate, daysRemaining);
             helper.setText(htmlContent, true);
@@ -153,7 +171,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Revision Requested - Application #" + appSeq + " - LicenseKaki");
+            helper.setSubject(code("A-15") + "Revision Requested - Application #" + appSeq + " - LicenseKaki");
             helper.setText(buildRevisionRequestHtml(userName, appSeq, address, comment), true);
             mailSender.send(message);
             log.info("Revision request email sent to: {}, appSeq={}", to, appSeq);
@@ -170,7 +188,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Payment Required - Application #" + appSeq + " - LicenseKaki");
+            helper.setSubject(code("A-17") + "Payment Required - Application #" + appSeq + " - LicenseKaki");
             helper.setText(buildPaymentRequestHtml(userName, appSeq, address, amount), true);
             mailSender.send(message);
             log.info("Payment request email sent to: {}, appSeq={}", to, appSeq);
@@ -187,7 +205,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Payment Confirmed - Application #" + appSeq + " - LicenseKaki");
+            helper.setSubject(code("A-20") + "Payment Confirmed - Application #" + appSeq + " - LicenseKaki");
             helper.setText(buildPaymentConfirmHtml(userName, appSeq, address, amount), true);
             mailSender.send(message);
             log.info("Payment confirm email sent to: {}, appSeq={}", to, appSeq);
@@ -205,7 +223,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("Licence Issued - " + licenseNo + " - LicenseKaki");
+            helper.setSubject(code("A-22") + "Licence Issued - " + licenseNo + " - LicenseKaki");
             helper.setText(buildLicenseIssuedHtml(userName, appSeq, address, licenseNo, expiryDate), true);
             mailSender.send(message);
             log.info("License issued email sent to: {}, appSeq={}, licenseNo={}", to, appSeq, licenseNo);
@@ -222,7 +240,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("New Application Assigned - #" + appSeq + " - LicenseKaki");
+            helper.setSubject(code("L-03") + "New Application Assigned - #" + appSeq + " - LicenseKaki");
             helper.setText(buildLewAssignedHtml(lewName, appSeq, address, applicantName), true);
             mailSender.send(message);
             log.info("LEW assigned email sent to: {}, appSeq={}", to, appSeq);
@@ -240,7 +258,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PR4: LEW가 메일 제목만 보고도 Phase 2 시작 시점임을 인지하도록 명시.
-            helper.setSubject("[LicenseKaki] Payment confirmed — Application #" + appSeq + " ready for certification");
+            helper.setSubject(code("L-06") + "[LicenseKaki] Payment confirmed — Application #" + appSeq + " ready for certification");
             helper.setText(buildPaymentConfirmedToLewHtml(lewName, appSeq, address, amount), true);
             mailSender.send(message);
             log.info("Payment confirmed (LEW) email sent to: {}, appSeq={}", to, appSeq);
@@ -263,7 +281,7 @@ public class SmtpEmailService implements EmailService {
             helper.setTo(to);
             // PR-2: PDPA 최소화 — Subject 에 kVA 수치/금액 노출 금지. publicCode 가 아직 도메인에
             // 자리잡지 않아 applicationSeq 를 reference 로 사용 (PR4 PaymentConfirmed 와 동일 패턴).
-            helper.setSubject("[LicenseKaki] kVA adjusted by Admin · Application #" + appSeq);
+            helper.setSubject(code("KVA-ADJ-LEW") + "[LicenseKaki] kVA adjusted by Admin · Application #" + appSeq);
             helper.setText(buildKvaAdjustedToLewHtml(lewName, appSeq, previousKva, newKva,
                     previousQuoteAmount, newQuoteAmount, amountDifference,
                     reason), true);
@@ -287,7 +305,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PR-4: PDPA 최소화 — Subject 에 금액·영수증 번호 노출 금지. applicationSeq 만 reference.
-            helper.setSubject("[LicenseKaki] kVA settlement marked · #" + appSeq);
+            helper.setSubject(code("KVA-SETTLE-LEW") + "[LicenseKaki] kVA settlement marked · #" + appSeq);
             helper.setText(buildKvaSettlementMarkedToLewHtml(lewName, appSeq,
                     paymentAdjustment, settledAmount, receiptReferenceNumber), true);
             mailSender.send(message);
@@ -308,7 +326,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PDPA 최소화 — Subject 에 kVA 수치/금액 노출 금지. applicationSeq 만 reference 로 노출.
-            helper.setSubject("[LicenseKaki] kVA adjustment requested · Application #" + appSeq);
+            helper.setSubject(code("KVA-REQ-ADMIN") + "[LicenseKaki] kVA adjustment requested · Application #" + appSeq);
             helper.setText(buildKvaAdjustmentRequestedToAdminHtml(adminName, lewName, appSeq,
                     proposedKva, currentKva, reason), true);
             mailSender.send(message);
@@ -387,7 +405,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PDPA 최소화: invoice number 만 노출.
-            helper.setSubject("[LicenseKaki] Receipt issued · #" + nullSafeStr(invoiceNumber));
+            helper.setSubject(code("RECEIPT") + "[LicenseKaki] Receipt issued · #" + nullSafeStr(invoiceNumber));
 
             String htmlContent = buildInvoiceIssuedHtml(recipientName, invoiceNumber, amount, currency);
             helper.setText(htmlContent, true);
@@ -1153,7 +1171,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] Your LEW requested " + requestedCount + " document(s)");
+            helper.setSubject(code("A-12") + "[LicenseKaki] Your LEW requested " + requestedCount + " document(s)");
             helper.setText(buildDocumentRequestCreatedHtml(userName, appSeq, requestedCount, documentLabels), true);
             mailSender.send(message);
             log.info("Document request created email sent to: {}, appSeq={}, count={}", to, appSeq, requestedCount);
@@ -1171,7 +1189,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PDPA: 신청자 이름은 제외하고 appSeq/라벨만 노출 (B-2 §3.1 권고)
-            helper.setSubject("[LicenseKaki] Application #" + appSeq
+            helper.setSubject(code("L-05") + "[LicenseKaki] Application #" + appSeq
                     + " — applicant uploaded " + documentLabel + ", please review");
             helper.setText(buildDocumentRequestFulfilledHtml(lewName, appSeq, documentLabel), true);
             mailSender.send(message);
@@ -1189,7 +1207,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] " + documentLabel + " approved");
+            helper.setSubject(code("A-13") + "[LicenseKaki] " + documentLabel + " approved");
             helper.setText(buildDocumentRequestApprovedHtml(userName, appSeq, documentLabel), true);
             mailSender.send(message);
             log.info("Document request approved email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
@@ -1207,7 +1225,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] " + documentLabel + " needs re-upload");
+            helper.setSubject(code("A-14") + "[LicenseKaki] " + documentLabel + " needs re-upload");
             helper.setText(buildDocumentRequestRejectedHtml(userName, appSeq, documentLabel, rejectionReason), true);
             mailSender.send(message);
             log.info("Document request rejected email sent to: {}, appSeq={}, label={}", to, appSeq, documentLabel);
@@ -1342,7 +1360,7 @@ public class SmtpEmailService implements EmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] Activate your account");
+            helper.setSubject(code("A-06") + "[LicenseKaki] Activate your account");
 
             String htmlContent = buildAccountSetupLinkHtml(fullName, setupUrl, expiresAtDisplay);
             helper.setText(htmlContent, true);
@@ -1404,7 +1422,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] Your Kaki Concierge request is received");
+            helper.setSubject(code("A-31") + "[LicenseKaki] Your Kaki Concierge request is received");
 
             String htmlContent = buildConciergeReceivedHtml(fullName, setupUrl, expiresAtDisplay);
             helper.setText(htmlContent, true);
@@ -1424,7 +1442,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] Your Kaki Concierge request is received");
+            helper.setSubject(code("A-31") + "[LicenseKaki] Your Kaki Concierge request is received");
 
             String htmlContent = buildConciergeReceivedExistingHtml(fullName);
             helper.setText(htmlContent, true);
@@ -1446,7 +1464,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // 제목에 사용자 입력이 섞이지 않도록 publicCode는 서버 생성값(C-YYYY-NNNN)으로 제한적
-            helper.setSubject("[LicenseKaki] New concierge request: " + publicCode);
+            helper.setSubject(code("M-03") + "[LicenseKaki] New concierge request: " + publicCode);
 
             String htmlContent = buildConciergeStaffNewRequestHtml(staffName, publicCode, applicantName, applicantEmail);
             helper.setText(htmlContent, true);
@@ -1586,7 +1604,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             helper.setSubject(
-                "[LicenseKaki] Confirmation: Your LOA signature was uploaded by your Concierge Manager");
+                code("A-36") + "[LicenseKaki] Confirmation: Your LOA signature was uploaded by your Concierge Manager");
 
             String htmlContent = buildConciergeLoaUploadConfirmHtml(
                 applicantName, managerName, applicationSeq, memo);
@@ -1668,7 +1686,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PDPA: 제목에 금액·주소·이름 제외, publicCode 만 포함
-            helper.setSubject("[LicenseKaki] Payment details for your concierge request " + publicCode);
+            helper.setSubject(code("A-33") + "[LicenseKaki] Payment details for your concierge request " + publicCode);
 
             String htmlContent = buildConciergeQuoteHtml(
                 applicantName, publicCode, quotedAmount, callScheduledAt,
@@ -1786,7 +1804,7 @@ public class SmtpEmailService implements EmailService {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
             // PDPA 최소화 — 신청자 식별 정보는 본문에만, 제목은 publicCode 만 노출.
-            helper.setSubject("[LicenseKaki] You have been assigned to a Concierge request · #" + publicCode);
+            helper.setSubject(code("A-32") + "[LicenseKaki] You have been assigned to a Concierge request · #" + publicCode);
             helper.setText(buildConciergeLewAssignedHtml(lewName, publicCode,
                     applicantName, applicantEmail, applicantPhone, memo, reassigned), true);
             mailSender.send(message);
@@ -1807,7 +1825,7 @@ public class SmtpEmailService implements EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             helper.setFrom(fromAddress, fromName);
             helper.setTo(to);
-            helper.setSubject("[LicenseKaki] You have been unassigned from a Concierge request · #" + publicCode);
+            helper.setSubject(code("L-04") + "[LicenseKaki] You have been unassigned from a Concierge request · #" + publicCode);
             helper.setText(buildConciergeLewUnassignedHtml(lewName, publicCode), true);
             mailSender.send(message);
             log.info("Concierge LEW unassigned email sent: to={}, publicCode={}", to, publicCode);

@@ -3,7 +3,8 @@
  * (ApplicationDetailPage & AdminApplicationDetailPage)
  */
 
-import type { FileInfo, FileType } from '../types';
+import type { EmaSubmissionStatus, FileInfo, FileType } from '../types';
+import type { BadgeVariant } from '../components/ui/Badge';
 
 /** Status steps displayed in StepTracker */
 export const STATUS_STEPS = [
@@ -45,8 +46,49 @@ export function formatFileType(type: string): string {
     case 'LICENSE_PDF': return 'Licence';
     case 'SP_ACCOUNT_DOC': return 'SP Account';
     case 'SKETCH_SLD': return 'Sketch';
+    case 'EMA_ACK': return 'EMA Receipt';
     default: return type;
   }
+}
+
+// ============================================
+// EMA Submission Tracking (ema-submission-tracking-spec.md §8)
+// ============================================
+
+/** EMA 상태 → 짧은 표시 라벨 (영문 UI 일관). */
+export function formatEmaStatus(status?: EmaSubmissionStatus | null): string {
+  switch (status) {
+    case 'NOT_SUBMITTED': return 'Not submitted';
+    case 'SUBMITTED': return 'Submitted';
+    case 'QUERY_RAISED': return 'Query raised';
+    case 'RESUBMITTED': return 'Resubmitted';
+    case 'APPROVED': return 'Approved';
+    case 'REJECTED': return 'Rejected';
+    case 'WITHDRAWN': return 'Withdrawn';
+    default: return '—';
+  }
+}
+
+/**
+ * EMA 상태 → Badge variant (스펙 §8.1 배지 규칙).
+ * SUBMITTED/RESUBMITTED→info, QUERY_RAISED→warning, APPROVED→success,
+ * REJECTED/WITHDRAWN→error(=danger), NOT_SUBMITTED→gray.
+ */
+export function getEmaStatusBadge(status?: EmaSubmissionStatus | null): BadgeVariant {
+  switch (status) {
+    case 'SUBMITTED':
+    case 'RESUBMITTED': return 'info';
+    case 'QUERY_RAISED': return 'warning';
+    case 'APPROVED': return 'success';
+    case 'REJECTED':
+    case 'WITHDRAWN': return 'error';
+    default: return 'gray';
+  }
+}
+
+/** "진행 중(정체 후보)" EMA 상태 — ADMIN 모니터링에서 정체 건 식별에 사용. */
+export function isEmaInFlight(status?: EmaSubmissionStatus | null): boolean {
+  return status === 'SUBMITTED' || status === 'QUERY_RAISED' || status === 'RESUBMITTED';
 }
 
 /** Map file type to Badge variant */
@@ -145,6 +187,17 @@ export const DOCUMENT_CATEGORIES: DocumentCategory[] = [
     bgColor: 'bg-emerald-50',
     borderColor: 'border-emerald-200',
     headerColor: 'text-emerald-800',
+    applicantUpload: false,
+    adminUpload: true,
+  },
+  {
+    key: 'ema',
+    label: 'EMA Submission',
+    icon: '🏛️',
+    fileTypes: ['EMA_ACK'],
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200',
+    headerColor: 'text-indigo-800',
     applicantUpload: false,
     adminUpload: true,
   },

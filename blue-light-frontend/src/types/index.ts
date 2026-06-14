@@ -218,6 +218,16 @@ export interface Application {
   generatorCapacityHint?: number;
   /** 경고 수준 검증 결과. 200 OK 차단하지 않음. */
   warnings?: ApplicantHintWarning[];
+  // ── EMA 제출 추적 inline (목록/상세 배지·필터용, ema-submission-tracking-spec.md §7) ──
+  // 파일 의존 필드(emaAckPresent/licensePdfPresent/canComplete)는 전용 GET /ema 응답에만 존재.
+  emaSubmissionStatus?: EmaSubmissionStatus;
+  emaSubmittedAt?: string | null;
+  emaReferenceNo?: string | null;
+  emaSubmittedByUserSeq?: number | null;
+  emaDecisionAt?: string | null;
+  emaQueryNote?: string | null;
+  /** 허점#2 — backfill APPROVED legacy 건 식별. */
+  emaGrandfathered?: boolean;
 }
 
 /**
@@ -243,7 +253,44 @@ export type DeclarationConsentType =
 /**
  * 파일 종류
  */
-export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC' | 'SKETCH_SLD' | 'CIRCUIT_SCHEDULE';
+export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC' | 'SKETCH_SLD' | 'CIRCUIT_SCHEDULE' | 'EMA_ACK';
+
+/**
+ * EMA ELISE 제출 추적 서브-상태 (백엔드 EmaSubmissionStatus mirror).
+ * IN_PROGRESS 의 서브-상태 기계 — ema-submission-tracking-spec.md §3.
+ */
+export type EmaSubmissionStatus =
+  | 'NOT_SUBMITTED'
+  | 'SUBMITTED'
+  | 'QUERY_RAISED'
+  | 'RESUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'WITHDRAWN';
+
+/**
+ * EMA 제출 추적 응답 (전이 7종 + GET /ema 공통, 백엔드 EmaSubmissionResponse mirror).
+ * ema-submission-tracking-spec.md §7.
+ */
+export interface EmaSubmissionResponse {
+  emaSubmissionStatus: EmaSubmissionStatus;
+  emaSubmittedAt: string | null;
+  emaReferenceNo: string | null;
+  emaSubmittedByUserSeq: number | null;
+  emaSubmittedByName: string | null;
+  emaDecisionAt: string | null;
+  emaQueryNote: string | null;
+  /** EMA_ACK 첨부 존재 여부. */
+  emaAckPresent: boolean;
+  /** = system_settings.ema.ack.required — UI 필수/선택 라벨 동적 표기(설정 우선). */
+  emaAckRequired: boolean;
+  /** 허점#2 — backfill APPROVED legacy 건 → "Approved (legacy)" 구분 배지. */
+  emaGrandfathered: boolean;
+  /** LICENSE_PDF 첨부 존재 여부 — 완료 CTA 게이팅 안내. */
+  licensePdfPresent: boolean;
+  /** = APPROVED && licensePdfPresent && IN_PROGRESS — Complete CTA 활성 판단(서버 계산). */
+  canComplete: boolean;
+}
 
 /**
  * 첨부 파일
@@ -783,13 +830,38 @@ export interface BatchUpdatePricesRequest {
 /**
  * LOA 상태 응답
  */
+/** LoA 교환 진행 단계 (loa-exchange-redesign-spec.md §2.3). */
+export type LoaStage =
+  | 'NOT_STARTED'
+  | 'FORM_SENT'
+  | 'APPLICANT_UPLOADED'
+  | 'FINAL_UPLOADED';
+
 export interface LoaStatus {
   applicationSeq: number;
+  applicationType: ApplicationType;
+  // ── 교환 모델 (신규) ──
+  loaStage?: LoaStage;
+  /** 신청자 오프라인 서명본(OWNER_AUTH_LETTER) 최신 파일 seq. */
+  applicantFileSeq?: number;
+  /** LEW 최종본(LOA_FINAL) 최신 파일 seq. */
+  finalFileSeq?: number;
+  /** 신청에 적용 가능한 active LoA 폼 존재 여부 (NEW 전용). */
+  activeFormAvailable?: boolean;
+  /** active LoA 폼 라벨. */
+  activeFormLabel?: string;
+  // ── 레거시 (하위호환) ──
   loaGenerated: boolean;
   loaSigned: boolean;
   loaSignedAt?: string;
   loaFileSeq?: number;
-  applicationType: ApplicationType;
+}
+
+/** active LoA 폼 메타 (loa-exchange-redesign-spec.md §3.2). */
+export interface LoaActiveForm {
+  loaFormTemplateSeq: number;
+  label: string;
+  fileSeq: number;
 }
 
 // ============================================
@@ -1373,6 +1445,23 @@ export interface AuditLog {
 
 export type NotificationType =
   | 'PAYMENT_CONFIRMED'
+  // 결제 요청(A-17) → 신청자. 클릭 시 결제 섹션으로.
+  | 'PAYMENT_REQUESTED'
+  // 결제 증빙 업로드(A-55) → ADMIN. 결제 확인 처리 위치로.
+  | 'PAYMENT_EVIDENCE_UPLOADED'
+  // 결제 확인 요청(A-56) → ADMIN.
+  | 'PAYMENT_CONFIRMATION_REQUESTED'
+  // LoA 폼 전달(A-57) → 신청자. LoA 섹션으로.
+  | 'LOA_FORM_SENT'
+  // 매니저 대리 LoA 업로드 확인(7일 이의제기) → 신청자
+  | 'CONCIERGE_LOA_UPLOAD_CONFIRM'
+  // EMA 제출 리마인더 → LEW (EMA 탭)
+  | 'EMA_SUBMISSION_REMINDER_LEW'
+  // EMA 반려 → LEW (EMA 탭)
+  | 'EMA_REJECTED_LEW'
+  // 컨시어지 접수 확인 / 견적 발송 (수신자별 라우팅 상이)
+  | 'CONCIERGE_REQUEST_SUBMITTED'
+  | 'CONCIERGE_QUOTE_SENT'
   // PR4 — ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 알림
   | 'PAYMENT_CONFIRMED_LEW'
   // Phase 3 — LEW 서류 요청 워크플로
@@ -1417,6 +1506,8 @@ export interface AppNotification {
   message: string;
   referenceType?: string;
   referenceId?: number;
+  /** 백엔드 NotificationLinkResolver 가 생성한 딥링크 상대경로(+섹션 해시). 클릭 시 이 위치로 이동. */
+  linkUrl?: string;
   isRead: boolean;
   read: boolean;
   readAt?: string;

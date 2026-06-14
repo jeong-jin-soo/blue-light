@@ -48,6 +48,14 @@ public class Notification extends BaseEntity {
     @Column(name = "reference_id")
     private Long referenceId;
 
+    /**
+     * 알림 클릭 시 이동할 프론트 라우트 상대경로(+섹션 해시). 예: {@code /applications/12#payment}.
+     * {@link com.bluelight.backend.api.notification.NotificationLinkResolver} 가 생성하며,
+     * 프론트는 이 값으로 바로 navigate 한다(없으면 type/reference 기반 fallback).
+     */
+    @Column(name = "link_url", length = 300)
+    private String linkUrl;
+
     @Column(name = "is_read", nullable = false)
     private boolean isRead = false;
 
@@ -56,13 +64,14 @@ public class Notification extends BaseEntity {
 
     @Builder
     public Notification(User recipient, NotificationType type, String title, String message,
-                        String referenceType, Long referenceId) {
+                        String referenceType, Long referenceId, String linkUrl) {
         this.recipient = recipient;
         this.type = type;
         this.title = title;
         this.message = message;
         this.referenceType = referenceType;
         this.referenceId = referenceId;
+        this.linkUrl = linkUrl;
     }
 
     public void markAsRead() {

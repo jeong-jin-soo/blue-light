@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS applications (
     uen_snapshot             VARCHAR(20)   NULL,
     designation_snapshot     VARCHAR(50)   NULL,
     snapshot_backfilled_at   DATETIME(6)   NULL,
+    -- LoA 교환 모델 (loa-exchange 재설계 PR3)
+    loa_stage                VARCHAR(30)   NOT NULL DEFAULT 'NOT_STARTED',
+    loa_form_template_seq    BIGINT        NULL,
     -- C.1 Snapshot-at-submit: 신청 시점 phone/email (SMS + EMA 양식용, updatable=false)
     loa_phone_snapshot       VARCHAR(20)   NULL,
     loa_email_snapshot       VARCHAR(100)  NULL,
@@ -132,6 +135,15 @@ CREATE TABLE IF NOT EXISTS applications (
     applicant_retailer_hint            VARCHAR(32),
     applicant_has_generator_hint       TINYINT(1),
     applicant_generator_capacity_hint  INT,
+    -- ── EMA ELISE 제출 추적 (ema-submission-tracking-spec.md §5.2) — IN_PROGRESS 서브-상태 기계 ──
+    ema_submission_status              VARCHAR(30)  NOT NULL DEFAULT 'NOT_SUBMITTED',
+    ema_submitted_at                   DATETIME(6),
+    ema_reference_no                   VARCHAR(60),
+    ema_submitted_by_user_seq          BIGINT,
+    ema_decision_at                    DATETIME(6),
+    ema_query_note                     VARCHAR(1000),
+    ema_status_before_decision         VARCHAR(30),  -- 허점#1: Revert(T9) 복원 슬롯
+    ema_reminder_notified_at           DATETIME(6),  -- PR-E5: 리마인더 중복 발송 가드(1일 1회 멱등)
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -143,6 +155,7 @@ CREATE TABLE IF NOT EXISTS applications (
     KEY idx_applications_assigned_lew (assigned_lew_seq),
     KEY idx_applications_type (application_type),
     KEY idx_applications_kva_status (kva_status),
+    KEY idx_applications_ema_status (ema_submission_status),
     -- ★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A
     KEY idx_applications_concierge (via_concierge_request_seq),
     CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
@@ -915,6 +928,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     message           VARCHAR(1000) NOT NULL,
     reference_type    VARCHAR(50),
     reference_id      BIGINT,
+    link_url          VARCHAR(300),
     is_read           BOOLEAN      NOT NULL DEFAULT FALSE,
     read_at           DATETIME(6),
     created_at        DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -1202,6 +1216,37 @@ CREATE TABLE IF NOT EXISTS manual_email_dispatches (
     CONSTRAINT fk_manual_email_sender FOREIGN KEY (sender_user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_manual_email_recipient_user FOREIGN KEY (recipient_user_seq) REFERENCES users (user_seq),
     CONSTRAINT fk_manual_email_application FOREIGN KEY (related_application_seq) REFERENCES applications (application_seq)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- ★ LoA(Letter of Appointment) 폼 템플릿 버전 관리 (LoA 교환 동선 재설계 PR2)
+-- 스펙: doc/Project Analysis/loa-exchange-redesign-spec.md §2.1
+-- - active 단일성은 서비스 레벨 보장 (MySQL 8.0 부분 유니크 인덱스 미지원).
+-- - soft delete 표준 (deleted_at + @SQLRestriction).
+-- - DatabaseMigrationRunner.syncCreateTablesFromSchemaSql 가 부팅 시 자동 반영.
+-- ============================================
+CREATE TABLE IF NOT EXISTS loa_form_templates (
+    loa_form_template_seq   BIGINT       NOT NULL AUTO_INCREMENT,
+    -- 운영용 표시 라벨 (예: "EMA NEW LoA v2026.06")
+    label                   VARCHAR(150) NOT NULL,
+    -- files.file_seq FK (저장된 폼 PDF)
+    file_seq                BIGINT       NOT NULL,
+    -- 현재 active 폼 여부. 동시 active 1건은 서비스 레벨 보장.
+    is_active               TINYINT(1)   NOT NULL DEFAULT 0,
+    -- 업로더 user_seq (users.user_seq FK)
+    uploaded_by             BIGINT       NOT NULL,
+    uploaded_at             DATETIME(6)  NOT NULL,
+    -- BaseEntity audit + soft delete
+    created_at              DATETIME(6),
+    updated_at              DATETIME(6),
+    created_by              BIGINT,
+    updated_by              BIGINT,
+    deleted_at              DATETIME(6),
+    PRIMARY KEY (loa_form_template_seq),
+    KEY idx_loa_form_active (is_active),
+    KEY idx_loa_form_uploaded_at (uploaded_at DESC),
+    CONSTRAINT fk_loa_form_file FOREIGN KEY (file_seq) REFERENCES files (file_seq),
+    CONSTRAINT fk_loa_form_uploader FOREIGN KEY (uploaded_by) REFERENCES users (user_seq)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================

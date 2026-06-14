@@ -7,6 +7,14 @@ package com.bluelight.backend.domain.notification;
  */
 public enum NotificationType {
     PAYMENT_CONFIRMED,
+    /** LEW/ADMIN이 결제를 요청하면(→PENDING_PAYMENT) 신청자에게 발송 (A-17, 인앱+이메일). */
+    PAYMENT_REQUESTED,
+    /** 신청자가 결제 증빙 업로드 → ADMIN 알림 (A-55). */
+    PAYMENT_EVIDENCE_UPLOADED,
+    /** 신청자가 결제 확인 요청 버튼 → ADMIN 알림 (A-56). */
+    PAYMENT_CONFIRMATION_REQUESTED,
+    /** LEW가 LoA 폼을 전달하면 신청자에게 발송 (A-57, 인앱+이메일). */
+    LOA_FORM_SENT,
     /**
      * PR4: ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 인앱 알림.
      * Phase 2(SLD/LOA/CoF) 시작 시점을 LEW가 명시적으로 인지하도록 분리된 신규 타입.
@@ -63,5 +71,13 @@ public enum NotificationType {
     // LEW 가 Application 에 배정될 때(자동 단일 적격 배정 또는 ADMIN 수동 배정) 해당 LEW 에게 발송.
     // 기존엔 ADMIN 수동 경로만 이메일을 보냈고 자동 경로는 무알림이었던 누락을 보완 — 두 경로를
     // LewAssignedEvent → LewAssignmentNotificationListener 단일 흐름으로 통일. referenceType=APPLICATION.
-    APPLICATION_LEW_ASSIGNED_LEW
+    APPLICATION_LEW_ASSIGNED_LEW,
+
+    // ── EMA 제출 추적 (ema-submission-tracking-spec.md §10) — IN_APP 1차 (허점#3 방향 a) ──
+    // SUBMITTED/RESUBMITTED 후 ema.reminder.days 무변동 건을 담당 LEW 에게 리마인드.
+    // 스케줄러(EmaReminderScheduler)가 1일 1회 멱등 발행. referenceType=APPLICATION.
+    EMA_SUBMISSION_REMINDER_LEW,
+    // reject(T7) 성공 시 담당 LEW 에게 "반려됨 — 사유 반영 후 재제출" 통지. 신청자에게는 비노출(US-C1).
+    // EmaRejectedEvent → EmaRejectedNotificationListener (AFTER_COMMIT). referenceType=APPLICATION.
+    EMA_REJECTED_LEW
 }

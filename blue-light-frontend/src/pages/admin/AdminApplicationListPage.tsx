@@ -14,7 +14,14 @@ import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
 import { getBasePath } from '../../utils/routeUtils';
-import type { AdminApplication, AdminDashboard, ApplicationStatus, KvaStatus } from '../../types';
+import { formatEmaStatus, getEmaStatusBadge, isEmaInFlight } from '../../utils/applicationUtils';
+import type {
+  AdminApplication,
+  AdminDashboard,
+  ApplicationStatus,
+  EmaSubmissionStatus,
+  KvaStatus,
+} from '../../types';
 
 // 닻 열 아바타 이니셜.
 function initials(first?: string, last?: string): string {
@@ -45,6 +52,31 @@ const KVA_STATUS_OPTIONS = [
   { value: 'CONFIRMED', label: 'Confirmed' },
 ];
 
+// EMA 제출 추적 필터 (ema-submission-tracking-spec.md §8.3).
+// 백엔드 목록 API 에 EMA 필터 파라미터가 없으므로 현재 페이지에 대한 클라이언트 사이드 필터.
+// "In flight" = SUBMITTED/QUERY_RAISED/RESUBMITTED (정체 후보 묶음).
+const EMA_STATUS_OPTIONS = [
+  { value: '', label: 'All EMA' },
+  { value: 'IN_FLIGHT', label: 'EMA in progress' },
+  { value: 'NOT_SUBMITTED', label: 'Not submitted' },
+  { value: 'SUBMITTED', label: 'Submitted' },
+  { value: 'QUERY_RAISED', label: 'Query raised' },
+  { value: 'RESUBMITTED', label: 'Resubmitted' },
+  { value: 'APPROVED', label: 'Approved' },
+  { value: 'REJECTED', label: 'Rejected' },
+  { value: 'WITHDRAWN', label: 'Withdrawn' },
+];
+
+/** SUBMITTED 후 N일 초과 시 정체 강조 (리마인더 기준과 동일 정신 — 클라이언트 보조 표시). */
+const EMA_STALE_DAYS = 3;
+
+function isEmaStale(app: AdminApplication): boolean {
+  if (!isEmaInFlight(app.emaSubmissionStatus)) return false;
+  if (!app.emaSubmittedAt) return false;
+  const days = (Date.now() - new Date(app.emaSubmittedAt).getTime()) / (1000 * 60 * 60 * 24);
+  return days > EMA_STALE_DAYS;
+}
+
 const PAGE_SIZE = 15;
 
 export default function AdminApplicationListPage() {
@@ -63,6 +95,7 @@ export default function AdminApplicationListPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [kvaStatusFilter, setKvaStatusFilter] = useState(initialKvaStatus);
+  const [emaStatusFilter, setEmaStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [counts, setCounts] = useState<AdminDashboard | null>(null);
@@ -122,6 +155,13 @@ export default function AdminApplicationListPage() {
     setPage(0);
     syncQuery({ status: statusFilter, kvaStatus: value });
   };
+
+  // EMA 필터는 현재 페이지에 대한 클라이언트 사이드 필터(백엔드 목록 API 미지원).
+  const visibleApplications = applications.filter((app) => {
+    if (!emaStatusFilter) return true;
+    if (emaStatusFilter === 'IN_FLIGHT') return isEmaInFlight(app.emaSubmissionStatus);
+    return (app.emaSubmissionStatus ?? 'NOT_SUBMITTED') === (emaStatusFilter as EmaSubmissionStatus);
+  });
 
   const columns: Column<AdminApplication>[] = [
     {
@@ -214,6 +254,39 @@ export default function AdminApplicationListPage() {
       render: (app) => <StatusBadge status={app.status} />,
     },
     {
+      key: 'emaStatus',
+      header: 'EMA',
+      width: '130px',
+      render: (app) => {
+        // IN_PROGRESS 가 아니면 EMA 단계가 아직 아님 → 흐리게 표시.
+        if (app.status !== 'IN_PROGRESS' && (app.emaSubmissionStatus ?? 'NOT_SUBMITTED') === 'NOT_SUBMITTED') {
+          return <span className="text-gray-300 text-xs">—</span>;
+        }
+        const stale = isEmaStale(app);
+        return (
+          <span className="inline-flex items-center gap-1">
+            <Badge variant={getEmaStatusBadge(app.emaSubmissionStatus)} className="text-[10px]">
+              {formatEmaStatus(app.emaSubmissionStatus)}
+            </Badge>
+            {app.emaGrandfathered && (
+              <span title="Auto-approved before EMA tracking">
+                <Badge variant="gray" className="text-[10px]">legacy</Badge>
+              </span>
+            )}
+            {stale && (
+              <span
+                className="text-warning-600 text-xs"
+                title={`No EMA change for more than ${EMA_STALE_DAYS} days`}
+                aria-label="EMA stale"
+              >
+                ⏱
+              </span>
+            )}
+          </span>
+        );
+      },
+    },
+    {
       key: 'createdAt',
       header: 'Date',
       sortable: true,
@@ -245,7 +318,7 @@ export default function AdminApplicationListPage() {
               }}
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
-              Start CoF Review
+              Review
               <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
@@ -307,13 +380,22 @@ export default function AdminApplicationListPage() {
               options={KVA_STATUS_OPTIONS}
             />
           </div>
+          <div className="w-full sm:w-44">
+            <Select
+              aria-label="EMA Status"
+              value={emaStatusFilter}
+              onChange={(e) => { setEmaStatusFilter(e.target.value); }}
+              options={EMA_STATUS_OPTIONS}
+            />
+          </div>
         </div>
+        <p className="mt-2 text-xs text-gray-400">EMA filter applies to the current page.</p>
       </Card>
 
       {/* Application table */}
       <DataTable
         columns={columns}
-        data={applications}
+        data={visibleApplications}
         loading={loading}
         keyExtractor={(app) => app.applicationSeq}
         onRowClick={(app) => navigate(`${basePath}/applications/${app.applicationSeq}`)}
@@ -321,7 +403,7 @@ export default function AdminApplicationListPage() {
         emptyIcon="📋"
         emptyTitle="No applications found"
         emptyDescription={
-          statusFilter || kvaStatusFilter || debouncedSearch
+          statusFilter || kvaStatusFilter || emaStatusFilter || debouncedSearch
             ? 'No applications match your search criteria.'
             : 'Applications will appear here once users start submitting them.'
         }
@@ -356,6 +438,15 @@ export default function AdminApplicationListPage() {
               </div>
               <span className="text-xs text-gray-400">{new Date(app.createdAt).toLocaleDateString()}</span>
             </div>
+            {(app.status === 'IN_PROGRESS' || (app.emaSubmissionStatus && app.emaSubmissionStatus !== 'NOT_SUBMITTED')) && (
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="text-xs text-gray-400">EMA</span>
+                <Badge variant={getEmaStatusBadge(app.emaSubmissionStatus)} className="text-[10px]">
+                  {formatEmaStatus(app.emaSubmissionStatus)}
+                </Badge>
+                {isEmaStale(app) && <span className="text-warning-600 text-xs" title="EMA stale">⏱</span>}
+              </div>
+            )}
             {app.assignedLewFirstName && (
               <div className="mt-1.5 text-xs text-gray-500">
                 <span className="inline-flex items-center gap-1">
@@ -375,7 +466,7 @@ export default function AdminApplicationListPage() {
                   }}
                   className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100"
                 >
-                  Start CoF Review →
+                  Review →
                 </button>
               )}
           </div>

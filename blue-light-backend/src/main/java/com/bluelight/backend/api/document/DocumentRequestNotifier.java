@@ -87,10 +87,12 @@ public class DocumentRequestNotifier {
         final String label = documentLabel(request);
 
         afterCommit(() -> {
+            // referenceType=APPLICATION(+appSeq) 로 통일 → linkUrl 해석기가 LEW Documents 탭으로 라우팅.
+            // (drId 는 메시지로만 전달; 딥링크는 신청 단위 #documents 섹션)
             createInAppSafe(lewSeq, NotificationType.DOCUMENT_REQUEST_FULFILLED,
                     "Applicant uploaded a document",
                     "Application #" + appSeq + " — " + code + " is ready for your review.",
-                    "DOCUMENT_REQUEST", drId);
+                    "APPLICATION", appSeq);
             if (hasEmail(lewEmail)) {
                 try {
                     emailService.sendDocumentRequestFulfilledEmail(lewEmail, lewName, appSeq, label);
@@ -124,7 +126,7 @@ public class DocumentRequestNotifier {
             createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_APPROVED,
                     "Document approved",
                     "Application #" + appSeq + " — " + code + " has been approved.",
-                    "DOCUMENT_REQUEST", drId);
+                    "APPLICATION", appSeq);
             if (hasEmail(applicantEmail)) {
                 try {
                     emailService.sendDocumentRequestApprovedEmail(applicantEmail, applicantName, appSeq, label);
@@ -159,7 +161,7 @@ public class DocumentRequestNotifier {
             createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_REJECTED,
                     "Document rejected",
                     "Application #" + appSeq + " — " + code + " was rejected. Please re-upload.",
-                    "DOCUMENT_REQUEST", drId);
+                    "APPLICATION", appSeq);
             if (hasEmail(applicantEmail)) {
                 try {
                     emailService.sendDocumentRequestRejectedEmail(

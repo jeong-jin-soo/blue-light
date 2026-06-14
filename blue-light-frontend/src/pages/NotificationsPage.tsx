@@ -17,6 +17,22 @@ import type { AppNotification, NotificationType } from '../types';
  */
 const NOTIFICATION_ICON: Record<NotificationType, string> = {
   PAYMENT_CONFIRMED: '💳',
+  // 결제 요청(A-17) → 신청자
+  PAYMENT_REQUESTED: '💳',
+  // 결제 증빙 업로드(A-55) → ADMIN
+  PAYMENT_EVIDENCE_UPLOADED: '🧾',
+  // 결제 확인 요청(A-56) → ADMIN
+  PAYMENT_CONFIRMATION_REQUESTED: '💳',
+  // LoA 폼 전달(A-57) → 신청자
+  LOA_FORM_SENT: '📄',
+  // 매니저 대리 LoA 업로드 확인 → 신청자
+  CONCIERGE_LOA_UPLOAD_CONFIRM: '✍️',
+  // EMA 제출 리마인더 / 반려 → LEW
+  EMA_SUBMISSION_REMINDER_LEW: '⏰',
+  EMA_REJECTED_LEW: '⚠️',
+  // 컨시어지 접수 / 견적
+  CONCIERGE_REQUEST_SUBMITTED: '🤝',
+  CONCIERGE_QUOTE_SENT: '💰',
   // PR4 — ADMIN의 결제 확인 후 배정된 LEW에게 전달되는 Phase 2 시작 알림
   PAYMENT_CONFIRMED_LEW: '💳',
   DOCUMENT_REQUEST_CREATED: '🔔',
@@ -84,7 +100,15 @@ export default function NotificationsPage() {
       } catch { /* silent */ }
     }
 
-    // Navigate to referenced entity
+    // ① 백엔드가 제공한 딥링크(linkUrl) 우선 — NotificationLinkResolver 가 수신자 역할 인지
+    //    상대경로 + 섹션 해시(#payment/#loa/#documents/#kva/#ema/#receipts)를 생성한다.
+    //    클릭 시 처리 화면의 해당 위치로 바로 이동(섹션 스크롤/탭 선택은 대상 페이지가 처리).
+    if (n.linkUrl) {
+      navigate(n.linkUrl);
+      return;
+    }
+
+    // ② linkUrl 미설정(레거시 행) — type/reference 기반 fallback 라우팅.
     // Phase 3: DOCUMENT_REQUEST notifications reference_type='DOCUMENT_REQUEST',
     //         reference_id=document_request_id. 백엔드가 metadata.applicationSeq를 같이
     //         싣지 않는 한 현재는 일반 APPLICATION 라우팅 fallback만 수행.

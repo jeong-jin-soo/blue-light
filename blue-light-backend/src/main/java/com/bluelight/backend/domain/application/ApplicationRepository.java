@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -157,4 +158,28 @@ public interface ApplicationRepository extends JpaRepository<Application, Long>,
      */
     List<Application> findByStatusAndLicenseExpiryDateLessThanEqualAndExpiryNotifiedAtIsNull(
             ApplicationStatus status, LocalDate date);
+
+    /**
+     * EMA 제출 리마인더 대상 (PR-E5, ema-submission-tracking-spec.md §10).
+     *
+     * <p>조건:
+     * <ul>
+     *   <li>{@code status = IN_PROGRESS} — EMA 서브-상태 기계는 IN_PROGRESS 에서만 동작(NG3).</li>
+     *   <li>{@code ema_submission_status ∈ {SUBMITTED, RESUBMITTED}} — 제출됐으나 결정 대기 중.</li>
+     *   <li>{@code ema_submitted_at < :cutoff} — 제출 후 N일(=ema.reminder.days) 경과.</li>
+     *   <li>{@code ema_reminder_notified_at IS NULL OR < :startOfToday} — 오늘 아직 미발송(1일 1회 멱등).</li>
+     * </ul>
+     * cutoff/startOfToday 는 스케줄러가 {@code EmaSubmissionSettings.reminder.days} 로 계산해 전달한다
+     * (설정 우선 — 임계값 하드코딩 금지).
+     */
+    @Query("SELECT a FROM Application a WHERE a.status = :inProgress "
+            + "AND a.emaSubmissionStatus IN (:submitted, :resubmitted) "
+            + "AND a.emaSubmittedAt < :cutoff "
+            + "AND (a.emaReminderNotifiedAt IS NULL OR a.emaReminderNotifiedAt < :startOfToday)")
+    List<Application> findEmaReminderTargets(
+            @Param("inProgress") ApplicationStatus inProgress,
+            @Param("submitted") EmaSubmissionStatus submitted,
+            @Param("resubmitted") EmaSubmissionStatus resubmitted,
+            @Param("cutoff") LocalDateTime cutoff,
+            @Param("startOfToday") LocalDateTime startOfToday);
 }

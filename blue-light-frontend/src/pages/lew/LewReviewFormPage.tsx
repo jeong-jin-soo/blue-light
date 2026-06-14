@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { InfoBox } from '../../components/ui/InfoBox';
@@ -10,9 +10,13 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
-import { AdminLoaSection } from '../admin/sections/AdminLoaSection';
+import { LewLoaExchangeSection } from './sections/LewLoaExchangeSection';
+import { AdminEmaSection } from '../admin/sections/AdminEmaSection';
+import { CompleteModal } from '../admin/sections/AdminModals';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { useEmaActions } from '../../hooks/useEmaActions';
+import { formatEmaStatus, getEmaStatusBadge } from '../../utils/applicationUtils';
 import lewReviewApi from '../../api/lewReviewApi';
 import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
@@ -48,7 +52,7 @@ import { AdminApplicationInfo } from '../admin/sections/AdminApplicationInfo';
  * <p>결제 요청(request-payment) 가드 = Phase 1 (kVA 확정 + 미해결 서류 0건).</p>
  */
 
-type TabKey = 'documents' | 'kva' | 'sld' | 'loa';
+type TabKey = 'documents' | 'kva' | 'sld' | 'loa' | 'ema';
 
 type ApiErrorShape = AxiosError<{ code?: string; message?: string }> & {
   code?: string;
@@ -58,6 +62,7 @@ type ApiErrorShape = AxiosError<{ code?: string; message?: string }> & {
 export default function LewReviewFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToastStore();
   const { user: currentUser } = useAuthStore();
 
@@ -86,6 +91,13 @@ export default function LewReviewFormPage() {
 
   const applicationId = id ? Number(id) : NaN;
   const idValid = Number.isFinite(applicationId) && applicationId > 0;
+
+  // ── EMA 제출 추적 (ema-submission-tracking-spec.md §8) ──
+  const ema = useEmaActions(applicationId);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
+  const [completing, setCompleting] = useState(false);
+  const [startingProcessing, setStartingProcessing] = useState(false);
 
   // ── Fetch ────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -139,35 +151,41 @@ export default function LewReviewFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idValid, applicationId]);
 
-  // ── LOA 액션 (동선 재설계 A: LoA 생성을 LEW 검토 흐름에 개방) ──
-  // 백엔드는 /api/admin/** = ADMIN/LEW/SYSTEM_ADMIN 허용. admin 상세와 동일 핸들러.
-  const handleGenerateLoa = async () => {
+  // ── LoA 교환 모델 액션 (loa-exchange-redesign-spec.md §3.3, PR3b) ──
+  // send-form / final-upload 는 /api/lew/** (담당 LEW 전용) 경로 사용.
+  // (loaGenerating/loaUploading state 는 각각 sending/uploading 의미로 재사용)
+  const handleSendLoaForm = async () => {
     setLoaGenerating(true);
     try {
-      await loaApi.generateLoa(applicationId);
-      toast.success('LOA generated successfully');
-      setLoaStatus(await loaApi.getLoaStatus(applicationId));
-    } catch {
-      toast.error('Failed to generate LOA');
+      const status = await loaApi.sendLoaForm(applicationId);
+      setLoaStatus(status);
+      toast.success('LoA form sent to applicant');
+    } catch (err) {
+      const code = (err as ApiErrorShape).response?.data?.code;
+      if (code === 'NO_ACTIVE_LOA_FORM') {
+        toast.error('No active LoA form is configured. Please contact an administrator.');
+      } else {
+        toast.error('Failed to send LoA form');
+      }
     } finally {
       setLoaGenerating(false);
     }
   };
-  const handleUploadLoa = async (file: File) => {
+  const handleUploadFinalLoa = async (file: File) => {
     setLoaUploading(true);
     try {
-      await adminApi.uploadFile(applicationId, file, 'OWNER_AUTH_LETTER');
-      toast.success('LOA uploaded successfully');
-      setLoaStatus(await loaApi.getLoaStatus(applicationId));
+      const status = await loaApi.uploadFinalLoa(applicationId, file);
+      setLoaStatus(status);
+      toast.success('Final LoA uploaded');
     } catch {
-      toast.error('Failed to upload LOA');
+      toast.error('Failed to upload final LoA');
     } finally {
       setLoaUploading(false);
     }
   };
   const handleLoaDownload = async (fileSeq: number, filename: string) => {
     try { await fileApi.downloadFile(fileSeq, filename); }
-    catch { toast.error('Failed to download LOA'); }
+    catch { toast.error('Failed to download LoA'); }
   };
 
   // ── Derived / Guards ─────────────────────────────────
@@ -180,38 +198,88 @@ export default function LewReviewFormPage() {
   const sldReady = !sldRequired || sldRequest?.status === 'CONFIRMED';
 
   // ── 결제 요청 (Phase 1 액션) ──────
-  // 결제 요청 가드 = kVA 확정 + 서류 0건. SLD 는 결제 후 작업이라 제외.
-  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출.
+  // 결제 요청 가드 = kVA 확정 + 서류 0건 + LoA 수령(신청자 서명본 업로드 이상, D-1). SLD 는 결제 후 작업이라 제외.
+  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출. 백엔드 LewReviewService.requestPayment 가드와 일치.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
-  const phase1Ready = kvaConfirmed && pendingDocCount === 0;
+  // LoA 완료 = LEW 최종본 업로드(FINAL_UPLOADED). 백엔드 isLoaFinalized 와 동일 (2026-06-14 결정:
+  // 결제 요청은 LoA 완료 후에만 가능). 변수명은 하위 사용처 호환 위해 유지.
+  const loaReceived = loaStatus?.loaStage === 'FINAL_UPLOADED';
+  const phase1Ready = kvaConfirmed && pendingDocCount === 0 && loaReceived;
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
   const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
     applicationId,
     {
       onSuccess: loadData,
       onStaleState: loadData,
-      // 가드 위반(kVA/서류) 시 이미 리뷰 폼이므로 해당 탭으로 점프.
-      onNeedsReview: (reason) => setActiveTab(reason === 'kva' ? 'kva' : 'documents'),
+      // 가드 위반(kVA/서류/LoA) 시 이미 리뷰 폼이므로 해당 탭으로 점프.
+      onNeedsReview: (reason) =>
+        setActiveTab(reason === 'kva' ? 'kva' : reason === 'loa' ? 'loa' : 'documents'),
     },
   );
 
-  // 기본 활성 탭 — 첫 미완료 탭. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
+  // 기본 활성 탭 — 알림 딥링크 해시(#documents/#kva/#sld/#loa/#ema)가 있으면 해당 탭 선택,
+  // 없으면 Documents 로 시작. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
   useEffect(() => {
     if (activeTab !== null) return;
     if (!adminApp || !lewData) return;
-    let next: TabKey;
-    if (pendingDocCount > 0) {
-      next = 'documents';
-    } else if (!kvaConfirmed) {
-      next = 'kva';
-    } else if (sldRequired && !sldReady) {
-      next = 'sld';
-    } else {
-      next = 'loa';
+    const hash = location.hash.slice(1);
+    const valid: TabKey[] = ['documents', 'kva', 'sld', 'loa', 'ema'];
+    setActiveTab((valid as string[]).includes(hash) ? (hash as TabKey) : 'documents');
+  }, [activeTab, adminApp, lewData, location.hash]);
+
+  // EMA 상태 로드 — IN_PROGRESS 진입 이후 의미가 있으나, 탭은 항상 보이므로 status 가 있으면 로드.
+  // (백엔드 GET /ema 는 IN_PROGRESS 전에도 NOT_SUBMITTED 응답을 준다 → 탭 비활성 안내에 사용.)
+  const emaRefresh = ema.refresh;
+  useEffect(() => {
+    if (!adminApp) return;
+    void emaRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminApp?.applicationSeq, adminApp?.status]);
+
+  // Complete & Issue Licence — 게이트(ema=APPROVED + LICENSE_PDF)는 백엔드가 강제.
+  const handleComplete = useCallback(async () => {
+    setCompleting(true);
+    try {
+      await adminApi.completeApplication(applicationId, completeForm);
+      toast.success('Licence issued. The application is now complete.');
+      setShowCompleteModal(false);
+      setCompleteForm({ licenseNumber: '', licenseExpiryDate: '' });
+      await loadData();
+      await ema.refresh();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { code?: string; message?: string } } };
+      const code = e?.response?.data?.code;
+      if (code === 'EMA_NOT_APPROVED') toast.error('EMA submission must be approved before completion.');
+      else if (code === 'LICENSE_PDF_MISSING') toast.error('Upload the licence PDF before completing.');
+      else toast.error(e?.response?.data?.message || 'Failed to complete the application');
+    } finally {
+      setCompleting(false);
     }
-    setActiveTab(next);
-  }, [activeTab, adminApp, lewData, pendingDocCount, kvaConfirmed, sldRequired, sldReady]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, completeForm, loadData, toast]);
+
+  // Start processing — PAID → IN_PROGRESS. EMA 작업은 IN_PROGRESS 에서만 가능하므로
+  // LEW 가 최종 LoA 업로드 후 직접 처리 시작할 수 있게 한다. LOA_FINAL 게이트는 백엔드가 강제.
+  const handleStartProcessing = useCallback(async () => {
+    setStartingProcessing(true);
+    try {
+      await adminApi.updateStatus(applicationId, { status: 'IN_PROGRESS' });
+      toast.success('Processing started. You can now submit to EMA ELISE.');
+      await loadData();
+      await ema.refresh();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { code?: string; message?: string } } };
+      if (e?.response?.data?.code === 'LOA_FINAL_NOT_UPLOADED') {
+        toast.error('Upload the final LoA in the LOA tab before starting processing.');
+      } else {
+        toast.error(e?.response?.data?.message || 'Failed to start processing');
+      }
+    } finally {
+      setStartingProcessing(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, loadData, toast]);
 
   // Phase 3 권한: LEW는 assigned_lew_seq 일치 시만 서류 요청 가능
   const canRequestDocuments =
@@ -312,6 +380,15 @@ export default function LewReviewFormPage() {
         }])
       : []),
     { key: 'loa', label: 'LOA' },
+    {
+      key: 'ema',
+      label: 'EMA',
+      // 배지는 EMA 상태별(NOT_SUBMITTED 는 배지 없음 — 스펙 §8.1).
+      badge:
+        ema.ema && ema.ema.emaSubmissionStatus !== 'NOT_SUBMITTED'
+          ? { text: formatEmaStatus(ema.ema.emaSubmissionStatus), variant: getEmaStatusBadge(ema.ema.emaSubmissionStatus) }
+          : undefined,
+    },
   ];
 
   const applicantDisplayName =
@@ -349,7 +426,7 @@ export default function LewReviewFormPage() {
         </div>
 
         {/* 결제 요청 — Phase 1(PENDING_REVIEW/REVISION_REQUESTED)에서만 노출.
-            가드 = kVA 확정 + 서류 0건 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
+            가드 = kVA 확정 + 서류 0건 + LoA 수령 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
         {inPhase1 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
             <span className="font-medium text-gray-700">Ready for payment?</span>
@@ -377,6 +454,22 @@ export default function LewReviewFormPage() {
                     {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending
                   </span>
                   <span className="sr-only"> pending — go to Documents tab</span>
+                  <span aria-hidden> →</span>
+                </button>
+              )}
+              {loaReceived ? (
+                <span className="inline-flex items-center gap-1 text-success-700">
+                  <span aria-hidden>✓</span> LoA
+                  <span className="sr-only">received</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('loa')}
+                  className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
+                >
+                  <span aria-hidden>•</span> LoA pending
+                  <span className="sr-only"> — go to LOA tab</span>
                   <span aria-hidden> →</span>
                 </button>
               )}
@@ -487,14 +580,63 @@ export default function LewReviewFormPage() {
           )}
 
           <TabPanel active={activeTab === 'loa'}>
-            <AdminLoaSection
-              application={adminApp}
+            <LewLoaExchangeSection
+              applicationType={adminApp.applicationType}
               loaStatus={loaStatus}
-              onGenerate={handleGenerateLoa}
-              onUploadLoa={handleUploadLoa}
-              onDownload={handleLoaDownload}
-              generating={loaGenerating}
-              uploading={loaUploading}
+              onSendForm={handleSendLoaForm}
+              onUploadFinal={handleUploadFinalLoa}
+              onDownloadFile={handleLoaDownload}
+              sendingForm={loaGenerating}
+              uploadingFinal={loaUploading}
+            />
+          </TabPanel>
+
+          <TabPanel active={activeTab === 'ema'}>
+            {/* PAID → IN_PROGRESS 진입: EMA 작업은 IN_PROGRESS 에서만 가능. LEW 가 최종 LoA 업로드 후 직접 시작. */}
+            {adminApp.status === 'PAID' && (
+              <Card className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">Start processing</h2>
+                <p className="text-sm text-gray-600 mb-3">
+                  Payment is confirmed. Start processing to move the application to <strong>In&nbsp;Progress</strong>{' '}
+                  and unlock EMA ELISE submission below.
+                </p>
+                {loaStatus?.loaStage === 'FINAL_UPLOADED' ? (
+                  <Button
+                    onClick={handleStartProcessing}
+                    loading={startingProcessing}
+                    disabled={startingProcessing}
+                  >
+                    Start processing
+                  </Button>
+                ) : (
+                  <InfoBox>
+                    Upload the final LoA in the{' '}
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline underline-offset-2"
+                      onClick={() => setActiveTab('loa')}
+                    >
+                      LOA tab
+                    </button>{' '}
+                    before you can start processing.
+                  </InfoBox>
+                )}
+              </Card>
+            )}
+            <AdminEmaSection
+              ema={ema.ema}
+              appStatus={adminApp.status}
+              isAdmin={currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN'}
+              busy={ema.busy}
+              onSubmit={ema.submit}
+              onQuery={ema.query}
+              onResubmit={ema.resubmit}
+              onApprove={ema.approve}
+              onReject={ema.reject}
+              onWithdraw={ema.withdraw}
+              onRevert={ema.revert}
+              onUploadFile={ema.uploadFile}
+              onCompleteClick={() => setShowCompleteModal(true)}
             />
           </TabPanel>
         </div>
@@ -521,6 +663,16 @@ export default function LewReviewFormPage() {
           void runRequestPayment();
         }}
         onClose={() => setShowRequestPaymentConfirm(false)}
+      />
+
+      {/* Complete & Issue Licence — EMA 탭의 CTA에서 오픈. 게이트는 백엔드 강제. */}
+      <CompleteModal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        onConfirm={handleComplete}
+        completeForm={completeForm}
+        setCompleteForm={setCompleteForm}
+        loading={completing}
       />
 
       {/* ───────────────────────────────────────────────────────────────────

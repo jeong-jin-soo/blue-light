@@ -1,8 +1,12 @@
+import { useRef, useState } from 'react';
 import { Card } from '../../../components/ui/Card';
-import { Badge } from '../../../components/ui/Badge';
+import { Badge, type BadgeVariant } from '../../../components/ui/Badge';
+import { Button } from '../../../components/ui/Button';
+import { Download, Upload, FileText, CheckCircle2 } from 'lucide-react';
 import fileApi from '../../../api/fileApi';
+import loaApi from '../../../api/loaApi';
 import { useToastStore } from '../../../stores/toastStore';
-import type { Application, LoaStatus } from '../../../types';
+import type { Application, LoaStage, LoaStatus } from '../../../types';
 
 interface Props {
   application: Application;
@@ -10,68 +14,212 @@ interface Props {
   onStatusUpdate: () => void;
 }
 
-/**
- * Applicant LOA (Letter of Appointment) 섹션
- * - LOA 문서 다운로드만 제공. 인앱 전자서명 기능은 제거됨 (2026-06-13).
- */
-export function ApplicationLoaSection({ application, loaStatus }: Props) {
-  const toast = useToastStore();
+const stageMeta: Record<LoaStage, { label: string; variant: BadgeVariant }> = {
+  NOT_STARTED: { label: 'Pending', variant: 'gray' },
+  FORM_SENT: { label: 'Action required', variant: 'warning' },
+  APPLICANT_UPLOADED: { label: 'Uploaded', variant: 'info' },
+  FINAL_UPLOADED: { label: 'Completed', variant: 'success' },
+};
 
-  const handleDownloadLoa = async () => {
-    if (!loaStatus?.loaFileSeq) return;
+/**
+ * Applicant LoA (Letter of Appointment) 섹션 — 교환 모델 (loa-exchange-redesign-spec.md §4.2, PR3b).
+ *
+ * <p>인앱 디지털 서명 폐기. NEW: LEW 가 폼을 전달하면 ① active 폼 다운로드 → 오프라인 서명 →
+ * ② 서명본 업로드. RENEWAL: 폼 다운로드 없이 서명본 업로드(또는 Documents 섹션으로 안내).</p>
+ */
+export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }: Props) {
+  const toast = useToastStore();
+  const isRenewal = application.applicationType === 'RENEWAL';
+  const stage: LoaStage = loaStatus?.loaStage ?? 'NOT_STARTED';
+  const meta = stageMeta[stage];
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const applicantUploaded = !!loaStatus?.applicantFileSeq;
+  // NEW: LEW 가 폼을 전달했거나 이미 업로드를 시작한 단계여야 업로드 UI 노출.
+  const canUpload = isRenewal || stage !== 'NOT_STARTED';
+  // NEW + active 폼 존재 시 폼 다운로드 노출.
+  const showFormDownload = !isRenewal && !!loaStatus?.activeFormAvailable;
+
+  const handleDownloadForm = async () => {
+    setDownloading(true);
     try {
-      await fileApi.downloadFile(
-        loaStatus.loaFileSeq,
-        `LOA_${application.applicationSeq}.pdf`
-      );
+      const blob = await loaApi.downloadActiveLoaForm(application.applicationSeq);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `LoA_form_${application.applicationSeq}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
     } catch {
-      toast.error('Failed to download LOA');
+      toast.error('Failed to download LoA form');
+    } finally {
+      setDownloading(false);
     }
   };
 
-  // LOA 미생성
-  if (!loaStatus?.loaGenerated) {
-    return (
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment</h2>
-          <Badge variant="gray">Pending</Badge>
-        </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-          <div className="flex items-start gap-2">
-            <span className="text-sm">ℹ️</span>
-            <p className="text-sm text-gray-600">
-              {application.applicationType === 'RENEWAL'
-                ? 'You can upload the LOA from the Documents section below. Once it is ready, you can download it here.'
-                : 'The LOA will be generated once your application has been reviewed and a LEW is assigned. You will be able to download it here.'}
-            </p>
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  const handleDownloadApplicant = async () => {
+    if (!loaStatus?.applicantFileSeq) return;
+    try {
+      await fileApi.downloadFile(loaStatus.applicantFileSeq, `LoA_${application.applicationSeq}`);
+    } catch {
+      toast.error('Failed to download LoA');
+    }
+  };
 
-  // LOA 생성됨 — 문서 다운로드
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setSelectedFile(file);
+    e.target.value = '';
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    try {
+      await loaApi.uploadApplicantLoa(application.applicationSeq, selectedFile);
+      toast.success('Signed LoA uploaded');
+      setSelectedFile(null);
+      onStatusUpdate();
+    } catch {
+      toast.error('Failed to upload signed LoA');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <Card>
-      <div className="flex items-center justify-between mb-3">
+      <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment</h2>
-        <Badge variant="gray">Ready</Badge>
+        <Badge variant={meta.variant}>{meta.label}</Badge>
       </div>
 
-      <button
-        onClick={handleDownloadLoa}
-        className="flex items-center gap-2 w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
-      >
-        <span className="text-lg">📄</span>
-        <div className="flex-1 text-left">
-          <p className="text-sm font-medium text-gray-800">Download LOA</p>
-          <p className="text-xs text-gray-500">PDF document for your records</p>
+      {/* 안내 — 아직 폼 전달 전 (NEW) */}
+      {!isRenewal && stage === 'NOT_STARTED' && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm text-gray-600">
+            Your LEW will share the Letter of Appointment form once your application has been reviewed.
+            You will then download it, sign it offline, and upload the signed copy here.
+          </p>
         </div>
-        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      </button>
+      )}
+
+      {/* RENEWAL 안내 */}
+      {isRenewal && !applicantUploaded && (
+        <div className="mb-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+          <p className="text-sm text-gray-600">
+            Upload your signed Letter of Appointment below, or from the Documents section.
+          </p>
+        </div>
+      )}
+
+      {/* Step 1: download active form (NEW) */}
+      {showFormDownload && (
+        <div className="mb-3 rounded-lg border border-gray-200 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-gray-800">1. Download the LoA form</p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                Download, print, and sign the form offline.
+                {loaStatus?.activeFormLabel ? ` (${loaStatus.activeFormLabel})` : ''}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              loading={downloading}
+              leftIcon={<Download className="h-4 w-4" />}
+              onClick={handleDownloadForm}
+            >
+              Download form
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: upload signed LoA */}
+      {canUpload && (
+        <div className="rounded-lg border border-gray-200 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800">
+                {showFormDownload ? '2. Upload signed LoA' : 'Upload signed LoA'}
+              </p>
+              <p className="mt-0.5 text-xs text-gray-500">
+                {applicantUploaded
+                  ? 'Your signed LoA has been received. You can replace it if needed.'
+                  : 'Upload the signed copy (PDF, JPG, or PNG).'}
+              </p>
+            </div>
+            {applicantUploaded && (
+              <Badge variant="success">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Received
+              </Badge>
+            )}
+          </div>
+
+          <div className="mt-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={handleFileSelect}
+            />
+            {selectedFile ? (
+              <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                  <span className="truncate text-sm text-gray-700">{selectedFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedFile(null)}
+                    className="ml-auto flex-shrink-0 text-gray-400 hover:text-red-500"
+                    aria-label="Remove selected file"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleUpload}
+                  loading={uploading}
+                  leftIcon={<Upload className="h-4 w-4" />}
+                >
+                  Upload
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  leftIcon={<Upload className="h-4 w-4" />}
+                >
+                  {applicantUploaded ? 'Replace signed LoA' : 'Upload signed LoA'}
+                </Button>
+                {applicantUploaded && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    leftIcon={<Download className="h-4 w-4" />}
+                    onClick={handleDownloadApplicant}
+                  >
+                    Download
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

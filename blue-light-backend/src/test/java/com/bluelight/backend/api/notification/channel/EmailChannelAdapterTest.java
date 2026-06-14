@@ -58,8 +58,9 @@ class EmailChannelAdapterTest {
     }
 
     @Test
-    @DisplayName("정상 흐름 - sendGenericEmail 위임 + success")
-    void send_happyPath() {
+    @DisplayName("운영 프로필 - 제목에 코드 prefix 없이 sendGenericEmail 위임 + success")
+    void send_happyPath_prodNoPrefix() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "prod");
         NotificationOutbox row = outbox("{\"amount\":\"185\"}");
         when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
         when(templateRegistry.render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), any()))
@@ -77,6 +78,62 @@ class EmailChannelAdapterTest {
         assertThat(toCap.getValue()).isEqualTo("ringo@test.sg");
         assertThat(subjCap.getValue()).isEqualTo("Payment");
         assertThat(bodyCap.getValue()).isEqualTo("<p>Confirmed</p>");
+    }
+
+    @Test
+    @DisplayName("개발서버(비-prod 프로필) - 제목 앞에 메일 코드 prefix")
+    void send_devServer_prefixesCode() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "default");
+        NotificationOutbox row = outbox("{\"amount\":\"185\"}");
+        when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
+        when(templateRegistry.render(eq("A-17"), eq(NotificationChannel.EMAIL), eq("en"), any()))
+                .thenReturn(new RenderedMessage("Payment Requested", "<p>Pay</p>", null));
+        ReflectionTestUtils.setField(row, "templateCode", "A-17");
+
+        SendResult result = adapter.send(row);
+
+        assertThat(result.success()).isTrue();
+        ArgumentCaptor<String> subjCap = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendGenericEmail(anyString(), subjCap.capture(), anyString());
+        assertThat(subjCap.getValue()).isEqualTo("[A-17] Payment Requested");
+    }
+
+    @Test
+    @DisplayName("CTA 절대화 - 상대경로 ctaUrl 이 프론트 베이스URL 기준 절대 URL 로 렌더에 전달")
+    void send_absolutizesRelativeCtaUrl() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "prod");
+        ReflectionTestUtils.setField(adapter, "frontendBaseUrl", "https://licensekaki.com/");
+        NotificationOutbox row = outbox("{\"ctaUrl\":\"/applications/7\",\"amount\":\"185\"}");
+        when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
+        when(templateRegistry.render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), any()))
+                .thenReturn(new RenderedMessage("S", "<p>B</p>", null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> payloadCap = ArgumentCaptor.forClass(java.util.Map.class);
+        adapter.send(row);
+
+        verify(templateRegistry).render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), payloadCap.capture());
+        // 트레일링 슬래시 정규화 + 상대경로 prepend, 비링크 값은 그대로
+        assertThat(payloadCap.getValue().get("ctaUrl")).isEqualTo("https://licensekaki.com/applications/7");
+        assertThat(payloadCap.getValue().get("amount")).isEqualTo("185");
+    }
+
+    @Test
+    @DisplayName("CTA 절대화 - 이미 절대 URL(http) 이면 변형 없음")
+    void send_leavesAbsoluteCtaUrlUntouched() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "prod");
+        ReflectionTestUtils.setField(adapter, "frontendBaseUrl", "https://licensekaki.com");
+        NotificationOutbox row = outbox("{\"ctaUrl\":\"https://other.example/x\"}");
+        when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
+        when(templateRegistry.render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), any()))
+                .thenReturn(new RenderedMessage("S", "<p>B</p>", null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> payloadCap = ArgumentCaptor.forClass(java.util.Map.class);
+        adapter.send(row);
+
+        verify(templateRegistry).render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), payloadCap.capture());
+        assertThat(payloadCap.getValue().get("ctaUrl")).isEqualTo("https://other.example/x");
     }
 
     @Test

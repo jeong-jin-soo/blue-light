@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { fullName } from '../../utils/formatName';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
@@ -34,6 +34,7 @@ import type { Application, FileInfo, FileType, MasterPrice, Payment, SldRequest,
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToastStore();
   const authUser = useAuthStore((s) => s.user);
 
@@ -134,6 +135,18 @@ export default function ApplicationDetailPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 알림 딥링크 — URL 해시(#payment/#loa/#documents/#receipts)가 가리키는 섹션으로 스크롤.
+  // 데이터 로드 후 DOM 이 그려진 뒤 실행되도록 loading 종료에 의존.
+  useEffect(() => {
+    if (loading || !location.hash) return;
+    const id = location.hash.slice(1);
+    const t = setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [loading, location.hash]);
 
   // ── Edit mode handlers ──────────────────────────────
 
@@ -274,9 +287,15 @@ export default function ApplicationDetailPage() {
   // ── Payment Advice handlers ──────────────────
 
   const handlePaymentAdviceUpload = async (file: File) => {
-    await fileApi.uploadFile(applicationId, file, 'PAYMENT_RECEIPT');
+    // E2: 결제 증빙 업로드 → ADMIN 알림(A-55). 엔드포인트가 알림을 발행(기존 fileApi 직접업로드 대체).
+    await applicationApi.reportPaymentEvidence(applicationId, file);
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
     setFiles(updatedFiles);
+  };
+
+  const handleRequestPaymentConfirmation = async () => {
+    // E3: "결제 확인 요청" → ADMIN 알림(A-56).
+    await applicationApi.requestPaymentConfirmation(applicationId);
   };
 
   const handlePaymentAdviceDelete = async (fileSeq: number) => {
@@ -431,11 +450,14 @@ export default function ApplicationDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content (left 2/3) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Phase 2 — 서류 섹션 (자발적 업로드). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
-          <DocumentUploadSection
-            applicationSeq={applicationId}
-            canUpload={authUser?.role === 'APPLICANT'}
-          />
+          {/* Phase 2 — 서류 섹션 (자발적 업로드 + LEW 요청). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
+          {/* id="documents": 서류 요청/반려/승인 알림 딥링크 타깃 */}
+          <div id="documents" className="scroll-mt-24">
+            <DocumentUploadSection
+              applicationSeq={applicationId}
+              canUpload={authUser?.role === 'APPLICANT'}
+            />
+          </div>
 
           <ApplicationInfo
             application={application}
@@ -456,18 +478,22 @@ export default function ApplicationDetailPage() {
             onCancelEdit={() => setEditMode(false)}
           />
 
-          <ApplicationPayment
-            application={application}
-            payments={payments}
-            paymentInfo={paymentInfo}
-            files={files}
-            onPaymentAdviceUpload={handlePaymentAdviceUpload}
-            onPaymentAdviceDelete={handlePaymentAdviceDelete}
-          />
+          {/* id="payment": 결제 요청/증빙/확인 알림 딥링크 타깃 */}
+          <div id="payment" className="scroll-mt-24">
+            <ApplicationPayment
+              application={application}
+              payments={payments}
+              paymentInfo={paymentInfo}
+              files={files}
+              onPaymentAdviceUpload={handlePaymentAdviceUpload}
+              onPaymentAdviceDelete={handlePaymentAdviceDelete}
+              onRequestPaymentConfirmation={handleRequestPaymentConfirmation}
+            />
+          </div>
 
-          {/* E-Invoice 다운로드 — PAID 이후에만 노출 */}
+          {/* E-Invoice 다운로드 — PAID 이후에만 노출. id="receipts": 영수증 알림 딥링크 타깃 */}
           {invoice && (
-            <Card>
+            <Card id="receipts" className="scroll-mt-24">
               <h2 className="text-lg font-semibold text-gray-800 mb-3">E-Invoice</h2>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
@@ -494,11 +520,14 @@ export default function ApplicationDetailPage() {
             </Card>
           )}
 
-          <ApplicationLoaSection
-            application={application}
-            loaStatus={loaStatus}
-            onStatusUpdate={fetchData}
-          />
+          {/* id="loa": LoA 폼 전달/업로드 확인 알림 딥링크 타깃 */}
+          <div id="loa" className="scroll-mt-24">
+            <ApplicationLoaSection
+              application={application}
+              loaStatus={loaStatus}
+              onStatusUpdate={fetchData}
+            />
+          </div>
 
           <ApplicationDocuments
             application={application}

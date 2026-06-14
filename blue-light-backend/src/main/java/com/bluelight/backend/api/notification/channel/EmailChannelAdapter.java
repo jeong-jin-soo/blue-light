@@ -1,6 +1,7 @@
 package com.bluelight.backend.api.notification.channel;
 
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.email.MailSubjectCode;
 import com.bluelight.backend.api.notification.template.NotificationTemplateRegistry;
 import com.bluelight.backend.api.notification.template.NotificationTemplateRegistry.TemplateNotFoundException;
 import com.bluelight.backend.api.notification.template.RenderedMessage;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -44,6 +46,22 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
     private final NotificationTemplateRegistry templateRegistry;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 활성 Spring 프로필. 운영(prod)이 아닌 환경(개발서버 등)에서는 메일 제목 앞에
+     * 템플릿 코드(예: {@code [A-17]})를 붙여 어떤 알림인지 식별하기 쉽게 한다.
+     * 운영 서버만 {@code SPRING_PROFILES_ACTIVE=prod} 로 뜨므로, prod 가 아니면 코드를 prefix 한다.
+     */
+    @Value("${spring.profiles.active:default}")
+    private String activeProfiles;
+
+    /**
+     * 프론트엔드 베이스 URL — 이메일 CTA의 상대경로(예: {@code /applications/123})를 절대 URL로
+     * 만들 때 prepend. 이메일 클라이언트는 상대경로 링크를 못 여므로 필수.
+     * password-reset 과 동일 프론트 루트 재사용(환경별 PASSWORD_RESET_BASE_URL 로 주입).
+     */
+    @Value("${password-reset.base-url:http://localhost:5174}")
+    private String frontendBaseUrl;
 
     @Override
     public NotificationChannel channel() {
@@ -78,6 +96,10 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
             return SendResult.permanentFailure("PAYLOAD_DESERIALIZE", e.getMessage());
         }
 
+        // 2b) 이메일 CTA 절대화 — 상대경로(/...) 링크 변수를 프론트 베이스URL 기준 절대 URL로.
+        //     이메일 클라이언트는 상대경로를 못 열기 때문. (인앱 채널은 상대경로 그대로 사용)
+        payload = absolutizeLinks(payload);
+
         // 3) 템플릿 렌더
         RenderedMessage rendered;
         try {
@@ -88,8 +110,11 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
         }
 
         // 4) 발송 위임
+        //    운영(prod) 외 환경에서는 제목 앞에 메일 코드(템플릿 코드)를 붙인다. (예: "[A-17] Payment Requested")
+        String subject = MailSubjectCode.prefix(activeProfiles, row.getTemplateCode())
+                + (rendered.subject() == null ? "" : rendered.subject());
         try {
-            emailService.sendGenericEmail(to, rendered.subject(), rendered.body());
+            emailService.sendGenericEmail(to, subject, rendered.body());
             // SMTP message-id 는 EmailService 가 반환하지 않으므로 outboxSeq 를 추적 식별자로 사용.
             return SendResult.success("outbox-" + row.getOutboxSeq());
         } catch (RuntimeException e) {
@@ -97,5 +122,25 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
                     row.getOutboxSeq(), e.getMessage());
             return SendResult.retryableFailure("SMTP_FAILED", e.getMessage());
         }
+    }
+
+    /**
+     * payload 의 링크형 값(상대경로 '/...')을 프론트 베이스URL 기준 절대 URL로 변환한다.
+     * 이메일에선 상대경로 href 가 동작하지 않으므로 CTA 버튼이 우리 서비스로 연결되도록 보정.
+     * 이미 절대 URL(http...)이거나 '/'로 시작하지 않으면 그대로 둔다.
+     */
+    private Map<String, String> absolutizeLinks(Map<String, String> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return payload;
+        }
+        String base = frontendBaseUrl == null ? "" : frontendBaseUrl.replaceAll("/+$", "");
+        Map<String, String> out = new java.util.LinkedHashMap<>(payload);
+        for (Map.Entry<String, String> e : out.entrySet()) {
+            String v = e.getValue();
+            if (v != null && v.startsWith("/") && !v.startsWith("//")) {
+                e.setValue(base + v);
+            }
+        }
+        return out;
     }
 }

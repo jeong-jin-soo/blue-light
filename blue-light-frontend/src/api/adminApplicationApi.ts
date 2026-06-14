@@ -4,6 +4,7 @@ import type {
   AdminDashboard,
   ApplicationStatus,
   CompleteApplicationRequest,
+  EmaSubmissionResponse,
   FileInfo,
   FileType,
   KvaStatus,
@@ -322,6 +323,91 @@ export const uploadFile = async (
     `/admin/applications/${applicationId}/files`,
     formData,
     { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data;
+};
+
+// ── EMA 제출 추적 (ema-submission-tracking-spec.md §7) ──────────────────────
+// 전이 7종 + GET 모두 EmaSubmissionResponse 반환. 권한(LEW 본인 + ADMIN 대행)·전이 가드는 백엔드.
+// 에러코드(토스트 매핑): EMA_NOT_APPROVED, LICENSE_PDF_MISSING, INVALID_EMA_TRANSITION,
+//   EMA_ACK_REQUIRED, EMA_REFERENCE_REQUIRED, EMA_QUERY_NOTE_REQUIRED, EMA_NOT_IN_PROGRESS.
+
+/** EMA 제출 추적 조회 (폴링/탭 갱신). */
+export const getEmaSubmission = async (id: number): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.get<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema`
+  );
+  return response.data;
+};
+
+/** T1: NOT_SUBMITTED → SUBMITTED. */
+export const markEmaSubmitted = async (
+  id: number,
+  emaReferenceNo: string
+): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/submit`,
+    { emaReferenceNo }
+  );
+  return response.data;
+};
+
+/** T2/T4: SUBMITTED/RESUBMITTED → QUERY_RAISED. */
+export const raiseEmaQuery = async (
+  id: number,
+  queryNote: string
+): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/query`,
+    { queryNote }
+  );
+  return response.data;
+};
+
+/** T3/T10: QUERY_RAISED/REJECTED → RESUBMITTED. 접수번호는 선택(미전달 시 기존값 유지). */
+export const resubmitEma = async (
+  id: number,
+  emaReferenceNo?: string
+): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/resubmit`,
+    emaReferenceNo ? { emaReferenceNo } : {}
+  );
+  return response.data;
+};
+
+/** T5/T6: SUBMITTED/RESUBMITTED → APPROVED. 발급(완료)과 분리된 상태 표기. */
+export const approveEma = async (id: number): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/approve`
+  );
+  return response.data;
+};
+
+/** T7: SUBMITTED/RESUBMITTED → REJECTED. 사유는 선택. 종착 아님(T10 재진입). */
+export const rejectEma = async (
+  id: number,
+  reason?: string
+): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/reject`,
+    reason ? { reason } : {}
+  );
+  return response.data;
+};
+
+/** T8: SUBMITTED/QUERY_RAISED/RESUBMITTED → WITHDRAWN. */
+export const withdrawEma = async (id: number): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/withdraw`
+  );
+  return response.data;
+};
+
+/** T9: APPROVED/WITHDRAWN → 직전 상태 복원. ADMIN/SYSTEM_ADMIN 전용(오기입 정정). */
+export const revertEmaDecision = async (id: number): Promise<EmaSubmissionResponse> => {
+  const response = await axiosClient.post<EmaSubmissionResponse>(
+    `/admin/applications/${id}/ema/revert`
   );
   return response.data;
 };

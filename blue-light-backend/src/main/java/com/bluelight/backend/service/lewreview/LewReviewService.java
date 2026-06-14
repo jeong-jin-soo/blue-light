@@ -2,6 +2,7 @@ package com.bluelight.backend.service.lewreview;
 
 import com.bluelight.backend.api.application.dto.ApplicationResponse;
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.notification.PaymentRequestNotifier;
 import com.bluelight.backend.api.lew.dto.LewApplicationResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.exception.LewReviewErrorCode;
@@ -48,6 +49,8 @@ public class LewReviewService {
     private final DocumentRequestRepository documentRequestRepository;
     // LEW가 결제 요청 트리거 시 신청자 메일 발송 (ADMIN 흐름과 동일)
     private final EmailService emailService;
+    // 결제 요청 알림(A-17 인앱+이메일) 오케스트레이터 디스패치
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /** 배정 신청 상세 조회. */
     public LewApplicationResponse getAssignedApplication(Long applicationSeq, Long lewUserSeq) {
@@ -100,6 +103,13 @@ public class LewReviewService {
         // 2) Phase 1 종료 가드 (LEW가 검토를 끝냈는지 재확인) — 상태 충돌이므로 409
         assertKvaConfirmed(application);
         assertNoPendingDocumentRequests(applicationSeq);
+
+        // 3) LoA 완료(LEW 최종본 업로드) 후에만 결제 요청 가능 (사용자 결정 2026-06-14).
+        if (!application.isLoaFinalized()) {
+            throw new BusinessException(
+                    "The final LoA must be uploaded before requesting payment.",
+                    HttpStatus.CONFLICT, "LOA_NOT_FINALIZED");
+        }
 
         // 상태 전이 — 도메인 메서드 사용 (reviewComment 클리어 포함)
         application.approveForPayment();
@@ -156,23 +166,6 @@ public class LewReviewService {
      * 메일 발송 실패는 swallow 하여 상태 전이 트랜잭션을 롤백하지 않는다.
      */
     private void notifyPaymentRequested(Application application) {
-        try {
-            User applicant = application.getUser();
-            if (applicant == null || applicant.getEmail() == null) {
-                log.warn("결제 요청 메일 발송 스킵 — 신청자 정보 없음: applicationId={}",
-                        application.getApplicationSeq());
-                return;
-            }
-            emailService.sendPaymentRequestEmail(
-                    applicant.getEmail(),
-                    (applicant.getFirstName() != null ? applicant.getFirstName() : "") + " "
-                            + (applicant.getLastName() != null ? applicant.getLastName() : ""),
-                    application.getApplicationSeq(),
-                    application.getAddress(),
-                    application.getQuoteAmount());
-        } catch (RuntimeException ex) {
-            log.warn("결제 요청 메일 발송 실패 (LEW trigger): applicationId={}, err={}",
-                    application.getApplicationSeq(), ex.getMessage());
-        }
+        PaymentRequestNotifier.dispatch(eventPublisher, application);
     }
 }
