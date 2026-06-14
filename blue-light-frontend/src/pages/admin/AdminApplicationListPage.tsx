@@ -318,7 +318,7 @@ export default function AdminApplicationListPage() {
               }}
               className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
-              Start CoF Review
+              Review
               <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
@@ -466,7 +466,7 @@ export default function AdminApplicationListPage() {
                   }}
                   className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100"
                 >
-                  Start CoF Review →
+                  Review →
                 </button>
               )}
           </div>
