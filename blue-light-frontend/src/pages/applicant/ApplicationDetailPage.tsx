@@ -274,9 +274,15 @@ export default function ApplicationDetailPage() {
   // ── Payment Advice handlers ──────────────────
 
   const handlePaymentAdviceUpload = async (file: File) => {
-    await fileApi.uploadFile(applicationId, file, 'PAYMENT_RECEIPT');
+    // E2: 결제 증빙 업로드 → ADMIN 알림(A-55). 엔드포인트가 알림을 발행(기존 fileApi 직접업로드 대체).
+    await applicationApi.reportPaymentEvidence(applicationId, file);
     const updatedFiles = await fileApi.getFilesByApplication(applicationId);
     setFiles(updatedFiles);
+  };
+
+  const handleRequestPaymentConfirmation = async () => {
+    // E3: "결제 확인 요청" → ADMIN 알림(A-56).
+    await applicationApi.requestPaymentConfirmation(applicationId);
   };
 
   const handlePaymentAdviceDelete = async (fileSeq: number) => {
@@ -463,6 +469,7 @@ export default function ApplicationDetailPage() {
             files={files}
             onPaymentAdviceUpload={handlePaymentAdviceUpload}
             onPaymentAdviceDelete={handlePaymentAdviceDelete}
+            onRequestPaymentConfirmation={handleRequestPaymentConfirmation}
           />
 
           {/* E-Invoice 다운로드 — PAID 이후에만 노출 */}
