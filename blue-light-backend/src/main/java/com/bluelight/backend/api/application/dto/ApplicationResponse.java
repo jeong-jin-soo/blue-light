@@ -92,11 +92,6 @@ public class ApplicationResponse {
     private Boolean hasGeneratorHint;
     private Integer generatorCapacityHint;
 
-    /** CoF finalize 여부 — 신청자 상세 화면의 "CoF 발급됨" 배지 노출용. */
-    private Boolean cofFinalized;
-    /** CoF finalize 시각 (신청자에게 공개 가능한 메타 정보). */
-    private LocalDateTime cofCertifiedAt;
-
     /** 경고 수준 검증 결과 (스펙 §5.4·§9-16). 성공 응답에 함께 실리며, 200/201을 절대 깨지 않는다. */
     private List<ApplicantHintWarning> warnings;
 
@@ -175,10 +170,6 @@ public class ApplicationResponse {
                 .retailerHint(application.getApplicantRetailerHint())
                 .hasGeneratorHint(application.getApplicantHasGeneratorHint())
                 .generatorCapacityHint(application.getApplicantGeneratorCapacityHint())
-                .cofFinalized(application.getCertificateOfFitness() != null
-                        && application.getCertificateOfFitness().isFinalized())
-                .cofCertifiedAt(application.getCertificateOfFitness() != null
-                        ? application.getCertificateOfFitness().getCertifiedAt() : null)
                 .build();
     }
 
@@ -241,8 +232,6 @@ public class ApplicationResponse {
                 .retailerHint(this.retailerHint)
                 .hasGeneratorHint(this.hasGeneratorHint)
                 .generatorCapacityHint(this.generatorCapacityHint)
-                .cofFinalized(this.cofFinalized)
-                .cofCertifiedAt(this.cofCertifiedAt)
                 .warnings(warnings)
                 .build();
     }

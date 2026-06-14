@@ -57,9 +57,6 @@ public class KvaAdjustmentHistoryItem {
     private String settlementMemo;
     private LocalDateTime settledAt;
 
-    /** CoF unfinalize 가 본 변경에 의해 트리거되었는지. */
-    private Boolean cofReissueTriggered;
-
     /** ADMIN 변경 row 가 어떤 LEW 요청 row 에 응답한 것인지 (self-FK). nullable. */
     private Long lewRequestSeq;
 
@@ -92,7 +89,6 @@ public class KvaAdjustmentHistoryItem {
                 .receiptReferenceNumber(r.getReceiptReferenceNumber())
                 .settlementMemo(r.getSettlementMemo())
                 .settledAt(r.getSettledAt())
-                .cofReissueTriggered(r.getCofReissueTriggered())
                 .lewRequestSeq(r.getLewRequestSeq())
                 .createdAt(r.getCreatedAt())
                 .adminAdjustmentAt(r.getAdminAdjustmentAt())

@@ -2,8 +2,8 @@ package com.bluelight.backend.service.application;
 
 import com.bluelight.backend.common.crypto.FieldEncryptionUtil;
 import com.bluelight.backend.common.crypto.HmacUtil;
-import com.bluelight.backend.domain.cof.ConsumerType;
-import com.bluelight.backend.domain.cof.RetailerCode;
+import com.bluelight.backend.domain.application.ConsumerType;
+import com.bluelight.backend.domain.application.RetailerCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

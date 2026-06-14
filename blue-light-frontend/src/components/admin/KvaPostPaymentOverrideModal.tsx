@@ -36,7 +36,6 @@ const MEMO_MAX = 2000;
 interface Props {
   isOpen: boolean;
   application: AdminApplication;
-  cofFinalized?: boolean; // CoF.certifiedAt 존재 여부 (경고 노출용)
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -51,7 +50,6 @@ const PAYMENT_ADJUSTMENT_OPTIONS: Array<{ value: string; label: string }> = [
 export function KvaPostPaymentOverrideModal({
   isOpen,
   application,
-  cofFinalized = false,
   onClose,
   onSuccess,
 }: Props) {
@@ -215,19 +213,6 @@ export function KvaPostPaymentOverrideModal({
             with previous values.
           </p>
         </div>
-
-        {cofFinalized && (
-          <div
-            role="alert"
-            className="text-sm text-error-700 bg-error-50 border border-error-500/40 rounded-md p-3 mb-4"
-          >
-            <p className="font-medium">CoF re-signature required</p>
-            <p className="mt-0.5">
-              The Certificate of Fitness has been finalized. It will be automatically
-              unfinalized and the assigned LEW must re-sign before the licence can issue.
-            </p>
-          </div>
-        )}
 
         {/* Current vs New preview */}
         <div className="bg-gray-50 border border-gray-200 rounded-md p-3 text-sm mb-4">

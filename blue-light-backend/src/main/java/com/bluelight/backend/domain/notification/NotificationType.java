@@ -23,10 +23,6 @@ public enum NotificationType {
     // Phase 5 — LEW kVA 확정 알림 (이메일은 범위 외)
     KVA_CONFIRMED,
 
-    // Phase 6 — 통합 LEW 리뷰 (CoF finalize 및 kVA override 재발급)
-    CERTIFICATE_OF_FITNESS_FINALIZED,   // 신청자: CoF 서명 완료 → 결제 단계 진입 안내
-    COF_REISSUED_BY_KVA_OVERRIDE,       // LEW/신청자: kVA override로 CoF 재서명 필요
-
     // PR-2 (kva-postpayment-adjustment-spec §5.4) — 결제 후 ADMIN 의 kVA 변경 → 배정 LEW 통지.
     // CoF re-issue 가 동반되더라도 본 알림 한 건에 통합 메시지 포함 (사용자 인지 부담 최소화).
     KVA_ADJUSTED_BY_ADMIN_LEW,

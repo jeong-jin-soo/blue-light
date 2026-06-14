@@ -1,11 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
 import { Card } from '../../../components/ui/Card';
 import { Badge } from '../../../components/ui/Badge';
-import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
-import SignaturePad, { type SignaturePadHandle } from '../../../components/domain/SignaturePad';
-import loaApi from '../../../api/loaApi';
 import fileApi from '../../../api/fileApi';
-import userApi from '../../../api/userApi';
 import { useToastStore } from '../../../stores/toastStore';
 import type { Application, LoaStatus } from '../../../types';
 
@@ -17,117 +12,10 @@ interface Props {
 
 /**
  * Applicant LOA (Letter of Appointment) 섹션
- * - LOA 다운로드, 전자서명, 서명 완료 상태
- * - 프로필 서명 저장 시 자동 로드 + 서명 후 프로필 저장 다이얼로그
+ * - LOA 문서 다운로드만 제공. 인앱 전자서명 기능은 제거됨 (2026-06-13).
  */
-export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }: Props) {
+export function ApplicationLoaSection({ application, loaStatus }: Props) {
   const toast = useToastStore();
-  const signatureRef = useRef<SignaturePadHandle>(null);
-  const [signing, setSigning] = useState(false);
-  const [hasSignature, setHasSignature] = useState(false);
-
-  const [showConfirm, setShowConfirm] = useState(false);
-
-  // 프로필 서명 관련 상태
-  const [savedSignatureDataUrl, setSavedSignatureDataUrl] = useState<string | null>(null);
-  const [hadSavedSignature, setHadSavedSignature] = useState(false);
-  const [showSaveToProfile, setShowSaveToProfile] = useState(false);
-  const [showReplaceSignature, setShowReplaceSignature] = useState(false);
-  const [savingToProfile, setSavingToProfile] = useState(false);
-  const pendingSignatureBlob = useRef<Blob | null>(null);
-
-  // 마운트 시 프로필 서명 로드
-  useEffect(() => {
-    if (!loaStatus?.loaGenerated || loaStatus.loaSigned) return;
-
-    const loadSavedSignature = async () => {
-      try {
-        const profile = await userApi.getMyProfile();
-        if (profile.hasSignature) {
-          setHadSavedSignature(true);
-          const dataUrl = await userApi.getSignatureDataUrl();
-          if (dataUrl) {
-            setSavedSignatureDataUrl(dataUrl);
-          }
-        }
-      } catch {
-        // 서명 로드 실패해도 LOA 서명은 계속 가능
-      }
-    };
-    loadSavedSignature();
-  }, [loaStatus?.loaGenerated, loaStatus?.loaSigned]);
-
-  const handleSignLoa = () => {
-    if (!signatureRef.current || signatureRef.current.isEmpty()) {
-      toast.error('Please sign before submitting');
-      return;
-    }
-    setShowConfirm(true);
-  };
-
-  const handleConfirmSign = async () => {
-    setShowConfirm(false);
-    if (!signatureRef.current || signatureRef.current.isEmpty()) {
-      toast.error('Please sign before submitting');
-      return;
-    }
-
-    setSigning(true);
-    try {
-      const blob = await signatureRef.current.toBlob();
-      if (!blob) {
-        toast.error('Failed to capture signature');
-        return;
-      }
-
-      // LOA 서명 API 호출
-      await loaApi.signLoa(application.applicationSeq, blob);
-      toast.success('LOA signed successfully!');
-
-      // 사용자가 직접 그렸는지 확인 → 프로필 저장 다이얼로그
-      const isModified = signatureRef.current.isModifiedByUser();
-      if (isModified) {
-        pendingSignatureBlob.current = blob;
-        if (hadSavedSignature) {
-          setShowReplaceSignature(true);
-        } else {
-          setShowSaveToProfile(true);
-        }
-      } else {
-        onStatusUpdate();
-      }
-    } catch {
-      toast.error('Failed to sign LOA');
-    } finally {
-      setSigning(false);
-    }
-  };
-
-  // 프로필에 서명 저장
-  const handleSaveSignatureToProfile = async () => {
-    if (!pendingSignatureBlob.current) return;
-    setSavingToProfile(true);
-    try {
-      await userApi.uploadSignature(pendingSignatureBlob.current);
-      toast.success('Signature saved to profile');
-    } catch {
-      toast.error('Failed to save signature to profile');
-    } finally {
-      setSavingToProfile(false);
-      setShowSaveToProfile(false);
-      setShowReplaceSignature(false);
-      pendingSignatureBlob.current = null;
-      onStatusUpdate();
-    }
-  };
-
-  // 프로필 저장 건너뛰기
-  const handleSkipSaveToProfile = () => {
-    setShowSaveToProfile(false);
-    setShowReplaceSignature(false);
-    pendingSignatureBlob.current = null;
-    onStatusUpdate();
-  };
 
   const handleDownloadLoa = async () => {
     if (!loaStatus?.loaFileSeq) return;
@@ -154,8 +42,8 @@ export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }
             <span className="text-sm">ℹ️</span>
             <p className="text-sm text-gray-600">
               {application.applicationType === 'RENEWAL'
-                ? 'You can upload the LOA from the Documents section below. Once uploaded, you can sign it here.'
-                : 'The LOA will be generated once your application has been reviewed and a LEW is assigned. You will be able to sign it digitally here.'}
+                ? 'You can upload the LOA from the Documents section below. Once it is ready, you can download it here.'
+                : 'The LOA will be generated once your application has been reviewed and a LEW is assigned. You will be able to download it here.'}
             </p>
           </div>
         </div>
@@ -163,172 +51,27 @@ export function ApplicationLoaSection({ application, loaStatus, onStatusUpdate }
     );
   }
 
-  // LOA 서명 완료
-  if (loaStatus.loaSigned) {
-    return (
-      <Card>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment</h2>
-          <Badge variant="success">Signed</Badge>
-        </div>
-
-        <div className="space-y-3">
-          {/* 서명 완료 배너 */}
-          <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-            <span>✅</span>
-            <div>
-              <p className="text-sm font-medium text-green-800">LOA Signed Successfully</p>
-              <p className="text-xs text-green-600 mt-0.5">
-                Signed on{' '}
-                {new Date(loaStatus.loaSignedAt!).toLocaleDateString('en-SG', {
-                  year: 'numeric', month: 'short', day: 'numeric',
-                  hour: '2-digit', minute: '2-digit',
-                })}
-              </p>
-            </div>
-          </div>
-
-          {/* 다운로드 */}
-          <button
-            onClick={handleDownloadLoa}
-            className="flex items-center gap-2 w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
-          >
-            <span className="text-lg">📄</span>
-            <div className="flex-1 text-left">
-              <p className="text-sm font-medium text-gray-800">Download Signed LOA</p>
-              <p className="text-xs text-gray-500">PDF document for EMA submission</p>
-            </div>
-            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </button>
-        </div>
-      </Card>
-    );
-  }
-
-  // LOA 생성됨 (미서명) — 서명 UI 표시
+  // LOA 생성됨 — 문서 다운로드
   return (
     <Card>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment</h2>
-        <Badge variant="warning">Signature Required</Badge>
+        <Badge variant="gray">Ready</Badge>
       </div>
 
-      <div className="space-y-4">
-        {/* LOA 다운로드 (미리보기) */}
-        <button
-          onClick={handleDownloadLoa}
-          className="flex items-center gap-2 w-full px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-lg border border-blue-200 transition-colors"
-        >
-          <span className="text-lg">📄</span>
-          <div className="flex-1 text-left">
-            <p className="text-sm font-medium text-blue-800">Review LOA Document</p>
-            <p className="text-xs text-blue-600">Download and review before signing</p>
-          </div>
-          <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </button>
-
-        {/* 서명 영역 */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Your Signature
-          </label>
-          <p className="text-xs text-gray-500 mb-3">
-            Please draw your signature below. This will be embedded into the LOA document.
-          </p>
-          <SignaturePad
-            ref={signatureRef}
-            onSignatureChange={setHasSignature}
-            disabled={signing}
-            initialDataUrl={savedSignatureDataUrl ?? undefined}
-          />
-          {savedSignatureDataUrl && (
-            <p className="text-xs text-blue-600 mt-1">
-              ✓ Your saved signature has been loaded. You can use it as-is or draw a new one.
-            </p>
-          )}
+      <button
+        onClick={handleDownloadLoa}
+        className="flex items-center gap-2 w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg border border-gray-200 transition-colors"
+      >
+        <span className="text-lg">📄</span>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-medium text-gray-800">Download LOA</p>
+          <p className="text-xs text-gray-500">PDF document for your records</p>
         </div>
-
-        {/* 서명 제출 버튼 */}
-        <button
-          onClick={handleSignLoa}
-          disabled={!hasSignature || signing}
-          className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {signing ? (
-            <>
-              <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Signing...
-            </>
-          ) : (
-            <>✍️ Sign LOA</>
-          )}
-        </button>
-      </div>
-
-      {/* 서명 확인 모달 */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                <span className="text-lg">✍️</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900">Confirm Signature</h3>
-            </div>
-            <p className="text-sm text-gray-600 mb-2">
-              Are you sure you want to sign the LOA with the signature you provided?
-            </p>
-            <p className="text-xs text-gray-500 mb-6">
-              This action cannot be undone. Your signature will be permanently embedded into the LOA document.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmSign}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
-              >
-                Confirm & Sign
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 프로필에 서명 저장 다이얼로그 (기존 서명 없음) */}
-      <ConfirmDialog
-        isOpen={showSaveToProfile}
-        onClose={handleSkipSaveToProfile}
-        onConfirm={handleSaveSignatureToProfile}
-        title="Save Signature to Profile"
-        message="Would you like to save this signature to your profile? It will be automatically loaded next time you need to sign a document."
-        confirmLabel="Save to Profile"
-        cancelLabel="Skip"
-        loading={savingToProfile}
-      />
-
-      {/* 프로필 서명 대체 다이얼로그 (기존 서명 있음) */}
-      <ConfirmDialog
-        isOpen={showReplaceSignature}
-        onClose={handleSkipSaveToProfile}
-        onConfirm={handleSaveSignatureToProfile}
-        title="Update Saved Signature"
-        message="You drew a new signature. Would you like to replace your saved profile signature with this new one?"
-        confirmLabel="Replace Signature"
-        cancelLabel="Keep Previous"
-        loading={savingToProfile}
-      />
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      </button>
     </Card>
   );
 }

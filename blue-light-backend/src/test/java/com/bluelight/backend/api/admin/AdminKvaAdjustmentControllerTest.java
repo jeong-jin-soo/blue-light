@@ -109,7 +109,6 @@ class AdminKvaAdjustmentControllerTest {
                 .amountDifference(new BigDecimal("200.00"))
                 .reason("Site survey accepted")
                 .paymentAdjustment(AdminPaymentAdjustment.PENDING)
-                .cofReissueTriggered(false)
                 .lewRequestSeq(10L)
                 .createdAt(LocalDateTime.of(2026, 5, 1, 11, 0))
                 .build();

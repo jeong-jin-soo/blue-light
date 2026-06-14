@@ -135,7 +135,7 @@ public class LogOnlyEmailService implements EmailService {
                                           Integer previousKva, Integer newKva,
                                           BigDecimal previousQuoteAmount, BigDecimal newQuoteAmount,
                                           BigDecimal amountDifference,
-                                          boolean cofReissueTriggered, String reason) {
+                                          String reason) {
         log.info("==================================================");
         log.info("[DEV] kVA Adjusted by Admin to LEW Email (not actually sent)");
         log.info("  To: {}", to);
@@ -146,7 +146,6 @@ public class LogOnlyEmailService implements EmailService {
         log.info("  Previous Quote: ${}", previousQuoteAmount);
         log.info("  New Quote: ${}", newQuoteAmount);
         log.info("  Difference: ${}", amountDifference);
-        log.info("  CoF Reissue Triggered: {}", cofReissueTriggered);
         log.info("  Reason: {}", reason);
         log.info("==================================================");
     }

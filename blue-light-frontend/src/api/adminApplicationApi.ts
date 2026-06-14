@@ -134,7 +134,6 @@ export interface KvaPostPaymentOverrideResponse {
   previousQuoteAmount: number;
   newQuoteAmount: number;
   amountDifference: number;
-  cofReissueTriggered: boolean;
 }
 
 /**
@@ -197,7 +196,6 @@ export interface KvaAdjustmentHistoryItem {
   receiptReferenceNumber?: string;
   settlementMemo?: string;
   settledAt?: string;
-  cofReissueTriggered: boolean;
   lewRequestSeq?: number;
   createdAt: string;
   adminAdjustmentAt?: string;

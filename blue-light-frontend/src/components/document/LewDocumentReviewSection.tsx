@@ -37,7 +37,7 @@ interface LewDocumentReviewSectionProps {
   /**
    * 서류 요청 상태(승인/반려/취소/생성)가 변동될 때 호출.
    * 부모(LewReviewFormPage)가 pendingDocCount 가드 등 파생 상태를 갱신하도록
-   * loadData 를 연결한다. 이게 없으면 CoF 탭의 prerequisite 체크리스트가 stale 해진다.
+   * loadData 를 연결한다. 이게 없으면 결제 요청 가드(pendingDocCount) 가 stale 해진다.
    */
   onRequestsChanged?: () => void;
 }

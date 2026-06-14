@@ -6,7 +6,6 @@ import { Card } from '../../components/ui/Card';
 import { InfoBox } from '../../components/ui/InfoBox';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/domain/StatusBadge';
-import { StepTracker } from '../../components/domain/StepTracker';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
@@ -22,14 +21,7 @@ import documentApi from '../../api/documentApi';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useRequestPayment } from '../../hooks/useRequestPayment';
-import type {
-  CertificateOfFitnessRequest,
-  CertificateOfFitnessResponse,
-  InspectionInterval,
-  LewApplicationResponse,
-  SupplyVoltage,
-} from '../../types/cof';
-import type { ConsumerType, RetailerCode } from '../../constants/cof';
+import type { LewApplicationResponse } from '../../types/cof';
 import type {
   AdminApplication,
   DocumentRequest,
@@ -37,43 +29,26 @@ import type {
   LoaStatus,
   SldRequest,
 } from '../../types';
-import { CofStepApplicationSummary } from './sections/CofStepApplicationSummary';
-import { CofStepInputs } from './sections/CofStepInputs';
-import { CofStepReviewFinalize } from './sections/CofStepReviewFinalize';
 import { AdminApplicationInfo } from '../admin/sections/AdminApplicationInfo';
 
 /**
- * LEW 통합 리뷰 페이지 (Phase 6).
+ * LEW 통합 리뷰 페이지.
  *
  * URL: `/lew/applications/:id/review`
  * 권한: LEW 역할만 (ProtectedRoute). 배정 여부는 백엔드 `@appSec.isAssignedLew`가 최종 판정.
  *
- * <h3>5개 탭</h3>
+ * <h3>탭</h3>
  * <ol>
  *   <li>Documents — LEW가 신청자에게 서류 요청·검토</li>
  *   <li>kVA — LEW 확정 (Application.selectedKva SSOT)</li>
  *   <li>SLD — sldOption=REQUEST_LEW 일 때만 노출</li>
- *   <li>LOA — view-only (LEW는 수정 불가)</li>
- *   <li>Certificate of Fitness — 기존 3-step 흐름(Summary/Inputs/Finalize)을 탭 내부에 유지</li>
+ *   <li>LOA — 생성/업로드 (동선 재설계 A: LEW 검토 흐름에 개방)</li>
  * </ol>
  *
- * <h3>Finalize 가드</h3>
- * 다음 3조건을 모두 만족해야 CoF finalize 가능:
- * <ul>
- *   <li>{@code kvaStatus === 'CONFIRMED'}</li>
- *   <li>미해결 DocumentRequest 0건 (REQUESTED/UPLOADED 없음)</li>
- *   <li>{@code sldOption === 'REQUEST_LEW'} 인 경우 SLD {@code status === 'CONFIRMED'}</li>
- * </ul>
- * 가드 미충족 시 Finalize 버튼 disabled + 해당 탭으로 이동 안내.
+ * <p>결제 요청(request-payment) 가드 = Phase 1 (kVA 확정 + 미해결 서류 0건).</p>
  */
 
-const COF_STEPS = [
-  { label: 'Summary', description: 'Applicant inputs' },
-  { label: 'CoF Fields', description: 'Enter CoF details' },
-  { label: 'Finalize', description: 'Review & submit' },
-];
-
-type TabKey = 'documents' | 'kva' | 'sld' | 'loa' | 'cof';
+type TabKey = 'documents' | 'kva' | 'sld' | 'loa';
 
 type ApiErrorShape = AxiosError<{ code?: string; message?: string }> & {
   code?: string;
@@ -89,7 +64,7 @@ export default function LewReviewFormPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<{ code: string; message: string } | null>(null);
 
-  // LEW 전용 응답 (CoF draft + hint + MSSL 평문)
+  // LEW 전용 응답 (hint + MSSL 평문 + 평문 주소)
   const [lewData, setLewData] = useState<LewApplicationResponse | null>(null);
   // /api/admin/applications/{id} — KvaSection/LOA/SLD 모두 이 형상 요구
   const [adminApp, setAdminApp] = useState<AdminApplication | null>(null);
@@ -104,18 +79,9 @@ export default function LewReviewFormPage() {
   const [actionLoading, setActionLoading] = useState(false);
 
   // 기본 활성 탭은 데이터 로드 후 useEffect에서 "첫 미완료 탭"으로 동적 설정한다.
-  // 정적으로 'cof'로 두면 가드 미충족 상태에서 빈 탭에 떨어져 LEW가 거꾸로 이동해야 함.
   const [activeTab, setActiveTab] = useState<TabKey | null>(null);
-  const [currentStep, setCurrentStep] = useState<0 | 1 | 2>(0);
-  const [draft, setDraft] = useState<CertificateOfFitnessRequest>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [confirmed, setConfirmed] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [finalizing, setFinalizing] = useState(false);
 
   // 옵션 B — 신청 정보 시야 토글.
-  // - 데스크톱: 우측 콜랩서블 사이드바 (기본 접힘). localStorage 영속화 안 함 — 페이지 재진입 시 항상 접힘.
-  // - 모바일: 우하단 FAB → 풀스크린 드로어. 같은 state로 제어.
   const [appInfoOpen, setAppInfoOpen] = useState(false);
 
   const applicationId = id ? Number(id) : NaN;
@@ -134,7 +100,6 @@ export default function LewReviewFormPage() {
       ]);
       setLewData(lewRes);
       setAdminApp(adminRes);
-      setDraft(buildInitialDraft(lewRes, adminRes));
 
       const [loaRes, sldRes, filesRes, docsRes] = await Promise.allSettled([
         loaApi.getLoaStatus(applicationId),
@@ -213,13 +178,10 @@ export default function LewReviewFormPage() {
   const kvaConfirmed = adminApp?.kvaStatus === 'CONFIRMED';
   const sldRequired = adminApp?.sldOption === 'REQUEST_LEW';
   const sldReady = !sldRequired || sldRequest?.status === 'CONFIRMED';
-  const guardsSatisfied = kvaConfirmed && pendingDocCount === 0 && sldReady;
 
-  const cofFinalized = lewData?.cof?.finalized === true;
-
-  // ── PR3 결제 요청 (UX 검토 결론: 리뷰 폼에서도 결제 요청 가능) ──────
-  // 결제 요청 가드 = Phase 1 (kVA 확정 + 서류 0건). SLD 는 결제 후 작업이라 제외.
-  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출 (Phase 1 액션).
+  // ── 결제 요청 (Phase 1 액션) ──────
+  // 결제 요청 가드 = kVA 확정 + 서류 0건. SLD 는 결제 후 작업이라 제외.
+  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
   const phase1Ready = kvaConfirmed && pendingDocCount === 0;
@@ -246,7 +208,7 @@ export default function LewReviewFormPage() {
     } else if (sldRequired && !sldReady) {
       next = 'sld';
     } else {
-      next = 'cof';
+      next = 'loa';
     }
     setActiveTab(next);
   }, [activeTab, adminApp, lewData, pendingDocCount, kvaConfirmed, sldRequired, sldReady]);
@@ -256,128 +218,6 @@ export default function LewReviewFormPage() {
     currentUser?.role === 'LEW' &&
     !!adminApp?.assignedLewSeq &&
     adminApp.assignedLewSeq === currentUser?.userSeq;
-
-  // ── Draft 편집 ───────────────────────────────────────
-  const handleDraftChange = useCallback((patch: Partial<CertificateOfFitnessRequest>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      Object.keys(patch).forEach((k) => {
-        delete next[k];
-      });
-      return next;
-    });
-  }, []);
-
-  // ── Save Draft ───────────────────────────────────────
-  const handleSaveDraft = useCallback(async () => {
-    if (!idValid) return;
-    setSaving(true);
-    try {
-      const saved: CertificateOfFitnessResponse = await lewReviewApi.saveDraftCof(
-        applicationId,
-        draft,
-      );
-      setDraft(responseToRequest(saved));
-      setLewData((prev) => (prev ? { ...prev, cof: saved } : prev));
-      toast.success('Draft saved');
-    } catch (err) {
-      const { code, message } = extractError(err);
-      if (code === 'COF_VERSION_CONFLICT') {
-        toast.warning('This CoF was updated elsewhere. Reloading latest version…');
-        await loadData();
-      } else if (code === 'COF_ALREADY_FINALIZED') {
-        toast.warning('This CoF has already been finalized.');
-        await loadData();
-      } else {
-        toast.error(message || 'Failed to save draft');
-      }
-    } finally {
-      setSaving(false);
-    }
-  }, [applicationId, draft, idValid, loadData, toast]);
-
-  const handleNextFromInputs = useCallback(() => {
-    const errs = validateDraftForFinalize(draft);
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      toast.error('Please complete all required fields before continuing.');
-      return;
-    }
-    setErrors({});
-    setCurrentStep(2);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [draft, toast]);
-
-  // ── Finalize (with Phase 6 guards + error mapping) ───
-  const handleFinalize = useCallback(async () => {
-    if (!idValid) return;
-    const errs = validateDraftForFinalize(draft);
-    if (Object.keys(errs).length > 0) {
-      setErrors(errs);
-      setCurrentStep(1);
-      toast.error('Missing required fields — returning to CoF fields.');
-      return;
-    }
-    if (!guardsSatisfied) {
-      if (!kvaConfirmed) {
-        toast.error('kVA must be confirmed first.');
-        setActiveTab('kva');
-      } else if (pendingDocCount > 0) {
-        toast.error(`Resolve ${pendingDocCount} pending document request(s) first.`);
-        setActiveTab('documents');
-      } else if (!sldReady) {
-        toast.error('SLD must be uploaded and confirmed first.');
-        setActiveTab('sld');
-      }
-      return;
-    }
-    setFinalizing(true);
-    try {
-      await lewReviewApi.saveDraftCof(applicationId, draft);
-      await lewReviewApi.finalizeCof(applicationId);
-      // PR3 옵션 R: finalize는 결제 후 단계 — status 전이 없음. 메시지에서 "moved to payment stage" 제거.
-      toast.success('Certificate of Fitness finalized.');
-      // 옵션 B: 리뷰 종료 후 신청 상세로 복귀 (목록이 아닌 같은 신청 컨텍스트 유지)
-      navigate(`/lew/applications/${applicationId}`);
-    } catch (err) {
-      const { code, message } = extractError(err);
-      if (code === 'COF_ALREADY_FINALIZED') {
-        toast.warning('This CoF has already been finalized.');
-        await loadData();
-      } else if (code === 'COF_VERSION_CONFLICT') {
-        toast.warning('Someone else edited this CoF. Reloading…');
-        await loadData();
-      } else if (code === 'APPLICATION_NOT_ASSIGNED') {
-        toast.error('You are not assigned to this application.');
-        // 권한 없는 신청은 상세도 못 보므로 목록으로 유지 (옵션 B 예외 — 무한 redirect 방지)
-        navigate('/lew/applications');
-      } else if (code === 'APPLICATION_NOT_PAID') {
-        // PR3: CoF는 결제(PAID/IN_PROGRESS) 이후에만 finalize 가능. SS 638 §13 준수.
-        toast.error('Payment must be confirmed before finalizing CoF.');
-        await loadData();
-      } else if (code === 'KVA_NOT_CONFIRMED') {
-        toast.error('kVA must be confirmed before finalizing CoF.');
-        setActiveTab('kva');
-        await loadData();
-      } else if (code === 'DOCUMENT_REQUESTS_PENDING') {
-        toast.error('Pending document requests block finalization.');
-        setActiveTab('documents');
-        await loadData();
-      } else if (code === 'SLD_NOT_CONFIRMED') {
-        toast.error('SLD must be uploaded and confirmed before finalizing CoF.');
-        setActiveTab('sld');
-        await loadData();
-      } else {
-        toast.error(message || 'Failed to finalize CoF');
-      }
-    } finally {
-      setFinalizing(false);
-    }
-  }, [
-    applicationId, draft, guardsSatisfied, idValid, kvaConfirmed, loadData,
-    navigate, pendingDocCount, sldReady, toast,
-  ]);
 
   // ── SLD handlers (AdminSldSection 용) ─────────────────
   const handleSldUpload = useCallback(async (file: File) => {
@@ -441,7 +281,6 @@ export default function LewReviewFormPage() {
       <ErrorPanel
         code={loadError?.code ?? 'UNKNOWN'}
         message={loadError?.message ?? 'Failed to load application'}
-        // application/lew 응답 자체를 받지 못한 상태 → 상세 페이지도 동일 에러 가능성 → 목록 유지 (옵션 B 예외)
         onBack={() => navigate('/lew/applications')}
       />
     );
@@ -473,15 +312,6 @@ export default function LewReviewFormPage() {
         }])
       : []),
     { key: 'loa', label: 'LOA' },
-    {
-      key: 'cof',
-      label: 'Certificate of Fitness',
-      badge: cofFinalized
-        ? { text: 'Finalized', variant: 'success' }
-        : guardsSatisfied
-          ? { text: 'Ready', variant: 'info' }
-          : { text: 'Blocked', variant: 'gray' },
-    },
   ];
 
   const applicantDisplayName =
@@ -496,8 +326,7 @@ export default function LewReviewFormPage() {
 
   return (
     <div className="space-y-6">
-      {/* 옵션 B: Sticky 상단 요약 헤더 — 리뷰 중에도 신청 메타가 항상 보이도록.
-          Layout 헤더가 top-0 z-10 (h-16=64px) 이므로 그 아래에 붙도록 top-16 + z-30. */}
+      {/* 옵션 B: Sticky 상단 요약 헤더 — 리뷰 중에도 신청 메타가 항상 보이도록. */}
       <div className="sticky top-16 z-30 -mx-4 lg:-mx-6 px-4 lg:px-6 py-2 bg-white border-b border-gray-200">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <span className="font-semibold text-gray-800 truncate max-w-[18ch]" title={applicantDisplayName}>
@@ -519,15 +348,11 @@ export default function LewReviewFormPage() {
           </button>
         </div>
 
-        {/* PR3 결제 요청 — Phase 1(PENDING_REVIEW/REVISION_REQUESTED)에서만 노출.
-            UX 검토 결론: 결제 요청은 '신청-수준 액션'이라 검토 화면 상단(모든 탭에서 보이는 곳)에 둔다.
+        {/* 결제 요청 — Phase 1(PENDING_REVIEW/REVISION_REQUESTED)에서만 노출.
             가드 = kVA 확정 + 서류 0건 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
         {inPhase1 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
             <span className="font-medium text-gray-700">Ready for payment?</span>
-            {/* Phase 1 진행도 — 어느 탭에 있든 무엇이 남았는지 인식 가능.
-                상태는 색(시각) + ✓/• 글리프(시각) + sr-only(스크린리더) 삼중 인코딩.
-                id 부여 → 비활성 버튼이 aria-describedby 로 "왜 비활성인지"를 가리킨다. */}
             <span id="phase1-progress" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
               <span
                 className={`inline-flex items-center gap-1 ${kvaConfirmed ? 'text-success-700' : 'text-warning-700'}`}
@@ -547,7 +372,6 @@ export default function LewReviewFormPage() {
                   className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
                 >
                   <span aria-hidden>•</span>
-                  {/* 모바일: "Docs 2" 축약 / sm 이상: 전체 문구 */}
                   <span className="sm:hidden">Docs {pendingDocCount}</span>
                   <span className="hidden sm:inline">
                     {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending
@@ -582,7 +406,7 @@ export default function LewReviewFormPage() {
         )}
       </div>
 
-      {/* Back navigation — PageHeader 위에 유지 */}
+      {/* Back navigation */}
       <div>
         <button
           type="button"
@@ -613,19 +437,9 @@ export default function LewReviewFormPage() {
         </div>
       )}
 
-      {/* Finalized banner */}
-      {cofFinalized && (
-        <InfoBox variant="info">
-          This Certificate of Fitness has been finalized on{' '}
-          <strong>{lewData.cof?.certifiedAt ?? 'unknown date'}</strong>. The application has moved to
-          payment stage.
-        </InfoBox>
-      )}
-
       {/* Tabs */}
       <Card padding="none">
         <div className="px-2">
-          {/* activeTab은 useEffect에서 첫 미완료 탭으로 동적 설정됨. 첫 렌더에서 null일 수 있어 fallback. */}
           <Tabs
             tabs={tabs}
             activeKey={activeTab ?? 'documents'}
@@ -673,65 +487,15 @@ export default function LewReviewFormPage() {
           )}
 
           <TabPanel active={activeTab === 'loa'}>
-            {adminApp ? (
-              <AdminLoaSection
-                application={adminApp}
-                loaStatus={loaStatus}
-                onGenerate={handleGenerateLoa}
-                onUploadLoa={handleUploadLoa}
-                onDownload={handleLoaDownload}
-                generating={loaGenerating}
-                uploading={loaUploading}
-              />
-            ) : (
-              <LoaReadOnlyView loaStatus={loaStatus} application={adminApp} />
-            )}
-          </TabPanel>
-
-          <TabPanel active={activeTab === 'cof'}>
-            <div className="space-y-6">
-              <Card>
-                <StepTracker steps={COF_STEPS} currentStep={currentStep} />
-              </Card>
-              <Card>
-                {currentStep === 0 && (
-                  <CofStepApplicationSummary data={lewData} onNext={() => setCurrentStep(1)} />
-                )}
-                {currentStep === 1 && (
-                  <CofStepInputs
-                    data={lewData}
-                    draft={draft}
-                    onDraftChange={handleDraftChange}
-                    onPrevious={() => setCurrentStep(0)}
-                    onSaveDraft={handleSaveDraft}
-                    onNext={handleNextFromInputs}
-                    saving={saving}
-                    errors={errors}
-                    readOnly={cofFinalized}
-                  />
-                )}
-                {currentStep === 2 && (
-                  <CofStepReviewFinalize
-                    draft={draft}
-                    confirmed={confirmed}
-                    onConfirmedChange={setConfirmed}
-                    onPrevious={() => setCurrentStep(1)}
-                    onSaveDraft={handleSaveDraft}
-                    onFinalize={handleFinalize}
-                    saving={saving}
-                    finalizing={finalizing}
-                    readOnly={cofFinalized}
-                    guards={{
-                      kvaConfirmed,
-                      pendingDocCount,
-                      sldRequired,
-                      sldReady,
-                    }}
-                    onJumpToTab={(key) => setActiveTab(key as TabKey)}
-                  />
-                )}
-              </Card>
-            </div>
+            <AdminLoaSection
+              application={adminApp}
+              loaStatus={loaStatus}
+              onGenerate={handleGenerateLoa}
+              onUploadLoa={handleUploadLoa}
+              onDownload={handleLoaDownload}
+              generating={loaGenerating}
+              uploading={loaUploading}
+            />
           </TabPanel>
         </div>
       </Card>
@@ -746,11 +510,11 @@ export default function LewReviewFormPage() {
         onClose={() => setShowSldConfirm(false)}
       />
 
-      {/* PR3 결제 요청 confirm dialog — 비가역 액션(신청자에게 결제 알림 발송) */}
+      {/* 결제 요청 confirm dialog — 비가역 액션(신청자에게 결제 알림 발송) */}
       <ConfirmDialog
         isOpen={showRequestPaymentConfirm}
         title="Request payment?"
-        message="The applicant will be notified by email to pay the licence fee. This moves the application to the payment stage. SLD, LOA, and the Certificate of Fitness are completed after payment."
+        message="The applicant will be notified by email to pay the licence fee. This moves the application to the payment stage. SLD and LOA are completed after payment."
         confirmLabel="Request payment"
         onConfirm={() => {
           setShowRequestPaymentConfirm(false);
@@ -761,8 +525,6 @@ export default function LewReviewFormPage() {
 
       {/* ───────────────────────────────────────────────────────────────────
           옵션 B 사이드바 형태 ② — 데스크톱 (>=1024px) 콜랩서블 사이드바
-          접힘: 우측 폭 ~40px 토글 바 / 펼침: 폭 ~360px 카드 (AdminApplicationInfo 재사용).
-          z-index 40 → sticky 헤더(z-30)보다 위. localStorage 영속화 안 함.
          ────────────────────────────────────────────────────────────────── */}
       <div className="hidden lg:block">
         {!appInfoOpen && (
@@ -861,147 +623,6 @@ export default function LewReviewFormPage() {
       </div>
     </div>
   );
-}
-
-/**
- * LOA view-only 패널. LEW는 LOA 생성/업로드 권한이 없다 (백엔드 URL 매처 차단).
- */
-function LoaReadOnlyView({
-  loaStatus,
-  application,
-}: {
-  loaStatus: LoaStatus | null;
-  application: AdminApplication;
-}) {
-  const signed = !!application.loaSignedAt;
-  const isRenewal = application.applicationType === 'RENEWAL';
-  return (
-    <div className="space-y-3">
-      <h2 className="text-lg font-semibold text-gray-800">Letter of Authority</h2>
-      <p className="text-sm text-gray-500">
-        LOA is managed by ADMIN. LEW can view its status here as part of the review workflow.
-      </p>
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2 text-sm">
-        <div className="flex justify-between">
-          <span className="text-gray-600">Type</span>
-          <span className="font-medium text-gray-800">{isRenewal ? 'Renewal (uploaded)' : 'New (generated)'}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-600">Signature status</span>
-          <span className="font-medium text-gray-800">
-            {signed ? 'Signed' : 'Not signed yet'}
-          </span>
-        </div>
-        {application.loaSignedAt && (
-          <div className="flex justify-between">
-            <span className="text-gray-600">Signed at</span>
-            <span className="font-medium text-gray-800">
-              {new Date(application.loaSignedAt).toLocaleString()}
-            </span>
-          </div>
-        )}
-        {loaStatus && (
-          <div className="flex justify-between">
-            <span className="text-gray-600">LOA file</span>
-            <span className="font-medium text-gray-800">
-              {loaStatus.loaFileSeq ? `#${loaStatus.loaFileSeq}` : 'Not generated'}
-            </span>
-          </div>
-        )}
-      </div>
-      {!signed && (
-        <div className="rounded-lg border border-warning-200 bg-warning-50 p-3 text-xs text-warning-700">
-          LOA signature is pending. ADMIN or the applicant must complete the signature before this
-          application can progress.
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** CoF Draft 존재 시 우선, 없으면 hint + today prefill. */
-function buildInitialDraft(
-  data: LewApplicationResponse,
-  adminApp: AdminApplication,
-): CertificateOfFitnessRequest {
-  const today = new Date().toISOString().slice(0, 10);
-  if (data.cof) {
-    const base = responseToRequest(data.cof);
-    // Phase 6: kVA는 Application.selectedKva SSOT. Draft 응답 값보다 현재 Application 값 우선.
-    return { ...base, approvedLoadKva: adminApp.selectedKva };
-  }
-  return {
-    msslAccountNo: data.msslHintPlain || undefined,
-    consumerType: data.consumerTypeHint,
-    retailerCode: data.retailerHint,
-    supplyVoltageV:
-      data.supplyVoltageHint != null ? (data.supplyVoltageHint as SupplyVoltage) : undefined,
-    approvedLoadKva: adminApp.kvaStatus === 'UNKNOWN' ? undefined : adminApp.selectedKva,
-    hasGenerator: data.hasGeneratorHint ?? false,
-    generatorCapacityKva: data.generatorCapacityHint,
-    inspectionIntervalMonths: undefined,
-    lewAppointmentDate: today,
-    lewConsentDate: undefined,
-  };
-}
-
-function responseToRequest(cof: CertificateOfFitnessResponse): CertificateOfFitnessRequest {
-  return {
-    msslAccountNo: cof.msslAccountNo,
-    consumerType: cof.consumerType as ConsumerType | undefined,
-    retailerCode: cof.retailerCode as RetailerCode | undefined,
-    supplyVoltageV: cof.supplyVoltageV as SupplyVoltage | undefined,
-    approvedLoadKva: cof.approvedLoadKva,
-    hasGenerator: cof.hasGenerator,
-    generatorCapacityKva: cof.generatorCapacityKva,
-    inspectionIntervalMonths:
-      cof.inspectionIntervalMonths as InspectionInterval | undefined,
-    lewAppointmentDate: cof.lewAppointmentDate,
-    lewConsentDate: cof.lewConsentDate,
-  };
-}
-
-function validateDraftForFinalize(draft: CertificateOfFitnessRequest): Record<string, string> {
-  const errs: Record<string, string> = {};
-  const msslRegex = /^\d{3}-\d{2}-\d{4}-\d$/;
-  if (!draft.msslAccountNo || !msslRegex.test(draft.msslAccountNo)) {
-    errs.msslAccountNo = 'Enter all 10 MSSL digits (format ###-##-####-#).';
-  }
-  if (!draft.consumerType) {
-    errs.consumerType = 'Pick a consumer type.';
-  }
-  if (draft.consumerType === 'CONTESTABLE' && !draft.retailerCode) {
-    errs.retailerCode = 'Retailer is required for contestable supply.';
-  }
-  if (!draft.supplyVoltageV) {
-    errs.supplyVoltageV = 'Pick a supply voltage.';
-  }
-  if (!draft.approvedLoadKva || draft.approvedLoadKva <= 0) {
-    errs.approvedLoadKva = 'Approved load (kVA) must be confirmed.';
-  }
-  if (draft.hasGenerator && (!draft.generatorCapacityKva || draft.generatorCapacityKva <= 0)) {
-    errs.generatorCapacityKva = 'Generator capacity is required when a generator is present.';
-  }
-  if (!draft.inspectionIntervalMonths) {
-    errs.inspectionIntervalMonths = 'Pick an inspection interval.';
-  }
-  if (!draft.lewAppointmentDate) {
-    errs.lewAppointmentDate = 'LEW appointment date is required.';
-  }
-  return errs;
-}
-
-function extractError(err: unknown): { code: string; message: string } {
-  const e = err as ApiErrorShape;
-  const code =
-    (e as unknown as { code?: string }).code ||
-    e.response?.data?.code ||
-    'UNKNOWN';
-  const message =
-    (e as unknown as { message?: string }).message ||
-    e.response?.data?.message ||
-    'Unknown error';
-  return { code, message };
 }
 
 function ErrorPanel({

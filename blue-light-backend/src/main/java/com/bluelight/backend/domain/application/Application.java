@@ -1,7 +1,6 @@
 package com.bluelight.backend.domain.application;
 
 import com.bluelight.backend.common.crypto.EncryptedStringConverter;
-import com.bluelight.backend.domain.cof.CertificateOfFitness;
 import com.bluelight.backend.domain.common.BaseEntity;
 import com.bluelight.backend.domain.user.User;
 import jakarta.persistence.*;
@@ -450,16 +449,6 @@ public class Application extends BaseEntity {
     @Column(name = "applicant_generator_capacity_hint")
     private Integer applicantGeneratorCapacityHint;
 
-    // ── LEW Review Form — Certificate of Fitness 매핑 (P1.A) ──
-
-    /**
-     * Certificate of Fitness (1:1). 신청 당시에는 null, LEW Draft Save 시 생성.
-     * <p>owning side는 {@link CertificateOfFitness#getApplication()} — 여기는 mappedBy로 inverse.</p>
-     * <p>cascade = PERSIST, MERGE — Application 저장 시 CoF도 함께 저장/갱신 (삭제는 soft delete 각자).</p>
-     */
-    @OneToOne(mappedBy = "application", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, fetch = FetchType.LAZY)
-    private CertificateOfFitness certificateOfFitness;
-
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
@@ -558,22 +547,6 @@ public class Application extends BaseEntity {
     public void approveForPayment() {
         this.reviewComment = null;
         this.status = ApplicationStatus.PENDING_PAYMENT;
-    }
-
-    /**
-     * Phase 6: CoF finalize 후 ADMIN이 kVA override 시 CoF 재서명을 요구하며 상태를 되돌린다.
-     *
-     * <p>PENDING_PAYMENT → PENDING_REVIEW. reviewComment는 덮어쓰지 않는다(재서명 맥락은
-     * 감사 로그와 notification에서 전달).</p>
-     *
-     * @throws IllegalStateException 현재 상태가 PENDING_PAYMENT 이외인 경우
-     */
-    public void reopenForCofReissue() {
-        if (this.status != ApplicationStatus.PENDING_PAYMENT) {
-            throw new IllegalStateException(
-                    "Can only reopen from PENDING_PAYMENT (current: " + this.status + ")");
-        }
-        this.status = ApplicationStatus.PENDING_REVIEW;
     }
 
     /**

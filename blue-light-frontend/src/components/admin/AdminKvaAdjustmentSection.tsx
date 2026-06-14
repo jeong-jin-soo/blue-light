@@ -239,7 +239,6 @@ function AdjustmentRow({ row, isAdmin, onMarkSettlement }: RowProps) {
         <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
         <Badge variant={roleBadge.variant}>{roleBadge.label}</Badge>
         {paymentBadge && <Badge variant={paymentBadge.variant}>{paymentBadge.label}</Badge>}
-        {row.cofReissueTriggered && <Badge variant="warning">CoF re-issue</Badge>}
         <span className="text-xs text-gray-500 ml-auto">
           {formatDateTime(row.createdAt)}
         </span>

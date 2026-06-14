@@ -54,14 +54,10 @@ function actionsFor(status: ConciergeStatus): ActionDef[] {
         { label: 'Create application on behalf', kind: 'createApplication' },
       ];
     case 'APPLICATION_CREATED':
-      return [{ label: 'Request LOA signing', kind: 'transition', nextStatus: 'AWAITING_APPLICANT_LOA_SIGN' }];
+      return [{ label: 'Mark LOA ready', kind: 'transition', nextStatus: 'AWAITING_APPLICANT_LOA_SIGN' }];
     case 'AWAITING_APPLICANT_LOA_SIGN':
       return [
-        {
-          label: 'Awaiting applicant LOA signature',
-          kind: 'blocked',
-          disabledReason: 'Applicant must sign the LOA before continuing.',
-        },
+        { label: 'Confirm LOA & proceed to payment', kind: 'transition', nextStatus: 'AWAITING_LICENCE_PAYMENT' },
       ];
     case 'AWAITING_LICENCE_PAYMENT':
       return [

@@ -18,8 +18,6 @@ import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.application.ApplicationType;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
-import com.bluelight.backend.domain.cof.CertificateOfFitness;
-import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
 import com.bluelight.backend.domain.invoice.Invoice;
 import com.bluelight.backend.domain.invoice.InvoiceRepository;
 import com.bluelight.backend.domain.kva.AdminPaymentAdjustment;
@@ -86,7 +84,6 @@ public class KvaPostPaymentService {
     private final MasterPriceRepository masterPriceRepository;
     private final UserRepository userRepository;
     private final KvaAdjustmentRepository kvaAdjustmentRepository;
-    private final CertificateOfFitnessRepository cofRepository;
     private final InvoiceRepository invoiceRepository;
     private final PaymentRepository paymentRepository;
     private final InvoiceGenerationService invoiceGenerationService;
@@ -189,7 +186,6 @@ public class KvaPostPaymentService {
                 .settlementMemo(null)
                 .adminAdjustmentAt(LocalDateTime.now())
                 .settledAt(null)
-                .cofReissueTriggered(false)
                 .build();
         record = kvaAdjustmentRepository.save(record);
 
@@ -244,18 +240,12 @@ public class KvaPostPaymentService {
         // ── Invoice invalidate + 재발행 (D3) ─────────────
         invalidateAndRegenerateInvoice(application, record.getAdjustmentSeq());
 
-        // ── CoF unfinalize (AC-C1) ───────────────────────
-        boolean cofReissueTriggered = unfinalizeCofIfNeeded(application, request.getNewKva());
-        if (cofReissueTriggered) {
-            record.markCofReissueTriggered();
-        }
-
         // ── Audit logs (REQUIRES_NEW) ────────────────────
         Map<String, Object> overrideMeta = buildOverrideMetadata(
                 previousKva, previousQuote, request.getNewKva(), newQuote,
                 amountDifference, masterPrice.getMasterPriceSeq(),
                 paymentAdjustment, request.getReason(), request.getAdminMemo(),
-                current, record.getAdjustmentSeq(), cofReissueTriggered);
+                current, record.getAdjustmentSeq());
         auditLogService.logAsync(
                 adminUserSeq, AuditAction.KVA_OVERRIDE_POSTPAYMENT, AuditCategory.ADMIN,
                 "Application", String.valueOf(applicationSeq),
@@ -264,24 +254,11 @@ public class KvaPostPaymentService {
                 null, null, "POST",
                 "/api/admin/applications/" + applicationSeq + "/kva-override-postpayment", 200);
 
-        if (cofReissueTriggered) {
-            Map<String, Object> cofMeta = new LinkedHashMap<>(overrideMeta);
-            cofMeta.put("cofUnfinalized", true);
-            auditLogService.logAsync(
-                    adminUserSeq, AuditAction.COF_UNFINALIZED_BY_KVA_ADJUSTMENT,
-                    AuditCategory.ADMIN,
-                    "Application", String.valueOf(applicationSeq),
-                    "CoF unfinalized due to kVA post-payment override",
-                    null, cofMeta,
-                    null, null, "POST",
-                    "/api/admin/applications/" + applicationSeq + "/kva-override-postpayment", 200);
-        }
-
         log.info("kVA post-payment overridden: applicationSeq={}, prev={}kVA/{}, new={}kVA/{}, "
-                        + "adjustmentSeq={}, cofReissued={}, adminUserSeq={}",
+                        + "adjustmentSeq={}, adminUserSeq={}",
                 applicationSeq, previousKva, previousQuote,
                 request.getNewKva(), newQuote, record.getAdjustmentSeq(),
-                cofReissueTriggered, adminUserSeq);
+                adminUserSeq);
 
         // ── PR-2: 배정 LEW 알림 이벤트 발행 ──────────────
         // 본 트랜잭션 커밋 후 KvaOverrideNotificationListener (AFTER_COMMIT) 가 인앱+이메일 발송.
@@ -298,7 +275,6 @@ public class KvaPostPaymentService {
                 previousQuote,
                 newQuote,
                 amountDifference,
-                cofReissueTriggered,
                 request.getReason(),
                 adminUserSeq,
                 "ADMIN"));
@@ -426,7 +402,6 @@ public class KvaPostPaymentService {
                 .settlementMemo(null)
                 .adminAdjustmentAt(null)
                 .settledAt(null)
-                .cofReissueTriggered(false)
                 .build();
         record = kvaAdjustmentRepository.save(record);
 
@@ -788,38 +763,12 @@ public class KvaPostPaymentService {
                 "/api/admin/applications/" + applicationSeq + "/kva-override-postpayment", 200);
     }
 
-    /**
-     * CoF 가 finalized 면 unfinalize. true 반환 시 LEW 재서명 흐름 필요.
-     * Application.status 는 변경하지 않는다 (PR3 모델 — CoF 는 결제 후 단계).
-     */
-    private boolean unfinalizeCofIfNeeded(Application application, Integer newKva) {
-        Optional<CertificateOfFitness> cofOpt = cofRepository
-                .findByApplication_ApplicationSeq(application.getApplicationSeq());
-        if (cofOpt.isEmpty()) {
-            return false;
-        }
-        CertificateOfFitness cof = cofOpt.get();
-        if (!cof.isFinalized()) {
-            // 이미 unfinalized 면 approvedLoadKva 만 새 값으로 동기화.
-            try {
-                cof.snapshotApprovedLoadKva(newKva);
-            } catch (IllegalStateException ignore) {
-                // race condition 으로 finalized 가 됐다면 다시 reopen
-                cof.reopenForReissue(newKva);
-                return true;
-            }
-            return false;
-        }
-        cof.reopenForReissue(newKva);
-        return true;
-    }
-
     private Map<String, Object> buildOverrideMetadata(
             Integer previousKva, BigDecimal previousQuote,
             Integer newKva, BigDecimal newQuote, BigDecimal amountDifference,
             Long masterPriceSeq, AdminPaymentAdjustment paymentAdjustment,
             String reason, String adminMemo,
-            ApplicationStatus status, Long adjustmentSeq, boolean cofReissueTriggered) {
+            ApplicationStatus status, Long adjustmentSeq) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("adjustmentSeq", adjustmentSeq);
         m.put("previousKva", previousKva);
@@ -832,7 +781,6 @@ public class KvaPostPaymentService {
         m.put("applicationStatus", status != null ? status.name() : null);
         m.put("reason", reason);
         m.put("adminMemo", adminMemo);
-        m.put("cofReissueTriggered", cofReissueTriggered);
         return m;
     }
 

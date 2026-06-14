@@ -311,7 +311,7 @@ const router = createBrowserRouter([
           { path: '/lew/dashboard', element: <AdminDashboardPage /> },
           { path: '/lew/applications', element: <AdminApplicationListPage /> },
           { path: '/lew/applications/:id', element: <LewApplicationDetailPage /> },
-          // LEW Review Form (P2.B) — CoF 3-step
+          // LEW Review Form — Documents/kVA/SLD/LOA 탭
           { path: '/lew/applications/:id/review', element: <LewReviewFormPage /> },
           // ★ Concierge 강화 PR-4 — LEW 컨시어지 워크스페이스
           { path: '/lew/concierge-requests', element: <LewConciergeRequestListPage /> },

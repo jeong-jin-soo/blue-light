@@ -10,14 +10,12 @@ import com.bluelight.backend.domain.user.User;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -32,9 +30,8 @@ import static org.mockito.Mockito.when;
  * PR-2 — {@link KvaOverrideNotificationListener} 단위 테스트.
  *
  * <p>책임: ① assignedLewUserSeq 정상 케이스에서 인앱 + 이메일 발송, ② LEW 미배정 스킵,
- * ③ 멱등성, ④ 이메일 실패가 비즈니스/리스너 트랜잭션을 깨뜨리지 않음, ⑤ cofReissueTriggered
- * 분기에 메시지 본문이 추가 안내 라인을 포함, ⑥ application lookup 실패 시 인앱은 진행하되
- * 이메일은 스킵.</p>
+ * ③ 멱등성, ④ 이메일 실패가 비즈니스/리스너 트랜잭션을 깨뜨리지 않음, ⑤ application lookup
+ * 실패 시 인앱은 진행하되 이메일은 스킵.</p>
  */
 @DisplayName("KvaOverrideNotificationListener — PR-2")
 class KvaOverrideNotificationListenerTest {
@@ -60,13 +57,12 @@ class KvaOverrideNotificationListenerTest {
                 applicationRepository, notificationRepository, notificationService, emailService);
     }
 
-    private KvaOverrideAppliedEvent event(Long lewSeq, boolean cofReissueTriggered) {
+    private KvaOverrideAppliedEvent event(Long lewSeq) {
         return new KvaOverrideAppliedEvent(
                 APPLICATION_SEQ, ADJUSTMENT_SEQ, lewSeq,
                 100, 200,
                 new BigDecimal("450.00"), new BigDecimal("650.00"),
                 new BigDecimal("200.00"),
-                cofReissueTriggered,
                 "Site survey: 200 kVA",
                 ADMIN_SEQ, "ADMIN");
     }
@@ -92,7 +88,7 @@ class KvaOverrideNotificationListenerTest {
     void onKvaOverrideApplied_정상() {
         stubLewAndApp();
 
-        listener.onKvaOverrideApplied(event(LEW_SEQ, false));
+        listener.onKvaOverrideApplied(event(LEW_SEQ));
 
         verify(notificationService).createNotification(
                 eq(LEW_SEQ),
@@ -108,18 +104,18 @@ class KvaOverrideNotificationListenerTest {
                 eq(100), eq(200),
                 eq(new BigDecimal("450.00")), eq(new BigDecimal("650.00")),
                 eq(new BigDecimal("200.00")),
-                eq(false), eq("Site survey: 200 kVA"));
+                eq("Site survey: 200 kVA"));
     }
 
     @Test
     @DisplayName("assignedLewUserSeq=null — 알림·이메일·repository 모두 호출 안 됨")
     void onKvaOverrideApplied_LEW_미배정_스킵() {
-        listener.onKvaOverrideApplied(event(null, false));
+        listener.onKvaOverrideApplied(event(null));
 
         verify(notificationService, never()).createNotification(
                 anyLong(), any(), anyString(), anyString(), anyString(), anyLong());
         verify(emailService, never()).sendKvaAdjustedToLewEmail(
-                anyString(), anyString(), anyLong(), any(), any(), any(), any(), any(), anyBoolean(), anyString());
+                anyString(), anyString(), anyLong(), any(), any(), any(), any(), any(), anyString());
         verify(notificationRepository, never())
                 .existsByRecipientUserSeqAndTypeAndReferenceTypeAndReferenceId(
                         anyLong(), any(), anyString(), anyLong());
@@ -134,12 +130,12 @@ class KvaOverrideNotificationListenerTest {
                 eq("APPLICATION"), eq(APPLICATION_SEQ)))
                 .thenReturn(true);
 
-        listener.onKvaOverrideApplied(event(LEW_SEQ, false));
+        listener.onKvaOverrideApplied(event(LEW_SEQ));
 
         verify(notificationService, never()).createNotification(
                 anyLong(), any(), anyString(), anyString(), anyString(), anyLong());
         verify(emailService, never()).sendKvaAdjustedToLewEmail(
-                anyString(), anyString(), anyLong(), any(), any(), any(), any(), any(), anyBoolean(), anyString());
+                anyString(), anyString(), anyLong(), any(), any(), any(), any(), any(), anyString());
     }
 
     @Test
@@ -150,10 +146,10 @@ class KvaOverrideNotificationListenerTest {
         // 이메일이 RuntimeException 을 던져도 리스너는 swallow.
         doThrow(new RuntimeException("SMTP down"))
                 .when(emailService).sendKvaAdjustedToLewEmail(
-                        anyString(), anyString(), anyLong(), any(), any(), any(), any(), any(), anyBoolean(), anyString());
+                        anyString(), anyString(), anyLong(), any(), any(), any(), any(), any(), anyString());
 
         // 예외가 호출자(이벤트 디스패처)로 전파되지 않아야 비즈니스 트랜잭션 결과가 영향을 받지 않음.
-        listener.onKvaOverrideApplied(event(LEW_SEQ, false));
+        listener.onKvaOverrideApplied(event(LEW_SEQ));
 
         // 인앱 알림은 이메일 실패와 독립적으로 호출되어야 한다 (둘은 독립 채널)
         verify(notificationService).createNotification(
@@ -173,32 +169,12 @@ class KvaOverrideNotificationListenerTest {
                 .when(notificationService).createNotification(
                         anyLong(), any(), anyString(), anyString(), anyString(), anyLong());
 
-        listener.onKvaOverrideApplied(event(LEW_SEQ, false));
+        listener.onKvaOverrideApplied(event(LEW_SEQ));
 
         // 이메일은 시도되어야 한다.
         verify(emailService).sendKvaAdjustedToLewEmail(
                 eq("lew@licensekaki.sg"), anyString(), eq(APPLICATION_SEQ),
-                any(), any(), any(), any(), any(), anyBoolean(), anyString());
-    }
-
-    @Test
-    @DisplayName("cofReissueTriggered=true — 인앱 메시지에 'CoF re-issue required' 안내 포함")
-    void onKvaOverrideApplied_CoF재서명_분기() {
-        stubLewAndApp();
-
-        listener.onKvaOverrideApplied(event(LEW_SEQ, true));
-
-        // 인앱 메시지 본문에 CoF 안내가 포함되었는가
-        ArgumentCaptor<String> bodyCap = ArgumentCaptor.forClass(String.class);
-        verify(notificationService).createNotification(
-                eq(LEW_SEQ), eq(NotificationType.KVA_ADJUSTED_BY_ADMIN_LEW),
-                anyString(), bodyCap.capture(), anyString(), anyLong());
-        assertThat(bodyCap.getValue()).contains("CoF re-issue required");
-
-        // 이메일 호출 시 cofReissueTriggered=true 가 전달됨
-        verify(emailService).sendKvaAdjustedToLewEmail(
-                anyString(), anyString(), eq(APPLICATION_SEQ),
-                any(), any(), any(), any(), any(), eq(true), anyString());
+                any(), any(), any(), any(), any(), anyString());
     }
 
     @Test
@@ -212,7 +188,7 @@ class KvaOverrideNotificationListenerTest {
         // application 이 사라진 경우 (race: 동시에 삭제됐다고 가정)
         when(applicationRepository.findById(APPLICATION_SEQ)).thenReturn(Optional.empty());
 
-        listener.onKvaOverrideApplied(event(LEW_SEQ, false));
+        listener.onKvaOverrideApplied(event(LEW_SEQ));
 
         // 인앱 알림은 정상 호출됨 (event payload 만으로 본문 구성 가능)
         verify(notificationService).createNotification(
@@ -221,7 +197,7 @@ class KvaOverrideNotificationListenerTest {
         // 이메일은 발송 대상자(email/이름)를 알 수 없으므로 스킵
         verify(emailService, never()).sendKvaAdjustedToLewEmail(
                 anyString(), anyString(), anyLong(),
-                any(), any(), any(), any(), any(), anyBoolean(), anyString());
+                any(), any(), any(), any(), any(), anyString());
     }
 
     @Test
@@ -229,7 +205,7 @@ class KvaOverrideNotificationListenerTest {
     void onKvaOverrideApplied_인앱_본문_kVA_표기() {
         stubLewAndApp();
 
-        listener.onKvaOverrideApplied(event(LEW_SEQ, false));
+        listener.onKvaOverrideApplied(event(LEW_SEQ));
 
         verify(notificationService).createNotification(
                 eq(LEW_SEQ), any(), anyString(),

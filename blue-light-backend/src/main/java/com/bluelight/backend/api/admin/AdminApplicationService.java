@@ -5,8 +5,6 @@ import com.bluelight.backend.api.concierge.ApplicationStatusChangedEvent;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.*;
-import com.bluelight.backend.domain.cof.CertificateOfFitness;
-import com.bluelight.backend.domain.cof.CertificateOfFitnessRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import jakarta.persistence.criteria.Predicate;
@@ -37,7 +35,6 @@ public class AdminApplicationService {
 
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
-    private final CertificateOfFitnessRepository cofRepository;
     private final EmailService emailService;
     /** ★ Phase 1 PR#7: Application → ConciergeRequest 상태 동기화용 이벤트 발행 */
     private final ApplicationEventPublisher eventPublisher;
@@ -252,18 +249,6 @@ public class AdminApplicationService {
                     "Only applications with IN_PROGRESS status can be completed",
                     HttpStatus.BAD_REQUEST,
                     "INVALID_STATUS_FOR_COMPLETION"
-            );
-        }
-
-        // 동선 재설계 B: CoF(LEW 제출 전 신고)가 finalize 되지 않은 채 라이선스가 발급되는 것을 차단.
-        // CoF는 ELISE 제출 데이터(Supply Voltage/Approved Load/MSSL 등)를 담으므로, 이것 없이
-        // 라이선스가 나왔다는 것은 EMA 제출 자체가 불가능한 모순 상태다. (sg-lew-expert 결정 #3)
-        CertificateOfFitness cof = cofRepository.findByApplication_ApplicationSeq(applicationSeq).orElse(null);
-        if (cof == null || !cof.isFinalized()) {
-            throw new BusinessException(
-                    "Certificate of Fitness must be finalized by the assigned LEW before issuing the licence",
-                    HttpStatus.CONFLICT,
-                    "COF_NOT_FINALIZED"
             );
         }
 

@@ -28,7 +28,7 @@ import type { AdminApplication, DocumentRequest, SldRequest } from '../../types'
 /**
  * LEW 전용 신청 진입(랜딩) 페이지
  * - URL: /lew/applications/:id
- * - 본 페이지는 "신청 메타 + Phase 1(CoF) 진입 CTA"만 담당
+ * - 본 페이지는 "신청 메타 + Phase 1 검토 진입 CTA"만 담당
  * - Documents/LOA/SLD/Payment 등 상세 워크플로우는 /lew/applications/:id/review 에서 다룸
  *
  * Admin 페이지(AdminApplicationDetailPage)와 분리한 이유:
@@ -394,7 +394,7 @@ export default function LewApplicationDetailPage() {
         isOpen={showRequestPaymentConfirm}
         title="Request payment from applicant?"
         message={
-          'The applicant will be notified to pay the licence fee. SLD, LOA, and the Certificate of Fitness will be completed after the payment is confirmed by admin.'
+          'The applicant will be notified to pay the licence fee. SLD and LOA will be completed after the payment is confirmed by admin.'
         }
         confirmLabel="Request payment"
         onConfirm={handleRequestPayment}
