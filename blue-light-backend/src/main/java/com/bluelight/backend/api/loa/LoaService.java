@@ -3,6 +3,7 @@ package com.bluelight.backend.api.loa;
 import com.bluelight.backend.api.admin.LoaFormTemplateService;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.email.EmailService;
+import com.bluelight.backend.api.email.MailSubjectCode;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -63,6 +64,10 @@ public class LoaService {
     private final ApplicationEventPublisher eventPublisher;
     // 교환 모델 (PR3b) — active LoA 폼 소비 (설정 우선 원칙).
     private final LoaFormTemplateService loaFormTemplateService;
+
+    // 비운영(개발서버) 메일 제목에 메일 코드 prefix 부착용.
+    @org.springframework.beans.factory.annotation.Value("${spring.profiles.active:default}")
+    private String activeProfiles;
 
     /**
      * LOA PDF 생성 (Admin/LEW 액션)
@@ -507,7 +512,8 @@ public class LoaService {
     private void sendFormSentNotification(Application application) {
         try {
             User applicant = application.getUser();
-            String subject = "[LicenseKaki] LoA form ready for your application #" + application.getApplicationSeq();
+            String subject = MailSubjectCode.prefix(activeProfiles, "A-34")
+                    + "[LicenseKaki] LoA form ready for your application #" + application.getApplicationSeq();
             String body = "Dear " + escape(applicant.getFullName()) + ",<br><br>"
                     + "Your assigned LEW has shared the Letter of Appointment (LoA) form for your "
                     + "application. Please download the form, sign it offline, and upload the signed copy "
