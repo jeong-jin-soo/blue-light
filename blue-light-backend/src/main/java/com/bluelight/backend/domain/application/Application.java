@@ -894,6 +894,11 @@ public class Application extends BaseEntity {
                 || this.loaStage == LoaStage.FINAL_UPLOADED;
     }
 
+    /** 결제 요청 가능 여부(강화) — LEW 최종본 업로드까지 완료(FINAL_UPLOADED)되어야 결제 요청 가능. */
+    public boolean isLoaFinalized() {
+        return this.loaStage == LoaStage.FINAL_UPLOADED;
+    }
+
     /**
      * LOA 생성 시점의 신청자 신원 스냅샷 기록 (Phase 2 PR#4 / B-5).
      * <p>

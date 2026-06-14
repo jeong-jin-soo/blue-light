@@ -373,11 +373,11 @@ public class AdminApplicationService {
                     HttpStatus.BAD_REQUEST, "KVA_NOT_CONFIRMED");
         }
 
-        // PR4 (D-1): LoA 수령(신청자 업로드 이상) 전에는 결제 요청 불가. NEW/RENEWAL 공통.
-        if (!application.isLoaReceivedForPayment()) {
+        // LoA 완료(LEW 최종본 업로드) 후에만 결제 요청 가능 (사용자 결정 2026-06-14).
+        if (!application.isLoaFinalized()) {
             throw new BusinessException(
-                    "The signed LoA must be received before requesting payment.",
-                    HttpStatus.CONFLICT, "LOA_NOT_RECEIVED");
+                    "The final LoA must be uploaded before requesting payment.",
+                    HttpStatus.CONFLICT, "LOA_NOT_FINALIZED");
         }
 
         application.approveForPayment();

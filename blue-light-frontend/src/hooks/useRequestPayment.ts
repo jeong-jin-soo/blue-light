@@ -74,7 +74,8 @@ export function useRequestPayment(
           else navigate(reviewUrl);
           break;
         case 'LOA_NOT_RECEIVED':
-          toast.error('The signed LoA must be received before requesting payment.');
+        case 'LOA_NOT_FINALIZED':
+          toast.error('The final LoA must be uploaded before requesting payment.');
           if (onNeedsReview) onNeedsReview('loa');
           else navigate(reviewUrl);
           break;

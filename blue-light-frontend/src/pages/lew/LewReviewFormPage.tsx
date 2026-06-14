@@ -201,9 +201,9 @@ export default function LewReviewFormPage() {
   // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출. 백엔드 LewReviewService.requestPayment 가드와 일치.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
-  // LoA 수령 = 신청자 서명본 업로드 이상 (APPLICANT_UPLOADED | FINAL_UPLOADED). 백엔드 isLoaReceivedForPayment 와 동일.
-  const loaReceived =
-    loaStatus?.loaStage === 'APPLICANT_UPLOADED' || loaStatus?.loaStage === 'FINAL_UPLOADED';
+  // LoA 완료 = LEW 최종본 업로드(FINAL_UPLOADED). 백엔드 isLoaFinalized 와 동일 (2026-06-14 결정:
+  // 결제 요청은 LoA 완료 후에만 가능). 변수명은 하위 사용처 호환 위해 유지.
+  const loaReceived = loaStatus?.loaStage === 'FINAL_UPLOADED';
   const phase1Ready = kvaConfirmed && pendingDocCount === 0 && loaReceived;
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
   const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
