@@ -99,6 +99,44 @@ class EmailChannelAdapterTest {
     }
 
     @Test
+    @DisplayName("CTA 절대화 - 상대경로 ctaUrl 이 프론트 베이스URL 기준 절대 URL 로 렌더에 전달")
+    void send_absolutizesRelativeCtaUrl() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "prod");
+        ReflectionTestUtils.setField(adapter, "frontendBaseUrl", "https://licensekaki.com/");
+        NotificationOutbox row = outbox("{\"ctaUrl\":\"/applications/7\",\"amount\":\"185\"}");
+        when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
+        when(templateRegistry.render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), any()))
+                .thenReturn(new RenderedMessage("S", "<p>B</p>", null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> payloadCap = ArgumentCaptor.forClass(java.util.Map.class);
+        adapter.send(row);
+
+        verify(templateRegistry).render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), payloadCap.capture());
+        // 트레일링 슬래시 정규화 + 상대경로 prepend, 비링크 값은 그대로
+        assertThat(payloadCap.getValue().get("ctaUrl")).isEqualTo("https://licensekaki.com/applications/7");
+        assertThat(payloadCap.getValue().get("amount")).isEqualTo("185");
+    }
+
+    @Test
+    @DisplayName("CTA 절대화 - 이미 절대 URL(http) 이면 변형 없음")
+    void send_leavesAbsoluteCtaUrlUntouched() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "prod");
+        ReflectionTestUtils.setField(adapter, "frontendBaseUrl", "https://licensekaki.com");
+        NotificationOutbox row = outbox("{\"ctaUrl\":\"https://other.example/x\"}");
+        when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
+        when(templateRegistry.render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), any()))
+                .thenReturn(new RenderedMessage("S", "<p>B</p>", null));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<java.util.Map<String, String>> payloadCap = ArgumentCaptor.forClass(java.util.Map.class);
+        adapter.send(row);
+
+        verify(templateRegistry).render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), payloadCap.capture());
+        assertThat(payloadCap.getValue().get("ctaUrl")).isEqualTo("https://other.example/x");
+    }
+
+    @Test
     @DisplayName("수신자 user 없음 - permanentFailure USER_NOT_FOUND")
     void send_userNotFound() {
         when(userRepository.findById(1001L)).thenReturn(Optional.empty());

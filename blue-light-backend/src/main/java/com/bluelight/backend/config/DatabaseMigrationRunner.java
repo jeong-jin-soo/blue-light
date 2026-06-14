@@ -146,6 +146,9 @@ public class DatabaseMigrationRunner {
             // 미사용 템플릿 일괄 비활성화 시 A-17(Payment requested)도 꺼졌을 수 있으나, 이제
             // LEW/ADMIN 결제 요청이 A-17 을 오케스트레이터로 발송하므로 EMAIL/IN_APP 을 멱등 활성화.
             enableWiredNotificationTemplates(conn);
+            // ── 신청자 결제 알림 템플릿(A-17 결제요청 / A-20 결제확인) 본문 멱등 시드+활성 ──
+            //    data.sql 은 dev/prod(SQL_INIT_MODE=never)에 미적용 → 행 누락 시 이메일 발송 실패 방지.
+            seedApplicantPaymentNotificationTemplates(conn);
             // ── 결제 신호 ADMIN 알림 템플릿(A-55 증빙업로드 / A-56 확인요청) 멱등 시드+활성 ──
             seedPaymentSignalNotificationTemplates(conn);
             // ── LoA 폼 전달 → 신청자 알림 템플릿(A-57) 멱등 시드+활성 ──
@@ -2421,6 +2424,98 @@ public class DatabaseMigrationRunner {
         }
         if (inserted > 0) {
             log.info("Migration: seeded {} LoA-form-sent template rows (A-57)", inserted);
+        }
+    }
+
+    /**
+     * 신청자 결제 알림 템플릿(A-17 결제 요청 / A-20 결제 확인)을 EMAIL+IN_APP 멱등 시드+활성.
+     *
+     * <p>이 본문은 그동안 {@code data.sql} 에만 존재했는데, 운영/개발 RDS 는
+     * {@code SQL_INIT_MODE=never} 라 data.sql 이 적용되지 않는다. 따라서 결제 요청(A-17)
+     * 이메일이 {@code TEMPLATE_NOT_FOUND} 로 영구 실패할 수 있었다(인앱은 별도 경로).
+     * A-55/56/57 과 동일하게 {@code INSERT ... WHERE NOT EXISTS} 로 누락 행만 주입하므로
+     * 관리자가 편집한 기존 행은 보존한다. EMAIL CTA 의 상대경로 ctaUrl 은
+     * {@code EmailChannelAdapter} 가 절대 URL 로 변환한다.</p>
+     */
+    private void seedApplicantPaymentNotificationTemplates(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        final String a17Email =
+            "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+            + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br>"
+            + "<span style=\"font-size:12px;color:#888\">Singapore Electrical Installation Licence Platform</span></div>"
+            + "<h1 style=\"font-size:20px;margin:0 0 16px\">Your application is approved. Please complete payment to start work.</h1>"
+            + "<p style=\"margin:0 0 16px\">Hello {{applicantName}},</p>"
+            + "<p style=\"margin:0 0 16px\">Good news — your Licensed Electrical Worker has confirmed the scope of work for application <strong>#{{publicCode}}</strong> ({{kvaLabel}}). To begin the work, please settle the payment below by <strong>{{deadline}}</strong>.</p>"
+            + "<p style=\"margin:0 0 16px\"><strong>Amount due</strong>: SGD {{amount}}<br><strong>PayNow UEN</strong>: {{paynowUen}}<br><strong>Payee name</strong>: {{paynowAccountName}}<br><strong>Reference (must include)</strong>: {{paynowReference}}</p>"
+            + "<p style=\"margin:0 0 16px\">Including the reference code lets us match your payment automatically — usually within 1 business hour.</p>"
+            + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Pay via PayNow</a></p>"
+            + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
+            + "<p style=\"margin:0;font-size:12px;color:#888\">This is a transactional email from LicenseKaki. You are receiving it because your application is awaiting payment.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email. Verify any link before clicking.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>";
+        final String a20Email =
+            "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+            + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br>"
+            + "<span style=\"font-size:12px;color:#888\">Singapore Electrical Installation Licence Platform</span></div>"
+            + "<h1 style=\"font-size:20px;margin:0 0 16px\">Payment received. Work is starting.</h1>"
+            + "<p style=\"margin:0 0 16px\">Hello {{applicantName}},</p>"
+            + "<p style=\"margin:0 0 16px\">We've received your PayNow payment of <strong>SGD {{amount}}</strong> for application <strong>#{{publicCode}}</strong> on <strong>{{paidAtDisplay}}</strong>. Thank you.</p>"
+            + "<p style=\"margin:0 0 16px\">Your reviewer <strong>{{lewName}}</strong> will now coordinate the work and submit the licence to authorities. We'll keep you posted as the status changes.</p>"
+            + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">View application</a></p>"
+            + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
+            + "<p style=\"margin:0;font-size:12px;color:#888\">This is a transactional email from LicenseKaki. You are receiving it because your payment was confirmed.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email. Verify any link before clicking.</p>"
+            + "<p style=\"margin:8px 0 0;font-size:12px;color:#888\">LicenseKaki Pte Ltd · PDPA enquiries: dpo@licensekaki.sg</p></div>";
+        final String a17Vars =
+            "[\"applicantName\",\"publicCode\",\"kvaLabel\",\"amount\",\"paynowUen\",\"paynowAccountName\",\"paynowReference\",\"deadline\",\"ctaUrl\"]";
+        final String a20Vars =
+            "[\"applicantName\",\"publicCode\",\"amount\",\"paidAtDisplay\",\"lewName\",\"ctaUrl\"]";
+
+        // {code, channel, subject, body, variablesJson, severity}
+        String[][] rows = {
+            {"A-17", "EMAIL", "[LicenseKaki] Payment requested · #{{publicCode}}", a17Email, a17Vars, "CRITICAL"},
+            {"A-17", "IN_APP", "Payment requested on #{{publicCode}}",
+                "Pay SGD {{amount}} via PayNow by {{deadline}} to start work.", a17Vars, "CRITICAL"},
+            {"A-20", "EMAIL", "[LicenseKaki] Payment received · #{{publicCode}}", a20Email, a20Vars, "IMPORTANT"},
+            {"A-20", "IN_APP", "Payment confirmed on #{{publicCode}}",
+                "SGD {{amount}} received. {{lewName}} will start work shortly.", a20Vars, "IMPORTANT"},
+        };
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'PAYMENT', ?, 'APPLICANT', TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                try {
+                    insertPs.setString(1, r[0]); insertPs.setString(2, r[1]);
+                    insertPs.setString(3, r[2]); insertPs.setString(4, r[3]);
+                    insertPs.setString(5, r[4]); insertPs.setString(6, r[0]);
+                    insertPs.setString(7, r[5]);
+                    insertPs.setString(8, r[0]); insertPs.setString(9, r[1]);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, r[0]); enablePs.setString(2, r[1]);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedApplicantPaymentNotificationTemplates {} {} warn: {}", r[0], r[1], e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedApplicantPaymentNotificationTemplates aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} applicant payment template rows (A-17/A-20)", inserted);
         }
     }
 

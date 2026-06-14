@@ -55,6 +55,14 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
     @Value("${spring.profiles.active:default}")
     private String activeProfiles;
 
+    /**
+     * 프론트엔드 베이스 URL — 이메일 CTA의 상대경로(예: {@code /applications/123})를 절대 URL로
+     * 만들 때 prepend. 이메일 클라이언트는 상대경로 링크를 못 여므로 필수.
+     * password-reset 과 동일 프론트 루트 재사용(환경별 PASSWORD_RESET_BASE_URL 로 주입).
+     */
+    @Value("${password-reset.base-url:http://localhost:5174}")
+    private String frontendBaseUrl;
+
     @Override
     public NotificationChannel channel() {
         return NotificationChannel.EMAIL;
@@ -88,6 +96,10 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
             return SendResult.permanentFailure("PAYLOAD_DESERIALIZE", e.getMessage());
         }
 
+        // 2b) 이메일 CTA 절대화 — 상대경로(/...) 링크 변수를 프론트 베이스URL 기준 절대 URL로.
+        //     이메일 클라이언트는 상대경로를 못 열기 때문. (인앱 채널은 상대경로 그대로 사용)
+        payload = absolutizeLinks(payload);
+
         // 3) 템플릿 렌더
         RenderedMessage rendered;
         try {
@@ -110,5 +122,25 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
                     row.getOutboxSeq(), e.getMessage());
             return SendResult.retryableFailure("SMTP_FAILED", e.getMessage());
         }
+    }
+
+    /**
+     * payload 의 링크형 값(상대경로 '/...')을 프론트 베이스URL 기준 절대 URL로 변환한다.
+     * 이메일에선 상대경로 href 가 동작하지 않으므로 CTA 버튼이 우리 서비스로 연결되도록 보정.
+     * 이미 절대 URL(http...)이거나 '/'로 시작하지 않으면 그대로 둔다.
+     */
+    private Map<String, String> absolutizeLinks(Map<String, String> payload) {
+        if (payload == null || payload.isEmpty()) {
+            return payload;
+        }
+        String base = frontendBaseUrl == null ? "" : frontendBaseUrl.replaceAll("/+$", "");
+        Map<String, String> out = new java.util.LinkedHashMap<>(payload);
+        for (Map.Entry<String, String> e : out.entrySet()) {
+            String v = e.getValue();
+            if (v != null && v.startsWith("/") && !v.startsWith("//")) {
+                e.setValue(base + v);
+            }
+        }
+        return out;
     }
 }
