@@ -127,17 +127,22 @@ export function LewLoaExchangeSection({
             </p>
           </div>
           {applicantUploaded ? (
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Download className="h-4 w-4" />}
-              onClick={() =>
-                loaStatus?.applicantFileSeq &&
-                onDownloadFile(loaStatus.applicantFileSeq, `LoA_applicant_${loaStatus.applicationSeq}`)
-              }
-            >
-              Download
-            </Button>
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <Badge variant="success">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Received
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={<Download className="h-4 w-4" />}
+                onClick={() =>
+                  loaStatus?.applicantFileSeq &&
+                  onDownloadFile(loaStatus.applicantFileSeq, `LoA_applicant_${loaStatus.applicationSeq}`)
+                }
+              >
+                Download
+              </Button>
+            </div>
           ) : (
             <Badge variant="gray">
               <Clock className="h-3.5 w-3.5" /> Pending
@@ -157,18 +162,27 @@ export function LewLoaExchangeSection({
               Upload the completed LoA after supplementing the applicant's submission. This is submitted to EMA externally.
             </p>
           </div>
-          {finalUploaded && (
-            <Button
-              size="sm"
-              variant="outline"
-              leftIcon={<Download className="h-4 w-4" />}
-              onClick={() =>
-                loaStatus?.finalFileSeq &&
-                onDownloadFile(loaStatus.finalFileSeq, `LoA_final_${loaStatus.applicationSeq}`)
-              }
-            >
-              Download
-            </Button>
+          {finalUploaded ? (
+            <div className="flex flex-shrink-0 items-center gap-2">
+              <Badge variant="success">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Uploaded
+              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                leftIcon={<Download className="h-4 w-4" />}
+                onClick={() =>
+                  loaStatus?.finalFileSeq &&
+                  onDownloadFile(loaStatus.finalFileSeq, `LoA_final_${loaStatus.applicationSeq}`)
+                }
+              >
+                Download
+              </Button>
+            </div>
+          ) : (
+            <Badge variant="gray">
+              <Clock className="h-3.5 w-3.5" /> Pending
+            </Badge>
           )}
         </div>
 

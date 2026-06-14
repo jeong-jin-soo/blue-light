@@ -8,8 +8,9 @@ import type { AdminApplication, ApplicationStatus } from '../types';
  *   Phase Gate                                   : LEW가 결제 요청 → ADMIN 입금 확인 → LEW 알림
  *   Phase 2 (PAID / IN_PROGRESS)                 : SLD / LOA 발행
  *
- * PR3 변경: Phase 1 가드(`pendingDocCount===0 && kvaConfirmed`)를 충족하면 CTA가
+ * PR3 변경: Phase 1 가드(`pendingDocCount===0 && kvaConfirmed && loaReceived`)를 충족하면 CTA가
  * "Start review" → "Request payment"로 전환된다. SLD 가드는 결제 후 수행되므로 제외.
+ * LoA 수령(신청자 서명본 업로드 이상, D-1)은 백엔드 requestPayment 가드와 일치시킨다.
  */
 
 export type LewPrimaryActionKind =
@@ -43,6 +44,8 @@ export type LewPrimaryActionGuards = {
   sldRequired?: boolean;
   /** SLD 가 CONFIRMED 또는 sldRequired=false 일 때 true. */
   sldReady?: boolean;
+  /** LoA 수령(loaStage ∈ {APPLICANT_UPLOADED, FINAL_UPLOADED}) 여부. 백엔드 isLoaReceivedForPayment 와 동일. */
+  loaReceived?: boolean;
 };
 
 export function deriveLewPrimaryAction(
@@ -54,10 +57,13 @@ export function deriveLewPrimaryAction(
   switch (application.status) {
     case 'PENDING_REVIEW':
     case 'REVISION_REQUESTED': {
-      // PR3: Phase 1 종료 시 (서류 0건 + kVA 확정) "Request payment"로 전환.
+      // PR3: Phase 1 종료 시 (서류 0건 + kVA 확정 + LoA 수령) "Request payment"로 전환.
       // 가드 정보가 없으면 (호환성 fallback) 기존 startReview 유지.
       const phase1Done =
-        guards != null && guards.pendingDocCount === 0 && guards.kvaConfirmed;
+        guards != null &&
+        guards.pendingDocCount === 0 &&
+        guards.kvaConfirmed &&
+        guards.loaReceived === true;
       if (phase1Done) {
         return {
           kind: 'requestPayment',

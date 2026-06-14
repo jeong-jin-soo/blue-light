@@ -146,6 +146,8 @@ public class DatabaseMigrationRunner {
             // 미사용 템플릿 일괄 비활성화 시 A-17(Payment requested)도 꺼졌을 수 있으나, 이제
             // LEW/ADMIN 결제 요청이 A-17 을 오케스트레이터로 발송하므로 EMAIL/IN_APP 을 멱등 활성화.
             enableWiredNotificationTemplates(conn);
+            // ── 결제 신호 ADMIN 알림 템플릿(A-55 증빙업로드 / A-56 확인요청) 멱등 시드+활성 ──
+            seedPaymentSignalNotificationTemplates(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -2287,6 +2289,84 @@ public class DatabaseMigrationRunner {
             }
         } catch (SQLException e) {
             log.warn("enableWiredNotificationTemplates skipped: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 결제 신호 ADMIN 알림 템플릿(A-55 증빙업로드 / A-56 확인요청)을 멱등 시드 + 활성화.
+     * 기존 DB(SQL_INIT_MODE=never)엔 data.sql 미적용이라 INSERT...WHERE NOT EXISTS 로 주입.
+     */
+    private void seedPaymentSignalNotificationTemplates(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        // {code, channel, subject, body}
+        String[][] rows = {
+            {"A-55", "EMAIL",
+                "[LicenseKaki] Payment evidence uploaded · #{{publicCode}}",
+                "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\"><div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br><span style=\"font-size:12px;color:#888\">Admin notification</span></div><h1 style=\"font-size:18px;margin:0 0 16px\">Payment evidence uploaded</h1><p style=\"margin:0 0 16px\">Applicant <strong>{{applicantName}}</strong> uploaded payment evidence for application <strong>#{{publicCode}}</strong> (SGD {{amount}}). Please review and confirm the payment.</p><p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">LicenseKaki internal admin notification.</p></div>"},
+            {"A-55", "IN_APP",
+                "Payment evidence uploaded on #{{publicCode}}",
+                "{{applicantName}} uploaded payment evidence (SGD {{amount}}). Review and confirm."},
+            {"A-56", "EMAIL",
+                "[LicenseKaki] Payment confirmation requested · #{{publicCode}}",
+                "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\"><div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br><span style=\"font-size:12px;color:#888\">Admin notification</span></div><h1 style=\"font-size:18px;margin:0 0 16px\">Payment confirmation requested</h1><p style=\"margin:0 0 16px\">Applicant <strong>{{applicantName}}</strong> indicated they have completed payment for application <strong>#{{publicCode}}</strong> (SGD {{amount}}) and is requesting confirmation. Please verify and confirm the payment.</p><p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p><hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">LicenseKaki internal admin notification.</p></div>"},
+            {"A-56", "IN_APP",
+                "Applicant requested payment confirmation on #{{publicCode}}",
+                "{{applicantName}} says payment is done (SGD {{amount}}). Verify and confirm."},
+        };
+        final String variablesJson = "[\"applicantName\",\"publicCode\",\"amount\",\"ctaUrl\"]";
+
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'PAYMENT', 'IMPORTANT', 'ADMIN', TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (" +
+            "  SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                String code = r[0], channel = r[1], subject = r[2], body = r[3];
+                try {
+                    insertPs.setString(1, code);
+                    insertPs.setString(2, channel);
+                    insertPs.setString(3, subject);
+                    insertPs.setString(4, body);
+                    insertPs.setString(5, variablesJson);
+                    insertPs.setString(6, code);
+                    insertPs.setString(7, code);
+                    insertPs.setString(8, channel);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, code);
+                    enablePs.setString(2, channel);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedPaymentSignalNotificationTemplates {} {} warn: {}", code, channel, e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedPaymentSignalNotificationTemplates aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} payment-signal template rows (A-55/A-56)", inserted);
+        }
+    }
+
+    /** notification_templates 존재 여부 — SQLException 삼킴(시드는 비치명적). */
+    private boolean tableExistsSafe(Connection conn) {
+        try {
+            return tableExists(conn, "notification_templates");
+        } catch (SQLException e) {
+            return false;
         }
     }
 }

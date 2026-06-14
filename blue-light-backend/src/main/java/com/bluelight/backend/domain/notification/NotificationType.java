@@ -9,6 +9,10 @@ public enum NotificationType {
     PAYMENT_CONFIRMED,
     /** LEW/ADMIN이 결제를 요청하면(→PENDING_PAYMENT) 신청자에게 발송 (A-17, 인앱+이메일). */
     PAYMENT_REQUESTED,
+    /** 신청자가 결제 증빙 업로드 → ADMIN 알림 (A-55). */
+    PAYMENT_EVIDENCE_UPLOADED,
+    /** 신청자가 결제 확인 요청 버튼 → ADMIN 알림 (A-56). */
+    PAYMENT_CONFIRMATION_REQUESTED,
     /**
      * PR4: ADMIN이 결제를 확인하면 배정된 LEW에게 발송되는 인앱 알림.
      * Phase 2(SLD/LOA/CoF) 시작 시점을 LEW가 명시적으로 인지하도록 분리된 신규 타입.

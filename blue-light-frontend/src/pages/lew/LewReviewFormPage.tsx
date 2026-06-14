@@ -197,19 +197,23 @@ export default function LewReviewFormPage() {
   const sldReady = !sldRequired || sldRequest?.status === 'CONFIRMED';
 
   // ── 결제 요청 (Phase 1 액션) ──────
-  // 결제 요청 가드 = kVA 확정 + 서류 0건. SLD 는 결제 후 작업이라 제외.
-  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출.
+  // 결제 요청 가드 = kVA 확정 + 서류 0건 + LoA 수령(신청자 서명본 업로드 이상, D-1). SLD 는 결제 후 작업이라 제외.
+  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출. 백엔드 LewReviewService.requestPayment 가드와 일치.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
-  const phase1Ready = kvaConfirmed && pendingDocCount === 0;
+  // LoA 수령 = 신청자 서명본 업로드 이상 (APPLICANT_UPLOADED | FINAL_UPLOADED). 백엔드 isLoaReceivedForPayment 와 동일.
+  const loaReceived =
+    loaStatus?.loaStage === 'APPLICANT_UPLOADED' || loaStatus?.loaStage === 'FINAL_UPLOADED';
+  const phase1Ready = kvaConfirmed && pendingDocCount === 0 && loaReceived;
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
   const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
     applicationId,
     {
       onSuccess: loadData,
       onStaleState: loadData,
-      // 가드 위반(kVA/서류) 시 이미 리뷰 폼이므로 해당 탭으로 점프.
-      onNeedsReview: (reason) => setActiveTab(reason === 'kva' ? 'kva' : 'documents'),
+      // 가드 위반(kVA/서류/LoA) 시 이미 리뷰 폼이므로 해당 탭으로 점프.
+      onNeedsReview: (reason) =>
+        setActiveTab(reason === 'kva' ? 'kva' : reason === 'loa' ? 'loa' : 'documents'),
     },
   );
 
@@ -419,7 +423,7 @@ export default function LewReviewFormPage() {
         </div>
 
         {/* 결제 요청 — Phase 1(PENDING_REVIEW/REVISION_REQUESTED)에서만 노출.
-            가드 = kVA 확정 + 서류 0건 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
+            가드 = kVA 확정 + 서류 0건 + LoA 수령 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
         {inPhase1 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
             <span className="font-medium text-gray-700">Ready for payment?</span>
@@ -447,6 +451,22 @@ export default function LewReviewFormPage() {
                     {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending
                   </span>
                   <span className="sr-only"> pending — go to Documents tab</span>
+                  <span aria-hidden> →</span>
+                </button>
+              )}
+              {loaReceived ? (
+                <span className="inline-flex items-center gap-1 text-success-700">
+                  <span aria-hidden>✓</span> LoA
+                  <span className="sr-only">received</span>
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('loa')}
+                  className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
+                >
+                  <span aria-hidden>•</span> LoA pending
+                  <span className="sr-only"> — go to LOA tab</span>
                   <span aria-hidden> →</span>
                 </button>
               )}

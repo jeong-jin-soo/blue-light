@@ -3,6 +3,7 @@ import type {
   Application,
   ApplicationSummary,
   CreateApplicationRequest,
+  FileInfo,
   Payment,
   SldRequest,
   UpdateApplicationRequest,
@@ -106,6 +107,30 @@ export const updateSldRequest = async (
   return response.data;
 };
 
+/**
+ * E2 — 결제 증빙(PAYMENT_RECEIPT) 업로드. ADMIN/SYSTEM_ADMIN 알림(A-55). PENDING_PAYMENT 한정.
+ */
+export const reportPaymentEvidence = async (
+  applicationId: number,
+  file: File,
+): Promise<FileInfo> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await axiosClient.post<FileInfo>(
+    `/applications/${applicationId}/payment/evidence`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return response.data;
+};
+
+/**
+ * E3 — 결제 확인 요청(파일 없음). ADMIN/SYSTEM_ADMIN 알림(A-56). PENDING_PAYMENT 한정.
+ */
+export const requestPaymentConfirmation = async (applicationId: number): Promise<void> => {
+  await axiosClient.post(`/applications/${applicationId}/payment/request-confirmation`);
+};
+
 export const applicationApi = {
   createApplication,
   updateApplication,
@@ -117,5 +142,7 @@ export const applicationApi = {
   createSldRequest,
   getSldRequest,
   updateSldRequest,
+  reportPaymentEvidence,
+  requestPaymentConfirmation,
 };
 export default applicationApi;
