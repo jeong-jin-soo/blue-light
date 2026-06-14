@@ -13,6 +13,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -44,6 +45,14 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
     private final NotificationTemplateRegistry templateRegistry;
     private final UserRepository userRepository;
     private final ObjectMapper objectMapper;
+
+    /**
+     * 활성 Spring 프로필. 운영(prod)이 아닌 환경(개발서버 등)에서는 메일 제목 앞에
+     * 템플릿 코드(예: {@code [A-17]})를 붙여 어떤 알림인지 식별하기 쉽게 한다.
+     * 운영 서버만 {@code SPRING_PROFILES_ACTIVE=prod} 로 뜨므로, prod 가 아니면 코드를 prefix 한다.
+     */
+    @Value("${spring.profiles.active:default}")
+    private String activeProfiles;
 
     @Override
     public NotificationChannel channel() {
@@ -88,8 +97,13 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
         }
 
         // 4) 발송 위임
+        //    운영(prod) 외 환경에서는 제목 앞에 메일 코드(템플릿 코드)를 붙인다. (예: "[A-17] Payment Requested")
+        String subject = rendered.subject();
+        if (shouldPrefixCode() && row.getTemplateCode() != null && !row.getTemplateCode().isBlank()) {
+            subject = "[" + row.getTemplateCode() + "] " + (subject == null ? "" : subject);
+        }
         try {
-            emailService.sendGenericEmail(to, rendered.subject(), rendered.body());
+            emailService.sendGenericEmail(to, subject, rendered.body());
             // SMTP message-id 는 EmailService 가 반환하지 않으므로 outboxSeq 를 추적 식별자로 사용.
             return SendResult.success("outbox-" + row.getOutboxSeq());
         } catch (RuntimeException e) {
@@ -97,5 +111,21 @@ public class EmailChannelAdapter implements NotificationChannelAdapter {
                     row.getOutboxSeq(), e.getMessage());
             return SendResult.retryableFailure("SMTP_FAILED", e.getMessage());
         }
+    }
+
+    /**
+     * 메일 제목에 코드를 prefix 할지 여부 = 운영(prod) 프로필이 아닐 때.
+     * {@code spring.profiles.active} 에 콤마로 여러 프로필이 올 수 있어 split 후 비교한다.
+     */
+    private boolean shouldPrefixCode() {
+        if (activeProfiles == null || activeProfiles.isBlank()) {
+            return true; // 프로필 미지정(default) = 비운영 → prefix
+        }
+        for (String token : activeProfiles.split(",")) {
+            if ("prod".equalsIgnoreCase(token.trim())) {
+                return false;
+            }
+        }
+        return true;
     }
 }

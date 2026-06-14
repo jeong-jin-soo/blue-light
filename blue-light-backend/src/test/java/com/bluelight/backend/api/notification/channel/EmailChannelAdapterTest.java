@@ -58,8 +58,9 @@ class EmailChannelAdapterTest {
     }
 
     @Test
-    @DisplayName("정상 흐름 - sendGenericEmail 위임 + success")
-    void send_happyPath() {
+    @DisplayName("운영 프로필 - 제목에 코드 prefix 없이 sendGenericEmail 위임 + success")
+    void send_happyPath_prodNoPrefix() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "prod");
         NotificationOutbox row = outbox("{\"amount\":\"185\"}");
         when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
         when(templateRegistry.render(eq("T"), eq(NotificationChannel.EMAIL), eq("en"), any()))
@@ -77,6 +78,24 @@ class EmailChannelAdapterTest {
         assertThat(toCap.getValue()).isEqualTo("ringo@test.sg");
         assertThat(subjCap.getValue()).isEqualTo("Payment");
         assertThat(bodyCap.getValue()).isEqualTo("<p>Confirmed</p>");
+    }
+
+    @Test
+    @DisplayName("개발서버(비-prod 프로필) - 제목 앞에 메일 코드 prefix")
+    void send_devServer_prefixesCode() {
+        ReflectionTestUtils.setField(adapter, "activeProfiles", "default");
+        NotificationOutbox row = outbox("{\"amount\":\"185\"}");
+        when(userRepository.findById(1001L)).thenReturn(Optional.of(userWithEmail("ringo@test.sg")));
+        when(templateRegistry.render(eq("A-17"), eq(NotificationChannel.EMAIL), eq("en"), any()))
+                .thenReturn(new RenderedMessage("Payment Requested", "<p>Pay</p>", null));
+        ReflectionTestUtils.setField(row, "templateCode", "A-17");
+
+        SendResult result = adapter.send(row);
+
+        assertThat(result.success()).isTrue();
+        ArgumentCaptor<String> subjCap = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendGenericEmail(anyString(), subjCap.capture(), anyString());
+        assertThat(subjCap.getValue()).isEqualTo("[A-17] Payment Requested");
     }
 
     @Test
