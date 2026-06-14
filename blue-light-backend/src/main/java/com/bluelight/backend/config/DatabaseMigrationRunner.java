@@ -89,6 +89,8 @@ public class DatabaseMigrationRunner {
             createLewServiceVisitPhotosTable(conn);
             // ── P1.1: EMA ELISE 필드 + Declaration 감사 로그 ──
             migrateApplicationsEmaFields(conn);
+            // ── EMA 제출 추적 (ema-submission-tracking-spec.md §6) — 7컬럼 + OQ-1 backfill ──
+            migrateApplicationsEmaSubmissionTracking(conn);
             migrateApplicationDeclarationLogsTable(conn);
             // ── C.1: Snapshot-at-submit — applications.loa_phone_snapshot, loa_email_snapshot ──
             migrateApplicationsLoaPhoneEmailSnapshots(conn);
@@ -1160,6 +1162,13 @@ public class DatabaseMigrationRunner {
             // D4=B (스펙 §13.3): Compose UI 카테고리 추천 드롭다운 옵션 (CSV). 자유 입력은 항상 허용.
             {"admin_manual_email_category_suggestions", "PAYMENT_NOTICE,MAINTENANCE,INFO,MISC",
              "Comma-separated category tag suggestions for manual email Compose UI"},
+
+            // ── EMA 제출 추적 (ema-submission-tracking-spec.md §5.4) — 운영 가변 값(설정 우선 원칙) ──
+            // 하드코딩 금지: 서비스가 system_settings 에서 조회한다(EmaSubmissionSettings).
+            {"ema.reminder.days", "3",
+             "Reminder threshold N days after EMA SUBMITTED/RESUBMITTED with no change"},
+            {"ema.ack.required", "false",
+             "Require EMA_ACK attachment on EMA submit-class transitions (T1/T3/T10)"},
         };
 
         int seeded = 0;
@@ -1452,6 +1461,68 @@ public class DatabaseMigrationRunner {
             log.info("Migration [applications-ema-fields]: added {} column(s)", added);
         } else {
             log.debug("Migration [applications-ema-fields]: all columns exist, skipping");
+        }
+    }
+
+    /**
+     * 마이그레이션 (EMA 제출 추적): applications 테이블에 EMA 제출 추적 7컬럼 추가 + OQ-1 backfill.
+     * <p>스펙: {@code doc/Project Analysis/ema-submission-tracking-spec.md} §6. P1.1
+     * {@link #migrateApplicationsEmaFields} 와 동일 패턴(컬럼별 {@link #columnExists} 가드 → 멱등).
+     *
+     * <h3>OQ-1 배포 호환 backfill (grandfathering)</h3>
+     * 이미 IN_PROGRESS 인 기존 신청은 새 종료 게이트(ema=APPROVED 필수)에 걸려 발급 불가가 된다.
+     * 이를 막기 위해 컬럼 신규 추가가 발생한 "이번 마이그레이션에서만" IN_PROGRESS 행을 APPROVED 로 일괄 세팅.
+     * <ul>
+     *   <li>(a) {@code added>0} 인 첫 실행에서만 backfill — 재실행 시 컬럼이 이미 있어 added=0 → 스킵.</li>
+     *   <li>(b) backfill UPDATE 자체도 {@code status='IN_PROGRESS' AND ema_submission_status='NOT_SUBMITTED'}
+     *       조건이라, 만에 하나 재실행돼도 이미 진행/전이된 행을 덮어쓰지 않는다(이중 가드).</li>
+     * </ul>
+     * grandfathering 은 "EMA 가 실제 승인됐다"는 단언이 아니라 신규 게이트로부터의 소급 면제다.
+     * LICENSE_PDF 게이트(§4)는 여전히 적용되므로 PDF 미첨부면 종료 시점에 막힌다(§11 R3).
+     */
+    private void migrateApplicationsEmaSubmissionTracking(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        String[][] columns = {
+                {"ema_submission_status",     "VARCHAR(30) NOT NULL DEFAULT 'NOT_SUBMITTED'"},
+                {"ema_submitted_at",          "DATETIME(6)"},
+                {"ema_reference_no",          "VARCHAR(60)"},
+                {"ema_submitted_by_user_seq", "BIGINT"},
+                {"ema_decision_at",           "DATETIME(6)"},
+                {"ema_query_note",            "VARCHAR(1000)"},
+                {"ema_status_before_decision", "VARCHAR(30)"},  // 허점#1 — Revert 복원 슬롯
+                {"ema_reminder_notified_at",  "DATETIME(6)"}    // PR-E5 — 리마인더 중복 발송 가드(1일 1회 멱등)
+        };
+
+        int added = 0;
+        try (Statement stmt = conn.createStatement()) {
+            for (String[] c : columns) {
+                if (!columnExists(conn, "applications", c[0])) {
+                    stmt.executeUpdate("ALTER TABLE applications ADD COLUMN " + c[0] + " " + c[1]);
+                    added++;
+                }
+            }
+        }
+        if (added > 0) {
+            log.info("Migration [applications-ema-submission]: added {} column(s)", added);
+        } else {
+            log.debug("Migration [applications-ema-submission]: all columns exist, skipping");
+        }
+
+        // ── OQ-1 backfill — 컬럼 신규 추가가 발생한 첫 실행에서만 (이중 멱등 가드) ──
+        if (added > 0) {
+            try (Statement stmt = conn.createStatement()) {
+                int backfilled = stmt.executeUpdate(
+                        "UPDATE applications " +
+                                "SET ema_submission_status = 'APPROVED' " +
+                                "WHERE status = 'IN_PROGRESS' " +
+                                "  AND ema_submission_status = 'NOT_SUBMITTED' " +
+                                "  AND deleted_at IS NULL");   // soft-delete 행 제외 (프로젝트 패턴)
+                if (backfilled > 0) {
+                    log.info("Migration [applications-ema-submission]: backfilled {} IN_PROGRESS row(s) to APPROVED",
+                            backfilled);
+                }
+            }
         }
     }
 

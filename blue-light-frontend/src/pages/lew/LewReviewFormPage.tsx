@@ -11,8 +11,12 @@ import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
 import { LewLoaExchangeSection } from './sections/LewLoaExchangeSection';
+import { AdminEmaSection } from '../admin/sections/AdminEmaSection';
+import { CompleteModal } from '../admin/sections/AdminModals';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { useEmaActions } from '../../hooks/useEmaActions';
+import { formatEmaStatus, getEmaStatusBadge } from '../../utils/applicationUtils';
 import lewReviewApi from '../../api/lewReviewApi';
 import adminApi from '../../api/adminApi';
 import fileApi from '../../api/fileApi';
@@ -48,7 +52,7 @@ import { AdminApplicationInfo } from '../admin/sections/AdminApplicationInfo';
  * <p>결제 요청(request-payment) 가드 = Phase 1 (kVA 확정 + 미해결 서류 0건).</p>
  */
 
-type TabKey = 'documents' | 'kva' | 'sld' | 'loa';
+type TabKey = 'documents' | 'kva' | 'sld' | 'loa' | 'ema';
 
 type ApiErrorShape = AxiosError<{ code?: string; message?: string }> & {
   code?: string;
@@ -86,6 +90,12 @@ export default function LewReviewFormPage() {
 
   const applicationId = id ? Number(id) : NaN;
   const idValid = Number.isFinite(applicationId) && applicationId > 0;
+
+  // ── EMA 제출 추적 (ema-submission-tracking-spec.md §8) ──
+  const ema = useEmaActions(applicationId);
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+  const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
+  const [completing, setCompleting] = useState(false);
 
   // ── Fetch ────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -219,6 +229,37 @@ export default function LewReviewFormPage() {
     setActiveTab(next);
   }, [activeTab, adminApp, lewData, pendingDocCount, kvaConfirmed, sldRequired, sldReady]);
 
+  // EMA 상태 로드 — IN_PROGRESS 진입 이후 의미가 있으나, 탭은 항상 보이므로 status 가 있으면 로드.
+  // (백엔드 GET /ema 는 IN_PROGRESS 전에도 NOT_SUBMITTED 응답을 준다 → 탭 비활성 안내에 사용.)
+  const emaRefresh = ema.refresh;
+  useEffect(() => {
+    if (!adminApp) return;
+    void emaRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminApp?.applicationSeq, adminApp?.status]);
+
+  // Complete & Issue Licence — 게이트(ema=APPROVED + LICENSE_PDF)는 백엔드가 강제.
+  const handleComplete = useCallback(async () => {
+    setCompleting(true);
+    try {
+      await adminApi.completeApplication(applicationId, completeForm);
+      toast.success('Licence issued. The application is now complete.');
+      setShowCompleteModal(false);
+      setCompleteForm({ licenseNumber: '', licenseExpiryDate: '' });
+      await loadData();
+      await ema.refresh();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { code?: string; message?: string } } };
+      const code = e?.response?.data?.code;
+      if (code === 'EMA_NOT_APPROVED') toast.error('EMA submission must be approved before completion.');
+      else if (code === 'LICENSE_PDF_MISSING') toast.error('Upload the licence PDF before completing.');
+      else toast.error(e?.response?.data?.message || 'Failed to complete the application');
+    } finally {
+      setCompleting(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, completeForm, loadData, toast]);
+
   // Phase 3 권한: LEW는 assigned_lew_seq 일치 시만 서류 요청 가능
   const canRequestDocuments =
     currentUser?.role === 'LEW' &&
@@ -318,6 +359,15 @@ export default function LewReviewFormPage() {
         }])
       : []),
     { key: 'loa', label: 'LOA' },
+    {
+      key: 'ema',
+      label: 'EMA',
+      // 배지는 EMA 상태별(NOT_SUBMITTED 는 배지 없음 — 스펙 §8.1).
+      badge:
+        ema.ema && ema.ema.emaSubmissionStatus !== 'NOT_SUBMITTED'
+          ? { text: formatEmaStatus(ema.ema.emaSubmissionStatus), variant: getEmaStatusBadge(ema.ema.emaSubmissionStatus) }
+          : undefined,
+    },
   ];
 
   const applicantDisplayName =
@@ -503,6 +553,24 @@ export default function LewReviewFormPage() {
               uploadingFinal={loaUploading}
             />
           </TabPanel>
+
+          <TabPanel active={activeTab === 'ema'}>
+            <AdminEmaSection
+              ema={ema.ema}
+              appStatus={adminApp.status}
+              isAdmin={currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN'}
+              busy={ema.busy}
+              onSubmit={ema.submit}
+              onQuery={ema.query}
+              onResubmit={ema.resubmit}
+              onApprove={ema.approve}
+              onReject={ema.reject}
+              onWithdraw={ema.withdraw}
+              onRevert={ema.revert}
+              onUploadFile={ema.uploadFile}
+              onCompleteClick={() => setShowCompleteModal(true)}
+            />
+          </TabPanel>
         </div>
       </Card>
 
@@ -527,6 +595,16 @@ export default function LewReviewFormPage() {
           void runRequestPayment();
         }}
         onClose={() => setShowRequestPaymentConfirm(false)}
+      />
+
+      {/* Complete & Issue Licence — EMA 탭의 CTA에서 오픈. 게이트는 백엔드 강제. */}
+      <CompleteModal
+        isOpen={showCompleteModal}
+        onClose={() => setShowCompleteModal(false)}
+        onConfirm={handleComplete}
+        completeForm={completeForm}
+        setCompleteForm={setCompleteForm}
+        loading={completing}
       />
 
       {/* ───────────────────────────────────────────────────────────────────

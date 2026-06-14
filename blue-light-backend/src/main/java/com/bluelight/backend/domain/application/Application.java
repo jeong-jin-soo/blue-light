@@ -1,6 +1,7 @@
 package com.bluelight.backend.domain.application;
 
 import com.bluelight.backend.common.crypto.EncryptedStringConverter;
+import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.common.BaseEntity;
 import com.bluelight.backend.domain.user.User;
 import jakarta.persistence.*;
@@ -464,6 +465,63 @@ public class Application extends BaseEntity {
     /** 발전기 용량 힌트(kVA). hasGenerator=false여도 저장 허용(경고), LEW finalize에서만 엄격 차단. */
     @Column(name = "applicant_generator_capacity_hint")
     private Integer applicantGeneratorCapacityHint;
+
+    // ── EMA ELISE 제출 추적 (ema-submission-tracking-spec.md §5.2) ──
+    // IN_PROGRESS 의 서브-상태 기계. 전이는 본 엔티티 도메인 메서드가 소유한다(상태 기계 캡슐화).
+    // ApplicationStatus 에는 값을 추가하지 않는다(NG3) — COMPLETED 로의 단일 전이만 게이팅.
+
+    /**
+     * EMA 제출 추적 상태 (기본 {@link EmaSubmissionStatus#NOT_SUBMITTED}).
+     * <p>신규 생성 신청은 NOT_SUBMITTED 부터 상태 기계를 탄다. 마이그레이션 backfill 은 오직
+     * "도입 시점에 이미 IN_PROGRESS 였던 기존 진행 건"만 APPROVED 로 grandfathering(OQ-1).
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ema_submission_status", nullable = false, length = 30)
+    private EmaSubmissionStatus emaSubmissionStatus = EmaSubmissionStatus.NOT_SUBMITTED;
+
+    /** 제출·재제출 시각 (T1/T3/T10 에서 NOW() 로 갱신). */
+    @Column(name = "ema_submitted_at")
+    private LocalDateTime emaSubmittedAt;
+
+    /** ELISE 접수번호. 설비 행정번호라 PII 아님 → 평문 보관. */
+    @Column(name = "ema_reference_no", length = 60)
+    private String emaReferenceNo;
+
+    /**
+     * 제출 실행 actor(누가 ELISE 에 제출했는지). FK 강제 아님, 값만 보관(기존 {@code *_by} 컨벤션).
+     * LEW 본인/ADMIN 대행 구분은 감사로그 actor role 로 보강(§3.2).
+     */
+    @Column(name = "ema_submitted_by_user_seq")
+    private Long emaSubmittedByUserSeq;
+
+    /** APPROVED/REJECTED/WITHDRAWN 결정 시각. 재제출(T3/T10)·Revert(T9) 시 null 로 클리어. */
+    @Column(name = "ema_decision_at")
+    private LocalDateTime emaDecisionAt;
+
+    /**
+     * 질의/반려 사유 (질의·반려 공용, 최신 1건만 보관). 재제출(T3/T10) 시 null 로 클리어(허점#4 —
+     * 옛 사유 화면 잔존 방지). 전체 이력은 감사로그로 무손실 추적. 자유 텍스트라 PII 유입 가능
+     * → 입력 가이드에 "개인정보 기재 금지" 명시(저장은 평문, OQ-4).
+     */
+    @Column(name = "ema_query_note", length = 1000)
+    private String emaQueryNote;
+
+    /**
+     * 결정(APPROVED/REJECTED/WITHDRAWN) 직전 상태 보관 — Revert(T9) 복원 슬롯(허점#1).
+     * <p>approve/reject/withdraw(T5~T8) 진입 시 직전 from 상태를 저장 → T9 가 정확 복원.
+     * 복원·재제출 시 null 로 클리어. 1-depth 복원만 — 다단계 undo 는 비목표.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ema_status_before_decision", length = 30)
+    private EmaSubmissionStatus emaStatusBeforeDecision;
+
+    /**
+     * EMA 제출 리마인더 발송 시각 — 중복 발송 가드(PR-E5, {@link #markExpiryNotified} 패턴 동일).
+     * <p>스케줄러가 "1일 1회 멱등"으로 발송한 뒤 NOW() 를 기록한다. 모든 EMA 전이 시 null 로 리셋해,
+     * 새 SUBMITTED/RESUBMITTED 구간이 시작되면 리마인더가 다시 발화할 수 있게 한다.
+     */
+    @Column(name = "ema_reminder_notified_at")
+    private LocalDateTime emaReminderNotifiedAt;
 
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
@@ -949,5 +1007,172 @@ public class Application extends BaseEntity {
      */
     public boolean isCreatedViaConcierge() {
         return viaConciergeRequestSeq != null;
+    }
+
+    // ── EMA ELISE 제출 추적 상태 기계 (ema-submission-tracking-spec.md §3 전이표 T1~T10) ──
+    // 상태 기계를 엔티티가 소유한다. 각 메서드는 from-state 가드 + 부수효과(타임스탬프/슬롯
+    // 저장/클리어)를 엔티티 내부에서 수행하며, 잘못된 전이는 BusinessException(BAD_REQUEST,
+    // "INVALID_EMA_TRANSITION") 으로 거부한다. 권한 SpEL / 접수번호·queryNote 필수 검증 /
+    // EMA_ACK 첨부 검증 / 감사 기록은 서비스 레이어 책임(컨트롤러 SpEL 은 PR-E2).
+    // App.status==IN_PROGRESS 게이트도 본 메서드 진입 직전 서비스에서 검증한다(§3.2 NG3).
+
+    /**
+     * T1: {@code NOT_SUBMITTED → SUBMITTED}. ELISE 제출 사실 기록.
+     *
+     * @param referenceNo  ELISE 접수번호 (서비스에서 @NotBlank 검증 완료된 값)
+     * @param actorSeq     제출 실행 actor userSeq (영속 보관 — 누가 ELISE 에 제출했는지)
+     * @throws BusinessException from-state 가 NOT_SUBMITTED 가 아닌 경우
+     */
+    public void markEmaSubmitted(String referenceNo, Long actorSeq) {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.NOT_SUBMITTED) {
+            throw invalidEmaTransition("markEmaSubmitted");
+        }
+        this.emaSubmissionStatus = EmaSubmissionStatus.SUBMITTED;
+        this.emaReferenceNo = referenceNo;
+        this.emaSubmittedAt = LocalDateTime.now();
+        this.emaSubmittedByUserSeq = actorSeq;
+        this.emaReminderNotifiedAt = null; // 새 SUBMITTED 구간 — 리마인더 재발화 허용
+    }
+
+    /**
+     * T2/T4: {@code SUBMITTED/RESUBMITTED → QUERY_RAISED}. EMA 질의 기록.
+     *
+     * @param queryNote  질의 내용 (서비스에서 @NotBlank 검증 완료된 값)
+     * @throws BusinessException from-state 가 SUBMITTED/RESUBMITTED 가 아닌 경우
+     */
+    public void raiseEmaQuery(String queryNote) {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.SUBMITTED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.RESUBMITTED) {
+            throw invalidEmaTransition("raiseEmaQuery");
+        }
+        this.emaSubmissionStatus = EmaSubmissionStatus.QUERY_RAISED;
+        this.emaQueryNote = queryNote;
+        this.emaReminderNotifiedAt = null; // 리마인더 타이머 리셋(LEW 가 보완해야 함)
+    }
+
+    /**
+     * T3/T10: {@code QUERY_RAISED/REJECTED → RESUBMITTED}. 보완 후 재제출.
+     *
+     * <p>부수효과: 재제출 시각 갱신 + 직전 결정·사유·복원 슬롯 클리어(허점#4).
+     * {@code emaQueryNote=null}(옛 질의/반려 사유 잔존 방지), {@code emaDecisionAt=null},
+     * {@code emaStatusBeforeDecision=null}. 전체 이력은 감사로그로 무손실 추적.
+     *
+     * @param referenceNo  갱신된 접수번호 (선택 — null/blank 면 기존 값 유지)
+     * @param actorSeq     재제출 실행 actor userSeq
+     * @throws BusinessException from-state 가 QUERY_RAISED/REJECTED 가 아닌 경우
+     */
+    public void resubmitEma(String referenceNo, Long actorSeq) {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.QUERY_RAISED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.REJECTED) {
+            throw invalidEmaTransition("resubmitEma");
+        }
+        this.emaSubmissionStatus = EmaSubmissionStatus.RESUBMITTED;
+        if (referenceNo != null && !referenceNo.isBlank()) {
+            this.emaReferenceNo = referenceNo;
+        }
+        this.emaSubmittedAt = LocalDateTime.now();
+        this.emaSubmittedByUserSeq = actorSeq;
+        // 직전 결정·사유·복원 슬롯 클리어 (허점#4)
+        this.emaQueryNote = null;
+        this.emaDecisionAt = null;
+        this.emaStatusBeforeDecision = null;
+        this.emaReminderNotifiedAt = null; // 재제출 — 새 RESUBMITTED 구간 리마인더 재시작
+    }
+
+    /**
+     * T5/T6: {@code SUBMITTED/RESUBMITTED → APPROVED}. EMA 승인 표기(발급과 분리 — §3.3/§4.2).
+     *
+     * <p>전이 직전 from 상태를 {@link #emaStatusBeforeDecision} 에 저장해 Revert(T9)가 정확
+     * 복원할 수 있게 한다(허점#1).
+     *
+     * @throws BusinessException from-state 가 SUBMITTED/RESUBMITTED 가 아닌 경우
+     */
+    public void approveEma() {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.SUBMITTED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.RESUBMITTED) {
+            throw invalidEmaTransition("approveEma");
+        }
+        this.emaStatusBeforeDecision = this.emaSubmissionStatus;
+        this.emaSubmissionStatus = EmaSubmissionStatus.APPROVED;
+        this.emaDecisionAt = LocalDateTime.now();
+        this.emaReminderNotifiedAt = null; // 결정됨 — 리마인더 타이머 종료
+    }
+
+    /**
+     * T7: {@code SUBMITTED/RESUBMITTED → REJECTED}. EMA 반려(종착 아님 — T10 재진입 가능).
+     *
+     * <p>App.status 는 IN_PROGRESS 유지(서비스 책임). 전이 직전 from 상태를 슬롯에 저장(허점#1).
+     *
+     * @param reason  반려 사유 (선택 — null/blank 면 기존 queryNote 유지)
+     * @throws BusinessException from-state 가 SUBMITTED/RESUBMITTED 가 아닌 경우
+     */
+    public void rejectEma(String reason) {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.SUBMITTED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.RESUBMITTED) {
+            throw invalidEmaTransition("rejectEma");
+        }
+        this.emaStatusBeforeDecision = this.emaSubmissionStatus;
+        this.emaSubmissionStatus = EmaSubmissionStatus.REJECTED;
+        this.emaDecisionAt = LocalDateTime.now();
+        this.emaReminderNotifiedAt = null; // 결정됨 — 리마인더 타이머 종료
+        if (reason != null && !reason.isBlank()) {
+            this.emaQueryNote = reason;
+        }
+    }
+
+    /**
+     * T8: {@code SUBMITTED/QUERY_RAISED/RESUBMITTED → WITHDRAWN}. EMA 철회(종착).
+     *
+     * <p>전이 직전 from 상태를 슬롯에 저장 → ADMIN Revert(T9)로만 복원 가능(허점#1).
+     *
+     * @throws BusinessException from-state 가 SUBMITTED/QUERY_RAISED/RESUBMITTED 가 아닌 경우
+     */
+    public void withdrawEma() {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.SUBMITTED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.QUERY_RAISED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.RESUBMITTED) {
+            throw invalidEmaTransition("withdrawEma");
+        }
+        this.emaStatusBeforeDecision = this.emaSubmissionStatus;
+        this.emaSubmissionStatus = EmaSubmissionStatus.WITHDRAWN;
+        this.emaDecisionAt = LocalDateTime.now();
+        this.emaReminderNotifiedAt = null; // 결정됨 — 리마인더 타이머 종료
+    }
+
+    /**
+     * T9: {@code APPROVED/WITHDRAWN → 직전 상태}. ADMIN 오기입 정정(컨트롤러 SpEL 로 LEW 제외).
+     *
+     * <p>{@link #emaStatusBeforeDecision} 으로 정확 복원 → 복원 후 슬롯·결정시각 null 클리어.
+     * 슬롯이 null 이면(grandfathered APPROVED 등) {@link EmaSubmissionStatus#SUBMITTED} 폴백(허점#1).
+     *
+     * @throws BusinessException from-state 가 APPROVED/WITHDRAWN 가 아닌 경우
+     */
+    public void revertEmaDecision() {
+        if (this.emaSubmissionStatus != EmaSubmissionStatus.APPROVED
+                && this.emaSubmissionStatus != EmaSubmissionStatus.WITHDRAWN) {
+            throw invalidEmaTransition("revertEmaDecision");
+        }
+        this.emaSubmissionStatus = this.emaStatusBeforeDecision != null
+                ? this.emaStatusBeforeDecision
+                : EmaSubmissionStatus.SUBMITTED; // null 폴백 (grandfathered 등)
+        this.emaStatusBeforeDecision = null;
+        this.emaDecisionAt = null;
+        this.emaReminderNotifiedAt = null; // 복원됨 — SUBMITTED/RESUBMITTED 로 돌아가면 리마인더 재발화
+    }
+
+    /** 잘못된 EMA 전이 — 컨트롤러/GlobalExceptionHandler 가 400 으로 변환. */
+    private BusinessException invalidEmaTransition(String action) {
+        return new BusinessException(
+                "Invalid EMA transition: " + action + " is not allowed from " + this.emaSubmissionStatus,
+                org.springframework.http.HttpStatus.BAD_REQUEST,
+                "INVALID_EMA_TRANSITION");
+    }
+
+    /**
+     * EMA 제출 리마인더 발송 기록 (PR-E5, {@link #markExpiryNotified} 패턴 동일).
+     * 스케줄러가 인앱 리마인더를 보낸 뒤 호출 → 같은 날 재발송을 멱등 차단.
+     */
+    public void markEmaReminderNotified() {
+        this.emaReminderNotifiedAt = LocalDateTime.now();
     }
 }

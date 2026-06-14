@@ -215,4 +215,152 @@ public class AdminApplicationController {
         List<PaymentResponse> payments = adminPaymentService.getPayments(id);
         return ResponseEntity.ok(payments);
     }
+
+    // ============================================================
+    // EMA ELISE 제출 추적 — 전이 + 조회 (ema-submission-tracking-spec.md §7, T1~T10)
+    // ------------------------------------------------------------
+    // 권한(OQ-2): T1~T8·T10 은 completeApplication 과 동일 SpEL — 담당 LEW 본인 + ADMIN/SYSTEM_ADMIN
+    //   대행 모두 허용. revert(T9)만 ADMIN/SYSTEM_ADMIN 전용. actorSeq/role 은 Authentication 에서 추출해
+    //   서비스에 전달 → 감사로그가 "LEW 본인 vs ADMIN 대행"을 구분(§3.2). 잘못된 전이는 서비스/도메인이
+    //   400 INVALID_EMA_TRANSITION 으로 거부(GlobalExceptionHandler 가 코드 그대로 매핑).
+    // ============================================================
+
+    /**
+     * EMA 제출 (T1): NOT_SUBMITTED → SUBMITTED.
+     * POST /api/admin/applications/:id/ema/submit
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.EMA_SUBMITTED, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/submit")
+    public ResponseEntity<EmaSubmissionResponse> markEmaSubmitted(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody EmaSubmitRequest request) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA submit: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response =
+                adminApplicationService.markEmaSubmitted(id, request.getEmaReferenceNo(), actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 질의 (T2/T4): SUBMITTED/RESUBMITTED → QUERY_RAISED.
+     * POST /api/admin/applications/:id/ema/query
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.EMA_QUERY_RAISED, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/query")
+    public ResponseEntity<EmaSubmissionResponse> raiseEmaQuery(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody EmaQueryRequest request) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA query: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response =
+                adminApplicationService.raiseEmaQuery(id, request.getQueryNote(), actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 재제출 (T3 QUERY_RAISED→ / T10 REJECTED→): → RESUBMITTED.
+     * POST /api/admin/applications/:id/ema/resubmit
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.EMA_RESUBMITTED, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/resubmit")
+    public ResponseEntity<EmaSubmissionResponse> resubmitEma(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody EmaResubmitRequest request) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA resubmit: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response =
+                adminApplicationService.resubmitEma(id, request.getEmaReferenceNo(), actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 승인 (T5/T6): SUBMITTED/RESUBMITTED → APPROVED. 발급(완료)과 분리된 상태 표기.
+     * POST /api/admin/applications/:id/ema/approve
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.EMA_APPROVED, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/approve")
+    public ResponseEntity<EmaSubmissionResponse> approveEma(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA approve: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response = adminApplicationService.approveEma(id, actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 반려 (T7): SUBMITTED/RESUBMITTED → REJECTED. 종착 아님(T10 재진입 가능), App 은 IN_PROGRESS 유지.
+     * POST /api/admin/applications/:id/ema/reject
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.EMA_REJECTED, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/reject")
+    public ResponseEntity<EmaSubmissionResponse> rejectEma(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody EmaRejectRequest request) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA reject: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response =
+                adminApplicationService.rejectEma(id, request.getReason(), actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 철회 (T8): SUBMITTED/QUERY_RAISED/RESUBMITTED → WITHDRAWN.
+     * POST /api/admin/applications/:id/ema/withdraw
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @Auditable(action = AuditAction.EMA_WITHDRAWN, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/withdraw")
+    public ResponseEntity<EmaSubmissionResponse> withdrawEma(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA withdraw: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response = adminApplicationService.withdrawEma(id, actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 결정 되돌리기 (T9): APPROVED/WITHDRAWN → 직전 상태 복원. ADMIN/SYSTEM_ADMIN 전용(오기입 정정).
+     * POST /api/admin/applications/:id/ema/revert
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN')")
+    @Auditable(action = AuditAction.EMA_DECISION_REVERTED, category = AuditCategory.APPLICATION, entityType = "Application")
+    @PostMapping("/applications/{id}/ema/revert")
+    public ResponseEntity<EmaSubmissionResponse> revertEmaDecision(
+            Authentication authentication,
+            @PathVariable Long id) {
+        Long actorSeq = AuthPrincipal.userSeq(authentication);
+        String role = AuthPrincipal.role(authentication);
+        log.info("EMA revert: applicationSeq={}, by actorSeq={}, role={}", id, actorSeq, role);
+        EmaSubmissionResponse response = adminApplicationService.revertEmaDecision(id, actorSeq, role);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * EMA 제출 추적 조회.
+     * GET /api/admin/applications/:id/ema
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @GetMapping("/applications/{id}/ema")
+    public ResponseEntity<EmaSubmissionResponse> getEmaSubmission(@PathVariable Long id) {
+        log.info("EMA get: applicationSeq={}", id);
+        EmaSubmissionResponse response = adminApplicationService.getEmaSubmission(id);
+        return ResponseEntity.ok(response);
+    }
 }

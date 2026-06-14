@@ -158,5 +158,17 @@ public enum AuditAction {
     // 컨트롤러 메서드 진입 전 거부하면서 @Auditable @Around 가 더이상 cross-tenant
     // 시도를 기록하지 못하던 공백을 GlobalExceptionHandler 에서 메운다.
     // metadata(requestUri/method/ip/userAgent)로 침해 시도 SQL 조회 가능.
-    ACCESS_DENIED
+    ACCESS_DENIED,
+
+    // ── EMA ELISE 제출 추적 (ema-submission-tracking-spec.md §3 전이표 T1~T10) ──
+    // 모든 전이는 actor userSeq + actor role(LEW 본인 vs ADMIN/SYSTEM_ADMIN 대행)을 metadata 로 기록해
+    // 사후 구분 가능하게 한다(§3.2). emaQueryNote/접수번호 등 옛 사유는 재제출 시 컬럼에서 클리어되지만
+    // 전체 이력은 아래 감사 액션으로 무손실 추적된다(허점#4/#5).
+    EMA_SUBMITTED,            // T1: NOT_SUBMITTED → SUBMITTED
+    EMA_QUERY_RAISED,         // T2/T4: SUBMITTED/RESUBMITTED → QUERY_RAISED
+    EMA_RESUBMITTED,          // T3/T10: QUERY_RAISED/REJECTED → RESUBMITTED
+    EMA_APPROVED,             // T5/T6: SUBMITTED/RESUBMITTED → APPROVED
+    EMA_REJECTED,             // T7: SUBMITTED/RESUBMITTED → REJECTED (종착 아님, T10 재진입)
+    EMA_WITHDRAWN,            // T8: SUBMITTED/QUERY_RAISED/RESUBMITTED → WITHDRAWN
+    EMA_DECISION_REVERTED     // T9: APPROVED/WITHDRAWN → 직전 상태 복원 (ADMIN 전용 오기입 정정)
 }

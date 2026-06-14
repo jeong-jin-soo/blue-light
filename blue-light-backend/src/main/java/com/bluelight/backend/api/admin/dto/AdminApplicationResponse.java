@@ -76,6 +76,18 @@ public class AdminApplicationResponse {
     private Long kvaConfirmedBy;
     private LocalDateTime kvaConfirmedAt;
 
+    // ── EMA ELISE 제출 추적 (ema-submission-tracking-spec.md §7 inline) ──
+    // 목록/상세에서 EMA 상태 배지·필터를 그릴 수 있도록 엔티티에서 직접 도출 가능한 필드만 inline.
+    // 파일 존재 여부(emaAckPresent/licensePdfPresent)·canComplete 등 repository 조회가 필요한 필드는
+    // 전용 응답 {@code EmaSubmissionResponse}(GET /ema)에서 제공 — 목록 N+1 회피.
+    private String emaSubmissionStatus; // NOT_SUBMITTED | SUBMITTED | QUERY_RAISED | RESUBMITTED | APPROVED | REJECTED | WITHDRAWN
+    private LocalDateTime emaSubmittedAt;
+    private String emaReferenceNo;
+    private Long emaSubmittedByUserSeq;
+    private LocalDateTime emaDecisionAt;
+    private String emaQueryNote;
+    private boolean emaGrandfathered;   // 허점#2 — backfill APPROVED legacy 건 식별 (status==APPROVED && decisionAt==null && referenceNo==null)
+
     public static AdminApplicationResponse from(Application application) {
         return AdminApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
@@ -135,6 +147,25 @@ public class AdminApplicationResponse {
                 .kvaConfirmedBy(application.getKvaConfirmedBy() != null
                         ? application.getKvaConfirmedBy().getUserSeq() : null)
                 .kvaConfirmedAt(application.getKvaConfirmedAt())
+                // ── EMA 제출 추적 inline ──
+                .emaSubmissionStatus(application.getEmaSubmissionStatus() != null
+                        ? application.getEmaSubmissionStatus().name() : null)
+                .emaSubmittedAt(application.getEmaSubmittedAt())
+                .emaReferenceNo(application.getEmaReferenceNo())
+                .emaSubmittedByUserSeq(application.getEmaSubmittedByUserSeq())
+                .emaDecisionAt(application.getEmaDecisionAt())
+                .emaQueryNote(application.getEmaQueryNote())
+                .emaGrandfathered(isEmaGrandfathered(application))
                 .build();
+    }
+
+    /**
+     * 허점#2 — backfill grandfathered 식별: APPROVED 인데 결정시각·접수번호가 둘 다 비어있는 건.
+     * 정상 승인 건은 둘 중 하나 이상 채워져 있어 false. {@code EmaSubmissionResponse.of} 와 동일 정의.
+     */
+    private static boolean isEmaGrandfathered(Application application) {
+        return application.getEmaSubmissionStatus() == com.bluelight.backend.domain.application.EmaSubmissionStatus.APPROVED
+                && application.getEmaDecisionAt() == null
+                && (application.getEmaReferenceNo() == null || application.getEmaReferenceNo().isBlank());
     }
 }

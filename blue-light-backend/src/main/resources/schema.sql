@@ -135,6 +135,15 @@ CREATE TABLE IF NOT EXISTS applications (
     applicant_retailer_hint            VARCHAR(32),
     applicant_has_generator_hint       TINYINT(1),
     applicant_generator_capacity_hint  INT,
+    -- ── EMA ELISE 제출 추적 (ema-submission-tracking-spec.md §5.2) — IN_PROGRESS 서브-상태 기계 ──
+    ema_submission_status              VARCHAR(30)  NOT NULL DEFAULT 'NOT_SUBMITTED',
+    ema_submitted_at                   DATETIME(6),
+    ema_reference_no                   VARCHAR(60),
+    ema_submitted_by_user_seq          BIGINT,
+    ema_decision_at                    DATETIME(6),
+    ema_query_note                     VARCHAR(1000),
+    ema_status_before_decision         VARCHAR(30),  -- 허점#1: Revert(T9) 복원 슬롯
+    ema_reminder_notified_at           DATETIME(6),  -- PR-E5: 리마인더 중복 발송 가드(1일 1회 멱등)
     created_at         DATETIME(6),
     updated_at         DATETIME(6),
     created_by         BIGINT,
@@ -146,6 +155,7 @@ CREATE TABLE IF NOT EXISTS applications (
     KEY idx_applications_assigned_lew (assigned_lew_seq),
     KEY idx_applications_type (application_type),
     KEY idx_applications_kva_status (kva_status),
+    KEY idx_applications_ema_status (ema_submission_status),
     -- ★ Kaki Concierge v1.5 Phase 1 PR#5 Stage A
     KEY idx_applications_concierge (via_concierge_request_seq),
     CONSTRAINT fk_applications_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),

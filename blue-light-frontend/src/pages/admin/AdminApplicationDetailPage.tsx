@@ -20,6 +20,7 @@ import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
 import { AdminLoaSection } from './sections/AdminLoaSection';
 import { AdminSldSection } from './sections/AdminSldSection';
+import { AdminEmaSection } from './sections/AdminEmaSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
 import { AdminPaymentSection } from './sections/AdminPaymentSection';
 import { AdminSidebar } from './sections/AdminSidebar';
@@ -28,6 +29,7 @@ import { LewDocumentReviewSection } from '../../components/document/LewDocumentR
 import { ManualPaymentModal } from '../../components/admin/ManualPaymentModal';
 import { InvoiceHistoryCard } from '../../components/admin/InvoiceHistoryCard';
 import { recordManualPayment as recordManualPaymentApi } from '../../api/adminApplicationApi';
+import { useEmaActions } from '../../hooks/useEmaActions';
 import type { ManualPaymentPayload } from '../../types/manualPayment';
 
 // Modal components
@@ -88,6 +90,9 @@ export default function AdminApplicationDetailPage() {
   const basePath = getBasePath(currentUser?.role);
   const applicationId = Number(id);
 
+  // ── EMA 제출 추적 (ema-submission-tracking-spec.md §8.3 — ADMIN 모니터링 + 액션) ──
+  const ema = useEmaActions(applicationId);
+
   // 서류 요청 모달 권한 가드 — ADMIN/SYSTEM_ADMIN 전용.
   // LEW는 별도 LEW 페이지(/lew/applications/:id, /lew/applications/:id/review)에서 처리.
   const canRequestDocuments = isAdmin;
@@ -129,6 +134,13 @@ export default function AdminApplicationDetailPage() {
   }, [applicationId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // EMA 상태 로드 (상세 진입 시). 응답은 NOT_SUBMITTED 도 정상.
+  const emaRefresh = ema.refresh;
+  useEffect(() => {
+    if (Number.isFinite(applicationId) && applicationId > 0) void emaRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId]);
 
   // ── Action Handlers ──────────────────────────────────
 
@@ -202,7 +214,15 @@ export default function AdminApplicationDetailPage() {
       toast.success('Application completed! Licence issued.');
       setShowCompleteModal(false);
       fetchData();
-    } catch { toast.error('Failed to complete application'); }
+      void ema.refresh();
+    } catch (err: unknown) {
+      // EMA 종료 게이트 에러코드 매핑 (ema-submission-tracking-spec.md §4).
+      const e = err as { response?: { data?: { code?: string; message?: string } } };
+      const code = e?.response?.data?.code;
+      if (code === 'EMA_NOT_APPROVED') toast.error('EMA submission must be approved before completion.');
+      else if (code === 'LICENSE_PDF_MISSING') toast.error('Upload the licence PDF before completing.');
+      else toast.error(e?.response?.data?.message || 'Failed to complete application');
+    }
     finally { setActionLoading(false); }
   };
 
@@ -476,6 +496,26 @@ export default function AdminApplicationDetailPage() {
               actionLoading={actionLoading}
               existingSldFiles={files.filter((f) => f.fileType === 'DRAWING_SLD')}
               onFileDelete={handleFileDelete}
+            />
+          )}
+
+          {/* EMA 제출 추적 — IN_PROGRESS 이거나 EMA 가 이미 시작된 건에만 노출(불필요한 노이즈 방지). */}
+          {(application.status === 'IN_PROGRESS' ||
+            (ema.ema && ema.ema.emaSubmissionStatus !== 'NOT_SUBMITTED')) && (
+            <AdminEmaSection
+              ema={ema.ema}
+              appStatus={application.status}
+              isAdmin={isAdmin}
+              busy={ema.busy}
+              onSubmit={ema.submit}
+              onQuery={ema.query}
+              onResubmit={ema.resubmit}
+              onApprove={ema.approve}
+              onReject={ema.reject}
+              onWithdraw={ema.withdraw}
+              onRevert={ema.revert}
+              onUploadFile={ema.uploadFile}
+              onCompleteClick={() => setShowCompleteModal(true)}
             />
           )}
 

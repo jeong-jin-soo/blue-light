@@ -92,5 +92,11 @@ public enum FileType {
     /**
      * Expired License 주문 방문 보고서 PDF
      */
-    EXPIRED_LICENSE_VISIT_REPORT
+    EXPIRED_LICENSE_VISIT_REPORT,
+
+    /**
+     * EMA ELISE 제출 접수증/확인 스크린샷 (담당 LEW 업로드).
+     * {@code system_settings.ema.ack.required=true} 면 제출 계열 전이(T1/T3/T10)의 필수 첨부.
+     */
+    EMA_ACK
 }

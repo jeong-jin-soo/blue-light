@@ -18,6 +18,14 @@ export {
   confirmSld,
   unconfirmSld,
   confirmKva,
+  getEmaSubmission,
+  markEmaSubmitted,
+  raiseEmaQuery,
+  resubmitEma,
+  approveEma,
+  rejectEma,
+  withdrawEma,
+  revertEmaDecision,
 } from './adminApplicationApi';
 export type { ConfirmKvaPayload, ConfirmKvaResponse } from './adminApplicationApi';
 

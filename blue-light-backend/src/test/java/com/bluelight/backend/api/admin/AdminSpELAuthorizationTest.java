@@ -36,6 +36,14 @@ class AdminSpELAuthorizationTest {
                 Arguments.of(AdminApplicationController.class, "requestRevision"),
                 Arguments.of(AdminApplicationController.class, "approveForPayment"),
                 Arguments.of(AdminApplicationController.class, "getPayments"),
+                // EMA 제출 추적 — T1~T8·T10 + GET 은 LEW 본인 + ADMIN 대행 동일 SpEL (revert/T9 는 ADMIN 전용이라 제외)
+                Arguments.of(AdminApplicationController.class, "markEmaSubmitted"),
+                Arguments.of(AdminApplicationController.class, "raiseEmaQuery"),
+                Arguments.of(AdminApplicationController.class, "resubmitEma"),
+                Arguments.of(AdminApplicationController.class, "approveEma"),
+                Arguments.of(AdminApplicationController.class, "rejectEma"),
+                Arguments.of(AdminApplicationController.class, "withdrawEma"),
+                Arguments.of(AdminApplicationController.class, "getEmaSubmission"),
                 // AdminSldController — 4 methods
                 Arguments.of(AdminSldController.class, "getAdminSldRequest"),
                 Arguments.of(AdminSldController.class, "uploadSld"),
@@ -73,6 +81,21 @@ class AdminSpELAuthorizationTest {
                 .as("%s.%s 의 SpEL 은 @appSec.isAssignedLew(#id, authentication) 을 포함해야 함",
                         controller.getSimpleName(), methodName)
                 .contains(expectedSpEL);
+    }
+
+    @org.junit.jupiter.api.Test
+    @DisplayName("EMA revert(T9) 은 ADMIN/SYSTEM_ADMIN 전용 — isAssignedLew SpEL 미포함")
+    void revertEmaDecision_isAdminOnly() {
+        Method method = findMethod(AdminApplicationController.class, "revertEmaDecision");
+        PreAuthorize annotation = method.getAnnotation(PreAuthorize.class);
+        assertThat(annotation).as("revertEmaDecision 에 @PreAuthorize 필요").isNotNull();
+        String value = annotation.value().replaceAll("\\s+", "");
+        assertThat(value)
+                .as("revert 은 ADMIN/SYSTEM_ADMIN bypass 포함")
+                .contains(EXPECTED_ADMIN_BYPASS.replaceAll("\\s+", ""));
+        assertThat(value)
+                .as("revert(T9)은 LEW 대행 불가 — isAssignedLew SpEL 미포함")
+                .doesNotContain("isAssignedLew");
     }
 
     private Method findMethod(Class<?> controller, String name) {

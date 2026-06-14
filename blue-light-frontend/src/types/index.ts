@@ -218,6 +218,16 @@ export interface Application {
   generatorCapacityHint?: number;
   /** 경고 수준 검증 결과. 200 OK 차단하지 않음. */
   warnings?: ApplicantHintWarning[];
+  // ── EMA 제출 추적 inline (목록/상세 배지·필터용, ema-submission-tracking-spec.md §7) ──
+  // 파일 의존 필드(emaAckPresent/licensePdfPresent/canComplete)는 전용 GET /ema 응답에만 존재.
+  emaSubmissionStatus?: EmaSubmissionStatus;
+  emaSubmittedAt?: string | null;
+  emaReferenceNo?: string | null;
+  emaSubmittedByUserSeq?: number | null;
+  emaDecisionAt?: string | null;
+  emaQueryNote?: string | null;
+  /** 허점#2 — backfill APPROVED legacy 건 식별. */
+  emaGrandfathered?: boolean;
 }
 
 /**
@@ -243,7 +253,44 @@ export type DeclarationConsentType =
 /**
  * 파일 종류
  */
-export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC' | 'SKETCH_SLD' | 'CIRCUIT_SCHEDULE';
+export type FileType = 'DRAWING_SLD' | 'OWNER_AUTH_LETTER' | 'SITE_PHOTO' | 'REPORT_PDF' | 'LICENSE_PDF' | 'PAYMENT_RECEIPT' | 'SP_ACCOUNT_DOC' | 'SKETCH_SLD' | 'CIRCUIT_SCHEDULE' | 'EMA_ACK';
+
+/**
+ * EMA ELISE 제출 추적 서브-상태 (백엔드 EmaSubmissionStatus mirror).
+ * IN_PROGRESS 의 서브-상태 기계 — ema-submission-tracking-spec.md §3.
+ */
+export type EmaSubmissionStatus =
+  | 'NOT_SUBMITTED'
+  | 'SUBMITTED'
+  | 'QUERY_RAISED'
+  | 'RESUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'WITHDRAWN';
+
+/**
+ * EMA 제출 추적 응답 (전이 7종 + GET /ema 공통, 백엔드 EmaSubmissionResponse mirror).
+ * ema-submission-tracking-spec.md §7.
+ */
+export interface EmaSubmissionResponse {
+  emaSubmissionStatus: EmaSubmissionStatus;
+  emaSubmittedAt: string | null;
+  emaReferenceNo: string | null;
+  emaSubmittedByUserSeq: number | null;
+  emaSubmittedByName: string | null;
+  emaDecisionAt: string | null;
+  emaQueryNote: string | null;
+  /** EMA_ACK 첨부 존재 여부. */
+  emaAckPresent: boolean;
+  /** = system_settings.ema.ack.required — UI 필수/선택 라벨 동적 표기(설정 우선). */
+  emaAckRequired: boolean;
+  /** 허점#2 — backfill APPROVED legacy 건 → "Approved (legacy)" 구분 배지. */
+  emaGrandfathered: boolean;
+  /** LICENSE_PDF 첨부 존재 여부 — 완료 CTA 게이팅 안내. */
+  licensePdfPresent: boolean;
+  /** = APPROVED && licensePdfPresent && IN_PROGRESS — Complete CTA 활성 판단(서버 계산). */
+  canComplete: boolean;
+}
 
 /**
  * 첨부 파일
