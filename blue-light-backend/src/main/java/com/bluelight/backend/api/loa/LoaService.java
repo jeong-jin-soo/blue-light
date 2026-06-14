@@ -3,7 +3,6 @@ package com.bluelight.backend.api.loa;
 import com.bluelight.backend.api.admin.LoaFormTemplateService;
 import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.email.EmailService;
-import com.bluelight.backend.api.email.MailSubjectCode;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
@@ -64,10 +63,6 @@ public class LoaService {
     private final ApplicationEventPublisher eventPublisher;
     // 교환 모델 (PR3b) — active LoA 폼 소비 (설정 우선 원칙).
     private final LoaFormTemplateService loaFormTemplateService;
-
-    // 비운영(개발서버) 메일 제목에 메일 코드 prefix 부착용.
-    @org.springframework.beans.factory.annotation.Value("${spring.profiles.active:default}")
-    private String activeProfiles;
 
     /**
      * LOA PDF 생성 (Admin/LEW 액션)
@@ -512,24 +507,22 @@ public class LoaService {
     private void sendFormSentNotification(Application application) {
         try {
             User applicant = application.getUser();
-            String subject = MailSubjectCode.prefix(activeProfiles, "A-34")
-                    + "[LicenseKaki] LoA form ready for your application #" + application.getApplicationSeq();
-            String body = "Dear " + escape(applicant.getFullName()) + ",<br><br>"
-                    + "Your assigned LEW has shared the Letter of Appointment (LoA) form for your "
-                    + "application. Please download the form, sign it offline, and upload the signed copy "
-                    + "in your application page.<br><br>"
-                    + "This is an automated notification from LicenseKaki. We will never ask for your "
-                    + "password or payment details by email.";
-            emailService.sendGenericEmail(applicant.getEmail(), subject, body);
-        } catch (Exception e) {
+            if (applicant == null || applicant.getUserSeq() == null) {
+                return;
+            }
+            Long seq = application.getApplicationSeq();
+            // 오케스트레이터(인앱+이메일) + 템플릿 A-57 — 하드코딩 직접발송 대체 (설정 우선 원칙).
+            eventPublisher.publishEvent(new NotificationDispatchEvent(
+                    "LOA_FORM_SENT", applicant.getUserSeq(), "APPLICATION", seq, "A-57",
+                    java.util.Map.of(
+                            "applicantName", applicant.getFullName() != null ? applicant.getFullName() : "",
+                            "publicCode", String.valueOf(seq),
+                            "ctaUrl", "/applications/" + seq)));
+        } catch (RuntimeException e) {
             // 알림 실패는 흐름을 막지 않는다 (다른 알림 메서드와 동일 정책).
-            log.warn("Failed to send LoA form-sent notification: applicationSeq={}",
+            log.warn("Failed to dispatch LoA form-sent notification: applicationSeq={}",
                     application.getApplicationSeq(), e);
         }
-    }
-
-    private static String escape(String s) {
-        return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private static String extractIp(HttpServletRequest request) {

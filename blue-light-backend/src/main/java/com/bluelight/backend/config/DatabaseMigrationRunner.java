@@ -148,6 +148,8 @@ public class DatabaseMigrationRunner {
             enableWiredNotificationTemplates(conn);
             // ── 결제 신호 ADMIN 알림 템플릿(A-55 증빙업로드 / A-56 확인요청) 멱등 시드+활성 ──
             seedPaymentSignalNotificationTemplates(conn);
+            // ── LoA 폼 전달 → 신청자 알림 템플릿(A-57) 멱등 시드+활성 ──
+            seedLoaFormSentNotificationTemplate(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -2358,6 +2360,67 @@ public class DatabaseMigrationRunner {
         }
         if (inserted > 0) {
             log.info("Migration: seeded {} payment-signal template rows (A-55/A-56)", inserted);
+        }
+    }
+
+    /**
+     * LoA 폼 전달 → 신청자 알림 템플릿(A-57, EMAIL+IN_APP, recipient APPLICANT)을 멱등 시드+활성.
+     * send-form 하드코딩 직접발송을 오케스트레이터로 전환하며 도입.
+     */
+    private void seedLoaFormSentNotificationTemplate(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        String emailBody =
+            "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+            + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br>"
+            + "<span style=\"font-size:12px;color:#888\">Singapore Electrical Installation Licence Platform</span></div>"
+            + "<h1 style=\"font-size:20px;margin:0 0 16px\">Your LoA form is ready</h1>"
+            + "<p style=\"margin:0 0 16px\">Hello {{applicantName}},</p>"
+            + "<p style=\"margin:0 0 16px\">Your assigned Licensed Electrical Worker has shared the Letter of Appointment (LoA) form for application <strong>#{{publicCode}}</strong>. "
+            + "Please download the form, sign it offline, and upload the signed copy on your application page.</p>"
+            + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p>"
+            + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\">"
+            + "<p style=\"margin:0;font-size:12px;color:#888\">Anti-phishing: our only sender domain is @licensekaki.sg. We never ask for your password, OTP, or PayNow PIN by email.</p></div>";
+        String[][] rows = {
+            {"A-57", "EMAIL", "[LicenseKaki] Your LoA form is ready · #{{publicCode}}", emailBody},
+            {"A-57", "IN_APP", "LoA form ready on #{{publicCode}}",
+                "Your LEW shared the LoA form. Download, sign offline, and upload the signed copy."},
+        };
+        final String variablesJson = "[\"applicantName\",\"publicCode\",\"ctaUrl\"]";
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'STATUS', 'IMPORTANT', 'APPLICANT', TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                try {
+                    insertPs.setString(1, r[0]); insertPs.setString(2, r[1]);
+                    insertPs.setString(3, r[2]); insertPs.setString(4, r[3]);
+                    insertPs.setString(5, variablesJson); insertPs.setString(6, r[0]);
+                    insertPs.setString(7, r[0]); insertPs.setString(8, r[1]);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, r[0]); enablePs.setString(2, r[1]);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedLoaFormSentNotificationTemplate {} {} warn: {}", r[0], r[1], e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedLoaFormSentNotificationTemplate aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} LoA-form-sent template rows (A-57)", inserted);
         }
     }
 
