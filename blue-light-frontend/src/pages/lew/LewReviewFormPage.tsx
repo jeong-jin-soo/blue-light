@@ -96,6 +96,7 @@ export default function LewReviewFormPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [completing, setCompleting] = useState(false);
+  const [startingProcessing, setStartingProcessing] = useState(false);
 
   // ── Fetch ────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -212,22 +213,13 @@ export default function LewReviewFormPage() {
     },
   );
 
-  // 기본 활성 탭 — 첫 미완료 탭. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
+  // 기본 활성 탭 — LEW 가 검토 진입 시 가장 먼저 확인할 것은 Documents 이므로 항상 Documents 로 시작.
+  // 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
   useEffect(() => {
     if (activeTab !== null) return;
     if (!adminApp || !lewData) return;
-    let next: TabKey;
-    if (pendingDocCount > 0) {
-      next = 'documents';
-    } else if (!kvaConfirmed) {
-      next = 'kva';
-    } else if (sldRequired && !sldReady) {
-      next = 'sld';
-    } else {
-      next = 'loa';
-    }
-    setActiveTab(next);
-  }, [activeTab, adminApp, lewData, pendingDocCount, kvaConfirmed, sldRequired, sldReady]);
+    setActiveTab('documents');
+  }, [activeTab, adminApp, lewData]);
 
   // EMA 상태 로드 — IN_PROGRESS 진입 이후 의미가 있으나, 탭은 항상 보이므로 status 가 있으면 로드.
   // (백엔드 GET /ema 는 IN_PROGRESS 전에도 NOT_SUBMITTED 응답을 준다 → 탭 비활성 안내에 사용.)
@@ -259,6 +251,28 @@ export default function LewReviewFormPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicationId, completeForm, loadData, toast]);
+
+  // Start processing — PAID → IN_PROGRESS. EMA 작업은 IN_PROGRESS 에서만 가능하므로
+  // LEW 가 최종 LoA 업로드 후 직접 처리 시작할 수 있게 한다. LOA_FINAL 게이트는 백엔드가 강제.
+  const handleStartProcessing = useCallback(async () => {
+    setStartingProcessing(true);
+    try {
+      await adminApi.updateStatus(applicationId, { status: 'IN_PROGRESS' });
+      toast.success('Processing started. You can now submit to EMA ELISE.');
+      await loadData();
+      await ema.refresh();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { code?: string; message?: string } } };
+      if (e?.response?.data?.code === 'LOA_FINAL_NOT_UPLOADED') {
+        toast.error('Upload the final LoA in the LOA tab before starting processing.');
+      } else {
+        toast.error(e?.response?.data?.message || 'Failed to start processing');
+      }
+    } finally {
+      setStartingProcessing(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, loadData, toast]);
 
   // Phase 3 권한: LEW는 assigned_lew_seq 일치 시만 서류 요청 가능
   const canRequestDocuments =
@@ -555,6 +569,37 @@ export default function LewReviewFormPage() {
           </TabPanel>
 
           <TabPanel active={activeTab === 'ema'}>
+            {/* PAID → IN_PROGRESS 진입: EMA 작업은 IN_PROGRESS 에서만 가능. LEW 가 최종 LoA 업로드 후 직접 시작. */}
+            {adminApp.status === 'PAID' && (
+              <Card className="mb-4">
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">Start processing</h2>
+                <p className="text-sm text-gray-600 mb-3">
+                  Payment is confirmed. Start processing to move the application to <strong>In&nbsp;Progress</strong>{' '}
+                  and unlock EMA ELISE submission below.
+                </p>
+                {loaStatus?.loaStage === 'FINAL_UPLOADED' ? (
+                  <Button
+                    onClick={handleStartProcessing}
+                    loading={startingProcessing}
+                    disabled={startingProcessing}
+                  >
+                    Start processing
+                  </Button>
+                ) : (
+                  <InfoBox>
+                    Upload the final LoA in the{' '}
+                    <button
+                      type="button"
+                      className="font-medium text-primary underline underline-offset-2"
+                      onClick={() => setActiveTab('loa')}
+                    >
+                      LOA tab
+                    </button>{' '}
+                    before you can start processing.
+                  </InfoBox>
+                )}
+              </Card>
+            )}
             <AdminEmaSection
               ema={ema.ema}
               appStatus={adminApp.status}
