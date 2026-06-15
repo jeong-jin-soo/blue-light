@@ -55,6 +55,7 @@ public class DatabaseMigrationRunner {
             migrateSampleFilesMultiFile(conn);
             migrateMasterPricesRenewalPrice(conn);
             migrateMasterPricesCalloutFee(conn);
+            migrateApplicationsCalloutFee(conn);
             migrateNotificationsTable(conn);
             // ★ Kaki Concierge Phase 1 PR#1
             migrateUsersAccountStatusColumns(conn);
@@ -348,8 +349,6 @@ public class DatabaseMigrationRunner {
         // LoA 교환 모델 (loa-exchange 재설계 PR3)
         addColumnIfMissing(conn, "applications", "loa_stage",               "ALTER TABLE applications ADD COLUMN loa_stage VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED'");
         addColumnIfMissing(conn, "applications", "loa_form_template_seq",   "ALTER TABLE applications ADD COLUMN loa_form_template_seq BIGINT NULL");
-        // 출장비(call-out fee) 스냅샷 — New License 신청에만 설정 (Renewal 은 null)
-        addColumnIfMissing(conn, "applications", "callout_fee",             "ALTER TABLE applications ADD COLUMN callout_fee DECIMAL(10,2) NULL AFTER sld_fee");
         // 인앱 알림 딥링크 — 클릭 시 처리 화면의 해당 위치로 이동(NotificationLinkResolver 생성)
         addColumnIfMissing(conn, "notifications", "link_url",               "ALTER TABLE notifications ADD COLUMN link_url VARCHAR(300) NULL");
     }
@@ -580,6 +579,29 @@ public class DatabaseMigrationRunner {
                 "ALTER TABLE master_prices ADD COLUMN callout_fee DECIMAL(10,2) NOT NULL DEFAULT 200.00 AFTER endorsement_price"
             );
             log.info("Migration [master-prices-callout]: completed");
+        }
+    }
+
+    /**
+     * 마이그레이션: applications 테이블에 callout_fee(출장비) 스냅샷 컬럼 추가
+     * - New License 신청에만 설정 (Renewal 은 null), nullable
+     * - Application 엔티티가 callout_fee 를 매핑하므로 컬럼 누락 시 모든 신청 조회가
+     *   "Unknown column 'callout_fee'" 로 500 실패한다. master_prices callout 과 함께 초기에 보정.
+     */
+    private void migrateApplicationsCalloutFee(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+
+        if (columnExists(conn, "applications", "callout_fee")) {
+            log.debug("Migration [applications-callout]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [applications-callout]: adding callout_fee column...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE applications ADD COLUMN callout_fee DECIMAL(10,2) NULL"
+            );
+            log.info("Migration [applications-callout]: completed");
         }
     }
 
