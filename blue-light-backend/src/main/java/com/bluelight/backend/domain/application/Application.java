@@ -717,24 +717,22 @@ public class Application extends BaseEntity {
      * <p>상태 전이 규칙:
      * <ul>
      *   <li>{@code kvaStatus=UNKNOWN} → {@code CONFIRMED} 로 전환.</li>
-     *   <li>{@code kvaStatus=CONFIRMED} 인 경우 {@code force=false} 이면 {@link IllegalStateException}.
-     *       컨트롤러/서비스에서 409 {@code KVA_ALREADY_CONFIRMED} 로 변환할 것.</li>
+     *   <li>{@code kvaStatus=CONFIRMED} 인 경우에도 결제 전에는 재확정(값 변경 포함)을 허용한다.
+     *       신청자 입력값(USER_INPUT) 검토 확정, LEW 확정 후 재변경 모두 동일 경로.</li>
      *   <li>재계산된 {@code quoteAmount} 는 서비스에서 계산 후 파라미터로 전달.</li>
      * </ul>
      *
-     * <p>금지 상태 검증({@code PAID} 이후 차단, B-3)은 서비스에서 수행 — 도메인에서는
-     * kvaStatus 자체의 전이만 관리한다.
+     * <p>금지 상태 검증({@code PAID} 이후 차단, B-3)과 권한(배정 LEW/ADMIN)·정책은 서비스에서 수행 —
+     * 도메인에서는 kvaStatus/값 전이만 관리한다.
      *
      * @param selectedKva    새 kVA tier
      * @param quoteAmount    재계산된 금액
      * @param confirmedBy    확정자 (LEW 또는 ADMIN)
-     * @param force          이미 CONFIRMED 상태에서 덮어쓸지 여부 (ADMIN 전용, 컨트롤러에서 역할 검증)
+     * @param force          ADMIN 명시적 override 여부 — 감사 라벨 구분용(서비스에서 사용). 도메인 전이엔
+     *                       영향 없음(결제 전 재확정은 force 무관 허용).
      */
     public void confirmKva(Integer selectedKva, BigDecimal quoteAmount,
                            User confirmedBy, boolean force) {
-        if (this.kvaStatus == KvaStatus.CONFIRMED && !force) {
-            throw new IllegalStateException("kVA is already confirmed");
-        }
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.kvaStatus = KvaStatus.CONFIRMED;

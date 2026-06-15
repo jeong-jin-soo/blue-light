@@ -12,16 +12,15 @@ import type { AdminApplication } from '../../types';
  *
  * <ul>
  *   <li>UNKNOWN: amber Card + [Confirm kVA] 버튼.</li>
- *   <li>CONFIRMED: 값 + source 배지 + (ADMIN) Override 버튼.</li>
- *   <li>권한:
+ *   <li>CONFIRMED: 값 + source 배지 + [Confirm kVA](USER_INPUT 검토) / [Change kVA](LEW_VERIFIED 변경) 버튼.</li>
+ *   <li>권한 (결제 전):
  *     <ul>
- *       <li>ADMIN/SYSTEM_ADMIN: 항상 확정 + override 가능.</li>
- *       <li>LEW (assigned): UNKNOWN 시에만 확정 가능. override 버튼 숨김.</li>
+ *       <li>ADMIN/SYSTEM_ADMIN: 확인·확정/변경·재확정 가능 (이미 LEW 확정값 변경 시 force=true 감사).</li>
+ *       <li>LEW (assigned): 신청자 입력값 확인·확정, 변경·재확정 모두 가능 (force 불필요).</li>
  *       <li>LEW (unassigned): 조회 + "Not assigned" 안내만.</li>
  *     </ul>
  *   </li>
- *   <li>PRE-PAYMENT(PENDING_REVIEW/REVISION_REQUESTED/PENDING_PAYMENT): {@link KvaConfirmModal}
- *       의 force=true override 사용.</li>
+ *   <li>PRE-PAYMENT(PENDING_REVIEW/REVISION_REQUESTED/PENDING_PAYMENT): {@link KvaConfirmModal}.</li>
  *   <li>POST-PAYMENT(PAID/IN_PROGRESS/COMPLETED): ADMIN 전용 [Override (post-payment)] 버튼 노출.
  *       {@link KvaPostPaymentOverrideModal} 호출 — 별도 엔드포인트.
  *       스펙: {@code doc/Project Analysis/kva-postpayment-adjustment-spec.md} §4.1.</li>
@@ -53,16 +52,12 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
   const kvaStatus = application.kvaStatus ?? 'CONFIRMED';
   const kvaSource = application.kvaSource;
 
-  // 권한 가드 — 버튼 노출 여부
-  const canConfirm =
-    !locked &&
-    kvaStatus === 'UNKNOWN' &&
-    (isAdmin || isAssignedLew);
-
-  const canOverride =
-    !locked &&
-    kvaStatus === 'CONFIRMED' &&
-    isAdmin;
+  // 권한 가드 — 결제 전에는 배정 LEW/ADMIN 모두 kVA 확인·확정/변경·재확정 가능.
+  // 신청자 입력값(CONFIRMED/USER_INPUT)도 LEW 가 검토 후 그대로 확정하거나 변경할 수 있고,
+  // 확정(LEW_VERIFIED) 뒤에도 다시 변경·재확정 가능. (결제 후는 아래 post-payment 전용 경로.)
+  const canAct = !locked && (isAdmin || isAssignedLew);
+  const canConfirm = canAct && kvaStatus === 'UNKNOWN';
+  const canChange = canAct && kvaStatus === 'CONFIRMED';
 
   // PR-1: 결제 후 kVA 사후 변경 — ADMIN 전용, PAID/IN_PROGRESS/COMPLETED 에서만 노출.
   const canOverridePostPayment =
@@ -141,13 +136,14 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
             </div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            {canOverride && (
+            {canChange && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setModalOpen(true)}
               >
-                Override
+                {/* 신청자 입력값(USER_INPUT)은 'Confirm'(검토 확정), 이미 LEW 확정값은 'Change'(변경/재확정) */}
+                {kvaSource === 'LEW_VERIFIED' ? 'Change kVA' : 'Confirm kVA'}
               </Button>
             )}
             {canOverridePostPayment && (
@@ -162,7 +158,7 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
           </div>
         </div>
       </Card>
-      {canOverride && (
+      {canChange && (
         <KvaConfirmModal
           isOpen={modalOpen}
           application={application}

@@ -194,6 +194,8 @@ export default function LewReviewFormPage() {
     [documentRequests],
   );
   const kvaConfirmed = adminApp?.kvaStatus === 'CONFIRMED';
+  // 신청자 입력값(USER_INPUT)은 CONFIRMED 라도 LEW 검토 전 — 배지로 "검토 필요" 구분.
+  const kvaLewVerified = kvaConfirmed && adminApp?.kvaSource === 'LEW_VERIFIED';
   const sldRequired = adminApp?.sldOption === 'REQUEST_LEW';
   const sldReady = !sldRequired || sldRequest?.status === 'CONFIRMED';
 
@@ -366,9 +368,11 @@ export default function LewReviewFormPage() {
     {
       key: 'kva',
       label: 'kVA',
-      badge: kvaConfirmed
+      badge: kvaLewVerified
         ? { text: 'Confirmed', variant: 'success' }
-        : { text: 'Unknown', variant: 'warning' },
+        : kvaConfirmed
+          ? { text: 'Review', variant: 'warning' }   // 신청자 입력값 — LEW 확인/확정 필요
+          : { text: 'Unknown', variant: 'warning' },
     },
     ...(sldRequired
       ? ([{

@@ -42,8 +42,9 @@ import java.util.Map;
  *   <li><b>B-4</b>: force=true 경로는 {@link AuditAction#KVA_OVERRIDDEN_BY_ADMIN},
  *       일반 경로는 {@link AuditAction#KVA_CONFIRMED_BY_LEW},
  *       실패 경로는 {@link AuditAction#KVA_CONFIRMATION_DENIED} 로 각각 분리 기록.</li>
- *   <li><b>AC-P1</b>: 이미 CONFIRMED 인 신청에 force=false 로 재확정 시 409
- *       {@code KVA_ALREADY_CONFIRMED}. force=true 는 ADMIN 전용 (컨트롤러에서 역할 검증).</li>
+ *   <li><b>재확정 허용</b>: 결제 전(B-3 미해당)에는 배정 LEW/ADMIN 이 kVA 를 확인·확정/변경하거나
+ *       확정 뒤에도 다시 변경·재확정할 수 있다(신청자 입력값 USER_INPUT 검토 확정 포함). force 는
+ *       ADMIN 명시적 override 의 감사 라벨 구분에만 쓰이며 재확정 허용 여부를 좌우하지 않는다.</li>
  *   <li><b>AC-A2</b>: ADMIN 이 아닌 LEW 는 본인에게 할당된 신청만 확정 가능 (403).</li>
  *   <li><b>@Version</b>: Application 엔티티의 {@code @Version} 으로 동시성 충돌 차단,
  *       OptimisticLockException → GlobalExceptionHandler 가 409 {@code STALE_STATE} 로 변환.</li>
@@ -101,17 +102,14 @@ public class ApplicationKvaService {
                     HttpStatus.CONFLICT, "KVA_LOCKED_AFTER_PAYMENT");
         }
 
-        // AC-P1: 이미 CONFIRMED 상태에서 force=false 이면 거부
+        // 결제 전(pre-payment)에는 배정 LEW/ADMIN 이 kVA 를 자유롭게 확인·확정/변경·재확정할 수 있다.
+        // 신청자 입력값(CONFIRMED/USER_INPUT)도 LEW 가 검토 후 그대로 확정(→LEW_VERIFIED)하거나
+        // 변경 후 확정할 수 있고, 확정 뒤에도 다시 변경·재확정 가능하다. (결제 후는 위 PAID 가드로 차단 →
+        // 정산 동반 사후변경은 KvaPostPaymentService 전용 경로 사용.) force 는 ADMIN 명시적 override 의
+        // 감사 라벨 구분에만 사용하며, 재확정 허용 여부를 더는 좌우하지 않는다.
         KvaStatus previousStatus = application.getKvaStatus();
         Integer previousKva = application.getSelectedKva();
         BigDecimal previousQuote = application.getQuoteAmount();
-        if (previousStatus == KvaStatus.CONFIRMED && !force) {
-            logDenied(actorSeq, application, request, "KVA_ALREADY_CONFIRMED",
-                    "Application already confirmed; force=true required", false);
-            throw new BusinessException(
-                    "kVA already confirmed; use force=true to override (ADMIN only)",
-                    HttpStatus.CONFLICT, "KVA_ALREADY_CONFIRMED");
-        }
 
         // AC-A3: tier 유효성 — MasterPrice 조회 실패 시 롤백 + 400 INVALID_KVA_TIER
         MasterPrice masterPrice = masterPriceRepository.findByKva(request.getSelectedKva())

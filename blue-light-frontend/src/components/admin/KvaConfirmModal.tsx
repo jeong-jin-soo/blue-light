@@ -48,8 +48,10 @@ export function KvaConfirmModal({
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SYSTEM_ADMIN';
 
-  const isOverride = application.kvaStatus === 'CONFIRMED';
-  const minNoteLen = isOverride ? NOTE_MIN_OVERRIDE : NOTE_MIN;
+  // 이미 LEW 가 확정한 값을 다시 바꾸는 경우(재확정/변경) — 신청자 입력값(USER_INPUT) 검토 확정은
+  // 일반 "Confirm" 으로 취급한다. 결제 전에는 배정 LEW/ADMIN 모두 변경·재확정 가능.
+  const isReconfirm = application.kvaStatus === 'CONFIRMED' && application.kvaSource === 'LEW_VERIFIED';
+  const minNoteLen = isReconfirm ? NOTE_MIN_OVERRIDE : NOTE_MIN;
 
   const [selectedKva, setSelectedKva] = useState<number>(application.selectedKva || 45);
   const [note, setNote] = useState('');
@@ -112,11 +114,8 @@ export function KvaConfirmModal({
     if (noteTrimmed.length > NOTE_MAX) {
       errs.push(`Note must be at most ${NOTE_MAX} characters.`);
     }
-    if (isOverride && !isAdmin) {
-      errs.push('Only ADMIN can override a confirmed kVA.');
-    }
     return errs;
-  }, [selectedKva, tierOptions, noteTrimmed, minNoteLen, isOverride, isAdmin]);
+  }, [selectedKva, tierOptions, noteTrimmed, minNoteLen]);
 
   const canSubmit = errors.length === 0 && !submitting;
 
@@ -132,7 +131,7 @@ export function KvaConfirmModal({
       await confirmKvaApi(
         application.applicationSeq,
         { selectedKva, note: noteTrimmed },
-        isOverride // ADMIN override
+        isReconfirm && isAdmin // force=true 는 ADMIN 이 이미 확정된 값을 override 할 때만(감사 라벨). LEW 는 force 없이 재확정.
       );
       toast.success('kVA confirmed');
       onSuccess();
@@ -189,7 +188,7 @@ export function KvaConfirmModal({
           <span className="text-xl" aria-hidden>⚡</span>
           <div>
             <h3 id="kva-confirm-title" className="text-lg font-semibold text-gray-800">
-              {isOverride ? 'Override confirmation' : 'Confirm kVA'}
+              {isReconfirm ? (isAdmin ? 'Override confirmation' : 'Change kVA') : 'Confirm kVA'}
             </h3>
             <p className="text-xs text-gray-500 mt-0.5">
               Application #{application.applicationSeq} · {applicantName}
@@ -228,16 +227,16 @@ export function KvaConfirmModal({
           </div>
         </div>
 
-        {/* Override warning */}
-        {isOverride && (
+        {/* Re-confirmation / override warning — 이미 LEW 확정된 값을 변경할 때만 */}
+        {isReconfirm && (
           <div
             role="alert"
             className="text-sm text-warning-700 bg-warning-50 border border-warning-500/40 rounded-md p-3 mb-4"
           >
-            <p className="font-medium">Override confirmation</p>
+            <p className="font-medium">{isAdmin ? 'Override confirmation' : 'Change confirmed kVA'}</p>
             <p className="mt-0.5">
-              This will override the current confirmed kVA and update the quoted price.
-              Admin-only action — recorded in the audit log with previous values.
+              This will change the currently confirmed kVA and update the quoted price.
+              Recorded in the audit log with the previous values, and the applicant is notified.
             </p>
           </div>
         )}
