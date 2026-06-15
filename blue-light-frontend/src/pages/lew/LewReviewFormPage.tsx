@@ -435,12 +435,19 @@ export default function LewReviewFormPage() {
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
             <span className="font-medium text-gray-700">Ready for payment?</span>
             <span id="phase1-progress" className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span
-                className={`inline-flex items-center gap-1 ${kvaConfirmed ? 'text-success-700' : 'text-warning-700'}`}
+              {/* kVA 항목은 확정 후에도 클릭 가능 — 결제 요청 전에는 LEW 가 언제든 kVA 탭에서
+                  값을 수정하고 다시 확정할 수 있다(확정했더라도). */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('kva')}
+                className={`inline-flex items-center gap-1 underline-offset-2 hover:underline ${kvaLewVerified ? 'text-success-700' : 'text-warning-700'}`}
               >
-                <span aria-hidden>{kvaConfirmed ? '✓' : '•'}</span> kVA
-                <span className="sr-only">{kvaConfirmed ? 'confirmed' : 'not confirmed'}</span>
-              </span>
+                <span aria-hidden>{kvaLewVerified ? '✓' : '•'}</span> kVA
+                <span className="sr-only">
+                  {kvaLewVerified ? 'confirmed — go to kVA tab to change/re-confirm' : 'not confirmed — go to kVA tab'}
+                </span>
+                <span aria-hidden> →</span>
+              </button>
               {pendingDocCount === 0 ? (
                 <span className="inline-flex items-center gap-1 text-success-700">
                   <span aria-hidden>✓</span> Documents
@@ -475,16 +482,6 @@ export default function LewReviewFormPage() {
                   <span aria-hidden>•</span> LoA pending
                   <span className="sr-only"> — go to LOA tab</span>
                   <span aria-hidden> →</span>
-                </button>
-              )}
-              {!kvaConfirmed && (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('kva')}
-                  className="text-warning-700 underline hover:text-warning-800"
-                >
-                  Confirm kVA <span aria-hidden>→</span>
-                  <span className="sr-only"> — go to kVA tab</span>
                 </button>
               )}
             </span>
