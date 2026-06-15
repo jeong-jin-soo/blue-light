@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
  *
  * <ul>
  *   <li>kvaUnknown=true → 서버가 selectedKva=55 로 강제, kvaStatus=UNKNOWN, kvaSource=null</li>
- *   <li>kvaUnknown=false/null (기존) → kvaStatus=CONFIRMED, kvaSource=USER_INPUT</li>
+ *   <li>kvaUnknown=false/null (신청자 신고값) → kvaStatus=UNKNOWN(LEW 미확정), kvaSource=USER_INPUT</li>
  *   <li>악의적: kvaUnknown=true 인데 selectedKva=500 전송 → 서버가 45 로 덮어쓰기</li>
  * </ul>
  */
@@ -123,7 +123,9 @@ class ApplicationServiceKvaTest {
     }
 
     @Test
-    void kvaUnknown_false면_CONFIRMED_USER_INPUT으로_저장() {
+    void 신청자_입력값은_LEW미확정_UNKNOWN_USER_INPUT으로_저장() {
+        // "신청자가 kVA 를 적어서 올렸다"고 LEW 확정(CONFIRMED) 상태가 되면 안 된다.
+        // 값은 보존하고 source=USER_INPUT 으로 신고값 표시, status 는 UNKNOWN(LEW 미확정).
         stubCommon(100);
         CreateApplicationRequest req = baseReq(100, Boolean.FALSE);
 
@@ -133,13 +135,13 @@ class ApplicationServiceKvaTest {
         verify(applicationRepository).save(cap.capture());
         Application saved = cap.getValue();
         assertThat(saved.getSelectedKva()).isEqualTo(100);
-        assertThat(saved.getKvaStatus()).isEqualTo(KvaStatus.CONFIRMED);
+        assertThat(saved.getKvaStatus()).isEqualTo(KvaStatus.UNKNOWN);
         assertThat(saved.getKvaSource())
                 .isEqualTo(com.bluelight.backend.domain.application.KvaSource.USER_INPUT);
     }
 
     @Test
-    void kvaUnknown_누락_null_이면_CONFIRMED_USER_INPUT_하위호환() {
+    void kvaUnknown_누락_null_이어도_신고값은_UNKNOWN_USER_INPUT() {
         stubCommon(55);
         CreateApplicationRequest req = baseReq(55, null);
 
@@ -148,7 +150,7 @@ class ApplicationServiceKvaTest {
         ArgumentCaptor<Application> cap = ArgumentCaptor.forClass(Application.class);
         verify(applicationRepository).save(cap.capture());
         Application saved = cap.getValue();
-        assertThat(saved.getKvaStatus()).isEqualTo(KvaStatus.CONFIRMED);
+        assertThat(saved.getKvaStatus()).isEqualTo(KvaStatus.UNKNOWN);
         assertThat(saved.getKvaSource())
                 .isEqualTo(com.bluelight.backend.domain.application.KvaSource.USER_INPUT);
     }

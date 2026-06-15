@@ -356,6 +356,138 @@ export default function ApplicationDetailPage() {
   const canUpload = ['PENDING_REVIEW', 'REVISION_REQUESTED', 'PENDING_PAYMENT', 'PAID']
     .includes(application.status);
 
+  // ── 진행 단계별 배치 (B안) ───────────────────────────────
+  // 신청자가 "지금 확인/처리해야 할" 섹션을 메인 영역 최상단으로 승격한다.
+  // 섹션 자체와 딥링크 앵커 ID(#payment/#loa/#documents)는 그대로 두고 렌더 순서만 바꾼다.
+  const licenceFiles = files.filter((f) => f.fileType === 'LICENSE_PDF');
+  const showLicenceTop = application.status === 'COMPLETED' && licenceFiles.length > 0;
+
+  // LoA 신청자 액션 필요 판단 — loaStage 가 권위 있는 신호(업로드 시 APPLICANT_UPLOADED 로 전이).
+  //  · NEW: LEW 가 폼 전달(FORM_SENT) → 다운로드·서명·업로드 대기
+  //  · RENEWAL: 폼 미제공, stage 는 업로드 전까지 NOT_STARTED → 서명본 업로드 대기
+  const loaStageNow = loaStatus?.loaStage ?? 'NOT_STARTED';
+  const isRenewalApp = application.applicationType === 'RENEWAL';
+  const loaActionNeeded =
+    loaStageNow === 'FORM_SENT'
+    || (isRenewalApp && loaStageNow === 'NOT_STARTED'
+        && !['COMPLETED', 'EXPIRED'].includes(application.status));
+
+  // 승격 대상 1개 선택 (우선순위: 수정 편집 > LoA 액션 > 결제 대기).
+  const focusKey: 'info' | 'loa' | 'payment' | null =
+    editMode ? 'info'
+    : loaActionNeeded ? 'loa'
+    : application.status === 'PENDING_PAYMENT' ? 'payment'
+    : null;
+
+  // 메인 영역 섹션 노드 — 아래에서 진행 단계에 따라 순서를 재배치한다.
+  // id="documents": 서류 요청/반려/승인 알림 딥링크 타깃
+  const documentsSection = (
+    <div id="documents" className="scroll-mt-24" key="documents">
+      <DocumentUploadSection
+        applicationSeq={applicationId}
+        canUpload={authUser?.role === 'APPLICANT'}
+      />
+    </div>
+  );
+
+  const infoSection = (
+    <ApplicationInfo
+      key="info"
+      application={application}
+      editMode={editMode}
+      editState={{
+        address: editAddress,
+        postalCode: editPostalCode,
+        buildingType: editBuildingType,
+        kva: editKva,
+        price: editPrice,
+        installation: editInstallation,
+      }}
+      prices={prices}
+      submitting={submitting}
+      onEditStateChange={handleEditStateChange}
+      onKvaChange={handleKvaChange}
+      onResubmit={() => setShowResubmitConfirm(true)}
+      onCancelEdit={() => setEditMode(false)}
+    />
+  );
+
+  // id="payment": 결제 요청/증빙/확인 알림 딥링크 타깃
+  const paymentSection = (
+    <div id="payment" className="scroll-mt-24" key="payment">
+      <ApplicationPayment
+        application={application}
+        payments={payments}
+        paymentInfo={paymentInfo}
+        files={files}
+        onPaymentAdviceUpload={handlePaymentAdviceUpload}
+        onPaymentAdviceDelete={handlePaymentAdviceDelete}
+        onRequestPaymentConfirmation={handleRequestPaymentConfirmation}
+      />
+    </div>
+  );
+
+  // E-Invoice 다운로드 — PAID 이후에만 노출. id="receipts": 영수증 알림 딥링크 타깃
+  const invoiceSection = invoice ? (
+    <Card id="receipts" className="scroll-mt-24" key="receipts">
+      <h2 className="text-lg font-semibold text-gray-800 mb-3">E-Invoice</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-gray-500">
+              {invoice.invoiceNumber}
+            </span>
+            <Badge variant="success">Issued</Badge>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {new Date(invoice.issuedAt).toLocaleString()} · {invoice.currency} ${Number(invoice.totalAmount).toLocaleString()}
+          </p>
+        </div>
+        <a
+          href={invoiceApi.buildInvoicePdfDownloadUrl(invoice.pdfFileSeq)}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+        >
+          <span aria-hidden>📄</span>
+          <span>Download Invoice</span>
+        </a>
+      </div>
+    </Card>
+  ) : null;
+
+  // id="loa": LoA 폼 전달/업로드 확인 알림 딥링크 타깃
+  const loaSection = (
+    <div id="loa" className="scroll-mt-24" key="loa">
+      <ApplicationLoaSection
+        application={application}
+        loaStatus={loaStatus}
+        onStatusUpdate={fetchData}
+      />
+    </div>
+  );
+
+  const filesSection = (
+    <ApplicationDocuments
+      key="files"
+      application={application}
+      files={files.filter((f) => f.fileType !== 'SKETCH_SLD')}
+      sldRequest={sldRequest}
+      canUpload={canUpload}
+      uploadFileType={uploadFileType}
+      onUploadFileTypeChange={setUploadFileType}
+      onFileUpload={handleFileUpload}
+      onFileDelete={async (fileId) => { setDeleteFileId(fileId); }}
+      onFileDownload={handleFileDownload}
+      onSketchUpload={handleSketchUpload}
+      onSketchDelete={handleSketchDelete}
+      onSldRequestUpdate={handleSldRequestUpdate}
+      sketchFiles={files.filter((f) => f.fileType === 'SKETCH_SLD')}
+      savingSldRequest={savingSldRequest}
+      sampleFiles={sampleFiles}
+    />
+  );
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Back navigation */}
@@ -448,104 +580,54 @@ export default function ApplicationDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content (left 2/3) */}
+        {/* Main content (left 2/3) — 진행 단계별 동적 배치 (B안) */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Phase 2 — 서류 섹션 (자발적 업로드 + LEW 요청). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
-          {/* id="documents": 서류 요청/반려/승인 알림 딥링크 타깃 */}
-          <div id="documents" className="scroll-mt-24">
-            <DocumentUploadSection
-              applicationSeq={applicationId}
-              canUpload={authUser?.role === 'APPLICANT'}
-            />
-          </div>
-
-          <ApplicationInfo
-            application={application}
-            editMode={editMode}
-            editState={{
-              address: editAddress,
-              postalCode: editPostalCode,
-              buildingType: editBuildingType,
-              kva: editKva,
-              price: editPrice,
-              installation: editInstallation,
-            }}
-            prices={prices}
-            submitting={submitting}
-            onEditStateChange={handleEditStateChange}
-            onKvaChange={handleKvaChange}
-            onResubmit={() => setShowResubmitConfirm(true)}
-            onCancelEdit={() => setEditMode(false)}
-          />
-
-          {/* id="payment": 결제 요청/증빙/확인 알림 딥링크 타깃 */}
-          <div id="payment" className="scroll-mt-24">
-            <ApplicationPayment
-              application={application}
-              payments={payments}
-              paymentInfo={paymentInfo}
-              files={files}
-              onPaymentAdviceUpload={handlePaymentAdviceUpload}
-              onPaymentAdviceDelete={handlePaymentAdviceDelete}
-              onRequestPaymentConfirmation={handleRequestPaymentConfirmation}
-            />
-          </div>
-
-          {/* E-Invoice 다운로드 — PAID 이후에만 노출. id="receipts": 영수증 알림 딥링크 타깃 */}
-          {invoice && (
-            <Card id="receipts" className="scroll-mt-24">
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">E-Invoice</h2>
-              <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* 완료: 라이선스 발급 시 다운로드를 최상단에 노출 */}
+          {showLicenceTop && (
+            <Card id="licence" className="scroll-mt-24 border-success-200 bg-success-50">
+              <div className="flex items-start gap-3">
+                <span className="text-2xl" aria-hidden>🎉</span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-gray-500">
-                      {invoice.invoiceNumber}
-                    </span>
-                    <Badge variant="success">Issued</Badge>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(invoice.issuedAt).toLocaleString()} · {invoice.currency} ${Number(invoice.totalAmount).toLocaleString()}
+                  <h2 className="text-lg font-semibold text-success-800">Your Licence is Ready</h2>
+                  <p className="text-sm text-success-700 mt-1">
+                    Your electrical installation licence has been issued. Download your licence document below.
                   </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {licenceFiles.map((f) => (
+                      <Button
+                        key={f.fileSeq}
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleFileDownload(f)}
+                      >
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download Licence PDF
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
                 </div>
-                <a
-                  href={invoiceApi.buildInvoicePdfDownloadUrl(invoice.pdfFileSeq)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
-                >
-                  <span aria-hidden>📄</span>
-                  <span>Download Invoice</span>
-                </a>
               </div>
             </Card>
           )}
 
-          {/* id="loa": LoA 폼 전달/업로드 확인 알림 딥링크 타깃 */}
-          <div id="loa" className="scroll-mt-24">
-            <ApplicationLoaSection
-              application={application}
-              loaStatus={loaStatus}
-              onStatusUpdate={fetchData}
-            />
-          </div>
+          {/* 신청자 액션이 필요한 섹션을 최상단으로 승격 */}
+          {focusKey === 'info' && infoSection}
+          {focusKey === 'loa' && loaSection}
+          {focusKey === 'payment' && paymentSection}
 
-          <ApplicationDocuments
-            application={application}
-            files={files.filter((f) => f.fileType !== 'SKETCH_SLD')}
-            sldRequest={sldRequest}
-            canUpload={canUpload}
-            uploadFileType={uploadFileType}
-            onUploadFileTypeChange={setUploadFileType}
-            onFileUpload={handleFileUpload}
-            onFileDelete={async (fileId) => { setDeleteFileId(fileId); }}
-            onFileDownload={handleFileDownload}
-            onSketchUpload={handleSketchUpload}
-            onSketchDelete={handleSketchDelete}
-            onSldRequestUpdate={handleSldRequestUpdate}
-            sketchFiles={files.filter((f) => f.fileType === 'SKETCH_SLD')}
-            savingSldRequest={savingSldRequest}
-            sampleFiles={sampleFiles}
-          />
+          {/* Phase 2 — 서류 섹션 (자발적 업로드 + LEW 요청). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
+          {documentsSection}
+
+          {/* 나머지 섹션 — 기본 순서 (승격된 섹션은 중복 렌더 방지) */}
+          {focusKey !== 'info' && infoSection}
+          {focusKey !== 'payment' && paymentSection}
+          {invoiceSection}
+          {focusKey !== 'loa' && loaSection}
+          {filesSection}
         </div>
 
         {/* Sidebar (right 1/3) */}
