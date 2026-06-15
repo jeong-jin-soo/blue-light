@@ -10,6 +10,11 @@ import {
   hasAnyAddressPart,
   type AddressInputValues,
 } from '../../../components/domain/AddressInputGroup';
+import {
+  CONSUMER_TYPE_OPTIONS,
+  RETAILER_OPTIONS,
+  SUPPLY_VOLTAGE_OPTIONS,
+} from '../../../constants/cof';
 import type { Application, MasterPrice } from '../../../types';
 
 interface EditState {
@@ -106,6 +111,9 @@ export function ApplicationInfo({
           <ReadOnlyInstallationDetails application={application} />
         )}
       </Card>
+
+      {/* 제출 내역 전체 요약 — 신청 폼에서 입력했지만 위에 안 보이는 항목들을 다시 볼 수 있게. (읽기 모드 전용) */}
+      {!editMode && <ApplicationSummaryDetails application={application} />}
 
       {/* Licence Period (both NEW and RENEWAL) */}
       {application.renewalPeriodMonths && (
@@ -227,5 +235,98 @@ function ReadOnlyInstallationDetails({ application }: { application: Application
         )}
       </div>
     </div>
+  );
+}
+
+const PREMISES_TYPE_LABELS: Record<string, string> = {
+  COMMERCIAL: 'Commercial',
+  FACTORIES: 'Factories',
+  FARM: 'Farm',
+  RESIDENTIAL: 'Residential',
+  INDUSTRIAL: 'Industrial',
+  HOTEL: 'Hotel',
+  HEALTHCARE: 'Healthcare',
+  EDUCATION: 'Education',
+  GOVERNMENT: 'Government',
+  MIXED_USE: 'Mixed use',
+  OTHER: 'Other',
+};
+
+const SLD_OPTION_LABELS: Record<string, string> = {
+  SELF_UPLOAD: 'Upload my own SLD',
+  SUBMIT_WITHIN_3_MONTHS: 'Submit within 3 months',
+  REQUEST_LEW: 'Request LEW to prepare',
+};
+
+function labelFromOptions(
+  options: ReadonlyArray<{ value: string | number; label: string }>,
+  value: string | number | undefined,
+): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  return options.find((o) => o.value === value)?.label;
+}
+
+/**
+ * 신청 폼에서 입력했지만 Property Details 에 표시되지 않는 항목들을 모아 보여주는 요약 카드.
+ *
+ * <p>값이 있는 필드만 렌더 — 빈 항목으로 화면을 채우지 않는다. 라벨은 신청 폼과 동일한
+ * 옵션 상수({@code constants/cof.ts})에서 가져와 표기를 일치시킨다.</p>
+ */
+function ApplicationSummaryDetails({ application }: { application: Application }) {
+  const rows: { label: string; value: string }[] = [];
+  const push = (label: string, value?: string | number | null) => {
+    if (value !== undefined && value !== null && value !== '') {
+      rows.push({ label, value: String(value) });
+    }
+  };
+
+  push('Application Type', application.applicationType === 'RENEWAL' ? 'Renewal' : 'New');
+  push(
+    'Applicant Type',
+    application.applicantType === 'CORPORATE'
+      ? 'Corporate'
+      : application.applicantType === 'INDIVIDUAL'
+        ? 'Individual'
+        : undefined,
+  );
+  push('Installation Name', application.installationName);
+  push(
+    'Premises Type',
+    application.premisesType
+      ? (PREMISES_TYPE_LABELS[application.premisesType] ?? application.premisesType)
+      : undefined,
+  );
+  if (application.isRentalPremises) {
+    push('Rental Premises', 'Yes');
+    push('Landlord EI Licence', application.landlordEiLicenceMasked);
+  }
+  push('Consumer Type', labelFromOptions(CONSUMER_TYPE_OPTIONS, application.consumerTypeHint));
+  push('Electricity Retailer', labelFromOptions(RETAILER_OPTIONS, application.retailerHint));
+  push('Supply Voltage', labelFromOptions(SUPPLY_VOLTAGE_OPTIONS, application.supplyVoltageHint));
+  if (application.hasGeneratorHint !== undefined && application.hasGeneratorHint !== null) {
+    push('Standby Generator', application.hasGeneratorHint ? 'Yes' : 'No');
+    if (application.hasGeneratorHint && application.generatorCapacityHint) {
+      push('Generator Capacity', `${application.generatorCapacityHint} kVA`);
+    }
+  }
+  push('MSSL No. (last 4)', application.msslHintLast4 ? `••••${application.msslHintLast4}` : undefined);
+  push(
+    'SLD Submission',
+    application.sldOption
+      ? (SLD_OPTION_LABELS[application.sldOption] ?? application.sldOption)
+      : undefined,
+  );
+
+  if (rows.length === 0) return null;
+
+  return (
+    <Card>
+      <h2 className="text-lg font-semibold text-gray-800 mb-4">Application Summary</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {rows.map((r) => (
+          <InfoField key={r.label} label={r.label} value={r.value} />
+        ))}
+      </div>
+    </Card>
   );
 }

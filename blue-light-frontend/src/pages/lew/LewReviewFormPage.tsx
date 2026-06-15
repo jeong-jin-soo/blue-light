@@ -11,6 +11,7 @@ import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
 import { LewLoaExchangeSection } from './sections/LewLoaExchangeSection';
+import { LewConfirmationSummary } from './sections/LewConfirmationSummary';
 import { AdminEmaSection } from '../admin/sections/AdminEmaSection';
 import { CompleteModal } from '../admin/sections/AdminModals';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
@@ -519,6 +520,18 @@ export default function LewReviewFormPage() {
         title={`LEW Review — Application #${app.applicationSeq}`}
         subtitle={app.address}
         actions={<StatusBadge status={app.status} />}
+      />
+
+      {/* 확정 내역 요약 — 모든 단계에서 항상 노출(결제 요청 후 포함). 결제 전엔 각 항목 수정·재확정 링크. */}
+      <LewConfirmationSummary
+        application={adminApp}
+        loaStatus={loaStatus}
+        documentRequests={documentRequests}
+        sldRequired={sldRequired}
+        sldRequest={sldRequest}
+        editable={inPhase1}
+        onGoToTab={setActiveTab}
+        onDownloadFinalLoa={handleLoaDownload}
       />
 
       {/* Review comment (ADMIN이 남긴 코멘트, view-only) */}
