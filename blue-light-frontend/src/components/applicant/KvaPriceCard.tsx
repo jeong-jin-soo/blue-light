@@ -105,7 +105,7 @@ export function KvaPriceCard({
             )}
             {priceResult.calloutFee != null && priceResult.calloutFee > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-primary-700">Call-out Fee</span>
+                <span className="text-primary-700">Attendance Fee</span>
                 <span className="font-medium text-primary-800">SGD ${priceResult.calloutFee.toLocaleString()}</span>
               </div>
             )}

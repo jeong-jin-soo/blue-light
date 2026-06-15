@@ -196,7 +196,7 @@ export default function AdminPriceManagementPage() {
       'Renewal Price (SGD)': Number(tier.renewalPrice) || 0,
       'SLD Price (SGD)': Number(tier.sldPrice) || 0,
       'Endorsement Price (SGD)': Number(tier.endorsementPrice) || 0,
-      'Call-out Fee (SGD)': Number(tier.calloutFee) || 0,
+      'Attendance Fee (SGD)': Number(tier.calloutFee) || 0,
       'Active': tier.isActive ? 'Yes' : 'No',
     }));
 
@@ -212,7 +212,7 @@ export default function AdminPriceManagementPage() {
       { wch: 14 },  // Renewal Price
       { wch: 14 },  // SLD Price
       { wch: 18 },  // Endorsement Price
-      { wch: 16 },  // Call-out Fee
+      { wch: 16 },  // Attendance Fee
       { wch: 8 },   // Active
     ];
 
@@ -616,7 +616,7 @@ export default function AdminPriceManagementPage() {
               <span>Renewal (SGD)</span>
               <span>SLD Draw</span>
               <span>Endorsement</span>
-              <span>Call-out</span>
+              <span>Attendance</span>
               <span>Active</span>
               <span />
             </div>
@@ -830,7 +830,7 @@ export default function AdminPriceManagementPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <Input
-                          label="Call-out Fee (SGD)"
+                          label="Attendance Fee (SGD)"
                           type="number"
                           min="0"
                           step="0.01"
