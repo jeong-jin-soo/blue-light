@@ -67,7 +67,7 @@ server:
 
 # JWT 설정
 jwt:
-  secret: ${JWT_SECRET:bluelight-jwt-secret-key-for-development-minimum-256-bits-required}
+  secret: ${JWT_SECRET:bluelight-jwt-secret-key-dev-b12975910581dcf07fc1f6ec698c116ba472d22c-256bit}  # dev 전용 fallback(무작위). dev/prod 는 JWT_SECRET 환경변수(GitHub Secrets)로 override
   expiration: 86400000  # 24시간 (밀리초)
 
 # CORS 설정

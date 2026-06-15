@@ -104,7 +104,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8100 --reload
 ```
 # Backend (blue-light-backend/.env — Git에서 제외됨)
 DB_USERNAME=user  |  DB_PASSWORD=password
-JWT_SECRET=bluelight-jwt-secret-key-for-development-minimum-256-bits-required
+JWT_SECRET=<강력한 256bit 무작위 값 — 커밋 금지. 로컬은 .env, dev/prod 는 GitHub Secrets. 생성: openssl rand -base64 48>
 FILE_UPLOAD_DIR=./uploads
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
 FILE_ENCRYPTION_KEY=<Base64 AES-256 키>  # .env 파일에 설정, bootRun 시 자동 로드
