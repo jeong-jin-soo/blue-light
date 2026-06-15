@@ -49,6 +49,10 @@ public class BatchPriceTierItem {
     @DecimalMin(value = "0.00", message = "Endorsement price must be non-negative")
     private BigDecimal endorsementPrice;
 
+    @NotNull(message = "Call-out fee is required")
+    @DecimalMin(value = "0.00", message = "Call-out fee must be non-negative")
+    private BigDecimal calloutFee;
+
     @NotNull(message = "Active status is required")
     private Boolean isActive;
 }

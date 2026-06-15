@@ -699,6 +699,11 @@ public class KvaPostPaymentService {
                 ? masterPrice.getRenewalPrice()
                 : masterPrice.getPrice();
         BigDecimal newQuote = tierPrice;
+        // 출장비(call-out fee): New License 에만 가산
+        if (application.getApplicationType() != ApplicationType.RENEWAL
+                && masterPrice.getCalloutFee() != null) {
+            newQuote = newQuote.add(masterPrice.getCalloutFee());
+        }
         if (application.getSldOption() != null
                 && application.getSldOption().name().equals("REQUEST_LEW")) {
             BigDecimal sldFee = masterPrice.getSldPrice();

@@ -179,6 +179,8 @@ export interface Application {
   // 갱신 + 견적
   applicationType: ApplicationType;
   sldFee?: number;
+  /** 출장비 (call-out fee) — New License 에만 설정 (Renewal 은 미설정) */
+  calloutFee?: number;
   originalApplicationSeq?: number;
   existingLicenceNo?: string;
   renewalReferenceNo?: string;
@@ -390,6 +392,8 @@ export interface MasterPrice {
   sldPrice?: number;
   /** LEW 인증 도장(endorsement) 가산 비용 */
   endorsementPrice?: number;
+  /** 출장비 (call-out fee) — New License 에만 가산, 기본 200 */
+  calloutFee?: number;
   isActive: boolean;
 }
 
@@ -607,6 +611,8 @@ export interface PriceCalculation {
   tierDescription: string;
   price: number;
   sldFee: number;
+  /** 출장비 (call-out fee) — New License 에만 포함 (Renewal 시 0) */
+  calloutFee?: number;
   totalAmount: number;
   emaFee?: number;
 }
@@ -786,6 +792,8 @@ export interface AdminPriceResponse {
   sldPrice: number;
   /** LEW 인증 도장(endorsement) 가산 비용 */
   endorsementPrice: number;
+  /** 출장비 (call-out fee) — New License 에만 가산 */
+  calloutFee: number;
   isActive: boolean;
   updatedAt: string;
 }
@@ -813,6 +821,7 @@ export interface BatchPriceTierItem {
   renewalPrice: number;
   sldPrice: number;
   endorsementPrice: number;
+  calloutFee: number;
   isActive: boolean;
 }
 

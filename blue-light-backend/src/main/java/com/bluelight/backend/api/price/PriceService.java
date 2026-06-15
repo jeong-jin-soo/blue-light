@@ -67,17 +67,23 @@ public class PriceService {
                 ? masterPrice.getSldPrice()
                 : BigDecimal.ZERO;
 
-        BigDecimal emaFee = (months != null) ? calculateEmaFee(months) : BigDecimal.ZERO;
-        BigDecimal totalAmount = tierPrice.add(sldFee).add(emaFee);
+        // 출장비(call-out fee): New License 에만 가산 (Renewal 미적용)
+        BigDecimal calloutFee = "RENEWAL".equals(applicationType)
+                ? BigDecimal.ZERO
+                : masterPrice.getCalloutFee();
 
-        log.info("Price calculated: kva={}, type={}, tier={}, price={}, sldFee={}, emaFee={}, total={}",
-                kva, applicationType, masterPrice.getDescription(), tierPrice, sldFee, emaFee, totalAmount);
+        BigDecimal emaFee = (months != null) ? calculateEmaFee(months) : BigDecimal.ZERO;
+        BigDecimal totalAmount = tierPrice.add(sldFee).add(calloutFee).add(emaFee);
+
+        log.info("Price calculated: kva={}, type={}, tier={}, price={}, sldFee={}, calloutFee={}, emaFee={}, total={}",
+                kva, applicationType, masterPrice.getDescription(), tierPrice, sldFee, calloutFee, emaFee, totalAmount);
 
         return PriceCalculationResponse.builder()
                 .kva(kva)
                 .tierDescription(masterPrice.getDescription())
                 .price(tierPrice)
                 .sldFee(sldFee)
+                .calloutFee(calloutFee)
                 .emaFee(emaFee)
                 .totalAmount(totalAmount)
                 .build();

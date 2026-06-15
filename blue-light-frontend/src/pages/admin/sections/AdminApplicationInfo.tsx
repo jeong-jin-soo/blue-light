@@ -145,7 +145,7 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
             <div className="flex justify-between text-sm">
               <span className="text-primary-700">kVA Tier Price</span>
               <span className="font-medium text-primary-800">
-                SGD ${(application.quoteAmount - (application.sldFee || 0) - (application.emaFee || 0)).toLocaleString()}
+                SGD ${(application.quoteAmount - (application.sldFee || 0) - (application.calloutFee || 0) - (application.emaFee || 0)).toLocaleString()}
               </span>
             </div>
             {application.sldFee != null && application.sldFee > 0 && (
@@ -153,6 +153,14 @@ export function AdminApplicationInfo({ application, onNavigateToOriginal }: Prop
                 <span className="text-primary-700">SLD Drawing Fee</span>
                 <span className="font-medium text-primary-800">
                   SGD ${application.sldFee.toLocaleString()}
+                </span>
+              </div>
+            )}
+            {application.calloutFee != null && application.calloutFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-primary-700">Call-out Fee</span>
+                <span className="font-medium text-primary-800">
+                  SGD ${application.calloutFee.toLocaleString()}
                 </span>
               </div>
             )}

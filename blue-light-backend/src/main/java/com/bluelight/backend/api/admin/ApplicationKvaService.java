@@ -127,6 +127,11 @@ public class ApplicationKvaService {
                 ? masterPrice.getRenewalPrice()
                 : masterPrice.getPrice();
         BigDecimal newQuote = tierPrice;
+        // 출장비(call-out fee): New License 에만 가산
+        if (application.getApplicationType() != ApplicationType.RENEWAL
+                && masterPrice.getCalloutFee() != null) {
+            newQuote = newQuote.add(masterPrice.getCalloutFee());
+        }
         // SLD fee: REQUEST_LEW 일 때만 신규 tier 의 sldPrice 적용 (일관성 유지)
         BigDecimal newSldFee = null;
         if (application.getSldOption() != null

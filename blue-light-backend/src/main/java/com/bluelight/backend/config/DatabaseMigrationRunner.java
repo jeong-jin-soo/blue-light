@@ -54,6 +54,7 @@ public class DatabaseMigrationRunner {
             migrateSampleFilesTable(conn);
             migrateSampleFilesMultiFile(conn);
             migrateMasterPricesRenewalPrice(conn);
+            migrateMasterPricesCalloutFee(conn);
             migrateNotificationsTable(conn);
             // ★ Kaki Concierge Phase 1 PR#1
             migrateUsersAccountStatusColumns(conn);
@@ -347,6 +348,8 @@ public class DatabaseMigrationRunner {
         // LoA 교환 모델 (loa-exchange 재설계 PR3)
         addColumnIfMissing(conn, "applications", "loa_stage",               "ALTER TABLE applications ADD COLUMN loa_stage VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED'");
         addColumnIfMissing(conn, "applications", "loa_form_template_seq",   "ALTER TABLE applications ADD COLUMN loa_form_template_seq BIGINT NULL");
+        // 출장비(call-out fee) 스냅샷 — New License 신청에만 설정 (Renewal 은 null)
+        addColumnIfMissing(conn, "applications", "callout_fee",             "ALTER TABLE applications ADD COLUMN callout_fee DECIMAL(10,2) NULL AFTER sld_fee");
         // 인앱 알림 딥링크 — 클릭 시 처리 화면의 해당 위치로 이동(NotificationLinkResolver 생성)
         addColumnIfMissing(conn, "notifications", "link_url",               "ALTER TABLE notifications ADD COLUMN link_url VARCHAR(300) NULL");
     }
@@ -555,6 +558,28 @@ public class DatabaseMigrationRunner {
                 "UPDATE master_prices SET renewal_price = price WHERE renewal_price = 0.00 AND deleted_at IS NULL"
             );
             log.info("Migration [master-prices-renewal]: completed");
+        }
+    }
+
+    /**
+     * 마이그레이션: master_prices에 callout_fee(출장비) 컬럼 추가
+     * - New License 신청에만 가산되는 출장비. 기본값 200.
+     * - 기존 row 는 DEFAULT 200.00 으로 채워진다.
+     */
+    private void migrateMasterPricesCalloutFee(Connection conn) throws SQLException {
+        if (!tableExists(conn, "master_prices")) return;
+
+        if (columnExists(conn, "master_prices", "callout_fee")) {
+            log.debug("Migration [master-prices-callout]: already applied, skipping");
+            return;
+        }
+
+        log.info("Migration [master-prices-callout]: adding callout_fee column...");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.executeUpdate(
+                "ALTER TABLE master_prices ADD COLUMN callout_fee DECIMAL(10,2) NOT NULL DEFAULT 200.00 AFTER endorsement_price"
+            );
+            log.info("Migration [master-prices-callout]: completed");
         }
     }
 

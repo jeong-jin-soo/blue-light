@@ -18,6 +18,10 @@ public class PriceCalculationResponse {
 
     // SLD 작성 비용 (REQUEST_LEW 시에만 포함)
     private BigDecimal sldFee;
+
+    // 출장비 (call-out fee) — New License 에만 포함 (Renewal 시 0)
+    private BigDecimal calloutFee;
+
     private BigDecimal totalAmount;
 
     // EMA 수수료 (총액에 포함)

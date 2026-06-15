@@ -143,6 +143,12 @@ public class Application extends BaseEntity {
     private BigDecimal sldFee;
 
     /**
+     * 출장비 (call-out fee) — New License 신청에만 설정 (Renewal 은 null), 생성 시점 스냅샷
+     */
+    @Column(name = "callout_fee", precision = 10, scale = 2)
+    private BigDecimal calloutFee;
+
+    /**
      * 원본 신청 (갱신 시 참조, nullable)
      */
     @ManyToOne(fetch = FetchType.LAZY)
@@ -526,6 +532,7 @@ public class Application extends BaseEntity {
     @Builder
     public Application(User user, String address, String postalCode, String buildingType,
                        Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
+                       BigDecimal calloutFee,
                        String spAccountNo, SldOption sldOption,
                        ApplicationType applicationType, ApplicantType applicantType,
                        Application originalApplication,
@@ -558,6 +565,7 @@ public class Application extends BaseEntity {
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.sldFee = sldFee;
+        this.calloutFee = calloutFee;
         this.spAccountNo = spAccountNo;
         this.sldOption = sldOption != null ? sldOption : SldOption.SELF_UPLOAD;
         this.applicationType = applicationType != null ? applicationType : ApplicationType.NEW;
@@ -638,7 +646,8 @@ public class Application extends BaseEntity {
      * "LEW 확정 후에는 LEW만 수정 가능".
      */
     public void updateDetails(String address, String postalCode, String buildingType,
-                              Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee) {
+                              Integer selectedKva, BigDecimal quoteAmount, BigDecimal sldFee,
+                              BigDecimal calloutFee) {
         this.address = address;
         this.postalCode = postalCode;
         this.buildingType = buildingType;
@@ -649,6 +658,7 @@ public class Application extends BaseEntity {
         this.selectedKva = selectedKva;
         this.quoteAmount = quoteAmount;
         this.sldFee = sldFee;
+        this.calloutFee = calloutFee;
     }
 
     /**

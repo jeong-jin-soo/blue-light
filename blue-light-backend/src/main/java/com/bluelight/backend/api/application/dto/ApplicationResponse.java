@@ -45,6 +45,7 @@ public class ApplicationResponse {
     // ── 갱신 + 견적 필드 ──
     private String applicationType;
     private BigDecimal sldFee;
+    private BigDecimal calloutFee;
     private Long originalApplicationSeq;
     private String existingLicenceNo;
     private String renewalReferenceNo;
@@ -132,6 +133,7 @@ public class ApplicationResponse {
                 // Phase 18 fields
                 .applicationType(application.getApplicationType().name())
                 .sldFee(application.getSldFee())
+                .calloutFee(application.getCalloutFee())
                 .originalApplicationSeq(application.getOriginalApplication() != null
                         ? application.getOriginalApplication().getApplicationSeq() : null)
                 .existingLicenceNo(application.getExistingLicenceNo())
@@ -198,6 +200,7 @@ public class ApplicationResponse {
                 .applicantType(this.applicantType)
                 .applicationType(this.applicationType)
                 .sldFee(this.sldFee)
+                .calloutFee(this.calloutFee)
                 .originalApplicationSeq(this.originalApplicationSeq)
                 .existingLicenceNo(this.existingLicenceNo)
                 .renewalReferenceNo(this.renewalReferenceNo)

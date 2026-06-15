@@ -237,6 +237,12 @@ export function StepReview({ formData, priceResult }: StepReviewProps) {
                 <span className="font-medium text-primary-800">SGD ${priceResult.sldFee.toLocaleString()}</span>
               </div>
             )}
+            {priceResult.calloutFee != null && priceResult.calloutFee > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-primary-700">Call-out Fee</span>
+                <span className="font-medium text-primary-800">SGD ${priceResult.calloutFee.toLocaleString()}</span>
+              </div>
+            )}
             {priceResult.emaFee != null && priceResult.emaFee > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-primary-700">EMA Fee ({formData.renewalPeriodMonths}-month)</span>

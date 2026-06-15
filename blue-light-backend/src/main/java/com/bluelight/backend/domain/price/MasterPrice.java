@@ -71,6 +71,12 @@ public class MasterPrice extends BaseEntity {
     private BigDecimal endorsementPrice = BigDecimal.ZERO;
 
     /**
+     * 출장비 (call-out fee, SGD) — New License 신청에만 가산 (Renewal 미적용). 기본값 200.
+     */
+    @Column(name = "callout_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal calloutFee = new BigDecimal("200.00");
+
+    /**
      * 사용 여부
      */
     @Column(name = "is_active")
@@ -80,7 +86,7 @@ public class MasterPrice extends BaseEntity {
     public MasterPrice(String description, Integer kvaMin, Integer kvaMax,
                        BigDecimal price, BigDecimal renewalPrice,
                        BigDecimal sldPrice, BigDecimal endorsementPrice,
-                       Boolean isActive) {
+                       BigDecimal calloutFee, Boolean isActive) {
         this.description = description;
         this.kvaMin = kvaMin;
         this.kvaMax = kvaMax;
@@ -88,6 +94,7 @@ public class MasterPrice extends BaseEntity {
         this.renewalPrice = renewalPrice != null ? renewalPrice : BigDecimal.ZERO;
         this.sldPrice = sldPrice != null ? sldPrice : BigDecimal.ZERO;
         this.endorsementPrice = endorsementPrice != null ? endorsementPrice : BigDecimal.ZERO;
+        this.calloutFee = calloutFee != null ? calloutFee : new BigDecimal("200.00");
         this.isActive = isActive != null ? isActive : true;
     }
 
@@ -117,6 +124,13 @@ public class MasterPrice extends BaseEntity {
      */
     public void updateEndorsementPrice(BigDecimal endorsementPrice) {
         this.endorsementPrice = endorsementPrice != null ? endorsementPrice : BigDecimal.ZERO;
+    }
+
+    /**
+     * 출장비 수정 (null 이면 기본 200 유지)
+     */
+    public void updateCalloutFee(BigDecimal calloutFee) {
+        this.calloutFee = calloutFee != null ? calloutFee : new BigDecimal("200.00");
     }
 
     /**
