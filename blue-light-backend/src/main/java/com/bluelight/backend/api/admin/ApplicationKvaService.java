@@ -127,10 +127,11 @@ public class ApplicationKvaService {
                 ? masterPrice.getRenewalPrice()
                 : masterPrice.getPrice();
         BigDecimal newQuote = tierPrice;
-        // 출장비(call-out fee): New License 에만 가산
-        if (application.getApplicationType() != ApplicationType.RENEWAL
-                && masterPrice.getCalloutFee() != null) {
-            newQuote = newQuote.add(masterPrice.getCalloutFee());
+        // 출장비(call-out fee): New License 에만 가산 (Renewal 은 null 스냅샷)
+        BigDecimal newCalloutFee = (application.getApplicationType() != ApplicationType.RENEWAL)
+                ? masterPrice.getCalloutFee() : null;
+        if (newCalloutFee != null) {
+            newQuote = newQuote.add(newCalloutFee);
         }
         // SLD fee: REQUEST_LEW 일 때만 신규 tier 의 sldPrice 적용 (일관성 유지)
         BigDecimal newSldFee = null;
@@ -152,6 +153,9 @@ public class ApplicationKvaService {
 
         // 도메인 메서드 호출 (selectedKva, quoteAmount, confirmedBy/At, status/source 원자 갱신)
         application.confirmKva(request.getSelectedKva(), newQuote, confirmer, force);
+        // 출장비 스냅샷 필드도 갱신 — quoteAmount 에 가산된 값과 일치시켜 견적 분해에서
+        // 'Attendance Fee' 가 tier price 에 묻히지 않도록 한다(confirmKva 는 quoteAmount 만 갱신).
+        application.reflectCalloutFee(newCalloutFee);
         // sldFee 도 갱신 필요 (도메인 메서드가 selectedKva/quoteAmount 만 바꾸므로)
         if (newSldFee != null || application.getSldFee() != null) {
             // updateDetails 를 쓰면 CONFIRMED 가드로 무시되므로 별도 setter 가 필요함.
