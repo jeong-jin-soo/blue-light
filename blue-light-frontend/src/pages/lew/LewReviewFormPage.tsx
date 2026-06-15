@@ -370,8 +370,8 @@ export default function LewReviewFormPage() {
       label: 'kVA',
       badge: kvaLewVerified
         ? { text: 'Confirmed', variant: 'success' }
-        : kvaConfirmed
-          ? { text: 'Review', variant: 'warning' }   // 신청자 입력값 — LEW 확인/확정 필요
+        : adminApp?.kvaSource === 'USER_INPUT'
+          ? { text: 'Review', variant: 'warning' }   // 신청자 신고값 — LEW 확인/확정 필요
           : { text: 'Unknown', variant: 'warning' },
     },
     ...(sldRequired

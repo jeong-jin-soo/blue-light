@@ -78,10 +78,17 @@ export function KvaSection({ application, onUpdated }: KvaSectionProps) {
               <h3 className="text-sm font-semibold text-warning-800">
                 kVA confirmation required
               </h3>
-              <p className="text-xs text-warning-700 mt-1">
-                Applicant is waiting for LEW to confirm the electrical capacity.
-                Placeholder value: {application.selectedKva} kVA.
-              </p>
+              {kvaSource === 'USER_INPUT' ? (
+                <p className="text-xs text-warning-700 mt-1">
+                  Applicant declared <strong>{application.selectedKva} kVA</strong>. Verify it and
+                  confirm (or change the value before confirming) — it is not LEW-confirmed yet.
+                </p>
+              ) : (
+                <p className="text-xs text-warning-700 mt-1">
+                  Applicant didn't provide the capacity. Determine and confirm the kVA
+                  (placeholder value: {application.selectedKva} kVA).
+                </p>
+              )}
               {isLew && !isAssignedLew && (
                 <p className="text-xs text-warning-700 mt-2 italic">
                   This application is not assigned to you — contact the admin to request assignment.

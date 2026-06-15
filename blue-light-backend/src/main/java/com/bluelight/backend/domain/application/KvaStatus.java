@@ -4,21 +4,23 @@ package com.bluelight.backend.domain.application;
  * kVA 확정 상태 (Phase 5)
  *
  * <ul>
- *   <li>{@link #UNKNOWN} — 신청자가 "I don't know"를 선택. LEW 확정 필요.
- *       이 상태에서는 {@code selectedKva=55} (placeholder)로 저장되며,
- *       결제 단계(approveForPayment) 진입이 차단된다.</li>
- *   <li>{@link #CONFIRMED} — 사용자 직접 선택(USER_INPUT) 또는 LEW 확정(LEW_VERIFIED)
- *       으로 값이 확정된 상태. 기본값. 결제 단계 진입 가능.</li>
+ *   <li>{@link #UNKNOWN} — LEW 미확정 상태. 신청자가 "I don't know"를 선택했거나(이 경우
+ *       {@code selectedKva=55} placeholder + {@code kvaSource=null}), 신청자가 값을 직접
+ *       신고했지만 아직 LEW 가 확정하지 않은 경우({@code kvaSource=USER_INPUT} + 신고값 보존)를
+ *       모두 포함한다. 결제 단계(approveForPayment) 진입이 차단된다.
+ *       <b>"신청자가 kVA 를 적어 올렸다"고 LEW 확정 상태가 되지 않는다.</b></li>
+ *   <li>{@link #CONFIRMED} — LEW(또는 ADMIN)가 {@code PATCH /kva} 로 확정한 상태
+ *       ({@code kvaSource=LEW_VERIFIED}). 결제 단계 진입 가능.</li>
  * </ul>
  *
- * 전이는 단방향: {@code UNKNOWN → CONFIRMED} ({@code PATCH /api/admin/applications/{id}/kva}).
- * 역전이는 명시적으로 금지 (감사 로그로만 이전 상태 추적).
+ * 정상 전이: {@code UNKNOWN → CONFIRMED} (LEW 확정). 결제 전에는 CONFIRMED 에서도 재확정(값 변경)
+ * 가능 — 정책/권한은 {@code ApplicationKvaService} 가 관리한다.
  */
 public enum KvaStatus {
-    /** 신청자가 kVA를 모름 — LEW 확정 대기. */
+    /** LEW 미확정 — 신청자 미입력 또는 신청자 신고값(USER_INPUT)이나 아직 LEW 확정 전. */
     UNKNOWN,
 
-    /** 값이 확정됨 (사용자 또는 LEW). */
+    /** LEW(또는 ADMIN)가 확정함 (kvaSource=LEW_VERIFIED). */
     CONFIRMED;
 
     /**

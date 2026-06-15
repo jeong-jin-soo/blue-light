@@ -254,10 +254,10 @@ public class ApplicationService {
                 .existingExpiryDate(existingExpiryDate)
                 .renewalPeriodMonths(renewalPeriodMonths)
                 .emaFee(emaFee)
-                // Phase 5: kVA 상태 (UNKNOWN 이면 kvaSource=NULL, 아니면 USER_INPUT)
-                .kvaStatus(kvaUnknown
-                        ? com.bluelight.backend.domain.application.KvaStatus.UNKNOWN
-                        : com.bluelight.backend.domain.application.KvaStatus.CONFIRMED)
+                // 신청자 입력값은 LEW 미확정(UNKNOWN) — "신청자가 kVA 를 적어서 올렸다"고 LEW 확정 상태가
+                // 되면 안 된다. 값은 selectedKva 에 보존하고 kvaSource=USER_INPUT 으로 "신청자 신고값"임을
+                // 표시한다. LEW(또는 ADMIN)가 확정해야 비로소 kvaStatus=CONFIRMED + LEW_VERIFIED 가 된다.
+                .kvaStatus(com.bluelight.backend.domain.application.KvaStatus.UNKNOWN)
                 .kvaSource(kvaUnknown
                         ? null
                         : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)
@@ -622,9 +622,9 @@ public class ApplicationService {
                 .existingExpiryDate(existingExpiryDate)
                 .renewalPeriodMonths(renewalPeriodMonths)
                 .emaFee(emaFee)
-                .kvaStatus(kvaUnknown
-                        ? com.bluelight.backend.domain.application.KvaStatus.UNKNOWN
-                        : com.bluelight.backend.domain.application.KvaStatus.CONFIRMED)
+                // 신청자 입력값은 LEW 미확정(UNKNOWN) — 신고값은 selectedKva 보존 + kvaSource=USER_INPUT.
+                // LEW(또는 ADMIN) 확정 시에만 CONFIRMED + LEW_VERIFIED 로 전이.
+                .kvaStatus(com.bluelight.backend.domain.application.KvaStatus.UNKNOWN)
                 .kvaSource(kvaUnknown
                         ? null
                         : com.bluelight.backend.domain.application.KvaSource.USER_INPUT)

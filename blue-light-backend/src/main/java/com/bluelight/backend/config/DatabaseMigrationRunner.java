@@ -153,6 +153,9 @@ public class DatabaseMigrationRunner {
             seedPaymentSignalNotificationTemplates(conn);
             // ── LoA 폼 전달 → 신청자 알림 템플릿(A-57) 멱등 시드+활성 ──
             seedLoaFormSentNotificationTemplate(conn);
+            // ── 신청자 신고 kVA(USER_INPUT) 가 LEW 미확정인데 CONFIRMED 로 저장돼 있던 레거시 행 보정 ──
+            //   "신청자가 적었다고 LEW 확정 상태가 되면 안 됨" 규칙 적용. 결제 전 상태만 안전하게 UNKNOWN 으로.
+            backfillUserDeclaredKvaToUnknown(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -2518,6 +2521,30 @@ public class DatabaseMigrationRunner {
         }
         if (inserted > 0) {
             log.info("Migration: seeded {} applicant payment template rows (A-17/A-20)", inserted);
+        }
+    }
+
+    /**
+     * 신청자 신고 kVA(kva_source=USER_INPUT)인데 kva_status=CONFIRMED 로 저장된 결제 전 레거시 행을
+     * UNKNOWN(LEW 미확정)으로 보정한다. "신청자가 kVA 를 적어 올렸다"고 LEW 확정 상태가 되면 안 된다는
+     * 규칙을 기존 데이터에도 적용. 결제 이후(PAID/IN_PROGRESS/COMPLETED/EXPIRED)는 동선이 진행됐으므로
+     * 손대지 않는다(되돌리면 인플라이트 결제·정산과 모순). LEW_VERIFIED 행도 당연히 제외.
+     * 멱등 — 한 번 보정되면 대상 행이 사라진다.
+     */
+    private void backfillUserDeclaredKvaToUnknown(Connection conn) {
+        try (Statement stmt = conn.createStatement()) {
+            if (!tableExists(conn, "applications")) {
+                return;
+            }
+            int n = stmt.executeUpdate(
+                    "UPDATE applications SET kva_status = 'UNKNOWN' " +
+                    "WHERE kva_status = 'CONFIRMED' AND kva_source = 'USER_INPUT' " +
+                    "AND status IN ('PENDING_REVIEW','REVISION_REQUESTED')");
+            if (n > 0) {
+                log.info("Migration [kva-user-declared-unknown]: reverted {} pre-payment rows to UNKNOWN", n);
+            }
+        } catch (SQLException e) {
+            log.warn("backfillUserDeclaredKvaToUnknown skipped: {}", e.getMessage());
         }
     }
 

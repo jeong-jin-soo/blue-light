@@ -216,7 +216,13 @@ export default function AdminApplicationListPage() {
       width: '110px',
       render: (app) => (
         <div className="flex items-center justify-end gap-1.5">
-          {app.kvaStatus === 'UNKNOWN' ? (
+          {app.kvaStatus !== 'CONFIRMED' && app.kvaSource === 'USER_INPUT' ? (
+            // 신청자 신고값 — LEW 미확정. 신고값 + 검토 대기 배지.
+            <>
+              <span className="text-gray-600">{app.selectedKva}</span>
+              <Badge variant="warning" className="text-[10px]">review</Badge>
+            </>
+          ) : app.kvaStatus === 'UNKNOWN' ? (
             <Badge variant="warning" className="text-[10px]">kVA pending</Badge>
           ) : (
             <>

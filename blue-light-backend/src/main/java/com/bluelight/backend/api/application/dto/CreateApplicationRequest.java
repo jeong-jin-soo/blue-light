@@ -44,7 +44,8 @@ public class CreateApplicationRequest {
      *   <li>{@code kvaStatus=UNKNOWN}, {@code kvaSource=null} 로 저장</li>
      *   <li>{@code quoteAmount} 는 45 kVA placeholder 기준 계산</li>
      * </ul>
-     * {@code false} 또는 {@code null} 이면 기존 경로 — {@code kvaStatus=CONFIRMED}, {@code kvaSource=USER_INPUT}.
+     * {@code false} 또는 {@code null} 이면 신청자 신고값 — {@code kvaStatus=UNKNOWN}(LEW 미확정),
+     * {@code kvaSource=USER_INPUT}. 신고만으로는 LEW 확정이 아니므로 LEW 가 확정해야 CONFIRMED 가 된다.
      * <p>하위호환: 이 필드가 누락된 구버전 클라이언트는 {@code null} → {@code false} 취급.
      */
     private Boolean kvaUnknown;

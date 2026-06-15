@@ -165,7 +165,18 @@ function ReadOnlyInstallationDetails({ application }: { application: Application
   const kvaLine = (
     <div>
       <dt className="text-xs text-gray-500 mb-0.5">Electric Box (kVA)</dt>
-      {application.kvaStatus === 'UNKNOWN' ? (
+      {application.kvaStatus !== 'CONFIRMED' && application.kvaSource === 'USER_INPUT' ? (
+        // 신청자가 직접 신고한 값 — 아직 LEW 미확정. 신고값을 보여주되 "확정 대기" 표시.
+        <dd className="text-sm font-medium text-gray-800 space-y-1">
+          <div className="flex items-center gap-2">
+            <span>{application.selectedKva} kVA</span>
+            <KvaPendingBadge label="pending LEW confirmation" />
+          </div>
+          <p className="text-xs text-gray-500">
+            You entered this value. Your LEW will verify and confirm it (the price may change).
+          </p>
+        </dd>
+      ) : application.kvaStatus === 'UNKNOWN' ? (
         <div className="space-y-1">
           <KvaPendingBadge label="kVA pending LEW review" />
           <p className="text-xs text-gray-500">
