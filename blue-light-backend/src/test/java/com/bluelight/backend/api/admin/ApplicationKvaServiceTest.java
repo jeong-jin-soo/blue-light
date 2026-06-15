@@ -40,7 +40,7 @@ import static org.mockito.Mockito.when;
  * <ul>
  *   <li>B-3: PAID/IN_PROGRESS/COMPLETED/EXPIRED 상태에서 force 와 무관하게 409 KVA_LOCKED_AFTER_PAYMENT</li>
  *   <li>B-4: 성공 경로는 force=false → KVA_CONFIRMED_BY_LEW, force=true → KVA_OVERRIDDEN_BY_ADMIN 감사</li>
- *   <li>AC-P1: 이미 CONFIRMED + force=false → 409 KVA_ALREADY_CONFIRMED</li>
+ *   <li>재확정: 결제 전 이미 CONFIRMED 여도 배정 LEW 가 force 없이 변경·재확정 성공</li>
  *   <li>AC-A3: 유효하지 않은 tier → 400 INVALID_KVA_TIER</li>
  *   <li>AC-A2: 미할당 LEW → 403 (OwnershipValidator 위임)</li>
  * </ul>
@@ -123,15 +123,29 @@ class ApplicationKvaServiceTest {
     }
 
     @Test
-    void ACP1_이미_CONFIRMED이고_force_false면_409_KVA_ALREADY_CONFIRMED() {
+    void 결제전_이미_CONFIRMED이어도_배정LEW가_force없이_재확정_성공() {
+        // 신청자 입력값/LEW 확정값 모두 결제 전에는 배정 LEW 가 force 없이 변경·재확정 가능.
         Application app = mockApp(1L, ApplicationStatus.PENDING_REVIEW, KvaStatus.CONFIRMED, 10L, 20L);
         when(applicationRepository.findById(1L)).thenReturn(Optional.of(app));
+        MasterPrice mp200 = mockPrice();
+        when(masterPriceRepository.findByKva(200)).thenReturn(Optional.of(mp200));
+        User lew = mock(User.class);
+        when(lew.getUserSeq()).thenReturn(20L);
+        when(userRepository.findById(20L)).thenReturn(Optional.of(lew));
+        when(app.getKvaSource()).thenReturn(KvaSource.LEW_VERIFIED);
 
-        assertThatThrownBy(() ->
-                service.confirm(1L, req(200, "retry"), false, 20L, "ROLE_LEW"))
-                .isInstanceOf(BusinessException.class)
-                .satisfies(ex -> assertThat(((BusinessException) ex).getCode())
-                        .isEqualTo("KVA_ALREADY_CONFIRMED"));
+        ConfirmKvaResponse resp = service.confirm(1L, req(200, "re-verified main breaker"),
+                false, 20L, "ROLE_LEW");
+
+        assertThat(resp).isNotNull();
+        verify(app).confirmKva(eq(200), any(BigDecimal.class), eq(lew), eq(false));
+
+        ArgumentCaptor<AuditAction> actionCap = ArgumentCaptor.forClass(AuditAction.class);
+        verify(auditLogService).logAsync(
+                eq(20L), actionCap.capture(), any(),
+                anyString(), anyString(), anyString(),
+                any(), any(), any(), any(), any(), anyString(), any());
+        assertThat(actionCap.getValue()).isEqualTo(AuditAction.KVA_CONFIRMED_BY_LEW);
     }
 
     @Test

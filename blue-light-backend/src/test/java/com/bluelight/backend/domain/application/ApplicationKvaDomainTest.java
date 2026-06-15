@@ -77,12 +77,18 @@ class ApplicationKvaDomainTest {
     }
 
     @Test
-    void confirmKva_이미_CONFIRMED인데_force_false면_거부() {
+    void confirmKva_이미_CONFIRMED여도_재확정_변경_성공() {
+        // 결제 전에는 LEW 가 확정된 값을 force 없이도 다시 변경·재확정할 수 있다(PAID 차단은 서비스 책임).
         Application app = newApp(KvaStatus.CONFIRMED, 100, new BigDecimal("650.00"));
-        User admin = Mockito.mock(User.class);
+        User lew = Mockito.mock(User.class);
 
-        assertThatThrownBy(() -> app.confirmKva(200, new BigDecimal("1200.00"), admin, false))
-                .isInstanceOf(IllegalStateException.class);
+        app.confirmKva(200, new BigDecimal("1200.00"), lew, false);
+
+        assertThat(app.getKvaStatus()).isEqualTo(KvaStatus.CONFIRMED);
+        assertThat(app.getSelectedKva()).isEqualTo(200);
+        assertThat(app.getQuoteAmount()).isEqualByComparingTo("1200.00");
+        assertThat(app.getKvaSource()).isEqualTo(KvaSource.LEW_VERIFIED);
+        assertThat(app.getKvaConfirmedBy()).isSameAs(lew);
     }
 
     @Test
