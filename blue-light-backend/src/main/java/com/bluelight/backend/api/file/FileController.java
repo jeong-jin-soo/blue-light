@@ -108,12 +108,7 @@ public class FileController {
         String encodedFilename = URLEncoder.encode(fileEntity.getOriginalFilename(), StandardCharsets.UTF_8)
                 .replaceAll("\\+", "%20");
 
-        // Detect MIME type from original filename; fall back to octet-stream
-        String mimeType = null;
-        try {
-            mimeType = Files.probeContentType(Path.of(fileEntity.getOriginalFilename()));
-        } catch (Exception ignored) {}
-        MediaType mediaType = mimeType != null ? MediaType.parseMediaType(mimeType) : MediaType.APPLICATION_OCTET_STREAM;
+        MediaType mediaType = resolveMediaType(fileEntity.getOriginalFilename());
 
         return ResponseEntity.ok()
                 .contentType(mediaType)
@@ -136,5 +131,48 @@ public class FileController {
         log.info("File delete: userSeq={}, fileSeq={}", userSeq, fileId);
         fileService.deleteFile(userSeq, role, fileId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * 원본 파일명의 확장자로 Content-Type을 결정한다.
+     * {@link Files#probeContentType}는 플랫폼·파일 존재 여부에 따라 null을 반환해
+     * octet-stream으로 떨어지면 브라우저가 .txt로 저장하는 문제가 있어, 확장자 매핑을 우선한다.
+     */
+    private static MediaType resolveMediaType(String filename) {
+        String ext = "";
+        if (filename != null) {
+            int dot = filename.lastIndexOf('.');
+            if (dot >= 0 && dot < filename.length() - 1) {
+                ext = filename.substring(dot + 1).toLowerCase();
+            }
+        }
+        switch (ext) {
+            case "pdf":  return MediaType.APPLICATION_PDF;
+            case "png":  return MediaType.IMAGE_PNG;
+            case "jpg":
+            case "jpeg": return MediaType.IMAGE_JPEG;
+            case "gif":  return MediaType.IMAGE_GIF;
+            case "webp": return MediaType.parseMediaType("image/webp");
+            case "svg":  return MediaType.parseMediaType("image/svg+xml");
+            case "dxf":  return MediaType.parseMediaType("image/vnd.dxf");
+            case "dwg":  return MediaType.parseMediaType("image/vnd.dwg");
+            case "txt":  return MediaType.TEXT_PLAIN;
+            case "csv":  return MediaType.parseMediaType("text/csv");
+            case "doc":  return MediaType.parseMediaType("application/msword");
+            case "docx": return MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+            case "xls":  return MediaType.parseMediaType("application/vnd.ms-excel");
+            case "xlsx": return MediaType.parseMediaType(
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            default:     break;
+        }
+        // 확장자로 못 찾으면 probeContentType 폴백, 그래도 없으면 octet-stream
+        try {
+            String probed = Files.probeContentType(Path.of(filename == null ? "" : filename));
+            if (probed != null) {
+                return MediaType.parseMediaType(probed);
+            }
+        } catch (Exception ignored) {}
+        return MediaType.APPLICATION_OCTET_STREAM;
     }
 }
