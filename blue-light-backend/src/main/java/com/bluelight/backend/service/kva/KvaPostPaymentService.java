@@ -157,6 +157,10 @@ public class KvaPostPaymentService {
                 .orElseThrow(() -> new BusinessException(
                         "User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
         application.overrideKvaPostPayment(request.getNewKva(), newQuote, overrider);
+        // 출장비 스냅샷도 신규 tier 기준으로 갱신 (newQuote 에 가산된 값과 일치) — New License 만
+        application.reflectCalloutFee(
+                (application.getApplicationType() != ApplicationType.RENEWAL)
+                        ? masterPrice.getCalloutFee() : null);
 
         // ── KvaAdjustmentRecord ledger 작성 ──────────────
         BigDecimal amountDifference =

@@ -662,6 +662,15 @@ public class Application extends BaseEntity {
     }
 
     /**
+     * 출장비(call-out fee) 스냅샷 단독 갱신.
+     * <p>{@link #confirmKva}/post-payment 재계산은 quoteAmount 만 바꾸므로, 그 경로에서
+     * quoteAmount 에 가산한 출장비 값을 이 필드에도 반영해 견적 분해 표시 정합성을 유지한다.</p>
+     */
+    public void reflectCalloutFee(BigDecimal calloutFee) {
+        this.calloutFee = calloutFee;
+    }
+
+    /**
      * Installation Address 5-part 갱신 — EMA ELISE 양식 대응.
      * <p>재제출 시 신청자가 Block/Unit/Street/Building/PostalCode 각각을 정정할 수 있다.
      * null 값은 "해당 서브필드를 지움" 의미 (UpdateApplicationRequest 로부터 일괄 덮어쓰기).</p>

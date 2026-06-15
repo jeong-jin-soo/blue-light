@@ -158,6 +158,10 @@ public class DatabaseMigrationRunner {
             // ── 신청자 신고 kVA(USER_INPUT) 가 LEW 미확정인데 CONFIRMED 로 저장돼 있던 레거시 행 보정 ──
             //   "신청자가 적었다고 LEW 확정 상태가 되면 안 됨" 규칙 적용. 결제 전 상태만 안전하게 UNKNOWN 으로.
             backfillUserDeclaredKvaToUnknown(conn);
+            // ── 출장비(call-out fee) 소급: 결제 전 기존 NEW 신청에 출장비 반영 ──
+            //   기능 도입 전 생성돼 callout_fee 가 NULL 인 결제 전 NEW 신청에 tier 출장비를 채우고
+            //   quote_amount 에 가산. callout_fee IS NULL 가드로 멱등(1회만 적용).
+            backfillCalloutFeeForPrePaymentApplications(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -602,6 +606,38 @@ public class DatabaseMigrationRunner {
                 "ALTER TABLE applications ADD COLUMN callout_fee DECIMAL(10,2) NULL"
             );
             log.info("Migration [applications-callout]: completed");
+        }
+    }
+
+    /**
+     * 소급 backfill: 결제 전 기존 NEW 신청에 출장비(call-out fee) 반영.
+     * <p>기능 도입 전 생성돼 {@code callout_fee IS NULL} 인, 아직 결제 전(PENDING_REVIEW /
+     * REVISION_REQUESTED / PENDING_PAYMENT) NEW 신청을 대상으로, 신청의 selected_kva 가 속한
+     * 활성 tier 의 출장비를 {@code callout_fee} 에 채우고 {@code quote_amount} 에 가산한다.</p>
+     * <p>멱등: {@code callout_fee IS NULL} 가드로 1회만 적용(이후 NOT NULL → 스킵). RENEWAL·결제 완료
+     * 건·tier 미매칭 건은 제외. kVA 미확정 건은 LEW 확정 시 재계산되어 자기수정된다.</p>
+     */
+    private void backfillCalloutFeeForPrePaymentApplications(Connection conn) throws SQLException {
+        if (!tableExists(conn, "applications")) return;
+        if (!columnExists(conn, "applications", "callout_fee")) return;
+        if (!tableExists(conn, "master_prices") || !columnExists(conn, "master_prices", "callout_fee")) return;
+
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE applications a " +
+                "JOIN master_prices mp ON a.selected_kva BETWEEN mp.kva_min AND mp.kva_max " +
+                "  AND mp.deleted_at IS NULL AND mp.is_active = 1 " +
+                "SET a.callout_fee = mp.callout_fee, " +
+                "    a.quote_amount = a.quote_amount + mp.callout_fee, " +
+                "    a.updated_at = NOW() " +
+                "WHERE a.application_type = 'NEW' " +
+                "  AND a.callout_fee IS NULL " +
+                "  AND a.status IN ('PENDING_REVIEW','REVISION_REQUESTED','PENDING_PAYMENT') " +
+                "  AND a.deleted_at IS NULL"
+            );
+            if (updated > 0) {
+                log.info("Backfill [callout-fee-prepayment]: {} application(s) updated", updated);
+            }
         }
     }
 
