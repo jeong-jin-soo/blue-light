@@ -156,7 +156,13 @@ public class ApplicationService {
         BigDecimal tierPrice = (appType == ApplicationType.RENEWAL)
                 ? masterPrice.getRenewalPrice()
                 : masterPrice.getPrice();
+        // 출장비(call-out fee): New License 에만 가산 (Renewal 은 null 스냅샷)
+        BigDecimal calloutFee = (appType != ApplicationType.RENEWAL)
+                ? masterPrice.getCalloutFee() : null;
         BigDecimal quoteAmount = tierPrice;
+        if (calloutFee != null) {
+            quoteAmount = quoteAmount.add(calloutFee);
+        }
         if (sldFee != null) {
             quoteAmount = quoteAmount.add(sldFee);
         }
@@ -244,6 +250,7 @@ public class ApplicationService {
                 .selectedKva(request.getSelectedKva())
                 .quoteAmount(quoteAmount)
                 .sldFee(sldFee)
+                .calloutFee(calloutFee)
                 .spAccountNo(request.getSpAccountNo())
                 .sldOption(sldOption)
                 .applicationType(appType)
@@ -556,7 +563,13 @@ public class ApplicationService {
         BigDecimal tierPrice = (appType == ApplicationType.RENEWAL)
                 ? masterPrice.getRenewalPrice()
                 : masterPrice.getPrice();
+        // 출장비(call-out fee): New License 에만 가산 (Renewal 은 null 스냅샷)
+        BigDecimal calloutFee = (appType != ApplicationType.RENEWAL)
+                ? masterPrice.getCalloutFee() : null;
         BigDecimal quoteAmount = tierPrice;
+        if (calloutFee != null) {
+            quoteAmount = quoteAmount.add(calloutFee);
+        }
         if (sldFee != null) {
             quoteAmount = quoteAmount.add(sldFee);
         }
@@ -612,6 +625,7 @@ public class ApplicationService {
                 .selectedKva(request.getSelectedKva())
                 .quoteAmount(quoteAmount)
                 .sldFee(sldFee)
+                .calloutFee(calloutFee)
                 .spAccountNo(request.getSpAccountNo())
                 .sldOption(sldOption)
                 .applicationType(appType)
@@ -758,7 +772,13 @@ public class ApplicationService {
         BigDecimal tierPrice = (application.getApplicationType() == ApplicationType.RENEWAL)
                 ? masterPrice.getRenewalPrice()
                 : masterPrice.getPrice();
+        // 출장비(call-out fee): New License 에만 가산 (Renewal 은 null 스냅샷)
+        BigDecimal calloutFee = (application.getApplicationType() != ApplicationType.RENEWAL)
+                ? masterPrice.getCalloutFee() : null;
         BigDecimal quoteAmount = tierPrice;
+        if (calloutFee != null) {
+            quoteAmount = quoteAmount.add(calloutFee);
+        }
         if (sldFee != null) {
             quoteAmount = quoteAmount.add(sldFee);
         }
@@ -769,7 +789,7 @@ public class ApplicationService {
         application.updateDetails(
                 request.getAddress(), request.getPostalCode(),
                 request.getBuildingType(), request.getSelectedKva(),
-                quoteAmount, sldFee
+                quoteAmount, sldFee, calloutFee
         );
 
         // ── EMA ELISE 5-part 주소 동기화 (재제출 경로) ──

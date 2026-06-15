@@ -185,6 +185,7 @@ public class AdminPriceSettingsService {
                 mp.updateRenewalPrice(tier.getRenewalPrice());
                 mp.updateSldPrice(tier.getSldPrice());
                 mp.updateEndorsementPrice(tier.getEndorsementPrice());
+                mp.updateCalloutFee(tier.getCalloutFee());
                 mp.updateKvaRange(tier.getKvaMin(), tier.getKvaMax(), tier.getDescription());
                 mp.setActive(tier.getIsActive());
                 log.info("Price tier updated: priceSeq={}, kvaMin={}, kvaMax={}, price={}, renewalPrice={}, sldPrice={}, endorsementPrice={}",
@@ -199,6 +200,7 @@ public class AdminPriceSettingsService {
                         .renewalPrice(tier.getRenewalPrice())
                         .sldPrice(tier.getSldPrice())
                         .endorsementPrice(tier.getEndorsementPrice())
+                        .calloutFee(tier.getCalloutFee())
                         .isActive(tier.getIsActive())
                         .build();
                 masterPriceRepository.save(newPrice);

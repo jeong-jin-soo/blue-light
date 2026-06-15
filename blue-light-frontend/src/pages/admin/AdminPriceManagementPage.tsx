@@ -21,6 +21,7 @@ interface TierErrors {
   renewalPrice?: string;
   sldPrice?: string;
   endorsementPrice?: string;
+  calloutFee?: string;
 }
 
 interface EditableTier {
@@ -33,6 +34,7 @@ interface EditableTier {
   renewalPrice: string;
   sldPrice: string;
   endorsementPrice: string;
+  calloutFee: string;
   isActive: boolean;
   errors: TierErrors;
 }
@@ -48,6 +50,7 @@ function toEditableTier(price: AdminPriceResponse): EditableTier {
     renewalPrice: String(price.renewalPrice ?? 0),
     sldPrice: String(price.sldPrice ?? 0),
     endorsementPrice: String(price.endorsementPrice ?? 0),
+    calloutFee: String(price.calloutFee ?? 200),
     isActive: price.isActive,
     errors: {},
   };
@@ -64,6 +67,7 @@ function createEmptyTier(): EditableTier {
     renewalPrice: '0',
     sldPrice: '0',
     endorsementPrice: '0',
+    calloutFee: '200',
     isActive: true,
     errors: {},
   };
@@ -192,6 +196,7 @@ export default function AdminPriceManagementPage() {
       'Renewal Price (SGD)': Number(tier.renewalPrice) || 0,
       'SLD Price (SGD)': Number(tier.sldPrice) || 0,
       'Endorsement Price (SGD)': Number(tier.endorsementPrice) || 0,
+      'Call-out Fee (SGD)': Number(tier.calloutFee) || 0,
       'Active': tier.isActive ? 'Yes' : 'No',
     }));
 
@@ -207,6 +212,7 @@ export default function AdminPriceManagementPage() {
       { wch: 14 },  // Renewal Price
       { wch: 14 },  // SLD Price
       { wch: 18 },  // Endorsement Price
+      { wch: 16 },  // Call-out Fee
       { wch: 8 },   // Active
     ];
 
@@ -233,6 +239,7 @@ export default function AdminPriceManagementPage() {
         tier.renewalPrice !== String(orig.renewalPrice ?? 0) ||
         tier.sldPrice !== String(orig.sldPrice ?? 0) ||
         tier.endorsementPrice !== String(orig.endorsementPrice ?? 0) ||
+        tier.calloutFee !== String(orig.calloutFee ?? 200) ||
         tier.isActive !== orig.isActive
       );
     });
@@ -253,6 +260,7 @@ export default function AdminPriceManagementPage() {
       const renewalPrice = parseFloat(tier.renewalPrice);
       const sldPrice = parseFloat(tier.sldPrice);
       const endorsementPrice = parseFloat(tier.endorsementPrice);
+      const calloutFee = parseFloat(tier.calloutFee);
 
       if (!tier.kvaMin || isNaN(kvaMin) || kvaMin < 1) {
         tier.errors.kvaMin = 'Required (min: 1)';
@@ -280,6 +288,10 @@ export default function AdminPriceManagementPage() {
       }
       if (tier.endorsementPrice === '' || isNaN(endorsementPrice) || endorsementPrice < 0) {
         tier.errors.endorsementPrice = 'Required (min: 0)';
+        isValid = false;
+      }
+      if (tier.calloutFee === '' || isNaN(calloutFee) || calloutFee < 0) {
+        tier.errors.calloutFee = 'Required (min: 0)';
         isValid = false;
       }
     });
@@ -332,6 +344,7 @@ export default function AdminPriceManagementPage() {
           renewalPrice: parseFloat(t.renewalPrice),
           sldPrice: parseFloat(t.sldPrice),
           endorsementPrice: parseFloat(t.endorsementPrice),
+          calloutFee: parseFloat(t.calloutFee),
           isActive: t.isActive,
         })),
       };
@@ -595,7 +608,7 @@ export default function AdminPriceManagementPage() {
         ) : (
           <>
             {/* 데스크톱 테이블 헤더 */}
-            <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_110px_120px_70px_44px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+            <div className="hidden md:grid grid-cols-[1fr_78px_78px_94px_94px_94px_104px_94px_64px_40px] gap-2 px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
               <span>Description</span>
               <span>kVA Min</span>
               <span>kVA Max</span>
@@ -603,6 +616,7 @@ export default function AdminPriceManagementPage() {
               <span>Renewal (SGD)</span>
               <span>SLD Draw</span>
               <span>Endorsement</span>
+              <span>Call-out</span>
               <span>Active</span>
               <span />
             </div>
@@ -619,7 +633,7 @@ export default function AdminPriceManagementPage() {
                 {editableTiers.map((tier, index) => (
                   <div key={tier.tempId}>
                     {/* 데스크톱 레이아웃 */}
-                    <div className="hidden md:grid grid-cols-[1fr_90px_90px_110px_110px_110px_120px_70px_44px] gap-2 px-3 py-2.5 items-start">
+                    <div className="hidden md:grid grid-cols-[1fr_78px_78px_94px_94px_94px_104px_94px_64px_40px] gap-2 px-3 py-2.5 items-start">
                       <Input
                         value={tier.description}
                         onChange={(e) => updateTier(tier.tempId, 'description', e.target.value)}
@@ -677,6 +691,15 @@ export default function AdminPriceManagementPage() {
                         onChange={(e) => updateTier(tier.tempId, 'endorsementPrice', e.target.value)}
                         placeholder="0.00"
                         error={tier.errors.endorsementPrice}
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={tier.calloutFee}
+                        onChange={(e) => updateTier(tier.tempId, 'calloutFee', e.target.value)}
+                        placeholder="0.00"
+                        error={tier.errors.calloutFee}
                       />
                       <div className="flex items-center justify-center pt-2.5">
                         <label className="relative inline-flex items-center cursor-pointer">
@@ -803,6 +826,18 @@ export default function AdminPriceManagementPage() {
                           onChange={(e) => updateTier(tier.tempId, 'endorsementPrice', e.target.value)}
                           placeholder="0.00"
                           error={tier.errors.endorsementPrice}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Call-out Fee (SGD)"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={tier.calloutFee}
+                          onChange={(e) => updateTier(tier.tempId, 'calloutFee', e.target.value)}
+                          placeholder="0.00"
+                          error={tier.errors.calloutFee}
                         />
                       </div>
                     </div>

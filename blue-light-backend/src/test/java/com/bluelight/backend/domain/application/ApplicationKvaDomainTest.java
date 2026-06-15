@@ -40,7 +40,8 @@ class ApplicationKvaDomainTest {
         Application app = newApp(KvaStatus.CONFIRMED, 100, new BigDecimal("650.00"));
 
         app.updateDetails("New Addr", "560002", "SHOPHOUSE",
-                /* selectedKva */ 500, /* quoteAmount */ new BigDecimal("3000.00"), /* sldFee */ null);
+                /* selectedKva */ 500, /* quoteAmount */ new BigDecimal("3000.00"), /* sldFee */ null,
+                /* calloutFee */ null);
 
         assertThat(app.getAddress()).isEqualTo("New Addr");
         assertThat(app.getPostalCode()).isEqualTo("560002");
@@ -55,7 +56,7 @@ class ApplicationKvaDomainTest {
         Application app = newApp(KvaStatus.UNKNOWN, 45, new BigDecimal("350.00"));
 
         app.updateDetails("Addr", "560001", "HDB_FLAT",
-                /* selectedKva */ 45, /* quoteAmount */ new BigDecimal("350.00"), null);
+                /* selectedKva */ 45, /* quoteAmount */ new BigDecimal("350.00"), null, null);
 
         assertThat(app.getSelectedKva()).isEqualTo(45);
         assertThat(app.getKvaStatus()).isEqualTo(KvaStatus.UNKNOWN);

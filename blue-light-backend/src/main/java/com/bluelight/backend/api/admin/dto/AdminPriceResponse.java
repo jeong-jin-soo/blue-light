@@ -22,6 +22,7 @@ public class AdminPriceResponse {
     private BigDecimal renewalPrice;
     private BigDecimal sldPrice;
     private BigDecimal endorsementPrice;
+    private BigDecimal calloutFee;
     private Boolean isActive;
     private LocalDateTime updatedAt;
 
@@ -35,6 +36,7 @@ public class AdminPriceResponse {
                 .renewalPrice(masterPrice.getRenewalPrice())
                 .sldPrice(masterPrice.getSldPrice())
                 .endorsementPrice(masterPrice.getEndorsementPrice())
+                .calloutFee(masterPrice.getCalloutFee())
                 .isActive(masterPrice.getIsActive())
                 .updatedAt(masterPrice.getUpdatedAt())
                 .build();

@@ -113,20 +113,21 @@ WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'sld_ai_gene
 -- master_prices 테이블이 비어 있을 때만 삽입
 -- sld_price        : LEW가 SLD 도면을 그려주는 비용
 -- endorsement_price: SLD에 LEW 인증 도장(endorsement)을 추가할 때 가산되는 비용
-INSERT INTO master_prices (description, kva_min, kva_max, price, renewal_price, sld_price, endorsement_price, is_active, created_at, updated_at)
-SELECT '45 kVA',              45,   45,   350.00,  350.00,  150.00,  50.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+-- callout_fee      : 출장비 — New License 신청에만 가산 (Renewal 미적용), 기본 200
+INSERT INTO master_prices (description, kva_min, kva_max, price, renewal_price, sld_price, endorsement_price, callout_fee, is_active, created_at, updated_at)
+SELECT '45 kVA',              45,   45,   350.00,  350.00,  150.00,  50.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '46 - 100 kVA',        46,  100,   500.00,  500.00,  200.00,  80.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '46 - 100 kVA',        46,  100,   500.00,  500.00,  200.00,  80.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '101 - 200 kVA',      101,  200,   750.00,  750.00,  300.00, 120.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '101 - 200 kVA',      101,  200,   750.00,  750.00,  300.00, 120.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '201 - 500 kVA',      201,  500,  1200.00, 1200.00,  450.00, 180.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '201 - 500 kVA',      201,  500,  1200.00, 1200.00,  450.00, 180.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '501 - 1000 kVA',     501, 1000,  1800.00, 1800.00,  600.00, 250.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '501 - 1000 kVA',     501, 1000,  1800.00, 1800.00,  600.00, 250.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '1001 - 2000 kVA',   1001, 2000,  2500.00, 2500.00,  800.00, 350.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
+SELECT '1001 - 2000 kVA',   1001, 2000,  2500.00, 2500.00,  800.00, 350.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1)
 UNION ALL
-SELECT '2001 kVA and above', 2001, 9999,  3500.00, 3500.00, 1000.00, 450.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1);
+SELECT '2001 kVA and above', 2001, 9999,  3500.00, 3500.00, 1000.00, 450.00, 200.00, 1, NOW(), NOW() FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM master_prices LIMIT 1);
 
 
 -- ============================================
@@ -140,8 +141,8 @@ INSERT INTO document_type_catalog
 VALUES
     ('SP_ACCOUNT',         'SP Account Holder PDF', 'SP Account Holder PDF',
      'Proof of SP Group account ownership for the premises',
-     'Download the official PDF from SP Group portal and upload it here.',
-     'application/pdf',                        10, '📄',  10, TRUE, NOW(), NOW()),
+     'Download the official PDF from SP Group portal and upload it here. A clear JPEG photo is also accepted.',
+     'application/pdf,image/jpeg',             10, '📄',  10, TRUE, NOW(), NOW()),
     ('LOA',                'Letter of Authorisation', 'Letter of Authorisation',
      'Signed authorisation letter granting LEW to act on your behalf',
      'Use the system-generated LOA template, sign it, then re-upload.',
