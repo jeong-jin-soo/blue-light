@@ -7,6 +7,7 @@ import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
 import com.bluelight.backend.common.util.EnumParser;
+import com.bluelight.backend.domain.user.ApprovalStatus;
 import com.bluelight.backend.domain.user.LewGrade;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
@@ -150,6 +151,11 @@ public class AdminUserController {
                     "Only LEW users can be approved",
                     HttpStatus.BAD_REQUEST, "NOT_LEW_USER");
         }
+        // #7 상태 머신 가드: 이미 APPROVED면 거부 (중복 승인 → 중복 알림/감사 방지).
+        if (user.getApprovedStatus() == ApprovalStatus.APPROVED) {
+            throw new BusinessException(
+                    "LEW is already approved", HttpStatus.CONFLICT, "LEW_ALREADY_APPROVED");
+        }
 
         user.approve();
         log.info("LEW approved: userSeq={}, email={}", id, user.getEmail());
@@ -176,6 +182,16 @@ public class AdminUserController {
             throw new BusinessException(
                     "Only LEW users can be rejected",
                     HttpStatus.BAD_REQUEST, "NOT_LEW_USER");
+        }
+        // #7 상태 머신 가드: PENDING에서만 거절. 이미 REJECTED(중복) 또는 APPROVED(권한 회수는 별도)는 거부.
+        if (user.getApprovedStatus() == ApprovalStatus.APPROVED) {
+            throw new BusinessException(
+                    "Cannot reject an approved LEW (revocation is a separate action)",
+                    HttpStatus.CONFLICT, "LEW_CANNOT_REJECT_APPROVED");
+        }
+        if (user.getApprovedStatus() == ApprovalStatus.REJECTED) {
+            throw new BusinessException(
+                    "LEW is already rejected", HttpStatus.CONFLICT, "LEW_ALREADY_REJECTED");
         }
 
         user.reject();

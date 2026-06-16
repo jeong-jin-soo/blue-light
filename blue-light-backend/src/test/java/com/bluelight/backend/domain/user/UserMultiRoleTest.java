@@ -218,6 +218,65 @@ class UserMultiRoleTest {
             .isInstanceOf(IllegalArgumentException.class);
     }
 
+    // ============================================================
+    // #7 approve/reject 상태 머신 가드
+    // ============================================================
+
+    private User pendingLew() {
+        User u = makeUser(UserRole.APPLICANT);
+        u.changeRoleToLew("0/00001", LewGrade.GRADE_7); // → PENDING
+        return u;
+    }
+
+    @Test
+    @DisplayName("approve: PENDING → APPROVED")
+    void approve_fromPending() {
+        User u = pendingLew();
+        u.approve();
+        assertThat(u.getApprovedStatus()).isEqualTo(ApprovalStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("approve: REJECTED → APPROVED (번복 허용)")
+    void approve_fromRejected() {
+        User u = pendingLew();
+        u.reject();
+        u.approve();
+        assertThat(u.getApprovedStatus()).isEqualTo(ApprovalStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("approve: 이미 APPROVED면 거부 (중복 승인 차단)")
+    void approve_alreadyApproved_throws() {
+        User u = pendingLew();
+        u.approve();
+        assertThatThrownBy(u::approve).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("reject: PENDING → REJECTED")
+    void reject_fromPending() {
+        User u = pendingLew();
+        u.reject();
+        assertThat(u.getApprovedStatus()).isEqualTo(ApprovalStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("reject: 이미 REJECTED면 거부 (중복 거절 차단)")
+    void reject_alreadyRejected_throws() {
+        User u = pendingLew();
+        u.reject();
+        assertThatThrownBy(u::reject).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("reject: APPROVED는 거부 (권한 회수는 별도)")
+    void reject_approved_throws() {
+        User u = pendingLew();
+        u.approve();
+        assertThatThrownBy(u::reject).isInstanceOf(IllegalStateException.class);
+    }
+
     @Test
     @DisplayName("changeRole(APPLICANT) — LEW 강등 시 면허·등급·승인상태 모두 정리")
     void changeRole_demoteFromLew_clearsLewCredentials() {

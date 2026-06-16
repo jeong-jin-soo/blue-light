@@ -333,6 +333,10 @@ public class User extends BaseEntity {
         if (this.role != UserRole.LEW) {
             throw new IllegalStateException("Only LEW users can be approved");
         }
+        // 상태 머신 가드(#7): PENDING/REJECTED(번복)에서만 승인. 이미 APPROVED면 거부(중복 승인→중복 알림 방지).
+        if (this.approvedStatus == ApprovalStatus.APPROVED) {
+            throw new IllegalStateException("LEW is already approved");
+        }
         this.approvedStatus = ApprovalStatus.APPROVED;
     }
 
@@ -342,6 +346,10 @@ public class User extends BaseEntity {
     public void reject() {
         if (this.role != UserRole.LEW) {
             throw new IllegalStateException("Only LEW users can be rejected");
+        }
+        // 상태 머신 가드(#7): PENDING에서만 거절. 이미 REJECTED(중복) 또는 APPROVED(권한 회수는 별도 동작)는 거부.
+        if (this.approvedStatus != ApprovalStatus.PENDING) {
+            throw new IllegalStateException("LEW can only be rejected from PENDING (current=" + this.approvedStatus + ")");
         }
         this.approvedStatus = ApprovalStatus.REJECTED;
     }
