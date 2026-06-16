@@ -109,7 +109,8 @@ public class AuthService {
             );
         }
 
-        // LEW 역할 선택 시 면허번호 + 등급 필수 검증
+        // LEW 역할 선택 시 면허번호 + 등급 필수 검증 + 면허번호 중복 검사
+        String lewLicenceNo = null;
         if (selectedRole == UserRole.LEW) {
             if (request.getLewLicenceNo() == null || request.getLewLicenceNo().isBlank()) {
                 throw new BusinessException(
@@ -123,6 +124,15 @@ public class AuthService {
                         "LEW grade is required for LEW registration",
                         HttpStatus.BAD_REQUEST,
                         "LEW_GRADE_REQUIRED"
+                );
+            }
+            // 면허번호 정규화(trim) + 중복 검사 — 한 실물 LEW = 한 계정 불변식 (사칭/중복 가입 방지)
+            lewLicenceNo = request.getLewLicenceNo().trim();
+            if (userRepository.existsByLewLicenceNo(lewLicenceNo)) {
+                throw new BusinessException(
+                        "LEW licence number is already registered",
+                        HttpStatus.CONFLICT,
+                        "DUPLICATE_LEW_LICENCE_NO"
                 );
             }
         }
@@ -151,7 +161,7 @@ public class AuthService {
                 // ProfilePage에서 선택 입력 받는다 (AC-S1~S4).
                 .role(selectedRole)
                 .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
-                .lewLicenceNo(selectedRole == UserRole.LEW ? request.getLewLicenceNo() : null)
+                .lewLicenceNo(lewLicenceNo)
                 .lewGrade(lewGrade)
                 .emailVerified(!emailVerificationEnabled)
                 .emailVerificationToken(emailVerificationToken)

@@ -55,12 +55,16 @@ public class LewAssignmentNotificationListener {
 
         // 1) 인앱 알림.
         try {
+            String title = event.isReassigned()
+                    ? "Application reassigned to you"
+                    : "New application assigned to you";
             String body = "Application #" + event.getApplicationSeq()
-                    + " — applicant " + safe(event.getApplicantName());
+                    + " — applicant " + safe(event.getApplicantName())
+                    + (event.isReassigned() ? " (reassigned — work may already be in progress)" : "");
             notificationService.createNotification(
                     lewSeq,
                     NotificationType.APPLICATION_LEW_ASSIGNED_LEW,
-                    "New application assigned to you",
+                    title,
                     body,
                     REFERENCE_TYPE_APPLICATION, event.getApplicationSeq());
         } catch (RuntimeException ex) {

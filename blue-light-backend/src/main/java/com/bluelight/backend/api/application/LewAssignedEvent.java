@@ -28,6 +28,8 @@ import lombok.RequiredArgsConstructor;
  * @param applicantName  신청자 이름 (이메일 본문 표시 — escape 후 사용)
  * @param address        설치 주소 (이메일 본문 표시)
  * @param autoAssigned   자동 단일 적격 배정이면 true, ADMIN 수동 배정이면 false (로그/디버깅용 구분)
+ * @param reassigned     기존 다른 LEW 를 교체한 재배정이면 true (새 LEW 에게 "진행중" 표시용).
+ *                       자동 배정·최초 배정이면 false.
  */
 @Getter
 @RequiredArgsConstructor
@@ -37,4 +39,5 @@ public class LewAssignedEvent {
     private final String applicantName;
     private final String address;
     private final boolean autoAssigned;
+    private final boolean reassigned;
 }

@@ -45,6 +45,8 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   KVA_ADJUSTED_BY_ADMIN_LEW: '⚡',
   // PR-3 (kva-postpayment) — LEW의 kVA 변경 요청 → ADMIN 알림 (전구⚡ 요청)
   KVA_ADJUSTMENT_REQUESTED_ADMIN: '⚡',
+  // #5 — kVA 변경으로 배정 LEW 등급 초과 → ADMIN 경고 (재배정 필요)
+  LEW_GRADE_MISMATCH_ADMIN: '⚠️',
   // PR-4 (kva-postpayment) — ADMIN의 settlement 마킹 → 배정 LEW 알림 (정산 영수증 🧾)
   KVA_ADJUSTMENT_SETTLED_LEW: '🧾',
   // PR-4 (admin-manual-email D4=B) — ADMIN 수동 이메일 동반 인앱 알림 (📧 봉투)
@@ -57,6 +59,11 @@ const NOTIFICATION_ICON: Record<NotificationType, string> = {
   CONCIERGE_LEW_ASSIGNED_LEW: '🤝',
   // Application LEW 배정 알림 (자동/ADMIN 수동) — 📋 신청서
   APPLICATION_LEW_ASSIGNED_LEW: '📋',
+  // LEW 배정 해제/재배정 → 떠나는 LEW
+  APPLICATION_LEW_UNASSIGNED_LEW: '📤',
+  // LEW 가입 승인/거절 → 본인
+  LEW_APPROVED: '✅',
+  LEW_REJECTED: '⚠️',
 };
 
 export default function NotificationsPage() {

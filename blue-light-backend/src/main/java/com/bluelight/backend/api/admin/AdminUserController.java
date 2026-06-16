@@ -34,6 +34,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminUserController {
 
     private final UserRepository userRepository;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     /**
      * Get all users (paginated, optional role filter and search)
@@ -114,8 +115,15 @@ public class AdminUserController {
                 throw new BusinessException(
                         "LEW grade is required", HttpStatus.BAD_REQUEST, "LEW_GRADE_REQUIRED");
             }
+            // 면허번호 정규화(trim) + 중복 검사 — 본인 제외 (한 실물 LEW = 한 계정)
+            String licenceNo = request.getLewLicenceNo().trim();
+            if (userRepository.existsByLewLicenceNoAndUserSeqNot(licenceNo, id)) {
+                throw new BusinessException(
+                        "LEW licence number is already registered",
+                        HttpStatus.CONFLICT, "DUPLICATE_LEW_LICENCE_NO");
+            }
             LewGrade grade = EnumParser.parse(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
-            user.changeRoleToLew(request.getLewLicenceNo(), grade);
+            user.changeRoleToLew(licenceNo, grade);
         } else {
             // approvedStatus·LEW 자격은 changeRole 이 자동 정리 (→ null)
             user.changeRole(targetRole);
@@ -146,6 +154,9 @@ public class AdminUserController {
         user.approve();
         log.info("LEW approved: userSeq={}, email={}", id, user.getEmail());
 
+        // 본인에게 인앱+이메일 통지 (AFTER_COMMIT 리스너)
+        eventPublisher.publishEvent(new LewApprovalDecisionEvent(user.getUserSeq(), true));
+
         return ResponseEntity.ok(AdminUserResponse.from(user));
     }
 
@@ -169,6 +180,9 @@ public class AdminUserController {
 
         user.reject();
         log.info("LEW rejected: userSeq={}, email={}", id, user.getEmail());
+
+        // 본인에게 인앱+이메일 통지 (AFTER_COMMIT 리스너)
+        eventPublisher.publishEvent(new LewApprovalDecisionEvent(user.getUserSeq(), false));
 
         return ResponseEntity.ok(AdminUserResponse.from(user));
     }

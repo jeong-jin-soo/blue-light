@@ -37,6 +37,9 @@ public enum NotificationType {
     // PR-3 (kva-postpayment-adjustment-spec §4.2) — LEW 가 결제 후 kVA 변경을 ADMIN 에게 요청.
     // ADMIN/SYSTEM_ADMIN 역할 사용자에게 인앱 알림 + 이메일 발송. 클릭 시 /admin/applications/{seq}.
     KVA_ADJUSTMENT_REQUESTED_ADMIN,
+    // kVA 변경으로 배정 LEW 가 등급 초과(미자격)가 됐을 때 ADMIN/SYSTEM_ADMIN 에게 통지(재배정 필요).
+    // 차단/자동해제 없이 경고+플래그(#5). LewGradeMismatchEvent → LewGradeMismatchNotificationListener.
+    LEW_GRADE_MISMATCH_ADMIN,
     // PR-4 (kva-postpayment-adjustment-spec §8 PR-4) — ADMIN 이 settlement 를 마킹한 직후 배정 LEW 통지.
     // 본 알림은 ADMIN 모달에서 notifyLew=true 로 체크된 경우에만 발행된다 (기본값 true).
     // 클릭 시 /lew/applications/{seq} 로 라우팅 — Subject 는 PDPA 최소화를 위해 금액 미포함.
@@ -73,11 +76,21 @@ public enum NotificationType {
     // LewAssignedEvent → LewAssignmentNotificationListener 단일 흐름으로 통일. referenceType=APPLICATION.
     APPLICATION_LEW_ASSIGNED_LEW,
 
+    // LEW 배정이 해제/재배정될 때 떠나는 LEW 에게 통지. account-level(더 이상 접근 불가 → referenceType=null).
+    // LewUnassignedEvent → LewUnassignmentNotificationListener (AFTER_COMMIT).
+    APPLICATION_LEW_UNASSIGNED_LEW,
+
     // ── EMA 제출 추적 (ema-submission-tracking-spec.md §10) — IN_APP 1차 (허점#3 방향 a) ──
     // SUBMITTED/RESUBMITTED 후 ema.reminder.days 무변동 건을 담당 LEW 에게 리마인드.
     // 스케줄러(EmaReminderScheduler)가 1일 1회 멱등 발행. referenceType=APPLICATION.
     EMA_SUBMISSION_REMINDER_LEW,
     // reject(T7) 성공 시 담당 LEW 에게 "반려됨 — 사유 반영 후 재제출" 통지. 신청자에게는 비노출(US-C1).
     // EmaRejectedEvent → EmaRejectedNotificationListener (AFTER_COMMIT). referenceType=APPLICATION.
-    EMA_REJECTED_LEW
+    EMA_REJECTED_LEW,
+
+    // ── LEW 가입 승인/거절 (account-level, 특정 application 없음 → referenceType=null) ──
+    // ADMIN 이 LEW 가입을 승인/거절할 때 해당 LEW 본인에게 인앱+이메일 통지.
+    // LewApprovalDecisionEvent → LewApprovalNotificationListener (AFTER_COMMIT).
+    LEW_APPROVED,
+    LEW_REJECTED
 }

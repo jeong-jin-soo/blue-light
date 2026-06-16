@@ -101,6 +101,25 @@ public interface EmailService {
     void sendLewAssignedEmail(String to, String lewName, Long appSeq, String address, String applicantName);
 
     /**
+     * LEW 가입 승인/거절 결과를 본인에게 통지하는 이메일.
+     *
+     * @param to       LEW 이메일
+     * @param lewName  LEW 이름
+     * @param approved true = 승인, false = 거절
+     */
+    void sendLewApprovalDecisionEmail(String to, String lewName, boolean approved);
+
+    /**
+     * Application 배정이 해제/재배정되어 더 이상 담당이 아님을 떠나는 LEW 에게 통지.
+     *
+     * @param to         LEW 이메일
+     * @param lewName    LEW 이름
+     * @param appSeq     대상 Application PK
+     * @param reassigned 다른 LEW 로 재배정됐으면 true, 단순 해제면 false
+     */
+    void sendLewUnassignedEmail(String to, String lewName, Long appSeq, boolean reassigned);
+
+    /**
      * 결제 확인 알림 이메일 (LEW에게 발송)
      *
      * @param to       LEW 이메일

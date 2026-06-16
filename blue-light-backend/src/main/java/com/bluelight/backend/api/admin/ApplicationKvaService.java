@@ -60,6 +60,7 @@ public class ApplicationKvaService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final NotificationService notificationService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     // Phase 6: 통합 LEW 리뷰 — finalize된 CoF가 kVA override로 재발급 필요 시 조회/갱신
 
     /**
@@ -183,6 +184,9 @@ public class ApplicationKvaService {
 
         // 신청자 인앱 알림 (이메일은 범위 외, spec §9 out of scope #6)
         notifyApplicant(application, request.getSelectedKva(), newQuote);
+
+        // #5: kVA 변경으로 배정 LEW 가 등급 초과가 되면 ADMIN 경고 (차단/해제 없이 경고+플래그).
+        LewGradeMismatchEvent.detect(application).ifPresent(eventPublisher::publishEvent);
 
         return ConfirmKvaResponse.from(application);
     }

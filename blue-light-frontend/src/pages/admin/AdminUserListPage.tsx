@@ -408,8 +408,8 @@ export default function AdminUserListPage() {
             maxLength={50}
             value={lewLicenceNo}
             onChange={(e) => setLewLicenceNo(e.target.value)}
-            placeholder="e.g., 8/35550"
-            hint="The EMA-issued LEW licence number (e.g., 8/35550)"
+            placeholder="0/00000"
+            hint="The EMA-issued LEW licence number (format: grade/serial)"
           />
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">

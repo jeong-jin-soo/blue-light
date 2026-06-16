@@ -119,6 +119,27 @@ public class LogOnlyEmailService implements EmailService {
     }
 
     @Override
+    public void sendLewApprovalDecisionEmail(String to, String lewName, boolean approved) {
+        log.info("==================================================");
+        log.info("[DEV] LEW Approval Decision Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Decision: {}", approved ? "APPROVED" : "REJECTED");
+        log.info("==================================================");
+    }
+
+    @Override
+    public void sendLewUnassignedEmail(String to, String lewName, Long appSeq, boolean reassigned) {
+        log.info("==================================================");
+        log.info("[DEV] LEW Unassigned Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  LEW Name: {}", lewName);
+        log.info("  Application: #{}", appSeq);
+        log.info("  Reason: {}", reassigned ? "REASSIGNED to another LEW" : "UNASSIGNED");
+        log.info("==================================================");
+    }
+
+    @Override
     public void sendPaymentConfirmedToLewEmail(String to, String lewName, Long appSeq, String address, BigDecimal amount) {
         log.info("==================================================");
         log.info("[DEV] Payment Confirmed to LEW Email (not actually sent)");

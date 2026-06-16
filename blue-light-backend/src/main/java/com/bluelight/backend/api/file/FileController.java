@@ -66,7 +66,9 @@ public class FileController {
      */
     @Auditable(action = AuditAction.FILE_UPLOADED, category = AuditCategory.ADMIN, entityType = "File")
     @PostMapping("/api/admin/applications/{applicationId}/files")
-    @PreAuthorize("hasAnyRole('ADMIN', 'LEW')")
+    // 배정 LEW만 자기 신청에 업로드 가능 — cross-tenant 방지. ADMIN/SYSTEM_ADMIN은 전체 허용.
+    // (AdminApplicationController 등과 동일한 @appSec.isAssignedLew 단일 가드)
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#applicationId, authentication)")
     public ResponseEntity<FileResponse> uploadFileAsAdmin(
             @PathVariable Long applicationId,
             @RequestParam("file") MultipartFile file,

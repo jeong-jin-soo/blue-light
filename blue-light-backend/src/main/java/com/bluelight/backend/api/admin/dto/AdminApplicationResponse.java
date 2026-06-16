@@ -49,6 +49,8 @@ public class AdminApplicationResponse {
     private String assignedLewLicenceNo;
     private String assignedLewGrade;
     private Integer assignedLewMaxKva;
+    /** 파생: 배정 LEW 등급이 현재 selectedKva 를 처리할 수 없으면 true (재배정 필요 경고 플래그, #5). */
+    private boolean assignedLewGradeMismatch;
 
     // SP Group 계정 번호
     private String spAccountNo;
@@ -127,6 +129,11 @@ public class AdminApplicationResponse {
                         ? application.getAssignedLew().getLewGrade().name() : null)
                 .assignedLewMaxKva(application.getAssignedLew() != null && application.getAssignedLew().getLewGrade() != null
                         ? application.getAssignedLew().getLewGrade().getMaxKva() : null)
+                // #5: 배정 LEW 등급이 현재 kVA 를 못 다루면 경고 플래그 (파생 — 항상 최신 상태)
+                .assignedLewGradeMismatch(application.getAssignedLew() != null
+                        && application.getAssignedLew().getLewGrade() != null
+                        && application.getSelectedKva() != null
+                        && !application.getAssignedLew().canHandleKva(application.getSelectedKva()))
                 // SP Account
                 .spAccountNo(application.getSpAccountNo())
                 // Phase 18 fields

@@ -337,7 +337,8 @@ public class ApplicationService {
                     autoAssignedLew.getUserSeq(),
                     user.getFullName(),
                     saved.getAddress(),
-                    true));
+                    true,
+                    false));
         }
 
         // C.1: Snapshot-at-submit — Application을 "신청 당시 정본"으로 격상
@@ -704,7 +705,8 @@ public class ApplicationService {
                     autoAssignedLewOnBehalf.getUserSeq(),
                     user.getFullName(),
                     saved.getAddress(),
-                    true));
+                    true,
+                    false));
         }
 
         // C.1: Snapshot-at-submit (Concierge 대리 생성 경로도 동일 로직 적용)

@@ -51,7 +51,7 @@ class LewAssignmentNotificationListenerTest {
     void notifiesInAppAndEmail() {
         when(userRepository.findById(7L)).thenReturn(Optional.of(lewWithSeq(7L, "lew@x.com")));
 
-        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "1 Marina Blvd", true));
+        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "1 Marina Blvd", true, false));
 
         verify(notificationService).createNotification(
                 eq(7L),
@@ -69,7 +69,7 @@ class LewAssignmentNotificationListenerTest {
     void skipsWhenLewNotFound() {
         when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
-        listener.onLewAssigned(new LewAssignedEvent(1L, 99L, "X", "addr", false));
+        listener.onLewAssigned(new LewAssignedEvent(1L, 99L, "X", "addr", false, false));
 
         verifyNoInteractions(notificationService);
         verify(emailService, never()).sendLewAssignedEmail(any(), any(), any(), any(), any());
@@ -80,10 +80,23 @@ class LewAssignmentNotificationListenerTest {
     void skipsEmailWhenBlank() {
         when(userRepository.findById(7L)).thenReturn(Optional.of(lewWithSeq(7L, "  ")));
 
-        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "addr", false));
+        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "addr", false, false));
 
         verify(notificationService).createNotification(eq(7L), any(), anyString(), anyString(), anyString(), eq(42L));
         verify(emailService, never()).sendLewAssignedEmail(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("재배정이면 인앱 알림 제목을 'reassigned' 로 표시한다")
+    void reassignedShowsReassignedTitle() {
+        when(userRepository.findById(7L)).thenReturn(Optional.of(lewWithSeq(7L, "lew@x.com")));
+
+        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "addr", false, true));
+
+        verify(notificationService).createNotification(
+                eq(7L), eq(NotificationType.APPLICATION_LEW_ASSIGNED_LEW),
+                eq("Application reassigned to you"), contains("reassigned"),
+                eq("APPLICATION"), eq(42L));
     }
 
     @Test
@@ -93,7 +106,7 @@ class LewAssignmentNotificationListenerTest {
         doThrow(new RuntimeException("db down")).when(notificationService)
                 .createNotification(anyLong(), any(), anyString(), anyString(), anyString(), anyLong());
 
-        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "addr", true));
+        listener.onLewAssigned(new LewAssignedEvent(42L, 7L, "John Tan", "addr", true, false));
 
         verify(emailService).sendLewAssignedEmail(eq("lew@x.com"), anyString(), eq(42L), eq("addr"), eq("John Tan"));
     }

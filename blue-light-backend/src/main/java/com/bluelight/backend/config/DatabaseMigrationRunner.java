@@ -135,6 +135,9 @@ public class DatabaseMigrationRunner {
             // User.anonymize() 패치 이전에 삭제된 row는 원본 이메일을 점유하고 있어
             // 동일 이메일 재가입 시 INSERT가 unique 제약으로 실패한다.
             backfillDeletedUserEmails(conn);
+            // ★ P0: lew_licence_no UNIQUE 제약 — 한 실물 LEW = 한 계정 (사칭/중복 가입 방지).
+            //   soft-deleted 행의 면허번호를 NULL로 비운 뒤, 활성 중복이 없을 때만 멱등 추가.
+            migrateUsersLewLicenceNoUnique(conn);
             // ── prod 패리티: dev/schema.sql 에만 반영되고 runner 에 누락됐던 컬럼 보정 ──
             //   (WhatsApp/전화/i18n users 컬럼 + kVA·snapshot·applicant_type·version applications 컬럼)
             //   bluelight_prod 드리프트 감사(2026-06)로 식별. 각 컬럼 columnExists 가드 → 멱등.
@@ -1884,6 +1887,57 @@ public class DatabaseMigrationRunner {
      * 익명화 형식은 도메인 anonymize()와 동일: deleted-{user_seq}@deleted.licensekaki.sg
      * 멱등성: 이미 익명화된 row(LIKE 패턴 매칭)는 제외한다.
      */
+    /**
+     * P0: users.lew_licence_no 에 UNIQUE 제약을 멱등 추가한다.
+     * <p>
+     * - soft-deleted 행이 면허번호를 점유하면 신규 등록과 충돌하므로 먼저 NULL 로 비운다
+     *   (uk_users_email 의 익명화 전략과 동일).
+     * - 활성(deleted_at IS NULL) 중복이 남아 있으면 인덱스 생성이 실패하므로, 중복이 있으면
+     *   경고만 남기고 인덱스 추가를 건너뛴다(부팅 실패 방지 — 앱 레벨 검사가 이후 가입은 막는다).
+     */
+    private void migrateUsersLewLicenceNoUnique(Connection conn) throws SQLException {
+        if (!columnExists(conn, "users", "lew_licence_no")) {
+            log.debug("Migration [lew-licence-unique]: users.lew_licence_no not present, skipping");
+            return;
+        }
+        if (indexExists(conn, "users", "uk_users_lew_licence_no")) {
+            log.debug("Migration [lew-licence-unique]: already applied, skipping");
+            return;
+        }
+        try (Statement stmt = conn.createStatement()) {
+            // 1) soft-deleted 행의 면허번호 해제 (재등록 충돌 회피)
+            if (columnExists(conn, "users", "deleted_at")) {
+                int freed = stmt.executeUpdate(
+                    "UPDATE users SET lew_licence_no = NULL " +
+                    "WHERE deleted_at IS NOT NULL AND lew_licence_no IS NOT NULL");
+                if (freed > 0) {
+                    log.info("Migration [lew-licence-unique]: freed {} soft-deleted licence numbers", freed);
+                }
+            }
+            // 2) 활성 중복 검사 — 있으면 인덱스 생성 보류 (부팅 보호)
+            int dupGroups = 0;
+            try (ResultSet rs = stmt.executeQuery(
+                    "SELECT lew_licence_no, COUNT(*) c FROM users " +
+                    "WHERE deleted_at IS NULL AND lew_licence_no IS NOT NULL " +
+                    "GROUP BY lew_licence_no HAVING c > 1")) {
+                while (rs.next()) {
+                    dupGroups++;
+                    log.warn("Migration [lew-licence-unique]: duplicate active licence '{}' x{}",
+                            rs.getString(1), rs.getInt(2));
+                }
+            }
+            if (dupGroups > 0) {
+                log.warn("Migration [lew-licence-unique]: {} duplicate licence group(s) found — " +
+                        "skipping UNIQUE index. Resolve duplicates then restart.", dupGroups);
+                return;
+            }
+            // 3) UNIQUE 인덱스 추가
+            stmt.executeUpdate(
+                "ALTER TABLE users ADD UNIQUE INDEX uk_users_lew_licence_no (lew_licence_no)");
+            log.info("Migration [lew-licence-unique]: added UNIQUE index uk_users_lew_licence_no");
+        }
+    }
+
     private void backfillDeletedUserEmails(Connection conn) throws SQLException {
         if (!columnExists(conn, "users", "deleted_at")) {
             log.debug("Migration [backfill-deleted-emails]: users.deleted_at not present, skipping");
