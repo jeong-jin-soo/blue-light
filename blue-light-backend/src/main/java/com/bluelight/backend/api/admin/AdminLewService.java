@@ -4,6 +4,7 @@ import com.bluelight.backend.api.admin.dto.AdminApplicationResponse;
 import com.bluelight.backend.api.admin.dto.AssignLewRequest;
 import com.bluelight.backend.api.admin.dto.LewSummaryResponse;
 import com.bluelight.backend.api.application.LewAssignedEvent;
+import com.bluelight.backend.api.application.LewUnassignedEvent;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
@@ -67,10 +68,16 @@ public class AdminLewService {
                     HttpStatus.BAD_REQUEST, "LEW_GRADE_INSUFFICIENT");
         }
 
-        application.assignLew(lew);
-        log.info("LEW assigned: applicationSeq={}, lewSeq={}", applicationSeq, lew.getUserSeq());
+        // 재배정 판정: 기존에 다른 LEW 가 배정돼 있었는지 (덮어쓰기 전에 캡처).
+        User previousLew = application.getAssignedLew();
+        boolean reassigned = previousLew != null
+                && !previousLew.getUserSeq().equals(lew.getUserSeq());
 
-        // LEW에게 할당 알림 (인앱 + 이메일) — AFTER_COMMIT 이벤트로 통일.
+        application.assignLew(lew);
+        log.info("LEW assigned: applicationSeq={}, lewSeq={}, reassigned={}",
+                applicationSeq, lew.getUserSeq(), reassigned);
+
+        // 새 LEW 에게 배정 알림 (인앱 + 이메일) — AFTER_COMMIT 이벤트로 통일.
         // 자동 배정(ApplicationService) 경로와 동일하게 LewAssignmentNotificationListener 가 처리한다.
         // 기존엔 여기서 이메일만 직접 발송했으나 인앱 알림이 누락돼 있었다.
         User applicant = application.getUser();
@@ -79,7 +86,14 @@ public class AdminLewService {
                 lew.getUserSeq(),
                 applicant.getFullName(),
                 application.getAddress(),
-                false));
+                false,
+                reassigned));
+
+        // 재배정이면 떠나는 LEW 에게도 통지 (#4 무알림 해소). 진행물은 보존되어 새 LEW 가 인계.
+        if (reassigned) {
+            eventPublisher.publishEvent(new LewUnassignedEvent(
+                    applicationSeq, previousLew.getUserSeq(), true));
+        }
 
         return AdminApplicationResponse.from(application);
     }
@@ -90,8 +104,17 @@ public class AdminLewService {
     @Transactional
     public AdminApplicationResponse unassignLew(Long applicationSeq) {
         Application application = findApplicationOrThrow(applicationSeq);
+        // 떠나는 LEW 캡처 (해제 전). 진행물은 보존되며 접근권만 회수된다.
+        User previousLew = application.getAssignedLew();
         application.unassignLew();
-        log.info("LEW unassigned: applicationSeq={}", applicationSeq);
+        log.info("LEW unassigned: applicationSeq={}, previousLewSeq={}",
+                applicationSeq, previousLew != null ? previousLew.getUserSeq() : null);
+
+        // 떠나는 LEW 에게 통지 (#4 무알림 해소).
+        if (previousLew != null) {
+            eventPublisher.publishEvent(new LewUnassignedEvent(
+                    applicationSeq, previousLew.getUserSeq(), false));
+        }
         return AdminApplicationResponse.from(application);
     }
 

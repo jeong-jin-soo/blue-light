@@ -251,6 +251,14 @@ export default function AdminApplicationListPage() {
       render: (app) => (
         <span className={app.assignedLewFirstName ? 'text-gray-700' : 'text-gray-400 italic'}>
           {fullName(app.assignedLewFirstName, app.assignedLewLastName) || 'Unassigned'}
+          {app.assignedLewGradeMismatch && (
+            <span
+              className="ml-1 text-error-600"
+              title="Assigned LEW grade cannot handle the current kVA — reassign to a higher-grade LEW"
+            >
+              ⚠
+            </span>
+          )}
         </span>
       ),
     },

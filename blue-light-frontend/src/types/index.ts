@@ -645,6 +645,8 @@ export interface AdminApplication extends Application {
   assignedLewLicenceNo?: string;
   assignedLewGrade?: LewGrade;
   assignedLewMaxKva?: number;
+  /** #5: 배정 LEW 등급이 현재 kVA 를 못 다루면 true (재배정 필요 경고). */
+  assignedLewGradeMismatch?: boolean;
 }
 
 /**
@@ -1488,6 +1490,8 @@ export type NotificationType =
   | 'KVA_ADJUSTED_BY_ADMIN_LEW'
   // PR-3 (kva-postpayment-adjustment) — LEW 의 kVA 변경 요청 → ADMIN 통지
   | 'KVA_ADJUSTMENT_REQUESTED_ADMIN'
+  // #5 — kVA 변경으로 배정 LEW 가 등급 초과 → ADMIN 통지(재배정 필요)
+  | 'LEW_GRADE_MISMATCH_ADMIN'
   // PR-4 (kva-postpayment-adjustment) — ADMIN 의 settlement 마킹 → 배정 LEW 통지
   | 'KVA_ADJUSTMENT_SETTLED_LEW'
   // PR-4 (admin-manual-email-spec D4=B) — ADMIN 수동 이메일 발송 동반 인앱 알림.
@@ -1501,7 +1505,12 @@ export type NotificationType =
   // (PR-3) LEW 가 ConciergeRequest 에 배정될 때 해당 LEW 에게 발송. referenceType=CONCIERGE_REQUEST.
   | 'CONCIERGE_LEW_ASSIGNED_LEW'
   // LEW 가 Application 에 배정될 때(자동/ADMIN 수동) 해당 LEW 에게 발송. referenceType=APPLICATION.
-  | 'APPLICATION_LEW_ASSIGNED_LEW';
+  | 'APPLICATION_LEW_ASSIGNED_LEW'
+  // LEW 배정 해제/재배정 시 떠나는 LEW 에게 발송. account-level(linkUrl 없음).
+  | 'APPLICATION_LEW_UNASSIGNED_LEW'
+  // LEW 가입 승인/거절 → 본인. account-level(referenceType=null, linkUrl 없음).
+  | 'LEW_APPROVED'
+  | 'LEW_REJECTED';
 
 // ── Phase 2 Document Management (re-export) ───
 export type {

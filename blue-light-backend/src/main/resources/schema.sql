@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS users (
     deleted_at     DATETIME(6),
     PRIMARY KEY (user_seq),
     UNIQUE KEY uk_users_email (email),
+    -- LEW 면허번호 중복 방지 (한 실물 LEW = 한 계정). 비-LEW는 NULL이며 MySQL은 다중 NULL 허용.
+    -- soft-delete 시 anonymize()가 lew_licence_no를 NULL로 비워 재등록 충돌을 회피(uk_users_email과 동일 전략).
+    UNIQUE KEY uk_users_lew_licence_no (lew_licence_no),
     KEY idx_users_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

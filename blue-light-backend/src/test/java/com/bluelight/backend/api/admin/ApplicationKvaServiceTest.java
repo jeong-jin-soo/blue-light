@@ -52,6 +52,7 @@ class ApplicationKvaServiceTest {
     private UserRepository userRepository;
     private AuditLogService auditLogService;
     private NotificationService notificationService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
     private ApplicationKvaService service;
 
     @BeforeEach
@@ -61,9 +62,10 @@ class ApplicationKvaServiceTest {
         userRepository = mock(UserRepository.class);
         auditLogService = mock(AuditLogService.class);
         notificationService = mock(NotificationService.class);
+        eventPublisher = mock(org.springframework.context.ApplicationEventPublisher.class);
         service = new ApplicationKvaService(
                 applicationRepository, masterPriceRepository, userRepository,
-                auditLogService, notificationService);
+                auditLogService, notificationService, eventPublisher);
     }
 
     private Application mockApp(Long id, ApplicationStatus status, KvaStatus kvaStatus,

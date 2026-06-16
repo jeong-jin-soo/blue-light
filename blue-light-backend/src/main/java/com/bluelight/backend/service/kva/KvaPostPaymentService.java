@@ -35,6 +35,7 @@ import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.api.admin.KvaOverrideAppliedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.bluelight.backend.api.admin.LewGradeMismatchEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -297,6 +298,9 @@ public class KvaPostPaymentService {
                     resolved.getProposedKva(),
                     request.getNewKva()));
         }
+
+        // #5: 사후 kVA 변경으로 배정 LEW 가 등급 초과가 되면 ADMIN 경고 (차단/해제 없이 경고+플래그).
+        LewGradeMismatchEvent.detect(application).ifPresent(eventPublisher::publishEvent);
 
         return KvaPostPaymentOverrideResponse.from(record);
     }

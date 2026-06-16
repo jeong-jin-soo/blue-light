@@ -773,6 +773,104 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(esc(userName), appSeq, esc(licenseNo), esc(address), formattedDate);
     }
 
+    @Override
+    public void sendLewApprovalDecisionEmail(String to, String lewName, boolean approved) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            String subject = approved
+                    ? code("L-07") + "[LicenseKaki] Your LEW registration is approved"
+                    : code("L-07") + "[LicenseKaki] Your LEW registration review result";
+            helper.setSubject(subject);
+            helper.setText(buildLewApprovalDecisionHtml(lewName, approved), true);
+            mailSender.send(message);
+            log.info("LEW approval decision email sent to: {}, approved={}", to, approved);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send LEW approval decision email to: {}", to, e);
+        }
+    }
+
+    @Override
+    public void sendLewUnassignedEmail(String to, String lewName, Long appSeq, boolean reassigned) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject(code("L-08") + "[LicenseKaki] Application #" + appSeq + " removed from your queue");
+            helper.setText(buildLewUnassignedHtml(lewName, appSeq, reassigned), true);
+            mailSender.send(message);
+            log.info("LEW unassigned email sent to: {}, appSeq={}, reassigned={}", to, appSeq, reassigned);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send LEW unassigned email to: {}", to, e);
+        }
+    }
+
+    private String buildLewUnassignedHtml(String lewName, Long appSeq, boolean reassigned) {
+        String reasonLine = reassigned
+                ? "This application has been reassigned to another Licensed Electrical Worker."
+                : "This application is no longer assigned to you.";
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">Application Removed From Your Queue</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">
+                        Application <strong>#%d</strong> is no longer assigned to you. %s
+                        You no longer have access to it. Any work you had recorded remains with the application.
+                      </p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px;">
+                        This is an automated notification from LicenseKaki.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(esc(lewName), appSeq, reasonLine);
+    }
+
+    private String buildLewApprovalDecisionHtml(String lewName, boolean approved) {
+        String heading = approved ? "Registration Approved" : "Registration Not Approved";
+        String body = approved
+                ? "Welcome aboard. Your LEW registration has been approved. "
+                  + "You can now sign in and start managing applications as a Licensed Electrical Worker."
+                : "Your LEW registration has been reviewed and was not approved at this time. "
+                  + "If you believe this is a mistake, please contact our support team.";
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="UTF-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+                  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="background-color: #1a3a5c; padding: 24px; text-align: center;">
+                      <h1 style="color: #ffffff; margin: 0; font-size: 24px;">LicenseKaki</h1>
+                    </div>
+                    <div style="padding: 32px 24px;">
+                      <h2 style="color: #333333; margin-top: 0;">%s</h2>
+                      <p style="color: #555555; line-height: 1.6;">Hello %s,</p>
+                      <p style="color: #555555; line-height: 1.6;">%s</p>
+                      <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                      <p style="color: #aaaaaa; font-size: 12px;">
+                        This is an automated notification from LicenseKaki. Our only sender domain is @licensekaki.sg.
+                        We never ask for your password or OTP by email.
+                      </p>
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(heading, esc(lewName), body);
+    }
+
     private String buildLewAssignedHtml(String lewName, Long appSeq, String address, String applicantName) {
         return """
                 <!DOCTYPE html>

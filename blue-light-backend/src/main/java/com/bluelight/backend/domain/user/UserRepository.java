@@ -27,6 +27,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
 
     /**
+     * LEW 면허번호 존재 여부 확인 (가입 시 중복 방지 — 한 실물 LEW = 한 계정).
+     * @SQLRestriction(deleted_at IS NULL)이 적용되어 활성 사용자만 검사한다.
+     */
+    boolean existsByLewLicenceNo(String lewLicenceNo);
+
+    /**
+     * 본인을 제외한 LEW 면허번호 중복 확인 (ADMIN 역할변경 시 사용).
+     */
+    boolean existsByLewLicenceNoAndUserSeqNot(String lewLicenceNo, Long userSeq);
+
+    /**
      * 이메일 인증 토큰으로 사용자 조회
      */
     Optional<User> findByEmailVerificationToken(String emailVerificationToken);

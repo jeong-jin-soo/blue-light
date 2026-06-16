@@ -221,8 +221,8 @@ export default function SignupPage() {
               maxLength={50}
               value={form.lewLicenceNo}
               onChange={(e) => updateField('lewLicenceNo', e.target.value)}
-              placeholder="e.g., 8/35550"
-              hint="Your EMA-issued LEW licence number (e.g., 8/35550)"
+              placeholder="<grade>/<serial>"
+              hint="Your EMA-issued LEW licence number (format: grade/serial)"
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
