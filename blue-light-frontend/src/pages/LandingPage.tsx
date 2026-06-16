@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   FileText, DraftingCompass, Lightbulb, Plug, Zap, RefreshCw,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
+import { authApi } from '../api/authApi';
 import licensekakiLogo from '../assets/licensekaki-logo.png';
 
 /* ------------------------------------------------------------------ */
@@ -50,6 +51,15 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
+  // LEW 가입 진입점은 admin 토글(lew_registration_open)을 따른다 — 설정 우선 원칙.
+  // 닫혀 있으면 LEW 가입 링크를 노출하지 않는다.
+  const [lewSignupOpen, setLewSignupOpen] = useState(false);
+  useEffect(() => {
+    authApi.getSignupOptions()
+      .then((opts) => setLewSignupOpen(opts.lewRegistrationOpen))
+      .catch(() => setLewSignupOpen(false));
+  }, []);
+
   // Redirect authenticated users to their dashboard
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -77,6 +87,14 @@ export default function LandingPage() {
             <img src={licensekakiLogo} alt="LicenseKaki" className="h-6" />
           </div>
           <div className="flex items-center gap-3">
+            {lewSignupOpen && (
+              <Link
+                to="/signup?role=LEW"
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-gray-600 hover:text-primary transition-colors"
+              >
+                <Zap className="w-4 h-4" /> For LEWs
+              </Link>
+            )}
             <Link to="/login">
               <Button variant="ghost" size="sm">Sign In</Button>
             </Link>
@@ -342,6 +360,12 @@ export default function LandingPage() {
               <span className="text-xs text-gray-400 leading-none">by HanVision</span>
             </div>
             <div className="flex items-center gap-4 text-xs text-gray-400">
+              {lewSignupOpen && (
+                <>
+                  <Link to="/signup?role=LEW" className="hover:text-primary transition-colors">For LEWs</Link>
+                  <span>·</span>
+                </>
+              )}
               <Link to="/disclaimer" className="hover:text-gray-600 transition-colors">Disclaimer</Link>
               <span>·</span>
               <Link to="/privacy" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>

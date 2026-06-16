@@ -4,13 +4,21 @@ import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { DataTable, type Column } from '../../components/data/DataTable';
 import { Pagination } from '../../components/data/Pagination';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
-import type { User, UserRole, ApprovalStatus } from '../../types';
+import type { User, UserRole, ApprovalStatus, LewGrade } from '../../types';
+
+const LEW_GRADE_OPTIONS: { value: LewGrade; label: string; desc: string }[] = [
+  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
+  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
+  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
+];
 import { useShallow } from 'zustand/react/shallow';
 import { useRoleStore, selectRoleLabels, selectAssignableRoles, selectFilterableRoles } from '../../stores/roleStore';
 
@@ -36,6 +44,9 @@ export default function AdminUserListPage() {
   const [roleFilter, setRoleFilter] = useState('');
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: User; newRole: UserRole } | null>(null);
   const [changingRole, setChangingRole] = useState(false);
+  // LEW 승격 시 함께 등록하는 면허번호·등급
+  const [lewLicenceNo, setLewLicenceNo] = useState('');
+  const [lewGrade, setLewGrade] = useState<LewGrade | ''>('');
   const [approvalTarget, setApprovalTarget] = useState<{ user: User; action: 'approve' | 'reject' } | null>(null);
   const [processingApproval, setProcessingApproval] = useState(false);
 
@@ -85,11 +96,25 @@ export default function AdminUserListPage() {
     setPage(newPage);
   };
 
+  const closeRoleChange = () => {
+    setRoleChangeTarget(null);
+    setLewLicenceNo('');
+    setLewGrade('');
+  };
+
   const handleRoleChange = async () => {
     if (!roleChangeTarget) return;
+    const isLew = roleChangeTarget.newRole === 'LEW';
+    if (isLew && (!lewLicenceNo.trim() || !lewGrade)) {
+      toast.error('LEW licence number and grade are required');
+      return;
+    }
     setChangingRole(true);
     try {
-      await adminApi.changeUserRole(roleChangeTarget.user.userSeq, { role: roleChangeTarget.newRole });
+      await adminApi.changeUserRole(roleChangeTarget.user.userSeq, {
+        role: roleChangeTarget.newRole,
+        ...(isLew ? { lewLicenceNo: lewLicenceNo.trim(), lewGrade } : {}),
+      });
       toast.success(`${fullName(roleChangeTarget.user.firstName, roleChangeTarget.user.lastName)}'s role changed to ${roleChangeTarget.newRole}`);
       loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
@@ -97,7 +122,7 @@ export default function AdminUserListPage() {
       toast.error(message);
     } finally {
       setChangingRole(false);
-      setRoleChangeTarget(null);
+      closeRoleChange();
     }
   };
 
@@ -191,7 +216,11 @@ export default function AdminUserListPage() {
               defaultValue=""
               onChange={(e) => {
                 if (e.target.value) {
-                  setRoleChangeTarget({ user, newRole: e.target.value as UserRole });
+                  const newRole = e.target.value as UserRole;
+                  // LEW 승격이면 기존 면허/등급이 있으면 프리필
+                  setLewLicenceNo(newRole === 'LEW' ? (user.lewLicenceNo ?? '') : '');
+                  setLewGrade(newRole === 'LEW' ? (user.lewGrade ?? '') : '');
+                  setRoleChangeTarget({ user, newRole });
                   e.target.value = '';
                 }
               }}
@@ -339,9 +368,9 @@ export default function AdminUserListPage() {
         </div>
       )}
 
-      {/* Role change confirmation */}
+      {/* Role change — LEW 승격은 면허·등급 입력 모달, 그 외는 단순 확인 */}
       <ConfirmDialog
-        isOpen={!!roleChangeTarget}
+        isOpen={!!roleChangeTarget && roleChangeTarget.newRole !== 'LEW'}
         title="Change User Role"
         message={
           roleChangeTarget
@@ -351,8 +380,74 @@ export default function AdminUserListPage() {
         confirmLabel="Change Role"
         loading={changingRole}
         onConfirm={handleRoleChange}
-        onClose={() => setRoleChangeTarget(null)}
+        onClose={closeRoleChange}
       />
+
+      <Modal
+        isOpen={!!roleChangeTarget && roleChangeTarget.newRole === 'LEW'}
+        onClose={closeRoleChange}
+        ariaLabelledBy="promote-lew-title"
+      >
+        <ModalHeader title="Promote to LEW" onClose={closeRoleChange} />
+        <ModalBody className="space-y-4">
+          {roleChangeTarget && (
+            <p className="text-sm text-gray-600">
+              Promoting{' '}
+              <span className="font-medium text-gray-800">
+                {fullName(roleChangeTarget.user.firstName, roleChangeTarget.user.lastName)}
+              </span>{' '}
+              ({roleChangeTarget.user.role}) to LEW. Register their licence details below.
+            </p>
+          )}
+          <p className="text-xs text-warning-600">
+            ⚠ The user will be set to <strong>PENDING approval</strong> and must be approved before they can manage applications.
+          </p>
+          <Input
+            label="LEW Licence Number"
+            required
+            maxLength={50}
+            value={lewLicenceNo}
+            onChange={(e) => setLewLicenceNo(e.target.value)}
+            placeholder="e.g., LEW-2026-XXXXX"
+            hint="The EMA-issued LEW licence number"
+          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              LEW Grade<span className="text-error-500 ml-0.5">*</span>
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {LEW_GRADE_OPTIONS.map((g) => (
+                <button
+                  key={g.value}
+                  type="button"
+                  onClick={() => setLewGrade(g.value)}
+                  className={`p-2.5 border-2 rounded-lg text-center transition-all ${
+                    lewGrade === g.value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="text-sm font-medium">{g.label}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{g.desc}</div>
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">Select the grade on the EMA licence</p>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="ghost" onClick={closeRoleChange} disabled={changingRole}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleRoleChange}
+            loading={changingRole}
+            disabled={!lewLicenceNo.trim() || !lewGrade}
+          >
+            Promote to LEW
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* LEW approval confirmation */}
       <ConfirmDialog
