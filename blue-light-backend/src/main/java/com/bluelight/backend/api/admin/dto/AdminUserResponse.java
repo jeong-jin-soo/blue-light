@@ -22,6 +22,7 @@ public class AdminUserResponse {
     private UserRole role;
     private String approvedStatus;
     private String lewLicenceNo;
+    private String lewGrade;
     private String companyName;
     private String uen;
     private String designation;
@@ -40,6 +41,7 @@ public class AdminUserResponse {
                 .approvedStatus(user.getApprovedStatus() != null
                         ? user.getApprovedStatus().name() : null)
                 .lewLicenceNo(user.getLewLicenceNo())
+                .lewGrade(user.getLewGrade() != null ? user.getLewGrade().name() : null)
                 .companyName(user.getCompanyName())
                 .uen(user.getUen())
                 .designation(user.getDesignation())

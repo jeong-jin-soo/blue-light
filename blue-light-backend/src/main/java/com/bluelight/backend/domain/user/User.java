@@ -414,15 +414,38 @@ public class User extends BaseEntity {
         if (role == null) {
             throw new IllegalArgumentException("primary role must not be null");
         }
+        if (role == UserRole.LEW) {
+            // LEW 승격은 면허번호·등급이 반드시 함께 등록돼야 하므로 changeRoleToLew 를 사용한다.
+            throw new IllegalArgumentException("Use changeRoleToLew(licenceNo, grade) to promote to LEW");
+        }
         this.role = role;
         if (this.roles == null) this.roles = new HashSet<>();
         this.roles.add(role);
-        if (role == UserRole.LEW) {
-            this.approvedStatus = ApprovalStatus.PENDING;
-        } else {
-            this.approvedStatus = null;
-            this.lewGrade = null;
+        // LEW 자격 해제: 승인상태·등급·면허번호 모두 정리
+        this.approvedStatus = null;
+        this.lewGrade = null;
+        this.lewLicenceNo = null;
+    }
+
+    /**
+     * APPLICANT 등 비-LEW 사용자를 LEW 로 승격하면서 면허번호·등급을 함께 등록한다.
+     * <p>
+     * 신규 LEW 는 {@link ApprovalStatus#PENDING} 으로 설정되어 ADMIN 승인 후에야 활동 가능하다.
+     * 면허번호/등급이 비어 있으면 거부한다(등급 null LEW 가 배정 단계에서 막히는 무결성 구멍 방지).
+     */
+    public void changeRoleToLew(String lewLicenceNo, LewGrade lewGrade) {
+        if (lewLicenceNo == null || lewLicenceNo.isBlank()) {
+            throw new IllegalArgumentException("LEW licence number is required");
         }
+        if (lewGrade == null) {
+            throw new IllegalArgumentException("LEW grade is required");
+        }
+        this.role = UserRole.LEW;
+        if (this.roles == null) this.roles = new HashSet<>();
+        this.roles.add(UserRole.LEW);
+        this.approvedStatus = ApprovalStatus.PENDING;
+        this.lewLicenceNo = lewLicenceNo.trim();
+        this.lewGrade = lewGrade;
     }
 
     // ============================================================

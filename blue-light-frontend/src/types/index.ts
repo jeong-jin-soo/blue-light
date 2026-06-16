@@ -576,6 +576,10 @@ export interface RevisionRequest {
  */
 export interface ChangeRoleRequest {
   role: string;
+  /** role 이 'LEW' 일 때 필수: 면허번호 */
+  lewLicenceNo?: string;
+  /** role 이 'LEW' 일 때 필수: 등급 (GRADE_7 | GRADE_8 | GRADE_9) */
+  lewGrade?: string;
 }
 
 /**

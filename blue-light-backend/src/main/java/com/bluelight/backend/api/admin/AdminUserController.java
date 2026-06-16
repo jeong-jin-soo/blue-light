@@ -7,6 +7,7 @@ import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
 import com.bluelight.backend.common.util.EnumParser;
+import com.bluelight.backend.domain.user.LewGrade;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
@@ -103,8 +104,22 @@ public class AdminUserController {
                     HttpStatus.BAD_REQUEST, "CANNOT_ASSIGN_ADMIN");
         }
 
-        // changeRole이 approvedStatus도 자동 연동 (LEW → PENDING, APPLICANT → null)
-        user.changeRole(targetRole);
+        if (targetRole == UserRole.LEW) {
+            // LEW 승격은 면허번호·등급을 함께 등록해야 한다 (등급 null LEW 가 배정 단계에서 막히는 무결성 구멍 방지).
+            if (request.getLewLicenceNo() == null || request.getLewLicenceNo().isBlank()) {
+                throw new BusinessException(
+                        "LEW licence number is required", HttpStatus.BAD_REQUEST, "LEW_LICENCE_NO_REQUIRED");
+            }
+            if (request.getLewGrade() == null || request.getLewGrade().isBlank()) {
+                throw new BusinessException(
+                        "LEW grade is required", HttpStatus.BAD_REQUEST, "LEW_GRADE_REQUIRED");
+            }
+            LewGrade grade = EnumParser.parse(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
+            user.changeRoleToLew(request.getLewLicenceNo(), grade);
+        } else {
+            // approvedStatus·LEW 자격은 changeRole 이 자동 정리 (→ null)
+            user.changeRole(targetRole);
+        }
         log.info("User role changed: userSeq={}, newRole={}", id, targetRole);
 
         return ResponseEntity.ok(AdminUserResponse.from(user));

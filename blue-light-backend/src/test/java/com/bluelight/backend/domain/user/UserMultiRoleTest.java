@@ -182,4 +182,53 @@ class UserMultiRoleTest {
         assertThatThrownBy(() -> user.changeRole(null))
             .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("changeRole(LEW) — 면허·등급 없이 LEW 승격 불가 (changeRoleToLew 강제)")
+    void changeRole_toLew_throws() {
+        User user = makeUser(UserRole.APPLICANT);
+        assertThatThrownBy(() -> user.changeRole(UserRole.LEW))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("changeRoleToLew — 면허번호·등급 등록 + PENDING 으로 승격")
+    void changeRoleToLew_setsCredentialsAndPending() {
+        User user = makeUser(UserRole.APPLICANT);
+
+        user.changeRoleToLew("  LEW-2026-00042  ", LewGrade.GRADE_8);
+
+        assertThat(user.getRole()).isEqualTo(UserRole.LEW);
+        assertThat(user.getRoles()).contains(UserRole.LEW);
+        assertThat(user.getApprovedStatus()).isEqualTo(ApprovalStatus.PENDING);
+        assertThat(user.getLewLicenceNo()).isEqualTo("LEW-2026-00042"); // trim
+        assertThat(user.getLewGrade()).isEqualTo(LewGrade.GRADE_8);
+        assertThat(user.isApproved()).isFalse();
+    }
+
+    @Test
+    @DisplayName("changeRoleToLew — 면허번호/등급 누락 시 거부")
+    void changeRoleToLew_missingCredentials_throws() {
+        User u1 = makeUser(UserRole.APPLICANT);
+        assertThatThrownBy(() -> u1.changeRoleToLew("  ", LewGrade.GRADE_7))
+            .isInstanceOf(IllegalArgumentException.class);
+
+        User u2 = makeUser(UserRole.APPLICANT);
+        assertThatThrownBy(() -> u2.changeRoleToLew("LEW-1", null))
+            .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("changeRole(APPLICANT) — LEW 강등 시 면허·등급·승인상태 모두 정리")
+    void changeRole_demoteFromLew_clearsLewCredentials() {
+        User user = makeUser(UserRole.APPLICANT);
+        user.changeRoleToLew("LEW-2026-00042", LewGrade.GRADE_9);
+
+        user.changeRole(UserRole.APPLICANT);
+
+        assertThat(user.getRole()).isEqualTo(UserRole.APPLICANT);
+        assertThat(user.getApprovedStatus()).isNull();
+        assertThat(user.getLewGrade()).isNull();
+        assertThat(user.getLewLicenceNo()).isNull();
+    }
 }
