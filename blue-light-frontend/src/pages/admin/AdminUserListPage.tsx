@@ -408,7 +408,7 @@ export default function AdminUserListPage() {
             maxLength={50}
             value={lewLicenceNo}
             onChange={(e) => setLewLicenceNo(e.target.value)}
-            placeholder="<grade>/<serial>"
+            placeholder="0/00000"
             hint="The EMA-issued LEW licence number (format: grade/serial)"
           />
           <div>
