@@ -109,11 +109,11 @@ jobs:
           SSH_OPTS: "-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
         run: |
           # DO용 compose 를 docker-compose.yml 이름으로 전송
-          scp $SSH_OPTS deploy/digitalocean/docker-compose.do.yml ${USER}@${HOST}:/home/${USER}/bluelight/docker-compose.yml
+          scp $SSH_OPTS deploy/digitalocean/docker-compose.do.yml ${USER}@${HOST}:/root/bluelight/docker-compose.yml
 
           ssh $SSH_OPTS ${USER}@${HOST} bash -s << 'DEPLOY_SCRIPT'
           set -e
-          cd /home/${{ secrets.PROD_SERVER_USER }}/bluelight
+          cd /root/bluelight
 
           # DOCR 로그인 (DO 토큰을 user/pass 양쪽으로)
           echo "${{ secrets.DO_REGISTRY_TOKEN }}" | docker login registry.digitalocean.com \
