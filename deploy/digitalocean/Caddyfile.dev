@@ -1,0 +1,11 @@
+# 개발 Droplet TLS 리버스 프록시 (Caddy)
+# Let's Encrypt 인증서 자동 발급/갱신. frontend 컨테이너(host:80)로 프록시.
+# 설치: apt install caddy → /etc/caddy/Caddyfile 로 배치 → systemctl reload caddy
+# 사전조건: dev.licensekaki.com A 레코드가 이 Droplet IP를 가리킬 것.
+
+dev.licensekaki.com {
+	encode gzip
+	reverse_proxy localhost:80
+}
+
+# (선택) www→apex 등 추가 도메인은 여기에.

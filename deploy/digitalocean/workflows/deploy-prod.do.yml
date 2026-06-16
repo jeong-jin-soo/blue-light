@@ -1,0 +1,173 @@
+name: Deploy to Production (DigitalOcean)
+
+# 초안 — .github/workflows/deploy-prod.yml 대체용. ECR→DOCR, EC2→Droplet.
+on:
+  push:
+    branches: [main]
+
+env:
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}   # registry.digitalocean.com/<registry>
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-backend:
+    name: Build Backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blue-light-backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with: { java-version: '17', distribution: 'temurin' }
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('blue-light-backend/**/*.gradle*', 'blue-light-backend/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+      - name: Build
+        run: ./gradlew build --no-daemon -x test
+
+  build-frontend:
+    name: Build Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: blue-light-frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: blue-light-frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_API_BASE_URL: /api
+
+  docker-push:
+    name: Push Docker Images → DOCR
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    environment: production
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Login to DOCR
+        run: doctl registry login --expiry-seconds 1200
+
+      - name: Build & Push Backend
+        run: |
+          docker build -t $DOCKER_REGISTRY/bluelight-backend:$IMAGE_TAG \
+                       -t $DOCKER_REGISTRY/bluelight-backend:stable ./blue-light-backend
+          docker push $DOCKER_REGISTRY/bluelight-backend:$IMAGE_TAG
+          docker push $DOCKER_REGISTRY/bluelight-backend:stable
+      - name: Build & Push Frontend
+        run: |
+          docker build -t $DOCKER_REGISTRY/bluelight-frontend:$IMAGE_TAG \
+                       -t $DOCKER_REGISTRY/bluelight-frontend:stable \
+                       --build-arg VITE_API_BASE_URL=/api ./blue-light-frontend
+          docker push $DOCKER_REGISTRY/bluelight-frontend:$IMAGE_TAG
+          docker push $DOCKER_REGISTRY/bluelight-frontend:stable
+      - name: Build & Push SLD Agent
+        run: |
+          docker build -t $DOCKER_REGISTRY/bluelight-sld-agent:$IMAGE_TAG \
+                       -t $DOCKER_REGISTRY/bluelight-sld-agent:stable \
+                       --build-arg GIT_COMMIT=$(echo $IMAGE_TAG | cut -c1-7) \
+                       --build-arg GIT_BRANCH=${{ github.ref_name }} ./blue-light-ai
+          docker push $DOCKER_REGISTRY/bluelight-sld-agent:$IMAGE_TAG
+          docker push $DOCKER_REGISTRY/bluelight-sld-agent:stable
+
+  deploy:
+    name: Deploy (${{ matrix.server == 1 && 'Droplet A' || 'Droplet B' }})
+    runs-on: ubuntu-latest
+    needs: docker-push
+    environment: production
+    strategy:
+      matrix:
+        server: [1, 2]
+      max-parallel: 1   # 순차(무중단). DO LB가 health 빠진 노드를 자동 우회.
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SERVER_SSH_KEY }}" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy compose & deploy
+        env:
+          HOST: ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
+          USER: ${{ secrets.PROD_SERVER_USER }}
+          SSH_OPTS: "-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+        run: |
+          # DO용 compose 를 docker-compose.yml 이름으로 전송
+          scp $SSH_OPTS deploy/digitalocean/docker-compose.do.yml ${USER}@${HOST}:/root/bluelight/docker-compose.yml
+
+          ssh $SSH_OPTS ${USER}@${HOST} bash -s << 'DEPLOY_SCRIPT'
+          set -e
+          cd /root/bluelight
+
+          # DOCR 로그인 (DO 토큰을 user/pass 양쪽으로)
+          echo "${{ secrets.DO_REGISTRY_TOKEN }}" | docker login registry.digitalocean.com \
+            -u "${{ secrets.DO_REGISTRY_TOKEN }}" --password-stdin
+
+          cat > .env << 'ENVEOF'
+          DOCKER_REGISTRY=${{ secrets.DOCKER_REGISTRY }}
+          IMAGE_TAG=${{ github.sha }}
+          SPRING_PROFILES_ACTIVE=prod
+          SQL_INIT_MODE=never
+          DB_URL=${{ secrets.DB_URL }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          FILE_ENCRYPTION_KEY=${{ secrets.FILE_ENCRYPTION_KEY }}
+          CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS }}
+          PASSWORD_RESET_BASE_URL=${{ secrets.PASSWORD_RESET_BASE_URL }}
+          FILE_STORAGE_TYPE=s3
+          AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+          AWS_S3_REGION=sgp1
+          AWS_S3_ENDPOINT=https://sgp1.digitaloceanspaces.com
+          AWS_ACCESS_KEY_ID=${{ secrets.SPACES_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+          MAIL_HOST=${{ secrets.MAIL_HOST }}
+          MAIL_PORT=${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+          MAIL_FROM=${{ secrets.MAIL_FROM }}
+          MAIL_FROM_NAME=${{ secrets.MAIL_FROM_NAME }}
+          MAIL_SMTP_ENABLED=true
+          SLD_AGENT_SERVICE_KEY=${{ secrets.SLD_AGENT_SERVICE_KEY }}
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          ENVEOF
+
+          # DB_URL(JDBC) → sld-agent용 MySQL 파라미터 추출
+          DB_URL_RAW=$(grep '^DB_URL=' .env | sed 's/^DB_URL=//')
+          echo "MYSQL_HOST=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d: -f1)" >> .env
+          echo "MYSQL_PORT=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d: -f2 | cut -d/ -f1)" >> .env
+          echo "MYSQL_DATABASE=$(echo "$DB_URL_RAW" | sed 's|jdbc:mysql://||' | cut -d/ -f2 | cut -d? -f1)" >> .env
+
+          docker compose pull
+          docker compose up -d --remove-orphans --force-recreate
+          docker image prune -f
+          DEPLOY_SCRIPT
+
+      - name: Health check
+        env:
+          HOST: ${{ matrix.server == 1 && secrets.PROD_SERVER_HOST_1 || secrets.PROD_SERVER_HOST_2 }}
+          USER: ${{ secrets.PROD_SERVER_USER }}
+        run: |
+          for i in $(seq 1 30); do
+            RESULT=$(ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+              ${USER}@${HOST} "curl -s -o /dev/null -w '%{http_code}' http://localhost/health" 2>/dev/null || echo "000")
+            [ "$RESULT" = "200" ] && { echo "✅ healthy"; exit 0; }
+            echo "⏳ $i/30 ($RESULT)"; sleep 10
+          done
+          echo "❌ health check failed"; exit 1

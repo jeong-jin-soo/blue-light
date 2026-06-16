@@ -21,6 +21,13 @@ Thumbs.db
 .env.*.local
 
 # ===================
+# Local secrets / credentials notes (NEVER commit)
+# ===================
+/AWS
+*.pem
+credentials*.txt
+
+# ===================
 # Claude Code (local)
 # ===================
 .claude/agent-memory/
