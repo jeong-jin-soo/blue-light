@@ -110,6 +110,23 @@ public class LoaExchangeController {
         return ResponseEntity.ok(loaService.adminReplaceLoa(adminSeq, id, parsedType, file, reason));
     }
 
+    /**
+     * POST /api/admin/applications/{id}/loa/send-form — ADMIN/SYSTEM_ADMIN 이 신청자에게 active LoA 폼 전달.
+     *
+     * <p>LEW 전용 {@code /api/lew/.../send-form}(URL 매처가 LEW 한정)과 동일 동작이지만,
+     * 배정 LEW가 없거나 ADMIN 이 직접 진행해야 하는 경우를 위해 {@code /api/admin/**} 경로로 제공.
+     * 409: {@code NO_ACTIVE_LOA_FORM}(active 폼 부재), {@code LOA_FORM_NOT_APPLICABLE}(RENEWAL).</p>
+     */
+    @PostMapping("/api/admin/applications/{id}/loa/send-form")
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN')")
+    public ResponseEntity<LoaStatusResponse> adminSendForm(
+            @PathVariable("id") Long id,
+            Authentication authentication) {
+        Long adminSeq = (Long) authentication.getPrincipal();
+        log.info("ADMIN sendLoaForm: adminSeq={}, applicationSeq={}", adminSeq, id);
+        return ResponseEntity.ok(loaService.sendLoaForm(adminSeq, id));
+    }
+
     // §3.2 active 폼 메타/다운로드(/api/applications/{id}/loa/active-form[/download])는
     // PR2 LoaActiveFormController 가 단독 담당 — 여기서 중복 매핑하지 않는다.
 }

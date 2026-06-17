@@ -54,6 +54,23 @@ export function AdminLoaSection({ application, loaStatus, onDownload, onReplaced
   const reasonMissing = reason.trim().length === 0;
   const canSubmit = !!selectedFile && !reasonMissing && !submitting;
 
+  // ── LoA 폼 전달 (NEW 전용, active 폼 있을 때) ──
+  const [sendingForm, setSendingForm] = useState(false);
+  const canSendForm = application.applicationType === 'NEW' && !!loaStatus?.activeFormAvailable;
+
+  const handleSendForm = async () => {
+    setSendingForm(true);
+    try {
+      await loaApi.adminSendLoaForm(application.applicationSeq);
+      toast.success('LoA form sent to the applicant.');
+      await onReplaced();
+    } catch {
+      toast.error('Failed to send the LoA form.');
+    } finally {
+      setSendingForm(false);
+    }
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (file && file.size > 20 * 1024 * 1024) {
@@ -141,6 +158,20 @@ export function AdminLoaSection({ application, loaStatus, onDownload, onReplaced
           <p className="text-xs text-gray-500 px-1">
             Active LoA form: <span className="font-medium text-gray-700">{loaStatus.activeFormLabel}</span>
           </p>
+        )}
+
+        {/* LoA 폼 전달 (NEW 전용) — 담당 LEW가 없거나 ADMIN이 직접 보낼 때 */}
+        {canSendForm && (
+          <div className="pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              loading={sendingForm}
+              onClick={handleSendForm}
+            >
+              {stage === 'NOT_STARTED' ? 'Send LoA form to applicant' : 'Resend LoA form to applicant'}
+            </Button>
+          </div>
         )}
       </div>
 
