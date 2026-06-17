@@ -40,7 +40,7 @@ import java.util.UUID;
  *       signupSource=ADMIN_INVITE, 임시 비번 해시) 생성 → 셋업 토큰 발급(LEW_INVITATION) → 초대 이메일.</li>
  *   <li>D-1 자동승인은 셋업 <b>완료</b> 시점(PR-3)에 적용 — 본 단계는 PENDING 으로 둔다.</li>
  *   <li>면허/등급/PayNow 는 초대 시 받지 않음(D-2) — 셋업 화면에서 LEW 가 입력.</li>
- *   <li>이메일 본문은 PR-2 까지 컨시어지 셋업 링크 메서드를 임시 재사용한다.</li>
+ *   <li>이메일은 LEW 초대 전용 본문({@code sendLewInvitationEmail}, PR-2)으로 발송한다.</li>
  * </ul>
  */
 @Slf4j
@@ -157,8 +157,7 @@ public class AdminLewInviteService {
 
     private void safeSend(String email, String name, String url, String exp) {
         try {
-            // PR-2 에서 sendLewInvitationEmail 로 교체. 그때까지 컨시어지 셋업 링크 메일 임시 재사용.
-            emailService.sendAccountSetupLinkEmail(email, name, url, exp);
+            emailService.sendLewInvitationEmail(email, name, url, exp);
         } catch (Exception e) {
             log.warn("LEW invitation email failed (suppressed): email={}, err={}", email, e.getMessage());
         }

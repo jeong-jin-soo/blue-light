@@ -94,7 +94,7 @@ class AdminLewInviteServiceTest {
 
         verify(tokenService).issue(any(User.class), eq(AccountSetupTokenSource.LEW_INVITATION), any());
         // afterCommit 동기화 비활성(테스트) → 즉시 발송. setupUrl 에 토큰 UUID 포함.
-        verify(emailService).sendAccountSetupLinkEmail(eq("new@lew.sg"), any(),
+        verify(emailService).sendLewInvitationEmail(eq("new@lew.sg"), any(),
                 eq("https://app.example.com/setup-account/tok-uuid-123"), any());
         assertThat(resp.getStatus()).isEqualTo("PENDING_ACTIVATION");
     }
@@ -149,7 +149,7 @@ class AdminLewInviteServiceTest {
         service.resendInvite(7L, null);
 
         verify(tokenService).issue(eq(invited), eq(AccountSetupTokenSource.LEW_INVITATION), any());
-        verify(emailService).sendAccountSetupLinkEmail(eq("i@lew.sg"), any(), any(), any());
+        verify(emailService).sendLewInvitationEmail(eq("i@lew.sg"), any(), any(), any());
     }
 
     @Test

@@ -1510,6 +1510,68 @@ public class SmtpEmailService implements EmailService {
                 """.formatted(name, url, exp);
     }
 
+    // ── ADMIN LEW 초대 이메일 (LEW invitation, PR-2) ──
+
+    @Override
+    @Async
+    public void sendLewInvitationEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        try {
+            MimeMessage message = createMessageWithConfigSet();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(to);
+            helper.setSubject(code("L-09") + "[LicenseKaki] You're invited to join as a Licensed Electrical Worker");
+
+            String htmlContent = buildLewInvitationHtml(fullName, setupUrl, expiresAtDisplay);
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("LEW invitation email sent to: {}", to);
+        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+            log.error("Failed to send LEW invitation email to: {}", to, e);
+            // 실패해도 예외를 던지지 않음 (보안: 이메일 존재 여부 노출 방지, 기존 패턴 준수)
+        }
+    }
+
+    /**
+     * ADMIN LEW 초대 이메일 본문.
+     * 기존 템플릿 스타일(600px, #1a3a5c 헤더, PDPA footer) 준수. name esc / URL htmlEscape 로 XSS 방어.
+     */
+    private String buildLewInvitationHtml(String fullName, String setupUrl, String expiresAtDisplay) {
+        String name = esc(fullName);
+        String url = HtmlUtils.htmlEscape(setupUrl == null ? "" : setupUrl);
+        String exp = esc(expiresAtDisplay);
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <body style="font-family:Arial,sans-serif;background:#f4f4f4;padding:20px;margin:0;">
+                  <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;">
+                    <div style="background:#1a3a5c;color:#fff;padding:20px;">
+                      <h2 style="margin:0;">You're invited to LicenseKaki</h2>
+                    </div>
+                    <div style="padding:24px;color:#222;line-height:1.6;">
+                      <p>Hello %s,</p>
+                      <p>You have been invited to join <strong>LicenseKaki</strong> as a Licensed Electrical
+                         Worker (LEW). To set up your account, use the link below. You'll be asked to set a
+                         password and provide your LEW licence number, grade and PayNow details.</p>
+                      <p style="text-align:center;margin:32px 0;">
+                        <a href="%s" style="background:#1a3a5c;color:#fff;padding:12px 24px;border-radius:4px;text-decoration:none;">
+                          Set up your account</a>
+                      </p>
+                      <p style="color:#555;font-size:13px;">This link expires at <strong>%s</strong> (48 hours after issue).</p>
+                      <p style="color:#555;font-size:13px;">If you were not expecting this invitation, you may safely ignore this email.</p>
+                    </div>
+                    <div style="background:#f4f4f4;padding:12px 24px;color:#888;font-size:12px;text-align:center;">
+                      © LicenseKaki — Collected under PDPA.
+                    </div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(name, url, exp);
+    }
+
     // ── N1 / N1-Alt / N2: Concierge 신청 접수 이메일 ──
 
     @Override
