@@ -13,12 +13,20 @@ export interface AccountSetupStatusResponse {
   maskedEmail: string;
   /** 토큰 만료 시각 (ISO-8601) */
   expiresAt: string;
+  /** LEW 초대 토큰 여부 — true 면 셋업 화면이 면허/등급/PayNow 입력란을 추가로 렌더 */
+  requiresLewDetails: boolean;
 }
 
 /** POST /api/public/account-setup/{token} 요청 본문 */
 export interface AccountSetupCompletePayload {
   password: string;
   passwordConfirm: string;
+  // LEW 초대 토큰(requiresLewDetails=true)일 때만 채워 보낸다 — Service 분기 검증.
+  lewLicenceNo?: string;
+  lewGrade?: string;
+  pdpaConsent?: boolean;
+  paynowType?: string;
+  paynowValue?: string;
 }
 
 /**

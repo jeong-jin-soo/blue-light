@@ -17,6 +17,13 @@ import { useAuthStore } from '../../stores/authStore';
 import { accountSetupApi } from '../../api/accountSetupApi';
 import type { AccountSetupStatusResponse } from '../../api/accountSetupApi';
 import type { ApiError, UserRole } from '../../types';
+import {
+  PAYNOW_TYPES,
+  PAYNOW_TYPE_LABELS,
+  PAYNOW_PLACEHOLDER,
+  isValidPaynow,
+  type PaynowType,
+} from '../../constants/paynow';
 
 type Phase = 'verifying' | 'form' | 'submitting' | 'done' | 'invalid';
 
@@ -49,6 +56,19 @@ export default function AccountSetupPage() {
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+
+  // ── LEW 초대 토큰일 때만 사용하는 필드 ──
+  const requiresLewDetails = status?.requiresLewDetails ?? false;
+  const [lewLicenceNo, setLewLicenceNo] = useState('');
+  const [lewGrade, setLewGrade] = useState('');
+  const [paynowType, setPaynowType] = useState<PaynowType>('MOBILE');
+  const [paynowValue, setPaynowValue] = useState('');
+  const [pdpaConsent, setPdpaConsent] = useState(false);
+
+  const paynowValid = isValidPaynow(paynowType, paynowValue);
+  const lewDetailsValid =
+    !requiresLewDetails ||
+    (lewLicenceNo.trim().length > 0 && lewGrade.length > 0 && paynowValid && pdpaConsent);
 
   // ── Step 1: 토큰 검증 ──
   useEffect(() => {
@@ -121,6 +141,7 @@ export default function AccountSetupPage() {
   const canSubmit =
     password.length >= 8 &&
     password === passwordConfirm &&
+    lewDetailsValid &&
     phase === 'form';
 
   // ── Step 2: 비밀번호 설정 제출 ──
@@ -134,6 +155,15 @@ export default function AccountSetupPage() {
       const tokenResponse = await accountSetupApi.complete(token, {
         password,
         passwordConfirm,
+        ...(requiresLewDetails
+          ? {
+              lewLicenceNo: lewLicenceNo.trim(),
+              lewGrade,
+              pdpaConsent,
+              paynowType,
+              paynowValue: paynowValue.trim(),
+            }
+          : {}),
       });
       // accountSetupApi.complete()가 tokenUtils.setToken 자동 호출(Stage A).
       // authStore 상태를 TokenResponse로 즉시 갱신하여 ProtectedRoute 통과.
@@ -155,6 +185,16 @@ export default function AccountSetupPage() {
           'Password does not meet requirements. Use 8~72 characters with both letters and numbers (no spaces).';
       } else if (code === 'PASSWORD_MISMATCH') {
         msg = 'Passwords do not match.';
+      } else if (code === 'PDPA_CONSENT_REQUIRED') {
+        msg = 'Please agree to the PDPA consent to continue.';
+      } else if (code === 'LEW_LICENCE_NO_REQUIRED') {
+        msg = 'LEW licence number is required.';
+      } else if (code === 'LEW_GRADE_REQUIRED' || code === 'INVALID_LEW_GRADE') {
+        msg = 'Please select a valid LEW grade.';
+      } else if (code === 'DUPLICATE_LEW_LICENCE_NO') {
+        msg = 'This LEW licence number is already registered. Please contact the administrator.';
+      } else if (code === 'INVALID_PAYNOW_VALUE' || code === 'INVALID_PAYNOW_TYPE' || code === 'PAYNOW_VALUE_REQUIRED' || code === 'PAYNOW_TYPE_REQUIRED') {
+        msg = 'Please enter a valid PayNow detail for the selected type.';
       } else if (status === 410) {
         msg = 'Activation link has expired or is invalid. Please request a new one.';
       } else if (e.response?.data?.message) {
@@ -254,7 +294,9 @@ export default function AccountSetupPage() {
   return (
     <AuthLayout>
       <div className="text-center mb-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-1">Set your password</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-1">
+          {requiresLewDetails ? 'Set up your LEW account' : 'Set your password'}
+        </h1>
         <p className="text-gray-600 text-sm">
           Activating <strong>{status?.maskedEmail}</strong>
         </p>
@@ -303,6 +345,102 @@ export default function AccountSetupPage() {
           maxLength={72}
           disabled={submitting}
         />
+
+        {requiresLewDetails && (
+          <div className="space-y-4 pt-2 border-t border-gray-100">
+            <p className="text-sm font-semibold text-gray-900">Your LEW details</p>
+
+            <Input
+              label="LEW Licence Number"
+              required
+              maxLength={50}
+              value={lewLicenceNo}
+              onChange={(e) => setLewLicenceNo(e.target.value)}
+              placeholder="0/00000"
+              hint="Your EMA-issued LEW licence number (format: grade/serial)"
+              disabled={submitting}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                LEW Grade<span className="text-error-500 ml-0.5">*</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
+                  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
+                  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
+                ].map((g) => (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => setLewGrade(g.value)}
+                    disabled={submitting}
+                    className={`p-2.5 border-2 rounded-lg text-center transition-all ${
+                      lewGrade === g.value
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="text-sm font-medium">{g.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{g.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                PayNow (for receiving payments)<span className="text-error-500 ml-0.5">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {PAYNOW_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setPaynowType(t)}
+                    disabled={submitting}
+                    className={`p-2.5 border-2 rounded-lg text-center text-sm font-medium transition-all ${
+                      paynowType === t
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {PAYNOW_TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+              <Input
+                label={paynowType === 'MOBILE' ? 'Mobile number' : 'Company UEN'}
+                value={paynowValue}
+                onChange={(e) => setPaynowValue(e.target.value)}
+                placeholder={PAYNOW_PLACEHOLDER[paynowType]}
+                error={
+                  paynowValue && !paynowValid
+                    ? paynowType === 'MOBILE'
+                      ? 'Enter an 8-digit Singapore mobile number (e.g. 97771983).'
+                      : 'Enter a 10-character Company UEN (e.g. 201837490N).'
+                    : undefined
+                }
+                disabled={submitting}
+              />
+            </div>
+
+            <label className="flex items-start gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={pdpaConsent}
+                onChange={(e) => setPdpaConsent(e.target.checked)}
+                disabled={submitting}
+              />
+              <span>
+                I agree to the collection and use of my personal data under the PDPA.
+                <span className="text-error-500 ml-0.5">*</span>
+              </span>
+            </label>
+          </div>
+        )}
 
         {formError && (
           <div
