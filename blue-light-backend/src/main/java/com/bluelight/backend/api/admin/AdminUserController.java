@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin;
 
 import com.bluelight.backend.api.admin.dto.AdminUserResponse;
 import com.bluelight.backend.api.admin.dto.ChangeRoleRequest;
+import com.bluelight.backend.api.admin.dto.InviteLewRequest;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
@@ -12,6 +13,7 @@ import com.bluelight.backend.domain.user.LewGrade;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserRole;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,7 @@ public class AdminUserController {
 
     private final UserRepository userRepository;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final AdminLewInviteService lewInviteService;
 
     /**
      * Get all users (paginated, optional role filter and search)
@@ -201,5 +204,31 @@ public class AdminUserController {
         eventPublisher.publishEvent(new LewApprovalDecisionEvent(user.getUserSeq(), false));
 
         return ResponseEntity.ok(AdminUserResponse.from(user));
+    }
+
+    /**
+     * Invite a LEW by email (creates a PENDING_ACTIVATION LEW account + setup token + invitation email)
+     * POST /api/admin/users/invite-lew
+     */
+    @Auditable(action = AuditAction.LEW_INVITATION_SENT, category = AuditCategory.ADMIN, entityType = "User")
+    @PostMapping("/invite-lew")
+    public ResponseEntity<AdminUserResponse> inviteLew(
+            @Valid @RequestBody InviteLewRequest request,
+            HttpServletRequest http) {
+        AdminUserResponse response = lewInviteService.invite(request, http);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Resend a LEW invitation (PENDING_ACTIVATION invited LEW only; revokes prior active token)
+     * POST /api/admin/users/:id/resend-invite
+     */
+    @Auditable(action = AuditAction.ACCOUNT_SETUP_TOKEN_ISSUED, category = AuditCategory.ADMIN, entityType = "User")
+    @PostMapping("/{id}/resend-invite")
+    public ResponseEntity<AdminUserResponse> resendInvite(
+            @PathVariable Long id,
+            HttpServletRequest http) {
+        AdminUserResponse response = lewInviteService.resendInvite(id, http);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
     }
 }
