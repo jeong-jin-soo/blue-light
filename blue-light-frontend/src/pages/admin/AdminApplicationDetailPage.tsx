@@ -18,7 +18,6 @@ import { getBasePath } from '../../utils/routeUtils';
 import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
-import { AdminLoaSection } from './sections/AdminLoaSection';
 import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminEmaSection } from './sections/AdminEmaSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
@@ -63,9 +62,8 @@ export default function AdminApplicationDetailPage() {
   const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
 
-  // LOA states
+  // LOA states (교환 모델 — Part B에서 admin 패널이 재사용 예정)
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
-  const [loaGenerating, setLoaGenerating] = useState(false);
   const [loaUploading, setLoaUploading] = useState(false);
 
   // SLD states
@@ -321,21 +319,7 @@ export default function AdminApplicationDetailPage() {
     }
   };
 
-  // LOA
-  const handleGenerateLoa = async () => {
-    setLoaGenerating(true);
-    try {
-      await loaApi.generateLoa(applicationId);
-      toast.success('LOA generated successfully');
-      const loaData = await loaApi.getLoaStatus(applicationId);
-      setLoaStatus(loaData);
-    } catch {
-      toast.error('Failed to generate LOA');
-    } finally {
-      setLoaGenerating(false);
-    }
-  };
-
+  // LOA (교환 모델 — Part B에서 admin 패널이 재사용 예정)
   const handleLoaDownload = async (fileSeq: number, filename: string) => {
     try { await fileApi.downloadFile(fileSeq, filename); }
     catch { toast.error('Failed to download LOA'); }
@@ -354,6 +338,13 @@ export default function AdminApplicationDetailPage() {
       setLoaUploading(false);
     }
   };
+
+  // LoA 데이터 로드/핸들러는 후속 Part B의 admin 교환 패널이 재사용할 예정이라
+  // 의도적으로 보존한다. 아직 렌더 소비처가 없어 noUnusedLocals 위반을 막기 위한 참조.
+  void loaStatus;
+  void loaUploading;
+  void handleLoaDownload;
+  void handleUploadLoa;
 
   // SLD
   const handleSldUpload = async (file: File) => {
@@ -483,16 +474,6 @@ export default function AdminApplicationDetailPage() {
           <AdminKvaAdjustmentSection
             applicationSeq={applicationId}
             applicationStatus={application.status}
-          />
-
-          <AdminLoaSection
-            application={application}
-            loaStatus={loaStatus}
-            onGenerate={handleGenerateLoa}
-            onUploadLoa={handleUploadLoa}
-            onDownload={handleLoaDownload}
-            generating={loaGenerating}
-            uploading={loaUploading}
           />
 
           {application.sldOption === 'REQUEST_LEW' && sldRequest && (

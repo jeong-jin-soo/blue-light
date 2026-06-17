@@ -31,7 +31,7 @@ import java.util.UUID;
  * <p>{@link Invoice} 스냅샷을 입력받아 OpenPDF(iText 포크)로 A4 단일 페이지 PDF를 생성하고,
  * {@link FileStorageService}에 저장한 후 {@link FileEntity}에 등록, {@code fileSeq}를 반환한다.</p>
  *
- * <p>{@code LoaGenerationService}와 동일하게 {@link BaseFont#HELVETICA} 기반으로 좌표 렌더링하며,
+ * <p>{@link BaseFont#HELVETICA} 기반으로 좌표 렌더링하며,
  * 스펙 §7 표의 좌표·폰트를 그대로 사용한다. 시각 유사도 80% 이상(AC-2)이 목표.</p>
  */
 @Slf4j
