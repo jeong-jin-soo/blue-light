@@ -159,4 +159,35 @@ class AccountSetupTokenTest {
 
         assertThat(t.isUsable()).isTrue();
     }
+
+    // recordInputValidationFailure() (D-9, 입력검증 오류 10회 잠금)
+
+    @Test
+    @DisplayName("recordInputValidationFailure() - 9회까지는 isUsable=true, 10회째 잠금")
+    void recordInputValidationFailure_tenTimes_locks() {
+        AccountSetupToken t = newToken(LocalDateTime.now().plusHours(48));
+
+        for (int i = 0; i < 9; i++) {
+            t.recordInputValidationFailure();
+        }
+        assertThat(t.isUsable()).isTrue();
+        assertThat(t.getInputValidationFailures()).isEqualTo(9);
+
+        t.recordInputValidationFailure(); // 10th
+        assertThat(t.getLockedAt()).isNotNull();
+        assertThat(t.isUsable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("recordInputValidationFailure() - H-3 5회 비번 잠금과 별개 카운터")
+    void recordInputValidationFailure_separateFromPasswordCounter() {
+        AccountSetupToken t = newToken(LocalDateTime.now().plusHours(48));
+
+        for (int i = 0; i < 6; i++) {
+            t.recordInputValidationFailure();
+        }
+        // 입력검증 6회는 비번 카운터(5회 잠금)와 무관 → 아직 잠기지 않음
+        assertThat(t.isUsable()).isTrue();
+        assertThat(t.getFailedAttempts()).isEqualTo(0);
+    }
 }

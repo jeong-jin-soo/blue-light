@@ -473,6 +473,28 @@ public class User extends BaseEntity {
     }
 
     /**
+     * 초대받은 LEW 의 셋업 완료 — 면허번호·등급을 확정하고 <b>자동 승인</b>한다 (D-1).
+     * <p>
+     * ADMIN 초대로 생성된 role=LEW 계정에만 사용한다. {@link #changeRoleToLew}와 달리
+     * {@link ApprovalStatus#APPROVED} 로 설정해 별도 승인 단계 없이 즉시 활동 가능하게 한다
+     * (admin 초대 자체가 검증으로 간주). 면허/등급이 비어 있으면 거부한다.
+     */
+    public void completeInvitedLewSetup(String lewLicenceNo, LewGrade lewGrade) {
+        if (lewLicenceNo == null || lewLicenceNo.isBlank()) {
+            throw new IllegalArgumentException("LEW licence number is required");
+        }
+        if (lewGrade == null) {
+            throw new IllegalArgumentException("LEW grade is required");
+        }
+        this.role = UserRole.LEW;
+        if (this.roles == null) this.roles = new HashSet<>();
+        this.roles.add(UserRole.LEW);
+        this.lewLicenceNo = lewLicenceNo.trim();
+        this.lewGrade = lewGrade;
+        this.approvedStatus = ApprovalStatus.APPROVED;
+    }
+
+    /**
      * LEW 본인 PayNow 수취 계정을 설정/변경한다 (택1: type+value 단일쌍).
      * <p>형식 검증은 {@link PaynowValidator} 가 담당하며, 여기서는 null/blank 가드와 trim 만 수행한다.
      * 변경 이력({@link LewPaynowChangeLog})은 호출하는 서비스가 직전 값을 스냅샷하여 기록한다.

@@ -344,6 +344,9 @@ public class DatabaseMigrationRunner {
         // users — LEW 본인 PayNow 수취 계정 (LEW 초대/가입 + PayNow 수집). nullable, 비-LEW/기존 row backfill 안전.
         addColumnIfMissing(conn, "users", "paynow_type",         "ALTER TABLE users ADD COLUMN paynow_type VARCHAR(20) NULL");
         addColumnIfMissing(conn, "users", "paynow_value",        "ALTER TABLE users ADD COLUMN paynow_value VARCHAR(20) NULL");
+        // account_setup_tokens — 입력 검증 오류(면허/등급/PayNow) 전용 카운터(10회 잠금). 기존 토큰 backfill 0.
+        addColumnIfMissing(conn, "account_setup_tokens", "input_validation_failures",
+            "ALTER TABLE account_setup_tokens ADD COLUMN input_validation_failures INT NOT NULL DEFAULT 0");
         // applications — snapshot-at-submit + kVA 사후변경 + applicant_type + 낙관락 version
         addColumnIfMissing(conn, "applications", "applicant_name_snapshot", "ALTER TABLE applications ADD COLUMN applicant_name_snapshot VARCHAR(100) NULL");
         addColumnIfMissing(conn, "applications", "company_name_snapshot",   "ALTER TABLE applications ADD COLUMN company_name_snapshot VARCHAR(100) NULL");

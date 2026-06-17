@@ -44,9 +44,15 @@ import java.time.LocalDateTime;
 public class AccountSetupToken extends BaseEntity {
 
     /**
-     * H-3: 5회 실패 누적 시 잠금
+     * H-3: 5회 실패 누적 시 잠금 (비밀번호/토큰 자체 오류)
      */
     private static final int MAX_FAILED_ATTEMPTS = 5;
+
+    /**
+     * 입력 검증 오류(면허/등급/PayNow/PDPA 형식·필수) 누적 한도 — 10회 초과 시 잠금.
+     * 비밀번호 오류(H-3, 5회)와 별개 카운터로, 면허 오타 등으로 쉽게 잠기지 않게 한 더 너그러운 한도.
+     */
+    private static final int MAX_INPUT_VALIDATION_FAILURES = 10;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -101,6 +107,12 @@ public class AccountSetupToken extends BaseEntity {
     private LocalDateTime lockedAt;
 
     /**
+     * 입력 검증 오류(면허/등급/PayNow/PDPA) 누적 카운트 — 10회 초과 시 lockedAt 세팅.
+     */
+    @Column(name = "input_validation_failures", nullable = false)
+    private Integer inputValidationFailures = 0;
+
+    /**
      * 발급 요청 IP (IPv6 max 45자)
      */
     @Column(name = "requesting_ip", length = 45)
@@ -122,6 +134,7 @@ public class AccountSetupToken extends BaseEntity {
         this.requestingIp = requestingIp;
         this.requestingUserAgent = requestingUserAgent;
         this.failedAttempts = 0;
+        this.inputValidationFailures = 0;
     }
 
     /**
@@ -167,6 +180,17 @@ public class AccountSetupToken extends BaseEntity {
     public void recordFailedAttempt() {
         this.failedAttempts = (this.failedAttempts == null ? 0 : this.failedAttempts) + 1;
         if (this.failedAttempts >= MAX_FAILED_ATTEMPTS) {
+            this.lockedAt = LocalDateTime.now();
+        }
+    }
+
+    /**
+     * 입력 검증 오류 기록 — 10회 누적 시 자동 잠금 (면허/등급/PayNow/PDPA 입력 오류 전용).
+     * <p>증분이 호출부 트랜잭션 롤백에도 보존되도록, 서비스는 별도 트랜잭션(REQUIRES_NEW)에서 호출한다.
+     */
+    public void recordInputValidationFailure() {
+        this.inputValidationFailures = (this.inputValidationFailures == null ? 0 : this.inputValidationFailures) + 1;
+        if (this.inputValidationFailures >= MAX_INPUT_VALIDATION_FAILURES) {
             this.lockedAt = LocalDateTime.now();
         }
     }

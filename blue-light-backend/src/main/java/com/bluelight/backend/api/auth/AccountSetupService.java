@@ -5,10 +5,26 @@ import com.bluelight.backend.api.auth.dto.AccountSetupCompleteRequest;
 import com.bluelight.backend.api.auth.dto.AccountSetupStatusResponse;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.common.util.EnumParser;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.user.AccountSetupToken;
+import com.bluelight.backend.domain.user.AccountSetupTokenSource;
+import com.bluelight.backend.domain.user.ConsentAction;
+import com.bluelight.backend.domain.user.ConsentSourceContext;
+import com.bluelight.backend.domain.user.ConsentType;
+import com.bluelight.backend.domain.user.LewGrade;
+import com.bluelight.backend.domain.user.LewPaynowChangeLog;
+import com.bluelight.backend.domain.user.LewPaynowChangeLogRepository;
+import com.bluelight.backend.domain.user.PaynowChangeSourceContext;
+import com.bluelight.backend.domain.user.PaynowType;
+import com.bluelight.backend.domain.user.PaynowValidator;
+import com.bluelight.backend.domain.user.SignupSource;
+import com.bluelight.backend.domain.user.TermsVersion;
 import com.bluelight.backend.domain.user.User;
+import com.bluelight.backend.domain.user.UserConsentLog;
+import com.bluelight.backend.domain.user.UserConsentLogRepository;
+import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.domain.user.UserStatus;
 import com.bluelight.backend.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +34,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 /**
  * AccountSetup 플로우 비즈니스 로직 (★ Kaki Concierge v1.5, Phase 1 PR#2 Stage A).
@@ -36,6 +54,9 @@ public class AccountSetupService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuditLogService auditLogService;
+    private final UserRepository userRepository;
+    private final UserConsentLogRepository consentLogRepository;
+    private final LewPaynowChangeLogRepository paynowChangeLogRepository;
 
     /**
      * 토큰 상태 조회 (Setup 페이지 진입 시 1단계).
@@ -48,6 +69,7 @@ public class AccountSetupService {
         return AccountSetupStatusResponse.builder()
             .maskedEmail(maskEmail(user.getEmail()))
             .expiresAt(token.getExpiresAt())
+            .requiresLewDetails(token.getSource() == AccountSetupTokenSource.LEW_INVITATION)
             .build();
     }
 
@@ -79,6 +101,46 @@ public class AccountSetupService {
         // 비밀번호 정책
         validatePasswordPolicy(request.getPassword());
 
+        // ── LEW 초대 토큰 분기 (LEW_INVITATION 일 때만) ──
+        // 컨시어지/로그인 활성화 토큰은 아래를 전혀 타지 않는다 (R-7/AC-11 회귀 안전).
+        boolean isLewInvitation = token.getSource() == AccountSetupTokenSource.LEW_INVITATION;
+        String lewLicenceNo = null;
+        LewGrade lewGrade = null;
+        PaynowType paynowType = null;
+        String paynowValue = null;
+
+        if (isLewInvitation) {
+            // 입력 검증(필수/형식) 오류는 10회까지 허용 후 토큰 잠금 — 별도 트랜잭션으로 증분 보존(D-9).
+            try {
+                if (!Boolean.TRUE.equals(request.getPdpaConsent())) {
+                    throw new BusinessException("PDPA consent is required",
+                        HttpStatus.BAD_REQUEST, "PDPA_CONSENT_REQUIRED");
+                }
+                if (request.getLewLicenceNo() == null || request.getLewLicenceNo().isBlank()) {
+                    throw new BusinessException("LEW licence number is required",
+                        HttpStatus.BAD_REQUEST, "LEW_LICENCE_NO_REQUIRED");
+                }
+                if (request.getLewGrade() == null || request.getLewGrade().isBlank()) {
+                    throw new BusinessException("LEW grade is required",
+                        HttpStatus.BAD_REQUEST, "LEW_GRADE_REQUIRED");
+                }
+                lewGrade = EnumParser.parse(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
+                paynowType = EnumParser.parse(PaynowType.class, request.getPaynowType(), "INVALID_PAYNOW_TYPE");
+                paynowValue = request.getPaynowValue();
+                PaynowValidator.validate(paynowType, paynowValue); // 형식 오류 시 400
+            } catch (BusinessException e) {
+                tokenService.recordInputValidationFailure(tokenUuid); // REQUIRES_NEW — 롤백에도 보존
+                throw e;
+            }
+
+            // 면허 중복은 입력 형식 오류가 아니라 충돌 → 잠금 카운트 미포함, 토큰은 살려 재시도/문의 가능(AC-7).
+            lewLicenceNo = request.getLewLicenceNo().trim();
+            if (userRepository.existsByLewLicenceNo(lewLicenceNo)) {
+                throw new BusinessException("LEW licence number is already registered",
+                    HttpStatus.CONFLICT, "DUPLICATE_LEW_LICENCE_NO");
+            }
+        }
+
         // 해싱 + 저장
         user.changePassword(passwordEncoder.encode(request.getPassword()));
 
@@ -91,6 +153,28 @@ public class AccountSetupService {
         // (Concierge 가입자가 AccountSetup 직후 대시보드 진입 가능하도록)
         if (!user.isEmailVerified()) {
             user.verifyEmail();
+        }
+
+        // LEW 초대: 면허/등급 확정 + 자동 승인(D-1), PayNow 세팅 + 이력, PDPA/TERMS 동의 기록.
+        if (isLewInvitation) {
+            LocalDateTime now = LocalDateTime.now();
+            user.completeInvitedLewSetup(lewLicenceNo, lewGrade);
+            user.changePaynow(paynowType, paynowValue);
+            user.recordSignupConsent(now, TermsVersion.CURRENT, SignupSource.ADMIN_INVITE);
+
+            String ip = extractIp(httpRequest);
+            String ua = httpRequest != null ? httpRequest.getHeader("User-Agent") : null;
+            recordConsent(user, ConsentType.PDPA, ip, ua);
+            recordConsent(user, ConsentType.TERMS, ip, ua);
+
+            paynowChangeLogRepository.save(LewPaynowChangeLog.builder()
+                .user(user)
+                .oldType(null).oldValue(null)
+                .newType(paynowType).newValue(user.getPaynowValue())
+                .changedBy(user.getUserSeq())
+                .sourceContext(PaynowChangeSourceContext.ACCOUNT_SETUP)
+                .ipAddress(ip).userAgent(ua)
+                .build());
         }
 
         tokenService.markUsed(token);
@@ -129,6 +213,22 @@ public class AccountSetupService {
             approved,
             emailVerified
         );
+    }
+
+    /**
+     * LEW 초대 셋업 시 PDPA/TERMS GRANTED 동의를 {@link UserConsentLog} 에 기록 (감사 증적).
+     * 발생 맥락은 {@link ConsentSourceContext#ADMIN_INVITE} (D-8 본인 동의).
+     */
+    private void recordConsent(User user, ConsentType type, String ip, String ua) {
+        consentLogRepository.save(UserConsentLog.builder()
+            .user(user)
+            .consentType(type)
+            .action(ConsentAction.GRANTED)
+            .documentVersion(TermsVersion.CURRENT)
+            .sourceContext(ConsentSourceContext.ADMIN_INVITE)
+            .ipAddress(ip)
+            .userAgent(ua)
+            .build());
     }
 
     /**

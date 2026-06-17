@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -110,6 +111,18 @@ public class AccountSetupTokenService {
     @Transactional
     public void recordFailure(AccountSetupToken token) {
         token.recordFailedAttempt();
+    }
+
+    /**
+     * 입력 검증 오류 기록. 10회 누적 시 자동 잠금 (면허/등급/PayNow/PDPA 전용).
+     * <p>
+     * 별도 트랜잭션(REQUIRES_NEW)에서 토큰을 재조회·증분·커밋한다 — 호출부 {@code complete()} 가
+     * 검증 실패로 BusinessException 을 던져 자신의 트랜잭션을 롤백해도, 증분은 독립적으로 보존된다.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordInputValidationFailure(String tokenUuid) {
+        tokenRepository.findByTokenUuid(tokenUuid)
+            .ifPresent(AccountSetupToken::recordInputValidationFailure);
     }
 
     private static String extractIp(HttpServletRequest request) {

@@ -961,6 +961,7 @@ CREATE TABLE IF NOT EXISTS account_setup_tokens (
     revoked_at            DATETIME(6),
     failed_attempts       INT           NOT NULL DEFAULT 0,
     locked_at             DATETIME(6),
+    input_validation_failures INT       NOT NULL DEFAULT 0,
     requesting_ip         VARCHAR(45),
     requesting_user_agent VARCHAR(500),
     created_at            DATETIME(6),

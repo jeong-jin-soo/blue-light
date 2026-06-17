@@ -37,6 +37,9 @@ class AccountSetupServiceTest {
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
     private AuditLogService auditLogService;
+    private com.bluelight.backend.domain.user.UserRepository userRepository;
+    private com.bluelight.backend.domain.user.UserConsentLogRepository consentLogRepository;
+    private com.bluelight.backend.domain.user.LewPaynowChangeLogRepository paynowChangeLogRepository;
     private AccountSetupService service;
 
     @BeforeEach
@@ -45,7 +48,11 @@ class AccountSetupServiceTest {
         passwordEncoder = mock(PasswordEncoder.class);
         jwtTokenProvider = mock(JwtTokenProvider.class);
         auditLogService = mock(AuditLogService.class);
-        service = new AccountSetupService(tokenService, passwordEncoder, jwtTokenProvider, auditLogService);
+        userRepository = mock(com.bluelight.backend.domain.user.UserRepository.class);
+        consentLogRepository = mock(com.bluelight.backend.domain.user.UserConsentLogRepository.class);
+        paynowChangeLogRepository = mock(com.bluelight.backend.domain.user.LewPaynowChangeLogRepository.class);
+        service = new AccountSetupService(tokenService, passwordEncoder, jwtTokenProvider, auditLogService,
+            userRepository, consentLogRepository, paynowChangeLogRepository);
 
         when(passwordEncoder.encode(anyString())).thenAnswer(inv -> "ENC:" + inv.getArgument(0));
         when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))
@@ -253,6 +260,141 @@ class AccountSetupServiceTest {
             isNull(), isNull(),
             eq("203.0.113.1"), eq("UA-Test"),
             anyString(), anyString(), eq(200));
+    }
+
+    // ============================================================
+    // complete() — LEW_INVITATION 분기 (PR-3)
+    // ============================================================
+
+    private User pendingInvitedLew(long seq, String email) {
+        User u = User.builder()
+            .email(email).password("old-hash").firstName("Jane").lastName("Tan")
+            .role(com.bluelight.backend.domain.user.UserRole.LEW)
+            .approvedStatus(com.bluelight.backend.domain.user.ApprovalStatus.PENDING)
+            .status(UserStatus.PENDING_ACTIVATION)
+            .signupSource(com.bluelight.backend.domain.user.SignupSource.ADMIN_INVITE)
+            .build();
+        ReflectionTestUtils.setField(u, "userSeq", seq);
+        return u;
+    }
+
+    private AccountSetupToken lewToken(User u) {
+        return AccountSetupToken.builder()
+            .tokenUuid("uuid-1234").user(u)
+            .source(AccountSetupTokenSource.LEW_INVITATION)
+            .expiresAt(LocalDateTime.now().plusHours(48))
+            .build();
+    }
+
+    private AccountSetupCompleteRequest lewReq() {
+        AccountSetupCompleteRequest r = new AccountSetupCompleteRequest();
+        r.setPassword("NewPass123");
+        r.setPasswordConfirm("NewPass123");
+        r.setLewLicenceNo("8/35550");
+        r.setLewGrade("GRADE_8");
+        r.setPdpaConsent(true);
+        r.setPaynowType("MOBILE");
+        r.setPaynowValue("97771983");
+        return r;
+    }
+
+    @Test
+    @DisplayName("getStatus() - LEW_INVITATION 토큰 → requiresLewDetails=true (컨시어지=false)")
+    void getStatus_lewInvitation_requiresLewDetails() {
+        User lew = pendingInvitedLew(30L, "lew@x.sg");
+        when(tokenService.validate("uuid-1234")).thenReturn(lewToken(lew));
+        assertThat(service.getStatus("uuid-1234").isRequiresLewDetails()).isTrue();
+
+        User concierge = pendingUser(31L, "c@x.sg");
+        when(tokenService.validate("uuid-5678")).thenReturn(freshTokenFor(concierge));
+        assertThat(service.getStatus("uuid-5678").isRequiresLewDetails()).isFalse();
+    }
+
+    @Test
+    @DisplayName("complete() - LEW 초대 정상: APPROVED 자동승인 + PayNow 저장 + 동의/이력 기록 + JWT approved")
+    void complete_lew_happyPath() {
+        User lew = pendingInvitedLew(40L, "lew@x.sg");
+        when(tokenService.validate("uuid-1234")).thenReturn(lewToken(lew));
+        when(userRepository.existsByLewLicenceNo("8/35550")).thenReturn(false);
+
+        TokenResponse result = service.complete("uuid-1234", lewReq(), null);
+
+        assertThat(lew.getApprovedStatus()).isEqualTo(com.bluelight.backend.domain.user.ApprovalStatus.APPROVED);
+        assertThat(lew.getLewLicenceNo()).isEqualTo("8/35550");
+        assertThat(lew.getLewGrade()).isEqualTo(com.bluelight.backend.domain.user.LewGrade.GRADE_8);
+        assertThat(lew.getPaynowType()).isEqualTo(com.bluelight.backend.domain.user.PaynowType.MOBILE);
+        assertThat(lew.getPaynowValue()).isEqualTo("97771983");
+        assertThat(lew.getStatus()).isEqualTo(UserStatus.ACTIVE);
+
+        verify(consentLogRepository, times(2)).save(any());      // PDPA + TERMS
+        verify(paynowChangeLogRepository).save(any());           // 최초 PayNow 이력
+        verify(tokenService).markUsed(any());
+        // JWT approved=true 로 발급(자동승인)
+        verify(jwtTokenProvider).createToken(eq(40L), eq("lew@x.sg"), eq("LEW"), eq(true), anyBoolean());
+        verify(tokenService, never()).recordInputValidationFailure(anyString());
+    }
+
+    @Test
+    @DisplayName("complete() - LEW 초대 PDPA 미동의 → 400 + 입력검증 실패 카운트 + 토큰 미사용")
+    void complete_lew_noPdpa() {
+        User lew = pendingInvitedLew(41L, "lew@x.sg");
+        when(tokenService.validate("uuid-1234")).thenReturn(lewToken(lew));
+        AccountSetupCompleteRequest req = lewReq();
+        req.setPdpaConsent(false);
+
+        assertThatThrownBy(() -> service.complete("uuid-1234", req, null))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo("PDPA_CONSENT_REQUIRED"));
+        verify(tokenService).recordInputValidationFailure("uuid-1234");
+        verify(tokenService, never()).markUsed(any());
+        assertThat(lew.getApprovedStatus()).isEqualTo(com.bluelight.backend.domain.user.ApprovalStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("complete() - LEW 초대 PayNow 형식 위반 → 400 INVALID_PAYNOW_VALUE + 입력검증 실패 카운트")
+    void complete_lew_badPaynow() {
+        User lew = pendingInvitedLew(42L, "lew@x.sg");
+        when(tokenService.validate("uuid-1234")).thenReturn(lewToken(lew));
+        AccountSetupCompleteRequest req = lewReq();
+        req.setPaynowValue("12345"); // MOBILE 형식 위반
+
+        assertThatThrownBy(() -> service.complete("uuid-1234", req, null))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo("INVALID_PAYNOW_VALUE"));
+        verify(tokenService).recordInputValidationFailure("uuid-1234");
+        verify(tokenService, never()).markUsed(any());
+    }
+
+    @Test
+    @DisplayName("complete() - LEW 초대 면허 중복 → 409, 입력검증 카운트 안 함(토큰 살림)")
+    void complete_lew_duplicateLicence() {
+        User lew = pendingInvitedLew(43L, "lew@x.sg");
+        when(tokenService.validate("uuid-1234")).thenReturn(lewToken(lew));
+        when(userRepository.existsByLewLicenceNo("8/35550")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.complete("uuid-1234", lewReq(), null))
+            .isInstanceOf(BusinessException.class)
+            .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo("DUPLICATE_LEW_LICENCE_NO"));
+        verify(tokenService, never()).recordInputValidationFailure(anyString()); // 충돌은 미카운트
+        verify(tokenService, never()).markUsed(any());
+    }
+
+    @Test
+    @DisplayName("complete() - 컨시어지 토큰은 LEW 검증/면허조회를 전혀 타지 않음 (회귀 안전, AC-11)")
+    void complete_concierge_skipsLewBranch() {
+        User u = pendingUser(44L, "c@x.sg");
+        when(tokenService.validate("uuid-1234")).thenReturn(freshTokenFor(u));
+        AccountSetupCompleteRequest req = new AccountSetupCompleteRequest();
+        req.setPassword("NewPass123");
+        req.setPasswordConfirm("NewPass123");
+
+        service.complete("uuid-1234", req, null);
+
+        verify(userRepository, never()).existsByLewLicenceNo(anyString());
+        verify(paynowChangeLogRepository, never()).save(any());
+        verify(consentLogRepository, never()).save(any());
+        verify(tokenService, never()).recordInputValidationFailure(anyString());
+        verify(tokenService).markUsed(any());
     }
 
     // ============================================================
