@@ -43,6 +43,8 @@ public enum AuditAction {
     LOA_FORM_SENT,
     LOA_APPLICANT_UPLOADED,
     LOA_FINAL_UPLOADED,
+    // Admin 교환 패널 — LoA 파일 등록/교체 (기존 파일 보관, 사유 기록)
+    LOA_ADMIN_REPLACED,
 
     // Admin user management
     LEW_APPROVED,

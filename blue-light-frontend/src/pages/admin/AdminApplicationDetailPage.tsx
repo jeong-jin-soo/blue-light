@@ -16,6 +16,7 @@ import { getBasePath } from '../../utils/routeUtils';
 
 // Section components
 import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
+import { AdminLoaSection } from './sections/AdminLoaSection';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
 import { AdminSldSection } from './sections/AdminSldSection';
@@ -64,7 +65,6 @@ export default function AdminApplicationDetailPage() {
 
   // LOA states (교환 모델 — Part B에서 admin 패널이 재사용 예정)
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
-  const [loaUploading, setLoaUploading] = useState(false);
 
   // SLD states
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
@@ -319,32 +319,18 @@ export default function AdminApplicationDetailPage() {
     }
   };
 
-  // LOA (교환 모델 — Part B에서 admin 패널이 재사용 예정)
+  // LOA (교환 모델 — Part B admin 패널)
+  const loadLoaStatus = useCallback(async () => {
+    try {
+      const loaData = await loaApi.getLoaStatus(applicationId);
+      setLoaStatus(loaData);
+    } catch { /* LOA status might not be available */ }
+  }, [applicationId]);
+
   const handleLoaDownload = async (fileSeq: number, filename: string) => {
     try { await fileApi.downloadFile(fileSeq, filename); }
     catch { toast.error('Failed to download LOA'); }
   };
-
-  const handleUploadLoa = async (file: File) => {
-    setLoaUploading(true);
-    try {
-      await adminApi.uploadFile(applicationId, file, 'OWNER_AUTH_LETTER');
-      toast.success('LOA uploaded successfully');
-      const loaData = await loaApi.getLoaStatus(applicationId);
-      setLoaStatus(loaData);
-    } catch {
-      toast.error('Failed to upload LOA');
-    } finally {
-      setLoaUploading(false);
-    }
-  };
-
-  // LoA 데이터 로드/핸들러는 후속 Part B의 admin 교환 패널이 재사용할 예정이라
-  // 의도적으로 보존한다. 아직 렌더 소비처가 없어 noUnusedLocals 위반을 막기 위한 참조.
-  void loaStatus;
-  void loaUploading;
-  void handleLoaDownload;
-  void handleUploadLoa;
 
   // SLD
   const handleSldUpload = async (file: File) => {
@@ -535,6 +521,18 @@ export default function AdminApplicationDetailPage() {
               applicationCode={`APP-${String(application.applicationSeq).padStart(6, '0')}`}
             />
           </div>
+
+          {/* LoA 교환 진행상태 + admin 등록/교체(사유 필수, 기존 파일 보관) — ADMIN/SYSTEM_ADMIN 전용 */}
+          {isAdmin && (
+            <div id="loa" className="scroll-mt-24">
+              <AdminLoaSection
+                application={application}
+                loaStatus={loaStatus}
+                onDownload={handleLoaDownload}
+                onReplaced={loadLoaStatus}
+              />
+            </div>
+          )}
 
           {/* id="payment": 결제 증빙/확인 요청 알림 딥링크 타깃 */}
           <div id="payment" className="scroll-mt-24">

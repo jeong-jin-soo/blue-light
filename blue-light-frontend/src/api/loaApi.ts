@@ -63,6 +63,31 @@ export const uploadFinalLoa = async (
 };
 
 /**
+ * ADMIN/SYSTEM_ADMIN: LoA 파일 등록/교체 (Part B 교환 패널).
+ * POST /api/admin/applications/{id}/loa/admin-replace
+ *
+ * 기존 동일 타입 파일은 서버에서 보관(삭제 안 함)되며, 사유(reason)는 필수로 감사에 기록된다.
+ * @param fileType OWNER_AUTH_LETTER(신청자 서명본) 또는 LOA_FINAL(LEW 최종본)
+ */
+export const adminReplaceLoa = async (
+  applicationId: number,
+  fileType: 'OWNER_AUTH_LETTER' | 'LOA_FINAL',
+  file: File,
+  reason: string
+): Promise<LoaStatus> => {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('fileType', fileType);
+  form.append('reason', reason);
+  const response = await axiosClient.post<LoaStatus>(
+    `/admin/applications/${applicationId}/loa/admin-replace`,
+    form,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data;
+};
+
+/**
  * active LoA 폼 메타 조회 (NEW 전용).
  * GET /api/applications/{id}/loa/active-form
  * RENEWAL 또는 active 폼 부재 시 404.
@@ -94,5 +119,7 @@ export const loaApi = {
   uploadFinalLoa,
   getActiveLoaForm,
   downloadActiveLoaForm,
+  // Part B — admin 교환 패널
+  adminReplaceLoa,
 };
 export default loaApi;

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -236,6 +237,79 @@ public class LoaService {
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  Admin 교환 패널 (Part B) — LoA 파일 등록/교체
+    //  기존 파일을 삭제하지 않고 보관(append-only) + 사유를 감사에 기록한다.
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * ADMIN/SYSTEM_ADMIN 이 LoA 파일(신청자 서명본 또는 LEW 최종본)을 등록/교체한다.
+     *
+     * <p>교환 모델 메서드(applicant-upload / final-upload)와 달리, <b>기존 동일 타입 파일을
+     * 절대 삭제하지 않고 보관</b>한다. 새 {@link FileEntity}만 추가되며 {@code buildStatus}는
+     * 항상 fileSeq 최댓값(=최신본)을 노출한다. 사유({@code reason})는 필수이며 감사 로그에 남는다.</p>
+     */
+    @Transactional
+    public LoaStatusResponse adminReplaceLoa(Long adminSeq, Long applicationSeq,
+                                             FileType fileType, MultipartFile file, String reason) {
+        // 1. 허용 파일 타입 검증 — LoA 교환에 쓰이는 2종만.
+        if (fileType != FileType.OWNER_AUTH_LETTER && fileType != FileType.LOA_FINAL) {
+            throw new BusinessException(
+                    "Only OWNER_AUTH_LETTER or LOA_FINAL can be replaced via the admin LoA panel.",
+                    HttpStatus.BAD_REQUEST, "INVALID_LOA_FILE_TYPE");
+        }
+
+        // 2. 사유 필수 — 감사 무결성.
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(
+                    "A reason is required when replacing a LoA file.",
+                    HttpStatus.BAD_REQUEST, "LOA_REASON_REQUIRED");
+        }
+
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        // 3. MIME/크기 검증 — 교환 메서드와 동일 정책.
+        MimeTypeValidator.validate(file, LOA_UPLOAD_MIME);
+        MimeTypeValidator.validateSize(file, LOA_UPLOAD_MAX_MB);
+
+        // 4. 파일 저장 — 기존 파일은 보관(delete 호출 없음). 새 FileEntity만 추가.
+        String subDirectory = "applications/" + applicationSeq;
+        String storedPath = fileStorageService.store(file, subDirectory);
+
+        FileEntity fileEntity = FileEntity.builder()
+                .application(application)
+                .fileType(fileType)
+                .fileUrl(storedPath)
+                .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .build();
+        FileEntity saved = fileRepository.save(fileEntity);
+
+        // 5. loaStage 진전 — 최종본이면 FINAL_UPLOADED, 서명본이면 APPLICANT_UPLOADED.
+        if (fileType == FileType.LOA_FINAL) {
+            application.markLoaFinalUploaded();
+        } else {
+            application.markLoaApplicantUploaded();
+        }
+
+        // 6. 감사 — 사유를 description + metadata 양쪽에 남긴다.
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("fileType", fileType.name());
+        metadata.put("reason", reason);
+        metadata.put("fileSeq", saved.getFileSeq());
+        auditLogService.logAsync(
+                adminSeq, AuditAction.LOA_ADMIN_REPLACED, AuditCategory.ADMIN,
+                "Application", String.valueOf(applicationSeq),
+                "Admin replaced LoA file (" + fileType + "). Reason: " + reason,
+                null, metadata, null, null,
+                "POST", "/api/admin/applications/" + applicationSeq + "/loa/admin-replace", 200);
+
+        log.info("LoA admin replace: applicationSeq={}, adminSeq={}, fileType={}, fileSeq={}",
+                applicationSeq, adminSeq, fileType, saved.getFileSeq());
+
+        return buildStatus(application);
+    }
+
     /**
      * LOA 상태 조회
      * - Owner, ADMIN, LEW 모두 접근 가능
@@ -264,10 +338,14 @@ public class LoaService {
         List<FileEntity> finalFiles = fileRepository
                 .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.LOA_FINAL);
 
-        Long applicantFileSeq = applicantFiles.isEmpty()
-                ? null : applicantFiles.get(applicantFiles.size() - 1).getFileSeq();
-        Long finalFileSeq = finalFiles.isEmpty()
-                ? null : finalFiles.get(finalFiles.size() - 1).getFileSeq();
+        // 보관(soft-retain) 정책으로 동일 타입 파일이 여러 개일 수 있으므로
+        // 리스트 순서가 아닌 fileSeq 최댓값(=최신본)을 선택한다.
+        Long applicantFileSeq = applicantFiles.stream()
+                .max(Comparator.comparing(FileEntity::getFileSeq))
+                .map(FileEntity::getFileSeq).orElse(null);
+        Long finalFileSeq = finalFiles.stream()
+                .max(Comparator.comparing(FileEntity::getFileSeq))
+                .map(FileEntity::getFileSeq).orElse(null);
 
         // active 폼 메타 (NEW 전용). PR2 getActiveForm()은 미설정 시 404 throw → unavailable 처리.
         boolean activeFormAvailable = false;
