@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.AdminUserResponse;
 import com.bluelight.backend.api.admin.dto.ChangeRoleRequest;
 import com.bluelight.backend.api.admin.dto.InviteLewRequest;
+import com.bluelight.backend.api.admin.dto.PaynowRevealResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
@@ -230,5 +231,26 @@ public class AdminUserController {
             HttpServletRequest http) {
         AdminUserResponse response = lewInviteService.resendInvite(id, http);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+    }
+
+    /**
+     * Reveal a LEW's full PayNow value (for payment execution; logs a view audit)
+     * GET /api/admin/users/:id/paynow/reveal
+     */
+    @Auditable(action = AuditAction.LEW_PAYNOW_VIEWED, category = AuditCategory.ADMIN, entityType = "User")
+    @GetMapping("/{id}/paynow/reveal")
+    public ResponseEntity<PaynowRevealResponse> revealPaynow(@PathVariable Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(
+                        "User not found", HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
+        if (user.getRole() != UserRole.LEW) {
+            throw new BusinessException(
+                    "Only LEW users have PayNow details", HttpStatus.BAD_REQUEST, "NOT_LEW_USER");
+        }
+        if (user.getPaynowValue() == null) {
+            throw new BusinessException(
+                    "This LEW has no PayNow set", HttpStatus.CONFLICT, "PAYNOW_NOT_SET");
+        }
+        return ResponseEntity.ok(PaynowRevealResponse.from(user));
     }
 }

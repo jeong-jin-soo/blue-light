@@ -8,6 +8,7 @@ import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.PasswordResetTokenRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserConsentLogRepository;
+import com.bluelight.backend.domain.user.LewPaynowChangeLogRepository;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +42,8 @@ class AuthServiceSignupReuseEmailTest {
             mock(PasswordResetTokenRepository.class),
             mock(EmailService.class),
             mock(AuditLogService.class),
-            mock(UserConsentLogRepository.class));
+            mock(UserConsentLogRepository.class),
+            mock(LewPaynowChangeLogRepository.class));
 
         when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))
             .thenReturn("jwt");

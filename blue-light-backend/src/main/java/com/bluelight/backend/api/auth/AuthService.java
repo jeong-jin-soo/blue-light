@@ -49,6 +49,8 @@ public class AuthService {
     private final AuditLogService auditLogService;
     /** PR-0D: signup 시 PDPA/TERMS GRANTED 를 UserConsentLog 에 기록 (감사 증적). */
     private final UserConsentLogRepository consentLogRepository;
+    /** PR-PN3: 자가가입 LEW 의 PayNow 최초 입력 이력 기록. */
+    private final LewPaynowChangeLogRepository paynowChangeLogRepository;
 
     @Value("${password-reset.token-expiry-minutes:60}")
     private int tokenExpiryMinutes;
@@ -143,6 +145,15 @@ public class AuthService {
             lewGrade = EnumParser.parse(LewGrade.class, request.getLewGrade(), "INVALID_LEW_GRADE");
         }
 
+        // LEW PayNow 수취 계정 — 모든 LEW 가입 경로에서 필수 수집(D-PN6/D-PN7)
+        PaynowType paynowType = null;
+        String paynowValue = null;
+        if (selectedRole == UserRole.LEW) {
+            paynowType = EnumParser.parse(PaynowType.class, request.getPaynowType(), "INVALID_PAYNOW_TYPE");
+            paynowValue = request.getPaynowValue() != null ? request.getPaynowValue().trim() : null;
+            PaynowValidator.validate(paynowType, paynowValue); // 필수/형식 오류 시 400
+        }
+
         // 이메일 인증 활성화 여부 확인
         boolean emailVerificationEnabled = isEmailVerificationEnabled();
 
@@ -163,6 +174,8 @@ public class AuthService {
                 .approvedStatus(selectedRole == UserRole.LEW ? ApprovalStatus.PENDING : null)
                 .lewLicenceNo(lewLicenceNo)
                 .lewGrade(lewGrade)
+                .paynowType(paynowType)
+                .paynowValue(paynowValue)
                 .emailVerified(!emailVerificationEnabled)
                 .emailVerificationToken(emailVerificationToken)
                 .pdpaConsentAt(now)
@@ -181,6 +194,18 @@ public class AuthService {
         String ua = userAgent(httpRequest);
         recordSignupConsent(savedUser, ConsentType.PDPA, termsVersion, ip, ua);
         recordSignupConsent(savedUser, ConsentType.TERMS, termsVersion, ip, ua);
+
+        // PR-PN3: 자가가입 LEW PayNow 최초 입력 이력
+        if (selectedRole == UserRole.LEW) {
+            paynowChangeLogRepository.save(LewPaynowChangeLog.builder()
+                    .user(savedUser)
+                    .oldType(null).oldValue(null)
+                    .newType(paynowType).newValue(savedUser.getPaynowValue())
+                    .changedBy(savedUser.getUserSeq())
+                    .sourceContext(PaynowChangeSourceContext.SIGNUP)
+                    .ipAddress(ip).userAgent(ua)
+                    .build());
+        }
 
         // 이메일 인증 메일 발송
         if (emailVerificationEnabled) {

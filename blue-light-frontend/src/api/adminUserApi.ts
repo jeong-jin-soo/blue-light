@@ -49,3 +49,15 @@ export const resendLewInvite = async (id: number): Promise<User> => {
   const response = await axiosClient.post<User>(`/admin/users/${id}/resend-invite`);
   return response.data;
 };
+
+export interface PaynowRevealResponse {
+  userSeq: number;
+  paynowType: string | null;
+  paynowValue: string | null;
+}
+
+/** LEW PayNow 전체값 조회(지급용) — 서버가 열람 감사를 기록한다. */
+export const revealPaynow = async (id: number): Promise<PaynowRevealResponse> => {
+  const response = await axiosClient.get<PaynowRevealResponse>(`/admin/users/${id}/paynow/reveal`);
+  return response.data;
+};

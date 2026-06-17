@@ -1,4 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import {
+  PAYNOW_TYPES,
+  PAYNOW_TYPE_LABELS,
+  PAYNOW_PLACEHOLDER,
+  isValidPaynow,
+  type PaynowType,
+} from '../../constants/paynow';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
@@ -22,6 +29,8 @@ interface SignupForm {
   role: string;
   lewLicenceNo: string;
   lewGrade: string;
+  paynowType: PaynowType;
+  paynowValue: string;
   pdpaConsent: boolean;
 }
 
@@ -34,6 +43,8 @@ const INITIAL_FORM: SignupForm = {
   role: 'APPLICANT',
   lewLicenceNo: '',
   lewGrade: '',
+  paynowType: 'MOBILE',
+  paynowValue: '',
   pdpaConsent: false,
 };
 
@@ -117,6 +128,15 @@ export default function SignupPage() {
       return;
     }
 
+    if (form.role === 'LEW' && !isValidPaynow(form.paynowType, form.paynowValue)) {
+      setLocalError(
+        form.paynowType === 'MOBILE'
+          ? 'Enter a valid 8-digit Singapore mobile number for PayNow (e.g. 97771983).'
+          : 'Enter a valid 10-character Company UEN for PayNow (e.g. 201837490N).'
+      );
+      return;
+    }
+
     if (!form.pdpaConsent) {
       setLocalError('You must agree to the Privacy Policy to continue');
       return;
@@ -131,6 +151,8 @@ export default function SignupPage() {
         role: form.role,
         lewLicenceNo: form.role === 'LEW' ? form.lewLicenceNo.trim() : undefined,
         lewGrade: form.role === 'LEW' ? form.lewGrade : undefined,
+        paynowType: form.role === 'LEW' ? form.paynowType : undefined,
+        paynowValue: form.role === 'LEW' ? form.paynowValue.trim() : undefined,
         pdpaConsent: form.pdpaConsent,
       });
     } catch {
@@ -250,6 +272,41 @@ export default function SignupPage() {
                 ))}
               </div>
               <p className="text-xs text-gray-500 mt-1">Select the grade on your EMA licence</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                PayNow (for receiving payments)<span className="text-error-500 ml-0.5">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                {PAYNOW_TYPES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => updateField('paynowType', t)}
+                    className={`p-2.5 border-2 rounded-lg text-center text-sm font-medium transition-all ${
+                      form.paynowType === t
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {PAYNOW_TYPE_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+              <Input
+                label={form.paynowType === 'MOBILE' ? 'Mobile number' : 'Company UEN'}
+                value={form.paynowValue}
+                onChange={(e) => updateField('paynowValue', e.target.value)}
+                placeholder={PAYNOW_PLACEHOLDER[form.paynowType]}
+                error={
+                  form.paynowValue && !isValidPaynow(form.paynowType, form.paynowValue)
+                    ? form.paynowType === 'MOBILE'
+                      ? 'Enter an 8-digit Singapore mobile number.'
+                      : 'Enter a 10-character Company UEN.'
+                    : undefined
+                }
+                hint="The account where you receive payments from the platform"
+              />
             </div>
           </div>
         )}

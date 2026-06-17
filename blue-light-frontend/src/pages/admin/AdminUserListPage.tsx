@@ -54,6 +54,9 @@ export default function AdminUserListPage() {
   const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '' });
   const [inviting, setInviting] = useState(false);
   const [resendingId, setResendingId] = useState<number | null>(null);
+  // PayNow reveal (지급용 전체값 — 클릭 시 서버가 열람 감사 기록)
+  const [revealedPaynow, setRevealedPaynow] = useState<Record<number, string>>({});
+  const [revealingId, setRevealingId] = useState<number | null>(null);
 
   const loadUsers = useCallback((currentPage: number, role: string, search: string) => {
     setLoading(true);
@@ -192,6 +195,19 @@ export default function AdminUserListPage() {
       toast.error(message);
     } finally {
       setResendingId(null);
+    }
+  };
+
+  const handleRevealPaynow = async (user: User) => {
+    setRevealingId(user.userSeq);
+    try {
+      const res = await adminApi.revealPaynow(user.userSeq);
+      setRevealedPaynow((m) => ({ ...m, [user.userSeq]: res.paynowValue ?? '-' }));
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to reveal PayNow';
+      toast.error(message);
+    } finally {
+      setRevealingId(null);
     }
   };
 
@@ -353,6 +369,32 @@ export default function AdminUserListPage() {
           {user.lewLicenceNo || '-'}
         </span>
       ),
+    },
+    {
+      key: 'paynowValueMasked' as keyof User,
+      header: 'PayNow',
+      render: (user) => {
+        if (user.role !== 'LEW' || !user.paynowValueMasked) return <span className="text-gray-400">-</span>;
+        const revealed = revealedPaynow[user.userSeq];
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-gray-700 font-mono text-xs">
+              {revealed ?? user.paynowValueMasked}
+            </span>
+            <span className="text-[10px] text-gray-400">{user.paynowType === 'MOBILE' ? 'Mobile' : 'UEN'}</span>
+            {!revealed && (
+              <button
+                onClick={() => handleRevealPaynow(user)}
+                disabled={revealingId === user.userSeq}
+                className="text-xs text-primary hover:underline disabled:opacity-50"
+                aria-label={`Reveal PayNow for ${fullName(user.firstName, user.lastName)}`}
+              >
+                {revealingId === user.userSeq ? '…' : 'Reveal'}
+              </button>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'createdAt',

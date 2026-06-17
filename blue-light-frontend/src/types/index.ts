@@ -58,6 +58,8 @@ export interface User {
   /** LEW 본인 PayNow 수취 계정 (COMPANY_UEN / MOBILE) */
   paynowType?: 'COMPANY_UEN' | 'MOBILE';
   paynowValue?: string;
+  /** admin 목록 응답의 마스킹된 PayNow 값 (전체값은 reveal 엔드포인트로만) */
+  paynowValueMasked?: string;
   companyName?: string;
   uen?: string;
   designation?: string;
@@ -448,6 +450,8 @@ export interface SignupRequest {
   role?: string;
   lewLicenceNo?: string;
   lewGrade?: string;
+  paynowType?: string;
+  paynowValue?: string;
   pdpaConsent: boolean;
 }
 

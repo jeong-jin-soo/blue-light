@@ -50,6 +50,7 @@ public enum AuditAction {
     LEW_APPROVED,
     LEW_REJECTED,
     LEW_INVITATION_SENT,
+    LEW_PAYNOW_VIEWED,
     USER_ROLE_CHANGED,
 
     // Admin application management
