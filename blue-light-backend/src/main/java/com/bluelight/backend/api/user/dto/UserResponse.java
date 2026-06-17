@@ -23,6 +23,15 @@ public class UserResponse {
     private boolean approved;
     private String lewLicenceNo;
     private String lewGrade;
+    /**
+     * LEW 본인 PayNow — 전체값(평문) 노출(D-PN5).
+     * ⚠️ 이 DTO는 <b>본인 전용</b>(GET /api/users/me)에만 사용한다. 타 사용자를 렌더하는
+     * admin/LEW 화면은 절대 이 DTO를 재사용하지 말 것 — 마스킹+감사 reveal 흐름을 우회해
+     * 평문 PayNow가 누출된다. 타인 노출은 {@code AdminUserResponse}(paynowValueMasked) +
+     * {@code GET /api/admin/users/{id}/paynow/reveal}(LEW_PAYNOW_VIEWED 감사)만 사용.
+     */
+    private String paynowType;
+    private String paynowValue;
     private String companyName;
     private String uen;
     private String designation;
@@ -43,6 +52,8 @@ public class UserResponse {
                 .approved(user.isApproved())
                 .lewLicenceNo(user.getLewLicenceNo())
                 .lewGrade(user.getLewGrade() != null ? user.getLewGrade().name() : null)
+                .paynowType(user.getPaynowType() != null ? user.getPaynowType().name() : null)
+                .paynowValue(user.getPaynowValue())
                 .companyName(user.getCompanyName())
                 .uen(user.getUen())
                 .designation(user.getDesignation())

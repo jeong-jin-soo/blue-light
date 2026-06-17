@@ -97,10 +97,12 @@ password-reset:
   base-url: ${PASSWORD_RESET_BASE_URL:http://localhost:5174}
 
 # Kaki Concierge 설정 (Phase 1 PR#2)
-# 계정 활성화 링크 base URL — Stage B의 ConciergeNotifier가 이메일 발송 시 사용
+# 계정 활성화 링크 base URL — Stage B의 ConciergeNotifier / LEW 초대 이메일이 사용.
+# CONCIERGE_SETUP_BASE_URL 미설정 시 PASSWORD_RESET_BASE_URL(배포 환경에 이미 주입됨)로 폴백 →
+# dev/prod 에서 localhost 링크로 나가던 문제 방지(셋업 토큰 링크는 동일 프론트 도메인).
 concierge:
   account-setup:
-    base-url: ${CONCIERGE_SETUP_BASE_URL:http://localhost:5174}
+    base-url: ${CONCIERGE_SETUP_BASE_URL:${PASSWORD_RESET_BASE_URL:http://localhost:5174}}
 
 # 면허 만료 스케줄러 설정
 license-expiry:

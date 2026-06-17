@@ -115,6 +115,20 @@ public class User extends BaseEntity {
     private LewGrade lewGrade;
 
     /**
+     * LEW 본인 PayNow 수취 계정 유형 (LEW만 사용, 택1: COMPANY_UEN / MOBILE).
+     * <p>플랫폼이 LEW 에게 정산할 때 사용하는 본인 계좌 — system_settings PayNow(플랫폼 계좌)와 무관.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "paynow_type", length = 20)
+    private PaynowType paynowType;
+
+    /**
+     * LEW 본인 PayNow 값 (MOBILE 8자리 / COMPANY_UEN 10자). {@link PaynowValidator} 로 검증.
+     */
+    @Column(name = "paynow_value", length = 20)
+    private String paynowValue;
+
+    /**
      * 회사명 (EMA 라이선스에 인쇄됨)
      */
     @Column(name = "company_name", length = 100)
@@ -265,7 +279,7 @@ public class User extends BaseEntity {
     @Builder
     public User(String email, String password, String firstName, String lastName, String phone,
                 UserRole role, ApprovalStatus approvedStatus, String lewLicenceNo,
-                LewGrade lewGrade,
+                LewGrade lewGrade, PaynowType paynowType, String paynowValue,
                 String companyName, String uen, String designation,
                 String correspondenceAddress, String correspondencePostalCode,
                 Boolean emailVerified, String emailVerificationToken,
@@ -285,6 +299,8 @@ public class User extends BaseEntity {
         this.approvedStatus = approvedStatus;
         this.lewLicenceNo = lewLicenceNo;
         this.lewGrade = lewGrade;
+        this.paynowType = paynowType;
+        this.paynowValue = paynowValue;
         this.companyName = companyName;
         this.uen = uen;
         this.designation = designation;
@@ -442,6 +458,27 @@ public class User extends BaseEntity {
      * 면허번호/등급이 비어 있으면 거부한다(등급 null LEW 가 배정 단계에서 막히는 무결성 구멍 방지).
      */
     public void changeRoleToLew(String lewLicenceNo, LewGrade lewGrade) {
+        assignLewLicence(lewLicenceNo, lewGrade);
+        this.approvedStatus = ApprovalStatus.PENDING;
+    }
+
+    /**
+     * 초대받은 LEW 의 셋업 완료 — 면허번호·등급을 확정하고 <b>자동 승인</b>한다 (D-1).
+     * <p>
+     * ADMIN 초대로 생성된 role=LEW 계정에만 사용한다. {@link #changeRoleToLew}와 달리
+     * {@link ApprovalStatus#APPROVED} 로 설정해 별도 승인 단계 없이 즉시 활동 가능하게 한다
+     * (admin 초대 자체가 검증으로 간주). 면허/등급이 비어 있으면 거부한다.
+     */
+    public void completeInvitedLewSetup(String lewLicenceNo, LewGrade lewGrade) {
+        assignLewLicence(lewLicenceNo, lewGrade);
+        this.approvedStatus = ApprovalStatus.APPROVED;
+    }
+
+    /**
+     * LEW 승격 공통 처리 — role=LEW + roles 동기화 + 면허/등급 확정(필수 검증).
+     * 승인 상태(PENDING vs APPROVED)는 호출자가 결정한다(승격 경로별 정책 분기).
+     */
+    private void assignLewLicence(String lewLicenceNo, LewGrade lewGrade) {
         if (lewLicenceNo == null || lewLicenceNo.isBlank()) {
             throw new IllegalArgumentException("LEW licence number is required");
         }
@@ -451,9 +488,24 @@ public class User extends BaseEntity {
         this.role = UserRole.LEW;
         if (this.roles == null) this.roles = new HashSet<>();
         this.roles.add(UserRole.LEW);
-        this.approvedStatus = ApprovalStatus.PENDING;
         this.lewLicenceNo = lewLicenceNo.trim();
         this.lewGrade = lewGrade;
+    }
+
+    /**
+     * LEW 본인 PayNow 수취 계정을 설정/변경한다 (택1: type+value 단일쌍).
+     * <p>형식 검증은 {@link PaynowValidator} 가 담당하며, 여기서는 null/blank 가드와 trim 만 수행한다.
+     * 변경 이력({@link LewPaynowChangeLog})은 호출하는 서비스가 직전 값을 스냅샷하여 기록한다.
+     */
+    public void changePaynow(PaynowType type, String value) {
+        if (type == null) {
+            throw new IllegalArgumentException("paynowType is required");
+        }
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("paynowValue is required");
+        }
+        this.paynowType = type;
+        this.paynowValue = value.trim();
     }
 
     // ============================================================
@@ -561,6 +613,15 @@ public class User extends BaseEntity {
      */
     public void removeSignatureUrl() {
         this.signatureUrl = null;
+    }
+
+    /**
+     * PDPA 동의 기록 — pdpaConsentAt 설정.
+     * <p>초대 LEW 셋업 등 가입 시점에 pdpaConsentAt를 빌더로 못 받은 계정이 동의 시 호출한다
+     * (자가가입/컨시어지는 빌더에서 이미 설정). {@link #hasPdpaConsent()} 일관성 보장.
+     */
+    public void grantPdpaConsent(LocalDateTime at) {
+        this.pdpaConsentAt = at;
     }
 
     /**

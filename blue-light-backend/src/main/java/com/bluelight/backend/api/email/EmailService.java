@@ -255,6 +255,19 @@ public interface EmailService {
     void sendAccountSetupLinkEmail(String to, String fullName, String setupUrl, String expiresAtDisplay);
 
     /**
+     * ADMIN LEW 초대 — 계정 활성화(셋업) 링크 이메일.
+     * <p>
+     * 초대받은 LEW 가 링크에서 비밀번호·면허/등급·PayNow·PDPA 동의를 입력해 계정을 활성화한다.
+     * 발송 실패는 swallow(보안: 이메일 존재 여부 노출 방지) — 호출부 트랜잭션과 무관.
+     *
+     * @param to               수신자 이메일
+     * @param fullName         수신자 이름
+     * @param setupUrl         완전한 URL (예: https://licensekaki.sg/setup-account/{uuid})
+     * @param expiresAtDisplay 만료 시각 표시 문자열 (48시간)
+     */
+    void sendLewInvitationEmail(String to, String fullName, String setupUrl, String expiresAtDisplay);
+
+    /**
      * N1: Concierge 신청 접수 + 계정 설정 링크 (신규 C1 / PENDING C3 케이스).
      * 접수 확인과 활성화 링크를 한 통으로 통합 발송.
      */

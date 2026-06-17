@@ -8,6 +8,7 @@ import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.PasswordResetTokenRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserConsentLogRepository;
+import com.bluelight.backend.domain.user.LewPaynowChangeLogRepository;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +42,8 @@ class AuthServiceSignupReuseEmailTest {
             mock(PasswordResetTokenRepository.class),
             mock(EmailService.class),
             mock(AuditLogService.class),
-            mock(UserConsentLogRepository.class));
+            mock(UserConsentLogRepository.class),
+            mock(LewPaynowChangeLogRepository.class));
 
         when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))
             .thenReturn("jwt");
@@ -68,6 +70,49 @@ class AuthServiceSignupReuseEmailTest {
         assertThat(resp).isNotNull();
         assertThat(resp.getEmail()).isEqualTo("foo@example.com");
         verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("리뷰 #2: 가입 이메일을 trim+lowercase 정규화하여 저장(로그인 매칭 보장)")
+    void signup_normalizesEmail() {
+        UserRepository userRepository = mock(UserRepository.class);
+        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
+        JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
+
+        AuthService authService = new AuthService(
+            userRepository, passwordEncoder, jwtTokenProvider,
+            mock(SystemSettingRepository.class),
+            mock(PasswordResetTokenRepository.class),
+            mock(EmailService.class),
+            mock(AuditLogService.class),
+            mock(UserConsentLogRepository.class),
+            mock(LewPaynowChangeLogRepository.class));
+
+        when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))
+            .thenReturn("jwt");
+        when(jwtTokenProvider.getExpirationInSeconds()).thenReturn(86400L);
+        when(passwordEncoder.encode(anyString())).thenReturn("hash");
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            ReflectionTestUtils.setField(u, "userSeq", 1L);
+            return u;
+        });
+
+        SignupRequest req = new SignupRequest();
+        ReflectionTestUtils.setField(req, "email", "  Foo@Example.COM ");
+        ReflectionTestUtils.setField(req, "password", "password1");
+        ReflectionTestUtils.setField(req, "firstName", "Foo");
+        ReflectionTestUtils.setField(req, "lastName", "Bar");
+        ReflectionTestUtils.setField(req, "pdpaConsent", true);
+
+        authService.signup(req, null);
+
+        // 중복검사와 저장 모두 정규화된 이메일로 수행
+        verify(userRepository).existsByEmail("foo@example.com");
+        org.mockito.ArgumentCaptor<User> captor = org.mockito.ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("foo@example.com");
     }
 
     @Test

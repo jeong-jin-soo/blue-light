@@ -1,163 +1,187 @@
 import { useState, useRef } from 'react';
 import { Card } from '../../../components/ui/Card';
-import { Badge } from '../../../components/ui/Badge';
-import type { AdminApplication, LoaStatus } from '../../../types';
+import { Badge, type BadgeVariant } from '../../../components/ui/Badge';
+import { Button } from '../../../components/ui/Button';
+import { Textarea } from '../../../components/ui/Textarea';
+import { useToastStore } from '../../../stores/toastStore';
+import loaApi from '../../../api/loaApi';
+import type { AdminApplication, LoaStatus, LoaStage } from '../../../types';
+
+type LoaFileType = 'OWNER_AUTH_LETTER' | 'LOA_FINAL';
 
 interface Props {
   application: AdminApplication;
   loaStatus: LoaStatus | null;
-  onGenerate: () => Promise<void>;
-  onUploadLoa: (file: File) => Promise<void>;
+  /** 파일 다운로드 핸들러 (페이지가 fileApi.downloadFile 로 위임). */
   onDownload: (fileSeq: number, filename: string) => void;
-  generating: boolean;
-  uploading: boolean;
+  /** 등록/교체 성공 후 상위에서 loaStatus 를 다시 로드. */
+  onReplaced: () => void | Promise<void>;
 }
 
-/**
- * Admin/LEW LOA (Letter of Appointment) 섹션
- * - NEW: LOA 자동 생성 + 서명
- * - RENEWAL: LOA 업로드 (관계기관에서 받은 문서) + 서명
- */
-export function AdminLoaSection({
-  application, loaStatus, onGenerate, onUploadLoa, onDownload, generating, uploading,
-}: Props) {
-  const isRenewal = application.applicationType === 'RENEWAL';
-  const lewAssigned = !!application.assignedLewSeq;
-  const isCorporate = application.applicantType === 'CORPORATE';
-  // CORPORATE만 Company/UEN/Designation 필요. INDIVIDUAL은 무조건 완비된 것으로 간주.
-  // Correspondence Address는 Installation address fallback 가능하므로 경고 제외 (V-1).
-  const missingCorporateFields: string[] = isCorporate
-    ? [
-        !application.userCompanyName && 'Company Name',
-        !application.userUen && 'UEN',
-        !application.userDesignation && 'Designation',
-      ].filter((v): v is string => !!v)
-    : [];
-  const profileComplete = missingCorporateFields.length === 0;
-  const canGenerate = lewAssigned && profileComplete;
+/** loaStage → 표시 라벨 + 뱃지 색상. */
+const STAGE_META: Record<LoaStage, { label: string; variant: BadgeVariant }> = {
+  NOT_STARTED: { label: 'Not started', variant: 'gray' },
+  FORM_SENT: { label: 'Form sent to applicant', variant: 'info' },
+  APPLICANT_UPLOADED: { label: 'Applicant signed copy uploaded', variant: 'warning' },
+  FINAL_UPLOADED: { label: 'Final LoA uploaded', variant: 'success' },
+};
 
-  // LOA 업로드용 파일 상태 (RENEWAL)
+const FILE_TYPE_LABEL: Record<LoaFileType, string> = {
+  OWNER_AUTH_LETTER: 'Owner-signed copy (Owner Auth Letter)',
+  LOA_FINAL: 'Final LoA (LEW)',
+};
+
+/**
+ * Admin LoA 교환-모델 패널 (Part B).
+ *
+ * <p>레거시 generate/sign 모델 대신 교환 모델의 진행 상태를 보여주고,
+ * ADMIN/SYSTEM_ADMIN 이 사유를 남기며 LoA 파일을 등록/교체한다.
+ * 기존 파일은 서버에서 보관(삭제 안 함)되며 사유는 감사 로그에 기록된다.</p>
+ */
+export function AdminLoaSection({ application, loaStatus, onDownload, onReplaced }: Props) {
+  const toast = useToastStore();
+
+  const stage: LoaStage = loaStatus?.loaStage ?? 'NOT_STARTED';
+  const stageMeta = STAGE_META[stage];
+
+  // ── 등록/교체 폼 상태 ──
+  const [fileType, setFileType] = useState<LoaFileType>('OWNER_AUTH_LETTER');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const reasonMissing = reason.trim().length === 0;
+  const canSubmit = !!selectedFile && !reasonMissing && !submitting;
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        // 10MB 제한
-        return;
-      }
-      setSelectedFile(file);
+    const file = e.target.files?.[0] ?? null;
+    if (file && file.size > 20 * 1024 * 1024) {
+      toast.error('File exceeds the 20MB limit.');
+      e.target.value = '';
+      return;
     }
+    setSelectedFile(file);
     e.target.value = '';
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-    await onUploadLoa(selectedFile);
-    setSelectedFile(null);
-  };
-
-  const handleReplaceLoa = () => {
-    fileInputRef.current?.click();
+  const handleSubmit = async () => {
+    if (!selectedFile || reasonMissing) return;
+    setSubmitting(true);
+    try {
+      await loaApi.adminReplaceLoa(application.applicationSeq, fileType, selectedFile, reason.trim());
+      toast.success('LoA file uploaded. Previous file retained and the reason recorded.');
+      setSelectedFile(null);
+      setReason('');
+      await onReplaced();
+    } catch {
+      toast.error('Failed to upload the LoA file.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment (LOA)</h2>
-        {loaStatus?.loaGenerated && (
-          <Badge variant="gray">Ready</Badge>
+        <h2 className="text-lg font-semibold text-gray-800">Letter of Appointment (LoA)</h2>
+        <Badge variant={stageMeta.variant}>{stageMeta.label}</Badge>
+      </div>
+
+      {/* ── 진행 상태 / 파일 ── */}
+      <div className="space-y-2.5">
+        {/* 신청자 서명본 */}
+        <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-800">Owner-signed copy</p>
+            <p className="text-xs text-gray-500">
+              {loaStatus?.applicantFileSeq ? 'Uploaded' : 'Not uploaded'}
+            </p>
+          </div>
+          {loaStatus?.applicantFileSeq ? (
+            <button
+              onClick={() => onDownload(
+                loaStatus.applicantFileSeq!,
+                `LOA_owner_${application.applicationSeq}.pdf`,
+              )}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex-shrink-0"
+            >
+              Download
+            </button>
+          ) : (
+            <span className="text-xs text-gray-400 flex-shrink-0">—</span>
+          )}
+        </div>
+
+        {/* LEW 최종본 */}
+        <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-800">Final LoA (LEW)</p>
+            <p className="text-xs text-gray-500">
+              {loaStatus?.finalFileSeq ? 'Uploaded' : 'Not uploaded'}
+            </p>
+          </div>
+          {loaStatus?.finalFileSeq ? (
+            <button
+              onClick={() => onDownload(
+                loaStatus.finalFileSeq!,
+                `LOA_final_${application.applicationSeq}.pdf`,
+              )}
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium flex-shrink-0"
+            >
+              Download
+            </button>
+          ) : (
+            <span className="text-xs text-gray-400 flex-shrink-0">—</span>
+          )}
+        </div>
+
+        {/* active 폼 라벨 (NEW 전용) */}
+        {loaStatus?.activeFormAvailable && loaStatus.activeFormLabel && (
+          <p className="text-xs text-gray-500 px-1">
+            Active LoA form: <span className="font-medium text-gray-700">{loaStatus.activeFormLabel}</span>
+          </p>
         )}
       </div>
 
-      {/* ── NEW 타입: 기존 Generate 워크플로우 ── */}
-      {!isRenewal && (
-        <>
-          {/* LEW 미할당 경고 */}
-          {!lewAssigned && (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <div className="flex items-start gap-2">
-                <span className="text-sm">ℹ️</span>
-                <div>
-                  <p className="text-sm font-medium text-gray-700">LEW Assignment Required</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    A LEW must be assigned to this application before generating the LOA.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 프로필 미완성 경고 — CORPORATE 전용 */}
-          {lewAssigned && !profileComplete && (
-            <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
-              <div className="flex items-start gap-2">
-                <span className="text-sm">⚠️</span>
-                <div>
-                  <p className="text-sm font-medium text-warning-800">Corporate Applicant Profile Incomplete</p>
-                  <p className="text-xs text-warning-700 mt-0.5">
-                    Missing: {missingCorporateFields.join(', ')}.
-                    Ask the applicant to update their profile before generating LOA.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* LOA 생성 가능 — 아직 미생성 */}
-          {canGenerate && !loaStatus?.loaGenerated && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Generate the LOA document with applicant and LEW details.
-              </p>
-              <button
-                onClick={onGenerate}
-                disabled={generating}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {generating ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Generating...
-                  </>
-                ) : (
-                  <>📄 Generate LOA</>
-                )}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ── RENEWAL 타입: 업로드 워크플로우 ── */}
-      {isRenewal && !loaStatus?.loaGenerated && (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-600">
-            For renewal applications, upload the LOA document received from the relevant authority.
+      {/* ── admin 등록/교체 폼 ── */}
+      <div className="mt-5 pt-5 border-t border-gray-100 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">Register / replace LoA file</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            The existing file is retained and the reason is recorded for audit.
           </p>
+        </div>
 
-          {/* 파일 선택 영역 */}
+        {/* 파일 타입 선택 */}
+        <div>
+          <label htmlFor="loa-file-type" className="block text-sm font-medium text-gray-700 mb-1.5">
+            File type
+          </label>
+          <select
+            id="loa-file-type"
+            value={fileType}
+            onChange={(e) => setFileType(e.target.value as LoaFileType)}
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            <option value="OWNER_AUTH_LETTER">{FILE_TYPE_LABEL.OWNER_AUTH_LETTER}</option>
+            <option value="LOA_FINAL">{FILE_TYPE_LABEL.LOA_FINAL}</option>
+          </select>
+        </div>
+
+        {/* 파일 선택 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">File</label>
           {selectedFile ? (
             <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
               <div className="flex items-center gap-2 min-w-0">
                 <span className="text-lg">📄</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-700 truncate">{selectedFile.name}</p>
-                  <p className="text-xs text-gray-400">
-                    {selectedFile.size < 1024 * 1024
-                      ? `${(selectedFile.size / 1024).toFixed(1)} KB`
-                      : `${(selectedFile.size / (1024 * 1024)).toFixed(1)} MB`}
-                  </p>
-                </div>
+                <span className="text-sm text-gray-700 truncate">{selectedFile.name}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedFile(null)}
-                className="text-gray-400 hover:text-red-500 transition-colors p-1"
+                className="text-gray-400 hover:text-red-500 transition-colors p-1 flex-shrink-0"
                 aria-label="Remove selected file"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -170,8 +194,9 @@ export function AdminLoaSection({
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span className="text-sm text-gray-600">Choose LOA file</span>
+              <span className="text-sm text-gray-600">Choose file (PDF / JPG / PNG, ≤20MB)</span>
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png"
                 className="hidden"
@@ -179,114 +204,29 @@ export function AdminLoaSection({
               />
             </label>
           )}
-
-          {/* 업로드 버튼 */}
-          {selectedFile && (
-            <button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {uploading ? (
-                <>
-                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Uploading...
-                </>
-              ) : (
-                <>📤 Upload LOA</>
-              )}
-            </button>
-          )}
         </div>
-      )}
 
-      {/* ── 공통: LOA 생성/업로드 완료 ── */}
-      {loaStatus?.loaGenerated && (
-        <div className="space-y-3">
-          {/* 다운로드 */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3 border border-gray-100">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">📄</span>
-              <div>
-                <p className="text-sm font-medium text-gray-800">
-                  LOA_{application.applicationSeq}.pdf
-                </p>
-                <p className="text-xs text-gray-500">LOA document ready</p>
-              </div>
-            </div>
-            <button
-              onClick={() => loaStatus.loaFileSeq && onDownload(
-                loaStatus.loaFileSeq,
-                `LOA_${application.applicationSeq}.pdf`
-              )}
-              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-            >
-              Download
-            </button>
-          </div>
+        {/* 사유 (필수) */}
+        <Textarea
+          label="Reason"
+          required
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="Why is this file being registered or replaced? (recorded for audit)"
+          error={selectedFile && reasonMissing ? 'A reason is required.' : undefined}
+          className="min-h-[80px]"
+        />
 
-          {/* 재생성/재업로드 */}
-          {(
-            isRenewal ? (
-              // RENEWAL: Replace LOA (재업로드)
-              <div className="space-y-2">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
-                {selectedFile ? (
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 flex-1 min-w-0 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                      <span className="text-sm">📄</span>
-                      <span className="text-sm text-gray-700 truncate">{selectedFile.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedFile(null)}
-                        className="text-gray-400 hover:text-red-500 ml-auto flex-shrink-0"
-                        aria-label="Remove selected file"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    <button
-                      onClick={handleUpload}
-                      disabled={uploading}
-                      className="inline-flex items-center gap-1 px-3 py-2 text-xs font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50"
-                    >
-                      {uploading ? 'Uploading...' : '📤 Upload'}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleReplaceLoa}
-                    disabled={uploading}
-                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                  >
-                    🔄 Replace LOA
-                  </button>
-                )}
-              </div>
-            ) : (
-              // NEW: Regenerate LOA
-              <button
-                onClick={onGenerate}
-                disabled={generating}
-                className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50"
-              >
-                🔄 Regenerate LOA
-              </button>
-            )
-          )}
-        </div>
-      )}
+        <Button
+          variant="primary"
+          size="md"
+          loading={submitting}
+          disabled={!canSubmit}
+          onClick={handleSubmit}
+        >
+          Upload (replace)
+        </Button>
+      </div>
     </Card>
   );
 }

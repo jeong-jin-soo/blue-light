@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isValidPaynow, type PaynowType } from '../../constants/paynow';
+import { LEW_GRADES } from '../../constants/lewGrade';
+import { PaynowField } from '../../components/domain/PaynowField';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
@@ -22,6 +25,8 @@ interface SignupForm {
   role: string;
   lewLicenceNo: string;
   lewGrade: string;
+  paynowType: PaynowType;
+  paynowValue: string;
   pdpaConsent: boolean;
 }
 
@@ -34,6 +39,8 @@ const INITIAL_FORM: SignupForm = {
   role: 'APPLICANT',
   lewLicenceNo: '',
   lewGrade: '',
+  paynowType: 'MOBILE',
+  paynowValue: '',
   pdpaConsent: false,
 };
 
@@ -117,6 +124,15 @@ export default function SignupPage() {
       return;
     }
 
+    if (form.role === 'LEW' && !isValidPaynow(form.paynowType, form.paynowValue)) {
+      setLocalError(
+        form.paynowType === 'MOBILE'
+          ? 'Enter a valid 8-digit Singapore mobile number for PayNow (starting with 8 or 9).'
+          : 'Enter a valid 10-character company UEN for PayNow.'
+      );
+      return;
+    }
+
     if (!form.pdpaConsent) {
       setLocalError('You must agree to the Privacy Policy to continue');
       return;
@@ -131,6 +147,8 @@ export default function SignupPage() {
         role: form.role,
         lewLicenceNo: form.role === 'LEW' ? form.lewLicenceNo.trim() : undefined,
         lewGrade: form.role === 'LEW' ? form.lewGrade : undefined,
+        paynowType: form.role === 'LEW' ? form.paynowType : undefined,
+        paynowValue: form.role === 'LEW' ? form.paynowValue.trim() : undefined,
         pdpaConsent: form.pdpaConsent,
       });
     } catch {
@@ -229,11 +247,7 @@ export default function SignupPage() {
                 LEW Grade<span className="text-error-500 ml-0.5">*</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
-                  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
-                  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
-                ].map((g) => (
+                {LEW_GRADES.map((g) => (
                   <button
                     key={g.value}
                     type="button"
@@ -251,6 +265,14 @@ export default function SignupPage() {
               </div>
               <p className="text-xs text-gray-500 mt-1">Select the grade on your EMA licence</p>
             </div>
+            <PaynowField
+              type={form.paynowType}
+              value={form.paynowValue}
+              onTypeChange={(t) => updateField('paynowType', t)}
+              onValueChange={(v) => updateField('paynowValue', v)}
+              required
+              hint="The account where you receive payments from the platform"
+            />
           </div>
         )}
 

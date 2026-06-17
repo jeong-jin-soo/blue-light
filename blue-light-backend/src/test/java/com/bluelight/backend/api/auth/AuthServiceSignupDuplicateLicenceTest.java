@@ -9,6 +9,7 @@ import com.bluelight.backend.domain.setting.SystemSettingRepository;
 import com.bluelight.backend.domain.user.PasswordResetTokenRepository;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserConsentLogRepository;
+import com.bluelight.backend.domain.user.LewPaynowChangeLogRepository;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.security.JwtTokenProvider;
 import org.junit.jupiter.api.DisplayName;
@@ -40,7 +41,8 @@ class AuthServiceSignupDuplicateLicenceTest {
             mock(PasswordResetTokenRepository.class),
             mock(EmailService.class),
             mock(AuditLogService.class),
-            mock(UserConsentLogRepository.class));
+            mock(UserConsentLogRepository.class),
+            mock(LewPaynowChangeLogRepository.class));
     }
 
     private SignupRequest lewSignup(String email, String licenceNo) {
@@ -53,6 +55,8 @@ class AuthServiceSignupDuplicateLicenceTest {
         ReflectionTestUtils.setField(req, "role", "LEW");
         ReflectionTestUtils.setField(req, "lewLicenceNo", licenceNo);
         ReflectionTestUtils.setField(req, "lewGrade", "GRADE_8");
+        ReflectionTestUtils.setField(req, "paynowType", "MOBILE");
+        ReflectionTestUtils.setField(req, "paynowValue", "97771983");
         return req;
     }
 

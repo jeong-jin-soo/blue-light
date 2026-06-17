@@ -165,6 +165,10 @@ public class DatabaseMigrationRunner {
             //   기능 도입 전 생성돼 callout_fee 가 NULL 인 결제 전 NEW 신청에 tier 출장비를 채우고
             //   quote_amount 에 가산. callout_fee IS NULL 가드로 멱등(1회만 적용).
             backfillCalloutFeeForPrePaymentApplications(conn);
+            // ── 문서 카탈로그 LOA/SP_ACCOUNT 업로드 형식에 JPG/PNG 허용 ──
+            //   document_type_catalog 는 data.sql(never 모드)로만 시드되어 dev/prod 기존 행이
+            //   옛 PDF-전용으로 남을 수 있다. accepted_mime 를 멱등 갱신해 JPEG/PNG 를 연다.
+            migrateDocumentCatalogAcceptedMime(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -341,6 +345,12 @@ public class DatabaseMigrationRunner {
         addColumnIfMissing(conn, "users", "whatsapp_opt_in_at",  "ALTER TABLE users ADD COLUMN whatsapp_opt_in_at DATETIME(6) NULL");
         addColumnIfMissing(conn, "users", "whatsapp_opt_out_at", "ALTER TABLE users ADD COLUMN whatsapp_opt_out_at DATETIME(6) NULL");
         addColumnIfMissing(conn, "users", "preferred_language",  "ALTER TABLE users ADD COLUMN preferred_language VARCHAR(10) NOT NULL DEFAULT 'en'");
+        // users — LEW 본인 PayNow 수취 계정 (LEW 초대/가입 + PayNow 수집). nullable, 비-LEW/기존 row backfill 안전.
+        addColumnIfMissing(conn, "users", "paynow_type",         "ALTER TABLE users ADD COLUMN paynow_type VARCHAR(20) NULL");
+        addColumnIfMissing(conn, "users", "paynow_value",        "ALTER TABLE users ADD COLUMN paynow_value VARCHAR(20) NULL");
+        // account_setup_tokens — 입력 검증 오류(면허/등급/PayNow) 전용 카운터(10회 잠금). 기존 토큰 backfill 0.
+        addColumnIfMissing(conn, "account_setup_tokens", "input_validation_failures",
+            "ALTER TABLE account_setup_tokens ADD COLUMN input_validation_failures INT NOT NULL DEFAULT 0");
         // applications — snapshot-at-submit + kVA 사후변경 + applicant_type + 낙관락 version
         addColumnIfMissing(conn, "applications", "applicant_name_snapshot", "ALTER TABLE applications ADD COLUMN applicant_name_snapshot VARCHAR(100) NULL");
         addColumnIfMissing(conn, "applications", "company_name_snapshot",   "ALTER TABLE applications ADD COLUMN company_name_snapshot VARCHAR(100) NULL");
@@ -640,6 +650,36 @@ public class DatabaseMigrationRunner {
             );
             if (updated > 0) {
                 log.info("Backfill [callout-fee-prepayment]: {} application(s) updated", updated);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: document_type_catalog 의 LOA/SP_ACCOUNT 업로드 형식에 JPG/PNG 허용.
+     * <p>카탈로그는 data.sql(SQL_INIT_MODE=never)로만 시드되어 dev/prod 기존 행이 옛 PDF-전용으로
+     * 남을 수 있다. accepted_mime 를 'application/pdf,image/jpeg,image/png' 로 멱등 갱신한다
+     * (이미 목표값이면 0건 업데이트 → 멱등).</p>
+     */
+    private void migrateDocumentCatalogAcceptedMime(Connection conn) throws SQLException {
+        if (!tableExists(conn, "document_type_catalog")) return;
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE document_type_catalog " +
+                "SET accepted_mime = 'application/pdf,image/jpeg,image/png', updated_at = NOW() " +
+                "WHERE code IN ('LOA','SP_ACCOUNT') " +
+                "  AND accepted_mime <> 'application/pdf,image/jpeg,image/png'"
+            );
+            if (updated > 0) {
+                log.info("Migration [doc-catalog-mime]: {} row(s) updated (LOA/SP_ACCOUNT → +JPG/PNG)", updated);
+            }
+            // SP_ACCOUNT 라벨이 옛 "...PDF" 면 갱신 (JPG/PNG 도 허용하므로 PDF 한정 표현 제거).
+            int relabeled = stmt.executeUpdate(
+                "UPDATE document_type_catalog " +
+                "SET label_en = 'SP Account Holder Document', label_ko = 'SP Account Holder Document', updated_at = NOW() " +
+                "WHERE code = 'SP_ACCOUNT' AND (label_en = 'SP Account Holder PDF' OR label_ko = 'SP Account Holder PDF')"
+            );
+            if (relabeled > 0) {
+                log.info("Migration [doc-catalog-mime]: SP_ACCOUNT label updated (PDF → Document)");
             }
         }
     }

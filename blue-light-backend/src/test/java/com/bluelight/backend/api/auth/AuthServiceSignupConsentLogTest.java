@@ -15,6 +15,7 @@ import com.bluelight.backend.domain.user.TermsVersion;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserConsentLog;
 import com.bluelight.backend.domain.user.UserConsentLogRepository;
+import com.bluelight.backend.domain.user.LewPaynowChangeLogRepository;
 import com.bluelight.backend.domain.user.UserRepository;
 import com.bluelight.backend.security.JwtTokenProvider;
 import jakarta.servlet.http.HttpServletRequest;
@@ -75,7 +76,8 @@ class AuthServiceSignupConsentLogTest {
         authService = new AuthService(
                 userRepository, passwordEncoder, jwtTokenProvider,
                 systemSettingRepository, passwordResetTokenRepository,
-                emailService, auditLogService, consentLogRepository);
+                emailService, auditLogService, consentLogRepository,
+                mock(LewPaynowChangeLogRepository.class));
 
         when(passwordEncoder.encode(anyString())).thenReturn("hash");
         when(jwtTokenProvider.createToken(anyLong(), anyString(), anyString(), anyBoolean(), anyBoolean()))

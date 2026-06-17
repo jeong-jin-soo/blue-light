@@ -3,7 +3,10 @@ package com.bluelight.backend.api.auth;
 import com.bluelight.backend.api.auth.dto.AccountSetupCompleteRequest;
 import com.bluelight.backend.api.auth.dto.AccountSetupStatusResponse;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
+import com.bluelight.backend.security.JwtTokenProvider;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AccountSetupController {
 
     private final AccountSetupService accountSetupService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     /**
      * 토큰 상태 조회 (Setup 페이지 진입 직전).
@@ -51,7 +55,23 @@ public class AccountSetupController {
     public ResponseEntity<TokenResponse> complete(
         @PathVariable("token") String token,
         @Valid @RequestBody AccountSetupCompleteRequest request,
-        HttpServletRequest httpRequest) {
-        return ResponseEntity.ok(accountSetupService.complete(token, request, httpRequest));
+        HttpServletRequest httpRequest,
+        HttpServletResponse httpResponse) {
+        TokenResponse response = accountSetupService.complete(token, request, httpRequest);
+        // 자동 로그인: 로그인과 동일하게 httpOnly 쿠키를 설정해야 셋업 직후 인증 API 가 동작한다.
+        // (앱은 bluelight_token 쿠키 기반 인증 — 미설정 시 모든 인증요청이 익명→403)
+        addJwtCookie(httpResponse, response.getAccessToken());
+        return ResponseEntity.ok(response);
+    }
+
+    /** JWT 를 httpOnly 쿠키로 설정 (AuthController.addJwtCookie 와 동일 정책). */
+    private void addJwtCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie("bluelight_token", token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(false); // 개발환경: false, 운영환경: true (login 과 동일)
+        cookie.setPath("/");
+        cookie.setMaxAge(jwtTokenProvider.getExpirationInSeconds().intValue());
+        cookie.setAttribute("SameSite", "Lax");
+        response.addCookie(cookie);
     }
 }

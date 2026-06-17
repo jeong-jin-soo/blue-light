@@ -2,28 +2,19 @@ package com.bluelight.backend.api.loa;
 
 import com.bluelight.backend.api.admin.LoaFormTemplateService;
 import com.bluelight.backend.api.audit.AuditLogService;
-import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.api.file.FileStorageService;
-import com.bluelight.backend.api.file.dto.FileResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.common.util.MimeTypeValidator;
 import com.bluelight.backend.common.util.OwnershipValidator;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationType;
-import com.bluelight.backend.domain.application.LoaSignatureSource;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
-import com.bluelight.backend.domain.concierge.ConciergeRequest;
-import com.bluelight.backend.domain.concierge.ConciergeRequestRepository;
-import com.bluelight.backend.domain.concierge.ConciergeRequestStatus;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
 import com.bluelight.backend.domain.user.User;
-import com.bluelight.backend.domain.user.UserRepository;
-import com.bluelight.backend.domain.user.UserRole;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.bluelight.backend.api.notification.orchestrator.NotificationDispatchEvent;
@@ -33,16 +24,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * LOA 비즈니스 로직 오케스트레이션 서비스
- * - PDF 생성, 서명, 상태 조회
+ * - 교환(exchange) 모델: send-form / applicant-upload / final-upload + 상태 조회
  * - FileStorageService를 통해 파일 저장 (Local/S3 무관)
+ * <p>레거시 generate/sign/upload-signature 모델은 제거됨.</p>
  */
 @Slf4j
 @Service
@@ -52,291 +43,12 @@ public class LoaService {
 
     private final ApplicationRepository applicationRepository;
     private final FileRepository fileRepository;
-    private final LoaGenerationService loaGenerationService;
     private final FileStorageService fileStorageService;
     private final AuditLogService auditLogService;
-    // ★ Kaki Concierge v1.5 Phase 1 PR#6 Stage A
-    private final UserRepository userRepository;
-    private final ConciergeRequestRepository conciergeRequestRepository;
-    private final EmailService emailService;
-    // PR-W3a: 알림 오케스트레이터 경로(A-36 등) — 레거시 EmailService 직접발송 대체.
+    // 알림 오케스트레이터 경로(A-57 LoA form sent 등) — 레거시 직접발송 대체.
     private final ApplicationEventPublisher eventPublisher;
     // 교환 모델 (PR3b) — active LoA 폼 소비 (설정 우선 원칙).
     private final LoaFormTemplateService loaFormTemplateService;
-
-    /**
-     * LOA PDF 생성 (Admin/LEW 액션)
-     * - 기존 미서명 LOA가 있으면 삭제 후 재생성
-     */
-    @Transactional
-    public FileResponse generateLoa(Long applicationSeq) {
-        Application application = findApplicationOrThrow(applicationSeq);
-
-        // RENEWAL 타입은 LOA 자동 생성 불가 — 신청자가 관계기관에서 받아 업로드
-        if (application.getApplicationType() == ApplicationType.RENEWAL) {
-            throw new BusinessException(
-                    "LOA cannot be auto-generated for renewal applications. Please upload the LOA document.",
-                    HttpStatus.BAD_REQUEST, "LOA_RENEWAL_UPLOAD_REQUIRED");
-        }
-
-        // 이미 서명된 LOA가 있으면 재생성 불가
-        if (application.getLoaSignatureUrl() != null) {
-            throw new BusinessException("LOA has already been signed. Cannot regenerate.",
-                    HttpStatus.BAD_REQUEST, "LOA_ALREADY_SIGNED");
-        }
-
-        // 기존 미서명 LOA 삭제 (재생성 케이스)
-        List<FileEntity> existingLoas = fileRepository
-                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
-        existingLoas.forEach(f -> fileRepository.delete(f));
-
-        // 타입에 따라 PDF 생성 (LoaGenerationService가 FileStorageService로 저장)
-        String pdfStoredPath;
-        if (application.getApplicationType() == ApplicationType.RENEWAL) {
-            pdfStoredPath = loaGenerationService.generateRenewalLoa(application);
-        } else {
-            pdfStoredPath = loaGenerationService.generateNewLicenceLoa(application);
-        }
-
-        // Phase 2 PR#4 (B-5) — LOA 생성 시점의 신청자 신원 스냅샷 기록 (법적 무결성)
-        // @Column(updatable=false) + 엔티티 가드로 한 번만 기록됨.
-        User applicant = application.getUser();
-        boolean snapshotRecorded = application.recordLoaSnapshot(
-                applicant.getFullName(),
-                applicant.getCompanyName(),
-                applicant.getUen(),
-                applicant.getDesignation()
-        );
-        if (snapshotRecorded) {
-            Map<String, Object> after = new LinkedHashMap<>();
-            after.put("applicantNameSnapshot", applicant.getFullName());
-            after.put("companyNameSnapshot", applicant.getCompanyName());
-            after.put("uenSnapshot", applicant.getUen());
-            after.put("designationSnapshot", applicant.getDesignation());
-            auditLogService.logAsync(
-                    applicant.getUserSeq(),
-                    AuditAction.LOA_SNAPSHOT_CREATED,
-                    AuditCategory.DATA_PROTECTION,
-                    "Application", String.valueOf(applicationSeq),
-                    "LOA applicant identity snapshot captured at generation time (immutable)",
-                    null, after,
-                    null, null, "POST", "/api/admin/applications/" + applicationSeq + "/loa/generate", 201
-            );
-        }
-
-        // 파일 크기: FileStorageService에서 로드하여 확인
-        long fileSize = getFileSize(pdfStoredPath);
-
-        // FileEntity 레코드 생성
-        FileEntity fileEntity = FileEntity.builder()
-                .application(application)
-                .fileType(FileType.OWNER_AUTH_LETTER)
-                .fileUrl(pdfStoredPath)
-                .originalFilename("LOA_" + applicationSeq + ".pdf")
-                .fileSize(fileSize)
-                .build();
-
-        FileEntity saved = fileRepository.save(fileEntity);
-        log.info("LOA generated: applicationSeq={}, fileSeq={}", applicationSeq, saved.getFileSeq());
-
-        return FileResponse.from(saved);
-    }
-
-    /**
-     * LOA 전자서명 (Applicant 액션)
-     * - 서명 이미지 저장 → PDF에 임베드 → FileEntity 업데이트
-     */
-    @Transactional
-    public FileResponse signLoa(Long userSeq, Long applicationSeq, MultipartFile signatureImage) {
-        Application application = findApplicationOrThrow(applicationSeq);
-
-        // 소유권 검증
-        if (!application.getUser().getUserSeq().equals(userSeq)) {
-            throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
-        }
-
-        // 이미 서명된 경우
-        if (application.getLoaSignatureUrl() != null) {
-            throw new BusinessException("LOA has already been signed",
-                    HttpStatus.BAD_REQUEST, "LOA_ALREADY_SIGNED");
-        }
-
-        // LOA PDF 존재 확인
-        List<FileEntity> loaFiles = fileRepository
-                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
-
-        if (loaFiles.isEmpty()) {
-            throw new BusinessException("LOA has not been generated yet",
-                    HttpStatus.BAD_REQUEST, "LOA_NOT_FOUND");
-        }
-
-        FileEntity loaFile = loaFiles.get(loaFiles.size() - 1); // 최신 LOA
-
-        // 서명 이미지를 FileStorageService로 저장
-        String subDirectory = "applications/" + applicationSeq;
-        String signatureRelativePath = fileStorageService.store(signatureImage, subDirectory);
-
-        // PDF에 서명 임베드 (LoaGenerationService가 FileStorageService를 통해 로드/저장)
-        String signedPdfPath = loaGenerationService.embedSignatureIntoPdf(
-                loaFile.getFileUrl(), signatureRelativePath, application);
-
-        // FileEntity 업데이트 (서명된 PDF로 교체)
-        long fileSize = getFileSize(signedPdfPath);
-        loaFile.updateFileUrl(signedPdfPath, "LOA_SIGNED_" + applicationSeq + ".pdf", fileSize);
-
-        // Application에 서명 정보 등록
-        application.registerLoaSignature(signatureRelativePath);
-
-        log.info("LOA signed: applicationSeq={}, signatureUrl={}", applicationSeq, signatureRelativePath);
-
-        return FileResponse.from(loaFile);
-    }
-
-    /**
-     * Manager 대리 서명 업로드 (★ Kaki Concierge v1.5 Phase 1 PR#6 Stage A).
-     * <p>
-     * 경로 A — Concierge Manager가 신청자에게서 직접 받은 서명 파일을 대신 업로드.
-     * PRD v1.5 §7.2.1-LOA 3경로 모델 중 MANAGER_UPLOAD 경로.
-     * <ul>
-     *   <li>권한: CONCIERGE_MANAGER (본인 담당) / ADMIN / SYSTEM_ADMIN</li>
-     *   <li>CONCIERGE_MANAGER는 {@code viaConciergeRequestSeq}가 있는 신청서만 업로드 가능,
-     *       해당 ConciergeRequest의 assignedManager와 일치해야 함</li>
-     *   <li>ADMIN/SYSTEM_ADMIN은 viaConcierge 무관하게 업로드 가능 (운영상 우회)</li>
-     *   <li>LEW는 URL 매처 단계에서 차단됨 (Controller에 {@code @PreAuthorize} 명시, AC-15b)</li>
-     * </ul>
-     * 후속 동작:
-     * - {@code Application.recordLoaSignatureSource(MANAGER_UPLOAD, ...)} + uploadedBy 세팅 (PR#1 Stage 3)
-     * - 연결된 ConciergeRequest가 AWAITING_APPLICANT_LOA_SIGN 상태면 자동 전이 {@code markLoaSigned()}
-     * - 감사 로그 {@code LOA_SIGNATURE_UPLOADED_BY_MANAGER}
-     * - afterCommit 훅으로 N5-UploadConfirm 이메일 발송 (7일 이의 제기 창구, AC-22b / O-15)
-     * <p>
-     * Phase 2 EXIF 제거(ImageSanitizer)는 현재 범위 외 — 업로드 이미지의 메타데이터 제거는 별도 PR.
-     */
-    @Transactional
-    public FileResponse uploadSignatureByManager(
-            Long managerSeq, Long applicationSeq, MultipartFile signatureImage,
-            String memo, HttpServletRequest httpRequest) {
-
-        // 1. 파일 검증 — PNG/JPEG 최대 2MB (매직바이트 + MIME)
-        MimeTypeValidator.validate(signatureImage, "image/png,image/jpeg");
-        MimeTypeValidator.validateSize(signatureImage, 2);
-
-        // 2. Manager 조회 + 역할 검증
-        User manager = userRepository.findById(managerSeq)
-                .orElseThrow(() -> new BusinessException(
-                        "Manager not found", HttpStatus.UNAUTHORIZED, "UNAUTHORIZED"));
-        UserRole role = manager.getRole();
-        if (role != UserRole.CONCIERGE_MANAGER
-                && role != UserRole.ADMIN
-                && role != UserRole.SYSTEM_ADMIN) {
-            throw new BusinessException(
-                    "Only Concierge Managers or administrators can upload LOA signatures.",
-                    HttpStatus.FORBIDDEN, "FORBIDDEN");
-        }
-
-        Application application = findApplicationOrThrow(applicationSeq);
-
-        // 3. CONCIERGE_MANAGER 경로별 본인 담당 검증
-        ConciergeRequest linkedCr = null;
-        if (role == UserRole.CONCIERGE_MANAGER) {
-            Long viaSeq = application.getViaConciergeRequestSeq();
-            if (viaSeq == null) {
-                throw new BusinessException(
-                        "This application was not created via concierge service.",
-                        HttpStatus.FORBIDDEN, "NOT_VIA_CONCIERGE");
-            }
-            linkedCr = conciergeRequestRepository.findById(viaSeq)
-                    .orElseThrow(() -> new BusinessException(
-                            "Concierge request not found",
-                            HttpStatus.NOT_FOUND, "NOT_FOUND"));
-            if (linkedCr.getAssignedManager() == null
-                    || !linkedCr.getAssignedManager().getUserSeq().equals(managerSeq)) {
-                throw new BusinessException(
-                        "This concierge request is not assigned to you.",
-                        HttpStatus.FORBIDDEN, "CONCIERGE_NOT_ASSIGNED");
-            }
-        } else if (application.getViaConciergeRequestSeq() != null) {
-            // ADMIN/SYSTEM_ADMIN도 전이용으로 ConciergeRequest를 로드 (afterCommit + markLoaSigned)
-            linkedCr = conciergeRequestRepository.findById(application.getViaConciergeRequestSeq())
-                    .orElse(null);
-        }
-
-        // 4. 이미 서명된 경우 차단
-        if (application.getLoaSignatureUrl() != null) {
-            throw new BusinessException("LOA has already been signed",
-                    HttpStatus.BAD_REQUEST, "LOA_ALREADY_SIGNED");
-        }
-
-        // 5. LOA PDF 존재 확인
-        List<FileEntity> loaFiles = fileRepository
-                .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.OWNER_AUTH_LETTER);
-        if (loaFiles.isEmpty()) {
-            throw new BusinessException("LOA has not been generated yet",
-                    HttpStatus.BAD_REQUEST, "LOA_NOT_FOUND");
-        }
-        FileEntity loaFile = loaFiles.get(loaFiles.size() - 1);
-
-        // 6. 서명 이미지 저장 + PDF 임베드 (기존 signLoa와 동일)
-        String subDirectory = "applications/" + applicationSeq;
-        String signatureRelativePath = fileStorageService.store(signatureImage, subDirectory);
-        String signedPdfPath = loaGenerationService.embedSignatureIntoPdf(
-                loaFile.getFileUrl(), signatureRelativePath, application);
-
-        long fileSize = getFileSize(signedPdfPath);
-        loaFile.updateFileUrl(signedPdfPath, "LOA_SIGNED_" + applicationSeq + ".pdf", fileSize);
-
-        // 7. Application — 서명 등록 + 출처 기록 (PR#1 Stage 3 도메인 메서드 재사용)
-        application.registerLoaSignature(signatureRelativePath);
-        application.recordLoaSignatureSource(LoaSignatureSource.MANAGER_UPLOAD, managerSeq, memo);
-        application.setLoaSignatureUploadedBy(manager);
-
-        // 8. ConciergeRequest 자동 전이 — APPLICATION_CREATED 단계라면 LOA 서명 요청 단계를
-        //    먼저 거쳐 AWAITING_APPLICANT_LOA_SIGN을 채운 뒤 곧바로 markLoaSigned로 진행.
-        //    Manager가 수동으로 "Request LOA signing" 버튼을 누르지 않고 바로 업로드하는 경우 대비.
-        if (linkedCr != null) {
-            if (linkedCr.getStatus() == ConciergeRequestStatus.APPLICATION_CREATED) {
-                linkedCr.requestLoaSign();
-            }
-            if (linkedCr.getStatus() == ConciergeRequestStatus.AWAITING_APPLICANT_LOA_SIGN) {
-                linkedCr.markLoaSigned();
-            }
-        }
-
-        // 9. 감사 로그
-        auditLogService.log(
-                manager.getUserSeq(), manager.getEmail(), manager.getRole().name(),
-                AuditAction.LOA_SIGNATURE_UPLOADED_BY_MANAGER, AuditCategory.APPLICATION,
-                "application", applicationSeq.toString(),
-                "Manager uploaded LOA signature on behalf of applicant "
-                        + application.getUser().getUserSeq()
-                        + (memo != null && !memo.isBlank() ? " (memo: " + memo + ")" : ""),
-                null, null,
-                extractIp(httpRequest), userAgent(httpRequest),
-                "POST", "/api/admin/applications/{id}/loa/upload-signature", 201);
-
-        // 10. A-36 (CONCIERGE_LOA_UPLOAD_CONFIRM) — 오케스트레이터 경로.
-        //     orchestrator 의 @TransactionalEventListener(AFTER_COMMIT) 가 커밋 후 발송을 보장하므로
-        //     수동 TransactionSynchronization 불필요. 채널(현재 EMAIL)·locale·옵트인은 orchestrator 결정.
-        Map<String, String> a36 = new LinkedHashMap<>();
-        a36.put("applicantName", application.getUser().getFullName());
-        a36.put("managerName", manager.getFullName());
-        a36.put("publicCode", linkedCr != null ? linkedCr.getPublicCode() : "APP-" + applicationSeq);
-        if (memo != null && !memo.isBlank()) {
-            a36.put("managerNote", memo);
-        }
-        a36.put("objectionDeadline",
-                LocalDateTime.now().plusDays(7).format(DateTimeFormatter.ofPattern("dd MMM yyyy")));
-        eventPublisher.publishEvent(new NotificationDispatchEvent(
-                "CONCIERGE_LOA_UPLOAD_CONFIRM",
-                application.getUser().getUserSeq(),
-                "APPLICATION", applicationSeq,
-                "A-36", a36));
-
-        log.info("LOA signature uploaded by manager: applicationSeq={}, managerSeq={}, role={}",
-                applicationSeq, managerSeq, role);
-
-        return FileResponse.from(loaFile);
-    }
 
     // ══════════════════════════════════════════════════════════════════
     //  교환 모델 (loa-exchange-redesign-spec.md §3.3, PR3b)
@@ -525,15 +237,77 @@ public class LoaService {
         }
     }
 
-    private static String extractIp(HttpServletRequest request) {
-        if (request == null) return null;
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) return xff.split(",")[0].trim();
-        return request.getRemoteAddr();
-    }
+    // ══════════════════════════════════════════════════════════════════
+    //  Admin 교환 패널 (Part B) — LoA 파일 등록/교체
+    //  기존 파일을 삭제하지 않고 보관(append-only) + 사유를 감사에 기록한다.
+    // ══════════════════════════════════════════════════════════════════
 
-    private static String userAgent(HttpServletRequest request) {
-        return request != null ? request.getHeader("User-Agent") : null;
+    /**
+     * ADMIN/SYSTEM_ADMIN 이 LoA 파일(신청자 서명본 또는 LEW 최종본)을 등록/교체한다.
+     *
+     * <p>교환 모델 메서드(applicant-upload / final-upload)와 달리, <b>기존 동일 타입 파일을
+     * 절대 삭제하지 않고 보관</b>한다. 새 {@link FileEntity}만 추가되며 {@code buildStatus}는
+     * 항상 fileSeq 최댓값(=최신본)을 노출한다. 사유({@code reason})는 필수이며 감사 로그에 남는다.</p>
+     */
+    @Transactional
+    public LoaStatusResponse adminReplaceLoa(Long adminSeq, Long applicationSeq,
+                                             FileType fileType, MultipartFile file, String reason) {
+        // 1. 허용 파일 타입 검증 — LoA 교환에 쓰이는 2종만.
+        if (fileType != FileType.OWNER_AUTH_LETTER && fileType != FileType.LOA_FINAL) {
+            throw new BusinessException(
+                    "Only OWNER_AUTH_LETTER or LOA_FINAL can be replaced via the admin LoA panel.",
+                    HttpStatus.BAD_REQUEST, "INVALID_LOA_FILE_TYPE");
+        }
+
+        // 2. 사유 필수 — 감사 무결성.
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException(
+                    "A reason is required when replacing a LoA file.",
+                    HttpStatus.BAD_REQUEST, "LOA_REASON_REQUIRED");
+        }
+
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        // 3. MIME/크기 검증 — 교환 메서드와 동일 정책.
+        MimeTypeValidator.validate(file, LOA_UPLOAD_MIME);
+        MimeTypeValidator.validateSize(file, LOA_UPLOAD_MAX_MB);
+
+        // 4. 파일 저장 — 기존 파일은 보관(delete 호출 없음). 새 FileEntity만 추가.
+        String subDirectory = "applications/" + applicationSeq;
+        String storedPath = fileStorageService.store(file, subDirectory);
+
+        FileEntity fileEntity = FileEntity.builder()
+                .application(application)
+                .fileType(fileType)
+                .fileUrl(storedPath)
+                .originalFilename(file.getOriginalFilename())
+                .fileSize(file.getSize())
+                .build();
+        FileEntity saved = fileRepository.save(fileEntity);
+
+        // 5. loaStage 진전 — 최종본이면 FINAL_UPLOADED, 서명본이면 APPLICANT_UPLOADED.
+        if (fileType == FileType.LOA_FINAL) {
+            application.markLoaFinalUploaded();
+        } else {
+            application.markLoaApplicantUploaded();
+        }
+
+        // 6. 감사 — 사유를 description + metadata 양쪽에 남긴다.
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("fileType", fileType.name());
+        metadata.put("reason", reason);
+        metadata.put("fileSeq", saved.getFileSeq());
+        auditLogService.logAsync(
+                adminSeq, AuditAction.LOA_ADMIN_REPLACED, AuditCategory.ADMIN,
+                "Application", String.valueOf(applicationSeq),
+                "Admin replaced LoA file (" + fileType + "). Reason: " + reason,
+                null, metadata, null, null,
+                "POST", "/api/admin/applications/" + applicationSeq + "/loa/admin-replace", 200);
+
+        log.info("LoA admin replace: applicationSeq={}, adminSeq={}, fileType={}, fileSeq={}",
+                applicationSeq, adminSeq, fileType, saved.getFileSeq());
+
+        return buildStatus(application);
     }
 
     /**
@@ -564,10 +338,14 @@ public class LoaService {
         List<FileEntity> finalFiles = fileRepository
                 .findByApplicationApplicationSeqAndFileType(applicationSeq, FileType.LOA_FINAL);
 
-        Long applicantFileSeq = applicantFiles.isEmpty()
-                ? null : applicantFiles.get(applicantFiles.size() - 1).getFileSeq();
-        Long finalFileSeq = finalFiles.isEmpty()
-                ? null : finalFiles.get(finalFiles.size() - 1).getFileSeq();
+        // 보관(soft-retain) 정책으로 동일 타입 파일이 여러 개일 수 있으므로
+        // 리스트 순서가 아닌 fileSeq 최댓값(=최신본)을 선택한다.
+        Long applicantFileSeq = applicantFiles.stream()
+                .max(Comparator.comparing(FileEntity::getFileSeq))
+                .map(FileEntity::getFileSeq).orElse(null);
+        Long finalFileSeq = finalFiles.stream()
+                .max(Comparator.comparing(FileEntity::getFileSeq))
+                .map(FileEntity::getFileSeq).orElse(null);
 
         // active 폼 메타 (NEW 전용). PR2 getActiveForm()은 미설정 시 404 throw → unavailable 처리.
         boolean activeFormAvailable = false;

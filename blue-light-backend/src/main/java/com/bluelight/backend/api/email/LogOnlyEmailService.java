@@ -266,6 +266,17 @@ public class LogOnlyEmailService implements EmailService {
     }
 
     @Override
+    public void sendLewInvitationEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
+        log.info("==================================================");
+        log.info("[DEV] LEW Invitation Email (not actually sent)");
+        log.info("  To: {}", to);
+        log.info("  Name: {}", fullName);
+        log.info("  Setup URL: {}", setupUrl);
+        log.info("  Expires At: {}", expiresAtDisplay);
+        log.info("==================================================");
+    }
+
+    @Override
     public void sendConciergeRequestReceivedEmail(String to, String fullName, String setupUrl, String expiresAtDisplay) {
         log.info("==================================================");
         log.info("[DEV] Concierge Request Received (N1) Email (not actually sent)");
