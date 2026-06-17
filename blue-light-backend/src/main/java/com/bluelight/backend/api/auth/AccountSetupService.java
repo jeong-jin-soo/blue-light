@@ -128,16 +128,17 @@ public class AccountSetupService {
                 paynowType = EnumParser.parse(PaynowType.class, request.getPaynowType(), "INVALID_PAYNOW_TYPE");
                 paynowValue = request.getPaynowValue();
                 PaynowValidator.validate(paynowType, paynowValue); // 형식 오류 시 400
+
+                // 면허 중복(409)도 잠금 카운터에 포함 — 유효 토큰으로 면허번호 존재를 무제한 탐침하는
+                // 오라클 차단(리뷰 #3). 토큰은 markUsed 전이라 10회까지 정정 재시도는 여전히 가능(AC-7).
+                lewLicenceNo = request.getLewLicenceNo().trim();
+                if (userRepository.existsByLewLicenceNo(lewLicenceNo)) {
+                    throw new BusinessException("LEW licence number is already registered",
+                        HttpStatus.CONFLICT, "DUPLICATE_LEW_LICENCE_NO");
+                }
             } catch (BusinessException e) {
                 tokenService.recordInputValidationFailure(tokenUuid); // REQUIRES_NEW — 롤백에도 보존
                 throw e;
-            }
-
-            // 면허 중복은 입력 형식 오류가 아니라 충돌 → 잠금 카운트 미포함, 토큰은 살려 재시도/문의 가능(AC-7).
-            lewLicenceNo = request.getLewLicenceNo().trim();
-            if (userRepository.existsByLewLicenceNo(lewLicenceNo)) {
-                throw new BusinessException("LEW licence number is already registered",
-                    HttpStatus.CONFLICT, "DUPLICATE_LEW_LICENCE_NO");
             }
         }
 

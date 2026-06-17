@@ -378,7 +378,8 @@ class AccountSetupServiceTest {
         assertThatThrownBy(() -> service.complete("uuid-1234", lewReq(), null))
             .isInstanceOf(BusinessException.class)
             .satisfies(e -> assertThat(((BusinessException) e).getCode()).isEqualTo("DUPLICATE_LEW_LICENCE_NO"));
-        verify(tokenService, never()).recordInputValidationFailure(anyString()); // 충돌은 미카운트
+        // 리뷰 #3: 면허 중복도 잠금 카운터에 포함(탐침 오라클 차단), 단 토큰은 미사용(정정 재시도 가능)
+        verify(tokenService).recordInputValidationFailure("uuid-1234");
         verify(tokenService, never()).markUsed(any());
     }
 

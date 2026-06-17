@@ -458,18 +458,8 @@ public class User extends BaseEntity {
      * 면허번호/등급이 비어 있으면 거부한다(등급 null LEW 가 배정 단계에서 막히는 무결성 구멍 방지).
      */
     public void changeRoleToLew(String lewLicenceNo, LewGrade lewGrade) {
-        if (lewLicenceNo == null || lewLicenceNo.isBlank()) {
-            throw new IllegalArgumentException("LEW licence number is required");
-        }
-        if (lewGrade == null) {
-            throw new IllegalArgumentException("LEW grade is required");
-        }
-        this.role = UserRole.LEW;
-        if (this.roles == null) this.roles = new HashSet<>();
-        this.roles.add(UserRole.LEW);
+        assignLewLicence(lewLicenceNo, lewGrade);
         this.approvedStatus = ApprovalStatus.PENDING;
-        this.lewLicenceNo = lewLicenceNo.trim();
-        this.lewGrade = lewGrade;
     }
 
     /**
@@ -480,6 +470,15 @@ public class User extends BaseEntity {
      * (admin 초대 자체가 검증으로 간주). 면허/등급이 비어 있으면 거부한다.
      */
     public void completeInvitedLewSetup(String lewLicenceNo, LewGrade lewGrade) {
+        assignLewLicence(lewLicenceNo, lewGrade);
+        this.approvedStatus = ApprovalStatus.APPROVED;
+    }
+
+    /**
+     * LEW 승격 공통 처리 — role=LEW + roles 동기화 + 면허/등급 확정(필수 검증).
+     * 승인 상태(PENDING vs APPROVED)는 호출자가 결정한다(승격 경로별 정책 분기).
+     */
+    private void assignLewLicence(String lewLicenceNo, LewGrade lewGrade) {
         if (lewLicenceNo == null || lewLicenceNo.isBlank()) {
             throw new IllegalArgumentException("LEW licence number is required");
         }
@@ -491,7 +490,6 @@ public class User extends BaseEntity {
         this.roles.add(UserRole.LEW);
         this.lewLicenceNo = lewLicenceNo.trim();
         this.lewGrade = lewGrade;
-        this.approvedStatus = ApprovalStatus.APPROVED;
     }
 
     /**
