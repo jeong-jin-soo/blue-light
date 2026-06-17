@@ -104,8 +104,8 @@ export default function ProfilePage() {
     if (isLewUser && paynowValue.trim() && !isValidPaynow(paynowType, paynowValue)) {
       errors.paynowValue =
         paynowType === 'MOBILE'
-          ? 'Enter an 8-digit Singapore mobile number (e.g. 97771983).'
-          : 'Enter a 10-character Company UEN (e.g. 201837490N).';
+          ? 'Enter an 8-digit Singapore mobile number (starting with 8 or 9).'
+          : 'Enter a 10-character company UEN.';
     }
     setProfileErrors(errors);
     if (Object.keys(errors).length > 0) return;

@@ -38,8 +38,8 @@ export function PaynowField({
 }: PaynowFieldProps) {
   const formatError =
     type === 'MOBILE'
-      ? 'Enter an 8-digit Singapore mobile number (e.g. 97771983).'
-      : 'Enter a 10-character Company UEN (e.g. 201837490N).';
+      ? 'Enter an 8-digit Singapore mobile number (starting with 8 or 9).'
+      : 'Enter a 10-character company UEN.';
   const shownError = error ?? (value && !isValidPaynow(type, value) ? formatError : undefined);
 
   return (

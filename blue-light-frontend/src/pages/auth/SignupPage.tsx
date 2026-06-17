@@ -127,8 +127,8 @@ export default function SignupPage() {
     if (form.role === 'LEW' && !isValidPaynow(form.paynowType, form.paynowValue)) {
       setLocalError(
         form.paynowType === 'MOBILE'
-          ? 'Enter a valid 8-digit Singapore mobile number for PayNow (e.g. 97771983).'
-          : 'Enter a valid 10-character Company UEN for PayNow (e.g. 201837490N).'
+          ? 'Enter a valid 8-digit Singapore mobile number for PayNow (starting with 8 or 9).'
+          : 'Enter a valid 10-character company UEN for PayNow.'
       );
       return;
     }

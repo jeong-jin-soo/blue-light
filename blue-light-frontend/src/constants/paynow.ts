@@ -12,9 +12,11 @@ export const PAYNOW_TYPE_LABELS: Record<PaynowType, string> = {
   MOBILE: 'Mobile PayNow',
 };
 
+// placeholder 는 구체 계좌/번호를 명시하지 않고 형식 안내문구만 사용한다
+// (실제 계좌처럼 보이는 예시는 오인 소지가 있어 금지).
 export const PAYNOW_PLACEHOLDER: Record<PaynowType, string> = {
-  COMPANY_UEN: '201837490N',
-  MOBILE: '97771983',
+  COMPANY_UEN: 'Enter your company UEN (10 characters)',
+  MOBILE: 'Enter your mobile number (8 digits)',
 };
 
 // 백엔드 PaynowValidator 와 동일 (R-PN5)
