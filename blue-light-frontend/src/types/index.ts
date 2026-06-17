@@ -51,8 +51,13 @@ export interface User {
   role: UserRole;
   approved?: boolean;
   approvedStatus?: ApprovalStatus;
+  /** 계정 활성화 상태 (ACTIVE / PENDING_ACTIVATION / SUSPENDED …) */
+  status?: string;
   lewLicenceNo?: string;
   lewGrade?: LewGrade;
+  /** LEW 본인 PayNow 수취 계정 (COMPANY_UEN / MOBILE) */
+  paynowType?: 'COMPANY_UEN' | 'MOBILE';
+  paynowValue?: string;
   companyName?: string;
   uen?: string;
   designation?: string;

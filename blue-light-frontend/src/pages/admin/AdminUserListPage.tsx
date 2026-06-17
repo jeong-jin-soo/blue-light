@@ -49,6 +49,11 @@ export default function AdminUserListPage() {
   const [lewGrade, setLewGrade] = useState<LewGrade | ''>('');
   const [approvalTarget, setApprovalTarget] = useState<{ user: User; action: 'approve' | 'reject' } | null>(null);
   const [processingApproval, setProcessingApproval] = useState(false);
+  // LEW 초대
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ email: '', firstName: '', lastName: '' });
+  const [inviting, setInviting] = useState(false);
+  const [resendingId, setResendingId] = useState<number | null>(null);
 
   const loadUsers = useCallback((currentPage: number, role: string, search: string) => {
     setLoading(true);
@@ -147,6 +152,49 @@ export default function AdminUserListPage() {
     }
   };
 
+  const closeInvite = () => {
+    setInviteOpen(false);
+    setInviteForm({ email: '', firstName: '', lastName: '' });
+  };
+
+  const inviteValid =
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteForm.email.trim()) &&
+    inviteForm.firstName.trim().length > 0 &&
+    inviteForm.lastName.trim().length > 0;
+
+  const handleInvite = async () => {
+    if (!inviteValid) return;
+    setInviting(true);
+    try {
+      await adminApi.inviteLew({
+        email: inviteForm.email.trim(),
+        firstName: inviteForm.firstName.trim(),
+        lastName: inviteForm.lastName.trim(),
+      });
+      toast.success(`Invitation sent to ${inviteForm.email.trim()}`);
+      closeInvite();
+      loadUsers(page, roleFilter, searchTerm);
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to send invitation';
+      toast.error(message);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleResendInvite = async (user: User) => {
+    setResendingId(user.userSeq);
+    try {
+      await adminApi.resendLewInvite(user.userSeq);
+      toast.success(`Invitation resent to ${user.email}`);
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to resend invitation';
+      toast.error(message);
+    } finally {
+      setResendingId(null);
+    }
+  };
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'ADMIN': return 'primary' as const;
@@ -240,6 +288,22 @@ export default function AdminUserListPage() {
       header: 'Approval',
       render: (user) => {
         if (user.role !== 'LEW') return <span className="text-gray-400">-</span>;
+        // 초대된 LEW(미활성): 셋업 완료 시 자동 승인되므로 Approve/Reject 대신 "Invited" + Resend.
+        if (user.status === 'PENDING_ACTIVATION') {
+          return (
+            <div className="flex items-center gap-2">
+              <Badge variant="warning">Invited</Badge>
+              <button
+                onClick={() => handleResendInvite(user)}
+                disabled={resendingId === user.userSeq}
+                className="text-xs text-primary hover:underline disabled:opacity-50"
+                aria-label={`Resend invitation to ${user.email}`}
+              >
+                {resendingId === user.userSeq ? 'Resending…' : 'Resend'}
+              </button>
+            </div>
+          );
+        }
         return (
           <div className="flex items-center gap-2">
             <Badge variant={getApprovalBadgeVariant(user.approvedStatus)}>
@@ -304,7 +368,15 @@ export default function AdminUserListPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <PageHeader title="User Management" subtitle="View and manage registered users" />
+      <PageHeader
+        title="User Management"
+        subtitle="View and manage registered users"
+        actions={
+          <Button onClick={() => setInviteOpen(true)}>
+            + Invite LEW
+          </Button>
+        }
+      />
 
       {/* Search & Filter */}
       <Card>
@@ -445,6 +517,50 @@ export default function AdminUserListPage() {
             disabled={!lewLicenceNo.trim() || !lewGrade}
           >
             Promote to LEW
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* LEW 초대 모달 */}
+      <Modal isOpen={inviteOpen} onClose={closeInvite} ariaLabelledBy="invite-lew-title">
+        <ModalHeader title="Invite a LEW" onClose={closeInvite} />
+        <ModalBody className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Send an invitation email. The LEW will set their own password, licence number, grade
+            and PayNow details, and the account is approved automatically on completion.
+          </p>
+          <Input
+            label="Email"
+            type="email"
+            required
+            maxLength={100}
+            value={inviteForm.email}
+            onChange={(e) => setInviteForm((f) => ({ ...f, email: e.target.value }))}
+            placeholder="lew@example.com"
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="First name"
+              required
+              maxLength={50}
+              value={inviteForm.firstName}
+              onChange={(e) => setInviteForm((f) => ({ ...f, firstName: e.target.value }))}
+            />
+            <Input
+              label="Last name"
+              required
+              maxLength={50}
+              value={inviteForm.lastName}
+              onChange={(e) => setInviteForm((f) => ({ ...f, lastName: e.target.value }))}
+            />
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="ghost" onClick={closeInvite} disabled={inviting}>
+            Cancel
+          </Button>
+          <Button onClick={handleInvite} loading={inviting} disabled={!inviteValid}>
+            Send invitation
           </Button>
         </ModalFooter>
       </Modal>

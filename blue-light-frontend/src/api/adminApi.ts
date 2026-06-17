@@ -50,7 +50,10 @@ export {
   changeUserRole,
   approveLew,
   rejectLew,
+  inviteLew,
+  resendLewInvite,
 } from './adminUserApi';
+export type { InviteLewRequest } from './adminUserApi';
 
 // ── Default export (backward compatibility) ──────────────────────────────
 

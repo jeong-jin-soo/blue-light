@@ -29,3 +29,23 @@ export const rejectLew = async (id: number): Promise<User> => {
   const response = await axiosClient.post<User>(`/admin/users/${id}/reject`);
   return response.data;
 };
+
+// ── LEW 초대 ──────────────────────────────
+
+export interface InviteLewRequest {
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+/** ADMIN LEW 초대 — 계정 선생성 + 셋업 토큰 + 초대 이메일. */
+export const inviteLew = async (data: InviteLewRequest): Promise<User> => {
+  const response = await axiosClient.post<User>('/admin/users/invite-lew', data);
+  return response.data;
+};
+
+/** 초대 재발송 — PENDING_ACTIVATION 상태의 초대 LEW만. */
+export const resendLewInvite = async (id: number): Promise<User> => {
+  const response = await axiosClient.post<User>(`/admin/users/${id}/resend-invite`);
+  return response.data;
+};
