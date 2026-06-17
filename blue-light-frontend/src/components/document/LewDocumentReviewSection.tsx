@@ -40,6 +40,8 @@ interface LewDocumentReviewSectionProps {
    * loadData 를 연결한다. 이게 없으면 결제 요청 가드(pendingDocCount) 가 stale 해진다.
    */
   onRequestsChanged?: () => void;
+  /** ADMIN 이 신청자 대신 서류를 업로드(fulfill)할 수 있는지 (admin parity). LEW 는 fulfill 불가. */
+  canFulfill?: boolean;
 }
 
 export function LewDocumentReviewSection({
@@ -48,6 +50,7 @@ export function LewDocumentReviewSection({
   applicantDisplayName,
   applicationCode,
   onRequestsChanged,
+  canFulfill = false,
 }: LewDocumentReviewSectionProps) {
   const toast = useToastStore();
 
@@ -60,6 +63,23 @@ export function LewDocumentReviewSection({
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [fulfillingId, setFulfillingId] = useState<number | null>(null);
+
+  // ADMIN 대리 업로드(fulfill) — REQUESTED/REJECTED 요청에 신청자 대신 파일 업로드.
+  const handleFulfill = async (req: DocumentRequest, file: File) => {
+    setFulfillingId(req.id);
+    try {
+      await documentApi.fulfillDocumentRequest(applicationSeq, req.id, file);
+      toast.success('Uploaded on behalf of the applicant.');
+      fetchAll();
+      onRequestsChanged?.();
+    } catch (err) {
+      const msg = (err as { message?: string })?.message ?? 'Failed to upload on behalf.';
+      toast.error(msg);
+    } finally {
+      setFulfillingId(null);
+    }
+  };
 
   const catalogByCode = useMemo(() => {
     const map = new Map<string, DocumentType>();
@@ -223,6 +243,9 @@ export function LewDocumentReviewSection({
                   onReject={() => setRejectTarget(req)}
                   onCancel={() => setCancelTarget(req)}
                   onDownload={() => handleDownload(req)}
+                  canFulfill={canFulfill}
+                  fulfilling={fulfillingId === req.id}
+                  onFulfill={(file) => handleFulfill(req, file)}
                 />
               </li>
             ))}
@@ -297,6 +320,9 @@ function LewRequestRow({
   onReject,
   onCancel,
   onDownload,
+  canFulfill,
+  fulfilling,
+  onFulfill,
 }: {
   request: DocumentRequest;
   documentType: DocumentType | null;
@@ -305,6 +331,9 @@ function LewRequestRow({
   onReject: () => void;
   onCancel: () => void;
   onDownload: () => void;
+  canFulfill: boolean;
+  fulfilling: boolean;
+  onFulfill: (file: File) => void;
 }) {
   const style = variantStyle[request.status] ?? { border: 'border-gray-200', bg: 'bg-surface' };
   const label =
@@ -437,6 +466,23 @@ function LewRequestRow({
           <Button size="sm" variant="ghost" onClick={onCancel}>
             Cancel Request
           </Button>
+        )}
+        {/* ADMIN 대리 업로드 — REQUESTED/REJECTED 요청에 신청자 대신 파일 첨부 (admin parity) */}
+        {canFulfill && (request.status === 'REQUESTED' || request.status === 'REJECTED') && (
+          <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-primary/40 text-primary cursor-pointer hover:bg-primary-50 transition-colors ${fulfilling ? 'opacity-50 pointer-events-none' : ''}`}>
+            {fulfilling ? 'Uploading…' : '↥ Upload on behalf'}
+            <input
+              type="file"
+              accept={documentType?.acceptedMime ?? '.pdf,.jpg,.jpeg,.png'}
+              className="hidden"
+              disabled={fulfilling}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) onFulfill(f);
+                e.target.value = '';
+              }}
+            />
+          </label>
         )}
         {request.status === 'UPLOADED' && (
           <>

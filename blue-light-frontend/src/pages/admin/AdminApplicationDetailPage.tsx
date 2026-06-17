@@ -519,6 +519,7 @@ export default function AdminApplicationDetailPage() {
                   : application.userEmail
               }
               applicationCode={`APP-${String(application.applicationSeq).padStart(6, '0')}`}
+              canFulfill={isAdmin}
             />
           </div>
 

@@ -68,9 +68,9 @@ public final class OwnershipValidator {
     }
 
     /**
-     * 관리자 역할 여부 확인
+     * 관리자 역할 여부 확인 (ADMIN / SYSTEM_ADMIN)
      */
-    private static boolean isAdmin(String role) {
+    public static boolean isAdmin(String role) {
         return "ROLE_ADMIN".equals(role) || "ROLE_SYSTEM_ADMIN".equals(role);
     }
 }
