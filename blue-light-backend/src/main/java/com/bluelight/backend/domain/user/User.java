@@ -618,6 +618,15 @@ public class User extends BaseEntity {
     }
 
     /**
+     * PDPA 동의 기록 — pdpaConsentAt 설정.
+     * <p>초대 LEW 셋업 등 가입 시점에 pdpaConsentAt를 빌더로 못 받은 계정이 동의 시 호출한다
+     * (자가가입/컨시어지는 빌더에서 이미 설정). {@link #hasPdpaConsent()} 일관성 보장.
+     */
+    public void grantPdpaConsent(LocalDateTime at) {
+        this.pdpaConsentAt = at;
+    }
+
+    /**
      * PDPA 동의 철회
      * - pdpaConsentAt을 null로 설정
      */

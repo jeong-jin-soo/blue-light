@@ -160,6 +160,8 @@ public class AccountSetupService {
             LocalDateTime now = LocalDateTime.now();
             user.completeInvitedLewSetup(lewLicenceNo, lewGrade);
             user.changePaynow(paynowType, paynowValue);
+            // 초대 계정은 빌더에서 pdpaConsentAt 미설정 → 동의 시점에 기록(hasPdpaConsent 일관성, 자가가입/컨시어지와 동일).
+            user.grantPdpaConsent(now);
             user.recordSignupConsent(now, TermsVersion.CURRENT, SignupSource.ADMIN_INVITE);
 
             String ip = extractIp(httpRequest);

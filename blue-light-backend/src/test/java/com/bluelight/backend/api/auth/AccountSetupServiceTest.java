@@ -325,6 +325,9 @@ class AccountSetupServiceTest {
         assertThat(lew.getPaynowType()).isEqualTo(com.bluelight.backend.domain.user.PaynowType.MOBILE);
         assertThat(lew.getPaynowValue()).isEqualTo("97771983");
         assertThat(lew.getStatus()).isEqualTo(UserStatus.ACTIVE);
+        // 리뷰 #1: 초대 LEW도 PDPA 동의 시 pdpaConsentAt 설정 → hasPdpaConsent()=true (동의 철회/표시 일관성)
+        assertThat(lew.getPdpaConsentAt()).isNotNull();
+        assertThat(lew.hasPdpaConsent()).isTrue();
 
         verify(consentLogRepository, times(2)).save(any());      // PDPA + TERMS
         verify(paynowChangeLogRepository).save(any());           // 최초 PayNow 이력

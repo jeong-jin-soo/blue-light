@@ -90,8 +90,12 @@ public class AuthService {
             );
         }
 
+        // 이메일 정규화 — 로그인이 trim+lowercase 로 조회하므로 동일하게 저장(#9 본인 로그인 불가 방지,
+        // AdminLewInviteService.invite 와 일관). MySQL CI 콜레이션이 대소문자는 흡수하나 공백은 못 흡수.
+        String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
+
         // 이메일 중복 검사
-        if (userRepository.existsByEmail(request.getEmail())) {
+        if (userRepository.existsByEmail(email)) {
             throw new BusinessException("Email is already in use", HttpStatus.CONFLICT, "DUPLICATE_EMAIL");
         }
 
@@ -164,7 +168,7 @@ public class AuthService {
         LocalDateTime now = LocalDateTime.now();
         String termsVersion = TermsVersion.CURRENT;
         User user = User.builder()
-                .email(request.getEmail())
+                .email(email)
                 .password(encodedPassword)
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
