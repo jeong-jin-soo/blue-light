@@ -1,4 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
+import { isValidPaynow, type PaynowType } from '../../constants/paynow';
+import { LEW_GRADE_SELECT_OPTIONS } from '../../constants/lewGrade';
+import { PaynowField } from '../../components/domain/PaynowField';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -28,6 +31,8 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState('');
   const [lewLicenceNo, setLewLicenceNo] = useState('');
   const [lewGrade, setLewGrade] = useState('');
+  const [paynowType, setPaynowType] = useState<PaynowType>('MOBILE');
+  const [paynowValue, setPaynowValue] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [uen, setUen] = useState('');
   const [designation, setDesignation] = useState('');
@@ -60,6 +65,8 @@ export default function ProfilePage() {
         setPhone(data.phone || '');
         setLewLicenceNo(data.lewLicenceNo || '');
         setLewGrade(data.lewGrade || '');
+        if (data.paynowType) setPaynowType(data.paynowType);
+        setPaynowValue(data.paynowValue || '');
         setCompanyName(data.companyName || '');
         setUen(data.uen || '');
         setDesignation(data.designation || '');
@@ -88,10 +95,18 @@ export default function ProfilePage() {
   }, [profile, firstName, lastName, phone, companyName, uen, designation, correspondenceAddress, correspondencePostalCode]);
   useFormGuard(isProfileDirty);
 
+  const isLewUser = profile?.role === 'LEW' || authUser?.role === 'LEW';
+
   const handleProfileSave = async () => {
     const errors: Record<string, string> = {};
     if (!firstName.trim()) errors.firstName = 'First name is required';
     if (!lastName.trim()) errors.lastName = 'Last name is required';
+    if (isLewUser && paynowValue.trim() && !isValidPaynow(paynowType, paynowValue)) {
+      errors.paynowValue =
+        paynowType === 'MOBILE'
+          ? 'Enter an 8-digit Singapore mobile number (e.g. 97771983).'
+          : 'Enter a 10-character Company UEN (e.g. 201837490N).';
+    }
     setProfileErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -103,6 +118,9 @@ export default function ProfilePage() {
         phone: phone.trim() || undefined,
         lewLicenceNo: lewLicenceNo.trim() || undefined,
         lewGrade: lewGrade || undefined,
+        ...(isLewUser && paynowValue.trim()
+          ? { paynowType, paynowValue: paynowValue.trim() }
+          : {}),
         companyName: companyName.trim() || undefined,
         uen: uen.trim() || undefined,
         designation: designation.trim() || undefined,
@@ -286,13 +304,16 @@ export default function ProfilePage() {
                 label="LEW Grade"
                 value={lewGrade}
                 onChange={(e) => setLewGrade(e.target.value)}
-                options={[
-                  { value: '', label: 'Select grade' },
-                  { value: 'GRADE_7', label: 'Grade 7 (≤ 45 kVA)' },
-                  { value: 'GRADE_8', label: 'Grade 8 (≤ 500 kVA)' },
-                  { value: 'GRADE_9', label: 'Grade 9 (≤ 400 kV)' },
-                ]}
+                options={[{ value: '', label: 'Select grade' }, ...LEW_GRADE_SELECT_OPTIONS]}
                 hint="Grade on your EMA LEW licence"
+              />
+              <PaynowField
+                type={paynowType}
+                value={paynowValue}
+                onTypeChange={setPaynowType}
+                onValueChange={setPaynowValue}
+                error={profileErrors.paynowValue}
+                hint="The account where you receive payments from the platform"
               />
             </>
           )}

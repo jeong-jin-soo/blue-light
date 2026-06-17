@@ -54,4 +54,16 @@ public class SignupRequest {
      */
     @Size(max = 20, message = "LEW grade must be 20 characters or less")
     private String lewGrade;
+
+    /**
+     * LEW 본인 PayNow 유형 (LEW 역할 선택 시 필수: COMPANY_UEN / MOBILE)
+     */
+    @Size(max = 20, message = "PayNow type must be 20 characters or less")
+    private String paynowType;
+
+    /**
+     * LEW 본인 PayNow 값 (MOBILE 8자리 / COMPANY_UEN 10자)
+     */
+    @Size(max = 20, message = "PayNow value must be 20 characters or less")
+    private String paynowValue;
 }

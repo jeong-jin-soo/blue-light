@@ -45,10 +45,11 @@ public class UserController {
     @PutMapping("/me")
     public ResponseEntity<UserResponse> updateMyProfile(
             Authentication authentication,
-            @Valid @RequestBody UpdateProfileRequest request) {
+            @Valid @RequestBody UpdateProfileRequest request,
+            jakarta.servlet.http.HttpServletRequest httpRequest) {
         Long userSeq = (Long) authentication.getPrincipal();
         log.info("Update profile: userSeq={}", userSeq);
-        UserResponse response = userService.updateProfile(userSeq, request);
+        UserResponse response = userService.updateProfile(userSeq, request, httpRequest);
         return ResponseEntity.ok(response);
     }
 

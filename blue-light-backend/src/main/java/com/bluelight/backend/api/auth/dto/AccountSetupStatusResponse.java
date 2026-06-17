@@ -24,4 +24,9 @@ public class AccountSetupStatusResponse {
      * 토큰 만료 시각 (프론트엔드에 "48시간 내에 완료" 표시용)
      */
     private LocalDateTime expiresAt;
+
+    /**
+     * LEW 초대 토큰 여부 — true 면 셋업 화면이 면허/등급/PayNow 입력란을 추가로 렌더한다 (D-5 단일 폼).
+     */
+    private boolean requiresLewDetails;
 }

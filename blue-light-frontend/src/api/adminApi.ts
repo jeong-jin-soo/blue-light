@@ -50,7 +50,11 @@ export {
   changeUserRole,
   approveLew,
   rejectLew,
+  inviteLew,
+  resendLewInvite,
+  revealPaynow,
 } from './adminUserApi';
+export type { InviteLewRequest, PaynowRevealResponse } from './adminUserApi';
 
 // ── Default export (backward compatibility) ──────────────────────────────
 
