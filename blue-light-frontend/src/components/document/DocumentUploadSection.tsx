@@ -377,7 +377,7 @@ function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
         return {
           ...baseRequest,
           status: 'REQUESTED',
-          lewNote: 'Please attach the SP account holder PDF for verification.',
+          lewNote: 'Please attach the SP account holder document for verification.',
           requestedAt: new Date().toISOString(),
         };
       case 'uploaded':
