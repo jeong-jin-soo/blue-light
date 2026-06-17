@@ -17,13 +17,9 @@ import { useAuthStore } from '../../stores/authStore';
 import { accountSetupApi } from '../../api/accountSetupApi';
 import type { AccountSetupStatusResponse } from '../../api/accountSetupApi';
 import type { ApiError, UserRole } from '../../types';
-import {
-  PAYNOW_TYPES,
-  PAYNOW_TYPE_LABELS,
-  PAYNOW_PLACEHOLDER,
-  isValidPaynow,
-  type PaynowType,
-} from '../../constants/paynow';
+import { isValidPaynow, type PaynowType } from '../../constants/paynow';
+import { LEW_GRADES } from '../../constants/lewGrade';
+import { PaynowField } from '../../components/domain/PaynowField';
 
 type Phase = 'verifying' | 'form' | 'submitting' | 'done' | 'invalid';
 
@@ -366,11 +362,7 @@ export default function AccountSetupPage() {
                 LEW Grade<span className="text-error-500 ml-0.5">*</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
-                  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
-                  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
-                ].map((g) => (
+                {LEW_GRADES.map((g) => (
                   <button
                     key={g.value}
                     type="button"
@@ -389,42 +381,14 @@ export default function AccountSetupPage() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                PayNow (for receiving payments)<span className="text-error-500 ml-0.5">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                {PAYNOW_TYPES.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setPaynowType(t)}
-                    disabled={submitting}
-                    className={`p-2.5 border-2 rounded-lg text-center text-sm font-medium transition-all ${
-                      paynowType === t
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    {PAYNOW_TYPE_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-              <Input
-                label={paynowType === 'MOBILE' ? 'Mobile number' : 'Company UEN'}
-                value={paynowValue}
-                onChange={(e) => setPaynowValue(e.target.value)}
-                placeholder={PAYNOW_PLACEHOLDER[paynowType]}
-                error={
-                  paynowValue && !paynowValid
-                    ? paynowType === 'MOBILE'
-                      ? 'Enter an 8-digit Singapore mobile number (e.g. 97771983).'
-                      : 'Enter a 10-character Company UEN (e.g. 201837490N).'
-                    : undefined
-                }
-                disabled={submitting}
-              />
-            </div>
+            <PaynowField
+              type={paynowType}
+              value={paynowValue}
+              onTypeChange={setPaynowType}
+              onValueChange={setPaynowValue}
+              required
+              disabled={submitting}
+            />
 
             <label className="flex items-start gap-2 text-sm text-gray-700">
               <input

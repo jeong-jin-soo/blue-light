@@ -1,11 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  PAYNOW_TYPES,
-  PAYNOW_TYPE_LABELS,
-  PAYNOW_PLACEHOLDER,
-  isValidPaynow,
-  type PaynowType,
-} from '../../constants/paynow';
+import { isValidPaynow, type PaynowType } from '../../constants/paynow';
+import { LEW_GRADES } from '../../constants/lewGrade';
+import { PaynowField } from '../../components/domain/PaynowField';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import AuthLayout from '../../components/common/AuthLayout';
@@ -251,11 +247,7 @@ export default function SignupPage() {
                 LEW Grade<span className="text-error-500 ml-0.5">*</span>
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
-                  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
-                  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
-                ].map((g) => (
+                {LEW_GRADES.map((g) => (
                   <button
                     key={g.value}
                     type="button"
@@ -273,41 +265,14 @@ export default function SignupPage() {
               </div>
               <p className="text-xs text-gray-500 mt-1">Select the grade on your EMA licence</p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                PayNow (for receiving payments)<span className="text-error-500 ml-0.5">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                {PAYNOW_TYPES.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => updateField('paynowType', t)}
-                    className={`p-2.5 border-2 rounded-lg text-center text-sm font-medium transition-all ${
-                      form.paynowType === t
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    {PAYNOW_TYPE_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-              <Input
-                label={form.paynowType === 'MOBILE' ? 'Mobile number' : 'Company UEN'}
-                value={form.paynowValue}
-                onChange={(e) => updateField('paynowValue', e.target.value)}
-                placeholder={PAYNOW_PLACEHOLDER[form.paynowType]}
-                error={
-                  form.paynowValue && !isValidPaynow(form.paynowType, form.paynowValue)
-                    ? form.paynowType === 'MOBILE'
-                      ? 'Enter an 8-digit Singapore mobile number.'
-                      : 'Enter a 10-character Company UEN.'
-                    : undefined
-                }
-                hint="The account where you receive payments from the platform"
-              />
-            </div>
+            <PaynowField
+              type={form.paynowType}
+              value={form.paynowValue}
+              onTypeChange={(t) => updateField('paynowType', t)}
+              onValueChange={(v) => updateField('paynowValue', v)}
+              required
+              hint="The account where you receive payments from the platform"
+            />
           </div>
         )}
 

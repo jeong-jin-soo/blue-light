@@ -1,11 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import {
-  PAYNOW_TYPES,
-  PAYNOW_TYPE_LABELS,
-  PAYNOW_PLACEHOLDER,
-  isValidPaynow,
-  type PaynowType,
-} from '../../constants/paynow';
+import { isValidPaynow, type PaynowType } from '../../constants/paynow';
+import { LEW_GRADE_SELECT_OPTIONS } from '../../constants/lewGrade';
+import { PaynowField } from '../../components/domain/PaynowField';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -308,43 +304,17 @@ export default function ProfilePage() {
                 label="LEW Grade"
                 value={lewGrade}
                 onChange={(e) => setLewGrade(e.target.value)}
-                options={[
-                  { value: '', label: 'Select grade' },
-                  { value: 'GRADE_7', label: 'Grade 7 (≤ 45 kVA)' },
-                  { value: 'GRADE_8', label: 'Grade 8 (≤ 500 kVA)' },
-                  { value: 'GRADE_9', label: 'Grade 9 (≤ 400 kV)' },
-                ]}
+                options={[{ value: '', label: 'Select grade' }, ...LEW_GRADE_SELECT_OPTIONS]}
                 hint="Grade on your EMA LEW licence"
               />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  PayNow (for receiving payments)
-                </label>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  {PAYNOW_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => setPaynowType(t)}
-                      className={`p-2.5 border-2 rounded-lg text-center text-sm font-medium transition-all ${
-                        paynowType === t
-                          ? 'border-primary bg-primary/5 text-primary'
-                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                      }`}
-                    >
-                      {PAYNOW_TYPE_LABELS[t]}
-                    </button>
-                  ))}
-                </div>
-                <Input
-                  label={paynowType === 'MOBILE' ? 'Mobile number' : 'Company UEN'}
-                  value={paynowValue}
-                  onChange={(e) => setPaynowValue(e.target.value)}
-                  placeholder={PAYNOW_PLACEHOLDER[paynowType]}
-                  error={profileErrors.paynowValue}
-                  hint="The account where you receive payments from the platform"
-                />
-              </div>
+              <PaynowField
+                type={paynowType}
+                value={paynowValue}
+                onTypeChange={setPaynowType}
+                onValueChange={setPaynowValue}
+                error={profileErrors.paynowValue}
+                hint="The account where you receive payments from the platform"
+              />
             </>
           )}
 

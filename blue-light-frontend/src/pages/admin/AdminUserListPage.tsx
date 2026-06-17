@@ -13,12 +13,7 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import adminApi from '../../api/adminApi';
 import type { User, UserRole, ApprovalStatus, LewGrade } from '../../types';
-
-const LEW_GRADE_OPTIONS: { value: LewGrade; label: string; desc: string }[] = [
-  { value: 'GRADE_7', label: 'Grade 7', desc: '≤ 45 kVA' },
-  { value: 'GRADE_8', label: 'Grade 8', desc: '≤ 500 kVA' },
-  { value: 'GRADE_9', label: 'Grade 9', desc: '≤ 400 kV' },
-];
+import { LEW_GRADES as LEW_GRADE_OPTIONS } from '../../constants/lewGrade';
 import { useShallow } from 'zustand/react/shallow';
 import { useRoleStore, selectRoleLabels, selectAssignableRoles, selectFilterableRoles } from '../../stores/roleStore';
 
