@@ -341,6 +341,9 @@ public class DatabaseMigrationRunner {
         addColumnIfMissing(conn, "users", "whatsapp_opt_in_at",  "ALTER TABLE users ADD COLUMN whatsapp_opt_in_at DATETIME(6) NULL");
         addColumnIfMissing(conn, "users", "whatsapp_opt_out_at", "ALTER TABLE users ADD COLUMN whatsapp_opt_out_at DATETIME(6) NULL");
         addColumnIfMissing(conn, "users", "preferred_language",  "ALTER TABLE users ADD COLUMN preferred_language VARCHAR(10) NOT NULL DEFAULT 'en'");
+        // users — LEW 본인 PayNow 수취 계정 (LEW 초대/가입 + PayNow 수집). nullable, 비-LEW/기존 row backfill 안전.
+        addColumnIfMissing(conn, "users", "paynow_type",         "ALTER TABLE users ADD COLUMN paynow_type VARCHAR(20) NULL");
+        addColumnIfMissing(conn, "users", "paynow_value",        "ALTER TABLE users ADD COLUMN paynow_value VARCHAR(20) NULL");
         // applications — snapshot-at-submit + kVA 사후변경 + applicant_type + 낙관락 version
         addColumnIfMissing(conn, "applications", "applicant_name_snapshot", "ALTER TABLE applications ADD COLUMN applicant_name_snapshot VARCHAR(100) NULL");
         addColumnIfMissing(conn, "applications", "company_name_snapshot",   "ALTER TABLE applications ADD COLUMN company_name_snapshot VARCHAR(100) NULL");

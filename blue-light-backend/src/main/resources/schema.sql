@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
     approved_status VARCHAR(20),
     lew_licence_no  VARCHAR(50),
     lew_grade       VARCHAR(20),
+    -- LEW 본인 PayNow 수취 계정 (LEW만 사용, 택1). system_settings PayNow(플랫폼 계좌)와 무관.
+    paynow_type     VARCHAR(20),
+    paynow_value    VARCHAR(20),
     company_name    VARCHAR(100),
     uen             VARCHAR(20),
     designation     VARCHAR(50),
@@ -1059,6 +1062,27 @@ CREATE TABLE IF NOT EXISTS user_consent_logs (
     CONSTRAINT fk_consent_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
     INDEX idx_consent_log_user_type (user_seq, consent_type, created_at),
     INDEX idx_consent_log_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- lew_paynow_change_logs — LEW 본인 PayNow 변경 이력 (append-only, D-PN3/D-PN8)
+-- 정산 민감정보의 old→new 변경을 시계열 보존. user_consent_logs 와 동일 불변 패턴.
+-- ============================================
+CREATE TABLE IF NOT EXISTS lew_paynow_change_logs (
+    paynow_change_log_seq    BIGINT        NOT NULL AUTO_INCREMENT,
+    user_seq                 BIGINT        NOT NULL,
+    old_type                 VARCHAR(20),
+    old_value                VARCHAR(20),
+    new_type                 VARCHAR(20)   NOT NULL,
+    new_value                VARCHAR(20)   NOT NULL,
+    changed_by               BIGINT        NOT NULL,
+    source_context           VARCHAR(40)   NOT NULL,
+    ip_address               VARCHAR(45),
+    user_agent               VARCHAR(500),
+    created_at               DATETIME(6)   NOT NULL,
+    PRIMARY KEY (paynow_change_log_seq),
+    CONSTRAINT fk_paynow_log_user FOREIGN KEY (user_seq) REFERENCES users (user_seq),
+    INDEX idx_paynow_log_user (user_seq, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
