@@ -29,6 +29,14 @@ public class UpdateProfileRequest {
     @Size(max = 20, message = "LEW grade must be 20 characters or less")
     private String lewGrade;
 
+    /** LEW 본인 PayNow 유형 (COMPANY_UEN / MOBILE). LEW가 프로필에서 변경 시에만 전달. */
+    @Size(max = 20, message = "PayNow type must be 20 characters or less")
+    private String paynowType;
+
+    /** LEW 본인 PayNow 값 (MOBILE 8자리 / COMPANY_UEN 10자). */
+    @Size(max = 20, message = "PayNow value must be 20 characters or less")
+    private String paynowValue;
+
     @Size(max = 100, message = "Company name must be 100 characters or less")
     private String companyName;
 

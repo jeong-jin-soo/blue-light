@@ -693,6 +693,8 @@ export interface UpdateProfileRequest {
   phone?: string;
   lewLicenceNo?: string;
   lewGrade?: string;
+  paynowType?: string;
+  paynowValue?: string;
   companyName?: string;
   uen?: string;
   designation?: string;

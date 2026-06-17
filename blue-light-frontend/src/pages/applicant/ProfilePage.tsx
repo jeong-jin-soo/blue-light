@@ -1,4 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
+import {
+  PAYNOW_TYPES,
+  PAYNOW_TYPE_LABELS,
+  PAYNOW_PLACEHOLDER,
+  isValidPaynow,
+  type PaynowType,
+} from '../../constants/paynow';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { Card, CardHeader } from '../../components/ui/Card';
@@ -28,6 +35,8 @@ export default function ProfilePage() {
   const [phone, setPhone] = useState('');
   const [lewLicenceNo, setLewLicenceNo] = useState('');
   const [lewGrade, setLewGrade] = useState('');
+  const [paynowType, setPaynowType] = useState<PaynowType>('MOBILE');
+  const [paynowValue, setPaynowValue] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [uen, setUen] = useState('');
   const [designation, setDesignation] = useState('');
@@ -60,6 +69,8 @@ export default function ProfilePage() {
         setPhone(data.phone || '');
         setLewLicenceNo(data.lewLicenceNo || '');
         setLewGrade(data.lewGrade || '');
+        if (data.paynowType) setPaynowType(data.paynowType);
+        setPaynowValue(data.paynowValue || '');
         setCompanyName(data.companyName || '');
         setUen(data.uen || '');
         setDesignation(data.designation || '');
@@ -88,10 +99,18 @@ export default function ProfilePage() {
   }, [profile, firstName, lastName, phone, companyName, uen, designation, correspondenceAddress, correspondencePostalCode]);
   useFormGuard(isProfileDirty);
 
+  const isLewUser = profile?.role === 'LEW' || authUser?.role === 'LEW';
+
   const handleProfileSave = async () => {
     const errors: Record<string, string> = {};
     if (!firstName.trim()) errors.firstName = 'First name is required';
     if (!lastName.trim()) errors.lastName = 'Last name is required';
+    if (isLewUser && paynowValue.trim() && !isValidPaynow(paynowType, paynowValue)) {
+      errors.paynowValue =
+        paynowType === 'MOBILE'
+          ? 'Enter an 8-digit Singapore mobile number (e.g. 97771983).'
+          : 'Enter a 10-character Company UEN (e.g. 201837490N).';
+    }
     setProfileErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -103,6 +122,9 @@ export default function ProfilePage() {
         phone: phone.trim() || undefined,
         lewLicenceNo: lewLicenceNo.trim() || undefined,
         lewGrade: lewGrade || undefined,
+        ...(isLewUser && paynowValue.trim()
+          ? { paynowType, paynowValue: paynowValue.trim() }
+          : {}),
         companyName: companyName.trim() || undefined,
         uen: uen.trim() || undefined,
         designation: designation.trim() || undefined,
@@ -294,6 +316,35 @@ export default function ProfilePage() {
                 ]}
                 hint="Grade on your EMA LEW licence"
               />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  PayNow (for receiving payments)
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  {PAYNOW_TYPES.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPaynowType(t)}
+                      className={`p-2.5 border-2 rounded-lg text-center text-sm font-medium transition-all ${
+                        paynowType === t
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      {PAYNOW_TYPE_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+                <Input
+                  label={paynowType === 'MOBILE' ? 'Mobile number' : 'Company UEN'}
+                  value={paynowValue}
+                  onChange={(e) => setPaynowValue(e.target.value)}
+                  placeholder={PAYNOW_PLACEHOLDER[paynowType]}
+                  error={profileErrors.paynowValue}
+                  hint="The account where you receive payments from the platform"
+                />
+              </div>
             </>
           )}
 

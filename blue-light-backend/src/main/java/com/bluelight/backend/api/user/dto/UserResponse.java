@@ -23,6 +23,9 @@ public class UserResponse {
     private boolean approved;
     private String lewLicenceNo;
     private String lewGrade;
+    /** LEW 본인 PayNow — 본인 프로필이므로 전체값 노출(D-PN5). */
+    private String paynowType;
+    private String paynowValue;
     private String companyName;
     private String uen;
     private String designation;
@@ -43,6 +46,8 @@ public class UserResponse {
                 .approved(user.isApproved())
                 .lewLicenceNo(user.getLewLicenceNo())
                 .lewGrade(user.getLewGrade() != null ? user.getLewGrade().name() : null)
+                .paynowType(user.getPaynowType() != null ? user.getPaynowType().name() : null)
+                .paynowValue(user.getPaynowValue())
                 .companyName(user.getCompanyName())
                 .uen(user.getUen())
                 .designation(user.getDesignation())

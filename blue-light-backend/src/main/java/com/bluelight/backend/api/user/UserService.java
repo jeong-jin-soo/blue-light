@@ -15,8 +15,15 @@ import com.bluelight.backend.domain.audit.AuditLogRepository;
 import com.bluelight.backend.domain.chat.ChatMessage;
 import com.bluelight.backend.domain.chat.ChatMessageRepository;
 import com.bluelight.backend.domain.user.LewGrade;
+import com.bluelight.backend.domain.user.LewPaynowChangeLog;
+import com.bluelight.backend.domain.user.LewPaynowChangeLogRepository;
+import com.bluelight.backend.domain.user.PaynowChangeSourceContext;
+import com.bluelight.backend.domain.user.PaynowType;
+import com.bluelight.backend.domain.user.PaynowValidator;
 import com.bluelight.backend.domain.user.User;
 import com.bluelight.backend.domain.user.UserRepository;
+import com.bluelight.backend.domain.user.UserRole;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
@@ -45,6 +52,7 @@ public class UserService {
     private final ChatMessageRepository chatMessageRepository;
     private final AuditLogService auditLogService;
     private final AuditLogRepository auditLogRepository;
+    private final LewPaynowChangeLogRepository paynowChangeLogRepository;
 
     /**
      * Get current user profile
@@ -58,7 +66,7 @@ public class UserService {
      * Update profile (name, phone, company info)
      */
     @Transactional
-    public UserResponse updateProfile(Long userSeq, UpdateProfileRequest request) {
+    public UserResponse updateProfile(Long userSeq, UpdateProfileRequest request, HttpServletRequest httpRequest) {
         User user = findUserOrThrow(userSeq);
 
         // LEW 등급 파싱
@@ -92,8 +100,40 @@ public class UserService {
             );
         }
 
+        // LEW 본인 PayNow 변경 — 값이 전달되고 실제로 바뀐 경우에만 적용 + 변경이력 기록(D-PN3).
+        if (user.getRole() == UserRole.LEW && request.getPaynowType() != null
+                && !request.getPaynowType().isBlank()) {
+            PaynowType newType = EnumParser.parse(PaynowType.class, request.getPaynowType(), "INVALID_PAYNOW_TYPE");
+            String newValue = request.getPaynowValue() != null ? request.getPaynowValue().trim() : null;
+            PaynowValidator.validate(newType, newValue); // 형식 오류 시 400
+
+            PaynowType oldType = user.getPaynowType();
+            String oldValue = user.getPaynowValue();
+            boolean changed = oldType != newType || !newValue.equals(oldValue);
+            if (changed) {
+                user.changePaynow(newType, newValue);
+                paynowChangeLogRepository.save(LewPaynowChangeLog.builder()
+                        .user(user)
+                        .oldType(oldType).oldValue(oldValue)
+                        .newType(newType).newValue(user.getPaynowValue())
+                        .changedBy(userSeq)
+                        .sourceContext(PaynowChangeSourceContext.PROFILE_UPDATE)
+                        .ipAddress(extractIp(httpRequest))
+                        .userAgent(httpRequest != null ? httpRequest.getHeader("User-Agent") : null)
+                        .build());
+                log.info("LEW PayNow updated via profile: userSeq={}", userSeq);
+            }
+        }
+
         log.info("Profile updated: userSeq={}", userSeq);
         return UserResponse.from(user);
+    }
+
+    private static String extractIp(HttpServletRequest request) {
+        if (request == null) return null;
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isEmpty()) return xff.split(",")[0].trim();
+        return request.getRemoteAddr();
     }
 
     /**
