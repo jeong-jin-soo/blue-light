@@ -19,6 +19,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class PaynowValidatorTest {
 
     @Test
+    @DisplayName("리뷰 #5: 정규식 상수 고정 — 프론트 constants/paynow.ts 와 반드시 동일(R-PN5 drift 방지)")
+    void regex_constants_pinned() {
+        // 이 값이 바뀌면 프론트 constants/paynow.ts(PAYNOW_MOBILE_REGEX/PAYNOW_COMPANY_UEN_REGEX)도
+        // 함께 수정해야 한다. 한쪽만 바뀌면 프론트/백 검증이 어긋난다.
+        assertThat(PaynowValidator.MOBILE_REGEX).isEqualTo("^[89]\\d{7}$");
+        assertThat(PaynowValidator.COMPANY_UEN_REGEX).isEqualTo("^\\d{9}[A-Za-z]$");
+    }
+
+    @Test
     @DisplayName("MOBILE 정상: 8/9로 시작하는 8자리")
     void mobile_valid() {
         assertThatCode(() -> PaynowValidator.validate(PaynowType.MOBILE, "97771983")).doesNotThrowAnyException();
