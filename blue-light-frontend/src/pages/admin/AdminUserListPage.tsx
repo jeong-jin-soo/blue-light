@@ -52,6 +52,8 @@ export default function AdminUserListPage() {
   // PayNow reveal (지급용 전체값 — 클릭 시 서버가 열람 감사 기록)
   const [revealedPaynow, setRevealedPaynow] = useState<Record<number, string>>({});
   const [revealingId, setRevealingId] = useState<number | null>(null);
+  // 상세 보기 모달 — 목록에서 뺀 항목 + 미노출 정보를 팝업으로
+  const [detailUser, setDetailUser] = useState<User | null>(null);
 
   const loadUsers = useCallback((currentPage: number, role: string, search: string) => {
     setLoading(true);
@@ -255,13 +257,6 @@ export default function AdminUserListPage() {
       ),
     },
     {
-      key: 'phone',
-      header: 'Phone',
-      render: (user) => (
-        <span className="text-gray-600">{user.phone || '-'}</span>
-      ),
-    },
-    {
       key: 'role',
       header: 'Role',
       render: (user) => (
@@ -343,65 +338,38 @@ export default function AdminUserListPage() {
       },
     },
     {
-      key: 'lewGrade' as keyof User,
-      header: 'Grade',
-      render: (user) => {
-        if (user.role !== 'LEW' || !user.lewGrade) return <span className="text-gray-400">-</span>;
-        const gradeNum = user.lewGrade.replace('GRADE_', '');
-        const maxKva = user.lewGrade === 'GRADE_7' ? 45 : user.lewGrade === 'GRADE_8' ? 500 : 9999;
-        return (
-          <Badge variant="info" className="text-[10px]">
-            G{gradeNum} (≤{maxKva === 9999 ? '400kV' : `${maxKva}kVA`})
-          </Badge>
-        );
-      },
-    },
-    {
-      key: 'lewLicenceNo' as keyof User,
-      header: 'Licence No.',
+      key: 'detail' as keyof User,
+      header: '',
+      width: '90px',
       render: (user) => (
-        <span className={user.lewLicenceNo ? 'text-gray-700 font-mono text-xs' : 'text-gray-400'}>
-          {user.lewLicenceNo || '-'}
-        </span>
-      ),
-    },
-    {
-      key: 'paynowValueMasked' as keyof User,
-      header: 'PayNow',
-      render: (user) => {
-        if (user.role !== 'LEW' || !user.paynowValueMasked) return <span className="text-gray-400">-</span>;
-        const revealed = revealedPaynow[user.userSeq];
-        return (
-          <div className="flex items-center gap-2">
-            <span className="text-gray-700 font-mono text-xs">
-              {revealed ?? user.paynowValueMasked}
-            </span>
-            <span className="text-[10px] text-gray-400">{user.paynowType === 'MOBILE' ? 'Mobile' : 'UEN'}</span>
-            {!revealed && (
-              <button
-                onClick={() => handleRevealPaynow(user)}
-                disabled={revealingId === user.userSeq}
-                className="text-xs text-primary hover:underline disabled:opacity-50"
-                aria-label={`Reveal PayNow for ${fullName(user.firstName, user.lastName)}`}
-              >
-                {revealingId === user.userSeq ? '…' : 'Reveal'}
-              </button>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      key: 'createdAt',
-      header: 'Registered',
-      sortable: true,
-      render: (user) => (
-        <span className="text-gray-500 text-xs">
-          {new Date(user.createdAt).toLocaleDateString()}
-        </span>
+        <button
+          onClick={() => setDetailUser(user)}
+          className="text-xs px-2.5 py-1 border border-gray-200 rounded-md text-primary hover:border-primary hover:bg-primary/5 transition-colors whitespace-nowrap"
+          aria-label={`View details for ${fullName(user.firstName, user.lastName)}`}
+        >
+          Details
+        </button>
       ),
     },
   ];
+
+  const gradeText = (g?: string | null) => {
+    if (!g) return null;
+    const n = g.replace('GRADE_', '');
+    const max = g === 'GRADE_7' ? '≤ 45 kVA' : g === 'GRADE_8' ? '≤ 500 kVA' : '≤ 400 kV';
+    return `Grade ${n} (${max})`;
+  };
+
+  const DetailRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="flex justify-between gap-4 py-2 border-b border-gray-50 last:border-b-0">
+      <span className="text-xs text-gray-500 shrink-0 pt-0.5">{label}</span>
+      <span className="text-sm text-gray-800 text-right break-all">
+        {value === null || value === undefined || value === ''
+          ? <span className="text-gray-400">-</span>
+          : value}
+      </span>
+    </div>
+  );
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -619,6 +587,83 @@ export default function AdminUserListPage() {
         onConfirm={handleApproval}
         onClose={() => setApprovalTarget(null)}
       />
+
+      {/* 사용자 상세 — 목록에서 뺀 항목 + 미노출 정보 */}
+      <Modal isOpen={!!detailUser} onClose={() => setDetailUser(null)} ariaLabelledBy="user-detail-title">
+        {detailUser && (
+          <>
+            <ModalHeader
+              title={fullName(detailUser.firstName, detailUser.lastName)}
+              onClose={() => setDetailUser(null)}
+            />
+            <ModalBody className="space-y-5">
+              {/* 계정 */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Account</p>
+                <DetailRow label="ID" value={<span className="font-mono">#{detailUser.userSeq}</span>} />
+                <DetailRow label="Email" value={detailUser.email} />
+                <DetailRow label="Phone" value={detailUser.phone} />
+                <DetailRow label="Role" value={<Badge variant={getRoleBadgeVariant(detailUser.role)}>{roleLabels[detailUser.role] ?? detailUser.role}</Badge>} />
+                <DetailRow
+                  label="Account status"
+                  value={
+                    detailUser.status === 'PENDING_ACTIVATION'
+                      ? <Badge variant="warning">Invited (pending activation)</Badge>
+                      : <Badge variant={detailUser.status === 'ACTIVE' ? 'success' : 'gray'}>{detailUser.status ?? '-'}</Badge>
+                  }
+                />
+                <DetailRow label="Registered" value={detailUser.createdAt ? new Date(detailUser.createdAt).toLocaleString() : null} />
+              </div>
+
+              {/* LEW 자격 */}
+              {detailUser.role === 'LEW' && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">LEW</p>
+                  <DetailRow
+                    label="Approval"
+                    value={<Badge variant={getApprovalBadgeVariant(detailUser.approvedStatus)}>{detailUser.approvedStatus ?? 'N/A'}</Badge>}
+                  />
+                  <DetailRow label="Licence No." value={detailUser.lewLicenceNo && <span className="font-mono">{detailUser.lewLicenceNo}</span>} />
+                  <DetailRow label="Grade" value={gradeText(detailUser.lewGrade)} />
+                  <DetailRow
+                    label="PayNow"
+                    value={
+                      detailUser.paynowValueMasked ? (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="font-mono">{revealedPaynow[detailUser.userSeq] ?? detailUser.paynowValueMasked}</span>
+                          <span className="text-[10px] text-gray-400">{detailUser.paynowType === 'MOBILE' ? 'Mobile' : 'UEN'}</span>
+                          {!revealedPaynow[detailUser.userSeq] && (
+                            <button
+                              onClick={() => handleRevealPaynow(detailUser)}
+                              disabled={revealingId === detailUser.userSeq}
+                              className="text-xs text-primary hover:underline disabled:opacity-50"
+                            >
+                              {revealingId === detailUser.userSeq ? '…' : 'Reveal'}
+                            </button>
+                          )}
+                        </span>
+                      ) : null
+                    }
+                  />
+                </div>
+              )}
+
+              {/* 사업자/연락 정보 */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400 mb-1">Business / Correspondence</p>
+                <DetailRow label="Company" value={detailUser.companyName} />
+                <DetailRow label="UEN" value={detailUser.uen} />
+                <DetailRow label="Designation" value={detailUser.designation} />
+                <DetailRow label="Address" value={detailUser.correspondenceAddress} />
+                <DetailRow label="Postal code" value={detailUser.correspondencePostalCode} />
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="ghost" onClick={() => setDetailUser(null)}>Close</Button>
+            </ModalFooter>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
