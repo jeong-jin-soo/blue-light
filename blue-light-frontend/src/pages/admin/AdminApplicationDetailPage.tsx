@@ -320,10 +320,16 @@ export default function AdminApplicationDetailPage() {
   };
 
   // LOA (교환 모델 — Part B admin 패널)
+  // 등록/교체 후 loaStatus 와 files 를 함께 재조회한다.
+  // (files 까지 갱신해야 LoA 행의 파일명·업로드 시각이 새 파일로 바뀌어 교체가 화면에 반영됨)
   const loadLoaStatus = useCallback(async () => {
     try {
-      const loaData = await loaApi.getLoaStatus(applicationId);
+      const [loaData, updatedFiles] = await Promise.all([
+        loaApi.getLoaStatus(applicationId),
+        fileApi.getFilesByApplication(applicationId).catch(() => null),
+      ]);
       setLoaStatus(loaData);
+      if (updatedFiles) setFiles(updatedFiles);
     } catch { /* LOA status might not be available */ }
   }, [applicationId]);
 
@@ -529,6 +535,7 @@ export default function AdminApplicationDetailPage() {
               <AdminLoaSection
                 application={application}
                 loaStatus={loaStatus}
+                files={files}
                 onDownload={handleLoaDownload}
                 onReplaced={loadLoaStatus}
               />

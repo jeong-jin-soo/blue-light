@@ -5,17 +5,28 @@ import { Button } from '../../../components/ui/Button';
 import { Textarea } from '../../../components/ui/Textarea';
 import { useToastStore } from '../../../stores/toastStore';
 import loaApi from '../../../api/loaApi';
-import type { AdminApplication, LoaStatus, LoaStage } from '../../../types';
+import type { AdminApplication, LoaStatus, LoaStage, FileInfo } from '../../../types';
 
 type LoaFileType = 'OWNER_AUTH_LETTER' | 'LOA_FINAL';
 
 interface Props {
   application: AdminApplication;
   loaStatus: LoaStatus | null;
+  /** 신청 첨부 파일 목록 — LoA 행에 현재 파일명·업로드 시각을 표시하기 위함. */
+  files: FileInfo[];
   /** 파일 다운로드 핸들러 (페이지가 fileApi.downloadFile 로 위임). */
   onDownload: (fileSeq: number, filename: string) => void;
-  /** 등록/교체 성공 후 상위에서 loaStatus 를 다시 로드. */
+  /** 등록/교체 성공 후 상위에서 loaStatus·files 를 다시 로드. */
   onReplaced: () => void | Promise<void>;
+}
+
+/** 업로드 시각을 간결하게 표기 (YYYY-MM-DD HH:mm). */
+function formatUploadedAt(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 /** loaStage → 표시 라벨 + 뱃지 색상. */
@@ -38,11 +49,15 @@ const FILE_TYPE_LABEL: Record<LoaFileType, string> = {
  * ADMIN/SYSTEM_ADMIN 이 사유를 남기며 LoA 파일을 등록/교체한다.
  * 기존 파일은 서버에서 보관(삭제 안 함)되며 사유는 감사 로그에 기록된다.</p>
  */
-export function AdminLoaSection({ application, loaStatus, onDownload, onReplaced }: Props) {
+export function AdminLoaSection({ application, loaStatus, files, onDownload, onReplaced }: Props) {
   const toast = useToastStore();
 
   const stage: LoaStage = loaStatus?.loaStage ?? 'NOT_STARTED';
   const stageMeta = STAGE_META[stage];
+
+  // 현재(최신) 파일 메타 — 교체 시 파일명·업로드 시각이 바뀌어 화면에 반영됨.
+  const ownerFile = files.find((f) => f.fileSeq === loaStatus?.applicantFileSeq);
+  const finalFile = files.find((f) => f.fileSeq === loaStatus?.finalFileSeq);
 
   // ── 등록/교체 폼 상태 ──
   const [fileType, setFileType] = useState<LoaFileType>('OWNER_AUTH_LETTER');
@@ -111,9 +126,16 @@ export function AdminLoaSection({ application, loaStatus, onDownload, onReplaced
         <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-800">Owner-signed copy</p>
-            <p className="text-xs text-gray-500">
-              {loaStatus?.applicantFileSeq ? 'Uploaded' : 'Not uploaded'}
-            </p>
+            {loaStatus?.applicantFileSeq ? (
+              <p className="text-xs text-gray-500 truncate">
+                {ownerFile?.originalFilename ?? 'Uploaded'}
+                {ownerFile?.uploadedAt && (
+                  <span className="text-gray-400"> · {formatUploadedAt(ownerFile.uploadedAt)}</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">Not uploaded</p>
+            )}
           </div>
           {loaStatus?.applicantFileSeq ? (
             <button
@@ -134,9 +156,16 @@ export function AdminLoaSection({ application, loaStatus, onDownload, onReplaced
         <div className="flex items-center justify-between px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-100">
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-800">Final LoA (LEW)</p>
-            <p className="text-xs text-gray-500">
-              {loaStatus?.finalFileSeq ? 'Uploaded' : 'Not uploaded'}
-            </p>
+            {loaStatus?.finalFileSeq ? (
+              <p className="text-xs text-gray-500 truncate">
+                {finalFile?.originalFilename ?? 'Uploaded'}
+                {finalFile?.uploadedAt && (
+                  <span className="text-gray-400"> · {formatUploadedAt(finalFile.uploadedAt)}</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-gray-500">Not uploaded</p>
+            )}
           </div>
           {loaStatus?.finalFileSeq ? (
             <button
