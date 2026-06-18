@@ -27,6 +27,17 @@ export const sendLoaForm = async (applicationId: number): Promise<LoaStatus> => 
 };
 
 /**
+ * ADMIN/SYSTEM_ADMIN: 신청자에게 active LoA 폼 전달 (LEW send-form 의 admin 경로).
+ * POST /api/admin/applications/{id}/loa/send-form
+ */
+export const adminSendLoaForm = async (applicationId: number): Promise<LoaStatus> => {
+  const response = await axiosClient.post<LoaStatus>(
+    `/admin/applications/${applicationId}/loa/send-form`
+  );
+  return response.data;
+};
+
+/**
  * 신청자(또는 ADMIN 대리): 오프라인 서명본 업로드.
  * POST /api/applications/{id}/loa/applicant-upload
  */
@@ -115,6 +126,7 @@ export const loaApi = {
   getLoaStatus,
   // 교환 모델 (PR3b)
   sendLoaForm,
+  adminSendLoaForm,
   uploadApplicantLoa,
   uploadFinalLoa,
   getActiveLoaForm,

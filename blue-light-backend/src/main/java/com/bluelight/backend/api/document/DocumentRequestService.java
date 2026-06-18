@@ -383,10 +383,10 @@ public class DocumentRequestService {
         }
 
         Application application = dr.getApplication();
-        // 신청자 본인만 fulfill 허용 (owner). ADMIN/LEW 는 파일을 대신 올리지 않는다.
-        // 단 기존 validate* 유틸은 owner/admin/lew 모두 통과시키므로 신청자만 허용하도록 별도 검사.
-        if (!application.getUser().getUserSeq().equals(requestorSeq)) {
-            // LEW/ADMIN 이 타인 신청에 fulfill 시도 — AC-P2 규칙에 따라 404
+        // 신청자 본인 또는 ADMIN/SYSTEM_ADMIN 만 fulfill 허용 (admin 대리 업로드 허용 — admin parity).
+        // LEW 는 fulfill 불가(검토/요청만) → AC-P2 규칙에 따라 404(정보 누설 방지).
+        boolean isOwner = application.getUser().getUserSeq().equals(requestorSeq);
+        if (!isOwner && !OwnershipValidator.isAdmin(requestorRole)) {
             throw new BusinessException("Document request not found",
                     HttpStatus.NOT_FOUND, "DOCUMENT_REQUEST_NOT_FOUND");
         }
