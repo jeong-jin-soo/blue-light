@@ -4,6 +4,7 @@ import com.bluelight.backend.api.auth.dto.AccountSetupCompleteRequest;
 import com.bluelight.backend.api.auth.dto.AccountSetupStatusResponse;
 import com.bluelight.backend.api.auth.dto.TokenResponse;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.security.JwtTokenProvider;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -61,9 +62,12 @@ class AccountSetupControllerTest {
     @BeforeEach
     void setUp() {
         accountSetupService = mock(AccountSetupService.class);
+        // 계정 셋업 완료 시 JWT httpOnly 쿠키 설정 — 컨트롤러가 getExpirationInSeconds().intValue() 사용.
+        JwtTokenProvider jwtTokenProvider = mock(JwtTokenProvider.class);
+        when(jwtTokenProvider.getExpirationInSeconds()).thenReturn(86400L);
         objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders
-            .standaloneSetup(new AccountSetupController(accountSetupService))
+            .standaloneSetup(new AccountSetupController(accountSetupService, jwtTokenProvider))
             .setHandlerExceptionResolvers(businessExceptionResolver())
             .build();
     }
