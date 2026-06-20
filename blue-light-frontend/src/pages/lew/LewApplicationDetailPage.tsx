@@ -253,7 +253,19 @@ export default function LewApplicationDetailPage() {
           </span>
         }
         subtitle={headerSubtitle}
-        actions={<StatusBadge status={application.status} />}
+        actions={
+          <div className="flex items-center gap-2">
+            {/* LEW Review 작업 화면은 어느 단계든 항상 열람 가능 (완료 후에는 읽기 전용). */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/lew/applications/${application.applicationSeq}/review`)}
+            >
+              Open review workspace
+            </Button>
+            <StatusBadge status={application.status} />
+          </div>
+        }
       />
 
       {/* Review Comment (admin이 남긴 review comment가 있다면 노출) */}

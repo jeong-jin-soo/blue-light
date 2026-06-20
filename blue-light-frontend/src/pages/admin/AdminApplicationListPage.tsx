@@ -316,12 +316,11 @@ export default function AdminApplicationListPage() {
       width: '120px',
       align: 'center',
       render: (app) => {
-        // LEW + 본인에게 배정 + PENDING_REVIEW 시 "Review" 링크 노출.
-        // 그 외는 기본 화살표로 상세 페이지(AdminApplicationDetailPage)로 이동.
+        // LEW + 본인에게 배정 시 "Review" 링크 노출 — 단계와 무관하게 항상 진입 가능
+        // (완료 후에는 리뷰 화면이 읽기 전용). 미배정은 기본 화살표로 상세 페이지 이동.
         const showReviewLink =
           currentUser?.role === 'LEW' &&
-          app.assignedLewSeq === currentUser.userSeq &&
-          app.status === 'PENDING_REVIEW';
+          app.assignedLewSeq === currentUser.userSeq;
         if (showReviewLink) {
           return (
             <button
@@ -468,10 +467,9 @@ export default function AdminApplicationListPage() {
                 </span>
               </div>
             )}
-            {/* LEW + 배정 + PENDING_REVIEW일 때 모바일 카드에도 Review 진입 버튼 */}
+            {/* LEW + 배정 시 모바일 카드에도 Review 진입 버튼 — 단계 무관 항상 노출 */}
             {currentUser?.role === 'LEW' &&
-              app.assignedLewSeq === currentUser.userSeq &&
-              app.status === 'PENDING_REVIEW' && (
+              app.assignedLewSeq === currentUser.userSeq && (
                 <button
                   type="button"
                   onClick={(e) => {

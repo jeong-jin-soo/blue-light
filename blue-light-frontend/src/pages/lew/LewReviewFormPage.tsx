@@ -205,6 +205,8 @@ export default function LewReviewFormPage() {
   // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출. 백엔드 LewReviewService.requestPayment 가드와 일치.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
+  // 완료/만료 = 읽기 전용. 리뷰 화면은 어느 단계든 열람 가능하되, 이 상태에서는 편집 동선을 잠근다.
+  const isTerminal = appStatus === 'COMPLETED' || appStatus === 'EXPIRED';
   // LoA 완료 = LEW 최종본 업로드(FINAL_UPLOADED). 백엔드 isLoaFinalized 와 동일 (2026-06-14 결정:
   // 결제 요청은 LoA 완료 후에만 가능). 변수명은 하위 사용처 호환 위해 유지.
   const loaReceived = loaStatus?.loaStage === 'FINAL_UPLOADED';
@@ -284,8 +286,9 @@ export default function LewReviewFormPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicationId, loadData, toast]);
 
-  // Phase 3 권한: LEW는 assigned_lew_seq 일치 시만 서류 요청 가능
+  // Phase 3 권한: LEW는 assigned_lew_seq 일치 시만 서류 요청 가능. 완료/만료 후에는 잠금.
   const canRequestDocuments =
+    !isTerminal &&
     currentUser?.role === 'LEW' &&
     !!adminApp?.assignedLewSeq &&
     adminApp.assignedLewSeq === currentUser?.userSeq;
@@ -583,6 +586,7 @@ export default function LewReviewFormPage() {
                   actionLoading={actionLoading}
                   existingSldFiles={files.filter((f) => f.fileType === 'DRAWING_SLD')}
                   onFileDelete={handleFileDelete}
+                  readOnly={isTerminal}
                 />
               ) : (
                 <InfoBox variant="info">

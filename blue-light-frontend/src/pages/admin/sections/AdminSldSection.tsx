@@ -19,6 +19,8 @@ interface Props {
   actionLoading: boolean;
   existingSldFiles?: FileInfo[];
   onFileDelete?: (fileId: number) => Promise<void>;
+  /** true면 편집 동선(업로드/확정/재오픈) 숨김 — 완료 이후 읽기 전용. */
+  readOnly?: boolean;
 }
 
 type SldTab = 'manual' | 'ai';
@@ -40,6 +42,7 @@ export function AdminSldSection({
   actionLoading,
   existingSldFiles = [],
   onFileDelete,
+  readOnly = false,
 }: Props) {
   // AI_GENERATING 상태면 AI 탭 자동 선택
   const [activeTab, setActiveTab] = useState<SldTab>(
@@ -51,7 +54,7 @@ export function AdminSldSection({
       <h2 className="text-lg font-semibold text-gray-800 mb-4">SLD Drawing Request</h2>
 
       {/* REQUESTED, AI_GENERATING, or UPLOADED — 탭 인터페이스 (재업로드 허용) */}
-      {(sldRequest.status === 'REQUESTED' || sldRequest.status === 'AI_GENERATING' || sldRequest.status === 'UPLOADED') && (
+      {!readOnly && (sldRequest.status === 'REQUESTED' || sldRequest.status === 'AI_GENERATING' || sldRequest.status === 'UPLOADED') && (
         <div className="space-y-4">
           {/* Applicant info banner */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -223,14 +226,16 @@ export function AdminSldSection({
               </div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onSldUnconfirmClick}
-            loading={actionLoading}
-          >
-            Reopen SLD
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSldUnconfirmClick}
+              loading={actionLoading}
+            >
+              Reopen SLD
+            </Button>
+          )}
         </div>
       )}
     </Card>
