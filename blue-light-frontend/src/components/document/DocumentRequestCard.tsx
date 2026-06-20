@@ -39,6 +39,11 @@ interface DocumentRequestCardProps {
   onCancel?: () => void | Promise<void>;
   /** REQUESTED/REJECTED → UPLOADED (신청자 전용, PR#3) */
   onReupload?: (file: File) => Promise<void>;
+  /**
+   * 폼 다운로드 (신청자 전용). Letter of Appointment(LOA) 요청 + 신규 라이센스일 때
+   * active LoA 폼을 내려받게 한다. 제공되면 "Download form" 버튼 노출.
+   */
+  onDownloadForm?: () => Promise<void>;
 }
 
 const variantStyle: Record<DocumentRequestCardVariant, string> = {
@@ -219,11 +224,23 @@ function RequestBody({
   documentType,
   request,
   onReupload,
+  onDownloadForm,
   readOnly,
 }: DocumentRequestCardProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [downloadingForm, setDownloadingForm] = useState(false);
+
+  const handleDownloadForm = async () => {
+    if (!onDownloadForm) return;
+    setDownloadingForm(true);
+    try {
+      await onDownloadForm();
+    } finally {
+      setDownloadingForm(false);
+    }
+  };
 
   const badge = (() => {
     switch (variant) {
@@ -320,6 +337,23 @@ function RequestBody({
           <blockquote className="border-l-2 border-warning-500 pl-3 text-sm text-gray-700 italic">
             {request.lewNote}
           </blockquote>
+        </div>
+      )}
+
+      {/* LoA 폼 다운로드 (Letter of Appointment 요청 + 신규 라이센스일 때만 주입됨) */}
+      {onDownloadForm && variant !== 'approved' && (
+        <div className="mb-3 rounded-md border border-primary-200 bg-primary-50/60 px-3 py-2">
+          <p className="text-xs text-gray-600 mb-2">
+            Download the Letter of Appointment form, sign it offline, then upload the signed copy below.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            loading={downloadingForm}
+            onClick={handleDownloadForm}
+          >
+            Download form
+          </Button>
         </div>
       )}
 

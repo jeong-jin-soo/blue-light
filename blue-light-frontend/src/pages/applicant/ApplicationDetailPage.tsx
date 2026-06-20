@@ -386,6 +386,7 @@ export default function ApplicationDetailPage() {
       <DocumentUploadSection
         applicationSeq={applicationId}
         canUpload={authUser?.role === 'APPLICANT'}
+        applicationType={application.applicationType}
       />
     </div>
   );
@@ -462,7 +463,6 @@ export default function ApplicationDetailPage() {
       <ApplicationLoaSection
         application={application}
         loaStatus={loaStatus}
-        onStatusUpdate={fetchData}
       />
     </div>
   );

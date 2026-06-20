@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import documentApi from '../../api/documentApi';
+import loaApi from '../../api/loaApi';
 import { useToastStore } from '../../stores/toastStore';
+import type { ApplicationType } from '../../types';
 import type { DocumentRequest, DocumentType } from '../../types/document';
 import { Card, CardHeader } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -14,6 +16,8 @@ interface DocumentUploadSectionProps {
   applicationSeq: number;
   /** 신청자(APPLICANT)만 자발적 업로드 가능. LEW/ADMIN은 읽기 전용. */
   canUpload: boolean;
+  /** 신청 유형 — NEW + LOA 요청일 때 Letter of Appointment 폼 다운로드 버튼 노출. */
+  applicationType?: ApplicationType;
 }
 
 /**
@@ -34,12 +38,14 @@ interface DocumentUploadSectionProps {
 export function DocumentUploadSection({
   applicationSeq,
   canUpload,
+  applicationType,
 }: DocumentUploadSectionProps) {
   const toast = useToastStore();
 
   const [catalog, setCatalog] = useState<DocumentType[]>([]);
   const [requests, setRequests] = useState<DocumentRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loaFormAvailable, setLoaFormAvailable] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DocumentRequest | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -76,6 +82,40 @@ export function DocumentUploadSection({
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
+
+  // NEW 신청일 때만 active Letter of Appointment 폼 가용 여부 확인 (LOA 요청 카드의 폼 다운로드용).
+  useEffect(() => {
+    if (applicationType !== 'NEW') {
+      setLoaFormAvailable(false);
+      return;
+    }
+    let cancelled = false;
+    loaApi
+      .getActiveLoaForm(applicationSeq)
+      .then(() => !cancelled && setLoaFormAvailable(true))
+      .catch(() => !cancelled && setLoaFormAvailable(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [applicationSeq, applicationType]);
+
+  const handleDownloadLoaForm = useCallback(async () => {
+    try {
+      const blob = await loaApi.downloadActiveLoaForm(applicationSeq);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Letter_of_Appointment_form_${applicationSeq}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Failed to download the Letter of Appointment form');
+    }
+    // toast store 참조는 stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationSeq]);
 
   const handleUpload = async ({
     documentTypeCode,
@@ -223,6 +263,14 @@ export function DocumentUploadSection({
                           onReupload={
                             canUpload
                               ? (file) => handleReupload(req.id, file)
+                              : undefined
+                          }
+                          onDownloadForm={
+                            canUpload &&
+                            req.documentTypeCode === 'LOA' &&
+                            applicationType === 'NEW' &&
+                            loaFormAvailable
+                              ? handleDownloadLoaForm
                               : undefined
                           }
                         />

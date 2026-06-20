@@ -75,7 +75,6 @@ export default function LewReviewFormPage() {
   // /api/admin/applications/{id} — KvaSection/LOA/SLD 모두 이 형상 요구
   const [adminApp, setAdminApp] = useState<AdminApplication | null>(null);
   const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
-  const [loaGenerating, setLoaGenerating] = useState(false);
   const [loaUploading, setLoaUploading] = useState(false);
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
   const [files, setFiles] = useState<FileInfo[]>([]);
@@ -153,25 +152,7 @@ export default function LewReviewFormPage() {
   }, [idValid, applicationId]);
 
   // ── LoA 교환 모델 액션 (loa-exchange-redesign-spec.md §3.3, PR3b) ──
-  // send-form / final-upload 는 /api/lew/** (담당 LEW 전용) 경로 사용.
-  // (loaGenerating/loaUploading state 는 각각 sending/uploading 의미로 재사용)
-  const handleSendLoaForm = async () => {
-    setLoaGenerating(true);
-    try {
-      const status = await loaApi.sendLoaForm(applicationId);
-      setLoaStatus(status);
-      toast.success('LoA form sent to applicant');
-    } catch (err) {
-      const code = (err as ApiErrorShape).response?.data?.code;
-      if (code === 'NO_ACTIVE_LOA_FORM') {
-        toast.error('No active LoA form is configured. Please contact an administrator.');
-      } else {
-        toast.error('Failed to send LoA form');
-      }
-    } finally {
-      setLoaGenerating(false);
-    }
-  };
+  // final-upload 는 /api/lew/** (담당 LEW 전용) 경로 사용. 신청자 서명본 수집은 Documents 탭으로 일원화.
   const handleUploadFinalLoa = async (file: File) => {
     setLoaUploading(true);
     try {
@@ -565,12 +546,9 @@ export default function LewReviewFormPage() {
 
           <TabPanel active={activeTab === 'loa'}>
             <LewLoaExchangeSection
-              applicationType={adminApp.applicationType}
               loaStatus={loaStatus}
-              onSendForm={handleSendLoaForm}
               onUploadFinal={handleUploadFinalLoa}
               onDownloadFile={handleLoaDownload}
-              sendingForm={loaGenerating}
               uploadingFinal={loaUploading}
             />
           </TabPanel>

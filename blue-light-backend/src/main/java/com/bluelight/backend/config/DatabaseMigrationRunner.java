@@ -685,6 +685,18 @@ public class DatabaseMigrationRunner {
             if (relabeled > 0) {
                 log.info("Migration [doc-catalog-mime]: SP_ACCOUNT label updated (PDF → Document)");
             }
+            // LOA 라벨 정정: "Letter of Authorisation" → "Letter of Appointment" (도메인 정본 용어).
+            int loaRelabel = stmt.executeUpdate(
+                "UPDATE document_type_catalog " +
+                "SET label_en = 'Letter of Appointment', label_ko = 'Letter of Appointment', " +
+                "    description = 'Signed letter appointing the LEW to act on your behalf', " +
+                "    help_text = 'Upload the signed Letter of Appointment. PDF, JPG, or PNG accepted.', " +
+                "    updated_at = NOW() " +
+                "WHERE code = 'LOA' AND label_en = 'Letter of Authorisation'"
+            );
+            if (loaRelabel > 0) {
+                log.info("Migration [doc-catalog-mime]: LOA label updated (Authorisation → Appointment)");
+            }
         }
     }
 
