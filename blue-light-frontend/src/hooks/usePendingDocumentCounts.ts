@@ -5,7 +5,7 @@ import documentApi from '../api/documentApi';
  * Phase 3 PR#3 — 신청 목록/대시보드의 "awaiting N" 배지용 훅 (AC-AU3)
  *
  * 각 applicationSeq에 대해 DocumentRequest 목록을 병렬 조회하고,
- * REQUESTED 또는 REJECTED 상태의 요청 건수를 집계한다.
+ * REQUESTED(미수취) 상태의 요청 건수를 집계한다. (승인/반려 단계 제거 — 2026-06-18)
  *
  * 설계 노트:
  * - 목록 API에 집계값이 없어 per-row 조회가 필요하지만, 목록은 보통 ≤ 20건이며
@@ -36,7 +36,7 @@ export function usePendingDocumentCounts(
             try {
               const reqs = await documentApi.getDocumentRequests(seq);
               const pending = reqs.filter(
-                (r) => r.status === 'REQUESTED' || r.status === 'REJECTED',
+                (r) => r.status === 'REQUESTED',
               ).length;
               return [seq, pending] as const;
             } catch {

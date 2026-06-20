@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { DocumentRequest } from '../../types/document';
 
 interface DocumentRequestBannerProps {
-  /** 전체 요청 목록 — 내부에서 REQUESTED/REJECTED만 집계 */
+  /** 전체 요청 목록 — 내부에서 REQUESTED(미수취)만 집계 */
   requests: DocumentRequest[];
   /** "View" 클릭 시 호출 (섹션 앵커로 스크롤) */
   onView?: () => void;
@@ -13,8 +13,8 @@ interface DocumentRequestBannerProps {
 /**
  * Phase 3 PR#3 — 신청자 상단 경고 배너 (AC-AU1)
  *
- * 노출 조건: REQUESTED 또는 REJECTED 상태의 요청이 1건 이상 있을 때만 렌더.
- * 모든 요청이 APPROVED/CANCELLED가 되면 자동 숨김.
+ * 노출 조건: REQUESTED(미수취) 상태의 요청이 1건 이상 있을 때만 렌더.
+ * 업로드(UPLOADED)되거나 취소(CANCELLED)되면 자동 숨김. (승인/반려 단계 제거 — 2026-06-18)
  *
  * 색: warning (Phase 1/2 InfoBox의 info 톤보다 한 단계 강함 — UX §3-1).
  */
@@ -23,17 +23,10 @@ export function DocumentRequestBanner({
   onView,
   anchorId = 'doc-requests',
 }: DocumentRequestBannerProps) {
-  const { total, rejected } = useMemo(() => {
-    let total = 0;
-    let rejected = 0;
-    for (const r of requests) {
-      if (r.status === 'REQUESTED' || r.status === 'REJECTED') {
-        total += 1;
-        if (r.status === 'REJECTED') rejected += 1;
-      }
-    }
-    return { total, rejected };
-  }, [requests]);
+  const total = useMemo(
+    () => requests.filter((r) => r.status === 'REQUESTED').length,
+    [requests],
+  );
 
   if (total === 0) return null;
 
@@ -65,11 +58,6 @@ export function DocumentRequestBanner({
           <p className="text-sm font-medium text-warning-800">
             Your LEW requested {total} document{total > 1 ? 's' : ''}
           </p>
-          {rejected > 0 && (
-            <p className="text-xs text-warning-700 mt-1">
-              {rejected} rejected · please re-upload
-            </p>
-          )}
         </div>
         <button
           type="button"

@@ -55,16 +55,13 @@ export function LewConfirmationSummary({
       ? { text: 'Awaiting final', variant: 'info' }
       : { text: 'Pending', variant: 'warning' };
 
-  // ── Documents ──
-  const approvedDocs = documentRequests.filter((d) => d.status === 'APPROVED').length;
-  const pendingDocs = documentRequests.filter(
-    (d) => d.status === 'REQUESTED' || d.status === 'UPLOADED',
-  ).length;
-  const rejectedDocs = documentRequests.filter((d) => d.status === 'REJECTED').length;
+  // ── Documents ── (승인/반려 단계 제거 — REQUESTED=미수취, UPLOADED=수취 완료)
+  const outstandingDocs = documentRequests.filter((d) => d.status === 'REQUESTED').length;
+  const receivedDocs = documentRequests.filter((d) => d.status === 'UPLOADED').length;
   const docsBadge: { text: string; variant: BadgeVariant } =
-    pendingDocs > 0 || rejectedDocs > 0
-      ? { text: `${pendingDocs + rejectedDocs} outstanding`, variant: 'warning' }
-      : { text: 'All resolved', variant: 'success' };
+    outstandingDocs > 0
+      ? { text: `${outstandingDocs} outstanding`, variant: 'warning' }
+      : { text: 'All received', variant: 'success' };
 
   // ── SLD ──
   const sldConfirmed = sldRequest?.status === 'CONFIRMED';
@@ -112,7 +109,7 @@ export function LewConfirmationSummary({
           value={
             documentRequests.length === 0
               ? 'No document requests'
-              : `${approvedDocs} approved · ${pendingDocs} pending${rejectedDocs > 0 ? ` · ${rejectedDocs} rejected` : ''}`
+              : `${receivedDocs} received · ${outstandingDocs} outstanding`
           }
           action={editable ? { text: 'Open Documents', onClick: () => onGoToTab('documents') } : undefined}
         />

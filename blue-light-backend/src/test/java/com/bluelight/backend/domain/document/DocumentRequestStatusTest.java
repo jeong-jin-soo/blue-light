@@ -4,17 +4,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import static com.bluelight.backend.domain.document.DocumentRequestStatus.APPROVED;
 import static com.bluelight.backend.domain.document.DocumentRequestStatus.CANCELLED;
-import static com.bluelight.backend.domain.document.DocumentRequestStatus.REJECTED;
 import static com.bluelight.backend.domain.document.DocumentRequestStatus.REQUESTED;
-import static com.bluelight.backend.domain.document.DocumentRequestStatus.UPLOADED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * DocumentRequestStatus 상태 머신 단위 테스트 — Phase 3 PR#1
+ * DocumentRequestStatus 상태 머신 단위 테스트.
  *
- * AC-S1~S6 상태 전이 가드 16케이스 파라미터화 검증.
+ * LEW 승인/반려 단계 제거 후(2026-06-18): REQUESTED / UPLOADED / CANCELLED 만 존재.
+ *   REQUESTED → UPLOADED | CANCELLED
+ *   UPLOADED  → UPLOADED (재업로드)
+ *   CANCELLED → (종결)
  */
 class DocumentRequestStatusTest {
 
@@ -23,24 +23,15 @@ class DocumentRequestStatusTest {
             // legal
             "REQUESTED, UPLOADED,  true",
             "REQUESTED, CANCELLED, true",
-            "UPLOADED,  APPROVED,  true",
-            "UPLOADED,  REJECTED,  true",
-            "UPLOADED,  UPLOADED,  true",   // 재업로드 (REJECTED→UPLOADED와 동일 경로)
-            "REJECTED,  UPLOADED,  true",
+            "UPLOADED,  UPLOADED,  true",   // 재업로드 (덮어쓰기 허용)
 
             // illegal
-            "REQUESTED, APPROVED,  false",
-            "REQUESTED, REJECTED,  false",
+            "REQUESTED, REQUESTED, false",
             "UPLOADED,  REQUESTED, false",
             "UPLOADED,  CANCELLED, false",
-            "REJECTED,  APPROVED,  false",
-            "REJECTED,  REJECTED,  false",
-            "REJECTED,  CANCELLED, false",
-            "APPROVED,  REJECTED,  false",
-            "APPROVED,  UPLOADED,  false",
-            "APPROVED,  CANCELLED, false",
             "CANCELLED, REQUESTED, false",
-            "CANCELLED, UPLOADED,  false"
+            "CANCELLED, UPLOADED,  false",
+            "CANCELLED, CANCELLED, false"
     })
     void canTransitionTo_파라미터화_검증(DocumentRequestStatus from,
                                         DocumentRequestStatus to,
@@ -59,7 +50,6 @@ class DocumentRequestStatusTest {
 
     @Test
     void 종결_상태는_자기_자신으로도_전이_불가() {
-        assertThat(APPROVED.canTransitionTo(APPROVED)).isFalse();
         assertThat(CANCELLED.canTransitionTo(CANCELLED)).isFalse();
         assertThat(REQUESTED.canTransitionTo(REQUESTED)).isFalse();
     }

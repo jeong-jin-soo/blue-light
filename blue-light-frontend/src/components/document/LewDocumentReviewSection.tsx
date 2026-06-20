@@ -9,20 +9,16 @@ import { Card, CardHeader } from '../ui/Card';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { DocumentRequestModal } from './DocumentRequestModal';
-import { RejectReasonModal } from './RejectReasonModal';
 import { formatBytes } from './documentUtils';
 
 /**
  * Phase 3 PR#2 — LEW/ADMIN 신청 상세의 "서류 요청" 섹션 (AC-LU3)
  *
  * - 상단 우측 "+ 서류 요청" 버튼 (DocumentRequestModal 오픈)
- * - 요청 목록 카드:
- *   · REQUESTED: [Cancel Request]
- *   · UPLOADED: 파일명 + [Reject] + [Approve]
- *   · APPROVED / REJECTED: 읽기 전용
+ * - 요청 목록 카드 (LEW 승인/반려 단계 제거 — 2026-06-18):
+ *   · REQUESTED: [Cancel Request] (+ ADMIN 대리 업로드)
+ *   · UPLOADED: "Received" + 파일명 + [Download]
  *   · CANCELLED: 섹션에서 제외 (fetch 시 필터)
- * - Approve 낙관적 업데이트 → 실패 시 롤백 + Toast
- * - Reject 클릭 → RejectReasonModal 열기
  * - Cancel 클릭 → ConfirmDialog 확인 후 API 호출
  *
  * Phase 2의 DocumentUploadSection(자발적 업로드)과는 별개로 노출된다 — "서류 요청" 워크플로 전용.
@@ -59,13 +55,11 @@ export function LewDocumentReviewSection({
   const [loading, setLoading] = useState(true);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [rejectTarget, setRejectTarget] = useState<DocumentRequest | null>(null);
   const [cancelTarget, setCancelTarget] = useState<DocumentRequest | null>(null);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [approvingId, setApprovingId] = useState<number | null>(null);
   const [fulfillingId, setFulfillingId] = useState<number | null>(null);
 
-  // ADMIN 대리 업로드(fulfill) — REQUESTED/REJECTED 요청에 신청자 대신 파일 업로드.
+  // ADMIN 대리 업로드(fulfill) — REQUESTED 요청에 신청자 대신 파일 업로드.
   const handleFulfill = async (req: DocumentRequest, file: File) => {
     setFulfillingId(req.id);
     try {
@@ -119,56 +113,7 @@ export function LewDocumentReviewSection({
     [requests],
   );
 
-  const handleApprove = async (req: DocumentRequest) => {
-    // 낙관적 업데이트
-    const prev = requests;
-    setApprovingId(req.id);
-    setRequests((list) =>
-      list.map((r) =>
-        r.id === req.id
-          ? {
-              ...r,
-              status: 'APPROVED',
-              reviewedAt: new Date().toISOString(),
-            }
-          : r,
-      ),
-    );
-    try {
-      await documentApi.approveDocumentRequest(req.id);
-      toast.success('Approved');
-      // 서버 상태로 refresh (reviewedBy 등 메타 정확화)
-      fetchAll();
-      onRequestsChanged?.();  // 부모 가드(pendingDocCount) 갱신
-    } catch (err) {
-      // 롤백
-      setRequests(prev);
-      const msg =
-        (err as { message?: string })?.message ??
-        'Failed to approve. Please try again.';
-      toast.error(msg);
-    } finally {
-      setApprovingId(null);
-    }
-  };
-
-  const handleRejectSubmit = async (reason: string) => {
-    if (!rejectTarget) return;
-    try {
-      await documentApi.rejectDocumentRequest(rejectTarget.id, reason);
-      toast.success('Rejected');
-      setRejectTarget(null);
-      fetchAll();
-      onRequestsChanged?.();  // 부모 가드(pendingDocCount) 갱신
-    } catch (err) {
-      const msg =
-        (err as { message?: string })?.message ??
-        'Failed to reject.';
-      toast.error(msg);
-      // 모달은 유지해서 재시도 가능하게
-      throw err;
-    }
-  };
+  // handleApprove / handleRejectSubmit 제거됨 (2026-06-18 — LEW 승인/반려 단계 폐지).
 
   const handleCancelConfirm = async () => {
     if (!cancelTarget) return;
@@ -238,9 +183,6 @@ export function LewDocumentReviewSection({
                 <LewRequestRow
                   request={req}
                   documentType={catalogByCode.get(req.documentTypeCode) ?? null}
-                  approving={approvingId === req.id}
-                  onApprove={() => handleApprove(req)}
-                  onReject={() => setRejectTarget(req)}
                   onCancel={() => setCancelTarget(req)}
                   onDownload={() => handleDownload(req)}
                   canFulfill={canFulfill}
@@ -268,20 +210,6 @@ export function LewDocumentReviewSection({
         />
       )}
 
-      <RejectReasonModal
-        isOpen={rejectTarget !== null}
-        requestId={rejectTarget?.id ?? null}
-        documentLabel={
-          rejectTarget
-            ? rejectTarget.customLabel ??
-              catalogByCode.get(rejectTarget.documentTypeCode)?.labelEn ??
-              rejectTarget.documentTypeCode
-            : undefined
-        }
-        onClose={() => setRejectTarget(null)}
-        onSubmit={handleRejectSubmit}
-      />
-
       <ConfirmDialog
         isOpen={cancelTarget !== null}
         onClose={() => (cancelLoading ? undefined : setCancelTarget(null))}
@@ -307,17 +235,12 @@ export function LewDocumentReviewSection({
 
 const variantStyle: Record<string, { border: string; bg: string }> = {
   REQUESTED: { border: 'border-warning-500/40', bg: 'bg-warning-50' },
-  UPLOADED: { border: 'border-info-500/40', bg: 'bg-info-50' },
-  APPROVED: { border: 'border-success-500/40', bg: 'bg-success-50' },
-  REJECTED: { border: 'border-error-500/40', bg: 'bg-error-50' },
+  UPLOADED: { border: 'border-success-500/40', bg: 'bg-success-50' },
 };
 
 function LewRequestRow({
   request,
   documentType,
-  approving,
-  onApprove,
-  onReject,
   onCancel,
   onDownload,
   canFulfill,
@@ -326,9 +249,6 @@ function LewRequestRow({
 }: {
   request: DocumentRequest;
   documentType: DocumentType | null;
-  approving: boolean;
-  onApprove: () => void;
-  onReject: () => void;
   onCancel: () => void;
   onDownload: () => void;
   canFulfill: boolean;
@@ -352,20 +272,8 @@ function LewRequestRow({
         );
       case 'UPLOADED':
         return (
-          <Badge variant="info" dot>
-            Under Review
-          </Badge>
-        );
-      case 'APPROVED':
-        return (
           <Badge variant="success" dot>
-            Approved
-          </Badge>
-        );
-      case 'REJECTED':
-        return (
-          <Badge variant="error" dot>
-            Rejected
+            Received
           </Badge>
         );
       default:
@@ -419,56 +327,20 @@ function LewRequestRow({
         </div>
       )}
 
-      {request.status === 'REJECTED' && request.rejectionReason && (
-        <div className="bg-surface border-l-2 border-error-500 rounded p-3 mb-2">
-          <p className="text-xs font-medium text-gray-500 mb-1">
-            Rejection reason
-          </p>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">
-            {request.rejectionReason}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            Awaiting applicant re-upload.
-          </p>
-        </div>
-      )}
-
-      {request.status === 'APPROVED' && (
-        <p className="text-xs text-success-700 flex items-center gap-1 mb-2">
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            viewBox="0 0 24 24"
-            aria-hidden
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          Approved
-          {request.reviewedAt && (
-            <span className="text-gray-500 ml-1">
-              · {new Date(request.reviewedAt).toLocaleString()}
-            </span>
-          )}
-        </p>
-      )}
-
-      {/* 액션 버튼 — 불법 전이 버튼은 렌더링하지 않음 (AC-S5/S6 사전 차단) */}
+      {/* 액션 버튼 — 불법 전이 버튼은 렌더링하지 않음. 승인/반려 단계 제거(2026-06-18). */}
       <div className="flex justify-end gap-2 mt-3 flex-wrap">
-        {(request.status === 'UPLOADED' || request.status === 'APPROVED') &&
-          request.fulfilledFileSeq && (
-            <Button size="sm" variant="ghost" onClick={onDownload}>
-              Download
-            </Button>
-          )}
+        {request.status === 'UPLOADED' && request.fulfilledFileSeq && (
+          <Button size="sm" variant="ghost" onClick={onDownload}>
+            Download
+          </Button>
+        )}
         {request.status === 'REQUESTED' && (
           <Button size="sm" variant="ghost" onClick={onCancel}>
             Cancel Request
           </Button>
         )}
-        {/* ADMIN 대리 업로드 — REQUESTED/REJECTED 요청에 신청자 대신 파일 첨부 (admin parity) */}
-        {canFulfill && (request.status === 'REQUESTED' || request.status === 'REJECTED') && (
+        {/* ADMIN 대리 업로드 — REQUESTED 요청에 신청자 대신 파일 첨부 (admin parity) */}
+        {canFulfill && request.status === 'REQUESTED' && (
           <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg border border-primary/40 text-primary cursor-pointer hover:bg-primary-50 transition-colors ${fulfilling ? 'opacity-50 pointer-events-none' : ''}`}>
             {fulfilling ? 'Uploading…' : '↥ Upload on behalf'}
             <input
@@ -483,22 +355,6 @@ function LewRequestRow({
               }}
             />
           </label>
-        )}
-        {request.status === 'UPLOADED' && (
-          <>
-            <Button
-              size="sm"
-              variant="outline"
-              className="text-error-700 border-error-500/40 hover:bg-error-50"
-              onClick={onReject}
-              disabled={approving}
-            >
-              Reject
-            </Button>
-            <Button size="sm" onClick={onApprove} loading={approving}>
-              Approve ✓
-            </Button>
-          </>
         )}
       </div>
     </div>

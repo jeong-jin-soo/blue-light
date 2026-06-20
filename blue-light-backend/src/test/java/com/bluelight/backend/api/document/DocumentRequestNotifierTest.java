@@ -127,49 +127,5 @@ class DocumentRequestNotifierTest {
                 anyString(), anyString(), anyLong(), anyString());
     }
 
-    @Test
-    void 승인시_신청자에게_인앱_이메일_발송() {
-        User applicant = mockUser(10L, "a@example.com", "John", "Tan");
-        Application app = mockApplication(42L, applicant, null);
-        DocumentRequest dr = mockDr(7L, app, "LOA", null, null);
-
-        notifier.notifyApproved(dr);
-
-        verify(notificationService).createNotification(
-                eq(10L), eq(NotificationType.DOCUMENT_REQUEST_APPROVED),
-                anyString(), anyString(), eq("APPLICATION"), eq(42L));
-        verify(emailService).sendDocumentRequestApprovedEmail(
-                eq("a@example.com"), eq("John Tan"), eq(42L), eq("LOA"));
-    }
-
-    @Test
-    void 반려시_사유를_이메일에_전달한다() {
-        User applicant = mockUser(10L, "a@example.com", "John", "Tan");
-        Application app = mockApplication(42L, applicant, null);
-        String reason = "Photo is blurred; please resubmit.";
-        DocumentRequest dr = mockDr(7L, app, "LOA", null, reason);
-
-        notifier.notifyRejected(dr);
-
-        verify(notificationService).createNotification(
-                eq(10L), eq(NotificationType.DOCUMENT_REQUEST_REJECTED),
-                anyString(), anyString(), eq("APPLICATION"), eq(42L));
-        verify(emailService).sendDocumentRequestRejectedEmail(
-                eq("a@example.com"), eq("John Tan"), eq(42L), eq("LOA"), eq(reason));
-    }
-
-    @Test
-    void 수신자_이메일_없으면_이메일_발송_스킵되지만_인앱은_유지() {
-        User applicant = mockUser(10L, null, "John", "Tan");
-        Application app = mockApplication(42L, applicant, null);
-        DocumentRequest dr = mockDr(7L, app, "LOA", null, null);
-
-        notifier.notifyApproved(dr);
-
-        verify(notificationService).createNotification(
-                eq(10L), eq(NotificationType.DOCUMENT_REQUEST_APPROVED),
-                anyString(), anyString(), eq("APPLICATION"), eq(42L));
-        verify(emailService, never()).sendDocumentRequestApprovedEmail(
-                anyString(), anyString(), anyLong(), anyString());
-    }
+    // 승인/반려 알림 테스트 제거됨 (2026-06-18 — notifyApproved/notifyRejected 폐지).
 }

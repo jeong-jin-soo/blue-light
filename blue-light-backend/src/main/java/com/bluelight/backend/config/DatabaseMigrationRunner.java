@@ -169,6 +169,10 @@ public class DatabaseMigrationRunner {
             //   document_type_catalog 는 data.sql(never 모드)로만 시드되어 dev/prod 기존 행이
             //   옛 PDF-전용으로 남을 수 있다. accepted_mime 를 멱등 갱신해 JPEG/PNG 를 연다.
             migrateDocumentCatalogAcceptedMime(conn);
+            // ── 문서 요청 승인/반려 단계 제거 (2026-06-18) — 레거시 APPROVED/REJECTED 행을 UPLOADED 로 ──
+            //   DocumentRequestStatus enum 에서 APPROVED/REJECTED 제거 → 기존 행 로드 시 enum 파싱 실패 방지.
+            //   부팅 시 1회 적용 후 멱등(매칭 행 0).
+            migrateDocumentRequestRemoveApproveReject(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -680,6 +684,25 @@ public class DatabaseMigrationRunner {
             );
             if (relabeled > 0) {
                 log.info("Migration [doc-catalog-mime]: SP_ACCOUNT label updated (PDF → Document)");
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: 문서 요청 승인/반려 단계 제거 (2026-06-18).
+     * <p>레거시 {@code document_request.status} 의 'APPROVED'/'REJECTED' 행을 'UPLOADED' 로 전환한다.
+     * DocumentRequestStatus enum 에서 두 값을 제거했으므로, 잔존 행이 있으면 엔티티 로드 시 enum
+     * 파싱이 실패한다. 부팅 시 1회 적용 후 매칭 행이 0이 되어 멱등하다.</p>
+     */
+    private void migrateDocumentRequestRemoveApproveReject(Connection conn) throws SQLException {
+        if (!tableExists(conn, "document_request")) return;
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE document_request SET status = 'UPLOADED' " +
+                "WHERE status IN ('APPROVED', 'REJECTED')"
+            );
+            if (updated > 0) {
+                log.info("Migration [docreq-approve-reject-removal]: {} row(s) APPROVED/REJECTED → UPLOADED", updated);
             }
         }
     }

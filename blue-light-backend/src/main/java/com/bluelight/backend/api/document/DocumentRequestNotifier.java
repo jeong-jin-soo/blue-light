@@ -104,75 +104,7 @@ public class DocumentRequestNotifier {
         });
     }
 
-    /**
-     * LEW 승인 → 신청자에게 인앱 + 이메일 (AC-N3).
-     */
-    public void notifyApproved(DocumentRequest request) {
-        if (request == null) return;
-        Application application = request.getApplication();
-        if (application == null) return;
-        User applicant = application.getUser();
-        if (applicant == null) return;
-
-        final Long applicantSeq = applicant.getUserSeq();
-        final String applicantName = applicant.getFullName();
-        final String applicantEmail = applicant.getEmail();
-        final Long appSeq = application.getApplicationSeq();
-        final Long drId = request.getId();
-        final String code = request.getDocumentTypeCode();
-        final String label = documentLabel(request);
-
-        afterCommit(() -> {
-            createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_APPROVED,
-                    "Document approved",
-                    "Application #" + appSeq + " — " + code + " has been approved.",
-                    "APPLICATION", appSeq);
-            if (hasEmail(applicantEmail)) {
-                try {
-                    emailService.sendDocumentRequestApprovedEmail(applicantEmail, applicantName, appSeq, label);
-                } catch (Exception e) {
-                    log.warn("sendDocumentRequestApprovedEmail failed (suppressed): drId={}, err={}",
-                            drId, e.getMessage());
-                }
-            }
-        });
-    }
-
-    /**
-     * LEW 반려 → 신청자에게 인앱 + 이메일 (사유 포함, AC-N3).
-     */
-    public void notifyRejected(DocumentRequest request) {
-        if (request == null) return;
-        Application application = request.getApplication();
-        if (application == null) return;
-        User applicant = application.getUser();
-        if (applicant == null) return;
-
-        final Long applicantSeq = applicant.getUserSeq();
-        final String applicantName = applicant.getFullName();
-        final String applicantEmail = applicant.getEmail();
-        final Long appSeq = application.getApplicationSeq();
-        final Long drId = request.getId();
-        final String code = request.getDocumentTypeCode();
-        final String label = documentLabel(request);
-        final String reason = request.getRejectionReason();
-
-        afterCommit(() -> {
-            createInAppSafe(applicantSeq, NotificationType.DOCUMENT_REQUEST_REJECTED,
-                    "Document rejected",
-                    "Application #" + appSeq + " — " + code + " was rejected. Please re-upload.",
-                    "APPLICATION", appSeq);
-            if (hasEmail(applicantEmail)) {
-                try {
-                    emailService.sendDocumentRequestRejectedEmail(
-                            applicantEmail, applicantName, appSeq, label, reason);
-                } catch (Exception e) {
-                    log.warn("sendDocumentRequestRejectedEmail failed (suppressed): drId={}, err={}",
-                            drId, e.getMessage());
-                }
-            }
-        });
-    }
+    // notifyApproved / notifyRejected 제거됨 (2026-06-18 — LEW 승인/반려 단계 폐지).
 
     // ──────────────────────────────────────────────────────────────────
     // 내부 헬퍼

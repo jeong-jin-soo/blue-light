@@ -216,38 +216,17 @@ public class DocumentRequest extends BaseEntity {
     }
 
     /**
-     * 신청자 fulfill — REQUESTED/REJECTED/UPLOADED → UPLOADED.
-     * 재업로드 시 rejection_reason 은 보존하고 reviewed_by/at 만 초기화한다.
+     * 신청자 fulfill — REQUESTED/UPLOADED → UPLOADED. (LEW 승인/반려 단계 제거됨 — 2026-06-18)
+     * 재업로드 시 과거 검토 기록(reviewed_by/at)은 초기화한다.
      */
     public void fulfill(FileEntity newFile) {
         assertCanTransitionTo(DocumentRequestStatus.UPLOADED);
         this.fulfilledFile = newFile;
         this.fulfilledAt = LocalDateTime.now();
-        // 재업로드(REJECTED → UPLOADED 또는 UPLOADED → UPLOADED) 시 검토 기록 초기화
+        // 재업로드(UPLOADED → UPLOADED) 시 레거시 검토 기록 초기화
         this.reviewedAt = null;
         this.reviewedBy = null;
         this.status = DocumentRequestStatus.UPLOADED;
-    }
-
-    /**
-     * LEW 승인 — UPLOADED → APPROVED
-     */
-    public void approve(User reviewer) {
-        assertCanTransitionTo(DocumentRequestStatus.APPROVED);
-        this.status = DocumentRequestStatus.APPROVED;
-        this.reviewedBy = reviewer;
-        this.reviewedAt = LocalDateTime.now();
-    }
-
-    /**
-     * LEW 반려 — UPLOADED → REJECTED
-     */
-    public void reject(User reviewer, String reason) {
-        assertCanTransitionTo(DocumentRequestStatus.REJECTED);
-        this.status = DocumentRequestStatus.REJECTED;
-        this.rejectionReason = reason;
-        this.reviewedBy = reviewer;
-        this.reviewedAt = LocalDateTime.now();
     }
 
     /**

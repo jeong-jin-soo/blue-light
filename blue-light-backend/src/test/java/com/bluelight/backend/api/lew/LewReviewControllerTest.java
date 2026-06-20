@@ -184,18 +184,7 @@ class LewReviewControllerTest {
             .andExpect(jsonPath("$.code").value("KVA_NOT_CONFIRMED"));
     }
 
-    @Test
-    @DisplayName("request-payment 시 미해결 서류 요청은 409 DOCUMENT_REQUESTS_PENDING")
-    void request_payment_documents_pending_409() throws Exception {
-        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
-            .thenThrow(new BusinessException(
-                "Pending docs", HttpStatus.CONFLICT,
-                LewReviewErrorCode.DOCUMENT_REQUESTS_PENDING));
-
-        mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
-            .andExpect(status().isConflict())
-            .andExpect(jsonPath("$.code").value("DOCUMENT_REQUESTS_PENDING"));
-    }
+    // (제거됨) 미해결 서류 요청 게이트 — 2026-06-18 결정으로 문서는 결제 요청을 막지 않음(kVA 확정이 충분조건).
 
     @Test
     @DisplayName("request-payment 미배정 LEW 호출은 403 APPLICATION_NOT_ASSIGNED")

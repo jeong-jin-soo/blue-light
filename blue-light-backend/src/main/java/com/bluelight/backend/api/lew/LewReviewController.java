@@ -56,8 +56,8 @@ public class LewReviewController {
      * <ul>
      *   <li>{@code INVALID_STATUS_TRANSITION} — status 전제 위반</li>
      *   <li>{@code KVA_NOT_CONFIRMED} — kVA 미확정</li>
-     *   <li>{@code DOCUMENT_REQUESTS_PENDING} — 미해결 서류 요청 존재</li>
      * </ul>
+     * <p>문서요청·LoA 상태는 결제 요청을 막지 않는다 (2026-06-18 결정 — kVA 확정이 충분조건).</p>
      */
     @PostMapping("/{id}/request-payment")
     @PreAuthorize("@appSec.isAssignedLew(#id, authentication)")

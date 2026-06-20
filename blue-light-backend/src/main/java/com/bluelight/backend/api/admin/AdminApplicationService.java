@@ -373,13 +373,10 @@ public class AdminApplicationService {
                     HttpStatus.BAD_REQUEST, "KVA_NOT_CONFIRMED");
         }
 
-        // LoA 완료(LEW 최종본 업로드) 후에만 결제 요청 가능 (사용자 결정 2026-06-14).
-        if (!application.isLoaFinalized()) {
-            throw new BusinessException(
-                    "The final LoA must be uploaded before requesting payment.",
-                    HttpStatus.CONFLICT, "LOA_NOT_FINALIZED");
-        }
-
+        // 결제·LoA 병렬 분리 (사용자 결정 2026-06-18, payment-gateway-marketplace-spec.md §1.5):
+        // 결제 요청은 kVA 확정만 전제로 조기화한다(현금 조기 유입). LoA 최종본 게이트는
+        // 작업개시(PAID→IN_PROGRESS, D-2 `LOA_FINAL_NOT_UPLOADED`)에만 유지되어 "LoA 없이 작업 시작" 은
+        // 여전히 차단된다. LoA 교환은 결제와 무관하게 병렬 진행(LoaService 에 결제 게이트 없음).
         application.approveForPayment();
         log.info("Application approved for payment: applicationSeq={}", applicationSeq);
 

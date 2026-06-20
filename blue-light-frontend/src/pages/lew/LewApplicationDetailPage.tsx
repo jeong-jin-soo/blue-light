@@ -11,8 +11,6 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { useToastStore } from '../../stores/toastStore';
 import { useAuthStore } from '../../stores/authStore';
 import adminApi from '../../api/adminApi';
-import documentApi from '../../api/documentApi';
-import loaApi from '../../api/loaApi';
 import { useRequestPayment } from '../../hooks/useRequestPayment';
 import { STATUS_STEPS, getStatusStep } from '../../utils/applicationUtils';
 import {
@@ -24,7 +22,7 @@ import {
 import { AdminApplicationInfo } from '../admin/sections/AdminApplicationInfo';
 import LewKvaAdjustmentRequestModal from '../../components/lew/LewKvaAdjustmentRequestModal';
 
-import type { AdminApplication, DocumentRequest, LoaStatus, SldRequest } from '../../types';
+import type { AdminApplication, SldRequest } from '../../types';
 
 /**
  * LEW 전용 신청 진입(랜딩) 페이지
@@ -44,9 +42,7 @@ export default function LewApplicationDetailPage() {
   const { user: currentUser } = useAuthStore();
 
   const [application, setApplication] = useState<AdminApplication | null>(null);
-  const [documentRequests, setDocumentRequests] = useState<DocumentRequest[]>([]);
   const [sldRequest, setSldRequest] = useState<SldRequest | null>(null);
-  const [loaStatus, setLoaStatus] = useState<LoaStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -68,16 +64,12 @@ export default function LewApplicationDetailPage() {
       const appData = await adminApi.getApplication(applicationId);
       setApplication(appData);
 
-      const [docsRes, sldRes, loaRes] = await Promise.allSettled([
-        documentApi.getDocumentRequests(applicationId),
-        appData.sldOption === 'REQUEST_LEW'
-          ? adminApi.getAdminSldRequest(applicationId)
-          : Promise.resolve(null),
-        loaApi.getLoaStatus(applicationId),
-      ]);
-      setDocumentRequests(docsRes.status === 'fulfilled' ? docsRes.value : []);
-      setSldRequest(sldRes.status === 'fulfilled' ? sldRes.value : null);
-      setLoaStatus(loaRes.status === 'fulfilled' ? loaRes.value : null);
+      // 결제 게이트 완화(2026-06-18): 문서요청·LoA 상태는 결제 CTA 판정에 더 이상 쓰지 않음 → SLD 만 조회.
+      let sld: SldRequest | null = null;
+      if (appData.sldOption === 'REQUEST_LEW') {
+        try { sld = await adminApi.getAdminSldRequest(applicationId); } catch { sld = null; }
+      }
+      setSldRequest(sld);
     } catch (err: unknown) {
       // 백엔드가 APPLICATION_NOT_ASSIGNED 코드를 줄 수 있음
       const e = err as { response?: { data?: { code?: string; message?: string } }; message?: string };
@@ -202,25 +194,16 @@ export default function LewApplicationDetailPage() {
     );
   }
 
-  // PR3: Phase 1 종료 가드 (DocumentRequest 미해결 0건 + kVA CONFIRMED) 충족 시 CTA가
-  // "Start review" → "Request payment" 로 전환된다. 백엔드가 최종 가드를 재검증하므로
-  // 프론트는 클릭 가능 여부만 결정.
-  const pendingDocCount = documentRequests.filter(
-    (d) => d.status === 'REQUESTED' || d.status === 'UPLOADED',
-  ).length;
+  // PR3 + 결제 게이트 완화(2026-06-18): kVA CONFIRMED 만 충족하면 CTA가 "Start review" → "Request payment"
+  // 로 전환된다(문서·LoA 는 결제 전제가 아님). 백엔드가 최종 가드를 재검증하므로 프론트는 클릭 가능 여부만 결정.
   const kvaConfirmed = application.kvaStatus === 'CONFIRMED';
   const sldRequired = application.sldOption === 'REQUEST_LEW';
   const sldReady = !sldRequired || sldRequest?.status === 'CONFIRMED';
-  // LoA 수령 = 신청자 서명본 업로드 이상. 백엔드 isLoaReceivedForPayment 와 동일.
-  const loaReceived =
-    loaStatus?.loaStage === 'APPLICANT_UPLOADED' || loaStatus?.loaStage === 'FINAL_UPLOADED';
 
   const guards: LewPrimaryActionGuards = {
-    pendingDocCount,
     kvaConfirmed,
     sldRequired,
     sldReady,
-    loaReceived,
   };
 
   const primaryAction = deriveLewPrimaryAction(application, guards);

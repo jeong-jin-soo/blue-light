@@ -8,9 +8,9 @@ import type { AdminApplication, ApplicationStatus } from '../types';
  *   Phase Gate                                   : LEW가 결제 요청 → ADMIN 입금 확인 → LEW 알림
  *   Phase 2 (PAID / IN_PROGRESS)                 : SLD / LOA 발행
  *
- * PR3 변경: Phase 1 가드(`pendingDocCount===0 && kvaConfirmed && loaReceived`)를 충족하면 CTA가
- * "Start review" → "Request payment"로 전환된다. SLD 가드는 결제 후 수행되므로 제외.
- * LoA 수령(신청자 서명본 업로드 이상, D-1)은 백엔드 requestPayment 가드와 일치시킨다.
+ * PR3 + 결제 게이트 완화(2026-06-18): Phase 1 가드(`kvaConfirmed`)를 충족하면
+ * CTA가 "Start review" → "Request payment"로 전환된다. SLD·LoA 는 결제 전제가 아니라 병렬/결제후 작업이라 제외.
+ * 백엔드 LewReviewService.requestPayment 가드(kVA 확정 + 서류 0건)와 일치.
  */
 
 export type LewPrimaryActionKind =
@@ -36,16 +36,12 @@ export type LewPrimaryAction = {
  * 호출자가 사전에 fetch하여 전달 (DocumentRequest, kvaStatus, sldOption/sldStatus).
  */
 export type LewPrimaryActionGuards = {
-  /** REQUESTED/UPLOADED 상태인 DocumentRequest 개수. 0이면 미해결 없음. */
-  pendingDocCount: number;
-  /** Application.kvaStatus === 'CONFIRMED' 여부. */
+  /** Application.kvaStatus === 'CONFIRMED' 여부. (결제 요청 전제 — 2026-06-18 기준 유일 가드) */
   kvaConfirmed: boolean;
   /** sldOption === 'REQUEST_LEW' 인지 여부 (Phase 2에서만 의미 있음). */
   sldRequired?: boolean;
   /** SLD 가 CONFIRMED 또는 sldRequired=false 일 때 true. */
   sldReady?: boolean;
-  /** LoA 수령(loaStage ∈ {APPLICANT_UPLOADED, FINAL_UPLOADED}) 여부. 백엔드 isLoaReceivedForPayment 와 동일. */
-  loaReceived?: boolean;
 };
 
 export function deriveLewPrimaryAction(
@@ -57,19 +53,16 @@ export function deriveLewPrimaryAction(
   switch (application.status) {
     case 'PENDING_REVIEW':
     case 'REVISION_REQUESTED': {
-      // PR3: Phase 1 종료 시 (서류 0건 + kVA 확정 + LoA 수령) "Request payment"로 전환.
-      // 가드 정보가 없으면 (호환성 fallback) 기존 startReview 유지.
-      const phase1Done =
-        guards != null &&
-        guards.pendingDocCount === 0 &&
-        guards.kvaConfirmed &&
-        guards.loaReceived === true;
+      // PR3 + 결제 게이트 완화(2026-06-18): kVA 확정만으로 "Request payment"로 전환.
+      // kVA 확정 = 필요 정보 수취 완료 신호 → 문서·LoA·SLD 는 결제 전제가 아니라 병렬/결제후 작업.
+      // 가드 정보가 없으면 fallback 으로 startReview.
+      const phase1Done = guards != null && guards.kvaConfirmed;
       if (phase1Done) {
         return {
           kind: 'requestPayment',
           label: 'Request payment',
           description:
-            'Phase 1 review is complete. Notify the applicant to pay the licence fee. SLD and LOA will be completed after payment.',
+            'kVA is confirmed. Notify the applicant to pay the licence fee. Document collection and the LoA exchange run in parallel; work begins once both payment and the final LoA are in.',
           // request-payment는 in-page 액션(POST + 페이지 새로고침). navigate 대신 onClick 핸들러로 처리.
           targetUrl: null,
           disabled: false,

@@ -10,16 +10,12 @@ import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.application.KvaStatus;
-import com.bluelight.backend.domain.document.DocumentRequestRepository;
-import com.bluelight.backend.domain.document.DocumentRequestStatus;
 import com.bluelight.backend.domain.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Set;
 
 /**
  * LEW Review Form — 배정 신청 조회 + 결제 요청 서비스.
@@ -40,13 +36,7 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class LewReviewService {
 
-    /** Phase 1 종료 가드: DocumentRequest 미해결 판정에 사용 */
-    private static final Set<DocumentRequestStatus> DOCUMENT_PENDING_STATUSES =
-            Set.of(DocumentRequestStatus.REQUESTED, DocumentRequestStatus.UPLOADED);
-
     private final ApplicationRepository applicationRepository;
-    // Phase 1 종료 가드
-    private final DocumentRequestRepository documentRequestRepository;
     // LEW가 결제 요청 트리거 시 신청자 메일 발송 (ADMIN 흐름과 동일)
     private final EmailService emailService;
     // 결제 요청 알림(A-17 인앱+이메일) 오케스트레이터 디스패치
@@ -83,8 +73,9 @@ public class LewReviewService {
      *   <li>현재 status ∈ {PENDING_REVIEW, REVISION_REQUESTED} 가 아니면 → 409 {@code INVALID_STATUS_TRANSITION}.
      *       ADMIN의 별도 approveForPayment 와 race 발생 시 두 번째 호출이 이 코드로 거부된다.</li>
      *   <li>{@code Application.kvaStatus != CONFIRMED} → 409 {@code KVA_NOT_CONFIRMED}</li>
-     *   <li>미해결 DocumentRequest(REQUESTED/UPLOADED) 존재 → 409 {@code DOCUMENT_REQUESTS_PENDING}</li>
      * </ol>
+     * <p>kVA 확정이 "필요 정보 수취 완료"의 신호이므로 미해결 DocumentRequest·LoA 상태는 결제 요청을 막지 않는다
+     * (사용자 결정 2026-06-18). 문서/LoA 는 결제와 병렬 진행.</p>
      */
     @Transactional(rollbackFor = Exception.class)
     public ApplicationResponse requestPayment(Long applicationSeq, Long lewUserSeq) {
@@ -100,16 +91,10 @@ public class LewReviewService {
                     HttpStatus.CONFLICT, LewReviewErrorCode.INVALID_STATUS_TRANSITION);
         }
 
-        // 2) Phase 1 종료 가드 (LEW가 검토를 끝냈는지 재확인) — 상태 충돌이므로 409
+        // 2) 결제 요청 전제 = kVA 확정뿐. (사용자 결정 2026-06-18, payment-gateway-marketplace-spec.md §1.5)
+        //    kVA 확정이 "필요 정보 수취 완료" 신호 → 미해결 문서요청·LoA 는 결제를 막지 않고 병렬 진행.
+        //    LoA 최종본 게이트는 작업개시(D-2)에만 유지.
         assertKvaConfirmed(application);
-        assertNoPendingDocumentRequests(applicationSeq);
-
-        // 3) LoA 완료(LEW 최종본 업로드) 후에만 결제 요청 가능 (사용자 결정 2026-06-14).
-        if (!application.isLoaFinalized()) {
-            throw new BusinessException(
-                    "The final LoA must be uploaded before requesting payment.",
-                    HttpStatus.CONFLICT, "LOA_NOT_FINALIZED");
-        }
 
         // 상태 전이 — 도메인 메서드 사용 (reviewComment 클리어 포함)
         application.approveForPayment();
@@ -147,17 +132,6 @@ public class LewReviewService {
                     "kVA must be confirmed first (current kvaStatus: "
                             + application.getKvaStatus() + ")",
                     HttpStatus.CONFLICT, LewReviewErrorCode.KVA_NOT_CONFIRMED);
-        }
-    }
-
-    /** 가드: 미해결 DocumentRequest(REQUESTED/UPLOADED) 가 없어야 requestPayment 가능. */
-    private void assertNoPendingDocumentRequests(Long applicationSeq) {
-        long pending = documentRequestRepository.countByApplicationAndStatusIn(
-                applicationSeq, DOCUMENT_PENDING_STATUSES);
-        if (pending > 0) {
-            throw new BusinessException(
-                    "There are " + pending + " pending document request(s) — resolve them first",
-                    HttpStatus.CONFLICT, LewReviewErrorCode.DOCUMENT_REQUESTS_PENDING);
         }
     }
 

@@ -6,11 +6,10 @@
 /**
  * DocumentRequest 상태 (백엔드 `DocumentRequestStatus` enum과 일치)
  */
+// LEW 승인/반려 단계 제거(2026-06-18): REQUESTED → UPLOADED(수취 완료) → (CANCELLED). APPROVED/REJECTED 폐지.
 export type DocumentRequestStatus =
   | 'REQUESTED'
   | 'UPLOADED'
-  | 'APPROVED'
-  | 'REJECTED'
   | 'CANCELLED';
 
 /**

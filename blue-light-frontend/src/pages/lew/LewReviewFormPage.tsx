@@ -201,16 +201,16 @@ export default function LewReviewFormPage() {
   const sldReady = !sldRequired || sldRequest?.status === 'CONFIRMED';
 
   // ── 결제 요청 (Phase 1 액션) ──────
-  // 결제 요청 가드 = kVA 확정 + 서류 0건 + LoA 수령(신청자 서명본 업로드 이상, D-1). SLD 는 결제 후 작업이라 제외.
-  // status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출. 백엔드 LewReviewService.requestPayment 가드와 일치.
+  // 결제 요청 가드 = kVA 확정뿐 (2026-06-18 결정, payment-gateway-marketplace-spec.md §1.5):
+  // kVA 확정이 "필요 정보 수취 완료" 신호 → 미해결 문서요청·LoA·SLD 는 결제를 막지 않고 병렬 진행.
+  // (LoA 최종본은 작업개시 게이트로만 유지). status 가 PENDING_REVIEW/REVISION_REQUESTED 일 때만 노출.
+  // 백엔드 LewReviewService.requestPayment 가드와 일치.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
   // 완료/만료 = 읽기 전용. 리뷰 화면은 어느 단계든 열람 가능하되, 이 상태에서는 편집 동선을 잠근다.
   const isTerminal = appStatus === 'COMPLETED' || appStatus === 'EXPIRED';
-  // LoA 완료 = LEW 최종본 업로드(FINAL_UPLOADED). 백엔드 isLoaFinalized 와 동일 (2026-06-14 결정:
-  // 결제 요청은 LoA 완료 후에만 가능). 변수명은 하위 사용처 호환 위해 유지.
-  const loaReceived = loaStatus?.loaStage === 'FINAL_UPLOADED';
-  const phase1Ready = kvaConfirmed && pendingDocCount === 0 && loaReceived;
+  // 결제 요청 가드 = kVA 확정뿐 (2026-06-18). 문서요청·LoA 는 결제 전제가 아니라 병렬 진행.
+  const phase1Ready = kvaConfirmed;
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
   const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
     applicationId,
@@ -434,7 +434,7 @@ export default function LewReviewFormPage() {
         </div>
 
         {/* 결제 요청 — Phase 1(PENDING_REVIEW/REVISION_REQUESTED)에서만 노출.
-            가드 = kVA 확정 + 서류 0건 + LoA 수령 (SLD 제외 — 결제 후 작업). 미충족 시 비활성 + 사유 점프 링크. */}
+            가드 = kVA 확정뿐 (문서·LoA·SLD 는 병렬/결제후 작업이라 제외). 미확정 시 비활성 + kVA 탭 점프. */}
         {inPhase1 && (
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-2 text-xs">
             <span className="font-medium text-gray-700">Ready for payment?</span>
@@ -452,42 +452,8 @@ export default function LewReviewFormPage() {
                 </span>
                 <span aria-hidden> →</span>
               </button>
-              {pendingDocCount === 0 ? (
-                <span className="inline-flex items-center gap-1 text-success-700">
-                  <span aria-hidden>✓</span> Documents
-                  <span className="sr-only">resolved</span>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('documents')}
-                  className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
-                >
-                  <span aria-hidden>•</span>
-                  <span className="sm:hidden">Docs {pendingDocCount}</span>
-                  <span className="hidden sm:inline">
-                    {pendingDocCount} document{pendingDocCount === 1 ? '' : 's'} pending
-                  </span>
-                  <span className="sr-only"> pending — go to Documents tab</span>
-                  <span aria-hidden> →</span>
-                </button>
-              )}
-              {loaReceived ? (
-                <span className="inline-flex items-center gap-1 text-success-700">
-                  <span aria-hidden>✓</span> LoA
-                  <span className="sr-only">received</span>
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('loa')}
-                  className="inline-flex items-center gap-1 text-warning-700 underline hover:text-warning-800"
-                >
-                  <span aria-hidden>•</span> LoA pending
-                  <span className="sr-only"> — go to LOA tab</span>
-                  <span aria-hidden> →</span>
-                </button>
-              )}
+              {/* 문서·LoA 는 결제 전제가 아님(2026-06-18 — kVA 확정이 충분조건) → 준비바에서 제외.
+                  진행 현황은 Documents 탭 배지·LoA 탭·확정 요약 패널에 노출. */}
             </span>
             <Button
               size="sm"

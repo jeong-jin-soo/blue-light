@@ -53,11 +53,10 @@ public class DocumentRequestService {
     private final UserRepository userRepository;
     private final DocumentRequestNotifier notifier;
 
-    /** 활성 요청 상태 집합 — 리밋/중복 검사에 사용 */
+    /** 활성 요청 상태 집합 — 리밋/중복 검사에 사용 (승인/반려 제거 후 REQUESTED/UPLOADED) */
     private static final Set<DocumentRequestStatus> ACTIVE_STATUSES =
             EnumSet.of(DocumentRequestStatus.REQUESTED,
-                       DocumentRequestStatus.UPLOADED,
-                       DocumentRequestStatus.REJECTED);
+                       DocumentRequestStatus.UPLOADED);
 
     /** 중복 감지 상태 집합 (AC-R5) — REQUESTED/UPLOADED */
     private static final Set<DocumentRequestStatus> DUPLICATE_DETECT_STATUSES =
@@ -423,49 +422,8 @@ public class DocumentRequestService {
     }
 
     // ----------------------------------------------------------------------
-    // Phase 3 — LEW 승인 / 반려 / 취소
+    // Phase 3 — LEW 취소 (승인/반려 단계는 제거됨 — 2026-06-18)
     // ----------------------------------------------------------------------
-
-    @Transactional
-    public DocumentRequestDto approve(Long requestorSeq, String requestorRole, Long docRequestId) {
-        DocumentRequest dr = loadForReviewWithAssignedLewCheck(requestorSeq, requestorRole, docRequestId);
-
-        User reviewer = userRepository.findById(requestorSeq)
-                .orElseThrow(() -> new BusinessException("Reviewer not found",
-                        HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
-
-        dr.approve(reviewer);
-
-        log.info("DocumentRequest approved: drId={}, reviewer={}", dr.getId(), requestorSeq);
-
-        notifier.notifyApproved(dr);
-
-        return DocumentRequestDto.from(dr);
-    }
-
-    @Transactional
-    public DocumentRequestDto reject(Long requestorSeq, String requestorRole,
-                                     Long docRequestId, String rejectionReason) {
-        if (rejectionReason == null || rejectionReason.trim().length() < 10) {
-            throw new BusinessException("rejectionReason is required (min 10 chars)",
-                    HttpStatus.BAD_REQUEST, "REJECTION_REASON_REQUIRED");
-        }
-
-        DocumentRequest dr = loadForReviewWithAssignedLewCheck(requestorSeq, requestorRole, docRequestId);
-
-        User reviewer = userRepository.findById(requestorSeq)
-                .orElseThrow(() -> new BusinessException("Reviewer not found",
-                        HttpStatus.NOT_FOUND, "USER_NOT_FOUND"));
-
-        dr.reject(reviewer, rejectionReason.trim());
-
-        log.info("DocumentRequest rejected: drId={}, reviewer={}, reasonLen={}",
-                dr.getId(), requestorSeq, rejectionReason.length());
-
-        notifier.notifyRejected(dr);
-
-        return DocumentRequestDto.from(dr);
-    }
 
     @Transactional
     public DocumentRequestDto cancel(Long requestorSeq, String requestorRole, Long docRequestId) {

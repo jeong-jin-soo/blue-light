@@ -167,9 +167,7 @@ export function DocumentUploadSection({
     [requests],
   );
 
-  const hasActiveRequests = lewRequested.some(
-    (r) => r.status === 'REQUESTED' || r.status === 'REJECTED',
-  );
+  const hasActiveRequests = lewRequested.some((r) => r.status === 'REQUESTED');
 
   const variantOf = (r: DocumentRequest): DocumentRequestCardVariant => {
     switch (r.status) {
@@ -177,10 +175,6 @@ export function DocumentUploadSection({
         return 'requested';
       case 'UPLOADED':
         return 'uploaded';
-      case 'APPROVED':
-        return 'approved';
-      case 'REJECTED':
-        return 'rejected';
       default:
         return 'requested';
     }
@@ -369,9 +363,10 @@ function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
     createdAt: new Date().toISOString(),
   };
 
-  const variants = ['requested', 'uploaded', 'approved', 'rejected'] as const;
+  // 승인/반려 단계 제거(2026-06-18) — requested/uploaded 두 variant 만 미리보기.
+  const variants = ['requested', 'uploaded'] as const;
 
-  const mockFor = (v: 'requested' | 'uploaded' | 'approved' | 'rejected'): DocumentRequest => {
+  const mockFor = (v: 'requested' | 'uploaded'): DocumentRequest => {
     switch (v) {
       case 'requested':
         return {
@@ -387,21 +382,6 @@ function DevMockupSkeletons({ catalog }: { catalog: DocumentType[] }) {
           fulfilledFilename: 'sp_account.pdf',
           fulfilledFileSize: 524288,
           fulfilledAt: new Date().toISOString(),
-        };
-      case 'approved':
-        return {
-          ...baseRequest,
-          status: 'APPROVED',
-          fulfilledFilename: 'sp_account.pdf',
-          reviewedAt: new Date().toISOString(),
-        };
-      case 'rejected':
-        return {
-          ...baseRequest,
-          status: 'REJECTED',
-          fulfilledFilename: 'sp_account.pdf',
-          rejectionReason: 'The file is blurry. Please upload a clearer copy.',
-          reviewedAt: new Date().toISOString(),
         };
     }
   };

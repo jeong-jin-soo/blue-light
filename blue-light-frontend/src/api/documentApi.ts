@@ -94,31 +94,7 @@ export const createDocumentRequests = async (
   return response.data;
 };
 
-/**
- * UPLOADED → APPROVED (AC-S2).
- */
-export const approveDocumentRequest = async (
-  reqId: number,
-): Promise<DocumentRequestDecisionResponse> => {
-  const response = await axiosClient.patch<DocumentRequestDecisionResponse>(
-    `/admin/document-requests/${reqId}/approve`,
-  );
-  return response.data;
-};
-
-/**
- * UPLOADED → REJECTED (AC-S3). reason은 min 10자.
- */
-export const rejectDocumentRequest = async (
-  reqId: number,
-  rejectionReason: string,
-): Promise<DocumentRequestDecisionResponse> => {
-  const response = await axiosClient.patch<DocumentRequestDecisionResponse>(
-    `/admin/document-requests/${reqId}/reject`,
-    { rejectionReason },
-  );
-  return response.data;
-};
+// approveDocumentRequest / rejectDocumentRequest 제거됨 (2026-06-18 — LEW 승인/반려 단계 폐지).
 
 /**
  * REQUESTED → CANCELLED (AC-S5). 다른 상태에서는 서버가 409 반환.
@@ -164,8 +140,6 @@ export const documentApi = {
   uploadVoluntaryDocument,
   deleteDocument,
   createDocumentRequests,
-  approveDocumentRequest,
-  rejectDocumentRequest,
   cancelDocumentRequest,
   fulfillDocumentRequest,
 };
