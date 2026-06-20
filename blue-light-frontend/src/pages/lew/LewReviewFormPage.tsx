@@ -16,6 +16,8 @@ import { AdminEmaSection } from '../admin/sections/AdminEmaSection';
 import { CompleteModal } from '../admin/sections/AdminModals';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import priceApi from '../../api/priceApi';
 import { useEmaActions } from '../../hooks/useEmaActions';
 import { formatEmaStatus, getEmaStatusBadge } from '../../utils/applicationUtils';
 import lewReviewApi from '../../api/lewReviewApi';
@@ -193,6 +195,12 @@ export default function LewReviewFormPage() {
   // 결제 요청 가드 = kVA 확정뿐 (2026-06-18). 문서요청·LoA 는 결제 전제가 아니라 병렬 진행.
   const phase1Ready = kvaConfirmed;
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);
+  // E1: 결제 요청 시 "내가 SLD 작성" 선택 + 가산될 SLD 작성비 표시
+  const [addSldFeeChoice, setAddSldFeeChoice] = useState(false);
+  const [sldFeeAmount, setSldFeeAmount] = useState<number | null>(null);
+  // E2: SLD 전환(self-upload → LEW 작성) 확인/진행 상태
+  const [showConvertSldConfirm, setShowConvertSldConfirm] = useState(false);
+  const [convertingSld, setConvertingSld] = useState(false);
   const { run: runRequestPayment, requesting: requestingPayment } = useRequestPayment(
     applicationId,
     {
@@ -203,6 +211,27 @@ export default function LewReviewFormPage() {
         setActiveTab(reason === 'kva' ? 'kva' : reason === 'loa' ? 'loa' : 'documents'),
     },
   );
+
+  // 가산될 SLD 작성비 조회 — REQUEST_LEW 가 아닌 신청에서 결제요청 토글(E1)·SLD 전환(E2) 모두에 사용.
+  useEffect(() => {
+    if (sldRequired || !adminApp?.selectedKva) {
+      setSldFeeAmount(null);
+      return;
+    }
+    let cancelled = false;
+    priceApi
+      .calculatePrice(adminApp.selectedKva, undefined, 'REQUEST_LEW', adminApp.applicationType)
+      .then((r) => !cancelled && setSldFeeAmount(Number(r.sldFee)))
+      .catch(() => !cancelled && setSldFeeAmount(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [sldRequired, adminApp?.selectedKva, adminApp?.applicationType]);
+
+  // E1: 결제요청 다이얼로그가 열릴 때 선택 초기화.
+  useEffect(() => {
+    if (showRequestPaymentConfirm) setAddSldFeeChoice(false);
+  }, [showRequestPaymentConfirm]);
 
   // 기본 활성 탭 — 알림 딥링크 해시(#documents/#kva/#sld/#loa/#ema)가 있으면 해당 탭 선택,
   // 없으면 Documents 로 시작. 사용자가 이미 탭을 직접 선택했다면 그 선택을 존중.
@@ -273,6 +302,29 @@ export default function LewReviewFormPage() {
     currentUser?.role === 'LEW' &&
     !!adminApp?.assignedLewSeq &&
     adminApp.assignedLewSeq === currentUser?.userSeq;
+
+  // E2: SLD self-upload → LEW 작성 전환 + SLD 작성비 청구.
+  const handleConvertSld = useCallback(async () => {
+    setConvertingSld(true);
+    try {
+      const res = await lewReviewApi.convertSldToLew(applicationId);
+      toast.success(
+        res.postPayment
+          ? `SLD assigned to you. An additional SLD fee of $${Number(res.sldFee).toFixed(2)} will be collected by admin.`
+          : `SLD assigned to you. SLD fee of $${Number(res.sldFee).toFixed(2)} added to the payable amount.`,
+      );
+      setShowConvertSldConfirm(false);
+      await loadData();
+      setActiveTab('sld');
+    } catch (err) {
+      const code = (err as ApiErrorShape).response?.data?.code;
+      if (code === 'SLD_ALREADY_LEW') toast.error('The SLD is already assigned to the LEW.');
+      else if (code === 'SLD_CONVERT_NOT_ALLOWED') toast.error('SLD cannot be changed at this stage.');
+      else toast.error('Failed to take over the SLD');
+    } finally {
+      setConvertingSld(false);
+    }
+  }, [applicationId, loadData, toast]);
 
   // ── SLD handlers (AdminSldSection 용) ─────────────────
   const handleSldUpload = useCallback(async (file: File) => {
@@ -359,15 +411,15 @@ export default function LewReviewFormPage() {
           ? { text: 'Review', variant: 'warning' }   // 신청자 신고값 — LEW 확인/확정 필요
           : { text: 'Unknown', variant: 'warning' },
     },
-    ...(sldRequired
-      ? ([{
-          key: 'sld' as TabKey,
-          label: 'SLD',
-          badge: sldReady
+    {
+      key: 'sld' as TabKey,
+      label: 'SLD',
+      badge: sldRequired
+        ? (sldReady
             ? { text: 'Confirmed', variant: 'success' as const }
-            : { text: sldRequest?.status ?? 'Missing', variant: 'warning' as const },
-        }])
-      : []),
+            : { text: sldRequest?.status ?? 'Missing', variant: 'warning' as const })
+        : { text: 'Self-upload', variant: 'gray' as const },
+    },
     { key: 'loa', label: 'LOA' },
     {
       key: 'ema',
@@ -518,9 +570,9 @@ export default function LewReviewFormPage() {
             <KvaSection application={adminApp} onUpdated={loadData} />
           </TabPanel>
 
-          {sldRequired && (
-            <TabPanel active={activeTab === 'sld'}>
-              {sldRequest ? (
+          <TabPanel active={activeTab === 'sld'}>
+            {sldRequired ? (
+              sldRequest ? (
                 <AdminSldSection
                   applicationSeq={applicationId}
                   sldRequest={sldRequest}
@@ -540,9 +592,34 @@ export default function LewReviewFormPage() {
                   SLD request record is not yet available. The applicant may not have requested it,
                   or the backend record is missing.
                 </InfoBox>
-              )}
-            </TabPanel>
-          )}
+              )
+            ) : (
+              /* sldOption != REQUEST_LEW — 신청자가 직접 SLD 제출. LEW 가 대신 작성(전환) 가능. */
+              <Card>
+                <h2 className="text-lg font-semibold text-gray-800 mb-2">Single Line Diagram</h2>
+                <p className="text-sm text-gray-600">
+                  The applicant chose to provide their own SLD. If they can't provide a valid SLD,
+                  you can take it over and create it yourself.
+                </p>
+                <InfoBox variant="info" className="mt-3">
+                  Creating the SLD adds an SLD fee
+                  {sldFeeAmount != null && <> of <strong>${sldFeeAmount.toFixed(2)}</strong></>}.
+                  {adminApp.status === 'PAID' || adminApp.status === 'IN_PROGRESS'
+                    ? ' Since payment is already done, this is charged as a supplementary payment (admin will settle it).'
+                    : ' It is added to the payable amount.'}
+                </InfoBox>
+                {!isTerminal && (
+                  <Button
+                    className="mt-3"
+                    variant="outline"
+                    onClick={() => setShowConvertSldConfirm(true)}
+                  >
+                    Create the SLD myself{sldFeeAmount != null ? ` (+$${sldFeeAmount.toFixed(2)})` : ''}
+                  </Button>
+                )}
+              </Card>
+            )}
+          </TabPanel>
 
           <TabPanel active={activeTab === 'loa'}>
             <LewLoaExchangeSection
@@ -614,18 +691,77 @@ export default function LewReviewFormPage() {
         onClose={() => setShowSldConfirm(false)}
       />
 
-      {/* 결제 요청 confirm dialog — 비가역 액션(신청자에게 결제 알림 발송) */}
+      {/* E2: SLD 전환 confirm — SLD 작성비 청구(결제 후면 보충 청구) */}
       <ConfirmDialog
-        isOpen={showRequestPaymentConfirm}
-        title="Request payment?"
-        message="The applicant will be notified by email to pay the licence fee. This moves the application to the payment stage. SLD and LOA are completed after payment."
-        confirmLabel="Request payment"
-        onConfirm={() => {
-          setShowRequestPaymentConfirm(false);
-          void runRequestPayment();
-        }}
-        onClose={() => setShowRequestPaymentConfirm(false)}
+        isOpen={showConvertSldConfirm}
+        title="Create the SLD yourself?"
+        message={
+          `The applicant's SLD task will be reassigned to you and an SLD fee` +
+          (sldFeeAmount != null ? ` of $${sldFeeAmount.toFixed(2)}` : '') +
+          (adminApp.status === 'PAID' || adminApp.status === 'IN_PROGRESS'
+            ? ' will be charged as a supplementary payment (settled by admin).'
+            : ' will be added to the payable amount.')
+        }
+        confirmLabel="Take over SLD"
+        loading={convertingSld}
+        onConfirm={handleConvertSld}
+        onClose={() => setShowConvertSldConfirm(false)}
       />
+
+      {/* 결제 요청 dialog — 비가역 액션(신청자에게 결제 알림 발송). E1: SLD 작성비 선택 토글 포함. */}
+      <Modal
+        isOpen={showRequestPaymentConfirm}
+        onClose={() => setShowRequestPaymentConfirm(false)}
+        size="sm"
+      >
+        <ModalHeader title="Request payment?" onClose={() => setShowRequestPaymentConfirm(false)} />
+        <ModalBody>
+          <p className="text-sm text-gray-600">
+            The applicant will be notified by email to pay the licence fee. This moves the
+            application to the payment stage. SLD and LOA are completed after payment.
+          </p>
+          {/* sldOption 이 REQUEST_LEW 가 아닐 때만 — 신청자가 직접 SLD 를 내기로 한 경우 */}
+          {!sldRequired && (
+            <label className="mt-3 flex items-start gap-2 rounded-lg border border-gray-200 p-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={addSldFeeChoice}
+                onChange={(e) => setAddSldFeeChoice(e.target.checked)}
+              />
+              <span className="text-sm text-gray-700">
+                I will create the SLD
+                {sldFeeAmount != null && (
+                  <> — add SLD fee (<strong>${sldFeeAmount.toFixed(2)}</strong>)</>
+                )}
+                <span className="block text-xs text-gray-500 mt-0.5">
+                  Use this when the applicant can't provide a valid SLD. The fee is added to this
+                  payment request.
+                </span>
+              </span>
+            </label>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRequestPaymentConfirm(false)}
+            disabled={requestingPayment}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setShowRequestPaymentConfirm(false);
+              void runRequestPayment(addSldFeeChoice);
+            }}
+          >
+            Request payment
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* Complete & Issue Licence — EMA 탭의 CTA에서 오픈. 게이트는 백엔드 강제. */}
       <CompleteModal

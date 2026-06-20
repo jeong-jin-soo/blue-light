@@ -53,6 +53,9 @@ public class AdminApplicationService {
     /** ── EMA 제출 추적 (ema-submission-tracking-spec.md) — 감사/설정조회 ── */
     private final AuditLogService auditLogService;
     private final EmaSubmissionSettings emaSubmissionSettings;
+    /** ── SLD 전환 발급/정산 게이트 (sld-lew-conversion-fee-spec.md §8, D-5/D-6) ── */
+    private final com.bluelight.backend.domain.application.SldRequestRepository sldRequestRepository;
+    private final com.bluelight.backend.domain.kva.KvaAdjustmentRepository kvaAdjustmentRepository;
 
     /**
      * Get admin dashboard summary (역할별 범위 분리)
@@ -292,6 +295,30 @@ public class AdminApplicationService {
             throw new BusinessException(
                     "License PDF must be uploaded before completion",
                     HttpStatus.BAD_REQUEST, "LICENSE_PDF_MISSING");
+        }
+
+        // ── D-5 발급 게이트 (sld-lew-conversion-fee-spec.md §8): REQUEST_LEW 면 SLD 가 CONFIRMED 여야 한다.
+        //    (LEW 작성 SLD 요금을 청구한 이상, SLD 없이 발급되는 공백을 차단.)
+        if (application.getSldOption() == com.bluelight.backend.domain.application.SldOption.REQUEST_LEW) {
+            boolean sldConfirmed = sldRequestRepository
+                    .findByApplicationApplicationSeq(applicationSeq)
+                    .map(sr -> sr.getStatus() == com.bluelight.backend.domain.application.SldRequestStatus.CONFIRMED)
+                    .orElse(false);
+            if (!sldConfirmed) {
+                throw new BusinessException(
+                        "The LEW-created SLD must be confirmed before completion",
+                        HttpStatus.CONFLICT, "SLD_NOT_CONFIRMED");
+            }
+        }
+
+        // ── D-6 정산 게이트 (sld-lew-conversion-fee-spec.md §8): 미정산(PENDING) SLD 보충 청구가 있으면 차단.
+        if (kvaAdjustmentRepository.existsByApplication_ApplicationSeqAndAdjustmentTypeAndAdminPaymentAdjustment(
+                applicationSeq,
+                com.bluelight.backend.domain.kva.AdjustmentType.SLD_ADDED,
+                com.bluelight.backend.domain.kva.AdminPaymentAdjustment.PENDING)) {
+            throw new BusinessException(
+                    "The additional SLD fee must be settled before completion",
+                    HttpStatus.CONFLICT, "SLD_FEE_NOT_SETTLED");
         }
 
         ApplicationStatus previousStatus = application.getStatus();

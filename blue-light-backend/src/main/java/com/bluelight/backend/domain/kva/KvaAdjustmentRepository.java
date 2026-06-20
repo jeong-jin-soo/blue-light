@@ -50,4 +50,11 @@ public interface KvaAdjustmentRepository extends JpaRepository<KvaAdjustmentReco
     List<KvaAdjustmentRecord> findByApplicationSeqAndStatusForUpdate(
             @Param("applicationSeq") Long applicationSeq,
             @Param("status") KvaAdjustmentStatus status);
+
+    /**
+     * D-6 정산 게이트(sld-lew-conversion-fee-spec.md §8): 특정 신청에 미정산(PENDING) 보충 청구가 있는지.
+     * 예: SLD_ADDED 차액이 아직 PAID_DIFFERENCE/WAIVED 로 정산되지 않은 경우.
+     */
+    boolean existsByApplication_ApplicationSeqAndAdjustmentTypeAndAdminPaymentAdjustment(
+            Long applicationSeq, AdjustmentType adjustmentType, AdminPaymentAdjustment adminPaymentAdjustment);
 }

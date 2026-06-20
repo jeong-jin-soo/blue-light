@@ -65,11 +65,13 @@ class AdminApplicationServiceEmaTest {
         auditLogService = mock(AuditLogService.class);
         fileRepository = mock(FileRepository.class);
         emaSubmissionSettings = mock(EmaSubmissionSettings.class);
-        // @RequiredArgsConstructor — 필드 선언 순서: appRepo, userRepo, email, eventPublisher,
-        // fileRepository, auditLogService, emaSubmissionSettings (LoA PR4 머지로 fileRepository 가 앞으로 이동)
+        // @RequiredArgsConstructor — 선언 순서: appRepo, userRepo, email, eventPublisher,
+        // fileRepository, auditLogService, emaSubmissionSettings, sldRequestRepository, kvaAdjustmentRepository.
         service = new AdminApplicationService(
                 applicationRepository, userRepository, emailService, eventPublisher,
-                fileRepository, auditLogService, emaSubmissionSettings);
+                fileRepository, auditLogService, emaSubmissionSettings,
+                mock(com.bluelight.backend.domain.application.SldRequestRepository.class),
+                mock(com.bluelight.backend.domain.kva.KvaAdjustmentRepository.class));
     }
 
     private Application inProgressApp() {

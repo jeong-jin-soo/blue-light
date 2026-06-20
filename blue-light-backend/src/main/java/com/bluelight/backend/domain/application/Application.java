@@ -810,6 +810,32 @@ public class Application extends BaseEntity {
     }
 
     /**
+     * SLD self-upload/3개월유예 → LEW 작성(REQUEST_LEW) 전환 + SLD 작성비 가산.
+     *
+     * <p>spec: {@code doc/Project Analysis/sld-lew-conversion-fee-spec.md} §3.1.
+     * 신청자가 SLD 를 직접 제출하기로 했으나 미제공/무효일 때 LEW 가 작성을 떠맡고 SLD 작성비를 청구한다.
+     * {@code status}/{@code kvaStatus}/{@code kvaSource} 는 변경하지 않는다 — 전환은 검토·결제후
+     * 어느 단계에서도 가능하며 변경 이력·정산은 {@code KvaAdjustmentRecord(adjustment_type=SLD_ADDED)}
+     * 에서 추적한다. 행위자는 서비스가 원장에 기록한다.</p>
+     *
+     * @param sldFee         전환 시점 master_prices 스냅샷 (SGD)
+     * @param newQuoteAmount sldFee 가 가산된 재계산 견적
+     * @throws IllegalStateException    이미 REQUEST_LEW 인 경우
+     * @throws IllegalArgumentException 인자가 null 인 경우
+     */
+    public void switchSldToLewCreated(BigDecimal sldFee, BigDecimal newQuoteAmount) {
+        if (sldFee == null || newQuoteAmount == null) {
+            throw new IllegalArgumentException("sldFee and newQuoteAmount must not be null");
+        }
+        if (this.sldOption == SldOption.REQUEST_LEW) {
+            throw new IllegalStateException("SLD is already LEW-created (sldOption=REQUEST_LEW)");
+        }
+        this.sldOption = SldOption.REQUEST_LEW;
+        this.sldFee = sldFee;
+        this.quoteAmount = newQuoteAmount;
+    }
+
+    /**
      * SP 계정 번호 수정
      */
     public void updateSpAccountNo(String spAccountNo) {

@@ -68,6 +68,8 @@ public final class NotificationLinkResolver {
             case PAYMENT_EVIDENCE_UPLOADED:
             case PAYMENT_CONFIRMATION_REQUESTED:
             case MANUAL_PAYMENT_CONFIRMED_APPLICANT:
+            case SLD_FEE_ADDED_APPLICANT:
+            case SLD_FEE_SETTLEMENT_PENDING_ADMIN:
                 return "#payment";
             // 영수증 카드.
             case INVOICE_ISSUED_APPLICANT:

@@ -32,8 +32,11 @@ export interface UseRequestPaymentOptions {
 }
 
 export interface RequestPaymentApi {
-  /** 결제 요청 실행 (confirm 이후 호출). */
-  run: () => Promise<void>;
+  /**
+   * 결제 요청 실행 (confirm 이후 호출).
+   * @param addSldFee true 면 결제 요청 직전 SLD self-upload → LEW 작성 전환 + SLD 작성비 가산(E1).
+   */
+  run: (addSldFee?: boolean) => Promise<void>;
   /** API 호출 진행 중 여부 — 버튼 로딩/중복 클릭 방지용. */
   requesting: boolean;
 }
@@ -48,10 +51,10 @@ export function useRequestPayment(
 
   const { onSuccess, onNeedsReview, onStaleState } = options;
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (addSldFee = false) => {
     setRequesting(true);
     try {
-      await lewReviewApi.requestPayment(applicationId);
+      await lewReviewApi.requestPayment(applicationId, addSldFee);
       toast.success('Payment requested. The applicant will be notified to pay the licence fee.');
       await onSuccess?.();
     } catch (err: unknown) {
@@ -78,6 +81,10 @@ export function useRequestPayment(
           toast.error('The final LoA must be uploaded before requesting payment.');
           if (onNeedsReview) onNeedsReview('loa');
           else navigate(reviewUrl);
+          break;
+        case 'SLD_ALREADY_LEW':
+          toast.error('The SLD is already assigned to the LEW — refreshing latest state.');
+          await onStaleState?.();
           break;
         case 'INVALID_STATUS_TRANSITION':
           toast.warning('This application is no longer in review — refreshing latest state.');

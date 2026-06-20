@@ -231,6 +231,8 @@ function AdjustmentRow({ row, isAdmin, onMarkSettlement }: RowProps) {
   // 변경 양상: ADMIN row 는 previous→new, LEW row 는 previous→proposed (제안).
   const fromKva = row.previousKva;
   const toKva = row.changedByRole === 'ADMIN' ? row.newKva : row.proposedKva;
+  // SLD 전환 추가요금 row — kVA 변경이 아니므로 별도 표기.
+  const isSldAdded = row.adjustmentType === 'SLD_ADDED';
 
   return (
     <div>
@@ -238,18 +240,25 @@ function AdjustmentRow({ row, isAdmin, onMarkSettlement }: RowProps) {
       <div className="flex flex-wrap items-center gap-2 mb-1.5">
         <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
         <Badge variant={roleBadge.variant}>{roleBadge.label}</Badge>
+        {isSldAdded && <Badge variant="info">SLD fee</Badge>}
         {paymentBadge && <Badge variant={paymentBadge.variant}>{paymentBadge.label}</Badge>}
         <span className="text-xs text-gray-500 ml-auto">
           {formatDateTime(row.createdAt)}
         </span>
       </div>
 
-      {/* kVA + amount summary */}
+      {/* kVA + amount summary (SLD_ADDED 는 kVA 변경이 아님) */}
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-gray-800">
         <span className="font-medium">
-          {fromKva != null ? `${fromKva} kVA` : '—'}
-          <span className="mx-1.5 text-gray-400">→</span>
-          {toKva != null ? `${toKva} kVA` : '—'}
+          {isSldAdded ? (
+            'SLD fee added (LEW-created SLD)'
+          ) : (
+            <>
+              {fromKva != null ? `${fromKva} kVA` : '—'}
+              <span className="mx-1.5 text-gray-400">→</span>
+              {toKva != null ? `${toKva} kVA` : '—'}
+            </>
+          )}
         </span>
         {row.amountDifference != null && row.changedByRole === 'ADMIN' && (
           <span className="text-xs text-gray-600">

@@ -41,6 +41,8 @@ public class LewReviewService {
     private final EmailService emailService;
     // 결제 요청 알림(A-17 인앱+이메일) 오케스트레이터 디스패치
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    // E1: 결제 요청 시 SLD self-upload → LEW 작성 전환 + SLD 요금 가산 (결제 전)
+    private final com.bluelight.backend.api.sld.SldConversionService sldConversionService;
 
     /** 배정 신청 상세 조회. */
     public LewApplicationResponse getAssignedApplication(Long applicationSeq, Long lewUserSeq) {
@@ -78,7 +80,7 @@ public class LewReviewService {
      * (사용자 결정 2026-06-18). 문서/LoA 는 결제와 병렬 진행.</p>
      */
     @Transactional(rollbackFor = Exception.class)
-    public ApplicationResponse requestPayment(Long applicationSeq, Long lewUserSeq) {
+    public ApplicationResponse requestPayment(Long applicationSeq, Long lewUserSeq, boolean addSldFee) {
         Application application = loadApplication(applicationSeq);
         assertAssignedLew(application, lewUserSeq);
 
@@ -95,6 +97,12 @@ public class LewReviewService {
         //    kVA 확정이 "필요 정보 수취 완료" 신호 → 미해결 문서요청·LoA 는 결제를 막지 않고 병렬 진행.
         //    LoA 최종본 게이트는 작업개시(D-2)에만 유지.
         assertKvaConfirmed(application);
+
+        // 2-1) E1: LEW 가 SLD 를 작성하기로 선택하면 결제 요청 직전에 전환 + SLD 작성비 가산 (결제 전 → 원장 없음).
+        //      이미 REQUEST_LEW 면 409 SLD_ALREADY_LEW. (sld-lew-conversion-fee-spec.md §4 E1)
+        if (addSldFee) {
+            sldConversionService.applyPrePaymentConversion(application);
+        }
 
         // 상태 전이 — 도메인 메서드 사용 (reviewComment 클리어 포함)
         application.approveForPayment();

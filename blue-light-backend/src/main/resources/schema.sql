@@ -1151,6 +1151,8 @@ CREATE TABLE IF NOT EXISTS document_number_sequence (
 CREATE TABLE IF NOT EXISTS kva_adjustment_record (
     adjustment_seq            BIGINT         NOT NULL AUTO_INCREMENT,
     application_seq           BIGINT         NOT NULL,
+    -- AdjustmentType: KVA_CHANGE | SLD_ADDED (견적 조정 원장 일반화). 기본 KVA_CHANGE.
+    adjustment_type           VARCHAR(20)    NOT NULL DEFAULT 'KVA_CHANGE',
     -- LEW 요청 row(PR-3) 연결. ADMIN 단독 변경(PR-1)은 항상 NULL.
     lew_request_seq           BIGINT         NULL,
     previous_kva              INT            NOT NULL,

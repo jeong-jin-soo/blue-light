@@ -48,6 +48,14 @@ public class KvaAdjustmentRecord extends BaseEntity {
     private Application application;
 
     /**
+     * 조정 유형 (견적 조정 원장 일반화). 기본 {@link AdjustmentType#KVA_CHANGE}.
+     * SLD self-upload → LEW 작성 전환 시 {@link AdjustmentType#SLD_ADDED}.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "adjustment_type", nullable = false, length = 20)
+    private AdjustmentType adjustmentType = AdjustmentType.KVA_CHANGE;
+
+    /**
      * LEW 요청 row 와 ADMIN 변경 row 를 연결하는 self-FK (PR-3 에서 사용).
      * PR-1 의 ADMIN 단독 변경은 항상 null.
      */
@@ -139,6 +147,7 @@ public class KvaAdjustmentRecord extends BaseEntity {
 
     @Builder
     public KvaAdjustmentRecord(Application application,
+                               AdjustmentType adjustmentType,
                                Long lewRequestSeq,
                                Integer previousKva,
                                Integer newKva,
@@ -159,6 +168,7 @@ public class KvaAdjustmentRecord extends BaseEntity {
                                LocalDateTime adminAdjustmentAt,
                                LocalDateTime settledAt) {
         this.application = application;
+        this.adjustmentType = (adjustmentType != null) ? adjustmentType : AdjustmentType.KVA_CHANGE;
         this.lewRequestSeq = lewRequestSeq;
         this.previousKva = previousKva;
         this.newKva = newKva;

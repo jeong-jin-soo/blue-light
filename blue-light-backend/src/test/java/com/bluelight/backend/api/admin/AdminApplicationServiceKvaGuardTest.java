@@ -47,11 +47,13 @@ class AdminApplicationServiceKvaGuardTest {
         com.bluelight.backend.api.audit.AuditLogService auditLogService =
             mock(com.bluelight.backend.api.audit.AuditLogService.class);
         EmaSubmissionSettings emaSubmissionSettings = mock(EmaSubmissionSettings.class);
-        // @RequiredArgsConstructor — 필드 선언 순서: appRepo, userRepo, email, eventPublisher,
-        // fileRepository, auditLogService, emaSubmissionSettings
+        // @RequiredArgsConstructor — 선언 순서: appRepo, userRepo, email, eventPublisher,
+        // fileRepository, auditLogService, emaSubmissionSettings, sldRequestRepository, kvaAdjustmentRepository
         service = new AdminApplicationService(
             applicationRepository, userRepository, emailService, eventPublisher,
-            fileRepository, auditLogService, emaSubmissionSettings);
+            fileRepository, auditLogService, emaSubmissionSettings,
+            mock(com.bluelight.backend.domain.application.SldRequestRepository.class),
+            mock(com.bluelight.backend.domain.kva.KvaAdjustmentRepository.class));
     }
 
     @Test

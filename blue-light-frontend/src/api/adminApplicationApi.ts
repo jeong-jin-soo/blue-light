@@ -181,6 +181,8 @@ export type KvaPaymentAdjustment =
  */
 export interface KvaAdjustmentHistoryItem {
   adjustmentSeq: number;
+  /** KVA_CHANGE | SLD_ADDED — 조정 유형(견적 조정 원장 일반화). */
+  adjustmentType?: 'KVA_CHANGE' | 'SLD_ADDED';
   status: KvaAdjustmentStatus;
   changedByRole: KvaAdjustmentChangedByRole;
   changedByUserName?: string;

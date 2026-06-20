@@ -35,9 +35,11 @@ export async function getAssignedApplication(id: number): Promise<LewApplication
  * - KVA_NOT_CONFIRMED         : kVA 미확정
  * - DOCUMENT_REQUESTS_PENDING : 미해결 서류 요청 존재
  */
-export async function requestPayment(id: number): Promise<Application> {
+export async function requestPayment(id: number, addSldFee = false): Promise<Application> {
   const response = await axiosClient.post<Application>(
     `/lew/applications/${id}/request-payment`,
+    null,
+    { params: addSldFee ? { addSldFee: true } : undefined },
   );
   return response.data;
 }
@@ -83,10 +85,36 @@ export async function requestKvaAdjustment(
   return response.data;
 }
 
+/** SLD 전환(E2) 응답 — sld-lew-conversion-fee-spec.md §9. */
+export interface SldConversionResponse {
+  applicationSeq: number;
+  sldFee: number;
+  newQuoteAmount: number;
+  /** true 면 결제 후 전환 → 보충 청구(정산 원장 PENDING) 발생. */
+  postPayment: boolean;
+  adjustmentSeq: number | null;
+}
+
+/**
+ * E2 — 담당 LEW 가 SLD self-upload → 본인 작성(REQUEST_LEW)으로 전환 + SLD 작성비 청구.
+ *
+ * 가드 위반 코드:
+ * - 409 SLD_ALREADY_LEW — 이미 REQUEST_LEW
+ * - 409 SLD_CONVERT_NOT_ALLOWED — COMPLETED/EXPIRED
+ * - 404 PRICE_TIER_NOT_FOUND — master_prices 미존재
+ */
+export async function convertSldToLew(id: number): Promise<SldConversionResponse> {
+  const response = await axiosClient.post<SldConversionResponse>(
+    `/lew/applications/${id}/sld/convert-to-lew`,
+  );
+  return response.data;
+}
+
 const lewReviewApi = {
   getAssignedApplication,
   requestPayment,
   requestKvaAdjustment,
+  convertSldToLew,
 };
 
 export default lewReviewApi;

@@ -158,6 +158,8 @@ public class DatabaseMigrationRunner {
             seedPaymentSignalNotificationTemplates(conn);
             // ── LoA 폼 전달 → 신청자 알림 템플릿(A-57) 멱등 시드+활성 ──
             seedLoaFormSentNotificationTemplate(conn);
+            // ── SLD 전환 추가요금 알림 템플릿(A-58 신청자 통보 / A-59 ADMIN 정산요청) 멱등 시드+활성 ──
+            seedSldConversionNotificationTemplates(conn);
             // ── 신청자 신고 kVA(USER_INPUT) 가 LEW 미확정인데 CONFIRMED 로 저장돼 있던 레거시 행 보정 ──
             //   "신청자가 적었다고 LEW 확정 상태가 되면 안 됨" 규칙 적용. 결제 전 상태만 안전하게 UNKNOWN 으로.
             backfillUserDeclaredKvaToUnknown(conn);
@@ -372,6 +374,9 @@ public class DatabaseMigrationRunner {
         addColumnIfMissing(conn, "applications", "loa_form_template_seq",   "ALTER TABLE applications ADD COLUMN loa_form_template_seq BIGINT NULL");
         // 인앱 알림 딥링크 — 클릭 시 처리 화면의 해당 위치로 이동(NotificationLinkResolver 생성)
         addColumnIfMissing(conn, "notifications", "link_url",               "ALTER TABLE notifications ADD COLUMN link_url VARCHAR(300) NULL");
+        // 견적 조정 원장 일반화 (sld-lew-conversion-fee-spec.md): DEFAULT 'KVA_CHANGE' 가 기존 행 자동 백필.
+        addColumnIfMissing(conn, "kva_adjustment_record", "adjustment_type",
+            "ALTER TABLE kva_adjustment_record ADD COLUMN adjustment_type VARCHAR(20) NOT NULL DEFAULT 'KVA_CHANGE' AFTER application_seq");
     }
 
     /** 컬럼이 없을 때만 ADD COLUMN 실행 (멱등). */
@@ -2580,6 +2585,75 @@ public class DatabaseMigrationRunner {
         }
         if (inserted > 0) {
             log.info("Migration: seeded {} payment-signal template rows (A-55/A-56)", inserted);
+        }
+    }
+
+    /**
+     * SLD 전환 추가요금 알림 템플릿을 멱등 시드+활성.
+     * (sld-lew-conversion-fee-spec.md §11) A-58: 신청자 통보(APPLICANT), A-59: ADMIN 정산요청(ADMIN). EMAIL+IN_APP.
+     */
+    private void seedSldConversionNotificationTemplates(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        String a58Email = "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+                + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span></div>"
+                + "<h1 style=\"font-size:18px;margin:0 0 16px\">Your LEW will prepare the SLD</h1>"
+                + "<p style=\"margin:0 0 16px\">Hi {{applicantName}}, for application <strong>#{{publicCode}}</strong> your LEW will prepare the Single Line Diagram. "
+                + "An additional SLD fee of <strong>SGD {{sldFee}}</strong> applies and will be collected separately.</p>"
+                + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p>"
+                + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">LicenseKaki</p></div>";
+        String a59Email = "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+                + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br><span style=\"font-size:12px;color:#888\">Admin notification</span></div>"
+                + "<h1 style=\"font-size:18px;margin:0 0 16px\">SLD fee pending settlement</h1>"
+                + "<p style=\"margin:0 0 16px\">Application <strong>#{{publicCode}}</strong> ({{applicantName}}) switched to LEW-created SLD after payment. "
+                + "An additional SLD fee of <strong>SGD {{sldFee}}</strong> must be collected and settled.</p>"
+                + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p>"
+                + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">LicenseKaki internal admin notification.</p></div>";
+        // {code, channel, subject, body, recipientRoles}
+        String[][] rows = {
+            {"A-58", "EMAIL", "[LicenseKaki] SLD will be prepared by your LEW · #{{publicCode}}", a58Email, "APPLICANT"},
+            {"A-58", "IN_APP", "SLD fee added on #{{publicCode}}",
+                "Your LEW will prepare the SLD. Additional SLD fee SGD {{sldFee}} applies.", "APPLICANT"},
+            {"A-59", "EMAIL", "[LicenseKaki] SLD fee pending settlement · #{{publicCode}}", a59Email, "ADMIN"},
+            {"A-59", "IN_APP", "SLD fee pending settlement on #{{publicCode}}",
+                "{{applicantName}} switched to LEW-created SLD. Collect SGD {{sldFee}} and settle.", "ADMIN"},
+        };
+        final String variablesJson = "[\"applicantName\",\"publicCode\",\"sldFee\",\"ctaUrl\"]";
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'PAYMENT', 'IMPORTANT', ?, TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                try {
+                    insertPs.setString(1, r[0]); insertPs.setString(2, r[1]);
+                    insertPs.setString(3, r[2]); insertPs.setString(4, r[3]);
+                    insertPs.setString(5, variablesJson); insertPs.setString(6, r[0]);
+                    insertPs.setString(7, r[4]);
+                    insertPs.setString(8, r[0]); insertPs.setString(9, r[1]);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, r[0]); enablePs.setString(2, r[1]);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedSldConversionNotificationTemplates {} {} warn: {}", r[0], r[1], e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedSldConversionNotificationTemplates aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} SLD-conversion template rows (A-58/A-59)", inserted);
         }
     }
 

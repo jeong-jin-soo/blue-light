@@ -56,8 +56,12 @@ public class LewReviewController {
      * <ul>
      *   <li>{@code INVALID_STATUS_TRANSITION} — status 전제 위반</li>
      *   <li>{@code KVA_NOT_CONFIRMED} — kVA 미확정</li>
+     *   <li>{@code SLD_ALREADY_LEW} — addSldFee=true 인데 이미 REQUEST_LEW</li>
      * </ul>
      * <p>문서요청·LoA 상태는 결제 요청을 막지 않는다 (2026-06-18 결정 — kVA 확정이 충분조건).</p>
+     *
+     * <p>E1 (sld-lew-conversion-fee-spec.md §4): {@code addSldFee=true} 면 결제 요청 직전에
+     * SLD self-upload → LEW 작성 전환 + SLD 작성비를 견적에 가산한다 (결제 전이라 정산 원장 없음).</p>
      */
     @PostMapping("/{id}/request-payment")
     @PreAuthorize("@appSec.isAssignedLew(#id, authentication)")
@@ -65,9 +69,10 @@ public class LewReviewController {
             category = AuditCategory.APPLICATION, entityType = "Application")
     public ResponseEntity<ApplicationResponse> requestPayment(
             @PathVariable("id") Long id,
+            @RequestParam(name = "addSldFee", defaultValue = "false") boolean addSldFee,
             Authentication authentication) {
         Long lewUserSeq = (Long) authentication.getPrincipal();
-        log.info("LEW requestPayment: lewUserSeq={}, applicationSeq={}", lewUserSeq, id);
-        return ResponseEntity.ok(lewReviewService.requestPayment(id, lewUserSeq));
+        log.info("LEW requestPayment: lewUserSeq={}, applicationSeq={}, addSldFee={}", lewUserSeq, id, addSldFee);
+        return ResponseEntity.ok(lewReviewService.requestPayment(id, lewUserSeq, addSldFee));
     }
 }

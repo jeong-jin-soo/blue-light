@@ -700,29 +700,11 @@ public class KvaPostPaymentService {
     // ── Helpers ──────────────────────────────────────────────
 
     /**
-     * tierPrice + sldFee + emaFee 로 newQuote 재계산. {@code ApplicationKvaService.confirm} 과 동일 로직.
+     * tierPrice + calloutFee + sldFee + emaFee 로 newQuote 재계산.
+     * 공용 {@link com.bluelight.backend.api.price.QuoteCalculator} 위임(SSOT — SLD 전환과 공유).
      */
     private BigDecimal recalculateQuote(Application application, MasterPrice masterPrice) {
-        BigDecimal tierPrice = (application.getApplicationType() == ApplicationType.RENEWAL)
-                ? masterPrice.getRenewalPrice()
-                : masterPrice.getPrice();
-        BigDecimal newQuote = tierPrice;
-        // 출장비(call-out fee): New License 에만 가산
-        if (application.getApplicationType() != ApplicationType.RENEWAL
-                && masterPrice.getCalloutFee() != null) {
-            newQuote = newQuote.add(masterPrice.getCalloutFee());
-        }
-        if (application.getSldOption() != null
-                && application.getSldOption().name().equals("REQUEST_LEW")) {
-            BigDecimal sldFee = masterPrice.getSldPrice();
-            if (sldFee != null) {
-                newQuote = newQuote.add(sldFee);
-            }
-        }
-        if (application.getEmaFee() != null) {
-            newQuote = newQuote.add(application.getEmaFee());
-        }
-        return newQuote;
+        return com.bluelight.backend.api.price.QuoteCalculator.recalculate(application, masterPrice);
     }
 
     /**

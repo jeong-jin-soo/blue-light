@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -151,7 +152,7 @@ class LewReviewControllerTest {
             .status(ApplicationStatus.PENDING_PAYMENT)
             .applicationType("NEW")
             .build();
-        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ))).thenReturn(appRes);
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ), anyBoolean())).thenReturn(appRes);
 
         mockMvc.perform(withAuth(post("/api/lew/applications/{id}/request-payment", APP_SEQ)))
             .andExpect(status().isOk())
@@ -161,7 +162,7 @@ class LewReviewControllerTest {
     @Test
     @DisplayName("request-payment 시 status 전제 위반은 409 INVALID_STATUS_TRANSITION")
     void request_payment_invalid_transition_409() throws Exception {
-        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ), anyBoolean()))
             .thenThrow(new BusinessException(
                 "Already at PENDING_PAYMENT", HttpStatus.CONFLICT,
                 LewReviewErrorCode.INVALID_STATUS_TRANSITION));
@@ -174,7 +175,7 @@ class LewReviewControllerTest {
     @Test
     @DisplayName("request-payment 시 kVA 미확정은 409 KVA_NOT_CONFIRMED")
     void request_payment_kva_not_confirmed_409() throws Exception {
-        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ), anyBoolean()))
             .thenThrow(new BusinessException(
                 "kVA must be confirmed", HttpStatus.CONFLICT,
                 LewReviewErrorCode.KVA_NOT_CONFIRMED));
@@ -189,7 +190,7 @@ class LewReviewControllerTest {
     @Test
     @DisplayName("request-payment 미배정 LEW 호출은 403 APPLICATION_NOT_ASSIGNED")
     void request_payment_unassigned_lew_403() throws Exception {
-        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ)))
+        when(service.requestPayment(eq(APP_SEQ), eq(LEW_SEQ), anyBoolean()))
             .thenThrow(new BusinessException(
                 "Not assigned", HttpStatus.FORBIDDEN,
                 LewReviewErrorCode.APPLICATION_NOT_ASSIGNED));
@@ -202,7 +203,7 @@ class LewReviewControllerTest {
     @DisplayName("request-payment 메서드에 @Auditable(APPLICATION_PAYMENT_REQUESTED_BY_LEW) 부착 확인")
     void request_payment_has_auditable() throws Exception {
         Method m = LewReviewController.class.getMethod(
-            "requestPayment", Long.class, Authentication.class);
+            "requestPayment", Long.class, boolean.class, Authentication.class);
         Auditable auditable = m.getAnnotation(Auditable.class);
         assertThat(auditable).as("@Auditable 누락 — 감사 로그가 기록되지 않음").isNotNull();
         assertThat(auditable.action()).isEqualTo(AuditAction.APPLICATION_PAYMENT_REQUESTED_BY_LEW);

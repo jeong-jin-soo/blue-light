@@ -29,6 +29,9 @@ public class KvaAdjustmentHistoryItem {
 
     private Long adjustmentSeq;
 
+    /** KVA_CHANGE | SLD_ADDED — 조정 유형(견적 조정 원장 일반화). */
+    private com.bluelight.backend.domain.kva.AdjustmentType adjustmentType;
+
     /** PENDING_ADMIN_REVIEW | APPLIED | RESOLVED_BY_ADMIN_OVERRIDE | REJECTED | CANCELLED. */
     private KvaAdjustmentStatus status;
 
@@ -73,6 +76,7 @@ public class KvaAdjustmentHistoryItem {
     public static KvaAdjustmentHistoryItem from(KvaAdjustmentRecord r, String changedByUserName) {
         return KvaAdjustmentHistoryItem.builder()
                 .adjustmentSeq(r.getAdjustmentSeq())
+                .adjustmentType(r.getAdjustmentType())
                 .status(r.getStatus())
                 .changedByRole(r.getChangedByRole())
                 .changedByUserName(changedByUserName)
