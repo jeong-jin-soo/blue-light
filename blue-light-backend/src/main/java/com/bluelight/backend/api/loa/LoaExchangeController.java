@@ -33,41 +33,10 @@ public class LoaExchangeController {
 
     private final LoaService loaService;
 
-    // ── §3.3 LEW: 폼 전달 (NEW 전용) ──
+    // 신청자 LoA(서명본) 업로드는 Documents 흐름(DocumentRequestController 자발/fulfill)으로 일원화되었다.
+    // 본 컨트롤러는 LEW 최종본 업로드 + ADMIN 파일 등록/교체만 담당한다.
 
-    /**
-     * POST /api/lew/applications/{id}/loa/send-form — 담당 LEW 가 active 폼을 신청자에게 전달.
-     * <p>409: {@code NO_ACTIVE_LOA_FORM}(active 폼 부재), {@code LOA_FORM_NOT_APPLICABLE}(RENEWAL).</p>
-     */
-    @PostMapping("/api/lew/applications/{id}/loa/send-form")
-    @PreAuthorize("@appSec.isAssignedLew(#id, authentication)")
-    public ResponseEntity<LoaStatusResponse> sendForm(
-            @PathVariable("id") Long id,
-            Authentication authentication) {
-        Long lewUserSeq = (Long) authentication.getPrincipal();
-        log.info("LEW sendLoaForm: lewUserSeq={}, applicationSeq={}", lewUserSeq, id);
-        return ResponseEntity.ok(loaService.sendLoaForm(lewUserSeq, id));
-    }
-
-    // ── §3.3 Owner: 서명본 업로드 ──
-
-    /**
-     * POST /api/applications/{id}/loa/applicant-upload — 신청자(또는 ADMIN 대리)가 오프라인 서명본 업로드.
-     * <p>multipart {@code file}(PDF/JPG/PNG, ≤20MB). 소유자 검증은 서비스 레이어 {@code OwnershipValidator}.</p>
-     */
-    @PostMapping(value = "/api/applications/{id}/loa/applicant-upload",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<LoaStatusResponse> applicantUpload(
-            @PathVariable("id") Long id,
-            @RequestPart("file") MultipartFile file,
-            Authentication authentication) {
-        Long userSeq = (Long) authentication.getPrincipal();
-        String role = authentication.getAuthorities().iterator().next().getAuthority();
-        log.info("Applicant uploadLoa: userSeq={}, applicationSeq={}", userSeq, id);
-        return ResponseEntity.ok(loaService.applicantUploadLoa(userSeq, role, id, file));
-    }
-
-    // ── §3.3 LEW: 최종본 업로드 ──
+    // ── LEW: 최종본 업로드 ──
 
     /**
      * POST /api/lew/applications/{id}/loa/final-upload — 담당 LEW 가 보완한 최종본 업로드.
@@ -108,23 +77,6 @@ public class LoaExchangeController {
         log.info("ADMIN adminReplaceLoa: adminSeq={}, applicationSeq={}, fileType={}",
                 adminSeq, id, parsedType);
         return ResponseEntity.ok(loaService.adminReplaceLoa(adminSeq, id, parsedType, file, reason));
-    }
-
-    /**
-     * POST /api/admin/applications/{id}/loa/send-form — ADMIN/SYSTEM_ADMIN 이 신청자에게 active LoA 폼 전달.
-     *
-     * <p>LEW 전용 {@code /api/lew/.../send-form}(URL 매처가 LEW 한정)과 동일 동작이지만,
-     * 배정 LEW가 없거나 ADMIN 이 직접 진행해야 하는 경우를 위해 {@code /api/admin/**} 경로로 제공.
-     * 409: {@code NO_ACTIVE_LOA_FORM}(active 폼 부재), {@code LOA_FORM_NOT_APPLICABLE}(RENEWAL).</p>
-     */
-    @PostMapping("/api/admin/applications/{id}/loa/send-form")
-    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN')")
-    public ResponseEntity<LoaStatusResponse> adminSendForm(
-            @PathVariable("id") Long id,
-            Authentication authentication) {
-        Long adminSeq = (Long) authentication.getPrincipal();
-        log.info("ADMIN sendLoaForm: adminSeq={}, applicationSeq={}", adminSeq, id);
-        return ResponseEntity.ok(loaService.sendLoaForm(adminSeq, id));
     }
 
     // §3.2 active 폼 메타/다운로드(/api/applications/{id}/loa/active-form[/download])는

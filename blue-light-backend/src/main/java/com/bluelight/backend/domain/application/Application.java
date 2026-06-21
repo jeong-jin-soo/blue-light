@@ -909,32 +909,12 @@ public class Application extends BaseEntity {
         this.loaSignedAt = LocalDateTime.now();
     }
 
-    // ── LoA 교환 모델 전이 (loa-exchange 재설계 PR3) ──
-
-    /** (NEW) LEW가 LoA 폼 전달: active 폼 버전 스냅샷 고정 + 단계 FORM_SENT. */
-    public void markLoaFormSent(Long formTemplateSeq) {
-        this.loaFormTemplateSeq = formTemplateSeq;
-        if (this.loaStage == LoaStage.NOT_STARTED) {
-            this.loaStage = LoaStage.FORM_SENT;
-        }
-    }
-
-    /** 신청자가 서명본 업로드: 단계 APPLICANT_UPLOADED (이미 FINAL이면 되돌리지 않음). */
-    public void markLoaApplicantUploaded() {
-        if (this.loaStage == LoaStage.NOT_STARTED || this.loaStage == LoaStage.FORM_SENT) {
-            this.loaStage = LoaStage.APPLICANT_UPLOADED;
-        }
-    }
+    // ── LoA 단계 전이 — LEW 최종본 트랙만 추적 ──
+    // 신청자 LoA(자발/요청 첨부)는 loaStage 와 무관하게 Documents 의 OWNER_AUTH_LETTER 파일로만 추적된다.
 
     /** LEW가 최종본 업로드: 단계 FINAL_UPLOADED. */
     public void markLoaFinalUploaded() {
         this.loaStage = LoaStage.FINAL_UPLOADED;
-    }
-
-    /** 결제 요청 가능 여부 — LoA 수령(신청자 업로드 이상). NEW/RENEWAL 공통(D-1). */
-    public boolean isLoaReceivedForPayment() {
-        return this.loaStage == LoaStage.APPLICANT_UPLOADED
-                || this.loaStage == LoaStage.FINAL_UPLOADED;
     }
 
     /** 결제 요청 가능 여부(강화) — LEW 최종본 업로드까지 완료(FINAL_UPLOADED)되어야 결제 요청 가능. */

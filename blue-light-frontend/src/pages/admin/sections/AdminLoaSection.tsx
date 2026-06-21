@@ -32,8 +32,6 @@ function formatUploadedAt(iso?: string): string {
 /** loaStage → 표시 라벨 + 뱃지 색상. */
 const STAGE_META: Record<LoaStage, { label: string; variant: BadgeVariant }> = {
   NOT_STARTED: { label: 'Not started', variant: 'gray' },
-  FORM_SENT: { label: 'Form sent to applicant', variant: 'info' },
-  APPLICANT_UPLOADED: { label: 'Applicant signed copy uploaded', variant: 'warning' },
   FINAL_UPLOADED: { label: 'Final LoA uploaded', variant: 'success' },
 };
 
@@ -68,23 +66,6 @@ export function AdminLoaSection({ application, loaStatus, files, onDownload, onR
 
   const reasonMissing = reason.trim().length === 0;
   const canSubmit = !!selectedFile && !reasonMissing && !submitting;
-
-  // ── LoA 폼 전달 (NEW 전용, active 폼 있을 때) ──
-  const [sendingForm, setSendingForm] = useState(false);
-  const canSendForm = application.applicationType === 'NEW' && !!loaStatus?.activeFormAvailable;
-
-  const handleSendForm = async () => {
-    setSendingForm(true);
-    try {
-      await loaApi.adminSendLoaForm(application.applicationSeq);
-      toast.success('LoA form sent to the applicant.');
-      await onReplaced();
-    } catch {
-      toast.error('Failed to send the LoA form.');
-    } finally {
-      setSendingForm(false);
-    }
-  };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
@@ -182,26 +163,6 @@ export function AdminLoaSection({ application, loaStatus, files, onDownload, onR
           )}
         </div>
 
-        {/* active 폼 라벨 (NEW 전용) */}
-        {loaStatus?.activeFormAvailable && loaStatus.activeFormLabel && (
-          <p className="text-xs text-gray-500 px-1">
-            Active LoA form: <span className="font-medium text-gray-700">{loaStatus.activeFormLabel}</span>
-          </p>
-        )}
-
-        {/* LoA 폼 전달 (NEW 전용) — 담당 LEW가 없거나 ADMIN이 직접 보낼 때 */}
-        {canSendForm && (
-          <div className="pt-1">
-            <Button
-              variant="outline"
-              size="sm"
-              loading={sendingForm}
-              onClick={handleSendForm}
-            >
-              {stage === 'NOT_STARTED' ? 'Send LoA form to applicant' : 'Resend LoA form to applicant'}
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* ── admin 등록/교체 폼 ── */}

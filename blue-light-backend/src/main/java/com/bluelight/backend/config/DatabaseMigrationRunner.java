@@ -175,6 +175,10 @@ public class DatabaseMigrationRunner {
             //   DocumentRequestStatus enum 에서 APPROVED/REJECTED 제거 → 기존 행 로드 시 enum 파싱 실패 방지.
             //   부팅 시 1회 적용 후 멱등(매칭 행 0).
             migrateDocumentRequestRemoveApproveReject(conn);
+            // ── LoA 단계 2상태 축소 (2026-06-21) — FORM_SENT/APPLICANT_UPLOADED 제거 ──
+            //   loaStage 가 LEW 최종본 트랙만 표현하도록 단순화. 기존 행 로드 시 enum 파싱 실패 방지를 위해
+            //   FORM_SENT/APPLICANT_UPLOADED → NOT_STARTED 로 멱등 변환(매칭 행 0이면 no-op).
+            migrateApplicationsLoaStageCollapse(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -720,6 +724,26 @@ public class DatabaseMigrationRunner {
             );
             if (updated > 0) {
                 log.info("Migration [docreq-approve-reject-removal]: {} row(s) APPROVED/REJECTED → UPLOADED", updated);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: LoaStage 2상태 축소 — FORM_SENT/APPLICANT_UPLOADED → NOT_STARTED.
+     * <p>loaStage 가 LEW 최종본 트랙(NOT_STARTED/FINAL_UPLOADED)만 표현하도록 단순화되면서,
+     * 레거시 행에 남은 FORM_SENT/APPLICANT_UPLOADED 는 enum 파싱 실패를 유발한다. 부팅 시 1회 변환 후
+     * 멱등(매칭 행 0). 신청자 LoA 파일(OWNER_AUTH_LETTER)·LEW 최종본(LOA_FINAL)은 그대로 보존되므로
+     * 데이터 손실 없음.</p>
+     */
+    private void migrateApplicationsLoaStageCollapse(Connection conn) throws SQLException {
+        if (!columnExists(conn, "applications", "loa_stage")) return;
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE applications SET loa_stage = 'NOT_STARTED' " +
+                "WHERE loa_stage IN ('FORM_SENT', 'APPLICANT_UPLOADED')"
+            );
+            if (updated > 0) {
+                log.info("Migration [loa-stage-collapse]: {} row(s) FORM_SENT/APPLICANT_UPLOADED → NOT_STARTED", updated);
             }
         }
     }

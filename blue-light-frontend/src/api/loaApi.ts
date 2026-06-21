@@ -12,48 +12,8 @@ export const getLoaStatus = async (applicationId: number): Promise<LoaStatus> =>
 };
 
 // ══════════════════════════════════════════════════════════════════
-//  교환 모델 (loa-exchange-redesign-spec.md §3.2 / §3.3, PR3b)
+//  LoA 파일 — 신청자 LoA 는 Documents(자발/fulfill)로 처리. 여기는 LEW 최종본 + ADMIN 등록/교체만.
 // ══════════════════════════════════════════════════════════════════
-
-/**
- * LEW: active LoA 폼을 신청자에게 전달 (NEW 전용).
- * POST /api/lew/applications/{id}/loa/send-form
- */
-export const sendLoaForm = async (applicationId: number): Promise<LoaStatus> => {
-  const response = await axiosClient.post<LoaStatus>(
-    `/lew/applications/${applicationId}/loa/send-form`
-  );
-  return response.data;
-};
-
-/**
- * ADMIN/SYSTEM_ADMIN: 신청자에게 active LoA 폼 전달 (LEW send-form 의 admin 경로).
- * POST /api/admin/applications/{id}/loa/send-form
- */
-export const adminSendLoaForm = async (applicationId: number): Promise<LoaStatus> => {
-  const response = await axiosClient.post<LoaStatus>(
-    `/admin/applications/${applicationId}/loa/send-form`
-  );
-  return response.data;
-};
-
-/**
- * 신청자(또는 ADMIN 대리): 오프라인 서명본 업로드.
- * POST /api/applications/{id}/loa/applicant-upload
- */
-export const uploadApplicantLoa = async (
-  applicationId: number,
-  file: File
-): Promise<LoaStatus> => {
-  const form = new FormData();
-  form.append('file', file);
-  const response = await axiosClient.post<LoaStatus>(
-    `/applications/${applicationId}/loa/applicant-upload`,
-    form,
-    { headers: { 'Content-Type': 'multipart/form-data' } }
-  );
-  return response.data;
-};
 
 /**
  * LEW: 보완한 최종본 업로드.
@@ -124,14 +84,10 @@ export const downloadActiveLoaForm = async (applicationId: number): Promise<Blob
 
 export const loaApi = {
   getLoaStatus,
-  // 교환 모델 (PR3b)
-  sendLoaForm,
-  adminSendLoaForm,
-  uploadApplicantLoa,
   uploadFinalLoa,
   getActiveLoaForm,
   downloadActiveLoaForm,
-  // Part B — admin 교환 패널
+  // admin 등록/교체 패널
   adminReplaceLoa,
 };
 export default loaApi;

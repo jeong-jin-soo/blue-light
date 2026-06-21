@@ -16,8 +16,6 @@ interface Props {
 
 const stageMeta: Record<LoaStage, { label: string; variant: BadgeVariant }> = {
   NOT_STARTED: { label: 'Not started', variant: 'gray' },
-  FORM_SENT: { label: 'Form sent to applicant', variant: 'info' },
-  APPLICANT_UPLOADED: { label: 'Applicant uploaded', variant: 'warning' },
   FINAL_UPLOADED: { label: 'Final LoA uploaded', variant: 'success' },
 };
 

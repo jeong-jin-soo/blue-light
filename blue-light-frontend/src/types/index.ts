@@ -856,26 +856,20 @@ export interface BatchUpdatePricesRequest {
 /**
  * LOA 상태 응답
  */
-/** LoA 교환 진행 단계 (loa-exchange-redesign-spec.md §2.3). */
+/** LoA 단계 — LEW 최종본 트랙만 표현. 신청자 LoA 는 Documents 트랙(별도). */
 export type LoaStage =
   | 'NOT_STARTED'
-  | 'FORM_SENT'
-  | 'APPLICANT_UPLOADED'
   | 'FINAL_UPLOADED';
 
 export interface LoaStatus {
   applicationSeq: number;
   applicationType: ApplicationType;
-  // ── 교환 모델 (신규) ──
+  /** LoA 단계 — LEW 최종본 트랙. */
   loaStage?: LoaStage;
-  /** 신청자 오프라인 서명본(OWNER_AUTH_LETTER) 최신 파일 seq. */
+  /** 신청자 LoA(OWNER_AUTH_LETTER) 최신 파일 seq. Documents 트랙. */
   applicantFileSeq?: number;
   /** LEW 최종본(LOA_FINAL) 최신 파일 seq. */
   finalFileSeq?: number;
-  /** 신청에 적용 가능한 active LoA 폼 존재 여부 (NEW 전용). */
-  activeFormAvailable?: boolean;
-  /** active LoA 폼 라벨. */
-  activeFormLabel?: string;
   // ── 레거시 (하위호환) ──
   loaGenerated: boolean;
   loaSigned: boolean;

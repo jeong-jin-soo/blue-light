@@ -362,20 +362,11 @@ export default function ApplicationDetailPage() {
   const licenceFiles = files.filter((f) => f.fileType === 'LICENSE_PDF');
   const showLicenceTop = application.status === 'COMPLETED' && licenceFiles.length > 0;
 
-  // LoA 신청자 액션 필요 판단 — loaStage 가 권위 있는 신호(업로드 시 APPLICANT_UPLOADED 로 전이).
-  //  · NEW: LEW 가 폼 전달(FORM_SENT) → 다운로드·서명·업로드 대기
-  //  · RENEWAL: 폼 미제공, stage 는 업로드 전까지 NOT_STARTED → 서명본 업로드 대기
-  const loaStageNow = loaStatus?.loaStage ?? 'NOT_STARTED';
-  const isRenewalApp = application.applicationType === 'RENEWAL';
-  const loaActionNeeded =
-    loaStageNow === 'FORM_SENT'
-    || (isRenewalApp && loaStageNow === 'NOT_STARTED'
-        && !['COMPLETED', 'EXPIRED'].includes(application.status));
-
-  // 승격 대상 1개 선택 (우선순위: 수정 편집 > LoA 액션 > 결제 대기).
-  const focusKey: 'info' | 'loa' | 'payment' | null =
+  // 신청자 LoA(서명본) 업로드는 Documents 섹션에서 처리되며, LoA 섹션은 LEW 최종본 상태(읽기 전용)만
+  // 보여준다. 따라서 LoA 섹션을 별도로 최상단 승격하지 않는다.
+  // 승격 대상 1개 선택 (우선순위: 수정 편집 > 결제 대기).
+  const focusKey: 'info' | 'payment' | null =
     editMode ? 'info'
-    : loaActionNeeded ? 'loa'
     : application.status === 'PENDING_PAYMENT' ? 'payment'
     : null;
 
@@ -616,7 +607,6 @@ export default function ApplicationDetailPage() {
 
           {/* 신청자 액션이 필요한 섹션을 최상단으로 승격 */}
           {focusKey === 'info' && infoSection}
-          {focusKey === 'loa' && loaSection}
           {focusKey === 'payment' && paymentSection}
 
           {/* Phase 2 — 서류 섹션 (자발적 업로드 + LEW 요청). APPLICANT만 업로드 가능, LEW/ADMIN은 읽기 전용. */}
@@ -626,7 +616,7 @@ export default function ApplicationDetailPage() {
           {focusKey !== 'info' && infoSection}
           {focusKey !== 'payment' && paymentSection}
           {invoiceSection}
-          {focusKey !== 'loa' && loaSection}
+          {loaSection}
           {filesSection}
         </div>
 

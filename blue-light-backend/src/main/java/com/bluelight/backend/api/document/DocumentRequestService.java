@@ -159,15 +159,15 @@ public class DocumentRequestService {
                 application, catalog.getCode(), trimmedLabel, savedFile);
         DocumentRequest saved = documentRequestRepository.save(dr);
 
-        // (6-1) 신청자(또는 ADMIN 대리)가 LoA(Letter of Appointment)를 자발 업로드하면 LoA 단계도 전이.
-        //       fulfill 경로와 동일하게 LoA 교환을 Documents 흐름으로 일원화한다(LEW 자발 업로드는 제외).
+        // (6-1) 신청자(또는 ADMIN 대리)가 LoA(Letter of Appointment)를 자발 업로드하면 신원 스냅샷을 기록한다.
+        //       신청자 LoA 는 Documents 트랙(OWNER_AUTH_LETTER 파일)으로만 추적되며 loaStage 는 건드리지 않는다
+        //       (loaStage 는 LEW 최종본 전용). LEW 자발 업로드는 스냅샷 대상에서 제외.
         boolean isOwner = application.getUser().getUserSeq().equals(requestorSeq);
         if ("LOA".equals(catalog.getCode()) && (isOwner || OwnershipValidator.isAdmin(requestorRole))) {
             User applicant = application.getUser();
             application.recordLoaSnapshot(
                     applicant.getFullName(), applicant.getCompanyName(),
                     applicant.getUen(), applicant.getDesignation());
-            application.markLoaApplicantUploaded();
         }
 
         log.info("Voluntary document uploaded: drId={}, applicationSeq={}, code={}, fileSeq={}, size={}",
@@ -423,17 +423,15 @@ public class DocumentRequestService {
         // 상태 전이 (REQUESTED/REJECTED/UPLOADED → UPLOADED)
         dr.fulfill(savedFile);
 
-        // LoA(Letter of Appointment) 문서를 신청자가 채우면 LoA 교환 단계도 APPLICANT_UPLOADED 로 전이한다.
-        // (loa-exchange 통합: 전용 LoA 섹션의 applicant-upload 를 Documents 요청 흐름으로 일원화.
+        // 신청자가 LoA(Letter of Appointment) 서류 요청을 채우면 신원 스냅샷을 기록한다.
         //  파일은 CODE_TO_FILE_TYPE 매핑으로 이미 OWNER_AUTH_LETTER 로 저장됨 → LoaService.buildStatus 가 인식.
-        //  LEW 의 최종본 업로드(final-upload)는 이 단계 이후 가능 — 결제/작업개시 게이트는 LEW 최종본 그대로 유지.)
+        //  신청자 LoA 는 Documents 트랙으로만 추적되며 loaStage(LEW 최종본 전용)는 건드리지 않는다.
         if ("LOA".equals(dr.getDocumentTypeCode())) {
             User applicant = application.getUser();
-            // 신원 스냅샷 최초 기록(PDPA, 멱등) — 기존 applicant-upload 경로와 동일.
+            // 신원 스냅샷 최초 기록(PDPA, 멱등).
             application.recordLoaSnapshot(
                     applicant.getFullName(), applicant.getCompanyName(),
                     applicant.getUen(), applicant.getDesignation());
-            application.markLoaApplicantUploaded();
         }
 
         log.info("DocumentRequest fulfilled: drId={}, applicationSeq={}, previousFileSeq={}, newFileSeq={}",
