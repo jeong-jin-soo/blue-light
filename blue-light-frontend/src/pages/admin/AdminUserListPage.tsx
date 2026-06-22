@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Copy, Check } from 'lucide-react';
 import { fullName } from '../../utils/formatName';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
@@ -52,6 +53,7 @@ export default function AdminUserListPage() {
   // PayNow reveal (지급용 전체값 — 클릭 시 서버가 열람 감사 기록)
   const [revealedPaynow, setRevealedPaynow] = useState<Record<number, string>>({});
   const [revealingId, setRevealingId] = useState<number | null>(null);
+  const [copiedPaynowId, setCopiedPaynowId] = useState<number | null>(null);
   // 상세 보기 모달 — 목록에서 뺀 항목 + 미노출 정보를 팝업으로
   const [detailUser, setDetailUser] = useState<User | null>(null);
 
@@ -205,6 +207,21 @@ export default function AdminUserListPage() {
       toast.error(message);
     } finally {
       setRevealingId(null);
+    }
+  };
+
+  const handleCopyPaynow = async (user: User) => {
+    const value = revealedPaynow[user.userSeq];
+    if (!value || value === '-') return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedPaynowId(user.userSeq);
+      toast.success('PayNow copied to clipboard');
+      window.setTimeout(() => {
+        setCopiedPaynowId((id) => (id === user.userSeq ? null : id));
+      }, 1500);
+    } catch {
+      toast.error('Failed to copy PayNow');
     }
   };
 
@@ -632,13 +649,27 @@ export default function AdminUserListPage() {
                         <span className="inline-flex items-center gap-2">
                           <span className="font-mono">{revealedPaynow[detailUser.userSeq] ?? detailUser.paynowValueMasked}</span>
                           <span className="text-[10px] text-gray-400">{detailUser.paynowType === 'MOBILE' ? 'Mobile' : 'UEN'}</span>
-                          {!revealedPaynow[detailUser.userSeq] && (
+                          {!revealedPaynow[detailUser.userSeq] ? (
                             <button
                               onClick={() => handleRevealPaynow(detailUser)}
                               disabled={revealingId === detailUser.userSeq}
                               className="text-xs text-primary hover:underline disabled:opacity-50"
                             >
                               {revealingId === detailUser.userSeq ? '…' : 'Reveal'}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPaynow(detailUser)}
+                              title="Copy PayNow"
+                              aria-label="Copy PayNow"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              {copiedPaynowId === detailUser.userSeq ? (
+                                <><Check className="w-3.5 h-3.5" /> Copied</>
+                              ) : (
+                                <><Copy className="w-3.5 h-3.5" /> Copy</>
+                              )}
                             </button>
                           )}
                         </span>
