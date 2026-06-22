@@ -48,15 +48,15 @@ public class AuditAspect {
             }
         } catch (Throwable ex) {
             httpStatus = 500;
-            logAudit(joinPoint, auditable, httpStatus);
+            logAudit(joinPoint, auditable, httpStatus, null);
             throw ex;
         }
 
-        logAudit(joinPoint, auditable, httpStatus);
+        logAudit(joinPoint, auditable, httpStatus, result);
         return result;
     }
 
-    private void logAudit(ProceedingJoinPoint joinPoint, Auditable auditable, int httpStatus) {
+    private void logAudit(ProceedingJoinPoint joinPoint, Auditable auditable, int httpStatus, Object result) {
         try {
             Long userSeq = null;
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -65,6 +65,7 @@ public class AuditAspect {
             }
 
             String entityId = extractEntityId(joinPoint);
+            Long applicationSeq = extractApplicationSeq(joinPoint, auditable.entityType(), entityId, result);
             HttpServletRequest request = getCurrentRequest();
             String ipAddress = request != null ? getClientIp(request) : null;
             String userAgent = request != null ? request.getHeader("User-Agent") : null;
@@ -74,6 +75,7 @@ public class AuditAspect {
             Object requestData = extractRequestData(joinPoint);
 
             auditLogService.logAsync(
+                    applicationSeq,
                     userSeq,
                     auditable.action(),
                     auditable.category(),
@@ -137,6 +139,57 @@ public class AuditAspect {
             }
         }
         return null;
+    }
+
+    /**
+     * 신청(Application) 타임라인 연결 seq 추출:
+     * ① {@code applicationId} 경로변수가 있으면 그 값 (예: 파일 업로드 — entityType 은 File 이라도 신청에 연결)
+     * ② 없고 entityType 이 "Application" 이면 {@code id} 경로변수 = applicationSeq
+     */
+    private Long extractApplicationSeq(ProceedingJoinPoint joinPoint, String entityType, String entityId, Object result) {
+        MethodSignature sig = (MethodSignature) joinPoint.getSignature();
+        Parameter[] params = sig.getMethod().getParameters();
+        Object[] args = joinPoint.getArgs();
+
+        for (int i = 0; i < params.length; i++) {
+            PathVariable pv = params[i].getAnnotation(PathVariable.class);
+            if (pv != null && args[i] != null) {
+                String name = pv.value().isEmpty() ? params[i].getName() : pv.value();
+                if ("applicationId".equals(name)) {
+                    return parseLongOrNull(String.valueOf(args[i]));
+                }
+            }
+        }
+        if ("Application".equalsIgnoreCase(entityType)) {
+            Long fromPath = parseLongOrNull(entityId);
+            if (fromPath != null) return fromPath;
+            // 생성류(POST, 경로에 id 없음): 응답 바디의 applicationSeq 폴백 (예: APPLICATION_CREATED)
+            return extractApplicationSeqFromResult(result);
+        }
+        return null;
+    }
+
+    /** ResponseEntity 바디에 applicationSeq getter 가 있으면 그 값을 읽는다 (생성 응답 연결용). */
+    private Long extractApplicationSeqFromResult(Object result) {
+        Object body = result instanceof ResponseEntity<?> re ? re.getBody() : result;
+        if (body == null) return null;
+        try {
+            var m = body.getClass().getMethod("getApplicationSeq");
+            Object v = m.invoke(body);
+            if (v instanceof Number n) return n.longValue();
+        } catch (ReflectiveOperationException ignored) {
+            // getApplicationSeq 가 없으면 연결 불가 — null 유지
+        }
+        return null;
+    }
+
+    private Long parseLongOrNull(String s) {
+        if (s == null) return null;
+        try {
+            return Long.parseLong(s.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private HttpServletRequest getCurrentRequest() {

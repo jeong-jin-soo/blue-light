@@ -143,7 +143,7 @@ public class AdminPaymentService {
                     savedPayment.getPaymentSeq(), e.getMessage(), e);
             try {
                 auditLogService.log(
-                        null, null, null,
+                        applicationSeq, null, null, null,
                         AuditAction.INVOICE_GENERATION_FAILED,
                         AuditCategory.APPLICATION,
                         "Payment",

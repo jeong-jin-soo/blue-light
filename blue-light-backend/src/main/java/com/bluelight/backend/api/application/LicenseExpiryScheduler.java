@@ -1,9 +1,12 @@
 package com.bluelight.backend.api.application;
 
+import com.bluelight.backend.api.audit.AuditLogService;
 import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.audit.AuditAction;
+import com.bluelight.backend.domain.audit.AuditCategory;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -28,6 +31,7 @@ public class LicenseExpiryScheduler {
 
     private final ApplicationRepository applicationRepository;
     private final EmailService emailService;
+    private final AuditLogService auditLogService;
 
     @Value("${license-expiry.warning-days-before:30}")
     private int warningDaysBefore;
@@ -86,6 +90,16 @@ public class LicenseExpiryScheduler {
                 app.markExpiryNotified();
                 log.info("Expiry warning sent: applicationSeq={}, expiryDate={}, daysRemaining={}",
                         app.getApplicationSeq(), app.getLicenseExpiryDate(), daysRemaining);
+
+                // 자동 동작 감사 기록 (SYSTEM 행위자) — 타임라인 노출용
+                auditLogService.log(
+                        app.getApplicationSeq(), null,
+                        AuditLogService.SYSTEM_ACTOR_EMAIL, AuditLogService.SYSTEM_ACTOR_ROLE,
+                        AuditAction.LICENSE_EXPIRY_WARNING_SENT, AuditCategory.APPLICATION,
+                        "Application", String.valueOf(app.getApplicationSeq()),
+                        "면허 만료 임박 알림 자동 발송 (만료일 " + app.getLicenseExpiryDate()
+                                + ", D-" + daysRemaining + ")",
+                        null, null, null, null, null, null, null);
             } catch (Exception e) {
                 log.error("Failed to send expiry warning: applicationSeq={}",
                         app.getApplicationSeq(), e);
@@ -112,6 +126,16 @@ public class LicenseExpiryScheduler {
             app.markAsExpired();
             log.info("Application expired: applicationSeq={}, expiryDate={}",
                     app.getApplicationSeq(), app.getLicenseExpiryDate());
+
+            // 자동 동작 감사 기록 (SYSTEM 행위자) — 타임라인 노출용
+            auditLogService.log(
+                    app.getApplicationSeq(), null,
+                    AuditLogService.SYSTEM_ACTOR_EMAIL, AuditLogService.SYSTEM_ACTOR_ROLE,
+                    AuditAction.LICENSE_EXPIRED, AuditCategory.APPLICATION,
+                    "Application", String.valueOf(app.getApplicationSeq()),
+                    "면허 만료일(" + app.getLicenseExpiryDate() + ") 경과 → 자동 EXPIRED 전환",
+                    ApplicationStatus.COMPLETED.name(), ApplicationStatus.EXPIRED.name(),
+                    null, null, null, null, null);
         }
     }
 }

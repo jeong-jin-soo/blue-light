@@ -339,6 +339,15 @@ public class ApplicationService {
                     saved.getAddress(),
                     true,
                     false));
+            // 자동 배정 감사 기록 (SYSTEM 행위자) — 수동 배정은 @Auditable(LEW_ASSIGNED) 가 담당.
+            auditLogService.log(
+                    saved.getApplicationSeq(), null,
+                    AuditLogService.SYSTEM_ACTOR_EMAIL, AuditLogService.SYSTEM_ACTOR_ROLE,
+                    AuditAction.LEW_ASSIGNED, AuditCategory.APPLICATION,
+                    "Application", String.valueOf(saved.getApplicationSeq()),
+                    "LEW 자동 배정 (적격 LEW 단독): " + autoAssignedLew.getFullName()
+                            + " (seq=" + autoAssignedLew.getUserSeq() + ")",
+                    null, null, null, null, null, null, null);
         }
 
         // C.1: Snapshot-at-submit — Application을 "신청 당시 정본"으로 격상
@@ -707,6 +716,15 @@ public class ApplicationService {
                     saved.getAddress(),
                     true,
                     false));
+            // 자동 배정 감사 기록 (SYSTEM 행위자) — 대리 생성 경로.
+            auditLogService.log(
+                    saved.getApplicationSeq(), null,
+                    AuditLogService.SYSTEM_ACTOR_EMAIL, AuditLogService.SYSTEM_ACTOR_ROLE,
+                    AuditAction.LEW_ASSIGNED, AuditCategory.APPLICATION,
+                    "Application", String.valueOf(saved.getApplicationSeq()),
+                    "LEW 자동 배정 (적격 LEW 단독, 대리 생성): " + autoAssignedLewOnBehalf.getFullName()
+                            + " (seq=" + autoAssignedLewOnBehalf.getUserSeq() + ")",
+                    null, null, null, null, null, null, null);
         }
 
         // C.1: Snapshot-at-submit (Concierge 대리 생성 경로도 동일 로직 적용)

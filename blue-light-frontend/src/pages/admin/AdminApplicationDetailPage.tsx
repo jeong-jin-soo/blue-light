@@ -19,6 +19,7 @@ import { AdminApplicationInfo } from './sections/AdminApplicationInfo';
 import { AdminLoaSection } from './sections/AdminLoaSection';
 import { KvaSection } from '../../components/admin/KvaSection';
 import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
+import { AdminActivityTimelineSection } from '../../components/admin/AdminActivityTimelineSection';
 import { AdminSldSection } from './sections/AdminSldSection';
 import { AdminEmaSection } from './sections/AdminEmaSection';
 import { AdminDocumentsSection } from './sections/AdminDocumentsSection';
@@ -83,6 +84,8 @@ export default function AdminApplicationDetailPage() {
   const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
   // 영수증 이력 카드 강제 새로고침 키 — manual-payment 후 invalidate.
   const [invoiceRefreshKey, setInvoiceRefreshKey] = useState(0);
+  // 활동 타임라인 새로고침 키 — fetchData(액션 후 재조회) 시마다 증가.
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0);
 
   const { user: currentUser } = useAuthStore();
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'SYSTEM_ADMIN';
@@ -124,6 +127,8 @@ export default function AdminApplicationDetailPage() {
           setSldRequest(sldData);
         } catch { /* SLD request might not exist */ }
       }
+      // 활동 타임라인 재조회 트리거 (상태/결제/배정 등 모든 액션 후 fetchData 호출됨).
+      setActivityRefreshKey((k) => k + 1);
     } catch {
       toast.error('Failed to load application details');
       navigate(`${basePath}/applications`);
@@ -458,6 +463,17 @@ export default function AdminApplicationDetailPage() {
             application={application}
             onNavigateToOriginal={(seq) => navigate(`${basePath}/applications/${seq}`)}
           />
+
+          {/* 활동 타임라인 (audit_logs SSOT) — ADMIN/SYSTEM_ADMIN 전용.
+              엔드포인트가 LEW 를 차단하므로 isAdmin 가드로 호출 자체를 막는다. */}
+          {isAdmin && (
+            <div id="activity" className="scroll-mt-24">
+              <AdminActivityTimelineSection
+                applicationSeq={applicationId}
+                refreshKey={activityRefreshKey}
+              />
+            </div>
+          )}
 
           {/* Phase 5 PR#3 — kVA 확정 섹션 (ADMIN/LEW) */}
           <KvaSection application={application} onUpdated={fetchData} />

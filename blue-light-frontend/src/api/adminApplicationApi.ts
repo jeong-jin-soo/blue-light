@@ -414,6 +414,44 @@ export const revertEmaDecision = async (id: number): Promise<EmaSubmissionRespon
   return response.data;
 };
 
+// ── 활동 타임라인 (audit_logs SSOT) ──────────────────────────────
+// GET /admin/applications/{id}/activity — ADMIN/SYSTEM_ADMIN 전용. 시간 오름차순.
+
+/** 백엔드 AuditAction 미러 — 신청 타임라인에 등장하는 주요 액션 (그 외는 string 폴백). */
+export type ActivityAction = string;
+
+/** 신청 건별 활동 타임라인 항목 (audit_logs 1행). */
+export interface ApplicationActivityItem {
+  auditLogSeq: number;
+  occurredAt: string;
+  action: ActivityAction;
+  actionCategory: 'AUTH' | 'APPLICATION' | 'ADMIN' | 'SYSTEM';
+  actorSeq: number | null;
+  actorEmail: string | null;
+  actorRole: string | null;
+  /** 자동(시스템/스케줄러) 동작이면 true. */
+  system: boolean;
+  description: string | null;
+  beforeValue: string | null;
+  afterValue: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  httpStatus: number | null;
+}
+
+/**
+ * 신청 건별 활동 타임라인 조회 (ADMIN/SYSTEM_ADMIN).
+ * 시간 오름차순(진행 순서). 빈 배열도 정상.
+ */
+export const getApplicationActivity = async (
+  applicationSeq: number
+): Promise<ApplicationActivityItem[]> => {
+  const response = await axiosClient.get<ApplicationActivityItem[]>(
+    `/admin/applications/${applicationSeq}/activity`
+  );
+  return response.data;
+};
+
 // ── SLD Request ──────────────────────────────
 
 export const getAdminSldRequest = async (applicationId: number): Promise<SldRequest | null> => {

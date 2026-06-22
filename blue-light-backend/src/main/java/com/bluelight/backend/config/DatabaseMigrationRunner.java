@@ -142,6 +142,9 @@ public class DatabaseMigrationRunner {
             //   (WhatsApp/전화/i18n users 컬럼 + kVA·snapshot·applicant_type·version applications 컬럼)
             //   bluelight_prod 드리프트 감사(2026-06)로 식별. 각 컬럼 columnExists 가드 → 멱등.
             migrateProdParityColumns(conn);
+            // ── 신청 건별 활동 타임라인 (audit_logs SSOT) ──
+            // audit_logs.application_seq 컬럼 + 인덱스 + 기존 entityType='Application' 행 백필.
+            migrateAuditLogsApplicationSeq(conn);
             // ── 알림 카탈로그 시드 (PR-T5) ──
             // notification_catalog 는 SQL_INIT_MODE=never 인 dev/prod 에서 data.sql 이 실행되지 않아
             // 비어 있을 수 있다(템플릿 142종은 별도 import 됐으나 카탈로그 시드 단계 누락 → Admin Edit
@@ -391,6 +394,48 @@ public class DatabaseMigrationRunner {
         try (Statement stmt = conn.createStatement()) {
             stmt.executeUpdate(ddl);
             log.info("Migration [prod-parity]: added {}.{}", table, column);
+        }
+    }
+
+    /**
+     * 마이그레이션: 신청 건별 활동 타임라인 (audit_logs SSOT).
+     * <p>
+     * <ul>
+     *   <li>{@code audit_logs.application_seq} 컬럼 + {@code idx_audit_logs_application} 인덱스 멱등 추가.</li>
+     *   <li>기존 {@code entity_type='Application'} 이고 {@code entity_id} 가 숫자인 행을 백필
+     *       (신규 이벤트는 쓰기 시점에 채워지므로 1회성).</li>
+     *   <li>결제/문서/kVA 등 자기 PK 를 담은 과거 로그는 best-effort 미백필 — 신규 이벤트만 정확.</li>
+     * </ul>
+     */
+    private void migrateAuditLogsApplicationSeq(Connection conn) throws SQLException {
+        if (!tableExists(conn, "audit_logs")) {
+            log.debug("Migration [audit-logs-application-seq]: table missing, skipping");
+            return;
+        }
+        if (!columnExists(conn, "audit_logs", "application_seq")) {
+            log.info("Migration [audit-logs-application-seq]: adding application_seq column...");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "ALTER TABLE audit_logs ADD COLUMN application_seq BIGINT NULL AFTER entity_id");
+            }
+        }
+        if (!indexExists(conn, "audit_logs", "idx_audit_logs_application")) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.executeUpdate(
+                    "CREATE INDEX idx_audit_logs_application ON audit_logs (application_seq, created_at)");
+            }
+        }
+        // 백필: entity_type='Application' + 숫자 entity_id → application_seq (아직 비어있는 행만)
+        try (Statement stmt = conn.createStatement()) {
+            int updated = stmt.executeUpdate(
+                "UPDATE audit_logs " +
+                "SET application_seq = CAST(entity_id AS UNSIGNED) " +
+                "WHERE application_seq IS NULL " +
+                "  AND entity_type = 'Application' " +
+                "  AND entity_id REGEXP '^[0-9]+$'");
+            if (updated > 0) {
+                log.info("Migration [audit-logs-application-seq]: backfilled {} rows", updated);
+            }
         }
     }
 

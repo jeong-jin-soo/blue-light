@@ -20,6 +20,9 @@ public enum AuditAction {
     APPLICATION_APPROVED,
     APPLICATION_COMPLETED,
     APPLICATION_RESUBMITTED,
+    // 자동(스케줄러) 동작 — LicenseExpiryScheduler
+    LICENSE_EXPIRED,              // 만료일 경과 → 자동 EXPIRED 전환
+    LICENSE_EXPIRY_WARNING_SENT,  // 만료 임박 알림 자동 발송
 
     // File
     FILE_UPLOADED,

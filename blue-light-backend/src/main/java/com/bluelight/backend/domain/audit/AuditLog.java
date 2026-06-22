@@ -45,6 +45,14 @@ public class AuditLog {
     @Column(name = "entity_id", length = 50)
     private String entityId;
 
+    /**
+     * 신청(Application) 건별 활동 타임라인 연결용 FK.
+     * entity_id 는 결제·문서요청·kVA 로그에서 자기 PK(paymentSeq·drId 등)를 담아
+     * applicationSeq 필터가 불가능하므로, 신청에 연결되는 모든 이벤트는 본 컬럼으로 수렴시킨다.
+     */
+    @Column(name = "application_seq")
+    private Long applicationSeq;
+
     @Column(name = "description", length = 500)
     private String description;
 
@@ -75,7 +83,7 @@ public class AuditLog {
     @Builder
     public AuditLog(Long userSeq, String userEmail, String userRole,
                     AuditAction action, AuditCategory actionCategory,
-                    String entityType, String entityId, String description,
+                    String entityType, String entityId, Long applicationSeq, String description,
                     String beforeValue, String afterValue,
                     String ipAddress, String userAgent,
                     String requestMethod, String requestUri, Integer httpStatus) {
@@ -86,6 +94,7 @@ public class AuditLog {
         this.actionCategory = actionCategory;
         this.entityType = entityType;
         this.entityId = entityId;
+        this.applicationSeq = applicationSeq;
         this.description = description;
         this.beforeValue = beforeValue;
         this.afterValue = afterValue;

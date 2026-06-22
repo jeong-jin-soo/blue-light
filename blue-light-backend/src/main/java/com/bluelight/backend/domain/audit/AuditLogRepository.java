@@ -9,9 +9,15 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Repository
 public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+
+    /**
+     * 신청 건별 활동 타임라인 — 시간 오름차순(진행 순서대로).
+     */
+    List<AuditLog> findByApplicationSeqOrderByCreatedAtAsc(Long applicationSeq);
 
     @Query("SELECT a FROM AuditLog a WHERE " +
            "(:category IS NULL OR a.actionCategory = :category) AND " +

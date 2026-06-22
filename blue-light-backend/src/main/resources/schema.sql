@@ -430,6 +430,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     action_category  VARCHAR(30)  NOT NULL,
     entity_type      VARCHAR(50),
     entity_id        VARCHAR(50),
+    application_seq  BIGINT,
     description      VARCHAR(500),
     before_value     JSON,
     after_value      JSON,
@@ -444,6 +445,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     KEY idx_audit_logs_action (action),
     KEY idx_audit_logs_category (action_category),
     KEY idx_audit_logs_entity (entity_type, entity_id),
+    KEY idx_audit_logs_application (application_seq, created_at),
     KEY idx_audit_logs_created_at (created_at),
     KEY idx_audit_logs_composite (action_category, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

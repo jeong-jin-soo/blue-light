@@ -37,6 +37,7 @@ public class AdminApplicationController {
     private final AdminPaymentService adminPaymentService;
     /** ★ Concierge 강화 + 별도 수금 PR-2 — Application 별도 수금. */
     private final com.bluelight.backend.api.payment.ManualPaymentService manualPaymentService;
+    private final com.bluelight.backend.api.audit.AuditLogService auditLogService;
     private final GenericRateLimiter rateLimiter;
 
     /** 결제 확인: 신청서당 5분 내 최대 3회 */
@@ -95,6 +96,21 @@ public class AdminApplicationController {
         log.info("Admin get application detail: applicationSeq={}", id);
         AdminApplicationResponse response = adminApplicationService.getApplication(id);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get application activity timeline (audit_logs SSOT)
+     * GET /api/admin/applications/:id/activity
+     *
+     * <p>신청 건의 전체 라이프사이클 활동(누가·언제·무엇을 + 자동 동작)을 시간 오름차순으로 반환.
+     * ADMIN/SYSTEM_ADMIN 전용 — 감사 로그는 PII(전·후값)를 포함할 수 있어 LEW 에는 노출하지 않는다.</p>
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN')")
+    @GetMapping("/applications/{id}/activity")
+    public ResponseEntity<List<com.bluelight.backend.api.audit.ApplicationActivityResponse>> getApplicationActivity(
+            @PathVariable Long id) {
+        log.info("Admin get application activity timeline: applicationSeq={}", id);
+        return ResponseEntity.ok(auditLogService.getApplicationActivity(id));
     }
 
     /**
