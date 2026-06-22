@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/domain/StatusBadge';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Tabs, TabPanel, type TabDefinition } from '../../components/ui/Tabs';
 import { KvaSection } from '../../components/admin/KvaSection';
+import { AdminKvaAdjustmentSection } from '../../components/admin/AdminKvaAdjustmentSection';
 import { AdminSldSection } from '../admin/sections/AdminSldSection';
 import { LewLoaExchangeSection } from './sections/LewLoaExchangeSection';
 import { LewConfirmationSummary } from './sections/LewConfirmationSummary';
@@ -568,6 +569,14 @@ export default function LewReviewFormPage() {
 
           <TabPanel active={activeTab === 'kva'}>
             <KvaSection application={adminApp} onUpdated={loadData} />
+            {/* 결제 후 kVA 사후조정 처리 이력 (read-only) — LEW 는 본인 요청의 처리/정산 진행을
+                추적한다. settlement 버튼은 컴포넌트 내부에서 ADMIN 권한일 때만 노출(LEW 는 읽기전용). */}
+            <div className="mt-6">
+              <AdminKvaAdjustmentSection
+                applicationSeq={adminApp.applicationSeq}
+                applicationStatus={adminApp.status}
+              />
+            </div>
           </TabPanel>
 
           <TabPanel active={activeTab === 'sld'}>
@@ -627,6 +636,7 @@ export default function LewReviewFormPage() {
               onUploadFinal={handleUploadFinalLoa}
               onDownloadFile={handleLoaDownload}
               uploadingFinal={loaUploading}
+              readOnly={isTerminal}
             />
           </TabPanel>
 

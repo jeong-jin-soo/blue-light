@@ -356,6 +356,9 @@ export default function ApplicationDetailPage() {
   const canUpload = ['PENDING_REVIEW', 'REVISION_REQUESTED', 'PENDING_PAYMENT', 'PAID']
     .includes(application.status);
 
+  // 종결(COMPLETED/EXPIRED) 건은 신청자의 모든 파일 업로드/수정 차단 — ADMIN reopen 후에만 가능.
+  const isTerminal = application.status === 'COMPLETED' || application.status === 'EXPIRED';
+
   // ── 진행 단계별 배치 (B안) ───────────────────────────────
   // 신청자가 "지금 확인/처리해야 할" 섹션을 메인 영역 최상단으로 승격한다.
   // 섹션 자체와 딥링크 앵커 ID(#payment/#loa/#documents)는 그대로 두고 렌더 순서만 바꾼다.
@@ -376,7 +379,7 @@ export default function ApplicationDetailPage() {
     <div id="documents" className="scroll-mt-24" key="documents">
       <DocumentUploadSection
         applicationSeq={applicationId}
-        canUpload={authUser?.role === 'APPLICANT'}
+        canUpload={authUser?.role === 'APPLICANT' && !isTerminal}
         applicationType={application.applicationType}
       />
     </div>

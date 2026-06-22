@@ -810,6 +810,30 @@ public class Application extends BaseEntity {
     }
 
     /**
+     * 본 신청이 종결(read-only) 상태인지 — COMPLETED(발급 완료) 또는 EXPIRED(만료).
+     * 종결 건은 신청자·LEW 의 파일 업로드/수정이 모두 차단된다. 재개는 ADMIN 의 상태 변경(reopen)뿐.
+     */
+    public boolean isTerminal() {
+        return this.status == ApplicationStatus.COMPLETED
+                || this.status == ApplicationStatus.EXPIRED;
+    }
+
+    /**
+     * 종결(COMPLETED/EXPIRED) 건에 대한 쓰기(업로드/수정) 시도를 차단한다.
+     * ADMIN 이 먼저 상태를 되돌린(reopen: COMPLETED → IN_PROGRESS) 뒤에만 수정 가능하다.
+     *
+     * @throws BusinessException 종결 상태인 경우 (APPLICATION_TERMINAL, 409)
+     */
+    public void assertModifiable() {
+        if (isTerminal()) {
+            throw new BusinessException(
+                    "Application is " + this.status + " and can no longer be modified",
+                    org.springframework.http.HttpStatus.CONFLICT,
+                    "APPLICATION_TERMINAL");
+        }
+    }
+
+    /**
      * SLD self-upload/3개월유예 → LEW 작성(REQUEST_LEW) 전환 + SLD 작성비 가산.
      *
      * <p>spec: {@code doc/Project Analysis/sld-lew-conversion-fee-spec.md} §3.1.

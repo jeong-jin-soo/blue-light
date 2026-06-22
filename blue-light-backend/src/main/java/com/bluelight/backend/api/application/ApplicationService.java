@@ -946,6 +946,9 @@ public class ApplicationService {
 
         OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
+        // 종결(COMPLETED/EXPIRED) 건은 SLD 요청 생성 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
+
         // 중복 체크
         if (sldRequestRepository.findByApplicationApplicationSeq(applicationSeq).isPresent()) {
             throw new BusinessException(
@@ -988,6 +991,9 @@ public class ApplicationService {
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
         OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
+
+        // 종결(COMPLETED/EXPIRED) 건은 SLD 요청 수정 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
 
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(

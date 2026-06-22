@@ -43,7 +43,7 @@ public class AdminSldService {
      */
     @Transactional
     public SldRequestResponse uploadSld(Long applicationSeq, SldUploadedDto dto) {
-        validateApplicationExists(applicationSeq);
+        assertApplicationModifiable(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
@@ -67,7 +67,7 @@ public class AdminSldService {
      */
     @Transactional
     public SldRequestResponse startAiGeneration(Long applicationSeq) {
-        validateApplicationExists(applicationSeq);
+        assertApplicationModifiable(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
@@ -90,7 +90,7 @@ public class AdminSldService {
      */
     @Transactional
     public SldRequestResponse confirmSld(Long applicationSeq) {
-        validateApplicationExists(applicationSeq);
+        assertApplicationModifiable(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
@@ -112,7 +112,7 @@ public class AdminSldService {
      */
     @Transactional
     public SldRequestResponse unconfirmSld(Long applicationSeq) {
-        validateApplicationExists(applicationSeq);
+        assertApplicationModifiable(applicationSeq);
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(
                         "SLD request not found", HttpStatus.NOT_FOUND, "SLD_REQUEST_NOT_FOUND"));
@@ -137,5 +137,16 @@ public class AdminSldService {
                     "APPLICATION_NOT_FOUND"
             );
         }
+    }
+
+    /**
+     * 쓰기 작업 전제: Application 존재 + 종결(COMPLETED/EXPIRED) 아님.
+     * 종결 건은 SLD 작성/확정 차단 — ADMIN 이 먼저 상태를 reopen 한 뒤에만 가능.
+     */
+    private void assertApplicationModifiable(Long applicationSeq) {
+        applicationRepository.findById(applicationSeq)
+                .orElseThrow(() -> new BusinessException(
+                        "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"))
+                .assertModifiable();
     }
 }

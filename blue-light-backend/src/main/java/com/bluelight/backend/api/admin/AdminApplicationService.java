@@ -435,7 +435,10 @@ public class AdminApplicationService {
             case REVISION_REQUESTED -> current == ApplicationStatus.PENDING_REVIEW;
             case PENDING_PAYMENT -> current == ApplicationStatus.PENDING_REVIEW;
             case PAID -> current == ApplicationStatus.PENDING_PAYMENT;
-            case IN_PROGRESS -> current == ApplicationStatus.PAID;
+            // PAID → IN_PROGRESS(작업개시) 또는 COMPLETED → IN_PROGRESS(ADMIN reopen:
+            // 종결된 건을 다시 열어 신청자·LEW 가 파일을 수정할 수 있게 함)
+            case IN_PROGRESS -> current == ApplicationStatus.PAID
+                    || current == ApplicationStatus.COMPLETED;
             case COMPLETED -> current == ApplicationStatus.IN_PROGRESS;
             case EXPIRED -> true; // can expire from any state
         };

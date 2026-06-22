@@ -120,6 +120,9 @@ public class DocumentRequestService {
                 requestorRole,
                 assignedLewSeq);
 
+        // (1-1) 종결(COMPLETED/EXPIRED) 건은 업로드 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
+
         // (2) Catalog 검증
         DocumentTypeCatalog catalog = catalogService.requireActiveByCode(documentTypeCode);
 
@@ -229,6 +232,9 @@ public class DocumentRequestService {
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
                 application.getUser().getUserSeq(), requestorSeq, requestorRole, assignedLewSeq);
 
+        // 종결(COMPLETED/EXPIRED) 건은 삭제 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
+
         // 자발적 업로드만 삭제 허용 (Phase 3 LEW 요청은 별도 정책)
         if (dr.getStatus() != DocumentRequestStatus.UPLOADED || dr.getRequestedBy() != null) {
             throw new BusinessException(
@@ -290,6 +296,9 @@ public class DocumentRequestService {
 
         // (3) 권한 재확인 — 소유자는 생성 권한 없음 (ADMIN / assigned LEW 만)
         assertAdminOrAssignedLew(application, requestorSeq, requestorRole);
+
+        // (3-1) 종결(COMPLETED/EXPIRED) 건은 서류 요청 생성 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
 
         User requester = userRepository.findById(requestorSeq)
                 .orElseThrow(() -> new BusinessException("Requester not found",
@@ -401,6 +410,9 @@ public class DocumentRequestService {
                     HttpStatus.NOT_FOUND, "DOCUMENT_REQUEST_NOT_FOUND");
         }
 
+        // 종결(COMPLETED/EXPIRED) 건은 서류 업로드(fulfill) 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
+
         // catalog 기반 MIME/size 재검증
         DocumentTypeCatalog catalog = catalogService.requireActiveByCode(dr.getDocumentTypeCode());
         MimeTypeValidator.validateSize(file, catalog.getMaxSizeMb());
@@ -450,6 +462,9 @@ public class DocumentRequestService {
     @Transactional
     public DocumentRequestDto cancel(Long requestorSeq, String requestorRole, Long docRequestId) {
         DocumentRequest dr = loadForReviewWithAssignedLewCheck(requestorSeq, requestorRole, docRequestId);
+
+        // 종결(COMPLETED/EXPIRED) 건은 서류 요청 취소 차단 — ADMIN reopen 후에만 가능
+        dr.getApplication().assertModifiable();
 
         // 취소는 REQUESTED 에서만 허용 — 상태 머신이 차단하나, 명시적 409 메시지 유지
         if (dr.getStatus() != DocumentRequestStatus.REQUESTED) {

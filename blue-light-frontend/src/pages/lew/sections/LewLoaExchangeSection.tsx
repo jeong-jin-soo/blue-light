@@ -12,6 +12,8 @@ interface Props {
   /** 최종본 다운로드 (fileSeq). */
   onDownloadFile: (fileSeq: number, filename: string) => void;
   uploadingFinal: boolean;
+  /** 종결(COMPLETED/EXPIRED) 건 — 업로드/교체 차단, 다운로드만 허용. */
+  readOnly?: boolean;
 }
 
 const stageMeta: Record<LoaStage, { label: string; variant: BadgeVariant }> = {
@@ -31,6 +33,7 @@ export function LewLoaExchangeSection({
   onUploadFinal,
   onDownloadFile,
   uploadingFinal,
+  readOnly = false,
 }: Props) {
   const stage: LoaStage = loaStatus?.loaStage ?? 'NOT_STARTED';
   const meta = stageMeta[stage];
@@ -92,6 +95,7 @@ export function LewLoaExchangeSection({
           )}
         </div>
 
+        {!readOnly && (
         <div className="mt-3">
           <input
             ref={finalInputRef}
@@ -134,6 +138,7 @@ export function LewLoaExchangeSection({
             </Button>
           )}
         </div>
+        )}
       </div>
     </Card>
   );

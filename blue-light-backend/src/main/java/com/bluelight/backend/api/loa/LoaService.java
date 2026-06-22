@@ -64,6 +64,9 @@ public class LoaService {
     public LoaStatusResponse finalUploadLoa(Long lewUserSeq, Long applicationSeq, MultipartFile file) {
         Application application = findApplicationOrThrow(applicationSeq);
 
+        // 종결(COMPLETED/EXPIRED) 건은 LoA 최종본 업로드 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
+
         MimeTypeValidator.validate(file, LOA_UPLOAD_MIME);
         MimeTypeValidator.validateSize(file, LOA_UPLOAD_MAX_MB);
 
@@ -129,6 +132,9 @@ public class LoaService {
         }
 
         Application application = findApplicationOrThrow(applicationSeq);
+
+        // 2-1. 종결(COMPLETED/EXPIRED) 건은 LoA 교체 차단 — ADMIN reopen 후에만 가능
+        application.assertModifiable();
 
         // 3. MIME/크기 검증.
         MimeTypeValidator.validate(file, LOA_UPLOAD_MIME);
