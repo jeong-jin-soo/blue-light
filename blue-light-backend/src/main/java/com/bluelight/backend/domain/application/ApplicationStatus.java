@@ -30,12 +30,11 @@ public enum ApplicationStatus {
     IN_PROGRESS,
 
     /**
-     * 라이선스 발급 완료
+     * 라이선스 발급 완료 — 신청 워크플로우의 종결 상태.
+     *
+     * <p>발급된 라이선스의 만료는 신청 상태가 아니라 {@link LicenseStatus} 로 분리 추적한다.
+     * (이전의 EXPIRED 신청 상태는 제거 — 라이선스 만료는 status=COMPLETED 인 채로
+     * {@code licenseStatus=EXPIRED} 로 표현.)</p>
      */
-    COMPLETED,
-
-    /**
-     * 만료됨
-     */
-    EXPIRED
+    COMPLETED
 }

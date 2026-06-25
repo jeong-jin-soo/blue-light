@@ -13,7 +13,6 @@ const STATUS_CONFIG: Record<ApplicationStatus, StatusConfig> = {
   PAID:               { label: 'Paid',               variant: 'info' },
   IN_PROGRESS:        { label: 'In Progress',        variant: 'primary' },
   COMPLETED:          { label: 'Completed',           variant: 'success' },
-  EXPIRED:            { label: 'Expired',             variant: 'gray' },
 };
 
 interface StatusBadgeProps {

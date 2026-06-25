@@ -42,7 +42,8 @@ const STATUS_CHIPS: { value: string; label: string; countKey: keyof AdminDashboa
   { value: 'PAID', label: 'Paid', countKey: 'paid' },
   { value: 'IN_PROGRESS', label: 'In Progress', countKey: 'inProgress' },
   { value: 'COMPLETED', label: 'Completed', countKey: 'completed' },
-  { value: 'EXPIRED', label: 'Expired', countKey: 'expired' },
+  // 라이선스 만료는 신청 상태가 아니라 licenseStatus 필터 — 센티넬 값으로 분기.
+  { value: 'LICENSE_EXPIRED', label: 'Expired', countKey: 'expired' },
 ];
 
 // Phase 5 PR#3 — kVA Status filter (AC-P3)
@@ -119,13 +120,15 @@ export default function AdminApplicationListPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    const licenseExpiredFilter = statusFilter === 'LICENSE_EXPIRED';
     adminApi
       .getApplications(
         page,
         PAGE_SIZE,
-        statusFilter ? (statusFilter as ApplicationStatus) : undefined,
+        licenseExpiredFilter || !statusFilter ? undefined : (statusFilter as ApplicationStatus),
         debouncedSearch || undefined,
-        kvaStatusFilter ? (kvaStatusFilter as KvaStatus) : undefined
+        kvaStatusFilter ? (kvaStatusFilter as KvaStatus) : undefined,
+        licenseExpiredFilter ? 'EXPIRED' : undefined
       )
       .then((data) => {
         setApplications(data.content);

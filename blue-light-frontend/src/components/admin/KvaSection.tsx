@@ -32,7 +32,7 @@ interface KvaSectionProps {
   onUpdated: () => void;
 }
 
-const PRE_PAYMENT_LOCKED_STATUSES = new Set(['PAID', 'IN_PROGRESS', 'COMPLETED', 'EXPIRED']);
+const PRE_PAYMENT_LOCKED_STATUSES = new Set(['PAID', 'IN_PROGRESS', 'COMPLETED']);
 const POST_PAYMENT_STATUSES = new Set(['PAID', 'IN_PROGRESS', 'COMPLETED']);
 
 export function KvaSection({ application, onUpdated }: KvaSectionProps) {

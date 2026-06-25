@@ -271,11 +271,9 @@ export default function LewApplicationDetailPage() {
             <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
             <StatusBadge status={application.status} />
           </div>
-          {application.status !== 'EXPIRED' && (
-            <div className="mt-3">
-              <StepTracker steps={STATUS_STEPS} currentStep={getStatusStep(application.status)} variant="horizontal" />
-            </div>
-          )}
+          <div className="mt-3">
+            <StepTracker steps={STATUS_STEPS} currentStep={getStatusStep(application.status)} variant="horizontal" />
+          </div>
         </Card>
       </div>
 
@@ -331,18 +329,11 @@ export default function LewApplicationDetailPage() {
           <div className="hidden lg:block">
             <Card>
               <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
-              {application.status === 'EXPIRED' ? (
-                <div className="text-center py-4">
-                  <span className="text-3xl">⏰</span>
-                  <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
-                </div>
-              ) : (
-                <StepTracker
-                  steps={STATUS_STEPS}
-                  currentStep={getStatusStep(application.status)}
-                  variant="vertical"
-                />
-              )}
+              <StepTracker
+                steps={STATUS_STEPS}
+                currentStep={getStatusStep(application.status)}
+                variant="vertical"
+              />
             </Card>
           </div>
 

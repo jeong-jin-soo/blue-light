@@ -109,18 +109,19 @@ class ManualPaymentServiceTest {
                 any(), any(), any(), any(), any(), any(), any());
     }
 
-    // ── AC-A2: EXPIRED 에서 호출 → 409 ──
+    // ── AC-A2: COMPLETED(발급 완료 — 만료 라이선스 포함) 에서 호출 → 409 ──
+    // 신청 상태 EXPIRED 는 제거됨: 만료된 라이선스도 status=COMPLETED 라 ALREADY_PAID 로 차단된다.
     @Test
-    @DisplayName("AC-A2: EXPIRED 에서 호출 → 409 APPLICATION_EXPIRED")
-    void shouldRejectManualPaymentForExpiredApplication() {
-        stubApplication(ApplicationStatus.EXPIRED, new BigDecimal("350.00"));
+    @DisplayName("AC-A2: COMPLETED 에서 호출 → 409 ALREADY_PAID")
+    void shouldRejectManualPaymentForCompletedApplication() {
+        stubApplication(ApplicationStatus.COMPLETED, new BigDecimal("350.00"));
 
         ManualPaymentRequest req = validRequest(new BigDecimal("350.00"), PaymentMethod.BANK_TRANSFER);
         assertThatThrownBy(() -> service.recordOfflinePayment(APP_SEQ, req, ADMIN_SEQ))
                 .isInstanceOf(BusinessException.class)
                 .satisfies(ex -> {
                     assertThat(((BusinessException) ex).getStatus().value()).isEqualTo(409);
-                    assertThat(((BusinessException) ex).getCode()).isEqualTo("APPLICATION_EXPIRED");
+                    assertThat(((BusinessException) ex).getCode()).isEqualTo("ALREADY_PAID");
                 });
         verify(paymentRepository, never()).save(any());
         verify(eventPublisher, never()).publishEvent(any());

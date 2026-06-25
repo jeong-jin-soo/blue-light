@@ -196,8 +196,7 @@ public class ApplicationKvaService {
     private boolean isLockedStatus(ApplicationStatus s) {
         return s == ApplicationStatus.PAID
                 || s == ApplicationStatus.IN_PROGRESS
-                || s == ApplicationStatus.COMPLETED
-                || s == ApplicationStatus.EXPIRED;
+                || s == ApplicationStatus.COMPLETED;
     }
 
     private Map<String, Object> buildConfirmMetadata(

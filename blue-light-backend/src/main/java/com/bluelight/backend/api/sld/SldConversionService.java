@@ -5,6 +5,7 @@ import com.bluelight.backend.api.sld.dto.SldConversionResponse;
 import com.bluelight.backend.common.exception.BusinessException;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
+import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.application.SldOption;
 import com.bluelight.backend.domain.application.SldRequest;
 import com.bluelight.backend.domain.application.SldRequestRepository;
@@ -74,12 +75,11 @@ public class SldConversionService {
                 .orElseThrow(() -> new BusinessException(
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
-        // COMPLETED/EXPIRED 는 전환 불가 (발급/마감 완료).
-        switch (application.getStatus()) {
-            case COMPLETED, EXPIRED -> throw new BusinessException(
-                    "SLD conversion is not allowed for " + application.getStatus() + " applications",
+        // COMPLETED 는 전환 불가 (발급 종결 — 만료 라이선스 건도 status=COMPLETED 라 함께 차단).
+        if (application.getStatus() == ApplicationStatus.COMPLETED) {
+            throw new BusinessException(
+                    "SLD conversion is not allowed for COMPLETED applications",
                     HttpStatus.CONFLICT, "SLD_CONVERT_NOT_ALLOWED");
-            default -> { /* proceed */ }
         }
 
         BigDecimal previousQuote = application.getQuoteAmount();

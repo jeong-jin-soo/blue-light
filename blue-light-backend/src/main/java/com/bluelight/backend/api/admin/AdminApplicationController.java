@@ -4,6 +4,7 @@ import com.bluelight.backend.api.admin.dto.*;
 import com.bluelight.backend.common.security.AuthPrincipal;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.application.KvaStatus;
+import com.bluelight.backend.domain.application.LicenseStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import com.bluelight.backend.domain.audit.Auditable;
@@ -68,6 +69,7 @@ public class AdminApplicationController {
             Authentication authentication,
             @RequestParam(required = false) ApplicationStatus status,
             @RequestParam(required = false) KvaStatus kvaStatus,
+            @RequestParam(required = false) LicenseStatus licenseStatus,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
@@ -75,11 +77,11 @@ public class AdminApplicationController {
         String role = AuthPrincipal.role(authentication);
         int validPage = Math.max(0, page);
         int validSize = Math.min(Math.max(1, size), 100);
-        log.info("Admin get all applications: userSeq={}, role={}, status={}, kvaStatus={}, search={}, page={}, size={}",
-                userSeq, role, status, kvaStatus, search, validPage, validSize);
+        log.info("Admin get all applications: userSeq={}, role={}, status={}, kvaStatus={}, licenseStatus={}, search={}, page={}, size={}",
+                userSeq, role, status, kvaStatus, licenseStatus, search, validPage, validSize);
         Pageable pageable = PageRequest.of(validPage, validSize);
         Page<AdminApplicationResponse> applications =
-                adminApplicationService.getAllApplications(status, kvaStatus, search, pageable, userSeq, role);
+                adminApplicationService.getAllApplications(status, kvaStatus, licenseStatus, search, pageable, userSeq, role);
         return ResponseEntity.ok(applications);
     }
 
@@ -182,6 +184,23 @@ public class AdminApplicationController {
             @Valid @RequestBody CompleteApplicationRequest request) {
         log.info("Admin complete application: applicationSeq={}, licenseNumber={}", id, request.getLicenseNumber());
         AdminApplicationResponse response = adminApplicationService.completeApplication(id, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Reopen a completed application (ADMIN 전용)
+     * POST /api/admin/applications/:id/reopen
+     *
+     * <p>완료(COMPLETED) 건의 종결 쓰기잠금을 해제해 신청자·LEW 가 파일을 다시 수정할 수 있게 한다.
+     * 일반 상태전이와 구분되도록 {@link AuditAction#APPLICATION_REOPENED} 로 감사되어 활동
+     * 타임라인에 "완료 건 재개"로 또렷이 남는다. 상태 변경은 ADMIN 권한 한정(LEW 제외).</p>
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN')")
+    @Auditable(action = AuditAction.APPLICATION_REOPENED, category = AuditCategory.ADMIN, entityType = "Application")
+    @PostMapping("/applications/{id}/reopen")
+    public ResponseEntity<AdminApplicationResponse> reopenApplication(@PathVariable Long id) {
+        log.info("Admin reopen application: applicationSeq={}", id);
+        AdminApplicationResponse response = adminApplicationService.reopenApplication(id);
         return ResponseEntity.ok(response);
     }
 

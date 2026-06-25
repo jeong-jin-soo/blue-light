@@ -96,7 +96,7 @@ export default function AdminDashboardPage() {
     { label: 'Paid', value: d?.paid ?? 0, icon: BadgeCheck, q: 'PAID' },
     { label: 'In Progress', value: d?.inProgress ?? 0, icon: RefreshCw, q: 'IN_PROGRESS' },
     { label: 'Completed', value: d?.completed ?? 0, icon: Flag, q: 'COMPLETED' },
-    { label: 'Expired', value: d?.expired ?? 0, icon: AlarmClock, q: 'EXPIRED' },
+    { label: 'Expired', value: d?.expired ?? 0, icon: AlarmClock, q: 'LICENSE_EXPIRED' },
     ...(isAdmin ? [{ label: 'Users', value: d?.totalUsers ?? 0, icon: Users, q: 'USERS' }] : []),
   ];
 

@@ -191,8 +191,9 @@ export default function LewReviewFormPage() {
   // 백엔드 LewReviewService.requestPayment 가드와 일치.
   const appStatus = adminApp?.status;
   const inPhase1 = appStatus === 'PENDING_REVIEW' || appStatus === 'REVISION_REQUESTED';
-  // 완료/만료 = 읽기 전용. 리뷰 화면은 어느 단계든 열람 가능하되, 이 상태에서는 편집 동선을 잠근다.
-  const isTerminal = appStatus === 'COMPLETED' || appStatus === 'EXPIRED';
+  // 완료(COMPLETED) = 읽기 전용. 리뷰 화면은 어느 단계든 열람 가능하되, 이 상태에서는 편집 동선을 잠근다.
+  // (라이선스 만료는 신청 상태와 분리 — 만료 라이선스도 status=COMPLETED 라 동일하게 잠김.)
+  const isTerminal = appStatus === 'COMPLETED';
   // 결제 요청 가드 = kVA 확정뿐 (2026-06-18). 문서요청·LoA 는 결제 전제가 아니라 병렬 진행.
   const phase1Ready = kvaConfirmed;
   const [showRequestPaymentConfirm, setShowRequestPaymentConfirm] = useState(false);

@@ -148,16 +148,26 @@ public interface ApplicationRepository extends JpaRepository<Application, Long>,
     Optional<Application> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * 만료 대상: COMPLETED + 만료일 경과
+     * 라이선스 만료 처리 대상: COMPLETED + licenseStatus=ACTIVE + 만료일 경과.
+     * ACTIVE 만 대상이라 이미 EXPIRED 처리된 건은 재처리되지 않는다.
      */
-    List<Application> findByStatusAndLicenseExpiryDateBefore(
-            ApplicationStatus status, LocalDate date);
+    List<Application> findByStatusAndLicenseStatusAndLicenseExpiryDateBefore(
+            ApplicationStatus status, LicenseStatus licenseStatus, LocalDate date);
 
     /**
      * 만료 알림 대상: COMPLETED + 만료일 임박 + 미알림
      */
     List<Application> findByStatusAndLicenseExpiryDateLessThanEqualAndExpiryNotifiedAtIsNull(
             ApplicationStatus status, LocalDate date);
+
+    /**
+     * 라이선스 상태별 집계 (대시보드) — 예: COMPLETED + licenseStatus=EXPIRED = 만료 라이선스 수.
+     */
+    long countByStatusAndLicenseStatus(ApplicationStatus status, LicenseStatus licenseStatus);
+
+    /** LEW 전용 — 배정 LEW 의 라이선스 상태별 집계. */
+    long countByAssignedLewUserSeqAndStatusAndLicenseStatus(
+            Long lewSeq, ApplicationStatus status, LicenseStatus licenseStatus);
 
     /**
      * EMA 제출 리마인더 대상 (PR-E5, ema-submission-tracking-spec.md §10).

@@ -71,8 +71,10 @@ public class AdminApplicationService {
         long pendingPayment = applicationRepository.countByStatus(ApplicationStatus.PENDING_PAYMENT);
         long paid = applicationRepository.countByStatus(ApplicationStatus.PAID);
         long inProgress = applicationRepository.countByStatus(ApplicationStatus.IN_PROGRESS);
-        long completed = applicationRepository.countByStatus(ApplicationStatus.COMPLETED);
-        long expired = applicationRepository.countByStatus(ApplicationStatus.EXPIRED);
+        // 라이선스 만료(licenseStatus=EXPIRED)는 신청 상태와 분리 — COMPLETED 중 만료된 건을 별도 집계.
+        long expired = applicationRepository.countByStatusAndLicenseStatus(
+                ApplicationStatus.COMPLETED, LicenseStatus.EXPIRED);
+        long completed = applicationRepository.countByStatus(ApplicationStatus.COMPLETED) - expired;
         long totalUsers = userRepository.count();
 
         long unassigned = applicationRepository.countByAssignedLewIsNull();
@@ -101,8 +103,9 @@ public class AdminApplicationService {
         long pendingPayment = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.PENDING_PAYMENT);
         long paid = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.PAID);
         long inProgress = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.IN_PROGRESS);
-        long completed = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.COMPLETED);
-        long expired = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.EXPIRED);
+        long expired = applicationRepository.countByAssignedLewUserSeqAndStatusAndLicenseStatus(
+                lewSeq, ApplicationStatus.COMPLETED, LicenseStatus.EXPIRED);
+        long completed = applicationRepository.countByAssignedLewUserSeqAndStatus(lewSeq, ApplicationStatus.COMPLETED) - expired;
 
         return AdminDashboardResponse.builder()
                 .totalApplications(totalApplications)
@@ -123,22 +126,22 @@ public class AdminApplicationService {
      * LEW는 자신에게 배정된 신청서만, Admin/SystemAdmin은 전체
      */
     public Page<AdminApplicationResponse> getAllApplications(
-            ApplicationStatus status, KvaStatus kvaStatus, String search, Pageable pageable,
-            Long userSeq, String role) {
+            ApplicationStatus status, KvaStatus kvaStatus, LicenseStatus licenseStatus,
+            String search, Pageable pageable, Long userSeq, String role) {
         Page<Application> page;
         boolean hasSearch = search != null && !search.trim().isEmpty();
         boolean isLew = "ROLE_LEW".equals(role);
 
-        // Phase 5 PR#3 — kvaStatus 필터가 들어오면 Specification 경로로 통합
-        // (기존 필터 조합과 직교). kvaStatus 미지정 시에는 기존 전용 쿼리 경로 유지.
-        if (kvaStatus != null) {
+        // kvaStatus 또는 licenseStatus(라이선스 만료 등) 필터가 들어오면 Specification 경로로 통합
+        // (기존 필터 조합과 직교). 둘 다 미지정 시에는 기존 전용 쿼리 경로 유지.
+        if (kvaStatus != null || licenseStatus != null) {
             Long lewSeqFilter = isLew ? userSeq : null;
             Pageable sorted = pageable.getSort().isSorted()
                     ? pageable
                     : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                             Sort.by(Sort.Direction.DESC, "createdAt"));
             page = applicationRepository.findAll(
-                    buildSpec(status, kvaStatus, hasSearch ? search.trim() : null, lewSeqFilter),
+                    buildSpec(status, kvaStatus, licenseStatus, hasSearch ? search.trim() : null, lewSeqFilter),
                     sorted);
         } else if (isLew) {
             page = getLewApplications(status, search, hasSearch, userSeq, pageable);
@@ -153,7 +156,8 @@ public class AdminApplicationService {
      * status / kvaStatus / keyword / assignedLew (LEW 역할) 를 AND 로 조합한다.
      */
     private Specification<Application> buildSpec(
-            ApplicationStatus status, KvaStatus kvaStatus, String keyword, Long lewSeqFilter) {
+            ApplicationStatus status, KvaStatus kvaStatus, LicenseStatus licenseStatus,
+            String keyword, Long lewSeqFilter) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (status != null) {
@@ -161,6 +165,9 @@ public class AdminApplicationService {
             }
             if (kvaStatus != null) {
                 predicates.add(cb.equal(root.get("kvaStatus"), kvaStatus));
+            }
+            if (licenseStatus != null) {
+                predicates.add(cb.equal(root.get("licenseStatus"), licenseStatus));
             }
             if (lewSeqFilter != null) {
                 predicates.add(cb.equal(root.get("assignedLew").get("userSeq"), lewSeqFilter));
@@ -258,6 +265,44 @@ public class AdminApplicationService {
             application.getViaConciergeRequestSeq(),
             previousStatus,
             application.getStatus()));
+
+        return AdminApplicationResponse.from(application);
+    }
+
+    /**
+     * 완료(COMPLETED) 건 재개(reopen) — ADMIN 전용.
+     *
+     * <p>종결 쓰기잠금({@link Application#assertModifiable()})으로 막힌 완료 건을 다시 열어
+     * 신청자·LEW 가 파일을 수정할 수 있게 한다. 일반 상태전이(PATCH /status)가 아닌 전용
+     * 동선이며, 컨트롤러 {@code @Auditable(APPLICATION_REOPENED)} 로 활동 타임라인에
+     * "완료 건 재개" 이벤트로 또렷이 기록된다(일반 상태변경과 구분).</p>
+     *
+     * <p>라이선스 번호/만료일 등 발급 정보는 보존된다 — 재완료 시 그대로 재사용되며,
+     * {@code completeApplication} 게이트(EMA 승인 + LICENSE_PDF)는 변함없이 적용된다.</p>
+     *
+     * @throws BusinessException 현재 상태가 COMPLETED 가 아니면 INVALID_STATUS_FOR_REOPEN(400)
+     */
+    @Transactional
+    public AdminApplicationResponse reopenApplication(Long applicationSeq) {
+        Application application = findApplicationOrThrow(applicationSeq);
+
+        if (application.getStatus() != ApplicationStatus.COMPLETED) {
+            throw new BusinessException(
+                    "Only completed applications can be reopened (current: " + application.getStatus() + ")",
+                    HttpStatus.BAD_REQUEST, "INVALID_STATUS_FOR_REOPEN");
+        }
+
+        ApplicationStatus previousStatus = application.getStatus();
+        application.changeStatus(ApplicationStatus.IN_PROGRESS);
+        log.info("Application reopened: applicationSeq={}, {} -> IN_PROGRESS",
+                applicationSeq, previousStatus);
+
+        // ConciergeRequest 자동 동기화 트리거 (updateStatus 와 동일 규약)
+        eventPublisher.publishEvent(new ApplicationStatusChangedEvent(
+                applicationSeq,
+                application.getViaConciergeRequestSeq(),
+                previousStatus,
+                application.getStatus()));
 
         return AdminApplicationResponse.from(application);
     }
@@ -435,12 +480,11 @@ public class AdminApplicationService {
             case REVISION_REQUESTED -> current == ApplicationStatus.PENDING_REVIEW;
             case PENDING_PAYMENT -> current == ApplicationStatus.PENDING_REVIEW;
             case PAID -> current == ApplicationStatus.PENDING_PAYMENT;
-            // PAID → IN_PROGRESS(작업개시) 또는 COMPLETED → IN_PROGRESS(ADMIN reopen:
-            // 종결된 건을 다시 열어 신청자·LEW 가 파일을 수정할 수 있게 함)
-            case IN_PROGRESS -> current == ApplicationStatus.PAID
-                    || current == ApplicationStatus.COMPLETED;
+            case IN_PROGRESS -> current == ApplicationStatus.PAID;
             case COMPLETED -> current == ApplicationStatus.IN_PROGRESS;
-            case EXPIRED -> true; // can expire from any state
+            // 주: COMPLETED → IN_PROGRESS(reopen)은 일반 상태전이가 아닌 전용 엔드포인트
+            //     POST /applications/{id}/reopen 로만 허용 — APPLICATION_REOPENED 로 감사된다.
+            //     라이선스 만료는 신청 상태가 아니라 licenseStatus 로 분리(스케줄러가 전환).
         };
 
         if (!valid) {

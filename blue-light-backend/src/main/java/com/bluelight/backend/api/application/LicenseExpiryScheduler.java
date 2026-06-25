@@ -5,6 +5,7 @@ import com.bluelight.backend.api.email.EmailService;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationRepository;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.LicenseStatus;
 import com.bluelight.backend.domain.audit.AuditAction;
 import com.bluelight.backend.domain.audit.AuditCategory;
 import lombok.RequiredArgsConstructor;
@@ -108,23 +109,26 @@ public class LicenseExpiryScheduler {
     }
 
     /**
-     * Step 2: 만료일 경과 → EXPIRED 자동 전환
-     * - 조건: COMPLETED + 만료일 < today
+     * Step 2: 만료일 경과 → 라이선스 licenseStatus 를 ACTIVE → EXPIRED 자동 전환
+     * - 조건: COMPLETED + licenseStatus=ACTIVE + 만료일 < today
+     * - 신청 상태(status=COMPLETED)는 유지 — 라이선스 유효성만 변경.
+     *   ACTIVE 만 대상이라 이미 EXPIRED 처리된 건은 재처리/재로깅되지 않음.
      */
     private void expireOverdueLicenses(LocalDate today) {
         List<Application> expired = applicationRepository
-                .findByStatusAndLicenseExpiryDateBefore(ApplicationStatus.COMPLETED, today);
+                .findByStatusAndLicenseStatusAndLicenseExpiryDateBefore(
+                        ApplicationStatus.COMPLETED, LicenseStatus.ACTIVE, today);
 
         if (expired.isEmpty()) {
-            log.debug("No expired applications found");
+            log.debug("No newly expired licenses found");
             return;
         }
 
-        log.info("Expiring {} application(s)", expired.size());
+        log.info("Expiring {} licence(s)", expired.size());
 
         for (Application app : expired) {
-            app.markAsExpired();
-            log.info("Application expired: applicationSeq={}, expiryDate={}",
+            app.markLicenseExpired();
+            log.info("Licence expired: applicationSeq={}, expiryDate={}",
                     app.getApplicationSeq(), app.getLicenseExpiryDate());
 
             // 자동 동작 감사 기록 (SYSTEM 행위자) — 타임라인 노출용
@@ -133,8 +137,8 @@ public class LicenseExpiryScheduler {
                     AuditLogService.SYSTEM_ACTOR_EMAIL, AuditLogService.SYSTEM_ACTOR_ROLE,
                     AuditAction.LICENSE_EXPIRED, AuditCategory.APPLICATION,
                     "Application", String.valueOf(app.getApplicationSeq()),
-                    "면허 만료일(" + app.getLicenseExpiryDate() + ") 경과 → 자동 EXPIRED 전환",
-                    ApplicationStatus.COMPLETED.name(), ApplicationStatus.EXPIRED.name(),
+                    "면허 만료일(" + app.getLicenseExpiryDate() + ") 경과 → 라이선스 EXPIRED 전환 (신청은 COMPLETED 유지)",
+                    LicenseStatus.ACTIVE.name(), LicenseStatus.EXPIRED.name(),
                     null, null, null, null, null);
         }
     }

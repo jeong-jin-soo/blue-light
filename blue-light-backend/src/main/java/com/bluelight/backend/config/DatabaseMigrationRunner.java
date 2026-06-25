@@ -182,6 +182,11 @@ public class DatabaseMigrationRunner {
             //   loaStage 가 LEW 최종본 트랙만 표현하도록 단순화. 기존 행 로드 시 enum 파싱 실패 방지를 위해
             //   FORM_SENT/APPLICANT_UPLOADED → NOT_STARTED 로 멱등 변환(매칭 행 0이면 no-op).
             migrateApplicationsLoaStageCollapse(conn);
+            // ── 신청 상태 vs 라이선스 유효성 분리 (2026-06-23) ──
+            //   applications.license_status 컬럼 추가 + 기존 status='EXPIRED' 행을
+            //   status='COMPLETED' + license_status='EXPIRED' 로 복원(EXPIRED 신청상태 제거).
+            //   COMPLETED 행의 license_status NULL 은 만료일 기준으로 ACTIVE/EXPIRED 백필.
+            migrateApplicationsLicenseStatus(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -780,6 +785,42 @@ public class DatabaseMigrationRunner {
      * 멱등(매칭 행 0). 신청자 LoA 파일(OWNER_AUTH_LETTER)·LEW 최종본(LOA_FINAL)은 그대로 보존되므로
      * 데이터 손실 없음.</p>
      */
+    /**
+     * 마이그레이션: 신청 상태(status)와 라이선스 유효성(license_status) 분리.
+     * <ul>
+     *   <li>{@code applications.license_status VARCHAR(20)} 컬럼 멱등 추가.</li>
+     *   <li>레거시 {@code status='EXPIRED'} 행 → {@code status='COMPLETED'} + {@code license_status='EXPIRED'}
+     *       (ApplicationStatus.EXPIRED 제거 → enum 파싱 실패 방지).</li>
+     *   <li>{@code status='COMPLETED'} 이고 {@code license_status} 가 NULL 인 행은 만료일 기준 백필:
+     *       만료일 경과면 EXPIRED, 아니면 ACTIVE.</li>
+     * </ul>
+     * 각 단계가 가드(컬럼/조건)로 멱등 — 부팅 시 1회 적용 후 매칭 행 0.
+     */
+    private void migrateApplicationsLicenseStatus(Connection conn) throws SQLException {
+        addColumnIfMissing(conn, "applications", "license_status",
+            "ALTER TABLE applications ADD COLUMN license_status VARCHAR(20) NULL AFTER status");
+        try (Statement stmt = conn.createStatement()) {
+            // 1) 레거시 EXPIRED 신청상태 → COMPLETED + 라이선스 EXPIRED
+            int restored = stmt.executeUpdate(
+                "UPDATE applications SET status = 'COMPLETED', license_status = 'EXPIRED' " +
+                "WHERE status = 'EXPIRED'");
+            if (restored > 0) {
+                log.info("Migration [license-status]: {} row(s) status=EXPIRED → COMPLETED + license_status=EXPIRED", restored);
+            }
+            // 2) COMPLETED 이고 license_status NULL 인 행 만료일 기준 백필
+            int expired = stmt.executeUpdate(
+                "UPDATE applications SET license_status = 'EXPIRED' " +
+                "WHERE status = 'COMPLETED' AND license_status IS NULL " +
+                "AND license_expiry_date IS NOT NULL AND license_expiry_date < CURRENT_DATE");
+            int active = stmt.executeUpdate(
+                "UPDATE applications SET license_status = 'ACTIVE' " +
+                "WHERE status = 'COMPLETED' AND license_status IS NULL");
+            if (expired > 0 || active > 0) {
+                log.info("Migration [license-status]: backfilled COMPLETED rows — {} EXPIRED, {} ACTIVE", expired, active);
+            }
+        }
+    }
+
     private void migrateApplicationsLoaStageCollapse(Connection conn) throws SQLException {
         if (!columnExists(conn, "applications", "loa_stage")) return;
         try (Statement stmt = conn.createStatement()) {

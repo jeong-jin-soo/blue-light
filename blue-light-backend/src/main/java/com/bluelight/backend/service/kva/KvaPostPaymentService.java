@@ -109,12 +109,13 @@ public class KvaPostPaymentService {
 
         // ── 가드 0: 상태 ─────────────────────────────────
         ApplicationStatus current = application.getStatus();
-        if (current == ApplicationStatus.EXPIRED) {
+        // 만료된 라이선스(licenseStatus=EXPIRED) 건은 kVA 조정 불가 — 신청은 COMPLETED 라도 차단.
+        if (application.isLicenseExpired()) {
             logDenied(adminUserSeq, application, request,
                     "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED",
-                    "Application is EXPIRED, cannot adjust kVA");
+                    "Licence is EXPIRED, cannot adjust kVA");
             throw new BusinessException(
-                    "EXPIRED applications cannot be adjusted",
+                    "Applications with an expired licence cannot be adjusted",
                     HttpStatus.CONFLICT, "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED");
         }
         if (!application.isPostPaymentStatus()) {
@@ -332,12 +333,13 @@ public class KvaPostPaymentService {
 
         // ── 가드 0: 상태 ─────────────────────────────────
         ApplicationStatus current = application.getStatus();
-        if (current == ApplicationStatus.EXPIRED) {
+        // 만료된 라이선스(licenseStatus=EXPIRED) 건은 kVA 조정 요청 불가 — 신청은 COMPLETED 라도 차단.
+        if (application.isLicenseExpired()) {
             logLewDenied(lewUserSeq, application, request,
                     "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED",
-                    "Application is EXPIRED, cannot request kVA adjustment");
+                    "Licence is EXPIRED, cannot request kVA adjustment");
             throw new BusinessException(
-                    "EXPIRED applications cannot be adjusted",
+                    "Applications with an expired licence cannot be adjusted",
                     HttpStatus.CONFLICT, "KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED");
         }
         if (!application.isPostPaymentStatus()) {

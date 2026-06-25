@@ -190,13 +190,10 @@ public class ManualPaymentService {
             case PAID:
             case IN_PROGRESS:
             case COMPLETED:
+                // COMPLETED 는 발급 종결 — 만료된 라이선스 건도 status=COMPLETED 라 여기서 차단됨.
                 throw new BusinessException(
                         "Application is already paid or beyond payment stage (current=" + current + ")",
                         HttpStatus.CONFLICT, "ALREADY_PAID");
-            case EXPIRED:
-                throw new BusinessException(
-                        "Cannot record payment for an expired application",
-                        HttpStatus.CONFLICT, "APPLICATION_EXPIRED");
             default:
                 throw new BusinessException(
                         "Manual payment is not allowed in status " + current,

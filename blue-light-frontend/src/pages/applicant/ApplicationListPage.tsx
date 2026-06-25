@@ -37,7 +37,8 @@ const STATUS_FILTER_OPTIONS = [
   { value: 'PAID', label: 'Paid' },
   { value: 'IN_PROGRESS', label: 'In Progress' },
   { value: 'COMPLETED', label: 'Completed' },
-  { value: 'EXPIRED', label: 'Expired' },
+  // 라이선스 만료는 신청 상태가 아니라 licenseStatus — 센티넬 값으로 분기.
+  { value: 'LICENSE_EXPIRED', label: 'Expired' },
 ];
 
 export default function ApplicationListPage() {
@@ -62,8 +63,10 @@ export default function ApplicationListPage() {
   const filteredApplications = useMemo(() => {
     let result = applications;
 
-    // Status filter
-    if (statusFilter) {
+    // Status filter — 'LICENSE_EXPIRED' 센티넬은 라이선스 만료(licenseStatus)로 분기.
+    if (statusFilter === 'LICENSE_EXPIRED') {
+      result = result.filter((app) => app.licenseStatus === 'EXPIRED');
+    } else if (statusFilter) {
       result = result.filter((app) => app.status === statusFilter);
     }
 

@@ -2,6 +2,7 @@ package com.bluelight.backend.api.admin.dto;
 
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationStatus;
+import com.bluelight.backend.domain.application.LicenseStatus;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -23,6 +24,8 @@ public class AdminApplicationResponse {
     private Integer selectedKva;
     private BigDecimal quoteAmount;
     private ApplicationStatus status;
+    /** 발급된 라이선스의 유효성 — 신청 상태와 분리(ACTIVE/EXPIRED, 발급 전 null). */
+    private LicenseStatus licenseStatus;
     private String licenseNumber;
     private LocalDate licenseExpiryDate;
     private String reviewComment;
@@ -100,6 +103,7 @@ public class AdminApplicationResponse {
                 .selectedKva(application.getSelectedKva())
                 .quoteAmount(application.getQuoteAmount())
                 .status(application.getStatus())
+                .licenseStatus(application.getLicenseStatus())
                 .licenseNumber(application.getLicenseNumber())
                 .licenseExpiryDate(application.getLicenseExpiryDate())
                 .reviewComment(application.getReviewComment())

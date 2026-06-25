@@ -24,7 +24,6 @@ export function getStatusStep(status: string): number {
     case 'PAID': return 2;
     case 'IN_PROGRESS': return 3;
     case 'COMPLETED': return 5;
-    case 'EXPIRED': return -1;
     default: return 0;
   }
 }

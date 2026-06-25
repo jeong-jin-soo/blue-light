@@ -90,6 +90,14 @@ public class Application extends BaseEntity {
     private ApplicationStatus status = ApplicationStatus.PENDING_REVIEW;
 
     /**
+     * 발급된 라이선스의 유효성 상태 — 신청 상태(status)와 분리된 개념.
+     * 발급 전(COMPLETED 이전)에는 null, 발급 시 ACTIVE, 만료일 경과 시 EXPIRED.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "license_status")
+    private LicenseStatus licenseStatus;
+
+    /**
      * 라이선스 번호 (발급 후 설정)
      */
     @Column(name = "license_number", length = 50)
@@ -801,7 +809,6 @@ public class Application extends BaseEntity {
 
     /**
      * 본 신청이 결제 후 단계인지 (PAID/IN_PROGRESS/COMPLETED).
-     * EXPIRED 는 본 메서드에서 false — 결제 자체가 closed 된 상태.
      */
     public boolean isPostPaymentStatus() {
         return this.status == ApplicationStatus.PAID
@@ -810,16 +817,17 @@ public class Application extends BaseEntity {
     }
 
     /**
-     * 본 신청이 종결(read-only) 상태인지 — COMPLETED(발급 완료) 또는 EXPIRED(만료).
-     * 종결 건은 신청자·LEW 의 파일 업로드/수정이 모두 차단된다. 재개는 ADMIN 의 상태 변경(reopen)뿐.
+     * 본 신청이 종결(read-only) 상태인지 — COMPLETED(발급 완료).
+     *
+     * <p>라이선스 만료(licenseStatus=EXPIRED)는 종결 여부와 무관하다 — 만료된 라이선스라도
+     * 신청 자체는 COMPLETED 로 종결된 상태이므로 쓰기는 동일하게 잠긴다. 재개는 ADMIN reopen 뿐.</p>
      */
     public boolean isTerminal() {
-        return this.status == ApplicationStatus.COMPLETED
-                || this.status == ApplicationStatus.EXPIRED;
+        return this.status == ApplicationStatus.COMPLETED;
     }
 
     /**
-     * 종결(COMPLETED/EXPIRED) 건에 대한 쓰기(업로드/수정) 시도를 차단한다.
+     * 종결(COMPLETED) 건에 대한 쓰기(업로드/수정) 시도를 차단한다.
      * ADMIN 이 먼저 상태를 되돌린(reopen: COMPLETED → IN_PROGRESS) 뒤에만 수정 가능하다.
      *
      * @throws BusinessException 종결 상태인 경우 (APPLICATION_TERMINAL, 409)
@@ -831,6 +839,16 @@ public class Application extends BaseEntity {
                     org.springframework.http.HttpStatus.CONFLICT,
                     "APPLICATION_TERMINAL");
         }
+    }
+
+    /**
+     * 본 신청으로 발급된 라이선스가 만료되었는지 — {@code licenseStatus == EXPIRED}.
+     *
+     * <p>신청 워크플로우 상태(status)와 분리된 라이선스 유효성 판정. 결제 후 보정/조정 등
+     * 일부 게이트는 신청이 COMPLETED 라도 라이선스가 만료되었으면 차단한다.</p>
+     */
+    public boolean isLicenseExpired() {
+        return this.licenseStatus == LicenseStatus.EXPIRED;
     }
 
     /**
@@ -889,19 +907,22 @@ public class Application extends BaseEntity {
     }
 
     /**
-     * 라이선스 발급
+     * 라이선스 발급 — 신청을 COMPLETED 로 종결하고 라이선스를 ACTIVE 로 발급한다.
      */
     public void issueLicense(String licenseNumber, LocalDate expiryDate) {
         this.licenseNumber = licenseNumber;
         this.licenseExpiryDate = expiryDate;
         this.status = ApplicationStatus.COMPLETED;
+        this.licenseStatus = LicenseStatus.ACTIVE;
+        this.expiryNotifiedAt = null; // 재발급 시 만료 임박 알림 재발화
     }
 
     /**
-     * 만료 처리
+     * 라이선스 만료 처리 — 신청 상태(status=COMPLETED)는 유지하고 라이선스만 EXPIRED 로 전환한다.
+     * (LicenseExpiryScheduler 가 만료일 경과 시 호출.)
      */
-    public void markAsExpired() {
-        this.status = ApplicationStatus.EXPIRED;
+    public void markLicenseExpired() {
+        this.licenseStatus = LicenseStatus.EXPIRED;
     }
 
     /**

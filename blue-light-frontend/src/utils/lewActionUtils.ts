@@ -104,14 +104,6 @@ export function deriveLewPrimaryAction(
         targetUrl: reviewUrl,
         disabled: true,
       };
-    case 'EXPIRED':
-      return {
-        kind: 'expired',
-        label: 'Application expired',
-        description: 'No further action is available for expired applications.',
-        targetUrl: null,
-        disabled: true,
-      };
   }
 }
 
@@ -129,7 +121,5 @@ export function deriveLewHeaderSubtitle(status: ApplicationStatus): string {
       return 'Continue certification work.';
     case 'COMPLETED':
       return 'Application completed.';
-    case 'EXPIRED':
-      return 'Application expired.';
   }
 }

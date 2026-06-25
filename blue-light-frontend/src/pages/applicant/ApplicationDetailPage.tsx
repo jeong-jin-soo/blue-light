@@ -356,8 +356,10 @@ export default function ApplicationDetailPage() {
   const canUpload = ['PENDING_REVIEW', 'REVISION_REQUESTED', 'PENDING_PAYMENT', 'PAID']
     .includes(application.status);
 
-  // 종결(COMPLETED/EXPIRED) 건은 신청자의 모든 파일 업로드/수정 차단 — ADMIN reopen 후에만 가능.
-  const isTerminal = application.status === 'COMPLETED' || application.status === 'EXPIRED';
+  // 종결(COMPLETED) 건은 신청자의 모든 파일 업로드/수정 차단 — ADMIN reopen 후에만 가능.
+  // (라이선스 만료는 신청 상태와 분리 — 만료 라이선스도 status=COMPLETED 라 동일하게 잠김.)
+  const isTerminal = application.status === 'COMPLETED';
+  const licenceExpired = application.licenseStatus === 'EXPIRED';
 
   // ── 진행 단계별 배치 (B안) ───────────────────────────────
   // 신청자가 "지금 확인/처리해야 할" 섹션을 메인 영역 최상단으로 승격한다.
@@ -561,15 +563,13 @@ export default function ApplicationDetailPage() {
             <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
             <StatusBadge status={application.status} />
           </div>
-          {application.status !== 'EXPIRED' && (
-            <div className="mt-3">
-              <StepTracker
-                steps={STATUS_STEPS}
-                currentStep={getStatusStep(application.status)}
-                variant="horizontal"
-              />
-            </div>
-          )}
+          <div className="mt-3">
+            <StepTracker
+              steps={STATUS_STEPS}
+              currentStep={getStatusStep(application.status)}
+              variant="horizontal"
+            />
+          </div>
         </Card>
       </div>
 
@@ -629,21 +629,11 @@ export default function ApplicationDetailPage() {
           <div className="hidden lg:block">
             <Card>
               <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
-              {application.status === 'EXPIRED' ? (
-                <div className="text-center py-4">
-                  <span className="text-3xl">⏰</span>
-                  <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    This application has expired due to non-payment.
-                  </p>
-                </div>
-              ) : (
-                <StepTracker
-                  steps={STATUS_STEPS}
-                  currentStep={getStatusStep(application.status)}
-                  variant="vertical"
-                />
-              )}
+              <StepTracker
+                steps={STATUS_STEPS}
+                currentStep={getStatusStep(application.status)}
+                variant="vertical"
+              />
             </Card>
           </div>
 
@@ -668,7 +658,14 @@ export default function ApplicationDetailPage() {
           {/* Licence Info (only when completed) */}
           {application.status === 'COMPLETED' && application.licenseNumber && (
             <Card>
-              <h3 className="text-sm font-semibold text-gray-800 mb-4">Licence Information</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-800">Licence Information</h3>
+                {licenceExpired && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                    ⏰ Expired
+                  </span>
+                )}
+              </div>
               <div className="space-y-3">
                 <InfoField label="Licence Number" value={application.licenseNumber} />
                 {application.licenseExpiryDate && (

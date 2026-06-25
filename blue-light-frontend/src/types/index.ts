@@ -84,8 +84,13 @@ export type ApplicationStatus =
   | 'PENDING_PAYMENT'
   | 'PAID'
   | 'IN_PROGRESS'
-  | 'COMPLETED'
-  | 'EXPIRED';
+  | 'COMPLETED';
+
+/**
+ * 발급된 라이선스의 유효성 상태 — 신청 상태(ApplicationStatus)와 분리.
+ * 발급 전(COMPLETED 이전)에는 undefined, 발급 시 ACTIVE, 만료일 경과 시 EXPIRED.
+ */
+export type LicenseStatus = 'ACTIVE' | 'EXPIRED';
 
 /**
  * 신청 유형
@@ -165,6 +170,8 @@ export interface Application {
   selectedKva: number;
   quoteAmount: number;
   status: ApplicationStatus;
+  /** 발급된 라이선스 유효성 — 신청 상태와 분리(ACTIVE/EXPIRED, 발급 전 undefined). */
+  licenseStatus?: LicenseStatus;
   licenseNumber?: string;
   reviewComment?: string;
   licenseExpiryDate?: string;

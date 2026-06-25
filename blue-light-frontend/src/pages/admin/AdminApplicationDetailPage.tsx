@@ -219,6 +219,23 @@ export default function AdminApplicationDetailPage() {
     finally { setActionLoading(false); }
   };
 
+  const handleReopen = async () => {
+    if (!confirm(
+      'Reopen this completed application?\n\n' +
+      'It will return to "In Progress" so the applicant and LEW can edit files again. ' +
+      'This action is recorded in the activity timeline.'
+    )) return;
+    setActionLoading(true);
+    try {
+      await adminApi.reopenApplication(applicationId);
+      toast.success('Application reopened — now In Progress');
+      fetchData();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string } } };
+      toast.error(e?.response?.data?.message || 'Failed to reopen application');
+    } finally { setActionLoading(false); }
+  };
+
   const handleComplete = async () => {
     if (!completeForm.licenseNumber.trim() || !completeForm.licenseExpiryDate) {
       toast.error('Please fill in all fields'); return;
@@ -448,11 +465,9 @@ export default function AdminApplicationDetailPage() {
             <h3 className="text-sm font-semibold text-gray-800">Progress</h3>
             <StatusBadge status={application.status} />
           </div>
-          {application.status !== 'EXPIRED' && (
-            <div className="mt-3">
-              <StepTracker steps={STATUS_STEPS} currentStep={getStatusStep(application.status)} variant="horizontal" />
-            </div>
-          )}
+          <div className="mt-3">
+            <StepTracker steps={STATUS_STEPS} currentStep={getStatusStep(application.status)} variant="horizontal" />
+          </div>
         </Card>
       </div>
 
@@ -586,6 +601,7 @@ export default function AdminApplicationDetailPage() {
           onPaymentClick={() => setShowPaymentModal(true)}
           onProcessingClick={() => setShowProcessingConfirm(true)}
           onCompleteClick={() => setShowCompleteModal(true)}
+          onReopenClick={handleReopen}
           onAssignLewClick={openAssignLewModal}
           onUnassignLewClick={() => setShowUnassignConfirm(true)}
           onManualPaymentClick={() => setShowManualPaymentModal(true)}

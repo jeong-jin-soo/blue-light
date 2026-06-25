@@ -195,11 +195,11 @@ public class ApplicationService {
                 // Verify ownership
                 OwnershipValidator.validateOwner(originalApp.getUser().getUserSeq(), userSeq);
 
-                // 원본 신청서가 COMPLETED 또는 EXPIRED 상태인지 검증
-                if (originalApp.getStatus() != ApplicationStatus.COMPLETED
-                        && originalApp.getStatus() != ApplicationStatus.EXPIRED) {
+                // 원본 신청서가 COMPLETED(발급 완료) 상태인지 검증
+                // (라이선스 만료 여부와 무관 — 만료된 라이선스도 status=COMPLETED 라 갱신 대상.)
+                if (originalApp.getStatus() != ApplicationStatus.COMPLETED) {
                     throw new BusinessException(
-                            "Original application must be completed or expired for renewal",
+                            "Original application must be completed for renewal",
                             HttpStatus.BAD_REQUEST, "ORIGINAL_APP_NOT_ELIGIBLE");
                 }
 
@@ -609,10 +609,10 @@ public class ApplicationService {
                 OwnershipValidator.validateOwner(
                     originalApp.getUser().getUserSeq(), targetApplicantSeq);
 
-                if (originalApp.getStatus() != ApplicationStatus.COMPLETED
-                        && originalApp.getStatus() != ApplicationStatus.EXPIRED) {
+                // 라이선스 만료 여부와 무관 — 만료된 라이선스도 status=COMPLETED 라 갱신 대상.
+                if (originalApp.getStatus() != ApplicationStatus.COMPLETED) {
                     throw new BusinessException(
-                            "Original application must be completed or expired for renewal",
+                            "Original application must be completed for renewal",
                             HttpStatus.BAD_REQUEST, "ORIGINAL_APP_NOT_ELIGIBLE");
                 }
 

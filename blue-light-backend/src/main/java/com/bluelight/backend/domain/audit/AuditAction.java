@@ -19,6 +19,7 @@ public enum AuditAction {
     APPLICATION_REVISION_REQUESTED,
     APPLICATION_APPROVED,
     APPLICATION_COMPLETED,
+    APPLICATION_REOPENED,         // ADMIN 이 완료(COMPLETED) 건을 IN_PROGRESS 로 재개 — 종결 쓰기잠금 해제
     APPLICATION_RESUBMITTED,
     // 자동(스케줄러) 동작 — LicenseExpiryScheduler
     LICENSE_EXPIRED,              // 만료일 경과 → 자동 EXPIRED 전환

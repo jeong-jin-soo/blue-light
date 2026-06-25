@@ -9,6 +9,7 @@ import type {
   FileType,
   KvaStatus,
   KvaSource,
+  LicenseStatus,
   Page,
   Payment,
   PaymentConfirmRequest,
@@ -51,7 +52,8 @@ export const getApplications = async (
   size = 20,
   status?: ApplicationStatus,
   search?: string,
-  kvaStatus?: KvaStatus
+  kvaStatus?: KvaStatus,
+  licenseStatus?: LicenseStatus
 ): Promise<Page<AdminApplication>> => {
   const response = await axiosClient.get<Page<AdminApplication>>('/admin/applications', {
     params: {
@@ -60,6 +62,7 @@ export const getApplications = async (
       ...(status && { status }),
       ...(search && { search }),
       ...(kvaStatus && { kvaStatus }),
+      ...(licenseStatus && { licenseStatus }),
     },
   });
   return response.data;
@@ -77,6 +80,14 @@ export const updateStatus = async (
   const response = await axiosClient.patch<AdminApplication>(
     `/admin/applications/${id}/status`,
     data
+  );
+  return response.data;
+};
+
+/** 완료 건 재개(reopen) — ADMIN 전용. COMPLETED → IN_PROGRESS, APPLICATION_REOPENED 로 감사됨. */
+export const reopenApplication = async (id: number): Promise<AdminApplication> => {
+  const response = await axiosClient.post<AdminApplication>(
+    `/admin/applications/${id}/reopen`
   );
   return response.data;
 };

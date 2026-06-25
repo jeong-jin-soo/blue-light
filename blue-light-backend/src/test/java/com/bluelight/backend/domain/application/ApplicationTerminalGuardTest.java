@@ -43,11 +43,13 @@ class ApplicationTerminalGuardTest {
     }
 
     @Test
-    void EXPIRED_는_isTerminal_이고_쓰기_차단() {
+    void 만료_라이선스라도_COMPLETED_면_종결_쓰기_차단() {
         Application app = newApp();
-        app.markAsExpired(); // → EXPIRED
+        app.issueLicense("L-12345", LocalDate.now().plusYears(1)); // → COMPLETED + ACTIVE
+        app.markLicenseExpired(); // 라이선스만 EXPIRED, status 는 COMPLETED 유지
 
-        assertThat(app.getStatus()).isEqualTo(ApplicationStatus.EXPIRED);
+        assertThat(app.getStatus()).isEqualTo(ApplicationStatus.COMPLETED);
+        assertThat(app.isLicenseExpired()).isTrue();
         assertThat(app.isTerminal()).isTrue();
         assertThatThrownBy(app::assertModifiable)
                 .isInstanceOf(BusinessException.class)

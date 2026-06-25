@@ -152,17 +152,6 @@ class ApplicationKvaDomainTest {
                 .isInstanceOf(IllegalStateException.class);
     }
 
-    @Test
-    void overrideKvaPostPayment_EXPIRED_상태에서_거부() {
-        Application app = newApp(KvaStatus.CONFIRMED, 100, new BigDecimal("650.00"));
-        app.approveForPayment();
-        app.markAsPaid();
-        app.markAsExpired();
-        User admin = Mockito.mock(User.class);
-
-        assertThatThrownBy(() -> app.overrideKvaPostPayment(200, new BigDecimal("1200"), admin))
-                .isInstanceOf(IllegalStateException.class);
-    }
 
     @Test
     void overrideKvaPostPayment_null_인자는_거부() {
@@ -194,7 +183,8 @@ class ApplicationKvaDomainTest {
         app.issueLicense("LIC-001", java.time.LocalDate.now().plusYears(1));
         assertThat(app.isPostPaymentStatus()).isTrue();  // COMPLETED
 
-        app.markAsExpired();
-        assertThat(app.isPostPaymentStatus()).isFalse(); // EXPIRED
+        // 라이선스 만료는 신청 상태와 분리 — COMPLETED 인 채로 라이선스만 EXPIRED → 여전히 post-payment.
+        app.markLicenseExpired();
+        assertThat(app.isPostPaymentStatus()).isTrue();  // COMPLETED 유지
     }
 }

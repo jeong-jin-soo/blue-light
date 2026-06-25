@@ -15,6 +15,7 @@ export const ACTIVITY_LABELS: Record<string, ActivityMeta> = {
   APPLICATION_REVISION_REQUESTED: { label: '보완 요청', icon: '⏳' },
   APPLICATION_APPROVED: { label: '결제 승인 (결제 요청)', icon: '✅' },
   APPLICATION_COMPLETED: { label: '신청 완료 — 면허 발급', icon: '🏁' },
+  APPLICATION_REOPENED: { label: '완료 건 재개 (관리자)', icon: '🔓' },
   APPLICATION_VIEWED_BY_LEW: { label: 'LEW 열람', icon: '👀' },
   APPLICATION_PAYMENT_REQUESTED_BY_LEW: { label: 'LEW 결제 요청', icon: '💸' },
 

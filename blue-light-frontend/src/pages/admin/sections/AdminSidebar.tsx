@@ -20,6 +20,8 @@ interface Props {
   onPaymentClick: () => void;
   onProcessingClick: () => void;
   onCompleteClick: () => void;
+  /** 완료 건 재개(reopen) — ADMIN 전용. COMPLETED 상태에서만 노출. */
+  onReopenClick?: () => void;
   onAssignLewClick: () => void;
   onUnassignLewClick: () => void;
   /** ★ Concierge 강화 PR-4 — Manual Payment 모달 트리거 (ADMIN/SYSTEM_ADMIN 전용). */
@@ -41,6 +43,7 @@ export function AdminSidebar({
   onPaymentClick,
   onProcessingClick,
   onCompleteClick,
+  onReopenClick,
   onAssignLewClick,
   onUnassignLewClick,
   onManualPaymentClick,
@@ -51,18 +54,11 @@ export function AdminSidebar({
       <div className="hidden lg:block">
         <Card>
           <h3 className="text-sm font-semibold text-gray-800 mb-4">Progress</h3>
-          {application.status === 'EXPIRED' ? (
-            <div className="text-center py-4">
-              <span className="text-3xl">⏰</span>
-              <p className="text-sm font-medium text-gray-700 mt-2">Application Expired</p>
-            </div>
-          ) : (
-            <StepTracker
-              steps={STATUS_STEPS}
-              currentStep={getStatusStep(application.status)}
-              variant="vertical"
-            />
-          )}
+          <StepTracker
+            steps={STATUS_STEPS}
+            currentStep={getStatusStep(application.status)}
+            variant="vertical"
+          />
         </Card>
       </div>
 
@@ -115,17 +111,20 @@ export function AdminSidebar({
           )}
 
           {application.status === 'COMPLETED' && (
-            <div className="bg-success-50 rounded-lg p-3 border border-success-200 text-center">
-              <span className="text-lg">🎉</span>
-              <p className="text-xs text-success-700 mt-1">This application is completed.</p>
+            <div className="space-y-2">
+              <div className="bg-success-50 rounded-lg p-3 border border-success-200 text-center">
+                <span className="text-lg">🎉</span>
+                <p className="text-xs text-success-700 mt-1">This application is completed.</p>
+              </div>
+              {/* 완료 건은 신청자·LEW 파일 수정 잠금. 보정이 필요하면 ADMIN 이 재개(reopen)한다. */}
+              {isAdmin && onReopenClick && (
+                <Button variant="outline" fullWidth size="sm" onClick={onReopenClick} loading={actionLoading}>
+                  🔓 Reopen for editing
+                </Button>
+              )}
             </div>
           )}
 
-          {application.status === 'EXPIRED' && (
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200 text-center">
-              <p className="text-xs text-gray-500">No actions available for expired applications.</p>
-            </div>
-          )}
 
           {/* PR-4 (admin-manual-email-spec §7.3): 신청 컨텍스트 prefill 진입점.
               ADMIN 전용 — 신청자에게 ad-hoc 이메일 발송 시 신청자 + 신청번호가 자동 prefill 된다. */}
@@ -206,7 +205,14 @@ export function AdminSidebar({
       {/* Licence Info */}
       {application.status === 'COMPLETED' && application.licenseNumber && (
         <Card>
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">Licence Information</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-800">Licence Information</h3>
+            {application.licenseStatus === 'EXPIRED' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                ⏰ Expired
+              </span>
+            )}
+          </div>
           <div className="space-y-3">
             <InfoField label="Licence Number" value={application.licenseNumber} />
             {application.licenseExpiryDate && (

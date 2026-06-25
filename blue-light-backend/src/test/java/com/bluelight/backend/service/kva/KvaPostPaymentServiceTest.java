@@ -238,8 +238,10 @@ class KvaPostPaymentServiceTest {
     }
 
     @Test
-    void AC_A3_EXPIRED_거부_409_KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED() {
-        Application app = mockApp(ApplicationStatus.EXPIRED, 100, new BigDecimal("450"));
+    void AC_A3_만료라이선스_거부_409_KVA_ADJUSTMENT_NOT_ALLOWED_EXPIRED() {
+        // 신청 상태 EXPIRED 제거 → 만료된 라이선스(COMPLETED + licenseStatus=EXPIRED)로 검증.
+        Application app = mockApp(ApplicationStatus.COMPLETED, 100, new BigDecimal("450"));
+        when(app.isLicenseExpired()).thenReturn(true);
         when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
 
         assertThatThrownBy(() -> service.overrideKva(APP_ID, req(200, "x"), ADMIN_SEQ))
@@ -477,8 +479,9 @@ class KvaPostPaymentServiceTest {
     }
 
     @Test
-    void AC_L3_LEW_요청_EXPIRED_거부() {
-        Application app = mockApp(ApplicationStatus.EXPIRED, 100, new BigDecimal("450"));
+    void AC_L3_LEW_요청_만료라이선스_거부() {
+        Application app = mockApp(ApplicationStatus.COMPLETED, 100, new BigDecimal("450"));
+        when(app.isLicenseExpired()).thenReturn(true);
         when(applicationRepository.findById(APP_ID)).thenReturn(Optional.of(app));
 
         assertThatThrownBy(() -> service.requestAdjustmentByLew(APP_ID, 50L, lewReq(200, "late")))

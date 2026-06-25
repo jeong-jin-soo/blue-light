@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS applications (
     selected_kva       INT           NOT NULL,
     quote_amount       DECIMAL(10,2) NOT NULL,
     status             VARCHAR(30)   NOT NULL DEFAULT 'PENDING_REVIEW',
+    license_status     VARCHAR(20),  -- 발급된 라이선스 유효성: ACTIVE | EXPIRED (발급 전 NULL). 신청 status 와 분리.
     license_number     VARCHAR(50),
     license_expiry_date DATE,
     review_comment     TEXT,
