@@ -88,6 +88,9 @@ public enum NotificationType {
     // SUBMITTED/RESUBMITTED 후 ema.reminder.days 무변동 건을 담당 LEW 에게 리마인드.
     // 스케줄러(EmaReminderScheduler)가 1일 1회 멱등 발행. referenceType=APPLICATION.
     EMA_SUBMISSION_REMINDER_LEW,
+    // 라이선스 발급 후 SLD 미제출 건을 담당 LEW 에게 주기(주1회, 발급 2~3개월차) 리마인드 (A-60).
+    // "3개월 내 EMA 제출 + 서비스에 SLD 업로드" 안내. SldReminderScheduler 가 발행. referenceType=APPLICATION.
+    SLD_SUBMISSION_REMINDER_LEW,
     // reject(T7) 성공 시 담당 LEW 에게 "반려됨 — 사유 반영 후 재제출" 통지. 신청자에게는 비노출(US-C1).
     // EmaRejectedEvent → EmaRejectedNotificationListener (AFTER_COMMIT). referenceType=APPLICATION.
     EMA_REJECTED_LEW,

@@ -163,6 +163,8 @@ public class DatabaseMigrationRunner {
             seedLoaFormSentNotificationTemplate(conn);
             // ── SLD 전환 추가요금 알림 템플릿(A-58 신청자 통보 / A-59 ADMIN 정산요청) 멱등 시드+활성 ──
             seedSldConversionNotificationTemplates(conn);
+            // ── SLD 미제출 리마인더 알림 템플릿(A-60, 담당 LEW, EMAIL+IN_APP) 멱등 시드+활성 ──
+            seedSldSubmissionReminderNotificationTemplate(conn);
             // ── 신청자 신고 kVA(USER_INPUT) 가 LEW 미확정인데 CONFIRMED 로 저장돼 있던 레거시 행 보정 ──
             //   "신청자가 적었다고 LEW 확정 상태가 되면 안 됨" 규칙 적용. 결제 전 상태만 안전하게 UNKNOWN 으로.
             backfillUserDeclaredKvaToUnknown(conn);
@@ -187,6 +189,10 @@ public class DatabaseMigrationRunner {
             //   status='COMPLETED' + license_status='EXPIRED' 로 복원(EXPIRED 신청상태 제거).
             //   COMPLETED 행의 license_status NULL 은 만료일 기준으로 ACTIVE/EXPIRED 백필.
             migrateApplicationsLicenseStatus(conn);
+            // ── SLD 미제출 리마인더 (2026-06-27) ──
+            //   applications.license_issued_at + sld_reminder_notified_at 컬럼 추가.
+            //   기존 COMPLETED 행은 발급시각 추정치로 updated_at 백필(신규 발급은 issueLicense 가 정확히 기록).
+            migrateApplicationsSldReminderColumns(conn);
             log.info("Database migration check completed");
         } catch (SQLException e) {
             log.error("Database migration failed", e);
@@ -817,6 +823,29 @@ public class DatabaseMigrationRunner {
                 "WHERE status = 'COMPLETED' AND license_status IS NULL");
             if (expired > 0 || active > 0) {
                 log.info("Migration [license-status]: backfilled COMPLETED rows — {} EXPIRED, {} ACTIVE", expired, active);
+            }
+        }
+    }
+
+    /**
+     * 마이그레이션: SLD 미제출 리마인더 컬럼 (2026-06-27).
+     * <ul>
+     *   <li>{@code license_issued_at}, {@code sld_reminder_notified_at} DATETIME(6) 멱등 추가.</li>
+     *   <li>기존 {@code status='COMPLETED'} 행의 {@code license_issued_at} 이 NULL 이면 {@code updated_at}
+     *       으로 백필(발급시각 근사). 신규 발급은 issueLicense() 가 정확히 기록.</li>
+     * </ul>
+     */
+    private void migrateApplicationsSldReminderColumns(Connection conn) throws SQLException {
+        addColumnIfMissing(conn, "applications", "license_issued_at",
+            "ALTER TABLE applications ADD COLUMN license_issued_at DATETIME(6) NULL AFTER license_expiry_date");
+        addColumnIfMissing(conn, "applications", "sld_reminder_notified_at",
+            "ALTER TABLE applications ADD COLUMN sld_reminder_notified_at DATETIME(6) NULL AFTER license_issued_at");
+        try (Statement stmt = conn.createStatement()) {
+            int backfilled = stmt.executeUpdate(
+                "UPDATE applications SET license_issued_at = updated_at " +
+                "WHERE status = 'COMPLETED' AND license_issued_at IS NULL");
+            if (backfilled > 0) {
+                log.info("Migration [sld-reminder]: backfilled license_issued_at for {} COMPLETED row(s)", backfilled);
             }
         }
     }
@@ -2764,6 +2793,66 @@ public class DatabaseMigrationRunner {
         }
         if (inserted > 0) {
             log.info("Migration: seeded {} SLD-conversion template rows (A-58/A-59)", inserted);
+        }
+    }
+
+    /**
+     * SLD 미제출 리마인더 알림 템플릿(A-60, EMAIL+IN_APP, recipient LEW)을 멱등 시드+활성.
+     * <p>라이선스 발급 후 SLD 가 아직 서비스에 업로드되지 않은 건을 담당 LEW 에게 주기(주1회,
+     * 발급 2~3개월차) 통지한다. 본문은 "3개월 내 EMA(ELISE) 제출 + 서비스에 SLD 업로드"를 안내한다.</p>
+     */
+    private void seedSldSubmissionReminderNotificationTemplate(Connection conn) {
+        if (!tableExistsSafe(conn)) {
+            return;
+        }
+        String a60Email = "<div style=\"font-family:Helvetica,Arial,sans-serif;color:#222;line-height:1.5;max-width:600px;margin:0 auto;padding:0 16px\">"
+                + "<div style=\"border-bottom:1px solid #E5E7EB;padding:16px 0;margin-bottom:24px\"><span style=\"font-size:18px;font-weight:700;color:#0F766E\">LicenseKaki</span><br><span style=\"font-size:12px;color:#888\">LEW reminder</span></div>"
+                + "<h1 style=\"font-size:18px;margin:0 0 16px\">SLD submission is still pending</h1>"
+                + "<p style=\"margin:0 0 16px\">For application <strong>#{{publicCode}}</strong> ({{applicantName}}), the licence has been issued but the Single Line Diagram has not been uploaded yet.</p>"
+                + "<p style=\"margin:0 0 16px\">The SLD must be submitted to EMA (ELISE) <strong>within 3 months of licence issuance</strong> (by <strong>{{deadline}}</strong>). Please <strong>upload the SLD on LicenseKaki</strong> and submit it to EMA.</p>"
+                + "<p style=\"margin:24px 0\"><a href=\"{{ctaUrl}}\" style=\"display:inline-block;background:#0F766E;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600\">Open application</a></p>"
+                + "<hr style=\"border:none;border-top:1px solid #ddd;margin:24px 0\"><p style=\"margin:0;font-size:12px;color:#888\">You receive this because you are the assigned LEW. Weekly reminder until the SLD is uploaded.</p></div>";
+        // {code, channel, subject, body, recipientRoles}
+        String[][] rows = {
+            {"A-60", "EMAIL", "[LicenseKaki] SLD still pending · #{{publicCode}}", a60Email, "LEW"},
+            {"A-60", "IN_APP", "SLD submission pending on #{{publicCode}}",
+                "Licence issued but SLD not uploaded. Submit to EMA within 3 months (by {{deadline}}) and upload the SLD here.", "LEW"},
+        };
+        final String variablesJson = "[\"applicantName\",\"publicCode\",\"deadline\",\"ctaUrl\"]";
+        String insertSql =
+            "INSERT INTO notification_templates " +
+            "(template_code, channel, locale, provider_template_name, subject, body_text, " +
+            " variables_json, catalog_meta_key, category, severity, recipient_roles, enabled, " +
+            " created_at, updated_at) " +
+            "SELECT ?, ?, 'en', NULL, ?, ?, ?, ?, 'STATUS', 'IMPORTANT', ?, TRUE, NOW(6), NOW(6) " +
+            "FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM notification_templates t " +
+            "  WHERE t.template_code = ? AND t.channel = ? AND t.locale = 'en')";
+        String enableSql =
+            "UPDATE notification_templates SET enabled = TRUE, deleted_at = NULL, updated_at = NOW(6) " +
+            "WHERE template_code = ? AND channel = ? AND locale = 'en' AND (enabled = FALSE OR deleted_at IS NOT NULL)";
+        int inserted = 0;
+        try (PreparedStatement insertPs = conn.prepareStatement(insertSql);
+             PreparedStatement enablePs = conn.prepareStatement(enableSql)) {
+            for (String[] r : rows) {
+                try {
+                    insertPs.setString(1, r[0]); insertPs.setString(2, r[1]);
+                    insertPs.setString(3, r[2]); insertPs.setString(4, r[3]);
+                    insertPs.setString(5, variablesJson); insertPs.setString(6, r[0]);
+                    insertPs.setString(7, r[4]);
+                    insertPs.setString(8, r[0]); insertPs.setString(9, r[1]);
+                    inserted += insertPs.executeUpdate();
+                    enablePs.setString(1, r[0]); enablePs.setString(2, r[1]);
+                    enablePs.executeUpdate();
+                } catch (SQLException e) {
+                    log.warn("seedSldSubmissionReminderNotificationTemplate {} {} warn: {}", r[0], r[1], e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("seedSldSubmissionReminderNotificationTemplate aborted: {}", e.getMessage());
+            return;
+        }
+        if (inserted > 0) {
+            log.info("Migration: seeded {} SLD-reminder template rows (A-60)", inserted);
         }
     }
 

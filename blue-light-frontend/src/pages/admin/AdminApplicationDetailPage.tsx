@@ -37,6 +37,7 @@ import type { ManualPaymentPayload } from '../../types/manualPayment';
 import {
   PaymentModal, CompleteModal, RevisionModal, AssignLewModal,
   ApproveConfirmDialog, ProcessingConfirmDialog, UnassignLewConfirmDialog, SldConfirmDialog,
+  type CompleteForm,
 } from './sections/AdminModals';
 
 import type { AdminApplication, FileInfo, FileType, Payment, LewSummary, SldRequest, LoaStatus } from '../../types';
@@ -61,7 +62,8 @@ export default function AdminApplicationDetailPage() {
   const [showApproveConfirm, setShowApproveConfirm] = useState(false);
   const [revisionComment, setRevisionComment] = useState('');
   const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow', receiptFile: null as File | null });
-  const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
+  const [completeForm, setCompleteForm] = useState<CompleteForm>({ licenseNumber: '', licenseExpiryDate: '', licenseIssuedDate: '' });
+  const [parsingLicense, setParsingLicense] = useState(false);
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
 
   // LOA states (교환 모델 — Part B에서 admin 패널이 재사용 예정)
@@ -234,6 +236,31 @@ export default function AdminApplicationDetailPage() {
       const e = err as { response?: { data?: { message?: string } } };
       toast.error(e?.response?.data?.message || 'Failed to reopen application');
     } finally { setActionLoading(false); }
+  };
+
+  // 라이선스 PDF 업로드 → AI 파싱 → 완료 폼 프리필 (번호/발급일/만료일, LEW 검토·수정).
+  const handleLicenseUpload = async (file: File) => {
+    setParsingLicense(true);
+    try {
+      await adminApi.uploadFile(applicationId, file, 'LICENSE_PDF');
+      try {
+        const parsed = await adminApi.parseLicense(applicationId);
+        setCompleteForm((prev) => ({
+          licenseNumber: parsed.licenseNumber || prev.licenseNumber,
+          licenseExpiryDate: parsed.expiryDate || prev.licenseExpiryDate,
+          licenseIssuedDate: parsed.issueDate || prev.licenseIssuedDate,
+        }));
+        toast.success('Licence read — please review the fields');
+      } catch {
+        // 파싱 실패해도 업로드는 정상 — LEW 가 번호·만료일을 직접 입력하면 발급 가능.
+        toast.warning('Licence uploaded. Couldn’t auto-read it — please enter the licence number and expiry date manually.');
+      }
+      fetchData(); // 파일 목록 갱신 → licenseUploaded 반영(파싱 결과와 무관)
+    } catch {
+      toast.error('Failed to upload the licence file');
+    } finally {
+      setParsingLicense(false);
+    }
   };
 
   const handleComplete = async () => {
@@ -619,6 +646,9 @@ export default function AdminApplicationDetailPage() {
         isOpen={showCompleteModal} onClose={() => setShowCompleteModal(false)}
         onConfirm={handleComplete} completeForm={completeForm}
         setCompleteForm={setCompleteForm} loading={actionLoading}
+        onUploadLicense={handleLicenseUpload}
+        licenseUploaded={files.some((f) => f.fileType === 'LICENSE_PDF')}
+        parsing={parsingLicense}
       />
       <RevisionModal
         isOpen={showRevisionModal} onClose={() => setShowRevisionModal(false)}

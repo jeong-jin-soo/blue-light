@@ -33,8 +33,15 @@ public final class NotificationLinkResolver {
             return null;
         }
         switch (referenceType) {
-            case "APPLICATION":
-                return basePath(recipientRole) + "/applications/" + referenceId + hashFor(type);
+            case "APPLICATION": {
+                String hash = hashFor(type);
+                // LEW 의 탭 해시(#documents/#kva/#sld/#loa/#ema)는 검토 화면(/review)에서만 탭 선택된다.
+                // 상세 화면(/lew/applications/{id})에는 탭이 없어 해시가 무시되므로 /review 로 보낸다.
+                if (recipientRole == UserRole.LEW && !hash.isEmpty()) {
+                    return "/lew/applications/" + referenceId + "/review" + hash;
+                }
+                return basePath(recipientRole) + "/applications/" + referenceId + hash;
+            }
             case "CONCIERGE_REQUEST":
                 // 컨시어지: 현재 LEW 전용 상세 페이지만 존재. 신청자/매니저용은 향후 PR.
                 if (recipientRole == UserRole.LEW) {
@@ -93,6 +100,9 @@ public final class NotificationLinkResolver {
             case EMA_SUBMISSION_REMINDER_LEW:
             case EMA_REJECTED_LEW:
                 return "#ema";
+            // SLD 미제출 리마인더 — LEW SLD 탭.
+            case SLD_SUBMISSION_REMINDER_LEW:
+                return "#sld";
             default:
                 // KVA_CONFIRMED, PAYMENT_CONFIRMED_LEW, APPLICATION_LEW_ASSIGNED_LEW,
                 // ADMIN_MANUAL_EMAIL_NOTICE 등은 페이지 상단(기본 위치)으로.

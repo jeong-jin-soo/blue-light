@@ -30,6 +30,8 @@ from app.models.schemas import (
     ChatResponse,
     FileInfo,
     HealthResponse,
+    LicenseParseRequest,
+    LicenseParseResponse,
     ResetRequest,
     SldGenerateRequest,
     SldGenerateResponse,
@@ -330,6 +332,42 @@ async def chat(
         has_file=has_file,
         file_id=file_id,
     )
+
+
+@app.post("/api/license/parse", response_model=LicenseParseResponse)
+async def parse_license_endpoint(
+    request: LicenseParseRequest,
+    _: str = Depends(verify_service_key),
+):
+    """라이선스 PDF/이미지에서 번호·발급일·만료일을 추출한다 (Gemini Vision).
+
+    Spring Boot 가 {attached_file: {filename, content_base64, mime_type}} 형태로 보낸다.
+    추출 못한 필드는 null — 프론트에서 LEW 가 검토·수정한다.
+    """
+    import base64
+
+    from app.license.license_parser import parse_license
+
+    attached = request.attached_file
+    if not attached or not attached.get("content_base64"):
+        raise HTTPException(status_code=400, detail="attached_file with content_base64 is required")
+
+    try:
+        file_bytes = base64.b64decode(attached["content_base64"])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"invalid base64: {exc}") from exc
+
+    mime_type = attached.get("mime_type") or "application/pdf"
+
+    try:
+        result = await parse_license(file_bytes, mime_type, api_key=request.api_key)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Licence parse failed")
+        raise HTTPException(status_code=502, detail=f"licence parse failed: {exc}") from exc
+
+    return LicenseParseResponse(**result)
 
 
 @app.get("/api/chat/history/{application_seq}")

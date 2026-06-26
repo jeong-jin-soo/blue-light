@@ -39,6 +39,7 @@ public class AdminApplicationController {
     /** ★ Concierge 강화 + 별도 수금 PR-2 — Application 별도 수금. */
     private final com.bluelight.backend.api.payment.ManualPaymentService manualPaymentService;
     private final com.bluelight.backend.api.audit.AuditLogService auditLogService;
+    private final LicenseParseService licenseParseService;
     private final GenericRateLimiter rateLimiter;
 
     /** 결제 확인: 신청서당 5분 내 최대 3회 */
@@ -185,6 +186,20 @@ public class AdminApplicationController {
         log.info("Admin complete application: applicationSeq={}, licenseNumber={}", id, request.getLicenseNumber());
         AdminApplicationResponse response = adminApplicationService.completeApplication(id, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Parse the uploaded licence PDF → licence number / issue date / expiry date (AI Vision).
+     * POST /api/admin/applications/:id/license/parse
+     *
+     * <p>업로드된 LICENSE_PDF 를 AI 서비스로 파싱해 완료 폼 프리필 값을 돌려준다. 추출값은
+     * LEW 가 검토·수정한다. 발급(완료)은 별도 {@code /complete} 호출로 이뤄진다.</p>
+     */
+    @PreAuthorize("hasAnyRole('ADMIN','SYSTEM_ADMIN') or @appSec.isAssignedLew(#id, authentication)")
+    @PostMapping("/applications/{id}/license/parse")
+    public ResponseEntity<LicenseParseResponse> parseLicense(@PathVariable Long id) {
+        log.info("Parse licence PDF: applicationSeq={}", id);
+        return ResponseEntity.ok(licenseParseService.parseLatestLicense(id));
     }
 
     /**

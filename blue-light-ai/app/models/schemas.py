@@ -73,6 +73,24 @@ class SldGenerateResponse(BaseModel):
     matched_reference: str | None = None
 
 
+class LicenseParseRequest(BaseModel):
+    """라이선스 PDF 파싱 요청 — Spring Boot 가 업로드된 LICENSE_PDF 바이트를 base64 로 보낸다."""
+
+    attached_file: dict = Field(
+        ...,
+        description='{"filename": "license.pdf", "content_base64": "...", "mime_type": "application/pdf"}',
+    )
+    api_key: str | None = Field(None, description="Gemini API key override (optional)")
+
+
+class LicenseParseResponse(BaseModel):
+    """라이선스 PDF 파싱 결과 — 추출 못한 필드는 None (프론트가 LEW 수정용 프리필로 사용)."""
+
+    license_number: str | None = None
+    issue_date: str | None = None   # ISO YYYY-MM-DD
+    expiry_date: str | None = None  # ISO YYYY-MM-DD
+
+
 class HealthResponse(BaseModel):
     """Health check response."""
 

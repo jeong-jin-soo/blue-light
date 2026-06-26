@@ -113,28 +113,98 @@ export function PaymentModal({ isOpen, onClose, onConfirm, quoteAmount, paymentF
 }
 
 // ── Complete Application Modal ──────────────────────────
+export interface CompleteForm {
+  licenseNumber: string;
+  licenseExpiryDate: string;
+  licenseIssuedDate: string;
+}
+
 interface CompleteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  completeForm: { licenseNumber: string; licenseExpiryDate: string };
-  setCompleteForm: React.Dispatch<React.SetStateAction<{ licenseNumber: string; licenseExpiryDate: string }>>;
+  completeForm: CompleteForm;
+  setCompleteForm: React.Dispatch<React.SetStateAction<CompleteForm>>;
   loading: boolean;
+  /** 라이선스 PDF 업로드 + AI 파싱 + 폼 프리필 (부모 구현). */
+  onUploadLicense: (file: File) => Promise<void>;
+  /** LICENSE_PDF 가 이미 업로드되어 있는지 (발급 전제). */
+  licenseUploaded: boolean;
+  /** 업로드/파싱 진행 중. */
+  parsing: boolean;
 }
 
-export function CompleteModal({ isOpen, onClose, onConfirm, completeForm, setCompleteForm, loading }: CompleteModalProps) {
+export function CompleteModal({
+  isOpen, onClose, onConfirm, completeForm, setCompleteForm, loading,
+  onUploadLicense, licenseUploaded, parsing,
+}: CompleteModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (file) await onUploadLicense(file);
+  };
+
+  const canIssue = licenseUploaded
+    && completeForm.licenseNumber.trim().length > 0
+    && !!completeForm.licenseExpiryDate;
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm">
       <ModalHeader title="Complete & Issue Licence" onClose={onClose} />
       <ModalBody>
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">Issue the electrical installation licence for this application.</p>
+          <p className="text-sm text-gray-600">
+            Upload the licence PDF — the licence number and dates are read automatically. Review and edit if needed.
+          </p>
+
+          {/* ① 라이선스 파일 업로드 (상단) */}
+          <div className="rounded-lg border border-dashed border-gray-300 p-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800">Licence file (PDF)</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  {licenseUploaded ? '✓ Uploaded — re-upload to re-read' : 'Required before issuing'}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                loading={parsing}
+                disabled={parsing}
+              >
+                {licenseUploaded ? 'Replace' : 'Upload'}
+              </Button>
+            </div>
+            {parsing && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                <LoadingSpinner size="sm" /> Reading the licence…
+              </div>
+            )}
+          </div>
+
+          {/* ② 라이선스 번호 → ③ 발급일 → ④ 만료일 (하단, 프리필·수정 가능) */}
           <Input
             label="Licence Number"
             placeholder="e.g., EIL-2025-00001"
             value={completeForm.licenseNumber}
             onChange={(e) => setCompleteForm((prev) => ({ ...prev, licenseNumber: e.target.value }))}
             required
+          />
+          <Input
+            label="Issue Date"
+            type="date"
+            value={completeForm.licenseIssuedDate}
+            onChange={(e) => setCompleteForm((prev) => ({ ...prev, licenseIssuedDate: e.target.value }))}
           />
           <Input
             label="Expiry Date"
@@ -147,7 +217,9 @@ export function CompleteModal({ isOpen, onClose, onConfirm, completeForm, setCom
       </ModalBody>
       <ModalFooter>
         <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-        <Button size="sm" onClick={onConfirm} loading={loading}>Issue Licence</Button>
+        <Button size="sm" onClick={onConfirm} loading={loading} disabled={!canIssue || parsing}>
+          Issue Licence
+        </Button>
       </ModalFooter>
     </Modal>
   );

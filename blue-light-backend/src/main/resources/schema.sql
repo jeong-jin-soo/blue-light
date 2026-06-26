@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS applications (
     license_status     VARCHAR(20),  -- 발급된 라이선스 유효성: ACTIVE | EXPIRED (발급 전 NULL). 신청 status 와 분리.
     license_number     VARCHAR(50),
     license_expiry_date DATE,
+    license_issued_at   DATETIME(6),  -- 라이선스 발급 시각 (SLD 미제출 리마인더 발급-경과 기준)
+    sld_reminder_notified_at DATETIME(6),  -- SLD 미제출 리마인더 마지막 발송 시각 (주1회 중복 가드)
     review_comment     TEXT,
     assigned_lew_seq   BIGINT,
     sp_account_no            VARCHAR(30),

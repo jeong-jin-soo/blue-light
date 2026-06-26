@@ -192,4 +192,30 @@ public interface ApplicationRepository extends JpaRepository<Application, Long>,
             @Param("resubmitted") EmaSubmissionStatus resubmitted,
             @Param("cutoff") LocalDateTime cutoff,
             @Param("startOfToday") LocalDateTime startOfToday);
+
+    /**
+     * SLD 미제출 리마인더 후보 (SldReminderScheduler).
+     * <p>조건:
+     * <ul>
+     *   <li>{@code status = COMPLETED} + {@code license_status = ACTIVE} — 발급 완료·유효 라이선스.</li>
+     *   <li>{@code assigned_lew IS NOT NULL} — 수신자(담당 LEW)가 있어야 함.</li>
+     *   <li>{@code :windowEnd <= license_issued_at <= :windowStart} — 발급 후 2~3개월 구간.</li>
+     *   <li>{@code sld_reminder_notified_at IS NULL OR < :dedupeBefore} — 최근(주1회) 미발송.</li>
+     * </ul>
+     * SLD 존재 여부(DRAWING_SLD 파일 유무)는 스케줄러가 루프에서 별도 필터한다.
+     * windowStart=now-2개월, windowEnd=now-3개월, dedupeBefore=now-6일 (스케줄러가 계산).
+     */
+    @Query("SELECT a FROM Application a WHERE a.status = :completed "
+            + "AND a.licenseStatus = :active "
+            + "AND a.assignedLew IS NOT NULL "
+            + "AND a.licenseIssuedAt IS NOT NULL "
+            + "AND a.licenseIssuedAt <= :windowStart "
+            + "AND a.licenseIssuedAt >= :windowEnd "
+            + "AND (a.sldReminderNotifiedAt IS NULL OR a.sldReminderNotifiedAt < :dedupeBefore)")
+    List<Application> findSldReminderCandidates(
+            @Param("completed") ApplicationStatus completed,
+            @Param("active") LicenseStatus active,
+            @Param("windowStart") LocalDateTime windowStart,
+            @Param("windowEnd") LocalDateTime windowEnd,
+            @Param("dedupeBefore") LocalDateTime dedupeBefore);
 }

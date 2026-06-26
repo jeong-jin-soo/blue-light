@@ -14,7 +14,7 @@ import { AdminSldSection } from '../admin/sections/AdminSldSection';
 import { LewLoaExchangeSection } from './sections/LewLoaExchangeSection';
 import { LewConfirmationSummary } from './sections/LewConfirmationSummary';
 import { AdminEmaSection } from '../admin/sections/AdminEmaSection';
-import { CompleteModal } from '../admin/sections/AdminModals';
+import { CompleteModal, type CompleteForm } from '../admin/sections/AdminModals';
 import { LewDocumentReviewSection } from '../../components/document/LewDocumentReviewSection';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../../components/ui/Modal';
@@ -98,7 +98,8 @@ export default function LewReviewFormPage() {
   // ── EMA 제출 추적 (ema-submission-tracking-spec.md §8) ──
   const ema = useEmaActions(applicationId);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
-  const [completeForm, setCompleteForm] = useState({ licenseNumber: '', licenseExpiryDate: '' });
+  const [completeForm, setCompleteForm] = useState<CompleteForm>({ licenseNumber: '', licenseExpiryDate: '', licenseIssuedDate: '' });
+  const [parsingLicense, setParsingLicense] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [startingProcessing, setStartingProcessing] = useState(false);
 
@@ -255,13 +256,39 @@ export default function LewReviewFormPage() {
   }, [adminApp?.applicationSeq, adminApp?.status]);
 
   // Complete & Issue Licence — 게이트(ema=APPROVED + LICENSE_PDF)는 백엔드가 강제.
+  // 라이선스 PDF 업로드 → AI 파싱 → 완료 폼 프리필 (번호/발급일/만료일, LEW 검토·수정).
+  const handleLicenseUpload = useCallback(async (file: File) => {
+    setParsingLicense(true);
+    try {
+      await adminApi.uploadFile(applicationId, file, 'LICENSE_PDF');
+      try {
+        const parsed = await adminApi.parseLicense(applicationId);
+        setCompleteForm((prev) => ({
+          licenseNumber: parsed.licenseNumber || prev.licenseNumber,
+          licenseExpiryDate: parsed.expiryDate || prev.licenseExpiryDate,
+          licenseIssuedDate: parsed.issueDate || prev.licenseIssuedDate,
+        }));
+        toast.success('Licence read — please review the fields');
+      } catch {
+        // 파싱 실패해도 업로드는 정상 — LEW 가 번호·만료일을 직접 입력하면 발급 가능.
+        toast.warning('Licence uploaded. Couldn’t auto-read it — please enter the licence number and expiry date manually.');
+      }
+      await loadData(); // 파일 목록 갱신 → licenseUploaded 반영(파싱 결과와 무관)
+    } catch {
+      toast.error('Failed to upload the licence file');
+    } finally {
+      setParsingLicense(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicationId, loadData, toast]);
+
   const handleComplete = useCallback(async () => {
     setCompleting(true);
     try {
       await adminApi.completeApplication(applicationId, completeForm);
       toast.success('Licence issued. The application is now complete.');
       setShowCompleteModal(false);
-      setCompleteForm({ licenseNumber: '', licenseExpiryDate: '' });
+      setCompleteForm({ licenseNumber: '', licenseExpiryDate: '', licenseIssuedDate: '' });
       await loadData();
       await ema.refresh();
     } catch (err: unknown) {
@@ -595,7 +622,8 @@ export default function LewReviewFormPage() {
                   actionLoading={actionLoading}
                   existingSldFiles={files.filter((f) => f.fileType === 'DRAWING_SLD')}
                   onFileDelete={handleFileDelete}
-                  readOnly={isTerminal}
+                  /* SLD 는 완료(종결) 후에도 업로드/확정 가능 — 쓰기잠금 예외(2026-06-26). */
+                  readOnly={false}
                 />
               ) : (
                 <InfoBox variant="info">
@@ -782,6 +810,9 @@ export default function LewReviewFormPage() {
         completeForm={completeForm}
         setCompleteForm={setCompleteForm}
         loading={completing}
+        onUploadLicense={handleLicenseUpload}
+        licenseUploaded={files.some((f) => f.fileType === 'LICENSE_PDF')}
+        parsing={parsingLicense}
       />
 
       {/* ───────────────────────────────────────────────────────────────────

@@ -342,19 +342,9 @@ public class AdminApplicationService {
                     HttpStatus.BAD_REQUEST, "LICENSE_PDF_MISSING");
         }
 
-        // ── D-5 발급 게이트 (sld-lew-conversion-fee-spec.md §8): REQUEST_LEW 면 SLD 가 CONFIRMED 여야 한다.
-        //    (LEW 작성 SLD 요금을 청구한 이상, SLD 없이 발급되는 공백을 차단.)
-        if (application.getSldOption() == com.bluelight.backend.domain.application.SldOption.REQUEST_LEW) {
-            boolean sldConfirmed = sldRequestRepository
-                    .findByApplicationApplicationSeq(applicationSeq)
-                    .map(sr -> sr.getStatus() == com.bluelight.backend.domain.application.SldRequestStatus.CONFIRMED)
-                    .orElse(false);
-            if (!sldConfirmed) {
-                throw new BusinessException(
-                        "The LEW-created SLD must be confirmed before completion",
-                        HttpStatus.CONFLICT, "SLD_NOT_CONFIRMED");
-            }
-        }
+        // ── SLD 발급 게이트 제거 (2026-06-26): SLD 가 등록/확정되지 않아도 라이선스 발급·완료 허용.
+        //    SLD 는 완료의 전제가 아니며, 완료 이후에도 LEW 가 업로드할 수 있다(AdminSldService 종결 가드 없음).
+        //    단, 이미 청구된 SLD 보충요금(SLD_ADDED)의 정산 게이트(D-6)는 금전 무결성 차원에서 유지한다.
 
         // ── D-6 정산 게이트 (sld-lew-conversion-fee-spec.md §8): 미정산(PENDING) SLD 보충 청구가 있으면 차단.
         if (kvaAdjustmentRepository.existsByApplication_ApplicationSeqAndAdjustmentTypeAndAdminPaymentAdjustment(
@@ -367,7 +357,8 @@ public class AdminApplicationService {
         }
 
         ApplicationStatus previousStatus = application.getStatus();
-        application.issueLicense(request.getLicenseNumber(), request.getLicenseExpiryDate());
+        application.issueLicense(request.getLicenseNumber(), request.getLicenseExpiryDate(),
+                request.getLicenseIssuedDate());
 
         log.info("Application completed: applicationSeq={}, licenseNumber={}, expiryDate={}",
                 applicationSeq, request.getLicenseNumber(), request.getLicenseExpiryDate());

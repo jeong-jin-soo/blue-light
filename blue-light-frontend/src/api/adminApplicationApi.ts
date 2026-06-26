@@ -273,6 +273,21 @@ export const completeApplication = async (
   return response.data;
 };
 
+/** 라이선스 PDF 파싱 결과 — 추출 못한 필드는 null (LEW 검토·수정용 프리필). */
+export interface LicenseParseResult {
+  licenseNumber: string | null;
+  issueDate: string | null;   // ISO YYYY-MM-DD
+  expiryDate: string | null;  // ISO YYYY-MM-DD
+}
+
+/** 업로드된 LICENSE_PDF 를 AI 로 파싱해 번호·발급일·만료일을 추출(완료 폼 프리필). */
+export const parseLicense = async (id: number): Promise<LicenseParseResult> => {
+  const response = await axiosClient.post<LicenseParseResult>(
+    `/admin/applications/${id}/license/parse`
+  );
+  return response.data;
+};
+
 // ── Payments ──────────────────────────────
 
 export const confirmPayment = async (

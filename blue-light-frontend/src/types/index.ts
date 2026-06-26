@@ -734,6 +734,8 @@ export interface UpdateStatusRequest {
 export interface CompleteApplicationRequest {
   licenseNumber: string;
   licenseExpiryDate: string;
+  /** 라이선스 발급일 (라이선스 PDF에서 추출/수정). 비면 발급 처리 시각으로 기록. */
+  licenseIssuedDate?: string;
 }
 
 /**

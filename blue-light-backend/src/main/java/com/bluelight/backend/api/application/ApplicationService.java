@@ -964,8 +964,7 @@ public class ApplicationService {
 
         OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
-        // 종결(COMPLETED/EXPIRED) 건은 SLD 요청 생성 차단 — ADMIN reopen 후에만 가능
-        application.assertModifiable();
+        // SLD 는 완료 쓰기잠금 대상에서 제외 — 종결 후에도 SLD 요청/업로드 허용(2026-06-26).
 
         // 중복 체크
         if (sldRequestRepository.findByApplicationApplicationSeq(applicationSeq).isPresent()) {
@@ -1010,8 +1009,7 @@ public class ApplicationService {
 
         OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
 
-        // 종결(COMPLETED/EXPIRED) 건은 SLD 요청 수정 차단 — ADMIN reopen 후에만 가능
-        application.assertModifiable();
+        // SLD 는 완료 쓰기잠금 대상에서 제외 — 종결 후에도 SLD 요청 수정 허용(2026-06-26).
 
         SldRequest sldRequest = sldRequestRepository.findByApplicationApplicationSeq(applicationSeq)
                 .orElseThrow(() -> new BusinessException(

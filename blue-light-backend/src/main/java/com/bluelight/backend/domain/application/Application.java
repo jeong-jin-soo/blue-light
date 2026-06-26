@@ -110,6 +110,18 @@ public class Application extends BaseEntity {
     private LocalDate licenseExpiryDate;
 
     /**
+     * 라이선스 발급 시각 (issueLicense 시점). SLD 미제출 리마인더의 발급 후 경과 개월 계산 기준.
+     */
+    @Column(name = "license_issued_at")
+    private LocalDateTime licenseIssuedAt;
+
+    /**
+     * SLD 미제출 리마인더 마지막 발송 시각 — 주기(주1회) 중복 발송 가드(SldReminderScheduler).
+     */
+    @Column(name = "sld_reminder_notified_at")
+    private LocalDateTime sldReminderNotifiedAt;
+
+    /**
      * LEW 리뷰 코멘트 (보완 요청 사유)
      */
     @Column(name = "review_comment", columnDefinition = "TEXT")
@@ -910,11 +922,28 @@ public class Application extends BaseEntity {
      * 라이선스 발급 — 신청을 COMPLETED 로 종결하고 라이선스를 ACTIVE 로 발급한다.
      */
     public void issueLicense(String licenseNumber, LocalDate expiryDate) {
+        issueLicense(licenseNumber, expiryDate, null);
+    }
+
+    /**
+     * 라이선스 발급 — 발급일({@code issuedDate})을 명시할 수 있다(LEW 가 라이선스 PDF 에서 확인).
+     * null 이면 발급 처리 시각(now)을 기록한다. 발급일은 SLD 미제출 리마인더의 발급-경과 기준.
+     */
+    public void issueLicense(String licenseNumber, LocalDate expiryDate, LocalDate issuedDate) {
         this.licenseNumber = licenseNumber;
         this.licenseExpiryDate = expiryDate;
         this.status = ApplicationStatus.COMPLETED;
         this.licenseStatus = LicenseStatus.ACTIVE;
+        this.licenseIssuedAt = issuedDate != null ? issuedDate.atStartOfDay() : LocalDateTime.now();
         this.expiryNotifiedAt = null; // 재발급 시 만료 임박 알림 재발화
+        this.sldReminderNotifiedAt = null; // 재발급 시 SLD 리마인더 주기 리셋
+    }
+
+    /**
+     * SLD 미제출 리마인더 발송 기록 — 주기(주1회) 중복 발송 가드(SldReminderScheduler).
+     */
+    public void markSldReminderNotified() {
+        this.sldReminderNotifiedAt = LocalDateTime.now();
     }
 
     /**
