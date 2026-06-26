@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin;
 import com.bluelight.backend.api.admin.dto.LicenseParseResponse;
 import com.bluelight.backend.api.file.FileStorageService;
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.config.GeminiConfig;
 import com.bluelight.backend.domain.file.FileEntity;
 import com.bluelight.backend.domain.file.FileRepository;
 import com.bluelight.backend.domain.file.FileType;
@@ -33,6 +34,7 @@ public class LicenseParseService {
     private final WebClient sldAgentWebClient;
     private final FileRepository fileRepository;
     private final FileStorageService fileStorageService;
+    private final GeminiConfig geminiConfig;
 
     /**
      * 신청의 최신 LICENSE_PDF 를 AI 서비스로 파싱한다.
@@ -64,11 +66,17 @@ public class LicenseParseService {
             mimeType = "application/pdf";
         }
 
-        Map<String, Object> body = Map.of(
-                "attached_file", Map.of(
-                        "filename", filename,
-                        "content_base64", Base64.getEncoder().encodeToString(bytes),
-                        "mime_type", mimeType));
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("attached_file", Map.of(
+                "filename", filename,
+                "content_base64", Base64.getEncoder().encodeToString(bytes),
+                "mime_type", mimeType));
+        // DB(system_settings.gemini_api_key, sysadmin 설정) 우선 키를 전달 — AI 서비스 env 폴백 방지.
+        // (SLD 호출과 동일 규약: GeminiConfig.getApiKey() = DB 오버라이드 > 환경변수)
+        String apiKey = geminiConfig.getApiKey();
+        if (apiKey != null && !apiKey.isBlank()) {
+            body.put("api_key", apiKey);
+        }
 
         try {
             @SuppressWarnings("unchecked")
