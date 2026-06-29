@@ -114,7 +114,13 @@ public class AuditAspect {
             RequestParam rp = params[i].getAnnotation(RequestParam.class);
             if (rp != null) {
                 String name = rp.value().isEmpty() ? params[i].getName() : rp.value();
-                queryParams.put(name, args[i]);
+                // 멀티파트 파일(바이너리)은 JSON 직렬화하면 깨진 JSON → audit_logs.after_value INSERT 실패.
+                // 파일명만 기록한다(업로드 식별엔 충분).
+                Object value = args[i];
+                if (value instanceof org.springframework.web.multipart.MultipartFile mf) {
+                    value = mf.getOriginalFilename();
+                }
+                queryParams.put(name, value);
             }
         }
 

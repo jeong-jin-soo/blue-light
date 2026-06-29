@@ -184,10 +184,9 @@ public class LoaService {
         Application application = findApplicationOrThrow(applicationSeq);
 
         // 접근 권한 검증: Admin 전체 / LEW는 담당 신청서만 / Applicant는 본인 소유만
-        Long assignedLewSeq = application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq() : null;
+        Long assignedLewSeq = OwnershipValidator.userSeqOrNull(application.getAssignedLew());
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                application.getUser().getUserSeq(), userSeq, role, assignedLewSeq);
+                OwnershipValidator.userSeqOrNull(application.getUser()), userSeq, role, assignedLewSeq);
 
         return buildStatus(application);
     }

@@ -111,11 +111,9 @@ public class DocumentRequestService {
                         "APPLICATION_NOT_FOUND"));
 
         // (1) Ownership / LEW / Admin
-        Long assignedLewSeq = application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq()
-                : null;
+        Long assignedLewSeq = OwnershipValidator.userSeqOrNull(application.getAssignedLew());
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                application.getUser().getUserSeq(),
+                OwnershipValidator.userSeqOrNull(application.getUser()),
                 requestorSeq,
                 requestorRole,
                 assignedLewSeq);
@@ -165,7 +163,7 @@ public class DocumentRequestService {
         // (6-1) 신청자(또는 ADMIN 대리)가 LoA(Letter of Appointment)를 자발 업로드하면 신원 스냅샷을 기록한다.
         //       신청자 LoA 는 Documents 트랙(OWNER_AUTH_LETTER 파일)으로만 추적되며 loaStage 는 건드리지 않는다
         //       (loaStage 는 LEW 최종본 전용). LEW 자발 업로드는 스냅샷 대상에서 제외.
-        boolean isOwner = application.getUser().getUserSeq().equals(requestorSeq);
+        boolean isOwner = requestorSeq.equals(OwnershipValidator.userSeqOrNull(application.getUser()));
         if ("LOA".equals(catalog.getCode()) && (isOwner || OwnershipValidator.isAdmin(requestorRole))) {
             User applicant = application.getUser();
             application.recordLoaSnapshot(
@@ -192,11 +190,9 @@ public class DocumentRequestService {
                         HttpStatus.NOT_FOUND,
                         "APPLICATION_NOT_FOUND"));
 
-        Long assignedLewSeq = application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq()
-                : null;
+        Long assignedLewSeq = OwnershipValidator.userSeqOrNull(application.getAssignedLew());
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                application.getUser().getUserSeq(), requestorSeq, requestorRole, assignedLewSeq);
+                OwnershipValidator.userSeqOrNull(application.getUser()), requestorSeq, requestorRole, assignedLewSeq);
 
         List<DocumentRequest> rows = (statusFilter == null)
                 ? documentRequestRepository.findByApplicationApplicationSeqOrderByCreatedAtAsc(applicationSeq)
@@ -226,11 +222,9 @@ public class DocumentRequestService {
         }
 
         Application application = dr.getApplication();
-        Long assignedLewSeq = application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq()
-                : null;
+        Long assignedLewSeq = OwnershipValidator.userSeqOrNull(application.getAssignedLew());
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                application.getUser().getUserSeq(), requestorSeq, requestorRole, assignedLewSeq);
+                OwnershipValidator.userSeqOrNull(application.getUser()), requestorSeq, requestorRole, assignedLewSeq);
 
         // 종결(COMPLETED/EXPIRED) 건은 삭제 차단 — ADMIN reopen 후에만 가능
         application.assertModifiable();
@@ -404,7 +398,7 @@ public class DocumentRequestService {
         Application application = dr.getApplication();
         // 신청자 본인 또는 ADMIN/SYSTEM_ADMIN 만 fulfill 허용 (admin 대리 업로드 허용 — admin parity).
         // LEW 는 fulfill 불가(검토/요청만) → AC-P2 규칙에 따라 404(정보 누설 방지).
-        boolean isOwner = application.getUser().getUserSeq().equals(requestorSeq);
+        boolean isOwner = requestorSeq.equals(OwnershipValidator.userSeqOrNull(application.getUser()));
         if (!isOwner && !OwnershipValidator.isAdmin(requestorRole)) {
             throw new BusinessException("Document request not found",
                     HttpStatus.NOT_FOUND, "DOCUMENT_REQUEST_NOT_FOUND");
@@ -517,8 +511,7 @@ public class DocumentRequestService {
             return;
         }
         if ("ROLE_LEW".equals(requestorRole)) {
-            if (application.getAssignedLew() != null
-                    && application.getAssignedLew().getUserSeq().equals(requestorSeq)) {
+            if (requestorSeq.equals(OwnershipValidator.userSeqOrNull(application.getAssignedLew()))) {
                 return;
             }
         }

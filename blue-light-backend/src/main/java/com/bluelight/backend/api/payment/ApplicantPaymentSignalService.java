@@ -97,7 +97,7 @@ public class ApplicantPaymentSignalService {
                 .orElseThrow(() -> new BusinessException(
                         "Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
-        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
+        OwnershipValidator.validateOwner(OwnershipValidator.userSeqOrNull(application.getUser()), userSeq);
 
         if (application.getStatus() != ApplicationStatus.PENDING_PAYMENT) {
             throw new BusinessException(

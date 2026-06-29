@@ -1,6 +1,9 @@
 package com.bluelight.backend.common.util;
 
 import com.bluelight.backend.common.exception.BusinessException;
+import com.bluelight.backend.domain.user.User;
+import jakarta.persistence.EntityNotFoundException;
+import org.hibernate.ObjectNotFoundException;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -14,14 +17,30 @@ public final class OwnershipValidator {
     }
 
     /**
+     * 프록시 사용자의 userSeq 를 안전하게 반환한다. 참조 사용자가 소프트삭제(@SQLRestriction)되거나
+     * 물리삭제돼 프록시 초기화가 실패하면 null 을 돌려준다(소유권 비교에서 null=불일치로 처리됨).
+     * <p>삭제된 사용자를 참조하는 신청/주문의 권한검증·DTO 변환이 500 으로 깨지는 것을 막는다.</p>
+     */
+    public static Long userSeqOrNull(User user) {
+        if (user == null) {
+            return null;
+        }
+        try {
+            return user.getUserSeq(); // 프록시면 초기화 유발 — 행 없으면 throw
+        } catch (EntityNotFoundException | ObjectNotFoundException e) {
+            return null;
+        }
+    }
+
+    /**
      * 소유권 검증 (단순 비교)
-     * - 리소스 소유자와 요청자가 다르면 FORBIDDEN 예외
+     * - 리소스 소유자와 요청자가 다르면(또는 소유자가 null=삭제) FORBIDDEN 예외
      *
-     * @param ownerSeq  리소스 소유자 userSeq
+     * @param ownerSeq  리소스 소유자 userSeq (삭제된 소유자면 null)
      * @param requestorSeq 요청자 userSeq
      */
     public static void validateOwner(Long ownerSeq, Long requestorSeq) {
-        if (!ownerSeq.equals(requestorSeq)) {
+        if (ownerSeq == null || !ownerSeq.equals(requestorSeq)) {
             throw new BusinessException("Access denied", HttpStatus.FORBIDDEN, "ACCESS_DENIED");
         }
     }

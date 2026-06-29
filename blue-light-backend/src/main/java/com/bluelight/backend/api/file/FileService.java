@@ -49,7 +49,7 @@ public class FileService {
                 .orElseThrow(() -> new BusinessException("Application not found", HttpStatus.NOT_FOUND, "APPLICATION_NOT_FOUND"));
 
         // Verify ownership (applicant)
-        OwnershipValidator.validateOwner(application.getUser().getUserSeq(), userSeq);
+        OwnershipValidator.validateOwner(OwnershipValidator.userSeqOrNull(application.getUser()), userSeq);
 
         // Validate file extension
         validateFileExtension(file.getOriginalFilename());
@@ -110,7 +110,7 @@ public class FileService {
 
         // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                application.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(application));
+                OwnershipValidator.userSeqOrNull(application.getUser()), userSeq, role, getAssignedLewSeq(application));
 
         return fileRepository.findByApplicationApplicationSeq(applicationSeq)
                 .stream()
@@ -128,7 +128,7 @@ public class FileService {
         // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
         Application application = fileEntity.getApplication();
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                application.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(application));
+                OwnershipValidator.userSeqOrNull(application.getUser()), userSeq, role, getAssignedLewSeq(application));
 
         return fileStorageService.loadAsResource(fileEntity.getFileUrl());
     }
@@ -143,7 +143,7 @@ public class FileService {
         // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
         Application app = fileEntity.getApplication();
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                app.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(app));
+                OwnershipValidator.userSeqOrNull(app.getUser()), userSeq, role, getAssignedLewSeq(app));
 
         return fileEntity;
     }
@@ -159,7 +159,7 @@ public class FileService {
         // Admin: 전체 접근 / LEW: 자신에게 할당된 신청서만 / Applicant: 본인 소유만
         Application delApp = fileEntity.getApplication();
         OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
-                delApp.getUser().getUserSeq(), userSeq, role, getAssignedLewSeq(delApp));
+                OwnershipValidator.userSeqOrNull(delApp.getUser()), userSeq, role, getAssignedLewSeq(delApp));
 
         // Delete from disk
         fileStorageService.delete(fileEntity.getFileUrl());
@@ -173,9 +173,7 @@ public class FileService {
      * 신청서에 할당된 LEW의 userSeq 반환 (없으면 null)
      */
     private Long getAssignedLewSeq(Application application) {
-        return application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq()
-                : null;
+        return OwnershipValidator.userSeqOrNull(application.getAssignedLew());
     }
 
     private void validateFileExtension(String filename) {

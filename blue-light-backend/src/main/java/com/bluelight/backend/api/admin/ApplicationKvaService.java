@@ -82,9 +82,8 @@ public class ApplicationKvaService {
 
         // AC-A2: 권한(소유권) 체크 — ADMIN/SYSTEM_ADMIN 통과, LEW 는 assignedLew 일치 시만 통과.
         // 추가 발견(NPE): ownerSeq 에 application.user.userSeq 를 실제 값으로 전달한다.
-        Long ownerSeq = application.getUser() != null ? application.getUser().getUserSeq() : null;
-        Long assignedLewSeq = application.getAssignedLew() != null
-                ? application.getAssignedLew().getUserSeq() : null;
+        Long ownerSeq = OwnershipValidator.userSeqOrNull(application.getUser());
+        Long assignedLewSeq = OwnershipValidator.userSeqOrNull(application.getAssignedLew());
         try {
             OwnershipValidator.validateOwnerOrAdminOrAssignedLew(
                     ownerSeq, actorSeq, role, assignedLewSeq);
@@ -243,8 +242,7 @@ public class ApplicationKvaService {
 
     private void notifyApplicant(Application application, Integer newKva, BigDecimal newQuote) {
         try {
-            Long recipientSeq = application.getUser() != null
-                    ? application.getUser().getUserSeq() : null;
+            Long recipientSeq = OwnershipValidator.userSeqOrNull(application.getUser());
             if (recipientSeq == null) {
                 return;
             }
