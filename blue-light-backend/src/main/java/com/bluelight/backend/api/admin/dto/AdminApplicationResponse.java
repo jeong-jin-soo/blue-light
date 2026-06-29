@@ -3,6 +3,7 @@ package com.bluelight.backend.api.admin.dto;
 import com.bluelight.backend.domain.application.Application;
 import com.bluelight.backend.domain.application.ApplicationStatus;
 import com.bluelight.backend.domain.application.LicenseStatus;
+import com.bluelight.backend.domain.user.User;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -95,6 +96,13 @@ public class AdminApplicationResponse {
     private boolean emaGrandfathered;   // 허점#2 — backfill APPROVED legacy 건 식별 (status==APPROVED && decisionAt==null && referenceNo==null)
 
     public static AdminApplicationResponse from(Application application) {
+        // 신청이 소프트삭제(@SQLRestriction deleted_at IS NULL)되거나 물리삭제된 사용자를 참조하면
+        // 프록시 초기화가 EntityNotFoundException 으로 터진다. seq(ID)는 프록시에서 안전하게 읽되,
+        // 이름/이메일 등은 초기화 성공 시에만 채워(삭제된 사용자는 null) 목록 전체가 깨지지 않게 한다.
+        User applicant = resolveOrNull(application.getUser());
+        Long applicantSeq = application.getUser() != null ? application.getUser().getUserSeq() : null;
+        User lew = resolveOrNull(application.getAssignedLew());
+        Long lewSeq = application.getAssignedLew() != null ? application.getAssignedLew().getUserSeq() : null;
         return AdminApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
                 .address(application.getAddress())
@@ -109,35 +117,29 @@ public class AdminApplicationResponse {
                 .reviewComment(application.getReviewComment())
                 .createdAt(application.getCreatedAt())
                 .updatedAt(application.getUpdatedAt())
-                .userSeq(application.getUser().getUserSeq())
-                .userFirstName(application.getUser().getFirstName())
-                .userLastName(application.getUser().getLastName())
-                .userEmail(application.getUser().getEmail())
-                .userPhone(application.getUser().getPhone())
-                .userCompanyName(application.getUser().getCompanyName())
-                .userUen(application.getUser().getUen())
-                .userDesignation(application.getUser().getDesignation())
-                .userCorrespondenceAddress(application.getUser().getCorrespondenceAddress())
-                .userCorrespondencePostalCode(application.getUser().getCorrespondencePostalCode())
-                .assignedLewSeq(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getUserSeq() : null)
-                .assignedLewFirstName(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getFirstName() : null)
-                .assignedLewLastName(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getLastName() : null)
-                .assignedLewEmail(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getEmail() : null)
-                .assignedLewLicenceNo(application.getAssignedLew() != null
-                        ? application.getAssignedLew().getLewLicenceNo() : null)
-                .assignedLewGrade(application.getAssignedLew() != null && application.getAssignedLew().getLewGrade() != null
-                        ? application.getAssignedLew().getLewGrade().name() : null)
-                .assignedLewMaxKva(application.getAssignedLew() != null && application.getAssignedLew().getLewGrade() != null
-                        ? application.getAssignedLew().getLewGrade().getMaxKva() : null)
+                .userSeq(applicantSeq)
+                .userFirstName(applicant != null ? applicant.getFirstName() : null)
+                .userLastName(applicant != null ? applicant.getLastName() : null)
+                .userEmail(applicant != null ? applicant.getEmail() : null)
+                .userPhone(applicant != null ? applicant.getPhone() : null)
+                .userCompanyName(applicant != null ? applicant.getCompanyName() : null)
+                .userUen(applicant != null ? applicant.getUen() : null)
+                .userDesignation(applicant != null ? applicant.getDesignation() : null)
+                .userCorrespondenceAddress(applicant != null ? applicant.getCorrespondenceAddress() : null)
+                .userCorrespondencePostalCode(applicant != null ? applicant.getCorrespondencePostalCode() : null)
+                .assignedLewSeq(lewSeq)
+                .assignedLewFirstName(lew != null ? lew.getFirstName() : null)
+                .assignedLewLastName(lew != null ? lew.getLastName() : null)
+                .assignedLewEmail(lew != null ? lew.getEmail() : null)
+                .assignedLewLicenceNo(lew != null ? lew.getLewLicenceNo() : null)
+                .assignedLewGrade(lew != null && lew.getLewGrade() != null
+                        ? lew.getLewGrade().name() : null)
+                .assignedLewMaxKva(lew != null && lew.getLewGrade() != null
+                        ? lew.getLewGrade().getMaxKva() : null)
                 // #5: 배정 LEW 등급이 현재 kVA 를 못 다루면 경고 플래그 (파생 — 항상 최신 상태)
-                .assignedLewGradeMismatch(application.getAssignedLew() != null
-                        && application.getAssignedLew().getLewGrade() != null
+                .assignedLewGradeMismatch(lew != null && lew.getLewGrade() != null
                         && application.getSelectedKva() != null
-                        && !application.getAssignedLew().canHandleKva(application.getSelectedKva()))
+                        && !lew.canHandleKva(application.getSelectedKva()))
                 // SP Account
                 .spAccountNo(application.getSpAccountNo())
                 // Phase 18 fields
@@ -176,6 +178,23 @@ public class AdminApplicationResponse {
      * 허점#2 — backfill grandfathered 식별: APPROVED 인데 결정시각·접수번호가 둘 다 비어있는 건.
      * 정상 승인 건은 둘 중 하나 이상 채워져 있어 false. {@code EmaSubmissionResponse.of} 와 동일 정의.
      */
+    /**
+     * 프록시 사용자를 초기화하되, 참조 행이 없으면(소프트삭제/물리삭제) null 을 돌려준다.
+     * 삭제된 사용자를 참조하는 단 한 건이 목록 전체를 500 으로 깨뜨리는 것을 막는다.
+     */
+    private static com.bluelight.backend.domain.user.User resolveOrNull(
+            com.bluelight.backend.domain.user.User proxy) {
+        if (proxy == null) {
+            return null;
+        }
+        try {
+            org.hibernate.Hibernate.initialize(proxy);
+            return proxy;
+        } catch (jakarta.persistence.EntityNotFoundException | org.hibernate.ObjectNotFoundException e) {
+            return null;
+        }
+    }
+
     private static boolean isEmaGrandfathered(Application application) {
         return application.getEmaSubmissionStatus() == com.bluelight.backend.domain.application.EmaSubmissionStatus.APPROVED
                 && application.getEmaDecisionAt() == null
