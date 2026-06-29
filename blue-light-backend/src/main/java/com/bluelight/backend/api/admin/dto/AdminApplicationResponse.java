@@ -97,12 +97,15 @@ public class AdminApplicationResponse {
 
     public static AdminApplicationResponse from(Application application) {
         // 신청이 소프트삭제(@SQLRestriction deleted_at IS NULL)되거나 물리삭제된 사용자를 참조하면
-        // 프록시 초기화가 EntityNotFoundException 으로 터진다. seq(ID)는 프록시에서 안전하게 읽되,
-        // 이름/이메일 등은 초기화 성공 시에만 채워(삭제된 사용자는 null) 목록 전체가 깨지지 않게 한다.
+        // 프록시 접근(getUserSeq 포함 — ID getter 도 초기화를 유발)이 EntityNotFoundException 으로 터진다.
+        // resolveOrNull 안에서만 프록시를 만지고(catch), 그 밖에서는 raw 프록시를 절대 건드리지 않는다.
+        // 삭제된 사용자는 seq·이름 모두 null 로 렌더해 목록 전체가 깨지지 않게 한다.
         User applicant = resolveOrNull(application.getUser());
-        Long applicantSeq = application.getUser() != null ? application.getUser().getUserSeq() : null;
+        Long applicantSeq = applicant != null ? applicant.getUserSeq() : null;
         User lew = resolveOrNull(application.getAssignedLew());
-        Long lewSeq = application.getAssignedLew() != null ? application.getAssignedLew().getUserSeq() : null;
+        Long lewSeq = lew != null ? lew.getUserSeq() : null;
+        User kvaConfirmedByUser = resolveOrNull(application.getKvaConfirmedBy());
+        Application originalApp = resolveOrNull(application.getOriginalApplication());
         return AdminApplicationResponse.builder()
                 .applicationSeq(application.getApplicationSeq())
                 .address(application.getAddress())
@@ -146,8 +149,7 @@ public class AdminApplicationResponse {
                 .applicationType(application.getApplicationType().name())
                 .sldFee(application.getSldFee())
                 .calloutFee(application.getCalloutFee())
-                .originalApplicationSeq(application.getOriginalApplication() != null
-                        ? application.getOriginalApplication().getApplicationSeq() : null)
+                .originalApplicationSeq(originalApp != null ? originalApp.getApplicationSeq() : null)
                 .existingLicenceNo(application.getExistingLicenceNo())
                 .renewalReferenceNo(application.getRenewalReferenceNo())
                 .existingExpiryDate(application.getExistingExpiryDate())
@@ -159,8 +161,7 @@ public class AdminApplicationResponse {
                 // Phase 5
                 .kvaStatus(application.getKvaStatus() != null ? application.getKvaStatus().name() : null)
                 .kvaSource(application.getKvaSource() != null ? application.getKvaSource().name() : null)
-                .kvaConfirmedBy(application.getKvaConfirmedBy() != null
-                        ? application.getKvaConfirmedBy().getUserSeq() : null)
+                .kvaConfirmedBy(kvaConfirmedByUser != null ? kvaConfirmedByUser.getUserSeq() : null)
                 .kvaConfirmedAt(application.getKvaConfirmedAt())
                 // ── EMA 제출 추적 inline ──
                 .emaSubmissionStatus(application.getEmaSubmissionStatus() != null
@@ -179,11 +180,12 @@ public class AdminApplicationResponse {
      * 정상 승인 건은 둘 중 하나 이상 채워져 있어 false. {@code EmaSubmissionResponse.of} 와 동일 정의.
      */
     /**
-     * 프록시 사용자를 초기화하되, 참조 행이 없으면(소프트삭제/물리삭제) null 을 돌려준다.
-     * 삭제된 사용자를 참조하는 단 한 건이 목록 전체를 500 으로 깨뜨리는 것을 막는다.
+     * 프록시(User/Application 등)를 초기화하되, 참조 행이 없으면(소프트삭제 @SQLRestriction/물리삭제)
+     * null 을 돌려준다. 삭제된 엔티티를 참조하는 단 한 건이 목록 전체를 500 으로 깨뜨리는 것을 막는다.
+     * <p>주의: 초기화 후에는 resolve 된 객체로만 필드(ID 포함)에 접근할 것 — raw 프록시의 getId 도
+     * 미초기화 시 EntityNotFoundException 을 던진다.</p>
      */
-    private static com.bluelight.backend.domain.user.User resolveOrNull(
-            com.bluelight.backend.domain.user.User proxy) {
+    private static <T> T resolveOrNull(T proxy) {
         if (proxy == null) {
             return null;
         }
