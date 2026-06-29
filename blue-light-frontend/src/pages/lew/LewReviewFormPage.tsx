@@ -100,6 +100,8 @@ export default function LewReviewFormPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completeForm, setCompleteForm] = useState<CompleteForm>({ licenseNumber: '', licenseExpiryDate: '', licenseIssuedDate: '' });
   const [parsingLicense, setParsingLicense] = useState(false);
+  // 업로드 성공 자체를 "업로드됨"의 근거로 — files(getFiles) 갱신이 실패/지연돼도 발급 버튼이 켜지게.
+  const [licenseUploadedLocal, setLicenseUploadedLocal] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [startingProcessing, setStartingProcessing] = useState(false);
 
@@ -261,6 +263,7 @@ export default function LewReviewFormPage() {
     setParsingLicense(true);
     try {
       await adminApi.uploadFile(applicationId, file, 'LICENSE_PDF');
+      setLicenseUploadedLocal(true); // 업로드 성공 → 발급 버튼 즉시 활성(getFiles 의존 X)
       try {
         const parsed = await adminApi.parseLicense(applicationId);
         setCompleteForm((prev) => ({
@@ -811,7 +814,7 @@ export default function LewReviewFormPage() {
         setCompleteForm={setCompleteForm}
         loading={completing}
         onUploadLicense={handleLicenseUpload}
-        licenseUploaded={files.some((f) => f.fileType === 'LICENSE_PDF')}
+        licenseUploaded={licenseUploadedLocal || files.some((f) => f.fileType === 'LICENSE_PDF')}
         parsing={parsingLicense}
       />
 

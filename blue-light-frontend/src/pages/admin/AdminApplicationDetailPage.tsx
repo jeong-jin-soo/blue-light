@@ -64,6 +64,8 @@ export default function AdminApplicationDetailPage() {
   const [paymentForm, setPaymentForm] = useState({ transactionId: '', paymentMethod: 'PayNow', receiptFile: null as File | null });
   const [completeForm, setCompleteForm] = useState<CompleteForm>({ licenseNumber: '', licenseExpiryDate: '', licenseIssuedDate: '' });
   const [parsingLicense, setParsingLicense] = useState(false);
+  // 업로드 성공 자체를 "업로드됨"의 근거로 — files(getFiles) 갱신이 실패/지연돼도 발급 버튼이 켜지게.
+  const [licenseUploadedLocal, setLicenseUploadedLocal] = useState(false);
   const [uploadFileType, setUploadFileType] = useState<FileType>('LICENSE_PDF');
 
   // LOA states (교환 모델 — Part B에서 admin 패널이 재사용 예정)
@@ -243,6 +245,7 @@ export default function AdminApplicationDetailPage() {
     setParsingLicense(true);
     try {
       await adminApi.uploadFile(applicationId, file, 'LICENSE_PDF');
+      setLicenseUploadedLocal(true); // 업로드 성공 → 발급 버튼 즉시 활성(getFiles 의존 X)
       try {
         const parsed = await adminApi.parseLicense(applicationId);
         setCompleteForm((prev) => ({
@@ -647,7 +650,7 @@ export default function AdminApplicationDetailPage() {
         onConfirm={handleComplete} completeForm={completeForm}
         setCompleteForm={setCompleteForm} loading={actionLoading}
         onUploadLicense={handleLicenseUpload}
-        licenseUploaded={files.some((f) => f.fileType === 'LICENSE_PDF')}
+        licenseUploaded={licenseUploadedLocal || files.some((f) => f.fileType === 'LICENSE_PDF')}
         parsing={parsingLicense}
       />
       <RevisionModal
