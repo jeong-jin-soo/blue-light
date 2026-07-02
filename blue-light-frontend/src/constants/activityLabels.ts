@@ -1,5 +1,5 @@
-// 신청 활동 타임라인 — 백엔드 AuditAction → 한국어 라벨/아이콘 매핑.
-// 백엔드 com.bluelight.backend.domain.audit.AuditAction 미러. 누락 액션은 getActivityMeta 가 폴백 처리.
+// Application activity timeline — maps backend AuditAction → display label/icon.
+// Mirrors com.bluelight.backend.domain.audit.AuditAction. Unmapped actions fall back via getActivityMeta.
 
 export interface ActivityMeta {
   label: string;
@@ -7,73 +7,73 @@ export interface ActivityMeta {
 }
 
 export const ACTIVITY_LABELS: Record<string, ActivityMeta> = {
-  // 신청 라이프사이클
-  APPLICATION_CREATED: { label: '신청서 생성', icon: '📝' },
-  APPLICATION_UPDATED: { label: '신청서 수정', icon: '✏️' },
-  APPLICATION_RESUBMITTED: { label: '신청서 재제출', icon: '🔁' },
-  APPLICATION_STATUS_CHANGE: { label: '상태 변경', icon: '🔀' },
-  APPLICATION_REVISION_REQUESTED: { label: '보완 요청', icon: '⏳' },
-  APPLICATION_APPROVED: { label: '결제 승인 (결제 요청)', icon: '✅' },
-  APPLICATION_COMPLETED: { label: '신청 완료 — 면허 발급', icon: '🏁' },
-  APPLICATION_REOPENED: { label: '완료 건 재개 (관리자)', icon: '🔓' },
-  APPLICATION_VIEWED_BY_LEW: { label: 'LEW 열람', icon: '👀' },
-  APPLICATION_PAYMENT_REQUESTED_BY_LEW: { label: 'LEW 결제 요청', icon: '💸' },
+  // Application lifecycle
+  APPLICATION_CREATED: { label: 'Application created', icon: '📝' },
+  APPLICATION_UPDATED: { label: 'Application updated', icon: '✏️' },
+  APPLICATION_RESUBMITTED: { label: 'Application resubmitted', icon: '🔁' },
+  APPLICATION_STATUS_CHANGE: { label: 'Status changed', icon: '🔀' },
+  APPLICATION_REVISION_REQUESTED: { label: 'Revision requested', icon: '⏳' },
+  APPLICATION_APPROVED: { label: 'Approved (payment requested)', icon: '✅' },
+  APPLICATION_COMPLETED: { label: 'Application completed — licence issued', icon: '🏁' },
+  APPLICATION_REOPENED: { label: 'Completed case reopened (admin)', icon: '🔓' },
+  APPLICATION_VIEWED_BY_LEW: { label: 'Viewed by LEW', icon: '👀' },
+  APPLICATION_PAYMENT_REQUESTED_BY_LEW: { label: 'Payment requested by LEW', icon: '💸' },
 
-  // 자동(스케줄러)
-  LICENSE_EXPIRED: { label: '면허 만료 (자동)', icon: '⌛' },
-  LICENSE_EXPIRY_WARNING_SENT: { label: '만료 임박 알림 발송 (자동)', icon: '🔔' },
+  // Automated (scheduler)
+  LICENSE_EXPIRED: { label: 'Licence expired (automatic)', icon: '⌛' },
+  LICENSE_EXPIRY_WARNING_SENT: { label: 'Expiry warning sent (automatic)', icon: '🔔' },
 
-  // LEW 배정
-  LEW_ASSIGNED: { label: 'LEW 배정', icon: '👷' },
-  LEW_UNASSIGNED: { label: 'LEW 배정 해제', icon: '🚫' },
+  // LEW assignment
+  LEW_ASSIGNED: { label: 'LEW assigned', icon: '👷' },
+  LEW_UNASSIGNED: { label: 'LEW unassigned', icon: '🚫' },
 
-  // 결제
-  PAYMENT_CONFIRMED: { label: '결제 확인', icon: '💳' },
-  MANUAL_PAYMENT_RECORDED: { label: '별도 수금 기록', icon: '💰' },
+  // Payment
+  PAYMENT_CONFIRMED: { label: 'Payment confirmed', icon: '💳' },
+  MANUAL_PAYMENT_RECORDED: { label: 'Manual payment recorded', icon: '💰' },
 
-  // 영수증
-  INVOICE_GENERATED: { label: '영수증 발행', icon: '🧾' },
-  INVOICE_REGENERATED: { label: '영수증 재발행', icon: '🧾' },
-  INVOICE_GENERATION_FAILED: { label: '영수증 발행 실패', icon: '⚠️' },
+  // Invoice
+  INVOICE_GENERATED: { label: 'Invoice generated', icon: '🧾' },
+  INVOICE_REGENERATED: { label: 'Invoice regenerated', icon: '🧾' },
+  INVOICE_GENERATION_FAILED: { label: 'Invoice generation failed', icon: '⚠️' },
 
-  // 파일
-  FILE_UPLOADED: { label: '파일 업로드', icon: '📎' },
-  FILE_DELETED: { label: '파일 삭제', icon: '🗑️' },
+  // File
+  FILE_UPLOADED: { label: 'File uploaded', icon: '📎' },
+  FILE_DELETED: { label: 'File deleted', icon: '🗑️' },
 
-  // 서류 요청
-  DOCUMENT_UPLOADED_VOLUNTARY: { label: '서류 자발 업로드', icon: '📎' },
-  DOCUMENT_DELETED_VOLUNTARY: { label: '서류 삭제', icon: '🗑️' },
-  DOCUMENT_REQUEST_CREATED: { label: '서류 요청 생성', icon: '📋' },
-  DOCUMENT_REQUEST_FULFILLED: { label: '서류 제출', icon: '📥' },
-  DOCUMENT_REQUEST_CANCELLED: { label: '서류 요청 취소', icon: '🚫' },
+  // Document request
+  DOCUMENT_UPLOADED_VOLUNTARY: { label: 'Document uploaded (voluntary)', icon: '📎' },
+  DOCUMENT_DELETED_VOLUNTARY: { label: 'Document deleted', icon: '🗑️' },
+  DOCUMENT_REQUEST_CREATED: { label: 'Document request created', icon: '📋' },
+  DOCUMENT_REQUEST_FULFILLED: { label: 'Document submitted', icon: '📥' },
+  DOCUMENT_REQUEST_CANCELLED: { label: 'Document request cancelled', icon: '🚫' },
 
   // LoA
-  LOA_SNAPSHOT_CREATED: { label: 'LoA 스냅샷 생성', icon: '📄' },
-  LOA_FORM_SENT: { label: 'LoA 폼 전달', icon: '📄' },
-  LOA_APPLICANT_UPLOADED: { label: '신청자 LoA 업로드', icon: '📄' },
-  LOA_FINAL_UPLOADED: { label: 'LEW 최종 LoA 업로드', icon: '📄' },
-  LOA_ADMIN_REPLACED: { label: 'LoA 파일 교체 (관리자)', icon: '♻️' },
+  LOA_SNAPSHOT_CREATED: { label: 'LoA snapshot created', icon: '📄' },
+  LOA_FORM_SENT: { label: 'LoA form sent', icon: '📄' },
+  LOA_APPLICANT_UPLOADED: { label: 'Applicant LoA uploaded', icon: '📄' },
+  LOA_FINAL_UPLOADED: { label: 'Final LoA uploaded by LEW', icon: '📄' },
+  LOA_ADMIN_REPLACED: { label: 'LoA file replaced (admin)', icon: '♻️' },
 
   // kVA
-  KVA_CONFIRMED_BY_LEW: { label: 'kVA 확정 (LEW)', icon: '⚡' },
-  KVA_OVERRIDDEN_BY_ADMIN: { label: 'kVA 변경 (관리자)', icon: '⚡' },
-  KVA_OVERRIDE_POSTPAYMENT: { label: '결제 후 kVA 변경', icon: '⚡' },
-  KVA_ADJUSTMENT_REQUESTED_BY_LEW: { label: 'kVA 조정 요청 (LEW)', icon: '⚡' },
-  KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE: { label: 'kVA 요청 처리 (override)', icon: '⚡' },
-  KVA_SETTLEMENT_MARKED: { label: 'kVA 정산 처리', icon: '🧾' },
-  KVA_SETTLEMENT_DENIED: { label: 'kVA 정산 거부', icon: '⚠️' },
+  KVA_CONFIRMED_BY_LEW: { label: 'kVA confirmed (LEW)', icon: '⚡' },
+  KVA_OVERRIDDEN_BY_ADMIN: { label: 'kVA overridden (admin)', icon: '⚡' },
+  KVA_OVERRIDE_POSTPAYMENT: { label: 'kVA changed after payment', icon: '⚡' },
+  KVA_ADJUSTMENT_REQUESTED_BY_LEW: { label: 'kVA adjustment requested (LEW)', icon: '⚡' },
+  KVA_LEW_REQUEST_RESOLVED_BY_OVERRIDE: { label: 'kVA request resolved (override)', icon: '⚡' },
+  KVA_SETTLEMENT_MARKED: { label: 'kVA settlement processed', icon: '🧾' },
+  KVA_SETTLEMENT_DENIED: { label: 'kVA settlement denied', icon: '⚠️' },
 
-  // EMA ELISE 제출 추적
-  EMA_SUBMITTED: { label: 'EMA 제출', icon: '📤' },
-  EMA_QUERY_RAISED: { label: 'EMA 질의 발생', icon: '❓' },
-  EMA_RESUBMITTED: { label: 'EMA 재제출', icon: '🔁' },
-  EMA_APPROVED: { label: 'EMA 승인', icon: '✅' },
-  EMA_REJECTED: { label: 'EMA 반려', icon: '⚠️' },
-  EMA_WITHDRAWN: { label: 'EMA 철회', icon: '↩️' },
-  EMA_DECISION_REVERTED: { label: 'EMA 결정 되돌림', icon: '↩️' },
+  // EMA ELISE submission tracking
+  EMA_SUBMITTED: { label: 'EMA submitted', icon: '📤' },
+  EMA_QUERY_RAISED: { label: 'EMA query raised', icon: '❓' },
+  EMA_RESUBMITTED: { label: 'EMA resubmitted', icon: '🔁' },
+  EMA_APPROVED: { label: 'EMA approved', icon: '✅' },
+  EMA_REJECTED: { label: 'EMA rejected', icon: '⚠️' },
+  EMA_WITHDRAWN: { label: 'EMA withdrawn', icon: '↩️' },
+  EMA_DECISION_REVERTED: { label: 'EMA decision reverted', icon: '↩️' },
 };
 
-/** AuditAction 문자열 → 라벨/아이콘. 미정의 액션은 enum 명을 보기 좋게 폴백. */
+/** AuditAction string → label/icon. Undefined actions fall back to a prettified enum name. */
 export function getActivityMeta(action: string): ActivityMeta {
   const found = ACTIVITY_LABELS[action];
   if (found) return found;

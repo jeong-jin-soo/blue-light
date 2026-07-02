@@ -12,17 +12,17 @@ import type { UserRole } from '../../constants/roles';
 
 interface Props {
   applicationSeq: number;
-  /** manual-payment / 상태변경 등 액션 후 재조회 트리거. */
+  /** Trigger re-fetch after actions such as manual-payment / status change. */
   refreshKey?: number;
 }
 
-/** 행위자 표시 — 시스템(자동)이면 "시스템 · 자동", 아니면 역할 라벨 + 이메일. */
+/** Actor display — "System · Automatic" for system events, otherwise role label + email. */
 function actorLabel(item: ApplicationActivityItem): { name: string; role: string } {
-  if (item.system) return { name: '시스템', role: '자동' };
+  if (item.system) return { name: 'System', role: 'Automatic' };
   const roleLabel = item.actorRole
     ? ROLE_LABELS[item.actorRole as UserRole] ?? item.actorRole
-    : '알 수 없음';
-  return { name: item.actorEmail ?? '알 수 없음', role: roleLabel };
+    : 'Unknown';
+  return { name: item.actorEmail ?? 'Unknown', role: roleLabel };
 }
 
 /** 카테고리/시스템/실패에 따른 점(dot) 색상. */
@@ -98,9 +98,9 @@ export function AdminActivityTimelineSection({ applicationSeq, refreshKey = 0 }:
     <Card>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-gray-800">활동 타임라인</h2>
+          <h2 className="text-lg font-semibold text-gray-800">Activity Timeline</h2>
           <p className="text-sm text-gray-500 mt-0.5">
-            누가·언제·무엇을 했는지 + 자동 처리 내역
+            Who did what and when, plus automated actions
           </p>
         </div>
         {items.length > 0 && (
@@ -109,19 +109,19 @@ export function AdminActivityTimelineSection({ applicationSeq, refreshKey = 0 }:
             onClick={() => setNewestFirst((v) => !v)}
             className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1 rounded-md hover:bg-gray-100 transition-colors"
           >
-            {newestFirst ? '최신순 ▾' : '진행순 ▴'}
+            {newestFirst ? 'Newest first ▾' : 'Chronological ▴'}
           </button>
         )}
       </div>
 
       {loading ? (
         <div className="py-8 flex justify-center">
-          <LoadingSpinner size="sm" label="활동 내역 불러오는 중..." />
+          <LoadingSpinner size="sm" label="Loading activity..." />
         </div>
       ) : error ? (
-        <p className="text-sm text-error-600 py-4">활동 내역을 불러오지 못했습니다.</p>
+        <p className="text-sm text-error-600 py-4">Failed to load activity.</p>
       ) : ordered.length === 0 ? (
-        <p className="text-sm text-gray-500 py-4">기록된 활동이 없습니다.</p>
+        <p className="text-sm text-gray-500 py-4">No recorded activity.</p>
       ) : (
         <ol className="relative border-l border-gray-200 ml-2">
           {ordered.map((item) => {
@@ -145,10 +145,10 @@ export function AdminActivityTimelineSection({ applicationSeq, refreshKey = 0 }:
                   <span className="text-sm font-medium text-gray-800">{meta.label}</span>
                   {item.system && (
                     <Badge variant="info" dot>
-                      자동
+                      Auto
                     </Badge>
                   )}
-                  {isFailure && <Badge variant="error">실패</Badge>}
+                  {isFailure && <Badge variant="error">Failed</Badge>}
                 </div>
 
                 <div className="mt-1 text-xs text-gray-500 flex flex-wrap items-center gap-x-2">
@@ -174,13 +174,13 @@ export function AdminActivityTimelineSection({ applicationSeq, refreshKey = 0 }:
                       onClick={() => toggleExpand(item.auditLogSeq)}
                       className="text-xs text-primary-600 hover:text-primary-800"
                     >
-                      {isOpen ? '상세 숨기기' : '변경 상세 보기'}
+                      {isOpen ? 'Hide details' : 'View change details'}
                     </button>
                     {isOpen && (
                       <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {before && (
                           <div>
-                            <p className="text-[11px] font-medium text-gray-400 mb-0.5">변경 전</p>
+                            <p className="text-[11px] font-medium text-gray-400 mb-0.5">Before</p>
                             <pre className="text-xs bg-gray-50 rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-all text-gray-600">
                               {before}
                             </pre>
@@ -188,7 +188,7 @@ export function AdminActivityTimelineSection({ applicationSeq, refreshKey = 0 }:
                         )}
                         {after && (
                           <div>
-                            <p className="text-[11px] font-medium text-gray-400 mb-0.5">변경 후</p>
+                            <p className="text-[11px] font-medium text-gray-400 mb-0.5">After</p>
                             <pre className="text-xs bg-gray-50 rounded-md p-2 overflow-x-auto whitespace-pre-wrap break-all text-gray-600">
                               {after}
                             </pre>

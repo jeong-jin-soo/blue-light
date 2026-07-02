@@ -22,5 +22,5 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   CONCIERGE_MANAGER: 'Concierge Manager',
   ADMIN: 'Administrator',
   SYSTEM_ADMIN: 'System Admin',
-  NOTIFICATION_MANAGER: '알림 매니저',
+  NOTIFICATION_MANAGER: 'Notification Manager',
 };
