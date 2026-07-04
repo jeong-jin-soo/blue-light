@@ -265,4 +265,38 @@ public class SystemAdminController {
                 "enabled", enabled
         ));
     }
+
+    // ── WhatsApp 상담 번호 ──────────────────────────────
+
+    /**
+     * WhatsApp Business 상담 번호 조회
+     * GET /api/admin/system/whatsapp-number
+     */
+    @GetMapping("/whatsapp-number")
+    public ResponseEntity<Map<String, Object>> getWhatsappNumber() {
+        log.info("System admin get WhatsApp business number");
+        String number = systemAdminService.getWhatsappBusinessNumber();
+        return ResponseEntity.ok(Map.of("whatsappBusinessNumber", number));
+    }
+
+    /**
+     * WhatsApp Business 상담 번호 변경
+     * PUT /api/admin/system/whatsapp-number
+     */
+    @Auditable(action = AuditAction.SETTINGS_UPDATED, category = AuditCategory.SYSTEM, entityType = "SystemSetting")
+    @PutMapping("/whatsapp-number")
+    public ResponseEntity<Map<String, Object>> updateWhatsappNumber(
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+        Long userSeq = (Long) authentication.getPrincipal();
+        String number = request.getOrDefault("whatsappBusinessNumber", "");
+
+        log.info("System admin update WhatsApp business number");
+        systemAdminService.updateWhatsappBusinessNumber(number, userSeq);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "WhatsApp business number updated.",
+                "whatsappBusinessNumber", number.trim()
+        ));
+    }
 }

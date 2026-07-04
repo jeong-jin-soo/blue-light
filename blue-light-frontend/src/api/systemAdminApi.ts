@@ -83,3 +83,15 @@ export const updateEmailVerification = async (enabled: boolean): Promise<{ messa
   const response = await axiosClient.put<{ message: string; enabled: boolean }>('/admin/system/email-verification', { enabled });
   return response.data;
 };
+
+// ── WhatsApp Business Number ──────────────────────────────
+
+export const getWhatsappNumber = async (): Promise<{ whatsappBusinessNumber: string }> => {
+  const response = await axiosClient.get<{ whatsappBusinessNumber: string }>('/admin/system/whatsapp-number');
+  return response.data;
+};
+
+export const updateWhatsappNumber = async (whatsappBusinessNumber: string): Promise<{ message: string; whatsappBusinessNumber: string }> => {
+  const response = await axiosClient.put<{ message: string; whatsappBusinessNumber: string }>('/admin/system/whatsapp-number', { whatsappBusinessNumber });
+  return response.data;
+};

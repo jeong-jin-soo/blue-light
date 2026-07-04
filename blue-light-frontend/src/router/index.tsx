@@ -3,6 +3,7 @@ import Layout from '../components/common/Layout';
 import ProtectedRoute from '../components/common/ProtectedRoute';
 import NotFoundPage from '../pages/NotFoundPage';
 import LandingPage from '../pages/LandingPage';
+import ServicesPage from '../pages/ServicesPage';
 
 // Auth pages
 import LoginPage from '../pages/auth/LoginPage';
@@ -107,6 +108,11 @@ import NotificationsPage from '../pages/NotificationsPage';
  */
 const router = createBrowserRouter([
   // Public routes
+  {
+    // Page 2 — 서비스 상세 (랜딩 카드가 /services#<slug> 앵커로 연결)
+    path: '/services',
+    element: <ServicesPage />,
+  },
   {
     path: '/login',
     element: <LoginPage />,

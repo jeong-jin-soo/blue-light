@@ -293,6 +293,31 @@ public class SystemAdminService {
         log.info("SLD AI generation {} by userSeq={}", enabled ? "enabled" : "disabled", updatedBy);
     }
 
+    // ── WhatsApp 상담 번호 ──────────────────────────────
+
+    /**
+     * WhatsApp Business 상담 번호 조회 (랜딩 공개 문의 채널)
+     */
+    public String getWhatsappBusinessNumber() {
+        return systemSettingRepository.findById("whatsapp_business_number")
+                .map(SystemSetting::getSettingValue)
+                .orElse("");
+    }
+
+    /**
+     * WhatsApp Business 상담 번호 변경
+     */
+    @Transactional
+    public void updateWhatsappBusinessNumber(String number, Long updatedBy) {
+        SystemSetting setting = systemSettingRepository.findById("whatsapp_business_number")
+                .orElseGet(() -> new SystemSetting(
+                        "whatsapp_business_number", "", "WhatsApp Business contact number (public landing)"));
+        setting.updateValue(number == null ? "" : number.trim(), updatedBy);
+        systemSettingRepository.save(setting);
+
+        log.info("WhatsApp business number updated by userSeq={}", updatedBy);
+    }
+
     // ── 전체 시스템 설정 조회 ──────────────────────────────
 
     /**
@@ -306,6 +331,9 @@ public class SystemAdminService {
 
         // AI SLD 생성 설정
         result.put("sldAiGenerationEnabled", isSldAiGenerationEnabled());
+
+        // WhatsApp 상담 번호
+        result.put("whatsappBusinessNumber", getWhatsappBusinessNumber());
 
         // Gemini API 상태
         result.put("geminiApiKey", getGeminiApiKeyStatus());

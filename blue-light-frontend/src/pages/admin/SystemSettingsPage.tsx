@@ -38,6 +38,11 @@ export default function SystemSettingsPage() {
   const [originalEmailVerification, setOriginalEmailVerification] = useState(false);
   const [savingEmailVerification, setSavingEmailVerification] = useState(false);
 
+  // ── WhatsApp Business Number ──────────────────────────────
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [originalWhatsappNumber, setOriginalWhatsappNumber] = useState('');
+  const [savingWhatsappNumber, setSavingWhatsappNumber] = useState(false);
+
   // ── SLD AI Generation ──────────────────────────────
   const [sldAiEnabled, setSldAiEnabled] = useState(true);
   const [originalSldAi, setOriginalSldAi] = useState(true);
@@ -68,13 +73,14 @@ export default function SystemSettingsPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [promptData, keyData, emailData, sldAiData, sldPromptData, sampleData] = await Promise.all([
+      const [promptData, keyData, emailData, sldAiData, sldPromptData, sampleData, whatsappData] = await Promise.all([
         systemAdminApi.getSystemPrompt(),
         systemAdminApi.getGeminiApiKeyStatus(),
         systemAdminApi.getEmailVerification(),
         systemAdminApi.getSldAiGeneration(),
         systemAdminApi.getSldSystemPrompt(),
         sampleFileApi.getSampleFiles(),
+        systemAdminApi.getWhatsappNumber(),
       ]);
 
       setPrompt(promptData.prompt);
@@ -82,6 +88,8 @@ export default function SystemSettingsPage() {
       setGeminiStatus(keyData);
       setEmailVerificationEnabled(emailData.enabled);
       setOriginalEmailVerification(emailData.enabled);
+      setWhatsappNumber(whatsappData.whatsappBusinessNumber);
+      setOriginalWhatsappNumber(whatsappData.whatsappBusinessNumber);
       setSldAiEnabled(sldAiData.enabled);
       setOriginalSldAi(sldAiData.enabled);
       setSldPrompt(sldPromptData.prompt);
@@ -187,6 +195,25 @@ export default function SystemSettingsPage() {
       toast.error(message);
     } finally {
       setSavingEmailVerification(false);
+    }
+  };
+
+  // ── WhatsApp Business Number Handlers ──────────────────────────────
+
+  const whatsappNumberChanged = whatsappNumber !== originalWhatsappNumber;
+
+  const handleSaveWhatsappNumber = async () => {
+    setSavingWhatsappNumber(true);
+    try {
+      const result = await systemAdminApi.updateWhatsappNumber(whatsappNumber.trim());
+      setWhatsappNumber(result.whatsappBusinessNumber);
+      setOriginalWhatsappNumber(result.whatsappBusinessNumber);
+      toast.success(result.message);
+    } catch (err: unknown) {
+      const message = (err as { message?: string })?.message || 'Failed to update WhatsApp number';
+      toast.error(message);
+    } finally {
+      setSavingWhatsappNumber(false);
     }
   };
 
@@ -316,6 +343,42 @@ export default function SystemSettingsPage() {
         title="System Configuration"
         subtitle="Manage system-level settings — chatbot prompt, API keys, and platform configuration"
       />
+
+      {/* ── WhatsApp Business Number ────────────────────── */}
+      <Card>
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">WhatsApp Business Number</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          Public enquiry channel shown on the landing and service pages. Any format is accepted
+          (e.g. +65 8796 7667) — links are normalized automatically.
+        </p>
+
+        <div className="flex items-center gap-3">
+          <input
+            type="tel"
+            value={whatsappNumber}
+            onChange={(e) => setWhatsappNumber(e.target.value)}
+            placeholder="+65 XXXX XXXX"
+            className="w-64 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+          />
+          <Button
+            onClick={handleSaveWhatsappNumber}
+            loading={savingWhatsappNumber}
+            disabled={!whatsappNumberChanged}
+            size="sm"
+          >
+            Save
+          </Button>
+          {whatsappNumberChanged && (
+            <span className="text-xs text-warning-600">Unsaved changes</span>
+          )}
+        </div>
+
+        {!whatsappNumber.trim() && (
+          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-3">
+            No number configured — public pages fall back to the default number in the frontend.
+          </p>
+        )}
+      </Card>
 
       {/* ── Email Verification ────────────────────── */}
       <Card>

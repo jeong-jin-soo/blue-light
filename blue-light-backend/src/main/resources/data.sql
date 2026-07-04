@@ -108,6 +108,12 @@ SELECT 'sld_ai_generation_enabled', 'true', 'Enable AI-powered SLD generation', 
 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'sld_ai_generation_enabled');
 
+-- 공개 WhatsApp Business 상담 번호 (랜딩·서비스 페이지 문의 채널)
+INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+SELECT 'whatsapp_business_number', '+65 8796 7667', 'WhatsApp Business contact number (public landing)', NOW()
+FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE setting_key = 'whatsapp_business_number');
+
 
 -- kVA 단가표 (싱가포르 시장 기준 placeholder)
 -- master_prices 테이블이 비어 있을 때만 삽입
