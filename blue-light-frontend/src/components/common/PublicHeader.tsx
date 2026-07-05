@@ -3,8 +3,9 @@ import { Button } from '../ui/Button';
 import licensekakiLogo from '../../assets/licensekaki-logo.png';
 
 /**
- * 공개 페이지(랜딩·서비스 상세) 공용 헤더.
- * 신청자는 WhatsApp 으로 문의하므로 가입 CTA 없이 로그인만 남긴다(내부 사용자용).
+ * 공개 페이지(랜딩·서비스 상세·About) 공용 헤더.
+ * 신청자는 WhatsApp 으로 문의하므로 가입/로그인 CTA 없이 About Us 만 노출한다.
+ * (내부 사용자는 /login 으로 직접 접속)
  */
 export default function PublicHeader() {
   return (
@@ -13,8 +14,8 @@ export default function PublicHeader() {
         <Link to="/" className="flex items-center">
           <img src={licensekakiLogo} alt="LicenseKaki" className="h-6" />
         </Link>
-        <Link to="/login">
-          <Button variant="ghost" size="sm">Sign In</Button>
+        <Link to="/about">
+          <Button variant="ghost" size="sm">About Us</Button>
         </Link>
       </div>
     </header>
