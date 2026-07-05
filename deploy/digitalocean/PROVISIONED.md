@@ -2,6 +2,14 @@
 
 > 비밀값(키/비번)은 여기 기록하지 않음 — GitHub Secrets/비밀저장소에 보관. 아래는 식별자/호스트(비민감)만.
 
+> ⚠️ **2026-07-05 비용축소 통합**: WhatsApp 퍼스트 전환으로 백엔드 상시가동 필요성이 줄어 **단일 드롭릿(prod-a)** 올인원으로 통합.
+> - **삭제됨**: Load Balancer(`bluelight-prod-lb`), dev 드롭릿(`bluelight-dev`), prod-b 드롭릿(`bluelight-prod-b`), dev DNS A 레코드, apex/www AAAA 레코드.
+> - **변경됨**: MySQL = 드롭릿 내 `mysql:8.4` 컨테이너(볼륨 `bluelight_mysql_data`), TLS = 드롭릿 **Caddy**(Let's Encrypt) 종단, DNS apex/www A → `159.223.58.11`, **sld-agent 제거**.
+> - **유지**: prod-a 드롭릿, DO Spaces(`bluelight-uploads-prod`), DOCR(`licensekaki`).
+> - **관찰 후 삭제 예정**: Managed MySQL `bluelight-db`(로컬 컨테이너 안정 확인 후). 로컬 덤프 `~/bluelight-aws-rescue/consolidation/`.
+> - 정본 compose/Caddyfile: `deploy/digitalocean/docker-compose.do.yml`, `deploy/digitalocean/Caddyfile`. 배포: `.github/workflows/deploy-prod.yml`(단일호스트).
+> - 아래 원본 표(3대·LB·Managed)는 통합 전 이력.
+
 ## 리전
 - 전부 **SGP1 (Singapore)**, VPC `default-sgp1` = `2143e40e-c72b-463e-845f-581fc07ac152` (10.104.0.0/20)
 
