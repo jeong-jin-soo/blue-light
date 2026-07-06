@@ -91,6 +91,9 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    environment:
+      # Caddyfile의 {$SITE_ADDRESS} 치환 — 환경별 도메인 주입
+      SITE_ADDRESS: ${SITE_ADDRESS:-licensekaki.com, www.licensekaki.com}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

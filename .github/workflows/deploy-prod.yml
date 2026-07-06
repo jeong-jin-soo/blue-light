@@ -121,6 +121,7 @@ jobs:
           IMAGE_TAG=${{ github.sha }}
           SPRING_PROFILES_ACTIVE=prod
           SQL_INIT_MODE=never
+          SITE_ADDRESS=licensekaki.com, www.licensekaki.com
           DB_URL=jdbc:mysql://mysql:3306/bluelight?serverTimezone=Asia/Singapore&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
           DB_USERNAME=${{ secrets.DB_USERNAME }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
