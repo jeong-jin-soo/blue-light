@@ -1,0 +1,13 @@
+# 올인원 드롭릿 TLS 리버스 프록시 (DO LB 대체)
+# Let's Encrypt 자동 발급/갱신(HTTP-01). frontend 컨테이너(docker network)로 프록시.
+# 사전조건: licensekaki.com / www.licensekaki.com A 레코드가 이 드롭릿 IP를 가리킬 것,
+#           AAAA(옛 LB IPv6) 레코드는 제거되어 있을 것(IPv6로 검증 시 실패 방지).
+
+{
+	email admin@licensekaki.com
+}
+
+licensekaki.com, www.licensekaki.com {
+	encode gzip
+	reverse_proxy frontend:80
+}

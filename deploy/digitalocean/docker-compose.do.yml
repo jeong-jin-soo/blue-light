@@ -1,24 +1,43 @@
-version: '3.8'
-
 # ============================================
-# DigitalOcean용 compose 초안
-# 기존 docker-compose.yml과 동일 + 아래 차이만:
-#   - backend 에 AWS_S3_ENDPOINT / AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 주입
-#     (EC2는 IAM Role로 S3 인증했으나 DO엔 Role이 없어 Spaces 키를 env로 전달)
-#   - 이메일 주석을 Resend로 정정(설정값 자체는 MAIL_* 동일)
-# DB는 DO Managed MySQL(외부). 레지스트리는 DOCR(${DOCKER_REGISTRY}).
+# DigitalOcean 올인원 단일 드롭릿 compose (비용축소 통합, 2026-07)
+#   - MySQL 셀프호스트 컨테이너(Managed MySQL 대체)
+#   - Caddy가 443 TLS 종단(Let's Encrypt) → frontend:80 (DO LB 대체)
+#   - sld-agent 제거(WhatsApp 퍼스트 전환으로 SLD 자가생성 미사용)
+#   - 파일저장은 DO Spaces 유지(FILE_STORAGE_TYPE=s3)
+# DNS: licensekaki.com / www → 이 드롭릿 IP
 # ============================================
 
 services:
+  mysql:
+    image: mysql:8.4
+    container_name: bluelight-mysql
+    restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: bluelight
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Singapore
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          memory: 640M
+
   backend:
     image: ${DOCKER_REGISTRY}/bluelight-backend:${IMAGE_TAG:-latest}
     container_name: bluelight-backend
     restart: always
-    ports:
-      - "8090:8090"
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-default}
-      # DB (DO Managed MySQL — SSL 필수)
+      # DB → 로컬 MySQL 컨테이너 (SSL 불필요)
       SPRING_DATASOURCE_URL: ${DB_URL}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
@@ -30,70 +49,61 @@ services:
       FILE_ENCRYPTION_KEY: ${FILE_ENCRYPTION_KEY}
       AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
       AWS_S3_REGION: ${AWS_S3_REGION:-sgp1}
-      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}          # https://sgp1.digitaloceanspaces.com
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}      # Spaces access key (DefaultCredentialsProvider가 env에서 읽음)
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
-      # Email (Resend SMTP — smtp.resend.com:465)
+      # Email (Resend SMTP)
       MAIL_HOST: ${MAIL_HOST:-}
-      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_PORT: ${MAIL_PORT:-2587}
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-noreply@licensekaki.com}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-LicenseKaki}
       MAIL_SMTP_ENABLED: ${MAIL_SMTP_ENABLED:-false}
-      PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-https://dev.licensekaki.com}
+      PASSWORD_RESET_BASE_URL: ${PASSWORD_RESET_BASE_URL:-https://licensekaki.com}
       SQL_INIT_MODE: ${SQL_INIT_MODE:-never}
-      SLD_AGENT_URL: http://sld-agent:8100
-      SLD_AGENT_SERVICE_KEY: ${SLD_AGENT_SERVICE_KEY:-dev-service-key}
     volumes:
       - uploads_data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 768M
 
-  sld-agent:
-    image: ${DOCKER_REGISTRY}/bluelight-sld-agent:${IMAGE_TAG:-latest}
-    container_name: bluelight-sld-agent
-    restart: always
-    ports:
-      - "8100:8100"
-    environment:
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      SPRING_BOOT_URL: http://backend:8090
-      SERVICE_KEY: ${SLD_AGENT_SERVICE_KEY:-dev-service-key}
-      SQLITE_DB_PATH: /app/data/db/checkpoints.db
-      TEMP_FILE_DIR: /app/temp
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      MYSQL_HOST: ${MYSQL_HOST:-localhost}
-      MYSQL_PORT: ${MYSQL_PORT:-3306}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-bluelight}
-      MYSQL_USER: ${DB_USERNAME:-user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
-    volumes:
-      - sld_data:/app/data/db
-      - sld_temp:/app/temp
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    depends_on:
-      - backend
-
   frontend:
     image: ${DOCKER_REGISTRY}/bluelight-frontend:${IMAGE_TAG:-latest}
     container_name: bluelight-frontend
     restart: always
-    ports:
-      - "80:80"     # 운영: DO LB가 443→80 종단 / 개발: Caddy가 443→80
+    # 호스트 포트 미노출 — Caddy가 리버스 프록시로 접근
+    depends_on:
+      - backend
     deploy:
       resources:
         limits:
           memory: 128M
+
+  caddy:
+    image: caddy:2
+    container_name: bluelight-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     depends_on:
-      - backend
+      - frontend
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 volumes:
+  mysql_data:
   uploads_data:
-  sld_data:
-  sld_temp:
+  caddy_data:
+  caddy_config:
