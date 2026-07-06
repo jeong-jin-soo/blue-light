@@ -83,20 +83,24 @@ export default function ServicesPage() {
                   <p className="mt-3 text-sm text-gray-600 leading-relaxed">
                     {service.intro}
                   </p>
-                  <ul className="mt-4 space-y-2">
-                    {service.bullets.map((bullet) => (
-                      <li key={bullet} className="flex items-start gap-2 text-sm text-gray-700">
-                        <Check className="w-4 h-4 text-success-500 mt-0.5 flex-shrink-0" />
-                        {bullet}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-5 rounded-xl bg-canvas px-4 py-3">
-                    <span className="text-[11px] font-semibold tracking-widest text-primary uppercase">
-                      Who needs this
-                    </span>
-                    <p className="mt-1 text-sm text-gray-600">{service.whoNeedsThis}</p>
-                  </div>
+                  {service.bullets.length > 0 && (
+                    <ul className="mt-4 space-y-2">
+                      {service.bullets.map((bullet) => (
+                        <li key={bullet} className="flex items-start gap-2 text-sm text-gray-700">
+                          <Check className="w-4 h-4 text-success-500 mt-0.5 flex-shrink-0" />
+                          {bullet}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {service.whoNeedsThis && (
+                    <div className="mt-5 rounded-xl bg-canvas px-4 py-3">
+                      <span className="text-[11px] font-semibold tracking-widest text-primary uppercase">
+                        Who needs this
+                      </span>
+                      <p className="mt-1 text-sm text-gray-600">{service.whoNeedsThis}</p>
+                    </div>
+                  )}
                   <a
                     href={buildWhatsAppLink(whatsappNumber, whatsappServiceMessage(service.label))}
                     target="_blank"

@@ -5,6 +5,7 @@ import {
   Lightbulb,
   Plug,
   History,
+  UserCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -21,7 +22,8 @@ export interface PublicService {
   /** Page 2 섹션 도입 문단 ("We help you:" / "We provide:" 로 끝남) */
   intro: string;
   bullets: string[];
-  whoNeedsThis: string;
+  /** 선택 — 없으면 "Who needs this" 박스를 렌더하지 않음 */
+  whoNeedsThis?: string;
 }
 
 export const PUBLIC_SERVICES: PublicService[] = [
@@ -36,7 +38,7 @@ export const PUBLIC_SERVICES: PublicService[] = [
     bullets: [
       'Determine whether you need an EI or SI license',
       'Prepare and submit your application via ELISE',
-      'Coordinate with your Licensed Electrical Worker (LEW)',
+      'Coordinate with Licensed Electrical Worker (LEW)',
       'Track your application until approval',
     ],
     whoNeedsThis:
@@ -118,6 +120,16 @@ export const PUBLIC_SERVICES: PublicService[] = [
     ],
     whoNeedsThis:
       'Anyone whose EI/SI license has expired and needs to regularize it.',
+  },
+  {
+    slug: 'lew-services',
+    icon: UserCheck,
+    label: 'LEW Services',
+    cardDesc:
+      'Get matched with a Licensed Electrical Worker for your installation, inspection, or certification needs — fast, reliable, and fully compliant.',
+    intro:
+      'Every electrical installation in Singapore needs sign-off from a Licensed Electrical Worker (LEW) before it can be certified safe for use. We connect you with qualified LEWs to handle testing, inspection, and certification — so your project gets signed off quickly and correctly.',
+    bullets: [],
   },
 ];
 

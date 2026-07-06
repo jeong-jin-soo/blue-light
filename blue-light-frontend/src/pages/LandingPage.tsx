@@ -68,12 +68,13 @@ export default function LandingPage() {
             Electrical Installation Licensing Service
           </span>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white leading-tight">
-            EMA Electrical Licenses,{' '}
+            Electrical installation license,{' '}
             <span className="relative inline-block">
-              Made Simple
+              Made simple
               {/* 레드 슬래시 언더라인 — 브랜드 모티프 */}
               <span className="absolute left-0 -bottom-1.5 h-1 w-full bg-accent-500 rounded-full -skew-x-12" aria-hidden />
             </span>
+            .
           </h1>
           <p className="mt-6 text-sm sm:text-base text-primary-100 leading-relaxed max-w-xl mx-auto">
             Skip the confusing paperwork. LicenseKaki handles your electrical
@@ -104,7 +105,7 @@ export default function LandingPage() {
               Our Services
             </span>
             <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-gray-900">
-              Our 6 Services
+              Our 7 Services
             </h2>
           </div>
 
