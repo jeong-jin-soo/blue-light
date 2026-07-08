@@ -190,8 +190,18 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-gray-700">9. Cookies and Tracking</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
               We use essential cookies and local storage to maintain your login session and
-              application state. We do not use third-party tracking cookies or analytics services
-              that collect personal data.
+              application state. We do not use third-party tracking cookies or third-party analytics
+              or advertising services.
+            </p>
+            <p className="text-sm text-gray-600 leading-relaxed">
+              To understand how people find our site and to plan our services, we keep basic
+              first-party usage records on our own servers: the pages visited on our website, the
+              referral or campaign tag contained in the link you arrived from, and when someone
+              chooses to contact us via WhatsApp. These records are kept to a minimum — we do not
+              store your full IP address, and we do not set advertising or cross-site tracking
+              cookies. A short random identifier held only in your browser session is used to group
+              a single visit; it is not linked to your identity and is cleared when you close the tab.
+              We retain these usage records only for as long as needed for analysis and then delete them.
             </p>
           </section>
 

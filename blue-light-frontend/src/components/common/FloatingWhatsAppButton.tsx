@@ -1,5 +1,6 @@
 import { useWhatsAppNumber } from '../../hooks/useWhatsAppNumber';
 import { buildWhatsAppLink } from '../../utils/whatsapp';
+import { trackWhatsAppClick } from '../../utils/track';
 import { WHATSAPP_GENERIC_MESSAGE } from '../../constants/publicServices';
 import WhatsAppIcon from './WhatsAppIcon';
 
@@ -14,6 +15,7 @@ export default function FloatingWhatsAppButton() {
       href={buildWhatsAppLink(number, WHATSAPP_GENERIC_MESSAGE)}
       target="_blank"
       rel="noopener noreferrer"
+      onClick={() => trackWhatsAppClick()}
       aria-label="Chat with us on WhatsApp"
       className="fixed bottom-5 right-5 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-[#1da851] hover:shadow-xl transition-all"
     >

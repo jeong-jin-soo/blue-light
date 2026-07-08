@@ -7,6 +7,7 @@ import {
   WHATSAPP_GENERIC_MESSAGE,
 } from '../constants/publicServices';
 import { buildWhatsAppLink } from '../utils/whatsapp';
+import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
@@ -35,6 +36,11 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
   const whatsappNumber = useWhatsAppNumber();
+
+  // 공개 방문 기록 (1st-party)
+  useEffect(() => {
+    trackPageView();
+  }, []);
 
   // 내부 사용자(담당자·LEW·관리자)는 로그인 상태면 대시보드로
   useEffect(() => {
@@ -85,6 +91,7 @@ export default function LandingPage() {
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWhatsAppClick()}
               className="inline-flex items-center gap-2.5 rounded-lg bg-[#25D366] px-7 py-3.5 text-base font-semibold text-white shadow-md hover:bg-[#1da851] hover:shadow-lg transition-all"
             >
               <WhatsAppIcon className="w-6 h-6" />
@@ -146,6 +153,7 @@ export default function LandingPage() {
               href={whatsappHref}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => trackWhatsAppClick()}
               className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-900 transition-colors"
             >
               Not sure which service you need? Chat with our team
