@@ -1,10 +1,7 @@
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Check } from 'lucide-react';
-import {
-  PUBLIC_SERVICES,
-  whatsappServiceMessage,
-} from '../constants/publicServices';
+import { Link } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { PUBLIC_SERVICES, WHATSAPP_GENERIC_MESSAGE } from '../constants/publicServices';
 import { buildWhatsAppLink } from '../utils/whatsapp';
 import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
@@ -13,39 +10,22 @@ import { SEO_META } from '../constants/seoMeta';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
 import FloatingWhatsAppButton from '../components/common/FloatingWhatsAppButton';
-import WhatsAppIcon from '../components/common/WhatsAppIcon';
 
 /**
- * Page 2 — Service Details (미팅 문서 "Landing Page Content Draft v1").
- * 랜딩 카드가 /services#<slug> 앵커로 연결되며, 각 섹션은 쉬운 설명 +
- * 해당 서비스명이 프리필된 WhatsApp 문의 버튼을 제공한다.
- * 담당자가 WhatsApp 대화 중 특정 섹션 링크를 신청자에게 보낼 수 있다.
+ * Page 2 — Services 허브. 각 서비스는 전용 상세 페이지(/services/:slug)로 연결된다.
+ * 전체 본문(설명·불릿·CTA)은 상세 페이지에만 두어 중복 콘텐츠를 피한다(SEO).
  */
 export default function ServicesPage() {
-  const { hash } = useLocation();
   const whatsappNumber = useWhatsAppNumber();
 
   useDocumentMeta(SEO_META.services);
 
-  // 공개 방문 기록 (1st-party)
   useEffect(() => {
+    window.scrollTo(0, 0);
     trackPageView();
   }, []);
 
-  // React Router 는 해시 스크롤을 처리하지 않으므로 직접 이동한다.
-  // 즉시 1회(클라이언트 사이드 내비게이션) + 지연 1회(전체 리로드 시
-  // 브라우저 초기 스크롤 복원과의 경합 보정) 실행한다.
-  useEffect(() => {
-    if (!hash) {
-      window.scrollTo(0, 0);
-      return;
-    }
-    const scrollToSection = () =>
-      document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    scrollToSection();
-    const timer = window.setTimeout(scrollToSection, 100);
-    return () => window.clearTimeout(timer);
-  }, [hash]);
+  const whatsappHref = buildWhatsAppLink(whatsappNumber, WHATSAPP_GENERIC_MESSAGE);
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -54,78 +34,60 @@ export default function ServicesPage() {
       {/* ── Intro ── */}
       <section className="bg-white border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
-          <span className="text-xs font-semibold tracking-widest text-primary uppercase">
-            Service Details
-          </span>
+          <span className="text-xs font-semibold tracking-widest text-primary uppercase">Our Services</span>
           <h1 className="mt-3 text-2xl sm:text-3xl font-bold text-gray-900">
-            Not sure where to start?
+            Electrical licensing services in Singapore
           </h1>
           <p className="mt-3 text-gray-500">
-            Here's what each service covers.
+            Pick the service that fits — each has its own page with the details.
           </p>
         </div>
       </section>
 
-      {/* ── Service sections ── */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-8">
-        {PUBLIC_SERVICES.map((service, i) => {
-          const Icon = service.icon;
-          return (
-            <section
-              key={service.slug}
-              id={service.slug}
-              // sticky 헤더(h-16)에 가리지 않도록 앵커 여백 확보
-              className="scroll-mt-24 bg-white rounded-2xl border border-primary-100 p-6 sm:p-8"
-            >
-              <div className="flex items-start gap-4">
-                <span className="hidden sm:flex w-12 h-12 bg-primary/5 rounded-xl items-center justify-center flex-shrink-0">
-                  <Icon className="w-6 h-6 text-primary" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-xs font-bold text-gray-300 tracking-widest">
-                      {String(i + 1).padStart(2, '0')}
-                    </span>
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900">
-                      {service.label}
-                    </h2>
-                  </div>
-                  <p className="mt-3 text-sm text-gray-600 leading-relaxed">
-                    {service.intro}
-                  </p>
-                  {service.bullets.length > 0 && (
-                    <ul className="mt-4 space-y-2">
-                      {service.bullets.map((bullet) => (
-                        <li key={bullet} className="flex items-start gap-2 text-sm text-gray-700">
-                          <Check className="w-4 h-4 text-success-500 mt-0.5 flex-shrink-0" />
-                          {bullet}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {service.whoNeedsThis && (
-                    <div className="mt-5 rounded-xl bg-canvas px-4 py-3">
-                      <span className="text-[11px] font-semibold tracking-widest text-primary uppercase">
-                        Who needs this
-                      </span>
-                      <p className="mt-1 text-sm text-gray-600">{service.whoNeedsThis}</p>
-                    </div>
-                  )}
-                  <a
-                    href={buildWhatsAppLink(whatsappNumber, whatsappServiceMessage(service.label))}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => trackWhatsAppClick(service.slug)}
-                    className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1da851] hover:shadow-md transition-all"
-                  >
-                    <WhatsAppIcon className="w-5 h-5" />
-                    Chat about {service.label}
-                  </a>
+      {/* ── Service grid (hub) ── */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {PUBLIC_SERVICES.map((service, i) => {
+            const Icon = service.icon;
+            return (
+              <Link
+                key={service.slug}
+                to={`/services/${service.slug}`}
+                className="group flex flex-col p-5 sm:p-6 rounded-2xl bg-white border border-primary-100 hover:shadow-lg hover:border-primary/40 transition-all"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <span className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center group-hover:bg-primary/10 transition-colors">
+                    <Icon className="w-6 h-6 text-primary" />
+                  </span>
+                  <span className="text-xs font-bold text-gray-300 tracking-widest tabular-nums">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                 </div>
-              </div>
-            </section>
-          );
-        })}
+                <h2 className="text-base font-semibold text-gray-900 group-hover:text-primary transition-colors">
+                  {service.label}
+                </h2>
+                <p className="mt-2 text-sm text-gray-500 leading-relaxed flex-1">{service.cardDesc}</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary/80 group-hover:text-primary transition-colors">
+                  Learn more <ArrowRight className="w-4 h-4" />
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Secondary CTA */}
+        <div className="mt-12 text-center">
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackWhatsAppClick()}
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-900 transition-colors"
+          >
+            Not sure which service you need? Chat with our team
+            <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
       </main>
 
       <PublicFooter />

@@ -126,7 +126,7 @@ export default function LandingPage() {
               return (
                 <Link
                   key={service.slug}
-                  to={`/services#${service.slug}`}
+                  to={`/services/${service.slug}`}
                   className="group flex flex-col p-5 sm:p-6 rounded-2xl bg-white border border-primary-100 hover:shadow-lg hover:border-primary/40 transition-all"
                 >
                   <div className="flex items-center justify-between mb-4">

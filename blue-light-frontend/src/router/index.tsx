@@ -4,6 +4,7 @@ import ProtectedRoute from '../components/common/ProtectedRoute';
 import NotFoundPage from '../pages/NotFoundPage';
 import LandingPage from '../pages/LandingPage';
 import ServicesPage from '../pages/ServicesPage';
+import ServiceDetailPage from '../pages/ServiceDetailPage';
 import AboutPage from '../pages/AboutPage';
 
 // Auth pages
@@ -114,6 +115,11 @@ const router = createBrowserRouter([
     // Page 2 — 서비스 상세 (랜딩 카드가 /services#<slug> 앵커로 연결)
     path: '/services',
     element: <ServicesPage />,
+  },
+  {
+    // Page 2b — 서비스별 개별 상세 (SEO: 서비스마다 전용 URL·메타·JSON-LD)
+    path: '/services/:slug',
+    element: <ServiceDetailPage />,
   },
   {
     // Page 3 — About Us (헤더 "About Us" 링크 대상)
