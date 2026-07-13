@@ -6,6 +6,7 @@ import { buildWhatsAppLink } from '../utils/whatsapp';
 import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { SERVICE_SEO } from '../constants/seoMeta';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
 import FloatingWhatsAppButton from '../components/common/FloatingWhatsAppButton';
@@ -30,6 +31,8 @@ export default function ServiceDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const whatsappNumber = useWhatsAppNumber();
   const service = PUBLIC_SERVICES.find((s) => s.slug === slug);
+  // 키워드 최적화 SEO(제목·H1·설명). 없으면 라벨 기반 폴백.
+  const seo = service ? SERVICE_SEO[service.slug] : undefined;
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -39,8 +42,8 @@ export default function ServiceDetailPage() {
   useDocumentMeta(
     service
       ? {
-          title: `${service.label} in Singapore | LicenseKaki`,
-          description: service.cardDesc,
+          title: seo?.title ?? `${service.label} in Singapore | LicenseKaki`,
+          description: seo?.description ?? service.cardDesc,
           path: `/services/${service.slug}`,
         }
       : { title: 'Services | LicenseKaki', description: '', path: '/services' },
@@ -85,7 +88,7 @@ export default function ServiceDetailPage() {
               <Icon className="w-7 h-7 text-primary" />
             </span>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-              {service.label}{' '}
+              {seo?.h1 ?? service.label}{' '}
               <span className="text-gray-400 font-semibold">· Singapore</span>
             </h1>
           </div>
