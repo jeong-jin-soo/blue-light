@@ -1548,3 +1548,27 @@ CREATE TABLE IF NOT EXISTS notification_template_history (
 -- ALTER TABLE kva_adjustment_record DROP COLUMN cof_reissue_triggered;
 -- DROP TABLE IF EXISTS certificate_of_fitness;
 -- ============================================
+
+-- ============================================
+-- web_event — 1st-party 유입/문의 텔레메트리 (2026-07)
+-- 공개 페이지 방문(PAGE_VIEW) 및 WhatsApp 문의 클릭(WHATSAPP_CLICK)을 우리 서버에만 기록.
+-- 제3자 분석/광고 트래커·쿠키 미사용. 개인정보 최소수집(IP·전체 URL 미저장,
+-- referrer 는 host 만, session_id 는 클라이언트 sessionStorage 랜덤값 — 쿠키 아님).
+-- 마케팅 채널 효과(UTM 출처별 문의) 집계 목적. 보관 최소화 권장.
+-- ============================================
+CREATE TABLE IF NOT EXISTS web_event (
+    event_seq     BIGINT       NOT NULL AUTO_INCREMENT,
+    event_type    VARCHAR(32)  NOT NULL,            -- PAGE_VIEW | WHATSAPP_CLICK
+    path          VARCHAR(255),                     -- 예: '/', '/services', '/about'
+    utm_source    VARCHAR(64),
+    utm_medium    VARCHAR(64),
+    utm_campaign  VARCHAR(128),
+    utm_content   VARCHAR(128),
+    referrer_host VARCHAR(255),                      -- host 만 (전체 URL 미저장)
+    service       VARCHAR(64),                       -- WHATSAPP_CLICK: 어떤 서비스 문의인지
+    session_id    VARCHAR(40),                       -- 클라이언트 랜덤 세션ID (쿠키 아님)
+    created_at    DATETIME(6)  NOT NULL,
+    PRIMARY KEY (event_seq),
+    INDEX idx_web_event_type_time (event_type, created_at),
+    INDEX idx_web_event_time (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

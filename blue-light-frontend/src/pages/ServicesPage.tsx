@@ -6,7 +6,10 @@ import {
   whatsappServiceMessage,
 } from '../constants/publicServices';
 import { buildWhatsAppLink } from '../utils/whatsapp';
+import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { SEO_META } from '../constants/seoMeta';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
 import FloatingWhatsAppButton from '../components/common/FloatingWhatsAppButton';
@@ -21,6 +24,13 @@ import WhatsAppIcon from '../components/common/WhatsAppIcon';
 export default function ServicesPage() {
   const { hash } = useLocation();
   const whatsappNumber = useWhatsAppNumber();
+
+  useDocumentMeta(SEO_META.services);
+
+  // 공개 방문 기록 (1st-party)
+  useEffect(() => {
+    trackPageView();
+  }, []);
 
   // React Router 는 해시 스크롤을 처리하지 않으므로 직접 이동한다.
   // 즉시 1회(클라이언트 사이드 내비게이션) + 지연 1회(전체 리로드 시
@@ -105,6 +115,7 @@ export default function ServicesPage() {
                     href={buildWhatsAppLink(whatsappNumber, whatsappServiceMessage(service.label))}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => trackWhatsAppClick(service.slug)}
                     className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1da851] hover:shadow-md transition-all"
                   >
                     <WhatsAppIcon className="w-5 h-5" />

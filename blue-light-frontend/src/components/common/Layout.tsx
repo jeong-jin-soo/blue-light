@@ -7,7 +7,7 @@ import licensekakiLogo from '../../assets/licensekaki-logo.png';
 import {
   LayoutDashboard, FileText, FilePlus2, DraftingCompass, Lightbulb, Plug,
   Zap, RefreshCw, User, Mail, Bell, Settings, Users, Wrench, KeyRound,
-  ScrollText, ShieldAlert, Handshake, type LucideIcon,
+  ScrollText, ShieldAlert, Handshake, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { ErrorBoundary } from './ErrorBoundary';
 import { NotificationBell } from './NotificationBell';
@@ -61,6 +61,7 @@ export default function Layout() {
 
   const adminMenu: MenuItem[] = [
     { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/admin/applications', label: 'Applications', icon: FileText },
     // admin-manual-email-spec.md §7.1: ADMIN 사이드바 노출, SYSTEM_ADMIN 은 미노출(직접 URL 진입만 가능)
     { path: '/admin/manual-emails', label: 'Manual Email', icon: Mail },

@@ -52,6 +52,7 @@ import AdminApplicationListPage from '../pages/admin/AdminApplicationListPage';
 import AdminApplicationDetailPage from '../pages/admin/AdminApplicationDetailPage';
 import AdminUserListPage from '../pages/admin/AdminUserListPage';
 import AdminPriceManagementPage from '../pages/admin/AdminPriceManagementPage';
+import AdminAnalyticsPage from '../pages/admin/AdminAnalyticsPage';
 import AdminManualEmailPage from '../pages/admin/AdminManualEmailPage';
 // PR-T6 — 알림 템플릿 관리
 import AdminNotificationTemplateListPage from '../pages/admin/AdminNotificationTemplateListPage';
@@ -230,6 +231,7 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { path: '/admin/dashboard', element: <AdminDashboardPage /> },
+          { path: '/admin/analytics', element: <AdminAnalyticsPage /> },
           { path: '/admin/users', element: <AdminUserListPage /> },
           { path: '/admin/prices', element: <AdminPriceManagementPage /> },
           { path: '/admin/notifications', element: <NotificationsPage /> },

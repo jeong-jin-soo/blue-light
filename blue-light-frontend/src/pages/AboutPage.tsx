@@ -2,7 +2,10 @@ import { useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { WHATSAPP_GENERIC_MESSAGE } from '../constants/publicServices';
 import { buildWhatsAppLink } from '../utils/whatsapp';
+import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { SEO_META } from '../constants/seoMeta';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
 import FloatingWhatsAppButton from '../components/common/FloatingWhatsAppButton';
@@ -25,8 +28,11 @@ const whyChooseUs = [
 export default function AboutPage() {
   const whatsappNumber = useWhatsAppNumber();
 
+  useDocumentMeta(SEO_META.about);
+
   useEffect(() => {
     window.scrollTo(0, 0);
+    trackPageView();
   }, []);
 
   const whatsappHref = buildWhatsAppLink(whatsappNumber, WHATSAPP_GENERIC_MESSAGE);
@@ -108,6 +114,7 @@ export default function AboutPage() {
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackWhatsAppClick()}
             className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#1da851] hover:shadow-md transition-all"
           >
             <WhatsAppIcon className="w-5 h-5" />
