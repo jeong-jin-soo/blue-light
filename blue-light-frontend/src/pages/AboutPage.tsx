@@ -4,6 +4,8 @@ import { WHATSAPP_GENERIC_MESSAGE } from '../constants/publicServices';
 import { buildWhatsAppLink } from '../utils/whatsapp';
 import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { SEO_META } from '../constants/seoMeta';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
 import FloatingWhatsAppButton from '../components/common/FloatingWhatsAppButton';
@@ -25,6 +27,8 @@ const whyChooseUs = [
 
 export default function AboutPage() {
   const whatsappNumber = useWhatsAppNumber();
+
+  useDocumentMeta(SEO_META.about);
 
   useEffect(() => {
     window.scrollTo(0, 0);

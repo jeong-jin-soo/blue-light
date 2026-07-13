@@ -80,33 +80,37 @@ axiosClient.interceptors.response.use(
 // 토큰 관리 유틸리티
 // - 토큰은 httpOnly 쿠키에 저장 (서버에서 설정)
 // - localStorage는 레거시 호환 + 토큰 만료 시간 확인용으로만 사용
+// 빌드-시 프리렌더(Node)에는 localStorage 가 없으므로 모든 접근을 가드한다.
+// 브라우저에서는 기존과 동일하게 동작.
+const hasLocalStorage = (): boolean => typeof localStorage !== 'undefined';
+
 export const tokenUtils = {
   /**
    * 토큰 저장 (레거시 호환: authStore에서 만료 검증용)
    */
   setToken: (token: string) => {
-    localStorage.setItem(TOKEN_KEY, token);
+    if (hasLocalStorage()) localStorage.setItem(TOKEN_KEY, token);
   },
 
   /**
    * 토큰 조회 (만료 시간 확인용)
    */
   getToken: (): string | null => {
-    return localStorage.getItem(TOKEN_KEY);
+    return hasLocalStorage() ? localStorage.getItem(TOKEN_KEY) : null;
   },
 
   /**
    * 토큰 삭제
    */
   removeToken: () => {
-    localStorage.removeItem(TOKEN_KEY);
+    if (hasLocalStorage()) localStorage.removeItem(TOKEN_KEY);
   },
 
   /**
    * 토큰 존재 여부 확인
    */
   hasToken: (): boolean => {
-    return !!localStorage.getItem(TOKEN_KEY);
+    return hasLocalStorage() ? !!localStorage.getItem(TOKEN_KEY) : false;
   },
 };
 

@@ -9,6 +9,8 @@ import {
 import { buildWhatsAppLink } from '../utils/whatsapp';
 import { trackPageView, trackWhatsAppClick } from '../utils/track';
 import { useWhatsAppNumber } from '../hooks/useWhatsAppNumber';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { SEO_META } from '../constants/seoMeta';
 import PublicHeader from '../components/common/PublicHeader';
 import PublicFooter from '../components/common/PublicFooter';
 import FloatingWhatsAppButton from '../components/common/FloatingWhatsAppButton';
@@ -36,6 +38,8 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
   const whatsappNumber = useWhatsAppNumber();
+
+  useDocumentMeta(SEO_META.home);
 
   // 공개 방문 기록 (1st-party)
   useEffect(() => {

@@ -1,0 +1,24 @@
+# LicenseKaki — https://licensekaki.com
+User-agent: *
+Allow: /
+
+# 앱/인증 경로는 색인 대상 아님(공개 마케팅 페이지만 노출)
+Disallow: /admin
+Disallow: /login
+Disallow: /signup
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /notifications
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /email-verification-pending
+Disallow: /account-setup
+Disallow: /lew
+Disallow: /sld-manager
+Disallow: /lighting-manager
+Disallow: /power-socket-manager
+Disallow: /lew-service-manager
+Disallow: /expired-license-manager
+Disallow: /concierge-manager
+
+Sitemap: https://licensekaki.com/sitemap.xml
