@@ -190,25 +190,18 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-gray-700">9. Cookies and Tracking</h2>
             <p className="text-sm text-gray-600 leading-relaxed">
               We use essential cookies and local storage to maintain your login session and
-              application state.
+              application state. We do not use third-party tracking cookies or third-party analytics
+              or advertising services.
             </p>
             <p className="text-sm text-gray-600 leading-relaxed">
-              We use <strong>Google Analytics</strong>, a web-analytics service provided by Google,
-              to understand how visitors find and use our website so we can improve it and plan our
-              marketing. Google Analytics sets cookies and collects information such as the pages you
-              view, how you arrived at our site, and general device and approximate location data.
-              This information may be processed by Google, including on servers outside Singapore.
-              You can learn more from Google&rsquo;s privacy policy, and you may opt out using the
-              <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer"
-                 className="text-primary hover:underline"> Google Analytics Opt-out Browser Add-on</a>.
-            </p>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              We also keep basic first-party usage records on our own servers: the pages visited, the
+              To understand how people find our site and to plan our services, we keep basic
+              first-party usage records on our own servers: the pages visited on our website, the
               referral or campaign tag contained in the link you arrived from, and when someone
-              chooses to contact us via WhatsApp. These first-party records are kept to a minimum — we
-              do not store your full IP address, and a short random identifier held only in your
-              browser session is used to group a single visit. We retain these records only for as
-              long as needed for analysis.
+              chooses to contact us via WhatsApp. These records are kept to a minimum — we do not
+              store your full IP address, and we do not set advertising or cross-site tracking
+              cookies. A short random identifier held only in your browser session is used to group
+              a single visit; it is not linked to your identity and is cleared when you close the tab.
+              We retain these usage records only for as long as needed for analysis and then delete them.
             </p>
           </section>
 
