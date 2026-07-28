@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import licensekakiLogo from '../../assets/licensekaki-logo.png';
+import { useDocumentMeta } from '../../hooks/useDocumentMeta';
+import { SEO_META } from '../../constants/seoMeta';
 
 export default function DisclaimerPage() {
+  useDocumentMeta(SEO_META.disclaimer);
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">

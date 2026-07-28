@@ -27,6 +27,19 @@ export const SEO_META = {
     description:
       'LicenseKaki, by HanVision Holdings, is a Singapore-owned team of experienced professionals and Licensed Electrical Workers (LEWs) helping you navigate electrical installation licensing with confidence.',
   },
+  privacy: {
+    // /privacy-policy 는 동일 페이지의 별칭 — canonical 을 /privacy 로 모아 중복을 제거한다.
+    path: '/privacy',
+    title: 'Privacy Policy | LicenseKaki',
+    description:
+      'How LicenseKaki collects, uses, discloses and protects your personal data in compliance with the Singapore Personal Data Protection Act 2012 (PDPA).',
+  },
+  disclaimer: {
+    path: '/disclaimer',
+    title: 'Disclaimer | LicenseKaki',
+    description:
+      'LicenseKaki is an independent service platform and is not affiliated with, endorsed by or connected to the Energy Market Authority (EMA), SP Group or any Singapore government agency.',
+  },
 } satisfies Record<string, RouteMeta>;
 
 /**

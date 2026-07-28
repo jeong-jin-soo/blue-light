@@ -1,24 +1,10 @@
 # LicenseKaki — https://licensekaki.com
+#
+# 앱/인증 경로(/login, /dashboard, /admin …)는 여기서 Disallow 하지 않는다.
+# Disallow 는 "크롤 금지"일 뿐 "색인 금지"가 아니라, 외부 링크로 발견되면 제목·설명 없이
+# 색인되고 Search Console "색인이 생성되었으나 robots.txt 에 의해 차단됨" 이 발생한다.
+# 대신 nginx.conf 가 해당 경로에 X-Robots-Tag: noindex 를 내려준다(크롤을 허용해야 읽힌다).
 User-agent: *
 Allow: /
-
-# 앱/인증 경로는 색인 대상 아님(공개 마케팅 페이지만 노출)
-Disallow: /admin
-Disallow: /login
-Disallow: /signup
-Disallow: /dashboard
-Disallow: /profile
-Disallow: /notifications
-Disallow: /reset-password
-Disallow: /verify-email
-Disallow: /email-verification-pending
-Disallow: /account-setup
-Disallow: /lew
-Disallow: /sld-manager
-Disallow: /lighting-manager
-Disallow: /power-socket-manager
-Disallow: /lew-service-manager
-Disallow: /expired-license-manager
-Disallow: /concierge-manager
 
 Sitemap: https://licensekaki.com/sitemap.xml

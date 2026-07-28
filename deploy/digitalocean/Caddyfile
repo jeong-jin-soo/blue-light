@@ -10,6 +10,12 @@
 }
 
 {$SITE_ADDRESS} {
+	# www → apex 301. 둘 다 200 을 주면 Google 이 중복 호스트로 보고
+	# "적절한 표준 태그가 포함된 대체 페이지"로 www 를 색인에서 제외한다.
+	# (dev 는 SITE_ADDRESS 에 www 가 없어 이 매처가 걸리지 않는다.)
+	@www host www.licensekaki.com
+	redir @www https://licensekaki.com{uri} permanent
+
 	encode gzip
 	reverse_proxy frontend:80
 }

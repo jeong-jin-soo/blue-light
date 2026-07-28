@@ -1,7 +1,12 @@
 import { Link } from 'react-router-dom';
 import licensekakiLogo from '../../assets/licensekaki-logo.png';
+import { useDocumentMeta } from '../../hooks/useDocumentMeta';
+import { SEO_META } from '../../constants/seoMeta';
 
 export default function PrivacyPolicyPage() {
+  // /privacy 와 /privacy-policy 가 같은 페이지 — canonical 을 /privacy 로 고정해 중복 색인을 막는다.
+  useDocumentMeta(SEO_META.privacy);
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
       <div className="max-w-3xl mx-auto">
