@@ -21,7 +21,9 @@ import { useRoleStore, selectRoleLabels, selectAssignableRoles, selectFilterable
 const PAGE_SIZE = 20;
 
 export default function AdminUserListPage() {
-  const toast = useToastStore();
+  // 전체 스토어 구독 금지: toasts 배열 변경마다 재렌더 → loadUsers 재생성 → useEffect 재실행 → 에러 토스트 무한루프
+  const toastError = useToastStore((s) => s.error);
+  const toastSuccess = useToastStore((s) => s.success);
   // useShallow: 각 selector가 매 호출마다 새 객체/배열을 반환하므로 얕은 비교 필수
   const roleLabels = useRoleStore(useShallow(selectRoleLabels));
   const assignableRoles = useRoleStore(useShallow(selectAssignableRoles));
@@ -67,10 +69,10 @@ export default function AdminUserListPage() {
         setTotalElements(data.totalElements);
       })
       .catch((err: { message?: string }) => {
-        toast.error(err.message || 'Failed to load users');
+        toastError(err.message || 'Failed to load users');
       })
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, [toastError]);
 
   useEffect(() => {
     loadUsers(page, roleFilter, searchTerm);
@@ -113,7 +115,7 @@ export default function AdminUserListPage() {
     if (!roleChangeTarget) return;
     const isLew = roleChangeTarget.newRole === 'LEW';
     if (isLew && (!lewLicenceNo.trim() || !lewGrade)) {
-      toast.error('LEW licence number and grade are required');
+      toastError('LEW licence number and grade are required');
       return;
     }
     setChangingRole(true);
@@ -122,11 +124,11 @@ export default function AdminUserListPage() {
         role: roleChangeTarget.newRole,
         ...(isLew ? { lewLicenceNo: lewLicenceNo.trim(), lewGrade } : {}),
       });
-      toast.success(`${fullName(roleChangeTarget.user.firstName, roleChangeTarget.user.lastName)}'s role changed to ${roleChangeTarget.newRole}`);
+      toastSuccess(`${fullName(roleChangeTarget.user.firstName, roleChangeTarget.user.lastName)}'s role changed to ${roleChangeTarget.newRole}`);
       loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to change role';
-      toast.error(message);
+      toastError(message);
     } finally {
       setChangingRole(false);
       closeRoleChange();
@@ -139,15 +141,15 @@ export default function AdminUserListPage() {
     try {
       if (approvalTarget.action === 'approve') {
         await adminApi.approveLew(approvalTarget.user.userSeq);
-        toast.success(`${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)} has been approved as LEW`);
+        toastSuccess(`${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)} has been approved as LEW`);
       } else {
         await adminApi.rejectLew(approvalTarget.user.userSeq);
-        toast.success(`${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)}'s LEW registration has been rejected`);
+        toastSuccess(`${fullName(approvalTarget.user.firstName, approvalTarget.user.lastName)}'s LEW registration has been rejected`);
       }
       loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to process approval';
-      toast.error(message);
+      toastError(message);
     } finally {
       setProcessingApproval(false);
       setApprovalTarget(null);
@@ -173,12 +175,12 @@ export default function AdminUserListPage() {
         firstName: inviteForm.firstName.trim(),
         lastName: inviteForm.lastName.trim(),
       });
-      toast.success(`Invitation sent to ${inviteForm.email.trim()}`);
+      toastSuccess(`Invitation sent to ${inviteForm.email.trim()}`);
       closeInvite();
       loadUsers(page, roleFilter, searchTerm);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to send invitation';
-      toast.error(message);
+      toastError(message);
     } finally {
       setInviting(false);
     }
@@ -188,10 +190,10 @@ export default function AdminUserListPage() {
     setResendingId(user.userSeq);
     try {
       await adminApi.resendLewInvite(user.userSeq);
-      toast.success(`Invitation resent to ${user.email}`);
+      toastSuccess(`Invitation resent to ${user.email}`);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to resend invitation';
-      toast.error(message);
+      toastError(message);
     } finally {
       setResendingId(null);
     }
@@ -204,7 +206,7 @@ export default function AdminUserListPage() {
       setRevealedPaynow((m) => ({ ...m, [user.userSeq]: res.paynowValue ?? '-' }));
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to reveal PayNow';
-      toast.error(message);
+      toastError(message);
     } finally {
       setRevealingId(null);
     }
@@ -216,12 +218,12 @@ export default function AdminUserListPage() {
     try {
       await navigator.clipboard.writeText(value);
       setCopiedPaynowId(user.userSeq);
-      toast.success('PayNow copied to clipboard');
+      toastSuccess('PayNow copied to clipboard');
       window.setTimeout(() => {
         setCopiedPaynowId((id) => (id === user.userSeq ? null : id));
       }, 1500);
     } catch {
-      toast.error('Failed to copy PayNow');
+      toastError('Failed to copy PayNow');
     }
   };
 

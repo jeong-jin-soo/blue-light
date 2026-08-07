@@ -17,7 +17,9 @@ import type { SampleFileInfo } from '../../types';
  * - 이메일 인증 설정
  */
 export default function SystemSettingsPage() {
-  const toast = useToastStore();
+  // 전체 스토어 구독 금지: toasts 배열 변경마다 재렌더 → loadData 재생성 → useEffect 재실행 → 에러 토스트 무한루프
+  const toastError = useToastStore((s) => s.error);
+  const toastSuccess = useToastStore((s) => s.success);
 
   // ── System Prompt ──────────────────────────────
   const [prompt, setPrompt] = useState('');
@@ -97,11 +99,11 @@ export default function SystemSettingsPage() {
       setSampleFiles(sampleData);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to load system settings';
-      toast.error(message);
+      toastError(message);
     } finally {
       setLoadingPrompt(false);
     }
-  }, [toast]);
+  }, [toastError]);
 
   useEffect(() => {
     loadData();
@@ -116,10 +118,10 @@ export default function SystemSettingsPage() {
     try {
       await systemAdminApi.updateSystemPrompt(prompt);
       setOriginalPrompt(prompt);
-      toast.success('System prompt updated successfully');
+      toastSuccess('System prompt updated successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update system prompt';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingPrompt(false);
     }
@@ -131,10 +133,10 @@ export default function SystemSettingsPage() {
       const result = await systemAdminApi.resetSystemPrompt();
       setPrompt(result.prompt);
       setOriginalPrompt(result.prompt);
-      toast.success('System prompt reset to default');
+      toastSuccess('System prompt reset to default');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to reset system prompt';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingPrompt(false);
       setShowResetConfirm(false);
@@ -145,7 +147,7 @@ export default function SystemSettingsPage() {
 
   const handleSaveApiKey = async () => {
     if (!newApiKey.trim()) {
-      toast.error('API key cannot be empty');
+      toastError('API key cannot be empty');
       return;
     }
     setSavingKey(true);
@@ -155,10 +157,10 @@ export default function SystemSettingsPage() {
       setGeminiStatus(updated);
       setNewApiKey('');
       setShowKeyInput(false);
-      toast.success('Gemini API key updated successfully');
+      toastSuccess('Gemini API key updated successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update API key';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingKey(false);
     }
@@ -170,10 +172,10 @@ export default function SystemSettingsPage() {
       await systemAdminApi.clearGeminiApiKey();
       const updated = await systemAdminApi.getGeminiApiKeyStatus();
       setGeminiStatus(updated);
-      toast.success('API key cleared — reverted to environment variable');
+      toastSuccess('API key cleared — reverted to environment variable');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to clear API key';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingKey(false);
       setShowClearKeyConfirm(false);
@@ -189,10 +191,10 @@ export default function SystemSettingsPage() {
     try {
       const result = await systemAdminApi.updateEmailVerification(emailVerificationEnabled);
       setOriginalEmailVerification(emailVerificationEnabled);
-      toast.success(result.message);
+      toastSuccess(result.message);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update email verification';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingEmailVerification(false);
     }
@@ -208,10 +210,10 @@ export default function SystemSettingsPage() {
       const result = await systemAdminApi.updateWhatsappNumber(whatsappNumber.trim());
       setWhatsappNumber(result.whatsappBusinessNumber);
       setOriginalWhatsappNumber(result.whatsappBusinessNumber);
-      toast.success(result.message);
+      toastSuccess(result.message);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update WhatsApp number';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingWhatsappNumber(false);
     }
@@ -226,10 +228,10 @@ export default function SystemSettingsPage() {
     try {
       const result = await systemAdminApi.updateSldAiGeneration(sldAiEnabled);
       setOriginalSldAi(sldAiEnabled);
-      toast.success(result.message);
+      toastSuccess(result.message);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update SLD AI generation setting';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingSldAi(false);
     }
@@ -244,10 +246,10 @@ export default function SystemSettingsPage() {
     try {
       await systemAdminApi.updateSldSystemPrompt(sldPrompt);
       setOriginalSldPrompt(sldPrompt);
-      toast.success('SLD system prompt updated successfully');
+      toastSuccess('SLD system prompt updated successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update SLD system prompt';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingSldPrompt(false);
     }
@@ -259,10 +261,10 @@ export default function SystemSettingsPage() {
       const result = await systemAdminApi.resetSldSystemPrompt();
       setSldPrompt(result.prompt);
       setOriginalSldPrompt(result.prompt);
-      toast.success('SLD system prompt reset to default');
+      toastSuccess('SLD system prompt reset to default');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to reset SLD system prompt';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingSldPrompt(false);
       setShowSldResetConfirm(false);
@@ -286,10 +288,10 @@ export default function SystemSettingsPage() {
       await sampleFileApi.uploadSampleFile(categoryKey, file);
       const updated = await sampleFileApi.getSampleFiles();
       setSampleFiles(updated);
-      toast.success('Sample file uploaded successfully');
+      toastSuccess('Sample file uploaded successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to upload sample file';
-      toast.error(message);
+      toastError(message);
     } finally {
       setUploadingCategory(null);
     }
@@ -302,10 +304,10 @@ export default function SystemSettingsPage() {
       await sampleFileApi.deleteSampleFile(deleteSeqTarget);
       const updated = await sampleFileApi.getSampleFiles();
       setSampleFiles(updated);
-      toast.success('Sample file deleted');
+      toastSuccess('Sample file deleted');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to delete sample file';
-      toast.error(message);
+      toastError(message);
     } finally {
       setDeletingSeq(null);
       setShowDeleteSampleConfirm(false);
@@ -321,7 +323,7 @@ export default function SystemSettingsPage() {
       const url = await sampleFileApi.getSampleFilePreviewUrl(sample.sampleFileSeq);
       setPreviewBlobUrl(url);
     } catch {
-      toast.error('Failed to load preview');
+      toastError('Failed to load preview');
       setPreviewSeq(null);
     } finally {
       setPreviewLoading(false);

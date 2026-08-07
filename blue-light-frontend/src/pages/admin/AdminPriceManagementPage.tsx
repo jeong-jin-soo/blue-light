@@ -76,7 +76,9 @@ function createEmptyTier(): EditableTier {
 // ── 메인 컴포넌트 ──────────────────────────────
 
 export default function AdminPriceManagementPage() {
-  const toast = useToastStore();
+  // 전체 스토어 구독 금지: toasts 배열 변경마다 재렌더 → loadPrices/loadSettings 재생성 → useEffect 재실행 → 에러 토스트 무한루프
+  const toastError = useToastStore((s) => s.error);
+  const toastSuccess = useToastStore((s) => s.success);
   const [loading, setLoading] = useState(true);
 
   // 가격 티어 상태
@@ -114,10 +116,10 @@ export default function AdminPriceManagementPage() {
         initializeTiers(prices);
       })
       .catch((err: { message?: string }) => {
-        toast.error(err.message || 'Failed to load prices');
+        toastError(err.message || 'Failed to load prices');
       })
       .finally(() => setLoading(false));
-  }, [initializeTiers, toast]);
+  }, [initializeTiers, toastError]);
 
   const loadSettings = useCallback(() => {
     adminApi
@@ -141,9 +143,9 @@ export default function AdminPriceManagementPage() {
         }
       })
       .catch((err: { message?: string }) => {
-        toast.error(err.message || 'Failed to load settings');
+        toastError(err.message || 'Failed to load settings');
       });
-  }, [toast]);
+  }, [toastError]);
 
   useEffect(() => {
     loadPrices();
@@ -350,10 +352,10 @@ export default function AdminPriceManagementPage() {
       };
       const updated = await adminApi.batchUpdatePrices(request);
       initializeTiers(updated);
-      toast.success('Price tiers saved successfully');
+      toastSuccess('Price tiers saved successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to save price tiers';
-      toast.error(message);
+      toastError(message);
     } finally {
       setBatchSaving(false);
     }
@@ -374,10 +376,10 @@ export default function AdminPriceManagementPage() {
       };
       await adminApi.updateSettings(data);
       setOriginalPaymentInfo(data);
-      toast.success('Payment information updated successfully');
+      toastSuccess('Payment information updated successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to update payment info';
-      toast.error(message);
+      toastError(message);
     } finally {
       setSavingPayment(false);
     }
@@ -389,13 +391,13 @@ export default function AdminPriceManagementPage() {
 
     // 이미지 파일 검증
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (PNG, JPG, etc.)');
+      toastError('Please select an image file (PNG, JPG, etc.)');
       return;
     }
 
     // 5MB 제한
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image file must be less than 5MB');
+      toastError('Image file must be less than 5MB');
       return;
     }
 
@@ -408,10 +410,10 @@ export default function AdminPriceManagementPage() {
       }
       // 업로드 성공 후 로컬 파일로 즉시 미리보기 (서버 왕복 불필요)
       setQrImageUrl(URL.createObjectURL(file));
-      toast.success('QR image uploaded successfully');
+      toastSuccess('QR image uploaded successfully');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to upload QR image';
-      toast.error(message);
+      toastError(message);
     } finally {
       setUploadingQr(false);
       // input 리셋
@@ -428,10 +430,10 @@ export default function AdminPriceManagementPage() {
         URL.revokeObjectURL(qrImageUrl);
       }
       setQrImageUrl(null);
-      toast.success('QR image removed');
+      toastSuccess('QR image removed');
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to remove QR image';
-      toast.error(message);
+      toastError(message);
     } finally {
       setDeletingQr(false);
     }

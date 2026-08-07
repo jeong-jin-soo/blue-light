@@ -23,7 +23,9 @@ import { CheckCircle2, Download, FileText, Trash2, UploadCloud } from 'lucide-re
  * + "현재 폼으로 지정"(activate) + 삭제 + 다운로드.
  */
 export default function LoaFormTemplatesSection() {
-  const toast = useToastStore();
+  // 전체 스토어 구독 금지: toasts 배열 변경마다 재렌더 → load 재생성 → useEffect 재실행 → 에러 토스트 무한루프
+  const toastError = useToastStore((s) => s.error);
+  const toastSuccess = useToastStore((s) => s.success);
 
   const [templates, setTemplates] = useState<LoaFormTemplateResponse[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,9 +46,9 @@ export default function LoaFormTemplatesSection() {
     setLoading(true);
     listLoaFormTemplates()
       .then(setTemplates)
-      .catch((err: { message?: string }) => toast.error(err.message || 'Failed to load LoA forms'))
+      .catch((err: { message?: string }) => toastError(err.message || 'Failed to load LoA forms'))
       .finally(() => setLoading(false));
-  }, [toast]);
+  }, [toastError]);
 
   useEffect(() => {
     load();
@@ -60,12 +62,12 @@ export default function LoaFormTemplatesSection() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (file && file.type !== 'application/pdf') {
-      toast.error('Please select a PDF file');
+      toastError('Please select a PDF file');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
     if (file && file.size > 20 * 1024 * 1024) {
-      toast.error('File must be less than 20MB');
+      toastError('File must be less than 20MB');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -74,17 +76,17 @@ export default function LoaFormTemplatesSection() {
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      toast.error('Please select a PDF file');
+      toastError('Please select a PDF file');
       return;
     }
     if (!label.trim()) {
-      toast.error('Please enter a label');
+      toastError('Please enter a label');
       return;
     }
     setUploading(true);
     try {
       await uploadLoaFormTemplate(selectedFile, label.trim(), activateOnUpload);
-      toast.success('LoA form uploaded');
+      toastSuccess('LoA form uploaded');
       setLabel('');
       setSelectedFile(null);
       setActivateOnUpload(true);
@@ -92,7 +94,7 @@ export default function LoaFormTemplatesSection() {
       load();
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to upload LoA form';
-      toast.error(message);
+      toastError(message);
     } finally {
       setUploading(false);
     }
@@ -102,11 +104,11 @@ export default function LoaFormTemplatesSection() {
     setActivatingSeq(seq);
     try {
       await activateLoaFormTemplate(seq);
-      toast.success('Form set as current');
+      toastSuccess('Form set as current');
       load();
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to activate form';
-      toast.error(message);
+      toastError(message);
     } finally {
       setActivatingSeq(null);
     }
@@ -117,12 +119,12 @@ export default function LoaFormTemplatesSection() {
     setDeleting(true);
     try {
       await deleteLoaFormTemplate(deleteTarget.loaFormTemplateSeq);
-      toast.success('Form removed');
+      toastSuccess('Form removed');
       setDeleteTarget(null);
       load();
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to remove form';
-      toast.error(message);
+      toastError(message);
     } finally {
       setDeleting(false);
     }
@@ -133,7 +135,7 @@ export default function LoaFormTemplatesSection() {
       await downloadLoaFormTemplate(t.loaFormTemplateSeq, t.label);
     } catch (err: unknown) {
       const message = (err as { message?: string })?.message || 'Failed to download form';
-      toast.error(message);
+      toastError(message);
     }
   };
 
