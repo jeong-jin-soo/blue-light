@@ -18,5 +18,5 @@ public record AnalyticsOverviewResponse(
         List<KeyCount> visitsBySource
 ) {
     public record KeyCount(String key, long count) {}
-    public record Daily(String date, long visits, long clicks) {}
+    public record Daily(String date, long visitors, long visits, long clicks) {}
 }

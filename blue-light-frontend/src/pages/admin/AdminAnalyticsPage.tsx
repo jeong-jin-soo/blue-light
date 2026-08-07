@@ -50,15 +50,16 @@ function BarList({ title, rows, accent }: { title: string; rows: KeyCount[]; acc
   );
 }
 
-/** 일자별 방문/클릭 막대 */
+/** 일자별 방문자/방문/클릭 막대 */
 function DailyChart({ data }: { data: AnalyticsOverview['daily'] }) {
-  const max = Math.max(1, ...data.map((d) => d.visits));
+  const max = Math.max(1, ...data.map((d) => Math.max(d.visitors, d.visits)));
   return (
     <Card>
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-800">Daily visits &amp; enquiries</h3>
+        <h3 className="text-sm font-semibold text-gray-800">Daily visitors &amp; enquiries</h3>
         <div className="flex items-center gap-4 text-xs text-gray-500">
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: 'var(--tw-prose, #26406E)' }} />Visits</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#26406E]" />Visitors</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#7E9BCE]" />Pageviews</span>
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-[#25D366]" />Enquiries</span>
         </div>
       </div>
@@ -66,17 +67,53 @@ function DailyChart({ data }: { data: AnalyticsOverview['daily'] }) {
         <p className="text-sm text-gray-400">No visits recorded yet.</p>
       ) : (
         <div className="overflow-x-auto">
-          <div className="flex items-end gap-1.5" style={{ height: 140, minWidth: data.length * 16 }}>
+          <div className="flex items-end gap-1.5" style={{ height: 140, minWidth: data.length * 20 }}>
             {data.map((d) => (
-              <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5" style={{ minWidth: 10 }}
-                title={`${d.date} · ${d.visits} visits · ${d.clicks} enquiries`}>
+              <div key={d.date} className="flex flex-1 flex-col items-center gap-0.5" style={{ minWidth: 14 }}
+                title={`${d.date} · ${d.visitors} visitors · ${d.visits} pageviews · ${d.clicks} enquiries`}>
                 <div className="flex w-full items-end justify-center gap-[2px]" style={{ height: 120 }}>
-                  <div className="w-1.5 rounded-t bg-[#26406E]" style={{ height: `${(d.visits / max) * 100}%` }} />
+                  <div className="w-1.5 rounded-t bg-[#26406E]" style={{ height: `${(d.visitors / max) * 100}%` }} />
+                  <div className="w-1.5 rounded-t bg-[#7E9BCE]" style={{ height: `${(d.visits / max) * 100}%` }} />
                   <div className="w-1.5 rounded-t bg-[#25D366]" style={{ height: `${(d.clicks / max) * 100}%` }} />
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** 일자별 상세 표 (최신일 우선) */
+function DailyTable({ data }: { data: AnalyticsOverview['daily'] }) {
+  return (
+    <Card>
+      <h3 className="mb-4 text-sm font-semibold text-gray-800">Daily breakdown</h3>
+      {data.length === 0 ? (
+        <p className="text-sm text-gray-400">No data yet.</p>
+      ) : (
+        <div className="max-h-80 overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white">
+              <tr className="border-b border-gray-200 text-left text-xs font-medium uppercase tracking-wide text-gray-400">
+                <th className="py-2 pr-4">Date</th>
+                <th className="py-2 pr-4 text-right">Visitors</th>
+                <th className="py-2 pr-4 text-right">Pageviews</th>
+                <th className="py-2 text-right">Enquiries</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...data].reverse().map((d) => (
+                <tr key={d.date} className="border-b border-gray-100 last:border-0">
+                  <td className="py-2 pr-4 text-gray-600">{d.date}</td>
+                  <td className="py-2 pr-4 text-right font-medium text-gray-900 tabular-nums">{d.visitors}</td>
+                  <td className="py-2 pr-4 text-right text-gray-600 tabular-nums">{d.visits}</td>
+                  <td className="py-2 text-right text-gray-600 tabular-nums">{d.clicks}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </Card>
@@ -91,18 +128,19 @@ export default function AdminAnalyticsPage() {
   const [days, setDays] = useState(30);
   const [data, setData] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
-  const toast = useToastStore();
+  // 전체 스토어 구독 금지: toasts 배열 변경마다 재렌더 → load 재생성 → useEffect 재실행 → 에러 토스트 무한루프
+  const toastError = useToastStore((s) => s.error);
 
   const load = useCallback(async (d: number) => {
     setLoading(true);
     try {
       setData(await getAnalyticsOverview(d));
     } catch {
-      toast.error('Failed to load analytics');
+      toastError('Failed to load analytics');
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toastError]);
 
   useEffect(() => { load(days); }, [days, load]);
 
@@ -144,6 +182,8 @@ export default function AdminAnalyticsPage() {
 
           <DailyChart data={data.daily} />
 
+          <DailyTable data={data.daily} />
+
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <BarList title="Enquiries by source" rows={data.clicksBySource} accent="#26406E" />
             <BarList title="Enquiries by campaign" rows={data.clicksByCampaign} accent="#25D366" />
@@ -156,7 +196,12 @@ export default function AdminAnalyticsPage() {
             Untagged / direct traffic shows as <code>(direct)</code>.
           </p>
         </>
-      ) : null}
+      ) : (
+        <Card className="flex flex-col items-start gap-3">
+          <p className="text-sm text-gray-500">Failed to load analytics data.</p>
+          <Button size="sm" onClick={() => load(days)}>Retry</Button>
+        </Card>
+      )}
     </div>
   );
 }

@@ -42,7 +42,7 @@ public class AdminAnalyticsController {
         long clicks = repo.countByTypeSince(WebEvent.TYPE_WHATSAPP_CLICK, from);
 
         List<Daily> daily = repo.dailyStatsSince(from).stream()
-                .map(s -> new Daily(s.getD(), s.getVisits(), s.getClicks()))
+                .map(s -> new Daily(String.valueOf(s.getD()), s.getVisitors(), s.getVisits(), s.getClicks()))
                 .toList();
 
         AnalyticsOverviewResponse body = new AnalyticsOverviewResponse(

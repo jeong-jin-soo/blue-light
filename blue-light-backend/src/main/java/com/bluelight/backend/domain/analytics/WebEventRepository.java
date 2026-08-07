@@ -19,9 +19,10 @@ public interface WebEventRepository extends JpaRepository<WebEvent, Long> {
         long getC();
     }
 
-    /** 일자별 방문/클릭 투영 */
+    /** 일자별 방문자/방문/클릭 투영. d 는 드라이버가 DATE 를 LocalDate 로 반환. */
     interface DailyStat {
-        String getD();
+        java.time.LocalDate getD();
+        long getVisitors();
         long getVisits();
         long getClicks();
     }
@@ -50,6 +51,7 @@ public interface WebEventRepository extends JpaRepository<WebEvent, Long> {
     List<KeyCount> countClicksByServiceSince(@Param("from") LocalDateTime from);
 
     @Query(value = "SELECT DATE(created_at) AS d, " +
+            "COUNT(DISTINCT session_id) AS visitors, " +
             "SUM(event_type = 'PAGE_VIEW') AS visits, " +
             "SUM(event_type = 'WHATSAPP_CLICK') AS clicks " +
             "FROM web_event WHERE created_at >= :from " +

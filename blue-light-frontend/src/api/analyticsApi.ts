@@ -7,6 +7,7 @@ export interface KeyCount {
 
 export interface DailyStat {
   date: string;
+  visitors: number;
   visits: number;
   clicks: number;
 }
