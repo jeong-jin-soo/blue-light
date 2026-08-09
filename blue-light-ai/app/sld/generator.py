@@ -211,6 +211,79 @@ class SldPipeline:
 
         return result
 
+    # CP-SAT solve 상한. 벤치 최악 케이스(ct_meter 8회로 A2 ≈ 20s)를 커버하되
+    # 그 이상은 FEASIBLE 채택 또는 v3 폴백.
+    _SOLVER_TIME_LIMIT_S = 20.0
+
+    def _try_solver_layout(
+        self, requirements: dict, pc: "PageConfig | None",
+    ) -> "LayoutResult | None":
+        """CP-SAT 솔버 레이아웃 시도.
+
+        None 반환 조건 (→ 호출자가 절차적 v3로 폴백):
+        - SLD_LAYOUT_ENGINE=v3 (비활성)
+        - capability 가드 미통과 (멀티DB·protection_groups·케이블연장 등)
+        - solve 실패(INFEASIBLE/timeout) 또는 어댑터 빈 결과
+        - ortools 미설치 등 import/실행 오류
+        """
+        from app.config import settings
+        engine = str(getattr(settings, "sld_layout_engine", "auto")).lower()
+        if engine == "v3":
+            return None
+
+        try:
+            from app.sld.solver.capability import solver_can_handle
+            ok, reason = solver_can_handle(requirements)
+            if not ok:
+                # solver 강제 모드에서만 warning — auto에선 정상 폴백이므로 info.
+                log = logger.warning if engine == "solver" else logger.info
+                log("Solver layout skipped (%s) → procedural v3", reason)
+                return None
+
+            from app.sld.solver import adapt_to_layout_result, place_layout
+            from app.sld.solver.scenario import build_scene
+
+            _pc = pc or A3_LANDSCAPE
+            scene = build_scene(requirements, page_config=_pc)
+            result = place_layout(scene, time_limit_s=self._SOLVER_TIME_LIMIT_S)
+            if not result.ok:
+                logger.warning(
+                    "Solver layout failed (status=%s, overlaps=%d) → procedural v3",
+                    result.status, result.overlaps,
+                )
+                return None
+
+            layout = adapt_to_layout_result(scene, result, requirements)
+            if not layout.components:
+                logger.warning("Solver adapter produced empty layout → procedural v3")
+                return None
+
+            # 솔버는 페이지 경계·타이틀블록 클리어런스를 모델 제약으로 보장한다.
+            # post_validator 등 하위 소비자가 같은 기준으로 검사하도록 config
+            # bounds를 PageConfig에 정렬하고, 스케일 축소는 사용하지 않는다.
+            layout.config = LayoutConfig(
+                min_x=_pc.drawing_left,
+                max_x=_pc.drawing_right,
+                min_y=_pc.title_block_top,
+                max_y=_pc.drawing_top,
+            )
+            layout.config.component_scale = 1.0
+
+            # 절차 경로와 동일한 overflow 측정 채움 — 솔버는 경계를 제약으로
+            # 보장하므로 정상이면 overflow=0이지만, 소비자(SldResult.
+            # overflow_metrics / layout_warnings)가 균일하게 동작해야 한다.
+            from app.sld.layout.engine import _detect_overflow
+            _detect_overflow(layout, layout.config)
+            logger.info(
+                "Layout engine: CP-SAT solver (status=%s, %.2fs, %d components)",
+                result.status, result.solve_time_s, len(layout.components),
+            )
+            return layout
+        except Exception as e:
+            logger.warning("Solver layout error (%s: %s) → procedural v3",
+                           type(e).__name__, e)
+            return None
+
     def _generate_once(
         self,
         requirements: dict,
@@ -247,8 +320,12 @@ class SldPipeline:
             layout_result = compute_layout(requirements, config=_opt_config,
                                            application_info=app_info, page_config=pc)
         else:
-            layout_result = compute_layout_v3(requirements, config=_opt_config,
-                                              application_info=app_info, page_config=pc)
+            # 단일 보드: CP-SAT 솔버 우선 (SLD_LAYOUT_ENGINE=auto|solver),
+            # 미지원 키/솔버 실패 시 절차적 v3 폴백.
+            layout_result = self._try_solver_layout(requirements, pc)
+            if layout_result is None:
+                layout_result = compute_layout_v3(requirements, config=_opt_config,
+                                                  application_info=app_info, page_config=pc)
 
         # ❺½ Post-layout validation + auto-fix (max 2 attempts)
         if layout_result.config:
@@ -299,8 +376,17 @@ class SldPipeline:
 
         # Render into selected backends
         _scale = layout_result.config.component_scale if layout_result.config else 1.0
-        _cx = pc.page_width / 2 if pc else 210.0
-        _cy = pc.page_height / 2 if pc else 148.5
+        # 축소 피벗은 레이아웃의 경계 확장 피벗과 일치해야 한다.
+        # _expand_layout_for_scale()는 도면영역 중심(cx,cy) 기준 대칭 확장이므로
+        # 확장 후에도 (min+max)/2 가 그 피벗을 보존한다. 페이지 중심(예: A3
+        # y=148.5)을 쓰면 피벗이 ~25mm 아래로 어긋나 콘텐츠가 타이틀블록
+        # 쪽으로 밀리는 결함이 있었음 (multi-DB scale<1에서 노출).
+        if layout_result.config:
+            _cx = (layout_result.config.min_x + layout_result.config.max_x) / 2
+            _cy = (layout_result.config.min_y + layout_result.config.max_y) / 2
+        else:
+            _cx = pc.page_width / 2 if pc else 210.0
+            _cy = pc.page_height / 2 if pc else 148.5
         component_count = 0
         for backend in backends:
             draw_border(backend, page_config=pc)

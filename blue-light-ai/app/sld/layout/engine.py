@@ -783,10 +783,13 @@ def _center_vertically(result: LayoutResult, config: LayoutConfig) -> None:
         # If content is too tall for even that, prioritise keeping the top
         # within bounds (top is circuit labels — most readable), letting
         # the bottom overflow into the title block zone.
-        if content_max_y + shift > config.max_y - 2:
-            shift = config.max_y - 2 - content_max_y
+        #
+        # NOTE: 마지막 대입이 이기므로 top 클램프가 나중이어야 한다.
+        # (기존 코드는 순서가 반대라 bottom 고정 + top이 페이지 밖으로 밀렸음)
         if content_min_y + shift < config.min_y:
             shift = config.min_y - content_min_y
+        if content_max_y + shift > config.max_y - 2:
+            shift = config.max_y - 2 - content_max_y
 
     if abs(shift) < 1.0:
         return  # Already centered enough

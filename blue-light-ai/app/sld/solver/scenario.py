@@ -1,19 +1,26 @@
 """Build a SolverScene from a requirements dict + the component catalog.
 
-Phase 1 supports the simplest case end-to-end:
-  - 1-phase or 3-phase supply
-  - SP-meter (no CT metering) — sections 1, 2, 3, 5, 7, 9, 10, 11, 12, 14
-  - N sub-circuits with optional rotated multi-line labels
-  - Earth bar at the bottom
+지원 범위 (단일 보드):
+  - 1-phase / 3-phase supply
+  - metering 3분기: sp_meter (meter board), ct_meter (pre-fuse + CT metering
+    composite), non_meter (unit isolator)
+  - N sub-circuits (단일 행, ≤24) + rotated multi-line labels
+  - Earth bar
 
-CT metering and multi-DB layouts are explicitly out of scope for Phase 1;
-they will be added by extending this builder in Phase 2 / 3.
+Multi-DB / protection_groups / cable-extension 은 미지원 — 적용 가능 여부는
+`app.sld.solver.capability.solver_can_handle()` 이 판정하고, 미지원이면
+파이프라인이 절차적 엔진(v3)으로 폴백한다.
 """
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from app.sld.catalog import get_catalog
 from app.sld.solver.boxes import Box, BoxRole, SolverScene, mm
+
+if TYPE_CHECKING:  # 순환 import 방지 — 런타임엔 duck typing으로 충분
+    from app.sld.page_config import PageConfig
 
 
 # Component-name → catalog key
@@ -82,24 +89,50 @@ def _sub_label(parent: str, *, lines: list[str]) -> Box:
     )
 
 
-def build_scene(requirements: dict) -> SolverScene:
-    """Translate a requirements dict to a SolverScene."""
-    scene = SolverScene()
-    page = requirements.get("page", {})
-    if page.get("size") == "A2":
-        scene.page_w = mm(594)
-        scene.page_h = mm(420)
+def build_scene(
+    requirements: dict,
+    page_config: "PageConfig | None" = None,
+) -> SolverScene:
+    """Translate a requirements dict to a SolverScene.
 
-    # 타이틀블록은 페이지 하단 띠를 차지한다 (PageConfig.title_block_height=32 mm).
-    # 솔버 박스가 타이틀블록 영역으로 침범하지 않도록 별도의 하단 마진을 확보.
-    # 32 mm + 8 mm 안전 여유 = 40 mm. PageConfig 기본값(margin=10)과 합치면
-    # 페이지 좌표 y=10..42가 타이틀블록 → 솔버는 y ≥ ~40에 배치된다.
-    title_block_clearance = mm(40)
-    scene.margin_bottom = max(scene.margin, title_block_clearance)
+    Args:
+        requirements: 엔진 공용 requirements dict.
+        page_config: 파이프라인이 결정한 페이지 설정 (A3/A2/AUTO 해석 결과).
+            주어지면 페이지 크기·마진·타이틀블록 클리어런스의 단일 원천이 된다.
+            None이면 레거시 경로: ``requirements["page"]["size"]`` == "A2"만
+            인식하고 그 외 A3 기본.
+    """
+    scene = SolverScene()
+    if page_config is not None:
+        scene.page_w = mm(page_config.page_width)
+        scene.page_h = mm(page_config.page_height)
+        scene.margin = mm(page_config.margin)
+        # 타이틀블록 상단(margin + title_block_height)까지 침범 금지.
+        # -2 mm 는 기존 하드코딩(40 mm = 10+32-2)과 동일한 관용 오차 유지.
+        title_block_clearance = mm(
+            page_config.margin + page_config.title_block_height - 2
+        )
+        scene.margin_bottom = max(scene.margin, title_block_clearance)
+    else:
+        page = requirements.get("page", {})
+        if page.get("size") == "A2":
+            scene.page_w = mm(594)
+            scene.page_h = mm(420)
+
+        # 타이틀블록은 페이지 하단 띠를 차지한다 (PageConfig.title_block_height=32 mm).
+        # 솔버 박스가 타이틀블록 영역으로 침범하지 않도록 별도의 하단 마진을 확보.
+        # 32 mm + 8 mm 안전 여유 = 40 mm. PageConfig 기본값(margin=10)과 합치면
+        # 페이지 좌표 y=10..42가 타이틀블록 → 솔버는 y ≥ ~40에 배치된다.
+        title_block_clearance = mm(40)
+        scene.margin_bottom = max(scene.margin, title_block_clearance)
 
     main = requirements.get("main_breaker", {}) or {}
     elcb = requirements.get("elcb", {}) or {}
-    metering = (requirements.get("metering") or {}).get("type", "sp_meter")
+    _m = requirements.get("metering")
+    if isinstance(_m, str):  # 레거시 문자열 형태 지원 (capability와 동일 규약)
+        metering = _m or "sp_meter"
+    else:
+        metering = (_m or {}).get("type", "sp_meter")
     sub_circuits = requirements.get("sub_circuits", [])
 
     # ── Section 1: supply ──

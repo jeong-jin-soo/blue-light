@@ -596,6 +596,9 @@ class LayoutResult:
     # Audit report (populated by audit_layout after _detect_overflow)
     audit_report: "AuditReport | None" = None
 
+    # Layout engine that produced this result: "procedural" (v2/v3) | "solver" (CP-SAT)
+    engine: str = "procedural"
+
     # Multi-DB tracking
     db_count: int = 1  # Number of distribution boards (1=single, 2+=multi)
     db_box_ranges: list[dict] = field(default_factory=list)  # Per-DB: {start_y, end_y, left, right}

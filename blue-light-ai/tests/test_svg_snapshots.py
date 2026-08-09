@@ -46,6 +46,16 @@ def _normalize_svg(svg: str) -> str:
     return svg
 
 
+@pytest.fixture(autouse=True)
+def _pin_procedural_engine(monkeypatch):
+    """스냅샷은 절차적(v3) 렌더 회귀 가드 — 솔버 경로로 새면 취지가 깨진다.
+
+    솔버 경로의 회귀는 tests/test_solver_pipeline.py 가 별도로 가드한다.
+    """
+    from app.config import settings
+    monkeypatch.setattr(settings, "sld_layout_engine", "v3")
+
+
 def _generate_svg(requirements: dict) -> str:
     """Generate SVG from requirements using the full pipeline."""
     svg_string = SldPipeline().run(

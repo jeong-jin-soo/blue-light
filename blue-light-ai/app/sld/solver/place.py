@@ -86,6 +86,9 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
     model.AddNoOverlap2D(x_ivs, y_ivs)
 
     # ── 14-section ordering on the spine ──
+    # SG LEW 관례 (sg-sld-domain-knowledge.md): 전원(§1)이 페이지 하단,
+    # 부하(부스바·서브회로)가 상단 — 흐름은 아래→위.
+    # 즉 section 번호가 클수록 y가 크다(위쪽).
     spine = sorted(
         [b for b in scene.boxes if b.column == "spine"],
         key=lambda b: b.section,
@@ -96,7 +99,7 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
     for a, b in zip(spine, spine[1:]):
         ya = vars_[a.name][1]
         yb = vars_[b.name][1]
-        model.Add(ya >= yb + b.h + SECTION_GAP)
+        model.Add(yb >= ya + a.h + SECTION_GAP)
 
     # ── Spine center alignment (with ±1 unit slack for parity safety) ──
     # CP-SAT integers cannot express center alignment exactly when widths
@@ -188,16 +191,17 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
         sub_gap = model.NewIntVar(60, 600, "sub_gap")
         for a, b in zip(subs, subs[1:]):
             model.Add(vars_[b.name][0] == vars_[a.name][0] + a.w + sub_gap)
-        # Below busbar
+        # Above busbar — 부스바에서 위로 분기해 상단 부하로 향한다 (SG 관례).
         if "busbar" in vars_:
             bus_y = vars_["busbar"][1]
-            model.Add(y_first + subs[0].h + 80 <= bus_y)
+            bus_box = next(b for b in scene.boxes if b.name == "busbar")
+            model.Add(y_first >= bus_y + bus_box.h + 80)
             # Busbar spans the full sub-circuit row.
             bus_x, _, bus_w_var, _ = vars_["busbar"]
             model.Add(bus_x <= vars_[subs[0].name][0] - 40)
             model.Add(bus_x + bus_w_var >= vars_[subs[-1].name][0] + subs[-1].w + 40)
 
-    # ── Earth bar below sub-circuits ──
+    # ── Earth bar: 도면 최하단 (spine 최저 섹션인 supply 아래) ──
     earth = next((b for b in scene.boxes if b.name == "earth_bar"), None)
     if earth and subs and spine:
         xe = vars_["earth_bar"][0]
@@ -205,8 +209,8 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
         x_anc = vars_[spine[0].name][0]
         model.Add(2 * xe + earth.w - 2 * x_anc - spine[0].w <= ALIGN_SLACK)
         model.Add(2 * xe + earth.w - 2 * x_anc - spine[0].w >= -ALIGN_SLACK)
-        y_first = vars_[subs[0].name][1]
-        model.Add(ye + earth.h + 60 <= y_first)
+        y_spine_bottom = vars_[spine[0].name][1]
+        model.Add(ye + earth.h + 60 <= y_spine_bottom)
 
     # ── Objective: minimise total drawing footprint (height + width). ──
     # Including the horizontal axis prevents the sub-circuit row from
@@ -228,6 +232,11 @@ def place_layout(scene: SolverScene, *, time_limit_s: float = 15.0) -> SolveResu
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = time_limit_s
     solver.parameters.num_search_workers = 8
+    # 멀티워커 탐색은 동비용 최적해 중 어느 것을 고를지 비결정적이다.
+    # 드물게 wire가 심볼 본체를 스치는 대체해가 선택될 수 있어(2026-08-09
+    # full-suite에서 1회 관측) 시드를 고정해 해 선택 변동성을 줄인다.
+    # 완전한 결정성은 workers=1이 필요하지만 속도 손실이 커서 채택하지 않음.
+    solver.parameters.random_seed = 20260809
     status_code = solver.Solve(model)
     status_name = solver.StatusName(status_code)
 

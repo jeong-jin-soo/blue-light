@@ -196,11 +196,35 @@ def _compute_bounding_box(comp: PlacedComponent, config: "LayoutConfig | None" =
         total_h = sym_h + 5 + 10 + 10  # breaker + stub + tail + name label
 
         if abs(comp.rotation - 90.0) < 0.1:
-            # Rotation=90°: labels are drawn to the LEFT of the MCB
-            # (base_x = comp.x - 12 in generator). Only symbol on the right.
-            # Labels are short text (~6mm wide), so actual right edge ≈ comp.x - 6
-            label_left = 7.0   # covers label text extent (compact)
-            right_extent = sym_w + 1.0  # symbol right edge + small margin
+            # Rotation=90°: 라벨은 MTEXT top-left 앵커로
+            # base_x = comp.x - breaker_label_x_default 에서 시작해 오른쪽으로
+            # 흐른다 (generator._draw_breaker_block_label 과 동일 근거).
+            # 기존의 label_left=7.0 고정값은 라벨 내용 길이를 무시해
+            # 긴 라벨("B100A" 등)에서 겹침 false-negative 를 만들었음 —
+            # 렌더러와 같은 줄 구성을 실측한다.
+            info_items = []
+            if comp.rating:
+                rating_text = comp.rating
+                if comp.breaker_characteristic:
+                    rating_text = f"{comp.breaker_characteristic}{comp.rating}"
+                info_items.append(rating_text)
+            if comp.poles:
+                info_items.append(comp.poles)
+            if comp.breaker_type_str:
+                info_items.append(
+                    "MCB" if comp.breaker_type_str.upper() == "ISOLATOR"
+                    else comp.breaker_type_str
+                )
+            if comp.fault_kA:
+                info_items.append(f"{comp.fault_kA}KA")
+            _char_h = config.label_ch_breaker_info if config else 2.0
+            _label_w, _ = measure_mtext_size(
+                "\\P".join(info_items), cap_height=_char_h,
+            ) if info_items else (0.0, 0.0)
+            _offset = config.breaker_label_x_default if config else 6.0
+            label_left = _offset + 1.0  # base_x + 여유 1mm
+            # 라벨이 심볼 폭을 넘어 오른쪽으로 삐져나올 수 있다.
+            right_extent = max(sym_w, _label_w - _offset) + 1.0
             return BoundingBox(
                 x=comp.x - label_left,
                 y=comp.y,

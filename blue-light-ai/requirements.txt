@@ -27,6 +27,9 @@ python-multipart>=0.0.18
 # DXF CAD file generation
 ezdxf>=1.4.0
 
+# CP-SAT layout solver (app/sld/solver — 글로벌 비중첩 보장)
+ortools>=9.10
+
 # PDF analysis + Track A title block editing
 pymupdf>=1.27.0
 

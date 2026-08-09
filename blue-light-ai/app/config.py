@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # Layout Optimizer (3-Tier)
     layout_optimizer_enabled: bool = False  # LAYOUT_OPTIMIZER_ENABLED=true로 활성화
 
+    # SLD 레이아웃 엔진 선택 (SLD_LAYOUT_ENGINE)
+    # - "auto"  : 솔버가 지원하는 케이스는 CP-SAT 솔버, 아니면 절차적 v3 (기본)
+    # - "solver": 솔버 강제 시도 (미지원/실패 시 v3 폴백 + warning 로그)
+    # - "v3"    : 절차적 엔진만 사용 (솔버 비활성)
+    sld_layout_engine: str = "auto"
+
     # SSE 타임아웃 정합 (단위: 초)
     # - sse_heartbeat_interval: AI service가 SSE 응답에 keepalive 이벤트를 보내는 주기.
     #   짧으면 트래픽↑, 길면 ReadTimeout 위험↑. 기본 15s.

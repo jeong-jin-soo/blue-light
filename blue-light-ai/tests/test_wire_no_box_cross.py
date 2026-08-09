@@ -23,6 +23,9 @@ from app.sld.solver.place import place_layout
 from app.sld.solver.scenario import build_scene
 from app.sld.solver.wire_check import measure_crossings
 
+# 9개 시나리오 × CP-SAT solve ≈ 50s — CI fast path에서 제외 가능하도록 표시
+pytestmark = pytest.mark.slow
+
 
 def _make_circuit(i: int) -> dict:
     return {

@@ -233,8 +233,8 @@ def _emit_meter_board_subs(
 
     솔버 박스 cx = spine x 이므로, sub-component를 cx에 가운데 정렬하면
     spine wire가 각 심볼의 top/bottom 핀을 통과하면서 자연스럽게 연결돼 보인다.
-    흐름은 페이지 위→아래(supply→main_breaker)이므로 박스 위쪽에 ISO,
-    중간에 KWH, 아래쪽에 MCB.
+    흐름은 페이지 아래→위(supply→main_breaker)이므로 박스 아래쪽에 ISO
+    (전원측 첫 부품), 중간에 KWH, 위쪽에 MCB (부하측).
     """
     cx = x_mm + w_mm / 2
     iso_w, iso_h = 5.5, 7.0
@@ -243,9 +243,9 @@ def _emit_meter_board_subs(
     pad = 4.0
     gap = max(((h_mm - 2 * pad) - (iso_h + kwh_h + mcb_h)) / 2, 2.0)
 
-    mcb_y = y_mm + pad
-    kwh_y = mcb_y + mcb_h + gap
-    iso_y = kwh_y + kwh_h + gap
+    iso_y = y_mm + pad
+    kwh_y = iso_y + iso_h + gap
+    mcb_y = kwh_y + kwh_h + gap
 
     layout.components.append(PlacedComponent(
         symbol_name="MCB", x=cx - mcb_w / 2, y=mcb_y,
@@ -296,19 +296,22 @@ def _emit_ct_metering_subs(
     좌우 영역에 배치된 계측기로 분기된다. 솔버 박스 안에서는 다음 6개 instrument를
     좌-우 균형 잡힌 2×3 grid로 배치하고 CT hook은 junction_arrows로 시각화한다.
 
-    - 좌 상단 : AMM + ASS (ammeter + selector)
-    - 좌 하단 : VLM + VSS (voltmeter + selector)
-    - 우 상단 : KWH (proc로 강제 — native-horizontal block의 텍스트 회전 회피)
-    - 우 중단 : ELR
+    흐름은 아래(MCCB)→위(busbar): CT hook이 하단(전원측), BI_CONNECTOR가
+    최상단(부하측 — 부스바 직전, 도메인 문서 "CT 구간 최상단").
+
+    - 좌 하단 : AMM + ASS (ammeter + selector — CT 근처)
+    - 좌 상단 : VLM + VSS (voltmeter + selector — BI 근처)
+    - 우 하단 : KWH (proc로 강제 — native-horizontal block의 텍스트 회전 회피)
+    - 우 상단 : ELR (BI 옆)
     - 스파인  : CT hook (junction_arrows) → BI_CONNECTOR
     """
     cx = x_mm + w_mm / 2
     pad = 4.0
 
     # ── 스파인 컴포넌트 ──
-    # BI_CONNECTOR — 하단, spine wire 통과
+    # BI_CONNECTOR — 최상단(부하측), spine wire 통과
     bi_w, bi_h = 7.0, 5.5
-    bi_y = y_mm + pad + 2  # 약간 띄워 라벨 공간 확보
+    bi_y = y_mm + h_mm - pad - 2 - bi_h  # 약간 띄워 라벨 공간 확보
     layout.components.append(PlacedComponent(
         symbol_name="BI_CONNECTOR", x=cx - bi_w / 2, y=bi_y,
         id=f"sub_{box.name}_bi",
@@ -317,8 +320,8 @@ def _emit_ct_metering_subs(
     layout.symbols_used.add("BI_CONNECTOR")
 
     # CT hook — junction_arrows로 시각화 (CT 심볼 본체는 stub만 그리므로 거의 안 보임).
-    # 상단 중앙, BI 위쪽에 배치.
-    ct_cy = y_mm + h_mm - pad - 4
+    # 하단 중앙(전원측 — MCCB 바로 위), BI 아래쪽에 배치.
+    ct_cy = y_mm + pad + 4
     layout.junction_arrows.append((cx, ct_cy, "left"))
 
     # ── Off-spine 계측기 (우측 영역) ──
@@ -326,9 +329,9 @@ def _emit_ct_metering_subs(
     kwh_w, kwh_h = 14.0, 10.0
     elr_w, elr_h = 12.0, 6.0
 
-    # KWH 우측 상단
+    # KWH 우측 하단
     kwh_x = right_band_x - kwh_w
-    kwh_y = y_mm + h_mm - pad - kwh_h
+    kwh_y = y_mm + pad
     layout.components.append(PlacedComponent(
         symbol_name="KWH_METER", x=kwh_x, y=kwh_y,
         id=f"sub_{box.name}_kwh",
@@ -336,7 +339,7 @@ def _emit_ct_metering_subs(
     ))
     layout.symbols_used.add("KWH_METER")
 
-    # ELR 우측 하단 (BI 옆쪽 높이)
+    # ELR 우측 상단 (BI 옆쪽 높이 — bi_y 기준 자동 추종)
     elr_x = right_band_x - elr_w
     elr_y = bi_y + (bi_h - elr_h) / 2
     layout.components.append(PlacedComponent(
@@ -350,8 +353,8 @@ def _emit_ct_metering_subs(
     pair_gap = 2.0
     left_band_x = x_mm + pad
 
-    # 상단 pair: AMM + ASS
-    pair_top_y = y_mm + h_mm - pad - meter_size
+    # 하단 pair: AMM + ASS (CT 근처)
+    pair_top_y = y_mm + pad
     layout.components.append(PlacedComponent(
         symbol_name="AMMETER", x=left_band_x, y=pair_top_y,
         id=f"sub_{box.name}_amm",
@@ -364,7 +367,7 @@ def _emit_ct_metering_subs(
     ))
     layout.symbols_used.add("SELECTOR_SWITCH")
 
-    # 하단 pair: VLM + VSS
+    # 상단 pair: VLM + VSS (BI 근처 — bi_y 기준 자동 추종)
     pair_bot_y = bi_y + (bi_h - meter_size) / 2
     layout.components.append(PlacedComponent(
         symbol_name="VOLTMETER", x=left_band_x, y=pair_bot_y,
@@ -389,8 +392,9 @@ def _emit_ct_pre_fuse_subs(
     레퍼런스(200A TPN SLD): "2A TP MCB" 보호 차단기 양측에 incoming/outgoing
     indicator light 세트(3 lamp + 2A 표시등). 솔버 vertical spine에서는:
     - FUSE — 스파인 중심, top/bottom 핀으로 wire 통과
-    - INDICATOR_LIGHTS — 좌/우 핀만 있어 스파인 통과 불가. 우측에 incoming(상)/
-      outgoing(하)으로 배치, 스파인에서 짧은 분기 wire로 각 IND의 left 핀에 연결.
+    - INDICATOR_LIGHTS — 좌/우 핀만 있어 스파인 통과 불가. 우측에 incoming(하,
+      전원측)/outgoing(상, 부하측)으로 배치, 스파인에서 짧은 분기 wire로 각
+      IND의 left 핀에 연결.
     """
     cx = x_mm + w_mm / 2
     pad = 3.0
@@ -411,11 +415,11 @@ def _emit_ct_pre_fuse_subs(
     ind_anchor_x = cx + 3.0  # 스파인 우측 3mm 갭
     branch_len = ind_anchor_x - cx  # 분기 wire 길이
 
-    # INCOMING IND — FUSE 위쪽, 박스 상단 근처.
+    # INCOMING IND — FUSE 아래쪽(전원측), 박스 하단 근처.
     # force_procedural=True: INDICATOR_LIGHTS_CUSTOM block은 native horizontal
     # (1062×265 DXF unit)이라 BlockSymbol이 vertical 배치 시 90° 회전 → 3개의 lamp가
     # 세로로 스택됨. 절차적 심볼은 정상 수평 배치.
-    inc_y = y_mm + h_mm - pad - ind_h
+    inc_y = y_mm + pad
     layout.components.append(PlacedComponent(
         symbol_name="INDICATOR_LIGHTS", x=ind_anchor_x, y=inc_y,
         id=f"sub_{box.name}_inc_ind",
@@ -433,8 +437,8 @@ def _emit_ct_pre_fuse_subs(
         style="normal",
     ))
 
-    # OUTGOING IND — FUSE 아래쪽, 박스 하단 근처
-    out_y = y_mm + pad
+    # OUTGOING IND — FUSE 위쪽(부하측), 박스 상단 근처
+    out_y = y_mm + h_mm - pad - ind_h
     layout.components.append(PlacedComponent(
         symbol_name="INDICATOR_LIGHTS", x=ind_anchor_x, y=out_y,
         id=f"sub_{box.name}_out_ind",
@@ -651,7 +655,38 @@ def adapt_to_layout_result(
         ))
         sections_rendered[box.name] = True
 
+    # 레거시 키 규약으로 정규화 — sg_compliance 등 하위 소비자는
+    # models.py sections_rendered 규약 키("ct_metering_section" 등)를 읽는다.
+    # 솔버 박스명 키도 진단용으로 함께 유지한다.
+    _LEGACY_SECTION_ALIAS = {
+        "supply": "incoming_supply",
+        "incoming_cab": "incoming_supply",
+        "outgoing_cab": "outgoing_cable",
+        "ct_pre_fuse": "ct_pre_mccb_fuse",
+        "ct_metering": "ct_metering_section",
+        "internal_cab": "internal_cable",
+        "busbar": "main_busbar",
+    }
+    for _k in list(sections_rendered):
+        _alias = _LEGACY_SECTION_ALIAS.get(_k)
+        if _alias:
+            sections_rendered[_alias] = True
+    if "busbar" in placement_by_name:
+        sections_rendered["main_busbar"] = True
+    if "earth_bar" in placement_by_name:
+        sections_rendered["earth_bar"] = True
+    if any(
+        b.column == "sub_circuit" and b.name in placement_by_name
+        for b in scene.boxes
+    ):
+        sections_rendered["sub_circuits"] = True
     layout.sections_rendered = sections_rendered
+
+    # 엔진 마커 + 스파인 X (v2 그룹 식별·진단용)
+    layout.engine = "solver"
+    if "main_breaker" in placement_by_name:
+        _mx, _my, _mw, _mh = _placement_mm(placement_by_name["main_breaker"])
+        layout.spine_x = _mx + _mw / 2
 
     # ── PortConnection: 스파인 sequential 체인 ──
     # LABEL-only spine 박스(cable/meter_board/ct_metering/ct_pre_fuse/
@@ -719,18 +754,21 @@ def adapt_to_layout_result(
 
 
 def _pick_outgoing_port(box: Box) -> str:
-    """스파인에서 다음 단으로 빠져나가는 포트 이름. bottom > center."""
-    if "bottom" in box.pins:
-        return "bottom"
-    if "center" in box.pins:
-        return "center"
-    return "bottom"
+    """스파인에서 다음 단(위쪽)으로 빠져나가는 포트 이름. top > center.
 
-
-def _pick_incoming_port(box: Box) -> str:
-    """위쪽에서 들어오는 포트 이름. top > center."""
+    흐름은 아래(전원)→위(부하)이므로 outgoing = top.
+    """
     if "top" in box.pins:
         return "top"
     if "center" in box.pins:
         return "center"
     return "top"
+
+
+def _pick_incoming_port(box: Box) -> str:
+    """아래쪽(전원측)에서 들어오는 포트 이름. bottom > center."""
+    if "bottom" in box.pins:
+        return "bottom"
+    if "center" in box.pins:
+        return "center"
+    return "bottom"
